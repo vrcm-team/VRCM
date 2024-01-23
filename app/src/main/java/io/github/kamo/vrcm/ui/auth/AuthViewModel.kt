@@ -1,19 +1,10 @@
 package io.github.kamo.vrcm.ui.auth
 
-import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrchatapi.ApiClient
-import io.github.vrchatapi.ApiException
-import io.github.vrchatapi.ApiResponse
-import io.github.vrchatapi.Configuration
 import io.github.vrchatapi.api.AuthenticationApi
-import io.github.vrchatapi.auth.ApiKeyAuth
-import io.github.vrchatapi.auth.HttpBasicAuth
-import io.github.vrchatapi.model.TwoFactorAuthCode
-import io.github.vrchatapi.model.TwoFactorEmailCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
