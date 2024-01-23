@@ -55,8 +55,9 @@ class AuthViewModel : ViewModel() {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
         if (password.isEmpty() || username.isEmpty()) return
-        onCardStateChange(AuthCardState.Loading)
+//        onCardStateChange(AuthCardState.Loading)
         viewModelScope.launch(context = Dispatchers.IO) {
+            _channel.send(true)
 //            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
 //            authHeader.username = username
 //            authHeader.password = password
@@ -71,7 +72,7 @@ class AuthViewModel : ViewModel() {
 //                }
 //            }
             delay(1000)
-            onCardStateChange(AuthCardState.EmailCode)
+//            onCardStateChange(AuthCardState.EmailCode)
         }
     }
 

@@ -76,7 +76,7 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
                 .offset(y = cardOffset)
                 .height(380.dp)
                 .align(Alignment.BottomCenter),
-            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
         ) {
             if (!isStartUp) return@Card
