@@ -1,60 +1,43 @@
 package io.github.kamo.vrcm.ui.auth
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardReturn
 import androidx.compose.material3.*
-import androidx.compose.material3.ProgressIndicatorDefaults.CircularDeterminateStrokeCap
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.R
 import io.github.kamo.vrcm.ui.auth.AuthCardState.*
 import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
 import io.github.kamo.vrcm.ui.auth.card.VerifyCardInput
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 
 @Composable
 fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
     val uiState by authViewModel.uiState
-    val context = LocalContext.current
     var isStartUp by remember { mutableStateOf(false) }
     val durationMillis = 1500
     val logoOffset by animateDpAsState(
         if (isStartUp) (-180).dp else 0.dp,
         tween(durationMillis)
     )
-    val cardOffset by animateDpAsState(
-        if (isStartUp) 0.dp else 380.dp,
-        tween(durationMillis)
-    )
-    val cardAlpha by animateFloatAsState(
-        if (isStartUp) 1.00f else 0.00f,
-        tween(durationMillis + 1000)
-    )
     LaunchedEffect(Unit) {
         isStartUp = true
-    }
-    LaunchedEffect(uiState, context) {
-        authViewModel.channel.collect {
-            if (it) {
-                onNavigate()
-            }
-        }
     }
     Box(
         modifier = Modifier
@@ -69,59 +52,88 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
                 .align(Alignment.Center)
                 .offset(y = logoOffset)
         )
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .alpha(cardAlpha)
-                .offset(y = cardOffset)
-                .height(380.dp)
-                .align(Alignment.BottomCenter),
-            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.onPrimary),
-            shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        AuthCard(durationMillis, isStartUp, uiState, authViewModel, onNavigate)
+    }
+}
+
+@Composable
+private fun BoxScope.AuthCard(
+    durationMillis: Int,
+    isStartUp: Boolean,
+    uiState: AuthUIState,
+    authViewModel: AuthViewModel,
+    onNavigate: () -> Unit
+) {
+    var isAuthed by remember { mutableStateOf(false) }
+    val cardOffset by animateDpAsState(
+        if (isStartUp) 0.dp else  380.dp,
+        tween(durationMillis)
+    )
+    val cardAlpha by animateFloatAsState(
+        if (isStartUp) 1.00f else 0.00f,
+        tween(durationMillis + 1000)
+    )
+    val doNavigate = {
+        isAuthed = true
+//        runBlocking(Dispatchers.Main){
+//            delay(2000)
+//            onNavigate()
+//            authViewModel.reset()
+//        }
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(cardAlpha)
+            .animateContentSize(tween(durationMillis))
+            .offset(y = cardOffset)
+            .height(if (!isAuthed) 380.dp else 1000.dp)
+            .align(Alignment.BottomCenter),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.onPrimary),
+        shape = if (!isAuthed) RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp) else CardDefaults.shape,
+    ) {
+        if (!isStartUp) return@Card
+        AnimatedContent(
+            targetState = uiState.cardState
         ) {
-            if (!isStartUp) return@Card
-            AnimatedContent(
-                targetState = uiState.cardState
-            ) {
-                when (it) {
-                    Login -> {
-                        NavCard("Login") {
-                            LoginCardInput(
-                                uiState = uiState,
-                                onUsernameChange = authViewModel::onUsernameChange,
-                                onPasswordChange = authViewModel::onPasswordChange,
-                                onClick = authViewModel::login
-                            )
-                        }
+            when (it) {
+                Login -> {
+                    NavCard("Login") {
+                        LoginCardInput(
+                            uiState = uiState,
+                            onUsernameChange = authViewModel::onUsernameChange,
+                            onPasswordChange = authViewModel::onPasswordChange,
+                            onClick = { authViewModel.login(doNavigate) }
+                        )
                     }
+                }
 
-                    TFACode, EmailCode -> {
-                        NavCard("Verify",
-                            barContent = {
-                                ReturnIcon(authViewModel::onCardStateChange)
-                            }
-                        ) {
-                            VerifyCardInput(
-                                uiState = uiState,
-                                onVerifyCodeChange = authViewModel::onVerifyCodeChange,
-                                onClick = authViewModel::verify
-                            )
+                TFACode, EmailCode -> {
+                    NavCard("Verify",
+                        barContent = {
+                            ReturnIcon(authViewModel::onCardStateChange)
                         }
+                    ) {
+                        VerifyCardInput(
+                            uiState = uiState,
+                            onVerifyCodeChange = authViewModel::onVerifyCodeChange,
+                            onClick = { authViewModel.verify(doNavigate) }
+                        )
                     }
+                }
 
-                    Loading -> {
-                        Box(
+                Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) {
+                        CircularProgressIndicator(
                             modifier = Modifier
-                                .fillMaxSize()
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .align(Alignment.Center),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                strokeWidth = 8.dp
-                            )
-                        }
+                                .size(100.dp)
+                                .align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            strokeWidth = 8.dp
+                        )
                     }
                 }
             }
@@ -130,7 +142,7 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
 }
 
 @Composable
-fun ReturnIcon(returnTo: (AuthCardState) -> Unit) {
+private fun ReturnIcon(returnTo: (AuthCardState) -> Unit) {
     Icon(
         modifier = Modifier
             .padding(start = 20.dp, top = 20.dp, bottom = 4.dp)
@@ -143,7 +155,7 @@ fun ReturnIcon(returnTo: (AuthCardState) -> Unit) {
 
 
 @Composable
-fun NavCard(
+private fun NavCard(
     tileText: String,
     barContent: @Composable ColumnScope.() -> Unit = {
         Spacer(modifier = Modifier.height(42.dp))

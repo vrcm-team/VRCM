@@ -19,13 +19,8 @@ enum class AuthCardState {
 }
 
 class AuthViewModel : ViewModel() {
-    private var _uiState = mutableStateOf(AuthUIState())
+    private val _uiState = mutableStateOf(AuthUIState())
     val uiState: State<AuthUIState> = _uiState
-
-    private val _channel = Channel<Boolean>()
-    val channel = _channel.receiveAsFlow()
-
-    private val authApiClient = AuthenticationApi()
 
     fun onUsernameChange(username: String) {
         _uiState.value = _uiState.value.copy(username = username)
@@ -51,13 +46,12 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun login() {
+    fun login(doNavigate: () -> Unit) {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
         if (password.isEmpty() || username.isEmpty()) return
-//        onCardStateChange(AuthCardState.Loading)
+        onCardStateChange(AuthCardState.Loading)
         viewModelScope.launch(context = Dispatchers.IO) {
-            _channel.send(true)
 //            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
 //            authHeader.username = username
 //            authHeader.password = password
@@ -73,10 +67,11 @@ class AuthViewModel : ViewModel() {
 //            }
             delay(1000)
 //            onCardStateChange(AuthCardState.EmailCode)
+            doNavigate()
         }
     }
 
-    fun verify() {
+    fun verify(doNavigate: () -> Unit) {
         val verifyCode = _uiState.value.verifyCode
         if (verifyCode.isEmpty() || verifyCode.length != 6) return
         onCardStateChange(AuthCardState.Loading)
@@ -106,8 +101,12 @@ class AuthViewModel : ViewModel() {
 //                _channel.send(true)
 //            }
             delay(1500)
-            onCardStateChange(AuthCardState.Login)
-
+//            onCardStateChange(AuthCardState.Login)
+            doNavigate()
         }
+    }
+
+    fun reset() {
+        _uiState.value = AuthUIState()
     }
 }

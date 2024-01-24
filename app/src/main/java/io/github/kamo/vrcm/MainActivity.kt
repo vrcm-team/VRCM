@@ -1,6 +1,7 @@
 package io.github.kamo.vrcm
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,6 +11,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -42,7 +44,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                 ) {
-                    NavHost(navController = navController, startDestination = "startup") {
+                    NavHost(
+                        navController = navController,
+                        startDestination = "startup"
+                    ) {
                         composable("startup", exitTransition = { ExitTransition.None }) {
                             StartUp {
                                 navController.navigate("auth") {
@@ -55,8 +60,15 @@ class MainActivity : ComponentActivity() {
 
                         composable("auth", enterTransition = { EnterTransition.None }) {
                             Auth(authViewModel) {
-                                println("ok")
+                                navController.navigate("home") {
+                                    popUpTo("auth") {
+                                        inclusive = true
+                                    }
+                                }
                             }
+                        }
+                        composable("home") {
+                            Text(text ="home")
                         }
                     }
                 }
