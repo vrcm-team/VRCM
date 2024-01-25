@@ -1,17 +1,18 @@
 package io.github.kamo.vrcm
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,6 +23,7 @@ import io.github.kamo.vrcm.ui.startup.StartUp
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
 import io.github.vrchatapi.model.CurrentUser
 import io.github.vrchatapi.model.CurrentUserPresence
+import kotlinx.coroutines.delay
 
 
 class MainActivity : ComponentActivity() {
@@ -68,7 +70,25 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("home") {
-                            Text(text ="home")
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                            ) {
+                                LaunchedEffect(Int){
+                                    authViewModel.reset()
+                                    delay(1000)
+                                    navController.navigate("startup") {
+                                        popUpTo("home") {
+                                            inclusive = true
+                                        }
+                                    }
+                                }
+                                Text(
+                                    modifier = Modifier
+                                        .align(Alignment.Center),
+                                    text = "home"
+                                )
+                            }
                         }
                     }
                 }

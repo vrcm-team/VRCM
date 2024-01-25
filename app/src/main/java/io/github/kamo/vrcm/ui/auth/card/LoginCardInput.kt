@@ -10,13 +10,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.PersonOutline
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -25,6 +28,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.ui.auth.AuthUIState
+import io.github.kamo.vrcm.ui.util.LoadingButton
 import io.github.kamo.vrcm.ui.util.PasswordMissEndVisualTransformation
 
 @Composable
@@ -62,25 +66,16 @@ fun LoginCardInput(
         onValueChange = onPasswordChange
     )
     Spacer(modifier = Modifier.height(36.dp))
-    Button(
+    LoadingButton(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 64.dp)
             .height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ),
-        onClick = onClick,
-    ) {
-        Text(
-            text = "LOGIN",
-            style = MaterialTheme.typography.titleMedium,
-        )
-    }
+        text = "LOGIN",
+        isLoading = uiState.isLoading,
+        onClick = onClick
+    )
 }
-
 
 @Composable
 fun LoginTextField(
@@ -102,8 +97,11 @@ fun LoginTextField(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(size = 16.dp)
             )
-            .background(color = MaterialTheme.colorScheme.surface),
-        verticalAlignment = Alignment.CenterVertically
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(size = 16.dp)
+            ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             modifier = Modifier
@@ -135,7 +133,8 @@ fun LoginTextField(
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
-            textStyle = MaterialTheme.typography.bodyLarge,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface)
         )
     }
 }

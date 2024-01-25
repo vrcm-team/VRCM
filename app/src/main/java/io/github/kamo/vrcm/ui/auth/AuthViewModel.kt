@@ -4,24 +4,19 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrchatapi.api.AuthenticationApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 enum class AuthCardState {
     Login,
     EmailCode,
     TFACode,
-    Loading
+    NONE,
 }
 
 class AuthViewModel : ViewModel() {
     private val _uiState = mutableStateOf(AuthUIState())
     val uiState: State<AuthUIState> = _uiState
-
+    private var _currentJob: Job? = null
     fun onUsernameChange(username: String) {
         _uiState.value = _uiState.value.copy(username = username)
     }
@@ -34,24 +29,47 @@ class AuthViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(verifyCode = verifyCode)
     }
 
+    fun onLoadingChange(isLoading: Boolean) {
+        _uiState.value = _uiState.value.copy(isLoading = isLoading)
+    }
+
+    fun onErrorMessageChange(errorMsg: String) {
+        _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
+    }
+
     fun onCardStateChange(cardState: AuthCardState) {
         _uiState.value = when (cardState) {
 
             AuthCardState.EmailCode, AuthCardState.TFACode -> _uiState.value.copy(
                 cardState = cardState,
-                verifyCode = ""
+                verifyCode = "",
+                isLoading = false,
             )
 
-            else -> _uiState.value.copy(cardState = cardState)
+            else -> _uiState.value.copy(
+                cardState = cardState,
+                isLoading = false,
+            )
         }
     }
+
+    fun cancelJob() {
+        _currentJob?.cancel()
+        _currentJob = null
+    }
+
 
     fun login(doNavigate: () -> Unit) {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
-        if (password.isEmpty() || username.isEmpty()) return
-        onCardStateChange(AuthCardState.Loading)
-        viewModelScope.launch(context = Dispatchers.IO) {
+        if (password.isEmpty() || username.isEmpty() || _uiState.value.isLoading ) {
+            if (password.isEmpty() || username.isEmpty()){
+                onErrorMessageChange("Username or Password is empty")
+            }
+            return
+        }
+        onLoadingChange(true)
+        _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
 //            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
 //            authHeader.username = username
 //            authHeader.password = password
@@ -65,17 +83,22 @@ class AuthViewModel : ViewModel() {
 //                    onCardStateChange(AuthCardState.EmailCode)
 //                }
 //            }
-            delay(1000)
-//            onCardStateChange(AuthCardState.EmailCode)
-            doNavigate()
+            val result = runBlocking(context = Dispatchers.IO) {
+                delay(1000)
+            }
+            launch(context = Dispatchers.Main) {
+                onCardStateChange(AuthCardState.EmailCode)
+//               doNavigate()
+            }
+
         }
     }
 
     fun verify(doNavigate: () -> Unit) {
         val verifyCode = _uiState.value.verifyCode
-        if (verifyCode.isEmpty() || verifyCode.length != 6) return
-        onCardStateChange(AuthCardState.Loading)
-        viewModelScope.launch(context = Dispatchers.IO) {
+        if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.isLoading) return
+        onLoadingChange(true)
+        _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
 //            val reps =  try {
 //                when (_uiState.value.cardState) {
 //                    AuthCardState.EmailCode -> {
@@ -100,9 +123,14 @@ class AuthViewModel : ViewModel() {
 //                println(authApiClient.currentUserWithHttpInfo)
 //                _channel.send(true)
 //            }
-            delay(1500)
+            val result = runBlocking(context = Dispatchers.IO) {
+                delay(1500)
+            }
 //            onCardStateChange(AuthCardState.Login)
-            doNavigate()
+            launch(context = Dispatchers.Main) {
+                doNavigate()
+            }
+
         }
     }
 
