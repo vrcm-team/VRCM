@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.text.isDigitsOnly
 
 /**
  * 验证码输入框
@@ -80,7 +80,7 @@ fun CodeTextField(
             } else {// 输入超长时，截取前面的部分
                 it.text.substring(0, length)
             }
-            if (lastTextValue != newText) {
+            if (lastTextValue != newText && newText.isDigitsOnly()) {
                 lastTextValue = newText
                 onValueChange(newText)
             }
