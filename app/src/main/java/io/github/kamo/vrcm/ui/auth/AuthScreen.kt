@@ -1,10 +1,7 @@
 package io.github.kamo.vrcm.ui.auth
 
-import android.os.Build
 import android.widget.Toast
-import androidx.annotation.RequiresApi
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -30,9 +27,9 @@ import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
 
 @Composable
 fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
-    val errorMsg = authViewModel.uiState.value.errorMsg
+    val errorMsg = authViewModel.uiState.errorMsg
     val durationMillis = 1500
-    var isStartUp by remember { mutableStateOf(false)  }
+    var isStartUp by remember { mutableStateOf(false) }
     val startUpTransition = updateTransition(targetState = isStartUp, label = "startUp")
     val logoOffset by startUpTransition.animateDp({ tween(durationMillis) }) {
         if (it) (-180).dp else 0.dp
@@ -45,13 +42,10 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
             .fillMaxSize()
             .background(color = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        if (errorMsg.isNotBlank()){
-            val toast = Toast.makeText(LocalContext.current, errorMsg, Toast.LENGTH_SHORT)
-            toast.addCallback(@RequiresApi(Build.VERSION_CODES.R)
-            object : Toast.Callback(){
-                override fun onToastHidden() = authViewModel.onErrorMessageChange("")
-            })
-            toast.show()
+        if (errorMsg.isNotBlank()) {
+//            Snackbar()
+            Toast.makeText(LocalContext.current, errorMsg, Toast.LENGTH_SHORT).show()
+            authViewModel.onErrorMessageChange("")
         }
 
         Image(
@@ -62,45 +56,57 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
                 .align(Alignment.Center)
                 .offset(y = logoOffset)
         )
-        AuthCard(durationMillis, startUpTransition, authViewModel.uiState.value, authViewModel, onNavigate)
+        AuthCard(
+            inDurationMillis = durationMillis,
+            startUpTransition = startUpTransition,
+            uiState = authViewModel.uiState,
+            authViewModel = authViewModel,
+            onNavigate = onNavigate
+        )
     }
 }
 
 @Composable
 private fun BoxScope.AuthCard(
-    durationMillis: Int,
+    inDurationMillis: Int,
+    outDurationMillis: Int = inDurationMillis - 200,
     startUpTransition: Transition<Boolean>,
     uiState: AuthUIState,
     authViewModel: AuthViewModel,
     onNavigate: () -> Unit
 ) {
     var isAuthed by remember { mutableStateOf(false) }
-    val cardOffset by startUpTransition.animateDp({tween(durationMillis)}) {
+    val cardOffset by startUpTransition.animateDp({ tween(inDurationMillis) }) {
         if (it) 0.dp else 380.dp
     }
-    val cardAlpha by startUpTransition.animateFloat({tween(durationMillis + 1000)}) {
+    val cardAlpha by startUpTransition.animateFloat({ tween(inDurationMillis + 1000) }) {
         if (it) 1.00f else 0.00f
     }
     val doNavigate = {
-        authViewModel.onCardStateChange(NONE)
         isAuthed = true
+        authViewModel.onCardStateChange(NONE)
     }
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(tween(durationMillis)) { _, _ ->
-                onNavigate()
-            }
+            .animateContentSize(tween(outDurationMillis)) { _, _ -> onNavigate() }
             .alpha(cardAlpha)
             .offset(y = cardOffset)
-            .height(if (!isAuthed) 380.dp else 1000.dp)
+            .run { if (!isAuthed) height(380.dp) else fillMaxHeight() }
             .align(Alignment.BottomCenter),
-        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.onPrimary),
+        color = MaterialTheme.colorScheme.onPrimary,
         shape = if (!isAuthed) RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp) else CardDefaults.shape,
     ) {
         AnimatedContent(
             targetState = uiState.cardState,
-            transitionSpec = if (uiState.cardState == Login)fadeSlideHorizontally(600) else fadeSlideHorizontally(600, direction = -1),
+            transitionSpec = {
+                when (this.targetState) {
+                    Login -> fadeSlideHorizontally(600)
+                    EmailCode, TFACode -> fadeSlideHorizontally(600, direction = -1)
+                    NONE -> fadeIn(tween(outDurationMillis, outDurationMillis))
+                        .togetherWith(fadeOut(tween(outDurationMillis)))
+                }
+            },
         ) { state ->
             when (state) {
                 Login -> {

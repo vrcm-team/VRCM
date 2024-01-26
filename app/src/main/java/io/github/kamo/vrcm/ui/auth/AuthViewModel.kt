@@ -1,6 +1,6 @@
 package io.github.kamo.vrcm.ui.auth
 
-import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,7 +15,7 @@ enum class AuthCardState {
 
 class AuthViewModel : ViewModel() {
     private val _uiState = mutableStateOf(AuthUIState())
-    val uiState: State<AuthUIState> = _uiState
+    val uiState: AuthUIState by _uiState
     private var _currentJob: Job? = null
     fun onUsernameChange(username: String) {
         _uiState.value = _uiState.value.copy(username = username)
@@ -87,8 +87,8 @@ class AuthViewModel : ViewModel() {
                 delay(1000)
             }
             launch(context = Dispatchers.Main) {
-                onCardStateChange(AuthCardState.EmailCode)
-//               doNavigate()
+//                onCardStateChange(AuthCardState.EmailCode)
+               doNavigate()
             }
 
         }
