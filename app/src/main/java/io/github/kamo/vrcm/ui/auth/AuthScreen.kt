@@ -26,7 +26,7 @@ import io.github.kamo.vrcm.R
 import io.github.kamo.vrcm.ui.auth.AuthCardState.*
 import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
 import io.github.kamo.vrcm.ui.auth.card.VerifyCardInput
-import io.github.kamo.vrcm.ui.util.fadeSlideInHorizontally
+import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
 
 @Composable
 fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
@@ -100,7 +100,7 @@ private fun BoxScope.AuthCard(
     ) {
         AnimatedContent(
             targetState = uiState.cardState,
-            transitionSpec = fadeSlideInHorizontally(600),
+            transitionSpec = if (uiState.cardState == Login)fadeSlideHorizontally(600) else fadeSlideHorizontally(600, direction = -1),
         ) { state ->
             when (state) {
                 Login -> {
