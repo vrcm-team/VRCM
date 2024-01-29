@@ -1,5 +1,6 @@
 package io.github.kamo.vrcm.ui.auth
 
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -87,8 +88,8 @@ class AuthViewModel : ViewModel() {
                 delay(1000)
             }
             launch(context = Dispatchers.Main) {
-//                onCardStateChange(AuthCardState.EmailCode)
-               doNavigate()
+                onCardStateChange(AuthCardState.EmailCode)
+//               doNavigate()
             }
 
         }

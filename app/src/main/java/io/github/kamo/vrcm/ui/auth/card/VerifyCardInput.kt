@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.text.isDigitsOnly
 import io.github.kamo.vrcm.ui.auth.AuthUIState
 import io.github.kamo.vrcm.ui.util.CodeTextField
 import io.github.kamo.vrcm.ui.util.LoadingButton
@@ -19,11 +20,12 @@ fun VerifyCardInput(
     onVerifyCodeChange: (String) -> Unit,
     onClick: () -> Unit
 ) {
+    val verifyCode = uiState.verifyCode
     Spacer(modifier = Modifier.height(68.dp))
     CodeTextField(
         modifier = Modifier
             .fillMaxWidth(),
-        value = uiState.verifyCode,
+        value = verifyCode,
         onValueChange = onVerifyCodeChange,
         length = 6,
         boxWidth = 48.dp,
@@ -40,6 +42,7 @@ fun VerifyCardInput(
             .padding(horizontal = 64.dp)
             .height(48.dp),
         text = "VERIFY",
+        enabled = verifyCode.isNotBlank() && verifyCode.length == 6 && verifyCode.isDigitsOnly(),
         isLoading = uiState.isLoading,
         onClick = onClick
     )
