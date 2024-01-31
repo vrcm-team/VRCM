@@ -1,11 +1,16 @@
 package io.github.kamo.vrcm.ui.auth
 
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.*
+import io.github.vrchatapi.Configuration
+import io.github.vrchatapi.auth.HttpBasicAuth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 enum class AuthCardState {
     Login,
@@ -63,6 +68,8 @@ class AuthViewModel : ViewModel() {
     fun login(doNavigate: () -> Unit) {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
+        onErrorMessageChange("Username or Password is empty")
+
         if (password.isEmpty() || username.isEmpty() || _uiState.value.isLoading ) {
             if (password.isEmpty() || username.isEmpty()){
                 onErrorMessageChange("Username or Password is empty")
@@ -71,7 +78,7 @@ class AuthViewModel : ViewModel() {
         }
         onLoadingChange(true)
         _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
-//            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
+            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
 //            authHeader.username = username
 //            authHeader.password = password
 //            runCatching {

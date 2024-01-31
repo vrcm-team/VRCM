@@ -47,6 +47,7 @@ android {
 }
 
 dependencies {
+    implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("com.github.vrchatapi:vrchatapi-java:1.16.2")
     implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation("androidx.core:core-ktx:1.10.1")
