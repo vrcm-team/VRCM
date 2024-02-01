@@ -1,13 +1,13 @@
 package io.github.kamo.vrcm.ui.auth
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
@@ -59,23 +59,22 @@ import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
 
 @Composable
 fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
-    val errorMsg = authViewModel.uiState.errorMsg
     val durationMillis = 1500
     var isStartUp by remember { mutableStateOf(false) }
     val startUpTransition = updateTransition(targetState = isStartUp, label = "StartUp")
-
-
     LaunchedEffect(Unit) {
         isStartUp = true
     }
-
+    val doNavigate = {
+        authViewModel.onCardStateChange(NONE)
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(color = MaterialTheme.colorScheme.primaryContainer)
     ) {
         SnackBarToast(
-           text =  errorMsg,
+            text = authViewModel.uiState.errorMsg,
             onEffect = { authViewModel.onErrorMessageChange("") }
         )
         Image(
@@ -90,31 +89,54 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
             inDurationMillis = durationMillis,
             startUpTransition = startUpTransition,
             uiState = authViewModel.uiState,
-            authViewModel = authViewModel,
             onNavigate = onNavigate
-        )
+        ) { state ->
+            when (state) {
+                Login -> {
+                    NavCard("Login") {
+                        LoginCardInput(uiState = authViewModel.uiState,
+                            onUsernameChange = authViewModel::onUsernameChange,
+                            onPasswordChange = authViewModel::onPasswordChange,
+                            onClick = { authViewModel.login(doNavigate) })
+                    }
+                }
+
+                TFACode, EmailCode -> {
+                    NavCard("Verify", barContent = {
+                        ReturnIcon {
+                            authViewModel.cancelJob()
+                            authViewModel.onCardStateChange(Login)
+                        }
+                    }) {
+                        VerifyCardInput(uiState = authViewModel.uiState,
+                            onVerifyCodeChange = authViewModel::onVerifyCodeChange,
+                            onClick = { authViewModel.verify(doNavigate) })
+                    }
+                }
+
+                NONE -> {
+                    Box(modifier = Modifier.fillMaxSize())
+                }
+
+            }
+        }
     }
 }
 
 @Composable
 private fun BoxScope.AuthCard(
     inDurationMillis: Int,
-    outDurationMillis: Int = inDurationMillis - 200,
     startUpTransition: Transition<Boolean>,
     uiState: AuthUIState,
-    authViewModel: AuthViewModel,
-    onNavigate: () -> Unit
+    onNavigate: () -> Unit,
+    content: @Composable (AuthCardState) -> Unit
 ) {
-    var isAuthed by remember { mutableStateOf(false) }
-
-    val doNavigate = {
-        authViewModel.onCardStateChange(NONE)
-        isAuthed = true
-    }
+    val isAuthed  = uiState.cardState ==  NONE
+    val cardChangeDurationMillis = 600
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(tween(outDurationMillis)) { _, _ -> onNavigate() }
+            .animateContentSize(tween(1000,cardChangeDurationMillis - 200)) { _, _ -> onNavigate() }
             .cardInAnimate(inDurationMillis, startUpTransition)
             .run { if (!isAuthed) height(380.dp) else fillMaxHeight() }
             .align(Alignment.BottomCenter),
@@ -129,40 +151,15 @@ private fun BoxScope.AuthCard(
             targetState = uiState.cardState,
             transitionSpec = {
                 when (this.targetState) {
-                    Login -> fadeSlideHorizontally(600, direction = -1)
-                    EmailCode, TFACode -> fadeSlideHorizontally(600)
-                    NONE -> fadeIn(tween(outDurationMillis - 400, outDurationMillis - 400))
-                        .togetherWith(fadeOut(tween(outDurationMillis - 400)))
+                    Login -> fadeSlideHorizontally(cardChangeDurationMillis, direction = -1)
+                    EmailCode, TFACode -> fadeSlideHorizontally(cardChangeDurationMillis)
+                    NONE -> EnterTransition.None
+                        .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
                 }
             },
-        ) { state ->
-            when (state) {
-                Login -> {
-                    NavCard("Login") {
-                        LoginCardInput(uiState = uiState,
-                            onUsernameChange = authViewModel::onUsernameChange,
-                            onPasswordChange = authViewModel::onPasswordChange,
-                            onClick = { authViewModel.login(doNavigate) })
-                    }
-                }
 
-                TFACode, EmailCode -> {
-                    NavCard("Verify", barContent = {
-                        ReturnIcon {
-                            authViewModel.cancelJob()
-                            authViewModel.onCardStateChange(Login)
-                        }
-                    }) {
-                        VerifyCardInput(uiState = uiState,
-                            onVerifyCodeChange = authViewModel::onVerifyCodeChange,
-                            onClick = { authViewModel.verify(doNavigate) })
-                    }
-                }
-
-                NONE -> {
-                    Box(modifier = Modifier.fillMaxSize())
-                }
-            }
+        ) {
+            content(it)
         }
     }
 }
