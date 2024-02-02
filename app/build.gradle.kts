@@ -45,8 +45,12 @@ android {
         }
     }
 }
-
+val ktorVersion = "2.3.8"
 dependencies {
+    implementation("io.ktor:ktor-serialization-gson:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("com.github.vrchatapi:vrchatapi-java:1.16.2")
     implementation("androidx.navigation:navigation-compose:2.7.6")

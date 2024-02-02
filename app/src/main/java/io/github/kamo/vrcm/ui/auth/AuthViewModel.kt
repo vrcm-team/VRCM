@@ -4,19 +4,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrchatapi.Configuration
-import io.github.vrchatapi.auth.HttpBasicAuth
+import io.github.kamo.vrcm.domain.api.AuthAPI
+import io.github.kamo.vrcm.domain.api.AuthState.*
+import io.github.kamo.vrcm.domain.api.AuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+
 
 enum class AuthCardState {
     Login,
     EmailCode,
     TFACode,
-    NONE,
+    Authed,
 }
 
 class AuthViewModel : ViewModel() {
@@ -40,7 +41,11 @@ class AuthViewModel : ViewModel() {
     }
 
     fun onErrorMessageChange(errorMsg: String) {
-        _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
+        if (_uiState.value.isLoading){
+            _uiState.value = _uiState.value.copy(errorMsg = errorMsg, isLoading = false)
+        }else{
+            _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
+        }
     }
 
     fun onCardStateChange(cardState: AuthCardState) {
@@ -65,80 +70,69 @@ class AuthViewModel : ViewModel() {
     }
 
 
-    fun login(doNavigate: () -> Unit) {
+    fun login() {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
-        onErrorMessageChange("Username or Password is empty")
-
-        if (password.isEmpty() || username.isEmpty() || _uiState.value.isLoading ) {
-            if (password.isEmpty() || username.isEmpty()){
+        if (password.isEmpty() || username.isEmpty() || _uiState.value.isLoading) {
+            if (password.isEmpty() || username.isEmpty()) {
                 onErrorMessageChange("Username or Password is empty")
             }
             return
         }
         onLoadingChange(true)
         _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
-            val authHeader = Configuration.getDefaultApiClient().getAuthentication("authHeader") as HttpBasicAuth
-//            authHeader.username = username
-//            authHeader.password = password
-//            runCatching {
-//                println(authApiClient.currentUserWithHttpInfo)
-//            }.recoverCatching {
-//                println(it)
-//                if (it.message?.contains("2FA") == true) {
-//                    onCardStateChange(AuthCardState.TFACode)
-//                } else if (it.message?.contains("email") == true) {
-//                    onCardStateChange(AuthCardState.EmailCode)
-//                }
-//            }
-            val result = runBlocking(context = Dispatchers.IO) {
-                delay(1000)
+            val authState = runBlocking(context = Dispatchers.IO) {
+                AuthAPI.login(username, password)
             }
-            launch(context = Dispatchers.Main) {
-                onCardStateChange(AuthCardState.EmailCode)
-//               doNavigate()
+            if (Unauthorized == authState) {
+                onErrorMessageChange("Username or Password is incorrect")
+                return@launch
+            }
+            val recombination = when (authState) {
+                Authed -> {
+                    { onCardStateChange(AuthCardState.Authed) }
+                }
+                NeedTFA -> {
+                    { onCardStateChange(AuthCardState.TFACode) }
+                }
+
+                NeedEmailCode -> {
+                    { onCardStateChange(AuthCardState.EmailCode) }
+                }
+
+                Unauthorized -> {
+                    error("not supported")
+                }
             }
 
+            launch(Dispatchers.Main) {
+                recombination()
+            }
         }
+
     }
 
-    fun verify(doNavigate: () -> Unit) {
+
+    fun verify() {
         val verifyCode = _uiState.value.verifyCode
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.isLoading) return
         onLoadingChange(true)
         _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
-//            val reps =  try {
-//                when (_uiState.value.cardState) {
-//                    AuthCardState.EmailCode -> {
-//                        authApiClient.verify2FAEmailCodeWithHttpInfo(TwoFactorEmailCode().code(_uiState.value.verifyCode))
-//                    }
-//
-//                    AuthCardState.TFACode -> {
-//                        authApiClient.verify2FAWithHttpInfo(TwoFactorAuthCode().code(_uiState.value.verifyCode))
-//                    }
-//
-//                    else -> {
-//                        return@launch
-//                    }
-//                }
-//            }catch (e: ApiException) {
-//                Log.e("AuthViewModel", e.message.toString())
-//                return@launch
-//            }
 
-//            if (reps != null && reps.statusCode == 200 && reps.data.toString().contains("verified: true")) {
-//                println(reps.data)
-//                println(authApiClient.currentUserWithHttpInfo)
-//                _channel.send(true)
-//            }
             val result = runBlocking(context = Dispatchers.IO) {
-                delay(1500)
+                val authType = when (_uiState.value.cardState) {
+                    AuthCardState.EmailCode -> AuthType.Email
+                    AuthCardState.TFACode -> AuthType.TFA
+                    else -> error("not supported")
+                }
+                AuthAPI.verify(verifyCode,authType)
             }
-//            onCardStateChange(AuthCardState.Login)
-            launch(context = Dispatchers.Main) {
-                doNavigate()
-            }
+            if (result) {
+                login()
+            } else {
+                onErrorMessageChange("Invalid Code")
 
+            }
         }
     }
 

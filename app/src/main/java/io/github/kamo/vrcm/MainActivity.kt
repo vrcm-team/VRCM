@@ -23,6 +23,7 @@ import io.github.vrchatapi.model.CurrentUser
 import io.github.vrchatapi.model.CurrentUserPresence
 
 
+
 class MainActivity : ComponentActivity() {
     init {
         CurrentUser.openapiFields += "contentFilters"
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val authViewModel: AuthViewModel by viewModels<AuthViewModel>()
+
         enableEdgeToEdge()
         setContent {
             val navController = rememberNavController()
