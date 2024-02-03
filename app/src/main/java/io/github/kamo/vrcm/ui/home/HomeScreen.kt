@@ -19,14 +19,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import io.github.kamo.vrcm.domain.api.auth.AuthAPI
 import io.github.kamo.vrcm.ui.util.UserStateIcon
+import kotlinx.coroutines.runBlocking
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home(onNavigate: () -> Unit) {
-
+    val authAPI = koinInject<AuthAPI>()
     var presses by remember { mutableIntStateOf(0) }
-
+    val userInfo = runBlocking {
+        authAPI.userInfo()
+    }
+    println(userInfo)
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
         topBar = {
@@ -76,6 +82,7 @@ fun Home(onNavigate: () -> Unit) {
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
+                userInfo.friends
                 LocationCard()
                 LocationCard()
                 LocationCard()

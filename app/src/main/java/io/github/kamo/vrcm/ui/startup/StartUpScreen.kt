@@ -12,19 +12,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.R
-import kotlinx.coroutines.delay
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun StartUp(onNavigate: () -> Unit) {
+fun StartUp(
+    startUpViewModel: StartUpViewModel = koinViewModel(),
+    onNavigate: (MainRouteEnum) -> Unit
+) {
+
     LaunchedEffect(Unit) {
-        delay(800)
-        onNavigate()
+        val mainRouteEnum = if (startUpViewModel.awaitAuth() == true) {
+            MainRouteEnum.Home
+        } else {
+            MainRouteEnum.Auth
+        }
+        onNavigate(mainRouteEnum)
     }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background( color = MaterialTheme.colorScheme.primaryContainer)
+            .background(color = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Image(
             painter = painterResource(R.drawable.logo),

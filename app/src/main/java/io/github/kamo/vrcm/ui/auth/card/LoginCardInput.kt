@@ -129,7 +129,7 @@ fun LoginTextField(
                     innerTextField()
                 }
             },
-            onValueChange = onValueChange,
+            onValueChange = { onValueChange(it.trim()) },
             singleLine = true,
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,

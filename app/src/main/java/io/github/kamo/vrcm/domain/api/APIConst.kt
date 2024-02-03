@@ -3,13 +3,16 @@ package io.github.kamo.vrcm.domain.api
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.cookies.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.gson.*
 
-//const val userAgent
-object APIClient {
-    private val apiClient = HttpClient {
+
+class APIClient(storage: CookiesStorage = AcceptAllCookiesStorage()) {
+
+    private var apiClient : HttpClient = HttpClient {
         defaultRequest {
             url {
                 protocol = URLProtocol.HTTPS
@@ -17,8 +20,15 @@ object APIClient {
                 path("api/1", "")
             }
         }
+        install(Logging) {
+            logger = Logger.DEFAULT
+            level = LogLevel.ALL
+        }
         install(ContentNegotiation) { gson() }
         install(UserAgent)
+        install(HttpCookies) {
+            this.storage = storage
+        }
     }
 
     suspend fun get(requestBuilder: HttpRequestBuilder.() -> Unit) = apiClient.get { requestBuilder() }
@@ -51,5 +61,7 @@ object APIClient {
         }
 
 }
+
+
 
 

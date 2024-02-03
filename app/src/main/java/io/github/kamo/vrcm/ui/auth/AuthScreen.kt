@@ -24,9 +24,13 @@ import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
 import io.github.kamo.vrcm.ui.auth.card.VerifyCardInput
 import io.github.kamo.vrcm.ui.util.SnackBarToast
 import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
+fun Auth(
+    authViewModel: AuthViewModel = koinViewModel(),
+    onNavigate: () -> Unit
+) {
     val durationMillis = 1500
     var isStartUp by remember { mutableStateOf(false) }
     val startUpTransition = updateTransition(targetState = isStartUp, label = "StartUp")
@@ -59,10 +63,12 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
             when (state) {
                 Login -> {
                     NavCard("Login") {
-                        LoginCardInput(uiState = authViewModel.uiState,
+                        LoginCardInput(
+                            uiState = authViewModel.uiState,
                             onUsernameChange = authViewModel::onUsernameChange,
                             onPasswordChange = authViewModel::onPasswordChange,
-                            onClick = { authViewModel.login() })
+                            onClick = authViewModel::login
+                        )
                     }
                 }
 
@@ -73,9 +79,11 @@ fun Auth(authViewModel: AuthViewModel, onNavigate: () -> Unit) {
                             authViewModel.onCardStateChange(Login)
                         }
                     }) {
-                        VerifyCardInput(uiState = authViewModel.uiState,
+                        VerifyCardInput(
+                            uiState = authViewModel.uiState,
                             onVerifyCodeChange = authViewModel::onVerifyCodeChange,
-                            onClick = { authViewModel.verify() })
+                            onClick = authViewModel::verify
+                        )
                     }
                 }
 
@@ -96,12 +104,12 @@ private fun BoxScope.AuthCard(
     onNavigate: () -> Unit,
     content: @Composable (AuthCardState) -> Unit
 ) {
-    val isAuthed  = uiState.cardState ==  Authed
+    val isAuthed = uiState.cardState == Authed
     val cardChangeDurationMillis = 600
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(tween(1000,cardChangeDurationMillis - 200)) { _, _ -> onNavigate() }
+            .animateContentSize(tween(1000, cardChangeDurationMillis - 200)) { _, _ -> onNavigate() }
             .cardInAnimate(inDurationMillis, startUpTransition)
             .run { if (!isAuthed) height(380.dp) else fillMaxHeight() }
             .align(Alignment.BottomCenter),
@@ -123,7 +131,7 @@ private fun BoxScope.AuthCard(
                 }
             },
 
-        ) {
+            ) {
             content(it)
         }
     }

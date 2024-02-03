@@ -4,9 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.kamo.vrcm.domain.api.AuthAPI
-import io.github.kamo.vrcm.domain.api.AuthState.*
-import io.github.kamo.vrcm.domain.api.AuthType
+import io.github.kamo.vrcm.domain.api.auth.AuthAPI
+import io.github.kamo.vrcm.domain.api.auth.AuthState.*
+import io.github.kamo.vrcm.domain.api.auth.AuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -20,7 +20,7 @@ enum class AuthCardState {
     Authed,
 }
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
     private val _uiState = mutableStateOf(AuthUIState())
     val uiState: AuthUIState by _uiState
     private var _currentJob: Job? = null
@@ -41,9 +41,9 @@ class AuthViewModel : ViewModel() {
     }
 
     fun onErrorMessageChange(errorMsg: String) {
-        if (_uiState.value.isLoading){
+        if (_uiState.value.isLoading) {
             _uiState.value = _uiState.value.copy(errorMsg = errorMsg, isLoading = false)
-        }else{
+        } else {
             _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
         }
     }
@@ -81,35 +81,8 @@ class AuthViewModel : ViewModel() {
         }
         onLoadingChange(true)
         _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
-            val authState = runBlocking(context = Dispatchers.IO) {
-                AuthAPI.login(username, password)
-            }
-            if (Unauthorized == authState) {
-                onErrorMessageChange("Username or Password is incorrect")
-                return@launch
-            }
-            val recombination = when (authState) {
-                Authed -> {
-                    { onCardStateChange(AuthCardState.Authed) }
-                }
-                NeedTFA -> {
-                    { onCardStateChange(AuthCardState.TFACode) }
-                }
-
-                NeedEmailCode -> {
-                    { onCardStateChange(AuthCardState.EmailCode) }
-                }
-
-                Unauthorized -> {
-                    error("not supported")
-                }
-            }
-
-            launch(Dispatchers.Main) {
-                recombination()
-            }
+            doLogin(username, password)
         }
-
     }
 
 
@@ -125,15 +98,33 @@ class AuthViewModel : ViewModel() {
                     AuthCardState.TFACode -> AuthType.TFA
                     else -> error("not supported")
                 }
-                AuthAPI.verify(verifyCode,authType)
+                authAPI.verify(verifyCode, authType)
             }
             if (result) {
-                login()
+                doLogin(_uiState.value.username, _uiState.value.password)
             } else {
                 onErrorMessageChange("Invalid Code")
-
             }
         }
+    }
+
+    private suspend fun doLogin(username: String, password: String) {
+        val authState = authAPI.login(username, password)
+        if (Unauthorized == authState) {
+            onErrorMessageChange("Username or Password is incorrect")
+            return
+        }
+        val authCardState = when (authState) {
+            Authed -> AuthCardState.Authed
+
+            NeedTFA -> AuthCardState.TFACode
+
+            NeedEmailCode -> AuthCardState.EmailCode
+
+            Unauthorized -> error("not supported")
+
+        }
+        onCardStateChange(authCardState)
     }
 
     fun reset() {
