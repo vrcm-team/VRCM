@@ -1,5 +1,6 @@
 package io.github.kamo.vrcm.ui.util
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -12,12 +13,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 
 @Composable
@@ -95,8 +98,9 @@ fun UserStateIcon(
     sateColor: Color
 ) {
     Box(
-        modifier = modifier,
+        modifier = modifier
     ) {
+        println(iconUrl)
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(iconUrl)
@@ -105,7 +109,8 @@ fun UserStateIcon(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(60.dp)
+                .fillMaxSize()
+                .aspectRatio(1f)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.inverseOnSurface)
         )

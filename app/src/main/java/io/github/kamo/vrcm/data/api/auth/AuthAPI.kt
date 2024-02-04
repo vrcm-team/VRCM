@@ -1,6 +1,6 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.github.kamo.vrcm.data.api.APIClient
+import io.ktor.client.HttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -11,7 +11,7 @@ internal const val AUTH_API_SUFFIX = "auth"
 
 internal const val EMAIL_OTP = "emailOtp"
 
-class AuthAPI(private val client: APIClient) {
+class AuthAPI(private val client: HttpClient) {
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
         client.get("$AUTH_API_SUFFIX/user") {
@@ -48,7 +48,7 @@ class AuthAPI(private val client: APIClient) {
     }
 
 
-    suspend fun friends(offline: Boolean = true, offset: Int = 0, n: Int = 60): List<FriendInfo> =
+    suspend fun friends(offline: Boolean = false, offset: Int = 0, n: Int = 60): List<FriendInfo> =
         client.get("$AUTH_API_SUFFIX/user/friends") {
             parameters {
                 append("offline", offline.toString())
@@ -74,17 +74,10 @@ class AuthAPI(private val client: APIClient) {
     }
 }
 
-enum class AuthType {
-    Email,
-    TFA,
-    TTFA;
-
-    val path: String
-        get() = when (this) {
-            Email -> "emailotp"
-            TFA -> "otp"
-            TTFA -> "totp"
-        }
+enum class AuthType(val path: String) {
+    Email("emailotp"),
+    TFA("otp"),
+    TTFA("totp");
 }
 
 enum class AuthState {

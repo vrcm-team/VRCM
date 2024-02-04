@@ -14,21 +14,21 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import io.github.kamo.vrcm.data.api.apiModule
+import io.github.kamo.vrcm.di.apiModule
+import io.github.kamo.vrcm.di.viewModeModule
 import io.github.kamo.vrcm.ui.auth.Auth
-import io.github.kamo.vrcm.ui.auth.AuthViewModel
 import io.github.kamo.vrcm.ui.home.Home
-import io.github.kamo.vrcm.ui.home.HomeViewModel
 import io.github.kamo.vrcm.ui.startup.StartUp
-import io.github.kamo.vrcm.ui.startup.StartUpViewModel
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
 import io.github.vrchatapi.model.CurrentUser
 import io.github.vrchatapi.model.CurrentUserPresence
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
-import org.koin.androidx.viewmodel.dsl.viewModelOf
+import org.koin.compose.KoinApplication
+import org.koin.compose.KoinContext
+import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
-import org.koin.dsl.module
+import org.koin.dsl.koinApplication
 
 
 enum class MainRouteEnum(val route: String) {
@@ -46,15 +46,21 @@ class MainActivity : ComponentActivity() {
     }
 
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startKoin {
-            androidLogger()
-            androidContext(this@MainActivity)
-            modules(viewModeModule, apiModule)
-        }
         enableEdgeToEdge()
-        setContent { MainContent() }
+        setContent {
+            KoinApplication(
+                {
+                    androidLogger()
+                    androidContext(this@MainActivity)
+                    modules(viewModeModule, apiModule)
+                }
+            ){
+                MainContent()
+            }
+        }
     }
 }
 
@@ -90,15 +96,10 @@ fun MainContent() {
                     }
                 }
                 composable(MainRouteEnum.Home.route) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                    ) {
-                        Home {
-                            navController.navigate(MainRouteEnum.Startup.route) {
-                                popUpTo(MainRouteEnum.Home.route) {
-                                    inclusive = true
-                                }
+                    Home {
+                        navController.navigate(MainRouteEnum.Startup.route) {
+                            popUpTo(MainRouteEnum.Home.route) {
+                                inclusive = true
                             }
                         }
                     }
@@ -108,9 +109,4 @@ fun MainContent() {
     }
 }
 
-val viewModeModule = module {
-    viewModelOf(::AuthViewModel)
-    viewModelOf(::StartUpViewModel)
-    viewModelOf(::HomeViewModel)
-}
 

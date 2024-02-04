@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -32,7 +34,7 @@ fun Home(
     onNavigate: () -> Unit
 ) {
     var presses by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit){
+    LaunchedEffect(Unit) {
         homeViewModel.init()
     }
     Scaffold(
@@ -84,105 +86,96 @@ fun Home(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                val flatten = homeViewModel.friendLocationMap.values.toList()
-                items(flatten, key = {it.first().location}) { friendInfos ->
-                    var friendLocation = FriendLocation(friendInfos)
-                    LocationCard(){
+                val flatten = homeViewModel._uiState.friendLocationMap.values.toList()
+                items(flatten, key = { it.first().value.location }) { friendInfos ->
+                    LocationCard {
                         LazyRow(
                             modifier = Modifier
                                 .fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(friendInfos){
-                                LocationFriend(it.currentAvatarThumbnailImageUrl, it.displayName)
+                            items(friendInfos) {
+                                LocationFriend(it.value.currentAvatarThumbnailImageUrl, it.value.displayName)
                             }
                         }
                     }
                 }
             }
         }
-
     }
-
 }
 
 
-
-@Preview
 @Composable
-fun LocationCard(content: @Composable () -> Unit){
-    Box(
+fun LocationCard(content: @Composable () -> Unit) {
+    Column(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.onPrimary, shape = RoundedCornerShape(12.dp))
-            .height(176.dp)
             .fillMaxWidth()
-
+            .padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .padding(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .height(80.dp)
+                .fillMaxWidth()
         ) {
-            Row(
+
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data("https://files.vrchat.cloud/World-Time-to-sleep-Image-201943.file_28750aba-4305-41f7-bbf9-4e300a68be39.1.png?Expires=1706771965&Key-Pair-Id=K3JAQ0Y971TV2Z&Signature=LdW~Ub4oJQWMSsFCnrgWjHFKXDjgm5Rk8KRt5Nl2JQs3EyzxxOU~cvmXvQP2DjlCsX8C5K32Ca5dvjMZyxZ9aMw57UIFhlFjYsgufR1qIl1fCLhU0VLFzBjPNyjsCth~5Vy0NUEHAfLwMDdoyFMTqcmuQREBsW38HvCd43OxE0cf1WmzeMTnhMgyhQjoz9cvhx5mRAYHPjnKfDUPhiesI2vOykv6VLO0QRhdFJiSyGYO41Kn0zOSarko8S5hjEOpw0JuGVJfDC9V~REeIRaJK6bYcQQVD1Wjq~~Yu8BOX56EeB09Uzd0X~enXe~NLlXyikYI91jkEJ1gb1YMHJXqFg__")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .width(120.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.inverseOnSurface)
+            )
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(start = 6.dp)
             ) {
-
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data("https://files.vrchat.cloud/World-Time-to-sleep-Image-201943.file_28750aba-4305-41f7-bbf9-4e300a68be39.1.png?Expires=1706771965&Key-Pair-Id=K3JAQ0Y971TV2Z&Signature=LdW~Ub4oJQWMSsFCnrgWjHFKXDjgm5Rk8KRt5Nl2JQs3EyzxxOU~cvmXvQP2DjlCsX8C5K32Ca5dvjMZyxZ9aMw57UIFhlFjYsgufR1qIl1fCLhU0VLFzBjPNyjsCth~5Vy0NUEHAfLwMDdoyFMTqcmuQREBsW38HvCd43OxE0cf1WmzeMTnhMgyhQjoz9cvhx5mRAYHPjnKfDUPhiesI2vOykv6VLO0QRhdFJiSyGYO41Kn0zOSarko8S5hjEOpw0JuGVJfDC9V~REeIRaJK6bYcQQVD1Wjq~~Yu8BOX56EeB09Uzd0X~enXe~NLlXyikYI91jkEJ1gb1YMHJXqFg__")
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(80.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.inverseOnSurface)
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = "WordName",
+                    textAlign = TextAlign.Center,
                 )
-                Column(
-                    modifier = Modifier
-                        .height(80.dp)
-                        .padding(start = 6.dp)
-                ) {
+                Text(
+                    text = "description",
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Row {
                     Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = "WordName",
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = "description",
+                        text = "Public",
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Row {
-                        Text(
-                            text = "Public",
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = "10/64",
-                        )
-                    }
-
+                    Text(
+                        text = "10/64",
+                    )
                 }
 
             }
-            content()
+
         }
+        content()
     }
+
 }
 
 
 @Composable
 fun LocationFriend(
     iconUrl: String,
-    name: String = "Name"
+    name: String
 ) {
+
     Column(
-        modifier = Modifier.size(60.dp, 78.dp)
-    ) {
+        modifier = Modifier.width(60.dp),
+        verticalArrangement = Arrangement.Center
+    ){
         UserStateIcon(
             iconUrl = iconUrl,
             size = 60,
