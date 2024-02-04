@@ -14,10 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import io.github.kamo.vrcm.domain.api.apiModule
+import io.github.kamo.vrcm.data.api.apiModule
 import io.github.kamo.vrcm.ui.auth.Auth
 import io.github.kamo.vrcm.ui.auth.AuthViewModel
 import io.github.kamo.vrcm.ui.home.Home
+import io.github.kamo.vrcm.ui.home.HomeViewModel
 import io.github.kamo.vrcm.ui.startup.StartUp
 import io.github.kamo.vrcm.ui.startup.StartUpViewModel
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
@@ -110,5 +111,6 @@ fun MainContent() {
 val viewModeModule = module {
     viewModelOf(::AuthViewModel)
     viewModelOf(::StartUpViewModel)
+    viewModelOf(::HomeViewModel)
 }
 

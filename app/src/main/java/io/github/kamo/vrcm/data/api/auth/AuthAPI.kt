@@ -1,6 +1,6 @@
-package io.github.kamo.vrcm.domain.api.auth
+package io.github.kamo.vrcm.data.api.auth
 
-import io.github.kamo.vrcm.domain.api.APIClient
+import io.github.kamo.vrcm.data.api.APIClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -14,12 +14,14 @@ internal const val EMAIL_OTP = "emailOtp"
 class AuthAPI(private val client: APIClient) {
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
-        client.get {
+        client.get("$AUTH_API_SUFFIX/user") {
             url { path(AUTH_API_SUFFIX, "user") }
             if (username != null && password != null) {
                 basicAuth(username, password)
             }
         }
+
+    suspend fun currentUser(): UserInfo = userRes().body()
 
     suspend fun login(username: String, password: String): AuthState {
         val response = userRes(username, password)
@@ -34,6 +36,7 @@ class AuthAPI(private val client: APIClient) {
                     AuthState.NeedTFA
                 }
             }
+
             HttpStatusCode.Unauthorized -> {
                 AuthState.Unauthorized
             }
@@ -45,25 +48,30 @@ class AuthAPI(private val client: APIClient) {
     }
 
 
-    suspend fun userInfo(): UseInfo = userRes().body()
+    suspend fun friends(offline: Boolean = true, offset: Int = 0, n: Int = 60): List<FriendInfo> =
+        client.get("$AUTH_API_SUFFIX/user/friends") {
+            parameters {
+                append("offline", offline.toString())
+                append("offset", offset.toString())
+                append("n", n.toString())
+            }
+        }.body()
+
 
     @OptIn(InternalAPI::class)
     suspend fun verify(code: String, authType: AuthType): Boolean {
-        val response = client.post {
-            url { path(AUTH_API_SUFFIX, "twofactorauth", authType.path, "verify") }
+        val response = client.post("$AUTH_API_SUFFIX/twofactorauth/${authType.path}/verify") {
             this.body = TextContent("""{"code":"$code"}""", ContentType.Application.Json)
         }
         return response.status == HttpStatusCode.OK
     }
 
     suspend fun isAuthed(): Boolean {
-        val response = client.get {
+        val response = client.get(AUTH_API_SUFFIX) {
             url { path(AUTH_API_SUFFIX) }
         }
         return response.status == HttpStatusCode.OK && response.body<AuthInfo>().ok == true
     }
-
-
 }
 
 enum class AuthType {

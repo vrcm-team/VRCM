@@ -2,6 +2,9 @@ package io.github.kamo.vrcm.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -19,20 +22,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import io.github.kamo.vrcm.domain.api.auth.AuthAPI
 import io.github.kamo.vrcm.ui.util.UserStateIcon
-import kotlinx.coroutines.runBlocking
-import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Home(onNavigate: () -> Unit) {
-    val authAPI = koinInject<AuthAPI>()
+fun Home(
+    homeViewModel: HomeViewModel = koinViewModel(),
+    onNavigate: () -> Unit
+) {
     var presses by remember { mutableIntStateOf(0) }
-    val userInfo = runBlocking {
-        authAPI.userInfo()
+    LaunchedEffect(Unit){
+        homeViewModel.init()
     }
-    println(userInfo)
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
         topBar = {
@@ -76,16 +78,27 @@ fun Home(onNavigate: () -> Unit) {
                 .padding(innerPadding)
 
         ) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .padding(9.dp)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                userInfo.friends
-                LocationCard()
-                LocationCard()
-                LocationCard()
+                val flatten = homeViewModel.friendLocationMap.values.toList()
+                items(flatten, key = {it.first().location}) { friendInfos ->
+                    var friendLocation = FriendLocation(friendInfos)
+                    LocationCard(){
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(friendInfos){
+                                LocationFriend(it.currentAvatarThumbnailImageUrl, it.displayName)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -93,19 +106,22 @@ fun Home(onNavigate: () -> Unit) {
 
 }
 
+
+
 @Preview
 @Composable
-fun LocationCard() {
+fun LocationCard(content: @Composable () -> Unit){
     Box(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.onPrimary, shape = RoundedCornerShape(12.dp))
             .height(176.dp)
             .fillMaxWidth()
+
     ) {
         Column(
             modifier = Modifier
                 .padding(6.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
                 modifier = Modifier
@@ -153,39 +169,30 @@ fun LocationCard() {
                 }
 
             }
-            Row {
-
-                LocationFriend()
-                Spacer(modifier = Modifier.weight(1f))
-                LocationFriend()
-                Spacer(modifier = Modifier.weight(1f))
-                LocationFriend()
-                Spacer(modifier = Modifier.weight(1f))
-                LocationFriend()
-                Spacer(modifier = Modifier.weight(1f))
-                LocationFriend()
-            }
+            content()
         }
     }
 }
 
 
 @Composable
-fun LocationFriend() {
+fun LocationFriend(
+    iconUrl: String,
+    name: String = "Name"
+) {
     Column(
         modifier = Modifier.size(60.dp, 78.dp)
     ) {
         UserStateIcon(
-            iconUrl = "",
+            iconUrl = iconUrl,
             size = 60,
             sateColor = Color.Green
         )
 
         Text(
             modifier = Modifier.fillMaxSize(),
-            text = "ikutsuu",
+            text = name,
             maxLines = 1,
-
             textAlign = TextAlign.Center,
             fontSize = 12.sp
         )

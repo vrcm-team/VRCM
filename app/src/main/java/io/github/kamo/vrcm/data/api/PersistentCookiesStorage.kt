@@ -1,4 +1,4 @@
-package io.github.kamo.vrcm.domain.api
+package io.github.kamo.vrcm.data.api
 
 import android.content.Context
 import io.ktor.client.plugins.cookies.*

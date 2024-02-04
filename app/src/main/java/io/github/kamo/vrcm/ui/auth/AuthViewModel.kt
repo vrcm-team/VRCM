@@ -4,9 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.kamo.vrcm.domain.api.auth.AuthAPI
-import io.github.kamo.vrcm.domain.api.auth.AuthState.*
-import io.github.kamo.vrcm.domain.api.auth.AuthType
+import io.github.kamo.vrcm.data.api.auth.AuthAPI
+import io.github.kamo.vrcm.data.api.auth.AuthState.*
+import io.github.kamo.vrcm.data.api.auth.AuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch

@@ -1,7 +1,7 @@
 package io.github.kamo.vrcm.ui.startup
 
 import androidx.lifecycle.ViewModel
-import io.github.kamo.vrcm.domain.api.auth.AuthAPI
+import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
