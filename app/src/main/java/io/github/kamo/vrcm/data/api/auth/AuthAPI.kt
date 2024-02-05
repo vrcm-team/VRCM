@@ -1,11 +1,13 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.util.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 internal const val AUTH_API_SUFFIX = "auth"
 
@@ -20,8 +22,6 @@ class AuthAPI(private val client: HttpClient) {
                 basicAuth(username, password)
             }
         }
-
-    suspend fun currentUser(): UserInfo = userRes().body()
 
     suspend fun login(username: String, password: String): AuthState {
         val response = userRes(username, password)
@@ -47,15 +47,32 @@ class AuthAPI(private val client: HttpClient) {
         }
     }
 
+    suspend fun currentUser(): UserInfo = userRes().body()
 
-    suspend fun friends(offline: Boolean = false, offset: Int = 0, n: Int = 60): List<FriendInfo> =
-        client.get("$AUTH_API_SUFFIX/user/friends") {
-            parameters {
-                append("offline", offline.toString())
-                append("offset", offset.toString())
-                append("n", n.toString())
+
+    suspend fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendInfo>> {
+        return flow {
+            var count = 0
+            while (true) {
+
+                val response = client.get {
+                    url {
+                        path(AUTH_API_SUFFIX, "user", "friends")
+                        this.parameters.run {
+                            append("offline", offline.toString())
+                            append("offset", (offset + count * n).toString())
+                            append("n", n.toString())
+                        }
+                    }
+                }
+                println("friendsFlow")
+                val bodyList = response.body<List<FriendInfo>>()
+                if (bodyList.isEmpty())  break
+                emit(bodyList)
+                count++
             }
-        }.body()
+        }
+    }
 
 
     @OptIn(InternalAPI::class)

@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -19,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -35,7 +32,7 @@ fun Home(
 ) {
     var presses by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
-        homeViewModel.init()
+        homeViewModel.flush()
     }
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
@@ -80,22 +77,76 @@ fun Home(
                 .padding(innerPadding)
 
         ) {
+            val friendLocationMap = homeViewModel.friendLocationMap
+            val instanceLocation =
+                friendLocationMap.filter { (k, _) -> k != "offline" && k != "private" }.values.toList()
+            println("aaa")
             LazyColumn(
                 modifier = Modifier
                     .padding(9.dp)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                val flatten = homeViewModel._uiState.friendLocationMap.values.toList()
-                items(flatten, key = { it.first().value.location }) { friendInfos ->
+                item {
+                    Text(text = "Friends Active on the Website")
+                }
+                item(key = "offline") {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(friendLocationMap["offline"] ?: emptyList(), key = { it.value.id }) {
+                            LocationFriend(it.value.imageUrl, it.value.displayName,when (it.value.status) {
+                                "active" -> Color.Green
+                                "join me" -> Color.Blue
+                                "ask me" -> Color.Yellow
+                                "busy" -> Color.Red
+                                else -> Color.Gray
+                            })
+                        }
+                    }
+                }
+                item {
+                    Text(text = "Friends in Private Worlds")
+                }
+                item(key = "private") {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(friendLocationMap["private"] ?: emptyList(), key = { it.value.id }) {
+                            LocationFriend(it.value.imageUrl, it.value.displayName,when (it.value.status) {
+                                "active" -> Color.Green
+                                "join me" -> Color.Blue
+                                "ask me" -> Color.Yellow
+                                "busy" -> Color.Red
+                                else -> Color.Gray
+                            })
+                        }
+                    }
+                }
+                item {
+                    Text(text = "by Location")
+                }
+                items(instanceLocation, key = { it.first().value.location }) { friendInfos ->
                     LocationCard {
                         LazyRow(
                             modifier = Modifier
                                 .fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(friendInfos) {
-                                LocationFriend(it.value.currentAvatarThumbnailImageUrl, it.value.displayName)
+                            items(friendInfos, key = { it.value.id }) {
+                                LocationFriend(
+                                    it.value.imageUrl, it.value.displayName, when (it.value.status) {
+                                        "active" -> Color.Green
+                                        "join me" -> Color.Blue
+                                        "ask me" -> Color.Yellow
+                                        "busy" -> Color.Red
+                                        else -> Color.Gray
+                                    }
+                                )
                             }
                         }
                     }
@@ -169,17 +220,18 @@ fun LocationCard(content: @Composable () -> Unit) {
 @Composable
 fun LocationFriend(
     iconUrl: String,
-    name: String
+    name: String,
+    sateColor: Color
 ) {
 
     Column(
         modifier = Modifier.width(60.dp),
         verticalArrangement = Arrangement.Center
-    ){
+    ) {
         UserStateIcon(
             iconUrl = iconUrl,
             size = 60,
-            sateColor = Color.Green
+            sateColor = sateColor
         )
 
         Text(

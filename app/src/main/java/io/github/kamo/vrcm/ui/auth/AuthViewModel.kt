@@ -9,8 +9,8 @@ import io.github.kamo.vrcm.data.api.auth.AuthState.*
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 
 enum class AuthCardState {
@@ -92,14 +92,14 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
         onLoadingChange(true)
         _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
 
-            val result = runBlocking(context = Dispatchers.IO) {
+            val result = async (context = Dispatchers.IO) {
                 val authType = when (_uiState.value.cardState) {
                     AuthCardState.EmailCode -> AuthType.Email
                     AuthCardState.TFACode -> AuthType.TFA
                     else -> error("not supported")
                 }
                 authAPI.verify(verifyCode, authType)
-            }
+            }.await()
             if (result) {
                 doLogin(_uiState.value.username, _uiState.value.password)
             } else {
