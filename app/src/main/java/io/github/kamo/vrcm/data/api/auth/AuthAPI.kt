@@ -1,11 +1,15 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
-import io.ktor.util.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.path
+import io.ktor.util.InternalAPI
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -54,7 +58,6 @@ class AuthAPI(private val client: HttpClient) {
         return flow {
             var count = 0
             while (true) {
-
                 val response = client.get {
                     url {
                         path(AUTH_API_SUFFIX, "user", "friends")
@@ -65,7 +68,6 @@ class AuthAPI(private val client: HttpClient) {
                         }
                     }
                 }
-                println("friendsFlow")
                 val bodyList = response.body<List<FriendInfo>>()
                 if (bodyList.isEmpty())  break
                 emit(bodyList)

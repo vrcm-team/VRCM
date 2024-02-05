@@ -9,7 +9,6 @@ import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.data.api.file.FileAPI
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.reduce
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
@@ -29,9 +28,11 @@ class HomeViewModel(
     fun flush() {
         viewModelScope.launch(Dispatchers.IO) {
             authAPI.friendsFlow()
-                .reduce { acc, list -> acc + list }
-                .associate { it.id to mutableStateOf(it) }
-                .also { friendIdMap = it }
+                .collect { friends ->
+                    friends.associate { it.id to mutableStateOf(it) }
+                        .also { friendIdMap = it }
+                }
+
         }
     }
 
@@ -40,7 +41,12 @@ class HomeViewModel(
             val friendLocationInfoMap = newValue.values.groupBy({ it.value.location }) {
                 it.apply {
                     launch(Dispatchers.IO) {
-                        value = value.copy(imageUrl = fileAPI.findImageFileLocal(value.imageUrl))
+                        value = value.copy(
+                            imageUrl = fileAPI.findImageFileLocal(
+                                value.imageUrl,
+                                fileSize = 64
+                            )
+                        )
                     }
                 }
             }
