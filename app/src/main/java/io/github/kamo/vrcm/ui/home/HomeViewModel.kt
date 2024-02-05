@@ -42,10 +42,7 @@ class HomeViewModel(
                 it.apply {
                     launch(Dispatchers.IO) {
                         value = value.copy(
-                            imageUrl = fileAPI.findImageFileLocal(
-                                value.imageUrl,
-                                fileSize = 64
-                            )
+                            imageUrl = fileAPI.findImageFileLocal(value.imageUrl)
                         )
                     }
                 }
