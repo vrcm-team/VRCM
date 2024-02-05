@@ -87,46 +87,55 @@ fun Home(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                item {
-                    Text(text = "Friends Active on the Website")
-                }
-                item(key = "offline") {
-                    LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(friendLocationMap["offline"] ?: emptyList(), key = { it.value.id }) {
-                            LocationFriend(it.value.imageUrl, it.value.displayName,when (it.value.status) {
-                                "active" -> Color.Green
-                                "join me" -> Color.Blue
-                                "ask me" -> Color.Yellow
-                                "busy" -> Color.Red
-                                else -> Color.Gray
-                            })
+                if (friendLocationMap["offline"]?.isNotEmpty() == true) {
+                    item {
+                        Text(text = "Friends Active on the Website")
+                    }
+                    item(key = "offline") {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(friendLocationMap["offline"] ?: emptyList(), key = { it.value.id }) {
+                                LocationFriend(
+                                    it.value.imageUrl, it.value.displayName, when (it.value.status) {
+                                        "active" -> Color.Green
+                                        "join me" -> Color.Blue
+                                        "ask me" -> Color.Yellow
+                                        "busy" -> Color.Red
+                                        else -> Color.Gray
+                                    }
+                                )
+                            }
                         }
                     }
                 }
-                item {
-                    Text(text = "Friends in Private Worlds")
-                }
-                item(key = "private") {
-                    LazyRow(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(friendLocationMap["private"] ?: emptyList(), key = { it.value.id }) {
-                            LocationFriend(it.value.imageUrl, it.value.displayName,when (it.value.status) {
-                                "active" -> Color.Green
-                                "join me" -> Color.Blue
-                                "ask me" -> Color.Yellow
-                                "busy" -> Color.Red
-                                else -> Color.Gray
-                            })
+                if (friendLocationMap["private"]?.isNotEmpty() == true) {
+                    item {
+                        Text(text = "Friends in Private Worlds")
+                    }
+                    item(key = "private") {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(friendLocationMap["private"] ?: emptyList(), key = { it.value.id }) {
+                                LocationFriend(
+                                    it.value.imageUrl, it.value.displayName, when (it.value.status) {
+                                        "active" -> Color.Green
+                                        "join me" -> Color.Blue
+                                        "ask me" -> Color.Yellow
+                                        "busy" -> Color.Red
+                                        else -> Color.Gray
+                                    }
+                                )
+                            }
                         }
                     }
                 }
+
                 item {
                     Text(text = "by Location")
                 }
