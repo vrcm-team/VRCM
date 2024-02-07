@@ -1,0 +1,30 @@
+package io.github.kamo.vrcm.data.api.instance
+
+data class World(
+    val authorId: String,
+    val authorName: String,
+    val capacity: Int,
+    val created_at: String,
+    val description: String,
+    val favorites: Int,
+    val featured: Boolean,
+    val heat: Int,
+    val id: String,
+    val imageUrl: String,
+    val labsPublicationDate: String,
+    val name: String,
+    val namespace: String,
+    val organization: String,
+    val popularity: Int,
+    val previewYoutubeId: Any,
+    val publicationDate: String,
+    val recommendedCapacity: Int,
+    val releaseStatus: String,
+    val tags: List<String>,
+    val thumbnailImageUrl: String,
+    val udonProducts: List<Any>,
+    val unityPackages: List<UnityPackage>,
+    val updated_at: String,
+    val version: Int,
+    val visits: Int
+)

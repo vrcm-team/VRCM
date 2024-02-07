@@ -28,10 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
-import coil.compose.AsyncImage
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+
 import org.koin.compose.koinInject
 
 @Composable
@@ -112,7 +116,10 @@ fun UserStateIcon(
         modifier = modifier
     ) {
         AsyncImage(
-            model = iconUrl,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(iconUrl)
+                .crossfade(true)
+                .build(),
             contentDescription = null,
             imageLoader = koinInject<ImageLoader>(),
             contentScale = ContentScale.Crop,
