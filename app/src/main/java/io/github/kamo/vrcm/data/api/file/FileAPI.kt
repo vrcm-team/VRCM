@@ -1,8 +1,7 @@
 package io.github.kamo.vrcm.data.api.file
 
-import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.request.url
+import io.ktor.client.*
+import io.ktor.client.request.*
 
 internal const val FILE_API_SUFFIX = "file"
 
@@ -23,12 +22,14 @@ class FileAPI(private val client: HttpClient) {
     }
 
     suspend fun findImageFileLocal(fileUrl: String, fileSize: Int = 128): String {
-        val response = client.get {
-            val findFileId = findFileId(fileUrl)
-            val findFileVersion = findFileVersion(fileUrl)
-            url("https://api.vrchat.cloud/api/1/image/$findFileId/$findFileVersion/$fileSize")
-        }
-        return response.headers["Location"] ?: fileUrl
+        return runCatching {
+            val response = client.get {
+                val findFileId = findFileId(fileUrl)
+                val findFileVersion = findFileVersion(fileUrl)
+                url("https://api.vrchat.cloud/api/1/image/$findFileId/$findFileVersion/$fileSize")
+            }
+            return response.headers["Location"] ?: fileUrl
+        } .getOrDefault(fileUrl)
     }
 
 }

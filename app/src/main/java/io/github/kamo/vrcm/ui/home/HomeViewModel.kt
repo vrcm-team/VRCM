@@ -68,14 +68,15 @@ class HomeViewModel(
                 },
                 LocationType.Instance to friendLocationInfoMap[LocationType.Instance]?.let { friends ->
                     friends.groupBy { it.value.location }.map {
-                        val instance = instanceAPI.instanceByLocation(it.key)
                         val friendLocation =
-                            FriendLocation(it.key, mutableStateOf(instance), it.value)
+                            FriendLocation(location = it.key, friends = it.value)
                         launch(Dispatchers.IO) {
-                            friendLocation.instance?.value = instance.copy(
-                                world = instance.world.copy(
-                                    imageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl)
-                                )
+                            val instance = instanceAPI.instanceByLocation(it.key)
+                            friendLocation.instants.value = InstantsVO(
+                                worldName = instance.world.name,
+                                worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
+                                instantsType = instance.type,
+                                userCount =  "${instance.userCount}/${instance.world.capacity}"
                             )
                         }
                         friendLocation

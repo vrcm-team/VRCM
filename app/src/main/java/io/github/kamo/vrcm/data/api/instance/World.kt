@@ -16,7 +16,7 @@ data class World(
     val namespace: String,
     val organization: String,
     val popularity: Int,
-    val previewYoutubeId: Any,
+    val previewYoutubeId: String? = null,
     val publicationDate: String,
     val recommendedCapacity: Int,
     val releaseStatus: String,
