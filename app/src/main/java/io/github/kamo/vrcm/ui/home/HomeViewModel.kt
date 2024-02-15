@@ -68,18 +68,22 @@ class HomeViewModel(
                 },
                 LocationType.Instance to friendLocationInfoMap[LocationType.Instance]?.let { friends ->
                     friends.groupBy { it.value.location }.map {
-                        val friendLocation =
-                            FriendLocation(location = it.key, friends = it.value)
-                        launch(Dispatchers.IO) {
-                            val instance = instanceAPI.instanceByLocation(it.key)
-                            friendLocation.instants.value = InstantsVO(
-                                worldName = instance.world.name,
-                                worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
-                                instantsType = instance.type,
-                                userCount =  "${instance.userCount}/${instance.world.capacity}"
-                            )
+                        FriendLocation(location = it.key, friends = it.value).apply {
+                            launch(Dispatchers.IO) {
+                                val instance = instanceAPI.instanceByLocation(it.key)
+                                kotlin.runCatching {
+                                    instants.value = InstantsVO(
+                                        worldName = instance.world.name,
+                                        worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
+                                        instantsType = instance.type,
+                                        userCount = "${instance.userCount}/${instance.world.capacity}"
+                                    )
+                                }.onFailure {
+                                    println(instance)
+                                }
+
+                            }
                         }
-                        friendLocation
                     }
                 },
             )

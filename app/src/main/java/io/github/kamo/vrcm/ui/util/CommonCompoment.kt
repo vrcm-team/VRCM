@@ -1,29 +1,13 @@
 package io.github.kamo.vrcm.ui.util
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarData
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -35,7 +19,6 @@ import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-
 import org.koin.compose.koinInject
 
 @Composable
@@ -107,35 +90,38 @@ fun SnackBarToast(
 
 @Composable
 fun UserStateIcon(
-    modifier: Modifier = Modifier,
     iconUrl: String,
-    size: Int,
     sateColor: Color
 ) {
-    Box(
-        modifier = modifier
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(iconUrl)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            imageLoader = koinInject<ImageLoader>(),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.inverseOnSurface)
-        )
-        Column(
-            Modifier
-                .size((size / 4).dp)
-                .background(sateColor, shape = CircleShape)
-                .border(2.dp, Color.White, shape = CircleShape)
-                .align(Alignment.BottomEnd),
-            content = { }
-        )
-    }
+    AImage(
+        modifier = Modifier
+            .sateCircle(sateColor)
+            .fillMaxSize()
+            .aspectRatio(1f)
+            .clip(CircleShape),
+        iconUrl = iconUrl,
+        contentDescription = "UserStateIcon"
+    )
 }
+
+@Composable
+fun AImage(
+    modifier: Modifier = Modifier,
+    iconUrl: String,
+    background: Color = MaterialTheme.colorScheme.inverseOnSurface,
+    contentDescription: String? = null,
+    imageLoader: ImageLoader = koinInject(),
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    AsyncImage(
+        modifier = modifier.background(background),
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(iconUrl)
+            .crossfade(true)
+            .build(),
+        contentDescription = contentDescription,
+        imageLoader = imageLoader,
+        contentScale = contentScale
+    )
+}
+

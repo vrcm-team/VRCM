@@ -19,19 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.ImageLoader
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
+import io.github.kamo.vrcm.ui.util.AImage
 import io.github.kamo.vrcm.ui.util.UserStateIcon
+import io.github.kamo.vrcm.ui.util.sateCircle
 import org.koin.androidx.compose.koinViewModel
-import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -172,18 +167,13 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                 .height(80.dp)
                 .fillMaxWidth()
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(instants.worldImageUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                imageLoader = koinInject<ImageLoader>(),
-                contentScale = ContentScale.Crop,
+            AImage(
                 modifier = Modifier
                     .width(120.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.inverseOnSurface)
+                    .sateCircle(Color.Red, isInLine = false)
+                    .clip(RoundedCornerShape(12.dp)),
+                iconUrl = instants.worldImageUrl,
+                contentDescription = "WorldImage"
             )
             Column(
                 modifier = Modifier
@@ -231,7 +221,6 @@ fun LocationFriend(
     ) {
         UserStateIcon(
             iconUrl = iconUrl,
-            size = 60,
             sateColor = sateColor
         )
 
