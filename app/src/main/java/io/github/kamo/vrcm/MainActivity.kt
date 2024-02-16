@@ -3,10 +3,8 @@ package io.github.kamo.vrcm
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -14,21 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import io.github.kamo.vrcm.di.apiModule
-import io.github.kamo.vrcm.di.viewModeModule
 import io.github.kamo.vrcm.ui.auth.Auth
 import io.github.kamo.vrcm.ui.home.Home
 import io.github.kamo.vrcm.ui.startup.StartUp
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
 import io.github.vrchatapi.model.CurrentUser
 import io.github.vrchatapi.model.CurrentUserPresence
-import org.koin.android.ext.koin.androidContext
-import org.koin.android.ext.koin.androidLogger
-import org.koin.compose.KoinApplication
-import org.koin.compose.KoinContext
-import org.koin.core.KoinApplication
-import org.koin.core.context.startKoin
-import org.koin.dsl.koinApplication
 
 
 enum class MainRouteEnum(val route: String) {
@@ -36,7 +25,6 @@ enum class MainRouteEnum(val route: String) {
     Auth("auth"),
     Home("home");
 }
-
 class MainActivity : ComponentActivity() {
     init {
         CurrentUser.openapiFields += "contentFilters"
@@ -46,23 +34,14 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
-            KoinApplication(
-                {
-                    androidLogger()
-                    androidContext(this@MainActivity)
-                    modules(viewModeModule, apiModule)
-                }
-            ){
-                MainContent()
-            }
+            MainContent()
         }
     }
 }
+
 
 @Composable
 fun MainContent() {

@@ -34,7 +34,6 @@ class HomeViewModel(
                     friends.associate { it.id to mutableStateOf(it) }
                         .also { friendIdMap = it }
                 }
-
         }
     }
 
@@ -71,17 +70,13 @@ class HomeViewModel(
                         FriendLocation(location = it.key, friends = it.value).apply {
                             launch(Dispatchers.IO) {
                                 val instance = instanceAPI.instanceByLocation(it.key)
-                                kotlin.runCatching {
-                                    instants.value = InstantsVO(
-                                        worldName = instance.world.name,
-                                        worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
-                                        instantsType = instance.type,
-                                        userCount = "${instance.userCount}/${instance.world.capacity}"
-                                    )
-                                }.onFailure {
-                                    println(instance)
-                                }
 
+                                instants.value = InstantsVO(
+                                    worldName = instance.world.name,
+                                    worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
+                                    instantsType = instance.type,
+                                    userCount = "${instance.userCount}/${instance.world.capacity}"
+                                )
                             }
                         }
                     }

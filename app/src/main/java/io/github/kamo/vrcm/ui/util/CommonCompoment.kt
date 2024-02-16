@@ -1,10 +1,22 @@
 package io.github.kamo.vrcm.ui.util
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -113,12 +125,17 @@ fun AImage(
     imageLoader: ImageLoader = koinInject(),
     contentScale: ContentScale = ContentScale.Crop,
 ) {
+    val imageRequest: ImageRequest = with(LocalContext.current) {
+        remember(this, iconUrl) {
+            ImageRequest.Builder(this)
+                .data(iconUrl)
+                .crossfade(true)
+                .build()
+        }
+    }
     AsyncImage(
         modifier = modifier.background(background),
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(iconUrl)
-            .crossfade(true)
-            .build(),
+        model = imageRequest,
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         contentScale = contentScale
