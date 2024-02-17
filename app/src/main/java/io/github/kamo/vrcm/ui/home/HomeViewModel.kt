@@ -1,6 +1,7 @@
 package io.github.kamo.vrcm.ui.home
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -24,21 +25,25 @@ class HomeViewModel(
             update(value)
             field = value
         }
-    val friendLocationMap: MutableMap<LocationType, List<FriendLocation>?> = mutableStateMapOf()
+    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
+        mutableStateMapOf()
 
-    val refreshing = mutableStateOf(false)
+    var refreshing = mutableStateOf(false)
     fun refresh() {
+        refreshing.value = true
+        this@HomeViewModel.friendLocationMap.clear()
         viewModelScope.launch(Dispatchers.IO) {
             authAPI.friendsFlow()
                 .collect { friends ->
                     friends.associate { it.id to mutableStateOf(it) }
                         .also { friendIdMap = it }
                 }
+            refreshing.value = false
         }
     }
 
     private fun update(newValue: Map<String, MutableState<FriendInfo>>) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main) {
             val friendLocationInfoMap = newValue.values.groupBy({
                 when (it.value.location) {
                     LocationType.Offline.typeName -> LocationType.Offline
@@ -54,56 +59,53 @@ class HomeViewModel(
                     }
                 }
             }
-            val typeMapping = mapOf(
-                LocationType.Offline to friendLocationInfoMap[LocationType.Offline]?.let {
-                    listOf(
-                        FriendLocation(it)
-                    )
-                },
-                LocationType.Private to friendLocationInfoMap[LocationType.Private]?.let {
-                    listOf(
-                        FriendLocation(it)
-                    )
-                },
-                LocationType.Instance to friendLocationInfoMap[LocationType.Instance]?.let { friends ->
-                    friends.groupBy { it.value.location }.map {
-                        FriendLocation(location = it.key, friends = it.value).apply {
-                            launch(Dispatchers.IO) {
-                                val instance = instanceAPI.instanceByLocation(it.key)
+            friendLocationInfoMap[LocationType.Offline]?.let { friends ->
+                this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Offline) {
+                    mutableStateListOf(FriendLocation.Offline)
+                }.first().friends.addAll(friends)
+            }
+            friendLocationInfoMap[LocationType.Private]?.let { friends ->
+                this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Private) {
+                    mutableStateListOf(FriendLocation.Private)
+                }.first().friends.addAll(friends)
+            }
 
-                                instants.value = InstantsVO(
-                                    worldName = instance.world.name,
-                                    worldImageUrl = fileAPI.findImageFileLocal(instance.world.imageUrl),
-                                    instantsType = instance.type,
-                                    userCount = "${instance.userCount}/${instance.world.capacity}"
-                                )
-                            }
-                        }
-                    }
-                },
-            )
-            this@HomeViewModel.friendLocationMap.clear()
-            this@HomeViewModel.friendLocationMap.putAll(typeMapping)
+            val inInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
+            inInstanceFriends.groupBy { it.value.location }
+                .forEach { locationFriendEntry ->
+                    this@HomeViewModel.friendLocationMap.getOrPut(
+                        LocationType.Instance,
+                        ::mutableStateListOf
+                    )
+                        .let { friendLocations ->
+                            friendLocations.find { locationFriendEntry.key == it.location }
+                                ?: FriendLocation(
+                                    location = locationFriendEntry.key,
+                                    friends = mutableStateListOf()
+                                ).apply {
+                                    launch(Dispatchers.IO) {
+                                        val instance = instanceAPI.instanceByLocation(location)
+                                        val worldImageUrl =
+                                            fileAPI.findImageFileLocal(instance.world.imageUrl)
+                                        if (instance.world.name == null) {
+                                            println("i = $instance")
+                                        }
+                                        instants.value = InstantsVO(
+                                            worldName = instance.world.name ?: "",
+                                            worldImageUrl = worldImageUrl,
+                                            instantsType = instance.type,
+                                            userCount = "${instance.userCount}/${instance.world.capacity}"
+                                        )
+                                    }
+                                    friendLocations.add(this@apply)
+                                }
+                        }.friends.addAll(locationFriendEntry.value)
+                }
         }
     }
 }
 
-enum class LocationType(val typeName: String) {
-    /**
-     * Friends Active on the Website
-     */
-    Offline("offline"),
 
-    /**
-     * Friends in Private Worlds
-     */
-    Private("private"),
-
-    /**
-     * by Location Instance
-     */
-    Instance("wrld_")
-}
 
 
 

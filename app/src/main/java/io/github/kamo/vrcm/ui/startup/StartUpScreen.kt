@@ -14,16 +14,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.R
-import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun StartUp(
-    startUpViewModel: StartUpViewModel = koinViewModel(),
     onNavigate: (MainRouteEnum) -> Unit
 ) {
 
     LaunchedEffect(Unit) {
-        val mainRouteEnum = if (startUpViewModel.awaitAuth() == true) {
+        val mainRouteEnum = if (false) {
             MainRouteEnum.Home
         } else {
             MainRouteEnum.Auth

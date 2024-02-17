@@ -5,15 +5,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
-import io.github.kamo.vrcm.data.api.auth.AuthState.*
+import io.github.kamo.vrcm.data.api.auth.AuthState.Authed
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedEmailCode
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedTFA
+import io.github.kamo.vrcm.data.api.auth.AuthState.Unauthorized
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
 enum class AuthCardState {
+    Loading,
     Login,
     EmailCode,
     TFACode,
@@ -49,8 +54,23 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
     }
 
     fun onCardStateChange(cardState: AuthCardState) {
-        _uiState.value = when (cardState) {
 
+        // 主界面跳回登录验证界面需要手动操作下,为了正确的显示出现和消失动画
+        if (cardState == AuthCardState.Loading && _uiState.value.cardState == AuthCardState.Authed) {
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(
+                    cardState = AuthCardState.Loading,
+                    isLoading = false,
+                )
+                delay(2000)
+                _uiState.value = _uiState.value.copy(
+                    cardState = AuthCardState.Login
+                )
+            }
+            return
+        }
+
+        _uiState.value = when (cardState) {
             AuthCardState.EmailCode, AuthCardState.TFACode -> _uiState.value.copy(
                 cardState = cardState,
                 verifyCode = "",
@@ -69,6 +89,11 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
         _currentJob = null
     }
 
+    suspend fun awaitAuth(): Boolean? {
+        return viewModelScope.async(Dispatchers.IO) {
+            runCatching { authAPI.isAuthed() }.getOrNull()
+        }.await()
+    }
 
     fun login() {
         val password = _uiState.value.password.trim()

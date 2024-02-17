@@ -1,13 +1,13 @@
 package io.github.kamo.vrcm.ui.auth
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,30 +43,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.R
-import io.github.kamo.vrcm.ui.auth.AuthCardState.Authed
-import io.github.kamo.vrcm.ui.auth.AuthCardState.EmailCode
-import io.github.kamo.vrcm.ui.auth.AuthCardState.Login
-import io.github.kamo.vrcm.ui.auth.AuthCardState.TFACode
 import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
 import io.github.kamo.vrcm.ui.auth.card.VerifyCardInput
+import io.github.kamo.vrcm.ui.home.Home
 import io.github.kamo.vrcm.ui.util.SnackBarToast
 import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun Auth(
-    authViewModel: AuthViewModel = koinViewModel(),
-    onNavigate: () -> Unit
+    authViewModel: AuthViewModel = koinViewModel()
 ) {
     val durationMillis = 1500
     var isStartUp by remember { mutableStateOf(false) }
     val startUpTransition = updateTransition(targetState = isStartUp, label = "StartUp")
+
     LaunchedEffect(Unit) {
         isStartUp = true
+        authViewModel.onCardStateChange(if (authViewModel.awaitAuth() == true) AuthCardState.Authed else AuthCardState.Login)
     }
     Box(
         modifier = Modifier
@@ -90,10 +89,21 @@ fun Auth(
             inDurationMillis = durationMillis,
             startUpTransition = startUpTransition,
             cardState = authViewModel.uiState.cardState,
-            onNavigate = onNavigate
         ) { state ->
             when (state) {
-                Login -> {
+                AuthCardState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 5.dp
+                        )
+                    }
+                }
+
+                AuthCardState.Login -> {
                     NavCard("Login") {
                         LoginCardInput(
                             uiState = authViewModel.uiState,
@@ -104,11 +114,11 @@ fun Auth(
                     }
                 }
 
-                TFACode, EmailCode -> {
+                AuthCardState.TFACode, AuthCardState.EmailCode -> {
                     NavCard("Verify", barContent = {
                         ReturnIcon {
                             authViewModel.cancelJob()
-                            authViewModel.onCardStateChange(Login)
+                            authViewModel.onCardStateChange(AuthCardState.Login)
                         }
                     }) {
                         VerifyCardInput(
@@ -119,10 +129,11 @@ fun Auth(
                     }
                 }
 
-                Authed -> {
-                    Box(modifier = Modifier.fillMaxSize())
+                AuthCardState.Authed -> {
+                    Home {
+                        authViewModel.onCardStateChange(AuthCardState.Loading)
+                    }
                 }
-
             }
         }
     }
@@ -133,42 +144,56 @@ private fun BoxScope.AuthCard(
     inDurationMillis: Int,
     startUpTransition: Transition<Boolean>,
     cardState: AuthCardState,
-    onNavigate: () -> Unit,
     content: @Composable (AuthCardState) -> Unit
 ) {
-    val isAuthed = cardState == Authed
+    val isAuthed = cardState == AuthCardState.Authed
     val cardChangeDurationMillis = 600
+    val cardChangeAnimationSpec = tween<Float>(
+        cardChangeDurationMillis,
+        cardChangeDurationMillis
+    )
+    val cardUpAnimationSpec = tween<Dp>(1000, cardChangeDurationMillis - 200)
+    val heightDp by animateDpAsState(
+        if (!isAuthed) 380.dp else LocalConfiguration.current.screenHeightDp.dp,
+        cardUpAnimationSpec,
+        label = "AuthCardHeightDp",
+    )
+    val shapeDp by animateDpAsState(
+        if (!isAuthed) 30.dp else 0.dp,
+        cardUpAnimationSpec,
+        label = "AuthCardShapeDp",
+    )
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(
-                tween(
-                    1000,
-                    cardChangeDurationMillis - 200
-                )
-            ) { _, _ -> onNavigate() }
             .cardInAnimate(inDurationMillis, startUpTransition)
-            .run { if (!isAuthed) height(380.dp) else fillMaxHeight() }
+            .height(heightDp)
             .align(Alignment.BottomCenter),
         color = MaterialTheme.colorScheme.onPrimary,
-        shape = if (!isAuthed) RoundedCornerShape(
-            topStart = 30.dp,
-            topEnd = 30.dp
-        ) else CardDefaults.shape,
+        shape = RoundedCornerShape(topStart = shapeDp, topEnd = shapeDp),
     ) {
         AnimatedContent(
             label = "AuthSurfaceChange",
             targetState = cardState,
             transitionSpec = {
                 when (this.targetState) {
-                    Login -> fadeSlideHorizontally(cardChangeDurationMillis, direction = -1)
-                    EmailCode, TFACode -> fadeSlideHorizontally(cardChangeDurationMillis)
-                    Authed -> EnterTransition.None
+                    AuthCardState.Loading -> fadeIn(cardChangeAnimationSpec)
+                        .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
+
+                    AuthCardState.Login -> fadeSlideHorizontally(
+                        cardChangeDurationMillis,
+                        direction = -1
+                    )
+
+                    AuthCardState.EmailCode, AuthCardState.TFACode -> fadeSlideHorizontally(
+                        cardChangeDurationMillis
+                    )
+
+                    AuthCardState.Authed -> fadeIn(cardChangeAnimationSpec)
                         .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
                 }
             },
-
-            ) {
+        ) {
             content(it)
         }
     }
@@ -183,7 +208,7 @@ private fun ReturnIcon(onClick: () -> Unit) {
             .size(18.dp)
             .clickable(onClick = onClick),
         imageVector = Icons.Rounded.ArrowBackIosNew,
-        contentDescription = "",
+        contentDescription = "ReturnIcon",
     )
 }
 
