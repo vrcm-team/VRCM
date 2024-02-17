@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.sp
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.ui.util.AImage
 import io.github.kamo.vrcm.ui.util.UserStateIcon
-import io.github.kamo.vrcm.ui.util.sateCircle
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -139,7 +138,6 @@ fun Home(
                 }
             }
             PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
-
         }
     }
 }
@@ -186,7 +184,6 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
             AImage(
                 modifier = Modifier
                     .width(120.dp)
-                    .sateCircle(Color.Red, isInLine = false)
                     .clip(RoundedCornerShape(12.dp)),
                 iconUrl = instants.worldImageUrl,
                 contentDescription = "WorldImage"
