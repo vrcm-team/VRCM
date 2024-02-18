@@ -1,44 +1,19 @@
 package io.github.kamo.vrcm.ui.auth
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Transition
-import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -66,7 +41,7 @@ fun Auth(
 
     LaunchedEffect(Unit) {
         isStartUp = true
-        authViewModel.onCardStateChange(if (authViewModel.awaitAuth() == true) AuthCardState.Authed else AuthCardState.Login)
+        authViewModel.onCardStateChange(if (authViewModel.awaitAuth() == true) AuthCardPage.Authed else AuthCardPage.Login)
     }
     Box(
         modifier = Modifier
@@ -91,7 +66,7 @@ fun Auth(
             cardState = authViewModel.uiState.cardState,
         ) { state ->
             when (state) {
-                AuthCardState.Loading -> {
+                AuthCardPage.Loading -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         CircularProgressIndicator(
                             modifier = Modifier
@@ -103,7 +78,7 @@ fun Auth(
                     }
                 }
 
-                AuthCardState.Login -> {
+                AuthCardPage.Login -> {
                     NavCard("Login") {
                         LoginCardInput(
                             uiState = authViewModel.uiState,
@@ -114,11 +89,11 @@ fun Auth(
                     }
                 }
 
-                AuthCardState.TFACode, AuthCardState.EmailCode -> {
+                AuthCardPage.TFACode, AuthCardPage.EmailCode -> {
                     NavCard("Verify", barContent = {
                         ReturnIcon {
                             authViewModel.cancelJob()
-                            authViewModel.onCardStateChange(AuthCardState.Login)
+                            authViewModel.onCardStateChange(AuthCardPage.Login)
                         }
                     }) {
                         VerifyCardInput(
@@ -129,9 +104,9 @@ fun Auth(
                     }
                 }
 
-                AuthCardState.Authed -> {
+                AuthCardPage.Authed -> {
                     Home {
-                        authViewModel.onCardStateChange(AuthCardState.Loading)
+                        authViewModel.onCardStateChange(AuthCardPage.Loading)
                     }
                 }
             }
@@ -143,10 +118,10 @@ fun Auth(
 private fun BoxScope.AuthCard(
     inDurationMillis: Int,
     startUpTransition: Transition<Boolean>,
-    cardState: AuthCardState,
-    content: @Composable (AuthCardState) -> Unit
+    cardState: AuthCardPage,
+    content: @Composable (AuthCardPage) -> Unit
 ) {
-    val isAuthed = cardState == AuthCardState.Authed
+    val isAuthed = cardState == AuthCardPage.Authed
     val cardChangeDurationMillis = 600
     val cardChangeAnimationSpec = tween<Float>(
         cardChangeDurationMillis,
@@ -177,19 +152,19 @@ private fun BoxScope.AuthCard(
             targetState = cardState,
             transitionSpec = {
                 when (this.targetState) {
-                    AuthCardState.Loading -> fadeIn(cardChangeAnimationSpec)
+                    AuthCardPage.Loading -> fadeIn(cardChangeAnimationSpec)
                         .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
 
-                    AuthCardState.Login -> fadeSlideHorizontally(
+                    AuthCardPage.Login -> fadeSlideHorizontally(
                         cardChangeDurationMillis,
                         direction = -1
                     )
 
-                    AuthCardState.EmailCode, AuthCardState.TFACode -> fadeSlideHorizontally(
+                    AuthCardPage.EmailCode, AuthCardPage.TFACode -> fadeSlideHorizontally(
                         cardChangeDurationMillis
                     )
 
-                    AuthCardState.Authed -> fadeIn(cardChangeAnimationSpec)
+                    AuthCardPage.Authed -> fadeIn(cardChangeAnimationSpec)
                         .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
                 }
             },

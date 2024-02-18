@@ -1,23 +1,18 @@
 package io.github.kamo.vrcm.ui.auth
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
-import io.github.kamo.vrcm.data.api.auth.AuthState.Authed
-import io.github.kamo.vrcm.data.api.auth.AuthState.NeedEmailCode
-import io.github.kamo.vrcm.data.api.auth.AuthState.NeedTFA
-import io.github.kamo.vrcm.data.api.auth.AuthState.Unauthorized
+import io.github.kamo.vrcm.data.api.auth.AuthState.*
 import io.github.kamo.vrcm.data.api.auth.AuthType
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 
 
-enum class AuthCardState {
+enum class AuthCardPage {
     Loading,
     Login,
     EmailCode,
@@ -25,10 +20,25 @@ enum class AuthCardState {
     Authed,
 }
 
-class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
-    private val _uiState = mutableStateOf(AuthUIState())
+class AuthViewModel(
+    private val authAPI: AuthAPI,
+    context: Context
+) : ViewModel() {
+    companion object {
+        // 定义一个常量，用于存储用户名和密码的键
+        private const val USERNAME_KEY = "username"
+        private const val PASSWORD_KEY = "password"
+    }
+
+    // 定义一个函数，用于获取 shared preferences 的实例
+    private val userSharedPreferences: SharedPreferences = context.getSharedPreferences("user", Context.MODE_PRIVATE)
+
+    private val _uiState = mutableStateOf(accountPair().run { AuthUIState(username = first, password = second) })
+
+    private var _currentVerifyJob: Job? = null
+
     val uiState: AuthUIState by _uiState
-    private var _currentJob: Job? = null
+
     fun onUsernameChange(username: String) {
         _uiState.value = _uiState.value.copy(username = username)
     }
@@ -53,25 +63,27 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
         }
     }
 
-    fun onCardStateChange(cardState: AuthCardState) {
+    fun onCardStateChange(cardState: AuthCardPage) {
 
         // 主界面跳回登录验证界面需要手动操作下,为了正确的显示出现和消失动画
-        if (cardState == AuthCardState.Loading && _uiState.value.cardState == AuthCardState.Authed) {
+        if (cardState == AuthCardPage.Loading && _uiState.value.cardState == AuthCardPage.Authed) {
+
+            _uiState.value = _uiState.value.copy(
+                cardState = AuthCardPage.Loading,
+                isLoading = false,
+            )
             viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(
-                    cardState = AuthCardState.Loading,
-                    isLoading = false,
-                )
                 delay(2000)
-                _uiState.value = _uiState.value.copy(
-                    cardState = AuthCardState.Login
-                )
+                onCardStateChange(AuthCardPage.Login)
             }
             return
         }
+        if (cardState == AuthCardPage.Authed) {
+            saveAccount(uiState.username, uiState.password)
+        }
 
         _uiState.value = when (cardState) {
-            AuthCardState.EmailCode, AuthCardState.TFACode -> _uiState.value.copy(
+            AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
                 cardState = cardState,
                 verifyCode = "",
                 isLoading = false,
@@ -85,8 +97,8 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
     }
 
     fun cancelJob() {
-        _currentJob?.cancel()
-        _currentJob = null
+        _currentVerifyJob?.cancel()
+        _currentVerifyJob = null
     }
 
     suspend fun awaitAuth(): Boolean? {
@@ -105,7 +117,7 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
             return
         }
         onLoadingChange(true)
-        _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
+        viewModelScope.launch(context = Dispatchers.Default) {
             doLogin(username, password)
         }
     }
@@ -115,12 +127,12 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
         val verifyCode = _uiState.value.verifyCode
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.isLoading) return
         onLoadingChange(true)
-        _currentJob = viewModelScope.launch(context = Dispatchers.Default) {
+        _currentVerifyJob = viewModelScope.launch(context = Dispatchers.Default) {
 
-            val result = async (context = Dispatchers.IO) {
+            val result = async(context = Dispatchers.IO) {
                 val authType = when (_uiState.value.cardState) {
-                    AuthCardState.EmailCode -> AuthType.Email
-                    AuthCardState.TFACode -> AuthType.TFA
+                    AuthCardPage.EmailCode -> AuthType.Email
+                    AuthCardPage.TFACode -> AuthType.TFA
                     else -> error("not supported")
                 }
                 authAPI.verify(verifyCode, authType)
@@ -139,20 +151,39 @@ class AuthViewModel(private val authAPI: AuthAPI) : ViewModel() {
             onErrorMessageChange("Username or Password is incorrect")
             return
         }
-        val authCardState = when (authState) {
-            Authed -> AuthCardState.Authed
+        val authCardPage = when (authState) {
+            Authed -> AuthCardPage.Authed
 
-            NeedTFA -> AuthCardState.TFACode
+            NeedTFA -> AuthCardPage.TFACode
 
-            NeedEmailCode -> AuthCardState.EmailCode
+            NeedEmailCode -> AuthCardPage.EmailCode
 
             Unauthorized -> error("not supported")
 
         }
-        onCardStateChange(authCardState)
+        onCardStateChange(authCardPage)
     }
 
-    fun reset() {
-        _uiState.value = AuthUIState()
+
+    // 定义一个函数，用于保存用户名和密码到本地
+    fun saveAccount(username: String, password: String) = userSharedPreferences.edit().run {
+        putString(USERNAME_KEY, username)
+        putString(PASSWORD_KEY, password)
+        apply()
     }
+
+    // 定义一个函数，用于从本地获取用户名和密码
+    private fun accountPair(): Pair<String, String> = userSharedPreferences.run {
+        val username = getString(USERNAME_KEY, null) ?: ""
+        val password = getString(PASSWORD_KEY, null) ?: ""
+        return username to password
+    }
+
+    // 定义一个函数，用于清除本地的用户名和密码
+    fun clearAccount() = userSharedPreferences.edit().run {
+        remove(USERNAME_KEY)
+        remove(PASSWORD_KEY)
+        apply()
+    }
+
 }
