@@ -218,6 +218,22 @@ val surfaceContainerHighDarkHighContrast = Color(0xFF272A2E)
 val surfaceContainerHighestDarkHighContrast = Color(0xFF313539)
 
 
+object GameColor {
+    object Status {
+        val Online = Color(0xFF51E57E)
+        val JoinMe = Color(0xFF42CAFF)
+        val Busy = Color(0xFF5B0B0B)
+        val AskMe = Color(0xFFE88134)
+        val Offline = Color.Gray
+    }
+    object Level {
+        val visitor = Color(0xFFCCCCCC)
+        val New = Color(0xFF1778FF)
+        val User = Color(0xFF2BCF5C)
+        val Known = Color(0xFFFF7B42)
+        val Trusted = Color(0xFF8143E6)
+    }
+}
 
 
 

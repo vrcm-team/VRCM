@@ -26,6 +26,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        println(System.getProperty("java.io.tmpdir"))
+        println(application.cacheDir.path)
         setContent {
             VRCMTheme {
                 Auth()

@@ -34,3 +34,4 @@ fun Modifier.sateCircle(
     drawCircle(Color.White, borderRadius, borderOffset)
     drawCircle(color, radius, borderOffset)
 }
+

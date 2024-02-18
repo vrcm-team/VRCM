@@ -1,15 +1,11 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.basicAuth
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.path
-import io.ktor.util.InternalAPI
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
+import io.ktor.util.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -54,11 +50,11 @@ class AuthAPI(private val client: HttpClient) {
     suspend fun currentUser(): UserInfo = userRes().body()
 
 
-    suspend fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendInfo>> {
-        return flow {
-            var count = 0
-            while (true) {
-                val response = client.get {
+    fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendInfo>> = flow {
+        var count = 0
+        while (true) {
+            val bodyList = runCatching {
+                client.get {
                     url {
                         path(AUTH_API_SUFFIX, "user", "friends")
                         this.parameters.run {
@@ -67,14 +63,14 @@ class AuthAPI(private val client: HttpClient) {
                             append("n", n.toString())
                         }
                     }
-                }
-                val bodyList = response.body<List<FriendInfo>>()
-                if (bodyList.isEmpty())  break
-                emit(bodyList)
-                count++
-            }
+                }.body<List<FriendInfo>>()
+            }.getOrDefault(emptyList())
+            if (bodyList.isEmpty()) break
+            emit(bodyList)
+            count++
         }
     }
+
 
 
     @OptIn(InternalAPI::class)
