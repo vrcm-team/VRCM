@@ -71,7 +71,6 @@ class AuthAPI(private val client: HttpClient) {
         }
     }
 
-
     @OptIn(InternalAPI::class)
     suspend fun verify(code: String, authType: AuthType): Boolean {
         val response = client.post("$AUTH_API_SUFFIX/twofactorauth/${authType.path}/verify") {
