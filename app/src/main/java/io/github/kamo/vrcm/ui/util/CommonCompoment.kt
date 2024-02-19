@@ -1,6 +1,9 @@
 package io.github.kamo.vrcm.ui.util
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -16,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import io.github.kamo.vrcm.ui.theme.GameColor
 import org.koin.compose.koinInject
 
 @Composable
@@ -87,13 +91,20 @@ fun SnackBarToast(
 
 @Composable
 fun UserStateIcon(
+    modifier: Modifier = Modifier,
     iconUrl: String,
-    sateColor: Color
+    userStatus: String
 ) {
     AImage(
-        modifier = Modifier
-            .sateCircle(sateColor)
-            .fillMaxSize()
+        modifier = modifier
+            .sateCircle(when(userStatus){
+                UserStatus.Online.type -> GameColor.Status.Online
+                UserStatus.JoinMe.type -> GameColor.Status.JoinMe
+                UserStatus.AskMe.type -> GameColor.Status.AskMe
+                UserStatus.Busy.type -> GameColor.Status.Busy
+                UserStatus.Offline.type -> GameColor.Status.Offline
+                else -> GameColor.Status.Offline
+            })
             .aspectRatio(1f)
             .clip(CircleShape),
         iconUrl = iconUrl,

@@ -1,5 +1,6 @@
 package io.github.kamo.vrcm.ui.home
 
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -7,13 +8,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -22,11 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
-import io.github.kamo.vrcm.ui.theme.GameColor
 import io.github.kamo.vrcm.ui.util.AImage
 import io.github.kamo.vrcm.ui.util.UserStateIcon
 import io.github.kamo.vrcm.ui.util.UserStatus
@@ -38,9 +36,11 @@ fun Home(
     homeViewModel: HomeViewModel = koinViewModel(),
     onNavigate: () -> Unit
 ) {
+
     LaunchedEffect(Unit) {
         homeViewModel.refresh()
     }
+
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
         topBar = {
@@ -50,7 +50,18 @@ fun Home(
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 title = {
-                    Text("Top app bar")
+                    Row {
+                        UserStateIcon(
+                            modifier = Modifier.size(40.dp),
+                            iconUrl = "https://api.vrchat.cloud/api/1/image/file_11ca3656-30fb-49e2-8f75-d4f2e5bc8120/6/256",
+                            userStatus = UserStatus.Online.type
+                        )
+                        Text(
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .padding(6.dp), text = "Top app bar"
+                        )
+                    }
                 }
             )
         },
@@ -67,21 +78,28 @@ fun Home(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                onNavigate()
-            }) {
-                Icon(Icons.Default.Add, contentDescription = "Add")
+            Card(onClick = { /*TODO*/ }) {
+
             }
+//            FloatingActionButton(onClick = {
+//                onNavigate()
+//            }) {
+//                Icon(Icons.Default.Add, contentDescription = "Add")
+//            }
         }
     ) { innerPadding ->
-        val refreshing by homeViewModel.refreshing
-        val pullRefreshState = rememberPullRefreshState(refreshing, { homeViewModel.refresh() })
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .pullRefresh(pullRefreshState)
-                .padding(innerPadding)
-
+        val state = homeViewModel.refreshState
+        val scaleFraction = if (state.isRefreshing) 1f else
+            LinearOutSlowInEasing.transform(state.progress).coerceIn(0f, 1f)
+        if (state.isRefreshing) {
+            LaunchedEffect(true) {
+                homeViewModel.refresh()
+            }
+        }
+        Box(Modifier
+            .fillMaxWidth()
+            .padding(innerPadding)
+            .nestedScroll(state.nestedScrollConnection)
         ) {
             val friendLocationMap = homeViewModel.friendLocationMap
             val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
@@ -119,8 +137,61 @@ fun Home(
                     }
                 }
             }
-            PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
+
+            PullToRefreshContainer(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer(scaleX = scaleFraction, scaleY = scaleFraction),
+                state = state,
+            )
         }
+//        val refreshing by homeViewModel.refreshing
+//        val pullRefreshState = rememberPullRefreshState(refreshing, { homeViewModel.refresh() })
+//        Box(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .pullRefresh(pullRefreshState)
+//                .padding(innerPadding)
+//
+//        ) {
+//            val friendLocationMap = homeViewModel.friendLocationMap
+//            val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
+//            val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
+//            val instanceFriendLocations = friendLocationMap[LocationType.Instance]
+//            LazyColumn(
+//                modifier = Modifier
+//                    .padding(9.dp)
+//                    .fillMaxWidth(),
+//                verticalArrangement = Arrangement.spacedBy(9.dp),
+//            ) {
+//
+//                if (offlineFriendLocation != null) {
+//                    item(key = LocationType.Offline) {
+//                        Text(text = "Friends Active on the Website")
+//                        Spacer(modifier = Modifier.height(6.dp))
+//                        UserIconsRow(offlineFriendLocation.friends)
+//                    }
+//                }
+//                if (privateFriendLocation != null) {
+//                    item(key = LocationType.Private) {
+//                        Text(text = "Friends in Private Worlds")
+//                        Spacer(modifier = Modifier.height(6.dp))
+//                        UserIconsRow(privateFriendLocation.friends)
+//                    }
+//                }
+//                if (instanceFriendLocations != null) {
+//                    item(key = LocationType.Instance) {
+//                        Text(text = "by Location")
+//                    }
+//                    items(instanceFriendLocations, key = { it.location }) { locations ->
+//                        LocationCard(locations) {
+//                            UserIconsRow(locations.friends)
+//                        }
+//                    }
+//                }
+//            }
+//            PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
+//        }
     }
 }
 
@@ -135,14 +206,7 @@ private fun UserIconsRow(friends: List<State<FriendInfo>>) {
             LocationFriend(
                 it.value.imageUrl,
                 it.value.displayName,
-                when(it.value.status){
-                    UserStatus.Online.type -> GameColor.Status.Online
-                    UserStatus.JoinMe.type -> GameColor.Status.JoinMe
-                    UserStatus.AskMe.type -> GameColor.Status.AskMe
-                    UserStatus.Busy.type -> GameColor.Status.Busy
-                    UserStatus.Offline.type -> GameColor.Status.Offline
-                    else -> GameColor.Status.Offline
-                }
+                it.value.status
             )
         }
     }
@@ -208,18 +272,17 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
 fun LocationFriend(
     iconUrl: String,
     name: String,
-    sateColor: Color
+    userStatus: String
 ) {
-
     Column(
         modifier = Modifier.width(60.dp),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
+            modifier = Modifier.fillMaxSize(),
             iconUrl = iconUrl,
-            sateColor = sateColor
+            userStatus = userStatus
         )
-
         Text(
             modifier = Modifier.fillMaxSize(),
             text = name,

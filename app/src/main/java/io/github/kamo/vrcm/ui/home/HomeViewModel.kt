@@ -1,5 +1,7 @@
 package io.github.kamo.vrcm.ui.home
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -8,14 +10,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
-import io.github.kamo.vrcm.data.api.file.FileAPI
 import io.github.kamo.vrcm.data.api.instance.InstanceAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
     private val authAPI: AuthAPI,
-    private val fileAPI: FileAPI,
     private val instanceAPI: InstanceAPI
 ) : ViewModel() {
     //    private val uiState = HomeUIState()
@@ -23,9 +23,12 @@ class HomeViewModel(
 
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> = mutableStateMapOf()
 
-    var refreshing = mutableStateOf(false)
-    fun refresh() {
-        refreshing.value = true
+    @OptIn(ExperimentalMaterial3Api::class)
+    val refreshState = PullToRefreshState(
+        positionalThresholdPx = 100f,
+    )
+    @OptIn(ExperimentalMaterial3Api::class)
+    suspend fun refresh() {
         this@HomeViewModel.friendLocationMap.clear()
         viewModelScope.launch(Dispatchers.IO) {
             authAPI.friendsFlow()
@@ -33,19 +36,17 @@ class HomeViewModel(
                     friends.associate { it.id to mutableStateOf(it) }
                         .also { update(it) }
                 }
-            refreshing.value = false
+            refreshState.endRefresh()
         }
     }
 
     private fun update(newValue: Map<String, MutableState<FriendInfo>>) = viewModelScope.launch(Dispatchers.Main) {
-        val friendLocationInfoMap = newValue.values.groupBy({
+        val friendLocationInfoMap = newValue.values.groupBy {
             when (it.value.location) {
                 LocationType.Offline.typeName -> LocationType.Offline
                 LocationType.Private.typeName -> LocationType.Private
                 else -> LocationType.Instance
             }
-        }) {
-            it
         }
         friendLocationInfoMap[LocationType.Offline]?.let { friends ->
             this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Offline) {
@@ -80,7 +81,7 @@ class HomeViewModel(
                                 }
                                 newFriendLocation.instants.value = InstantsVO(
                                     worldName = worldName,
-                                    worldImageUrl = instance.world.thumbnailImageUrl,
+                                    worldImageUrl = instance.world.thumbnailImageUrl ?: "",
                                     instantsType = instance.type,
                                     userCount = "${instance.userCount}/${instance.world.capacity}"
                                 )

@@ -21,7 +21,7 @@ data class World(
     val recommendedCapacity: Int,
     val releaseStatus: String,
     val tags: List<String>,
-    val thumbnailImageUrl: String,
+    val thumbnailImageUrl: String?,
     val udonProducts: List<Any>,
     val unityPackages: List<UnityPackage>,
     val updated_at: String,
