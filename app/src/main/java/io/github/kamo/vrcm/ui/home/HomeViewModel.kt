@@ -80,7 +80,7 @@ class HomeViewModel(
                                 }
                                 newFriendLocation.instants.value = InstantsVO(
                                     worldName = worldName,
-                                    worldImageUrl = instance.world.imageUrl,
+                                    worldImageUrl = instance.world.thumbnailImageUrl,
                                     instantsType = instance.type,
                                     userCount = "${instance.userCount}/${instance.world.capacity}"
                                 )

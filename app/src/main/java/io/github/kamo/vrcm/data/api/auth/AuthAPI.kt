@@ -5,7 +5,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
-import io.ktor.util.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -71,10 +70,9 @@ class AuthAPI(private val client: HttpClient) {
         }
     }
 
-    @OptIn(InternalAPI::class)
     suspend fun verify(code: String, authType: AuthType): Boolean {
         val response = client.post("$AUTH_API_SUFFIX/twofactorauth/${authType.path}/verify") {
-            this.body = TextContent("""{"code":"$code"}""", ContentType.Application.Json)
+            setBody(TextContent("""{"code":"$code"}""", ContentType.Application.Json))
         }
         return response.status == HttpStatusCode.OK
     }
