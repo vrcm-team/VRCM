@@ -3,6 +3,7 @@ package io.github.kamo.vrcm
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import io.github.kamo.vrcm.ui.auth.Auth
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
 import io.github.vrchatapi.model.CurrentUser
@@ -26,8 +27,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        println(System.getProperty("java.io.tmpdir"))
-        println(application.cacheDir.path)
+        enableEdgeToEdge()
         setContent {
             VRCMTheme {
                 Auth()

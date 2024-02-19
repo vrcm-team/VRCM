@@ -2,15 +2,31 @@ package io.github.kamo.vrcm.ui.home
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material3.*
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Card
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -30,38 +46,37 @@ import io.github.kamo.vrcm.ui.util.UserStateIcon
 import io.github.kamo.vrcm.ui.util.UserStatus
 import org.koin.androidx.compose.koinViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home(
     homeViewModel: HomeViewModel = koinViewModel(),
     onNavigate: () -> Unit
 ) {
-
-    LaunchedEffect(Unit) {
-        homeViewModel.refresh()
+    val pullToRefreshState = rememberPullToRefreshState()
+    LaunchedEffect(UInt) {
+        pullToRefreshState.startRefresh()
     }
-
+    println("Home")
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 colors = topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.onPrimary,
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 title = {
-                    Row {
-                        UserStateIcon(
-                            modifier = Modifier.size(40.dp),
-                            iconUrl = "https://api.vrchat.cloud/api/1/image/file_11ca3656-30fb-49e2-8f75-d4f2e5bc8120/6/256",
-                            userStatus = UserStatus.Online.type
-                        )
-                        Text(
-                            modifier = Modifier
-                                .align(Alignment.CenterVertically)
-                                .padding(6.dp), text = "Top app bar"
-                        )
-                    }
+
+                    Text(
+                        modifier = Modifier.padding(6.dp), text = "Top app bar"
+                    )
+                },
+                actions = {
+                    UserStateIcon(
+                        modifier = Modifier.size(40.dp),
+                        iconUrl = "https://api.vrchat.cloud/api/1/image/file_11ca3656-30fb-49e2-8f75-d4f2e5bc8120/6/256",
+                        userStatus = UserStatus.Online.type
+                    )
                 }
             )
         },
@@ -88,19 +103,20 @@ fun Home(
 //            }
         }
     ) { innerPadding ->
-        val state = homeViewModel.refreshState
-        val scaleFraction = if (state.isRefreshing) 1f else
-            LinearOutSlowInEasing.transform(state.progress).coerceIn(0f, 1f)
-        if (state.isRefreshing) {
-            LaunchedEffect(true) {
-                homeViewModel.refresh()
-            }
-        }
-        Box(Modifier
-            .fillMaxWidth()
-            .padding(innerPadding)
-            .nestedScroll(state.nestedScrollConnection)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(innerPadding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
         ) {
+            val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
+                LinearOutSlowInEasing.transform(pullToRefreshState.progress).coerceIn(0f, 1f)
+            if (pullToRefreshState.isRefreshing) {
+                LaunchedEffect(Unit) {
+                    homeViewModel.refresh()
+                    pullToRefreshState.endRefresh()
+                }
+            }
             val friendLocationMap = homeViewModel.friendLocationMap
             val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
             val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
@@ -142,56 +158,9 @@ fun Home(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .graphicsLayer(scaleX = scaleFraction, scaleY = scaleFraction),
-                state = state,
+                state = pullToRefreshState,
             )
         }
-//        val refreshing by homeViewModel.refreshing
-//        val pullRefreshState = rememberPullRefreshState(refreshing, { homeViewModel.refresh() })
-//        Box(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .pullRefresh(pullRefreshState)
-//                .padding(innerPadding)
-//
-//        ) {
-//            val friendLocationMap = homeViewModel.friendLocationMap
-//            val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
-//            val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
-//            val instanceFriendLocations = friendLocationMap[LocationType.Instance]
-//            LazyColumn(
-//                modifier = Modifier
-//                    .padding(9.dp)
-//                    .fillMaxWidth(),
-//                verticalArrangement = Arrangement.spacedBy(9.dp),
-//            ) {
-//
-//                if (offlineFriendLocation != null) {
-//                    item(key = LocationType.Offline) {
-//                        Text(text = "Friends Active on the Website")
-//                        Spacer(modifier = Modifier.height(6.dp))
-//                        UserIconsRow(offlineFriendLocation.friends)
-//                    }
-//                }
-//                if (privateFriendLocation != null) {
-//                    item(key = LocationType.Private) {
-//                        Text(text = "Friends in Private Worlds")
-//                        Spacer(modifier = Modifier.height(6.dp))
-//                        UserIconsRow(privateFriendLocation.friends)
-//                    }
-//                }
-//                if (instanceFriendLocations != null) {
-//                    item(key = LocationType.Instance) {
-//                        Text(text = "by Location")
-//                    }
-//                    items(instanceFriendLocations, key = { it.location }) { locations ->
-//                        LocationCard(locations) {
-//                            UserIconsRow(locations.friends)
-//                        }
-//                    }
-//                }
-//            }
-//            PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
-//        }
     }
 }
 
