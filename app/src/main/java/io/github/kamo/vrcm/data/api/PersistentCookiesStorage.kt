@@ -9,15 +9,15 @@ class PersistentCookiesStorage(
     private val cookiesDao: CookiesDao
 ) : CookiesStorage {
 
-    override suspend fun get(requestUrl: Url): List<Cookie> {
-        println("requestUrl=$requestUrl")
-        return cookiesDao.allCookies.filter { it.value is String }
-            .map { (key, value) ->
-                val cookie = parseServerSetCookieHeader(value as String)
-                val currentKey = cookie.name + "@" + requestUrl.host
-                if (currentKey == key) cookie else null
-            }.fastFilterNotNull()
-    }
+    override suspend fun get(requestUrl: Url): List<Cookie> = cookiesDao.allCookies
+        .filter { it.value is String }
+        .map { (key, value) ->
+            println("requestUrl=$requestUrl")
+            val cookie = parseServerSetCookieHeader(value as String)
+            val currentKey = cookie.name + "@" + requestUrl.host
+            if (currentKey == key) cookie else null
+        }.fastFilterNotNull()
+
 
     override suspend fun addCookie(requestUrl: Url, cookie: Cookie) =
         cookiesDao.saveCookies(cookie.name + "@" + requestUrl.host, "${cookie.name}=${cookie.value}")
