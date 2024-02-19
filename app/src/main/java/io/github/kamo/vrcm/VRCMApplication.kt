@@ -2,6 +2,7 @@ package io.github.kamo.vrcm
 
 import android.app.Application
 import io.github.kamo.vrcm.di.apiModule
+import io.github.kamo.vrcm.di.daoModule
 import io.github.kamo.vrcm.di.viewModeModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -13,7 +14,7 @@ class VRCMApplication : Application() {
         startKoin {
             androidLogger()
             androidContext(this@VRCMApplication)
-            modules(viewModeModule, apiModule)
+            modules(viewModeModule, apiModule,daoModule)
         }
     }
 }

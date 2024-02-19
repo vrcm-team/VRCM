@@ -72,7 +72,6 @@ class AuthAPI(private val client: HttpClient) {
     }
 
 
-
     @OptIn(InternalAPI::class)
     suspend fun verify(code: String, authType: AuthType): Boolean {
         val response = client.post("$AUTH_API_SUFFIX/twofactorauth/${authType.path}/verify") {
@@ -81,13 +80,14 @@ class AuthAPI(private val client: HttpClient) {
         return response.status == HttpStatusCode.OK
     }
 
-    suspend fun isAuthed(): Boolean {
+    suspend fun isAuthed(): Boolean? = runCatching {
         val response = client.get(AUTH_API_SUFFIX) {
             url { path(AUTH_API_SUFFIX) }
         }
         return response.status == HttpStatusCode.OK && response.body<AuthInfo>().ok == true
-    }
+    }.getOrNull()
 }
+
 
 enum class AuthType(val path: String) {
     Email("emailotp"),

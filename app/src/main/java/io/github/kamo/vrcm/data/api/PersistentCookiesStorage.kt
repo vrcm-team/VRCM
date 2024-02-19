@@ -1,34 +1,27 @@
 package io.github.kamo.vrcm.data.api
 
-import android.content.Context
+import androidx.compose.ui.util.fastFilterNotNull
+import io.github.kamo.vrcm.data.dao.CookiesDao
 import io.ktor.client.plugins.cookies.*
 import io.ktor.http.*
 
-class PersistentCookiesStorage(context: Context) : CookiesStorage {
-
-    private val preferences = context.getSharedPreferences("cookies", Context.MODE_PRIVATE)
+class PersistentCookiesStorage(
+    private val cookiesDao: CookiesDao
+) : CookiesStorage {
 
     override suspend fun get(requestUrl: Url): List<Cookie> {
-        val cookies = mutableListOf<Cookie>()
         println("requestUrl=$requestUrl")
-        preferences.all.forEach { (key, value) ->
-            if (value is String) {
-                val cookie = parseServerSetCookieHeader(value)
+        return cookiesDao.allCookies.filter { it.value is String }
+            .map { (key, value) ->
+                val cookie = parseServerSetCookieHeader(value as String)
                 val currentKey = cookie.name + "@" + requestUrl.host
-                if (currentKey == key) {
-                    cookies.add(cookie)
-                }
-            }
-        }
-        return cookies
+                if (currentKey == key) cookie else null
+            }.fastFilterNotNull()
     }
 
-    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) {
-        val editor = preferences.edit()
-        val key = cookie.name + "@" + requestUrl.host
-        editor.putString(key, "${cookie.name}=${cookie.value}")
-        editor.apply()
-    }
+    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) =
+        cookiesDao.saveCookies(cookie.name + "@" + requestUrl.host, "${cookie.name}=${cookie.value}")
 
     override fun close(): Unit = Unit
+
 }

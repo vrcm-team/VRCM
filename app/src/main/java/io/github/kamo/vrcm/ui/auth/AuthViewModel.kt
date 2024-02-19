@@ -1,7 +1,5 @@
 package io.github.kamo.vrcm.ui.auth
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -9,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import io.github.kamo.vrcm.data.api.auth.AuthState.*
 import io.github.kamo.vrcm.data.api.auth.AuthType
+import io.github.kamo.vrcm.data.dao.AccountDao
 import kotlinx.coroutines.*
 
 
@@ -22,18 +21,12 @@ enum class AuthCardPage {
 
 class AuthViewModel(
     private val authAPI: AuthAPI,
-    context: Context
+    private val accountDao: AccountDao,
 ) : ViewModel() {
-    companion object {
-        // 定义一个常量，用于存储用户名和密码的键
-        private const val USERNAME_KEY = "username"
-        private const val PASSWORD_KEY = "password"
-    }
 
-    // 定义一个函数，用于获取 shared preferences 的实例
-    private val userSharedPreferences: SharedPreferences = context.getSharedPreferences("user", Context.MODE_PRIVATE)
-
-    private val _uiState = mutableStateOf(accountPair().run { AuthUIState(username = first, password = second) })
+    private val _uiState = mutableStateOf(accountDao.accountPair().run {
+        AuthUIState(username = first, password = second)
+    })
 
     private var _currentVerifyJob: Job? = null
 
@@ -79,7 +72,7 @@ class AuthViewModel(
             return
         }
         if (cardState == AuthCardPage.Authed) {
-            saveAccount(uiState.username, uiState.password)
+            accountDao.saveAccount(uiState.username, uiState.password)
         }
 
         _uiState.value = when (cardState) {
@@ -101,11 +94,8 @@ class AuthViewModel(
         _currentVerifyJob = null
     }
 
-    suspend fun awaitAuth(): Boolean? {
-        return viewModelScope.async(Dispatchers.IO) {
-            runCatching { authAPI.isAuthed() }.getOrNull()
-        }.await()
-    }
+    suspend fun awaitAuth(): Boolean = viewModelScope.async(Dispatchers.IO) { authAPI.isAuthed() }.await() == true
+
 
     fun login() {
         val password = _uiState.value.password.trim()
@@ -164,26 +154,5 @@ class AuthViewModel(
         onCardStateChange(authCardPage)
     }
 
-
-    // 定义一个函数，用于保存用户名和密码到本地
-    fun saveAccount(username: String, password: String) = userSharedPreferences.edit().run {
-        putString(USERNAME_KEY, username)
-        putString(PASSWORD_KEY, password)
-        apply()
-    }
-
-    // 定义一个函数，用于从本地获取用户名和密码
-    private fun accountPair(): Pair<String, String> = userSharedPreferences.run {
-        val username = getString(USERNAME_KEY, null) ?: ""
-        val password = getString(PASSWORD_KEY, null) ?: ""
-        return username to password
-    }
-
-    // 定义一个函数，用于清除本地的用户名和密码
-    fun clearAccount() = userSharedPreferences.edit().run {
-        remove(USERNAME_KEY)
-        remove(PASSWORD_KEY)
-        apply()
-    }
 
 }

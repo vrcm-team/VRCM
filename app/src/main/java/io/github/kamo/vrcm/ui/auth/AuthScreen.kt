@@ -41,7 +41,7 @@ fun Auth(
 
     LaunchedEffect(Unit) {
         isStartUp = true
-        authViewModel.onCardStateChange(if (authViewModel.awaitAuth() == true) AuthCardPage.Authed else AuthCardPage.Login)
+        authViewModel.onCardStateChange(if (authViewModel.awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login)
     }
     Box(
         modifier = Modifier
