@@ -1,6 +1,7 @@
 package io.github.kamo.vrcm.ui.home
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
+import io.github.kamo.vrcm.data.api.auth.UserInfo
 import io.github.kamo.vrcm.data.api.instance.InstanceAPI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,7 +21,17 @@ class HomeViewModel(
     //    private val uiState = HomeUIState()
 //    val _uiState: HomeUIState = uiState
 
-    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> = mutableStateMapOf()
+    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
+        mutableStateMapOf()
+
+    private val _currentUser = mutableStateOf<UserInfo?>(null)
+
+    val currentUser by _currentUser
+
+    fun ini() = viewModelScope.launch(Dispatchers.IO) {
+        _currentUser.value = authAPI.currentUser()
+    }
+
 
     suspend fun refresh() {
         this@HomeViewModel.friendLocationMap.clear()
@@ -66,15 +78,10 @@ class HomeViewModel(
                                 viewModelScope.launch(Dispatchers.IO) {
                                     val instance =
                                         instanceAPI.instanceByLocation(newFriendLocation.location)
-                                    val worldName = try {
-                                        instance.world.name
-                                    } catch (e: Exception) {
-                                        println("instanceAPI.instanceByLocation error: $instance")
-                                        ""
-                                    }
+                                            ?: return@launch
                                     runCatching {
                                         newFriendLocation.instants.value = InstantsVO(
-                                            worldName = worldName,
+                                            worldName = instance.world.name,
                                             worldImageUrl = instance.world.thumbnailImageUrl ?: "",
                                             instantsType = instance.type,
                                             userCount = "${instance.userCount}/${instance.world.capacity}"

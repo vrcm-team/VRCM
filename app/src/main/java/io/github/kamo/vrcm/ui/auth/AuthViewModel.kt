@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthAPI
-import io.github.kamo.vrcm.data.api.auth.AuthState.*
+import io.github.kamo.vrcm.data.api.auth.AuthState.Authed
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedEmailCode
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedTFA
+import io.github.kamo.vrcm.data.api.auth.AuthState.Unauthorized
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import io.github.kamo.vrcm.data.dao.AccountDao
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +66,6 @@ class AuthViewModel(
         if (cardState == AuthCardPage.Authed) {
             accountDao.saveAccount(uiState.username, uiState.password)
         }
-
         _uiState.value = when (cardState) {
             AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
                 cardState = cardState,

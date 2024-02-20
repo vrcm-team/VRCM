@@ -21,8 +21,6 @@ data class FriendLocation(
                 location = LocationType.Private.typeName,
                 friends = mutableStateListOf()
             )
-
-
     }
 }
 

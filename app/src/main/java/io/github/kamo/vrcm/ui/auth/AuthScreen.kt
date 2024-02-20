@@ -1,12 +1,21 @@
 package io.github.kamo.vrcm.ui.auth
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.Transition
-import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material3.CircularProgressIndicator
@@ -15,11 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
@@ -34,8 +41,16 @@ fun Auth(
     onNavigate: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        authViewModel.onCardStateChange(if (authViewModel.awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login)
+        println("cardState: " + authViewModel.hashCode())
+        println("cardState: " + authViewModel.uiState.cardState)
+        authViewModel.onCardStateChange(AuthCardPage.Loading)
+        val cardState = if (authViewModel.awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
+        println("cardState2: " + cardState)
+        authViewModel.onCardStateChange(cardState)
+        println("cardState1: " + authViewModel.hashCode())
+        println("cardState1: " + authViewModel.uiState.cardState)
     }
+
     AuthFold {
         AuthCard(
             cardState = authViewModel.uiState.cardState,
@@ -80,9 +95,10 @@ fun Auth(
                 }
 
                 AuthCardPage.Authed -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    LaunchedEffect(Unit) {
                         onNavigate()
                     }
+                    Box(modifier = Modifier.fillMaxSize())
                 }
             }
         }
@@ -95,25 +111,26 @@ private fun AuthCard(
     content: @Composable (AuthCardPage) -> Unit
 ) {
     val cardChangeDurationMillis = 600
-    val cardChangeAnimationSpec = tween<Float>(
-        cardChangeDurationMillis,
-        cardChangeDurationMillis
-    )
+    val cardChangeAnimationSpec =
+        remember { tween<Float>(cardChangeDurationMillis, cardChangeDurationMillis) }
+    val animationSpec = remember { tween<Float>(cardChangeDurationMillis) }
     AnimatedContent(
         label = "AuthSurfaceChange",
         targetState = cardState,
         transitionSpec = {
-            println(this.initialState)
             when (this.targetState) {
                 AuthCardPage.Loading -> fadeIn(cardChangeAnimationSpec)
-                    .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
+                    .togetherWith(fadeOut(animationSpec))
 
-                AuthCardPage.Login -> fadeSlideHorizontally(cardChangeDurationMillis, direction = -1)
+                AuthCardPage.Login -> fadeSlideHorizontally(
+                    cardChangeDurationMillis,
+                    direction = -1
+                )
 
                 AuthCardPage.EmailCode, AuthCardPage.TFACode -> fadeSlideHorizontally(cardChangeDurationMillis)
 
                 AuthCardPage.Authed -> EnterTransition.None
-                    .togetherWith(fadeOut(tween(cardChangeDurationMillis)))
+                    .togetherWith(fadeOut(animationSpec))
             }
         },
     ) {
@@ -157,35 +174,6 @@ private fun NavCard(
     }
 }
 
-private fun Modifier.cardInAnimate(inDurationMillis: Int, startUpTransition: Transition<Boolean>) =
-    composed {
-        val authSurfaceOffset by startUpTransition.animateDp(
-            { tween(inDurationMillis) },
-            label = "AuthSurfaceOffset"
-        ) {
-            if (it) 0.dp else 380.dp
-        }
-        val authSurfaceAlpha by startUpTransition.animateFloat(
-            { tween(inDurationMillis + 1000) },
-            label = "AuthSurfaceAlpha"
-        ) {
-            if (it) 1.00f else 0.00f
-        }
-
-        alpha(authSurfaceAlpha)
-            .offset(y = authSurfaceOffset)
-    }
-
-private fun Modifier.iconInAnimate(durationMillis: Int, startUpTransition: Transition<Boolean>) =
-    this.then(composed {
-        val logoOffset by startUpTransition.animateDp(
-            { tween(durationMillis) },
-            label = "LogoOffset"
-        ) {
-            if (it) (-180).dp else 0.dp
-        }
-        offset(y = logoOffset)
-    })
 
 
 

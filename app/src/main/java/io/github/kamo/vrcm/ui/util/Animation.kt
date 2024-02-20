@@ -1,15 +1,25 @@
 package io.github.kamo.vrcm.ui.util;
 
-import androidx.compose.animation.*
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -21,10 +31,11 @@ fun AuthAnime(
     isAuthed: Boolean,
     onNavigate: () -> Unit
 ) {
+
     var isAuthedState by remember { mutableStateOf(isAuthed) }
-    val cardUpAnimationSpec = tween<Dp>(1000)
+    val cardUpAnimationSpec = tween<Dp>(1200)
     val cardHeightDp by animateDpAsState(
-        if (!isAuthedState) 380.dp else LocalConfiguration.current.screenHeightDp.dp,
+        if (!isAuthedState) 380.dp else (LocalConfiguration.current.screenHeightDp + 100).dp,
         cardUpAnimationSpec,
         label = "AuthCardHeightDp",
     )
@@ -58,7 +69,7 @@ fun AuthAnime(
 fun StartupAnime(
     onNavigate: () -> Unit
 ) {
-    val durationMillis = 1500
+    val durationMillis = 1200
     var isStartUp by remember { mutableStateOf(false) }
     val iconYOffset by animateDpAsState(
         if (isStartUp) (-180).dp else 0.dp,

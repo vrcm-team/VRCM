@@ -10,10 +10,7 @@ const val instances_API_SUFFIX = "instances"
 
 class InstanceAPI(private val client: HttpClient) {
 
-    suspend fun instanceByLocation(location: String): InstanceInfo {
-        return client.get {
-            url { path(instances_API_SUFFIX, location) }
-        }.body()
-    }
-
+    suspend fun instanceByLocation(location: String): InstanceInfo? = runCatching {
+        return client.get { url { path(instances_API_SUFFIX, location) } }.body()
+    }.getOrNull()
 }
