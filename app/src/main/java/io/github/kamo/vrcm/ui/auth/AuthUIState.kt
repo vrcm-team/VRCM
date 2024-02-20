@@ -5,7 +5,7 @@ data class AuthUIState(
     val password: String = "",
     val verifyCode: String = "",
     val errorMsg: String = "",
-    val isLoading: Boolean = false,
+    val btnIsLoading: Boolean = false,
     val cardState: AuthCardPage = AuthCardPage.Loading,
 )
 

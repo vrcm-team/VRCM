@@ -19,8 +19,7 @@ class HomeViewModel(
     //    private val uiState = HomeUIState()
 //    val _uiState: HomeUIState = uiState
 
-    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
-        mutableStateMapOf()
+    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> = mutableStateMapOf()
 
     suspend fun refresh() {
         this@HomeViewModel.friendLocationMap.clear()

@@ -43,7 +43,7 @@ fun VerifyCardInput(
             .height(48.dp),
         text = "VERIFY",
         enabled = verifyCode.isNotBlank() && verifyCode.length == 6 && verifyCode.isDigitsOnly(),
-        isLoading = uiState.isLoading,
+        isLoading = uiState.btnIsLoading,
         onClick = onClick
     )
 }

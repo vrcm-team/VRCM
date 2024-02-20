@@ -73,7 +73,7 @@ fun LoginCardInput(
             .height(48.dp),
         text = "LOGIN",
         enabled = uiState.password.isNotBlank() && uiState.username.isNotBlank(),
-        isLoading = uiState.isLoading,
+        isLoading = uiState.btnIsLoading,
         onClick = onClick
     )
 }

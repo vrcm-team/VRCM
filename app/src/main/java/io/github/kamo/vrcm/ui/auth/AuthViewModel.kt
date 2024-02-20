@@ -8,7 +8,10 @@ import io.github.kamo.vrcm.data.api.auth.AuthAPI
 import io.github.kamo.vrcm.data.api.auth.AuthState.*
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import io.github.kamo.vrcm.data.dao.AccountDao
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 
 
 enum class AuthCardPage {
@@ -45,32 +48,18 @@ class AuthViewModel(
     }
 
     fun onLoadingChange(isLoading: Boolean) {
-        _uiState.value = _uiState.value.copy(isLoading = isLoading)
+        _uiState.value = _uiState.value.copy(btnIsLoading = isLoading)
     }
 
     fun onErrorMessageChange(errorMsg: String) {
-        if (_uiState.value.isLoading) {
-            _uiState.value = _uiState.value.copy(errorMsg = errorMsg, isLoading = false)
+        if (_uiState.value.btnIsLoading) {
+            _uiState.value = _uiState.value.copy(errorMsg = errorMsg, btnIsLoading = false)
         } else {
             _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
         }
     }
 
     fun onCardStateChange(cardState: AuthCardPage) {
-
-        // 主界面跳回登录验证界面需要手动操作下,为了正确的显示出现和消失动画
-        if (cardState == AuthCardPage.Loading && _uiState.value.cardState == AuthCardPage.Authed) {
-
-            _uiState.value = _uiState.value.copy(
-                cardState = AuthCardPage.Loading,
-                isLoading = false,
-            )
-            viewModelScope.launch {
-                delay(2000)
-                onCardStateChange(AuthCardPage.Login)
-            }
-            return
-        }
         if (cardState == AuthCardPage.Authed) {
             accountDao.saveAccount(uiState.username, uiState.password)
         }
@@ -79,12 +68,12 @@ class AuthViewModel(
             AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
                 cardState = cardState,
                 verifyCode = "",
-                isLoading = false,
+                btnIsLoading = false,
             )
 
             else -> _uiState.value.copy(
                 cardState = cardState,
-                isLoading = false,
+                btnIsLoading = false,
             )
         }
     }
@@ -100,7 +89,7 @@ class AuthViewModel(
     fun login() {
         val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
-        if (password.isEmpty() || username.isEmpty() || _uiState.value.isLoading) {
+        if (password.isEmpty() || username.isEmpty() || _uiState.value.btnIsLoading) {
             if (password.isEmpty() || username.isEmpty()) {
                 onErrorMessageChange("Username or Password is empty")
             }
@@ -115,7 +104,7 @@ class AuthViewModel(
 
     fun verify() {
         val verifyCode = _uiState.value.verifyCode
-        if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.isLoading) return
+        if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = viewModelScope.launch(context = Dispatchers.Default) {
 
@@ -128,7 +117,7 @@ class AuthViewModel(
                 authAPI.verify(verifyCode, authType)
             }.await()
             if (result) {
-                doLogin(_uiState.value.username, _uiState.value.password)
+                onCardStateChange(AuthCardPage.Authed)
             } else {
                 onErrorMessageChange("Invalid Code")
             }
