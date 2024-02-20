@@ -1,4 +1,4 @@
-package io.github.kamo.vrcm.ui.util;
+package io.github.kamo.vrcm.ui.util
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.animateDpAsState

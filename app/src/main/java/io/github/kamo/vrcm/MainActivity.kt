@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent() {
     val navController = rememberNavController()
-    var isAuthed = false
+//    var isAuthed = false
     VRCMTheme {
         Surface(
             modifier = Modifier.fillMaxSize()
