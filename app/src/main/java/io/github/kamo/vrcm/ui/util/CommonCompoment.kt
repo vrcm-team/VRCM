@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import io.github.kamo.vrcm.R
-import io.github.kamo.vrcm.common.UserStatus
+import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.ui.theme.GameColor
 import org.koin.compose.koinInject
 

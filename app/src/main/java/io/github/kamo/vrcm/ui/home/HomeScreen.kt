@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
@@ -31,7 +32,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.kamo.vrcm.common.UserStatus
+import io.github.kamo.vrcm.data.api.CountryIcon
+import io.github.kamo.vrcm.data.api.LocationType
+import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.ui.theme.GameColor
 import io.github.kamo.vrcm.ui.util.AImage
@@ -232,35 +235,52 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 6.dp)
+                        .padding(horizontal = 6.dp)
                 ) {
                     Text(
                         modifier = Modifier.fillMaxWidth(),
-                        text = instants.worldName ?: "",
+                        text = instants.worldName,
                         fontSize = 15.sp,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
-                    Row {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(20.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ){
+                        AImage(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape),
+                            imageUrl = CountryIcon.fetchIconUrl(location.location),
+                        )
                         Text(
-                            text = instants.instantsType,
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                            text = instants.instantsType.displayName,
                         )
                         Spacer(modifier = Modifier.weight(1f))
+
                         Text(
+                            modifier = Modifier.padding(horizontal = 6.dp),
                             text = instants.userCount,
                         )
+                        Icon(
+                            modifier = Modifier
+                                .size(20.dp),
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = "Person"
+                        )
                     }
-
                 }
-
             }
             content()
         }
     }
-
-
 }
 
 

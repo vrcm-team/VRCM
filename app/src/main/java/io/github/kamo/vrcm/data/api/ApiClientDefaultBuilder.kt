@@ -1,6 +1,5 @@
 package io.github.kamo.vrcm.data.api;
 
-import io.github.kamo.vrcm.common.UserStatus
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*

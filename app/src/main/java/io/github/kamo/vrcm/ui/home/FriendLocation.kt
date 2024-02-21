@@ -3,6 +3,8 @@ package io.github.kamo.vrcm.ui.home
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import io.github.kamo.vrcm.data.api.InstantsType
+import io.github.kamo.vrcm.data.api.LocationType
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 
 data class FriendLocation(
@@ -25,32 +27,10 @@ data class FriendLocation(
 }
 
 data class InstantsVO(
-    val worldName: String? = "",
-    val worldImageUrl: String = "",
-    val instantsType: String = "",
+    val worldName: String = "",
+    val worldImageUrl: String? = null,
+    val instantsType: InstantsType = InstantsType.Public,
+    val regionIconUrl: String? = null,
     val userCount: String = "",
 )
 
-enum class InstantsType {
-    Public,
-    FriendPlus,
-    Friend,
-    Prav
-}
-
-enum class LocationType(val typeName: String) {
-    /**
-     * Friends Active on the Website
-     */
-    Offline("offline"),
-
-    /**
-     * Friends in Private Worlds
-     */
-    Private("private"),
-
-    /**
-     * by Location Instance
-     */
-    Instance("wrld_")
-}

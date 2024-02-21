@@ -1,7 +1,7 @@
 package io.github.kamo.vrcm.data.api.auth
 
 import com.google.gson.annotations.SerializedName
-import io.github.kamo.vrcm.common.UserStatus
+import io.github.kamo.vrcm.data.api.UserStatus
 
 data class FriendInfo(
     val bio: String,

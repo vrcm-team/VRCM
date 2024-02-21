@@ -124,12 +124,8 @@ fun MainContent() {
                     MainRouteEnum.Home.route,
                     enterTransition = { fadeIn(tween(1000)) },
                     exitTransition = {
-                        fadeOut(tween(500, 500)) + slideOut(tween(1000)) {
-                            IntOffset(
-                                0,
-                                (it.height * 0.6f).toInt()
-                            )
-                        }
+                        fadeOut(tween(500, 500)) +
+                                slideOut(tween(1000)) { IntOffset(0, (it.height * 0.6f).toInt()) }
                     }
                 ) {
                     Home {

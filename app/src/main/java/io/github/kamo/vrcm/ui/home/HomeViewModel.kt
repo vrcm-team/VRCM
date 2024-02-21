@@ -3,6 +3,8 @@ package io.github.kamo.vrcm.ui.home
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.kamo.vrcm.data.api.CountryIcon
+import io.github.kamo.vrcm.data.api.LocationType
 import io.github.kamo.vrcm.data.api.auth.AuthApi
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.data.api.auth.UserInfo
@@ -72,19 +74,18 @@ class HomeViewModel(
                                 friends = mutableStateListOf()
                             ).also { newFriendLocation ->
                                 viewModelScope.launch(Dispatchers.IO) {
-                                    val instance =
-                                        instanceAPI.instanceByLocation(newFriendLocation.location)
+                                    val instance = instanceAPI.instanceByLocation(newFriendLocation.location)
                                             ?: return@launch
                                     runCatching {
                                         newFriendLocation.instants.value = InstantsVO(
-                                            worldName = instance.world.name,
-                                            worldImageUrl = instance.world.thumbnailImageUrl ?: "",
-                                            instantsType = instance.type,
+                                            worldName = instance.world.name?: "",
+                                            worldImageUrl = instance.world.thumbnailImageUrl,
+                                            instantsType = instance.detailedType,
+                                            regionIconUrl = CountryIcon.fetchIconUrl(instance.location),
                                             userCount = "${instance.userCount}/${instance.world.capacity}"
                                         )
                                     }
-                                }.invokeOnCompletion {
-                                    it ?: friendLocations.add(newFriendLocation)
+                                    friendLocations.add(newFriendLocation)
                                 }
                             }
                     }.friends.addAll(locationFriendEntry.value)
