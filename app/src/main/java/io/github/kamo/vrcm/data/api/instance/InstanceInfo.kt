@@ -1,5 +1,7 @@
 package io.github.kamo.vrcm.data.api.instance
 
+import com.google.gson.annotations.SerializedName
+
 data class InstanceInfo(
     val active: Boolean,
     val canRequestInvite: Boolean,
@@ -15,7 +17,8 @@ data class InstanceInfo(
     val id: String,
     val instanceId: String,
     val location: String,
-    val n_users: Int,
+    @SerializedName("n_users")
+    val nUsers: Int,
     val name: String,
     val ownerId: String?,
     val permanent: Boolean,
@@ -31,6 +34,6 @@ data class InstanceInfo(
     val tags: List<String>,
     val type: String,
     val userCount: Int,
-    val world: World,
+    val world: WorldInfo,
     val worldId: String
 )

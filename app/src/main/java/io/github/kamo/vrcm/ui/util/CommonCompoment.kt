@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import io.github.kamo.vrcm.R
+import io.github.kamo.vrcm.common.UserStatus
 import io.github.kamo.vrcm.ui.theme.GameColor
 import org.koin.compose.koinInject
 
@@ -133,22 +134,23 @@ fun SnackBarToast(
 @Composable
 fun UserStateIcon(
     modifier: Modifier = Modifier,
-    iconUrl: String,
-    userStatus: String
+    iconUrl: String?,
+    userStatus: UserStatus
 ) {
     AImage(
-        modifier = modifier
-            .sateCircle(when(userStatus){
-                UserStatus.Online.type -> GameColor.Status.Online
-                UserStatus.JoinMe.type -> GameColor.Status.JoinMe
-                UserStatus.AskMe.type -> GameColor.Status.AskMe
-                UserStatus.Busy.type -> GameColor.Status.Busy
-                UserStatus.Offline.type -> GameColor.Status.Offline
-                else -> GameColor.Status.Offline
-            })
+        modifier = Modifier
+            .sateCircle(
+                when (userStatus) {
+                    UserStatus.Online -> GameColor.Status.Online
+                    UserStatus.JoinMe -> GameColor.Status.JoinMe
+                    UserStatus.AskMe -> GameColor.Status.AskMe
+                    UserStatus.Busy -> GameColor.Status.Busy
+                    UserStatus.Offline -> GameColor.Status.Offline
+                }
+            ).then(modifier)
             .aspectRatio(1f)
             .clip(CircleShape),
-        iconUrl = iconUrl,
+        imageUrl = iconUrl,
         contentDescription = "UserStateIcon"
     )
 }
@@ -156,7 +158,7 @@ fun UserStateIcon(
 @Composable
 fun AImage(
     modifier: Modifier = Modifier,
-    iconUrl: String,
+    imageUrl: String?,
     color: Color = MaterialTheme.colorScheme.inverseOnSurface,
     contentDescription: String? = null,
     imageLoader: ImageLoader = koinInject(),
@@ -165,7 +167,7 @@ fun AImage(
     val placeholder = remember(color) { ColorPainter(color) }
     AsyncImage(
         modifier = modifier,
-        model = iconUrl,
+        model = imageUrl,
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         placeholder = placeholder,
@@ -174,11 +176,4 @@ fun AImage(
     )
 }
 
-enum class UserStatus(val type: String) {
-    Online("active"),
-    JoinMe("join me"),
-    AskMe("ask me"),
-    Busy("busy"),
-    Offline("offline")
-}
 

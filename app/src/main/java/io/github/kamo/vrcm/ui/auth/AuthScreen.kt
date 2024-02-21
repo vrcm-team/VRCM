@@ -1,21 +1,9 @@
 package io.github.kamo.vrcm.ui.auth
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,14 +29,8 @@ fun Auth(
     onNavigate: () -> Unit
 ) {
     LaunchedEffect(Unit) {
-        println("cardState: " + authViewModel.hashCode())
-        println("cardState: " + authViewModel.uiState.cardState)
-        authViewModel.onCardStateChange(AuthCardPage.Loading)
         val cardState = if (authViewModel.awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
-        println("cardState2: " + cardState)
         authViewModel.onCardStateChange(cardState)
-        println("cardState1: " + authViewModel.hashCode())
-        println("cardState1: " + authViewModel.uiState.cardState)
     }
 
     AuthFold {

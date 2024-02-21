@@ -1,13 +1,9 @@
 package io.github.kamo.vrcm.ui.home
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.kamo.vrcm.data.api.auth.AuthAPI
+import io.github.kamo.vrcm.data.api.auth.AuthApi
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.data.api.auth.UserInfo
 import io.github.kamo.vrcm.data.api.instance.InstanceAPI
@@ -15,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-    private val authAPI: AuthAPI,
+    private val authAPI: AuthApi,
     private val instanceAPI: InstanceAPI
 ) : ViewModel() {
     //    private val uiState = HomeUIState()

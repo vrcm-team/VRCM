@@ -1,10 +1,13 @@
 package io.github.kamo.vrcm.data.api.instance
 
-data class World(
+import com.google.gson.annotations.SerializedName
+
+data class WorldInfo(
     val authorId: String,
     val authorName: String,
     val capacity: Int,
-    val created_at: String,
+    @SerializedName("created_at")
+    val createdAt: String,
     val description: String,
     val favorites: Int,
     val featured: Boolean,
@@ -24,7 +27,8 @@ data class World(
     val thumbnailImageUrl: String?,
     val udonProducts: List<Any>,
     val unityPackages: List<UnityPackage>,
-    val updated_at: String,
+    @SerializedName("updated_at")
+    val updatedAt: String,
     val version: Int,
     val visits: Int
 )

@@ -5,7 +5,7 @@ import io.ktor.client.request.*
 
 internal const val FILE_API_SUFFIX = "file"
 
-class FileAPI(private val client: HttpClient) {
+class FileApi(private val client: HttpClient) {
 
     companion object {
         private val regex = Regex("file_[\\w-]+")

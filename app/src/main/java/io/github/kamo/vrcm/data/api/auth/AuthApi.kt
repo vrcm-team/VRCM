@@ -12,7 +12,7 @@ internal const val AUTH_API_SUFFIX = "auth"
 
 internal const val EMAIL_OTP = "emailOtp"
 
-class AuthAPI(private val client: HttpClient) {
+class AuthApi(private val client: HttpClient) {
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
         client.get("$AUTH_API_SUFFIX/user") {

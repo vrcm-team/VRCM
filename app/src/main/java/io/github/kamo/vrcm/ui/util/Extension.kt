@@ -17,7 +17,7 @@ fun Modifier.sateCircle(
     percentage: Float = 0.125f,
     borderWidth: Dp = 16.dp,
     isInLine: Boolean = true,
-    alignment: Alignment = Alignment.BottomEnd
+    alignment: Alignment = Alignment.BottomEnd,
 ) = this.drawWithContent {
     val radius = (size.minDimension - borderWidth.toPx()) * percentage
     val borderRadius = size.minDimension * percentage
@@ -34,4 +34,6 @@ fun Modifier.sateCircle(
     drawCircle(Color.White, borderRadius, borderOffset)
     drawCircle(color, radius, borderOffset)
 }
+
+
 

@@ -4,11 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.kamo.vrcm.data.api.auth.AuthAPI
-import io.github.kamo.vrcm.data.api.auth.AuthState.Authed
-import io.github.kamo.vrcm.data.api.auth.AuthState.NeedEmailCode
-import io.github.kamo.vrcm.data.api.auth.AuthState.NeedTFA
-import io.github.kamo.vrcm.data.api.auth.AuthState.Unauthorized
+import io.github.kamo.vrcm.data.api.auth.AuthApi
+import io.github.kamo.vrcm.data.api.auth.AuthState.*
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import io.github.kamo.vrcm.data.dao.AccountDao
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +23,7 @@ enum class AuthCardPage {
 }
 
 class AuthViewModel(
-    private val authAPI: AuthAPI,
+    private val authAPI: AuthApi,
     private val accountDao: AccountDao,
 ) : ViewModel() {
 

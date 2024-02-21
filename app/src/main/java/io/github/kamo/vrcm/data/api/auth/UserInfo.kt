@@ -1,5 +1,8 @@
 package io.github.kamo.vrcm.data.api.auth
 
+import com.google.gson.annotations.SerializedName
+import io.github.kamo.vrcm.common.UserStatus
+
 data class UserInfo(
     val acceptedPrivacyVersion: Int,
     val acceptedTOSVersion: Int,
@@ -14,7 +17,8 @@ data class UserInfo(
     val currentAvatarImageUrl: String,
     val currentAvatarTags: List<String>,
     val currentAvatarThumbnailImageUrl: String,
-    val date_joined: String,
+    @SerializedName("date_joined")
+    val dateJoined: String,
     val developerType: String,
     val displayName: String,
     val emailVerified: Boolean,
@@ -31,9 +35,12 @@ data class UserInfo(
     val homeLocation: String,
     val id: String,
     val isFriend: Boolean,
-    val last_activity: String,
-    val last_login: String,
-    val last_platform: String,
+    @SerializedName("last_activity")
+    val lastActivity: String,
+    @SerializedName("last_login")
+    val lastLogin: String,
+    @SerializedName("last_platform")
+    val lastPlatform: String,
     val obfuscatedEmail: String,
     val obfuscatedPendingEmail: String,
     val oculusId: String,
@@ -44,7 +51,7 @@ data class UserInfo(
     val presence: Presence,
     val profilePicOverride: String,
     val state: String,
-    val status: String,
+    val status: UserStatus,
     val statusDescription: String,
     val statusFirstTime: Boolean,
     val statusHistory: List<String>,
@@ -54,10 +61,14 @@ data class UserInfo(
     val twoFactorAuthEnabled: Boolean,
     val twoFactorAuthEnabledDate: String,
     val unsubscribe: Boolean,
-    val updated_at: String,
+    @SerializedName("updated_at")
+    val updatedAt: String,
     val userIcon: String,
     val userLanguage: String,
     val userLanguageCode: String,
     val username: String,
     val viveId: String
 )
+
+
+

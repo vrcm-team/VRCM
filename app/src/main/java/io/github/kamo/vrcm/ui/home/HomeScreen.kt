@@ -2,34 +2,17 @@ package io.github.kamo.vrcm.ui.home
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -43,13 +26,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.kamo.vrcm.common.UserStatus
 import io.github.kamo.vrcm.data.api.auth.FriendInfo
+import io.github.kamo.vrcm.ui.theme.GameColor
 import io.github.kamo.vrcm.ui.util.AImage
 import io.github.kamo.vrcm.ui.util.UserStateIcon
-import io.github.kamo.vrcm.ui.util.UserStatus
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +69,7 @@ fun Home(
                             iconUrl = homeViewModel.currentUser?.currentAvatarThumbnailImageUrl
                                 ?: "",
                             userStatus = homeViewModel.currentUser?.status
-                                ?: UserStatus.Offline.type
+                                ?: UserStatus.Offline
                         )
 
                     }
@@ -206,6 +192,7 @@ private fun UserIconsRow(friends: List<State<FriendInfo>>) {
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(friends, key = { it.value.id }) {
+            println("Friend: ${it.value}")
             LocationFriend(
                 it.value.imageUrl,
                 it.value.displayName,
@@ -239,7 +226,7 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                     modifier = Modifier
                         .width(120.dp)
                         .clip(shape),
-                    iconUrl = instants.worldImageUrl,
+                    imageUrl = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
                 Column(
@@ -281,7 +268,7 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
 fun LocationFriend(
     iconUrl: String,
     name: String,
-    userStatus: String
+    userStatus: UserStatus
 ) {
     Column(
         modifier = Modifier.width(60.dp),
@@ -299,5 +286,44 @@ fun LocationFriend(
             textAlign = TextAlign.Center,
             fontSize = 12.sp
         )
+    }
+}
+
+@Preview
+@Composable
+fun FriedScreen() {
+    Box(Modifier.fillMaxSize()) {
+        val height = (LocalConfiguration.current.screenHeightDp / 4)
+        LocalConfiguration.current.smallestScreenWidthDp
+
+        AImage(
+            modifier = Modifier.height(height.dp),
+            imageUrl = null,
+            color = Color.Green
+        )
+        Column {
+            Spacer(modifier = Modifier.height((height - 40).dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .padding(horizontal = 20.dp)
+                    .align(Alignment.CenterHorizontally)
+
+            ) {
+                UserStateIcon(
+                    modifier = Modifier
+                        .border(3.dp, GameColor.Level.Known, CircleShape),
+                    iconUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256",
+                    userStatus = UserStatus.Online
+                )
+                Column {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(text = "IKUTUS")
+                    Text(text = "IKUTUS")
+                }
+
+            }
+        }
     }
 }
