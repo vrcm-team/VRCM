@@ -1,7 +1,7 @@
 package io.github.kamo.vrcm.data.api.instance
 
 import com.google.gson.annotations.SerializedName
-import io.github.kamo.vrcm.data.api.InstantsType
+import io.github.kamo.vrcm.data.api.AccessType
 
 data class InstanceInfo(
     val active: Boolean,
@@ -33,23 +33,32 @@ data class InstanceInfo(
     val shortName: String? = null,
     val strict: Boolean,
     val tags: List<String>,
-    var type: String,
+    val type: String,
     val userCount: Int,
     val world: WorldInfo,
     val worldId: String
 ) {
-    val detailedType: InstantsType
-        get() {
-            return if (type == InstantsType.Group.typeName) {
-                val detailedType = instanceId.substringAfter("groupAccessType(").substringBefore(")")
-                when (detailedType) {
-                    "public" -> InstantsType.GroupPublic
-                    "plus" -> InstantsType.GroupPlus
-                    else -> InstantsType.Group
+    val accessType: AccessType
+        get() =
+            when (type) {
+                AccessType.Group.typeName -> {
+                    when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
+                        AccessType.GroupPublic.typeName -> AccessType.GroupPublic
+                        AccessType.GroupPlus.typeName -> AccessType.GroupPlus
+                        AccessType.GroupMembers.typeName -> AccessType.Group
+                        else -> AccessType.Group
+                    }
                 }
-            } else {
-                InstantsType.entries.first { it.typeName == type }
+
+                AccessType.Private.typeName -> {
+                    if (canRequestInvite) AccessType.InvitePlus else AccessType.Invite
+                }
+
+                AccessType.FriendPlus.typeName -> AccessType.FriendPlus
+
+                AccessType.Friend.typeName -> AccessType.Friend
+
+                else -> AccessType.Public
             }
-        }
 }
 

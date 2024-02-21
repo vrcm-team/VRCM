@@ -1,22 +1,27 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
-internal const val AUTH_API_SUFFIX = "auth"
+internal const val AUTH_API_PREFIX = "auth"
 
 internal const val EMAIL_OTP = "emailOtp"
 
 class AuthApi(private val client: HttpClient) {
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
-        client.get("$AUTH_API_SUFFIX/user") {
-            url { path(AUTH_API_SUFFIX, "user") }
+        client.get("$AUTH_API_PREFIX/user") {
+            url { path(AUTH_API_PREFIX, "user") }
             if (username != null && password != null) {
                 basicAuth(username, password)
             }
@@ -36,13 +41,10 @@ class AuthApi(private val client: HttpClient) {
                 }
             }
 
-            HttpStatusCode.Unauthorized -> {
-                AuthState.Unauthorized
-            }
+            HttpStatusCode.Unauthorized -> AuthState.Unauthorized
 
-            else -> {
-                AuthState.Unauthorized
-            }
+            else -> AuthState.Unauthorized
+
         }
     }
 
@@ -55,7 +57,7 @@ class AuthApi(private val client: HttpClient) {
             val bodyList = runCatching {
                 client.get {
                     url {
-                        path(AUTH_API_SUFFIX, "user", "friends")
+                        path(AUTH_API_PREFIX, "user", "friends")
                         this.parameters.run {
                             append("offline", offline.toString())
                             append("offset", (offset + count * n).toString())
@@ -71,15 +73,15 @@ class AuthApi(private val client: HttpClient) {
     }
 
     suspend fun verify(code: String, authType: AuthType): Boolean {
-        val response = client.post("$AUTH_API_SUFFIX/twofactorauth/${authType.path}/verify") {
+        val response = client.post("$AUTH_API_PREFIX/twofactorauth/${authType.path}/verify") {
             setBody(TextContent("""{"code":"$code"}""", ContentType.Application.Json))
         }
         return response.status == HttpStatusCode.OK
     }
 
     suspend fun isAuthed(): Boolean? = runCatching {
-        val response = client.get(AUTH_API_SUFFIX) {
-            url { path(AUTH_API_SUFFIX) }
+        val response = client.get(AUTH_API_PREFIX) {
+            url { path(AUTH_API_PREFIX) }
         }
         return response.status == HttpStatusCode.OK && response.body<AuthInfo>().ok == true
     }.getOrNull()

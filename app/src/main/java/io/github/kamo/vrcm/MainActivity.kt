@@ -4,8 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.*
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -96,7 +100,7 @@ fun MainContent() {
                     MainRouteEnum.StartupAnime.route,
                     exitTransition = { ExitTransition.None }) {
                     StartupAnime {
-                        navController.navigate(MainRouteEnum.Auth.route, navOptionsBuilder(it))
+                        navController.navigate(MainRouteEnum.Auth.route, navPopBuilder(it))
                     }
                 }
 
@@ -105,7 +109,10 @@ fun MainContent() {
                     enterTransition = { EnterTransition.None }
                 ) {
                     Auth {
-                        navController.navigate(MainRouteEnum.AuthAnime.route + "/false", navOptionsBuilder(it))
+                        navController.navigate(
+                            MainRouteEnum.AuthAnime.route + "/false",
+                            navPopBuilder(it)
+                        )
                     }
                 }
                 composable(
@@ -115,9 +122,9 @@ fun MainContent() {
                     exitTransition = { fadeOut(tween(500)) },
                 ) {
                     val isAuthed = it.arguments?.getBoolean("isAuthed") ?: false
-                    AuthAnime(isAuthed){
+                    AuthAnime(isAuthed) {
                         val mainRoute = if (isAuthed) MainRouteEnum.Auth else MainRouteEnum.Home
-                        navController.navigate(mainRoute.route, navOptionsBuilder(it))
+                        navController.navigate(mainRoute.route, navPopBuilder(it))
                     }
                 }
                 composable(
@@ -128,8 +135,14 @@ fun MainContent() {
                                 slideOut(tween(1000)) { IntOffset(0, (it.height * 0.6f).toInt()) }
                     }
                 ) {
-                    Home {
-                        navController.navigate(MainRouteEnum.AuthAnime.route + "/true", navOptionsBuilder(it))
+                    Home { mainRouter, isPop, arguments ->
+                        val routePath =
+                            "${mainRouter.route}/${arguments.joinToString("/") { it.toString() }}"
+                        if (isPop) {
+                            navController.navigate(routePath, navPopBuilder(it))
+                        } else {
+                            navController.navigate(routePath)
+                        }
                     }
                 }
             }
@@ -138,12 +151,12 @@ fun MainContent() {
 }
 
 
-private fun navOptionsBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
-        launchSingleTop = true
-        popUpTo(it.destination.route!!) {
-            inclusive = true
-        }
+private fun navPopBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
+    launchSingleTop = true
+    popUpTo(it.destination.route!!) {
+        inclusive = true
     }
+}
 
 
 

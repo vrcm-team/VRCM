@@ -1,9 +1,10 @@
 package io.github.kamo.vrcm.data.api.file
 
-import io.ktor.client.*
-import io.ktor.client.request.*
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.url
 
-internal const val FILE_API_SUFFIX = "file"
+internal const val FILE_API_PREFIX = "file"
 
 class FileApi(private val client: HttpClient) {
 

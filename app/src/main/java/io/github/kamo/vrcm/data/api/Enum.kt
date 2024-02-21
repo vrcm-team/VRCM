@@ -28,42 +28,30 @@ enum class CountryIcon(val iconUrl: String) {
     Jp("https://assets.vrchat.com/www/images/Region_JP.png");
 
     companion object {
-        fun fetchIconUrl(location: String): String? {
-            val region = runCatching {
-                location.split("region(")[1].removeSuffix(")")
-            }.getOrNull()
-            return when (region) {
-                "us" -> Us.iconUrl
-                "use" -> Use.iconUrl
-                "eu" -> Eu.iconUrl
-                "jp" -> Jp.iconUrl
-                else -> Us.iconUrl
-            }
-        }
+        fun fetchIconUrl(region: String): String = (CountryIcon.entries.firstOrNull {
+            it.name.lowercase() == region
+        } ?: Us).iconUrl
+
     }
 }
 
-enum class InstantsType(val typeName: String, val displayName: String) {
-    Public("public","public"),
+enum class AccessType(val typeName: String, val displayName: String) {
+    Public("public", "Public"),
 
-    GroupPublic("group","Group Public"),
-    GroupPlus("group","Group+"),
-    Group("group","Group"),
+    GroupPublic("public", "Group Public"),
+    GroupPlus("plus", "Group+"),
+    GroupMembers("members", "Group"),
+    Group("group", "Group"),
 
-    FriendPlus("hidden","Friends+"),
-    Friend("friends","Friends"),
+    FriendPlus("hidden", "Friends+"),
+    Friend("friends", "Friends"),
 
-    Private("private","Private");
+    InvitePlus("canRequestInvite", "Invite"),
+    Invite("!canRequestInvite", "Invite"),
+    Private("private", "Private"),
 
-    companion object {
-        val Deserializer = JsonDeserializer { json, _, _ ->
-            InstantsType.entries.firstOrNull { it.typeName == json.asString }?:json.asString
-        }
-        val Serializer = JsonSerializer<UserStatus> { src, _, _ ->
-            JsonPrimitive(src.typeName)
-        }
-    }
 }
+
 
 enum class LocationType(val typeName: String) {
     /**
@@ -79,5 +67,7 @@ enum class LocationType(val typeName: String) {
     /**
      * by Location Instance
      */
-    Instance("wrld_")
+    Instance("wrld_"),
+
+    Traveling("traveling")
 }

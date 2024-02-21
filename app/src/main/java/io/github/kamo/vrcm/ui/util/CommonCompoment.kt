@@ -2,10 +2,26 @@ package io.github.kamo.vrcm.ui.util
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -17,7 +33,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
@@ -99,13 +114,11 @@ fun LoadingButton(
 
 @Composable
 fun SnackBarToast(
+    modifier: Modifier = Modifier,
     text: String,
     onEffect: () -> Unit,
     content: @Composable (SnackbarData) -> Unit = {
-        Text(
-            text = it.visuals.message,
-            textAlign = TextAlign.Center
-        )
+        Text(text = it.visuals.message)
     }
 ) {
     val snackBarHostState = remember { SnackbarHostState() }
@@ -116,11 +129,11 @@ fun SnackBarToast(
             onEffect()
         }
     }
-    SnackbarHost(snackBarHostState) {
+    SnackbarHost(
+        modifier = modifier,
+        hostState = snackBarHostState
+    ) {
         Snackbar(
-            modifier = Modifier
-                .systemBarsPadding()
-                .padding(16.dp),
             containerColor = MaterialTheme.colorScheme.onPrimary,
             contentColor = MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(12.dp),
@@ -147,7 +160,8 @@ fun UserStateIcon(
                     UserStatus.Busy -> GameColor.Status.Busy
                     UserStatus.Offline -> GameColor.Status.Offline
                 }
-            ).then(modifier)
+            )
+            .then(modifier)
             .aspectRatio(1f)
             .clip(CircleShape),
         imageUrl = iconUrl,
