@@ -1,10 +1,6 @@
 package io.github.kamo.vrcm.ui.home
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.CountryIcon
@@ -98,7 +94,6 @@ class HomeViewModel(
                     viewModelScope.launch(Dispatchers.IO) instanceLaunch@{
                         runCatching {
                             val instance = instanceAPI.instanceByLocation(friendLocation.location)
-                                ?: return@instanceLaunch
                             friendLocation.instants.value = InstantsVO(
                                 worldName = instance.world.name ?: "",
                                 worldImageUrl = instance.world.thumbnailImageUrl,

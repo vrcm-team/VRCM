@@ -1,31 +1,14 @@
 package io.github.kamo.vrcm.ui.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -33,8 +16,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -70,30 +60,20 @@ fun Home(
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 navigationIcon = {
-                    Row(
-                        modifier = Modifier
-                            .padding(start = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        UserStateIcon(
-                            modifier = Modifier.size(40.dp),
-                            iconUrl = homeViewModel.currentUser?.currentAvatarThumbnailImageUrl
-                                ?: "",
-                            userStatus = homeViewModel.currentUser?.status
-                                ?: UserStatus.Offline
-                        )
-
-                    }
-
+                    UserStateIcon(
+                        modifier = Modifier.height(56.dp),
+                        iconUrl = homeViewModel.currentUser?.currentAvatarThumbnailImageUrl
+                            ?: "",
+                        userStatus = homeViewModel.currentUser?.status
+                            ?: UserStatus.Offline
+                    )
                 },
                 title = {
                     Column(
-                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = homeViewModel.currentUser?.displayName ?: "",
-                            fontSize = 16.sp
+                            fontSize = 20.sp
                         )
                         Text(
                             text = homeViewModel.currentUser?.statusDescription ?: "",
@@ -105,7 +85,6 @@ fun Home(
                 actions = {
                     Icon(
                         modifier = Modifier
-                            .size(32.dp)
                             .padding(6.dp),
                         imageVector = Icons.Rounded.Notifications,
                         contentDescription = "notificationIcon"
@@ -123,20 +102,29 @@ fun Home(
                         .fillMaxWidth()
                         .clickable { onErrorToAuthPage() },
                     textAlign = TextAlign.Center,
-                    text = "Bottom app bar",
+                    text = "Return to Auth Page",
                 )
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { homeViewModel.onErrorMessageChange("21321321312") }
+            FloatingActionButton(
+                modifier = Modifier
+                    .blur(10.dp)
+                    .alpha(0.5f),
+                onClick = {
+                    homeViewModel.onErrorMessageChange("Hello World")
+                }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add")
+                Icon(
+
+                    Icons.Default.Add, contentDescription = "Add"
+                )
             }
         }
     ) { innerPadding ->
         Box(
             Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(innerPadding)
         ) {
             LocationsPage(
@@ -150,16 +138,13 @@ fun Home(
             SnackBarToast(
                 modifier = Modifier
                     .padding(16.dp)
-                    .align(Alignment.BottomCenter),
+                    .align(Alignment.TopCenter),
                 text = homeViewModel.errorMessage,
                 onEffect = { homeViewModel.onErrorMessageChange("") }
             )
         }
     }
 }
-
-
-
 
 
 @Composable
@@ -190,37 +175,68 @@ fun LocationFriend(
 @Preview
 @Composable
 fun FriedScreen() {
-    Box(Modifier.fillMaxSize()) {
-        val height = (LocalConfiguration.current.screenHeightDp / 4)
-        LocalConfiguration.current.smallestScreenWidthDp
+    val scrollState = rememberScrollState()
+    val nestedScrollInteropConnection: NestedScrollConnection =
+        rememberNestedScrollInteropConnection()
 
-        AImage(
-            modifier = Modifier.height(height.dp),
-            imageUrl = null,
-            color = Color.Green
-        )
-        Column {
-            Spacer(modifier = Modifier.height((height - 40).dp))
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollInteropConnection)
+    ) {
+        val height = (LocalConfiguration.current.screenHeightDp / 4)
+        val offset = (scrollState.value / 2)
+        val offsetDp = with(LocalDensity.current) { offset.toDp() }
+        val blurDp =
+            with(LocalDensity.current) { ((scrollState.value / height.toFloat()) * 20).toDp() }
+        val offsetDp2 =
+            with(LocalDensity.current) { ((scrollState.value / height.toFloat()) * (height - 50)).toDp() }
+        println(scrollState.value / height.toFloat())
+        Box(
+            Modifier
+                .verticalScroll(scrollState)
+                .height(2000.dp)
+                .fillMaxSize()
+                .padding(10.dp)
+        ) {
+            AImage(
+                modifier = Modifier
+                    .heightIn(0.dp, max = height.dp)
+                    .fillMaxWidth()
+                    // TODO: Update to use offset to avoid recomposition
+                    .padding(top = offsetDp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .blur(blurDp),
+                imageUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256",
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
-                    .padding(horizontal = 20.dp)
-                    .align(Alignment.CenterHorizontally)
-
+                    .padding(start = 30.dp, end = 30.dp)
             ) {
                 UserStateIcon(
                     modifier = Modifier
-                        .border(3.dp, GameColor.Level.Known, CircleShape),
+                        .border(3.dp, Color.White, CircleShape),
                     iconUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256",
                     userStatus = UserStatus.Online
                 )
                 Column {
                     Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Rounded.Shield,
+                        tint = GameColor.Level.Known,
+                        contentDescription = ""
+                    )
                     Text(text = "IKUTUS")
                     Text(text = "IKUTUS")
                 }
             }
         }
+
+
     }
+
 }
+

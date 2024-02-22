@@ -45,7 +45,7 @@ data class InstanceInfo(
                     when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
                         AccessType.GroupPublic.typeName -> AccessType.GroupPublic
                         AccessType.GroupPlus.typeName -> AccessType.GroupPlus
-                        AccessType.GroupMembers.typeName -> AccessType.Group
+                        AccessType.GroupMembers.typeName -> AccessType.GroupMembers
                         else -> AccessType.Group
                     }
                 }

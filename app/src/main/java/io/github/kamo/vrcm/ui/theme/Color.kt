@@ -222,8 +222,8 @@ object GameColor {
     object Status {
         val Online = Color(0xFF51E57E)
         val JoinMe = Color(0xFF42CAFF)
-        val Busy = Color(0xFF5B0B0B)
-        val AskMe = Color(0xFFE88134)
+        val Busy = Color(0xFFFF6161)
+        val AskMe = Color(0xFFFFD24C)
         val Offline = Color.Gray
     }
     object Level {

@@ -55,12 +55,11 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
 
-
     implementation("io.coil-kt.coil3:coil-network-ktor:3.0.0-alpha04")
     implementation("io.coil-kt.coil3:coil-compose-core:3.0.0-alpha04")
 
     implementation("com.github.vrchatapi:vrchatapi-java:1.16.2")
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")

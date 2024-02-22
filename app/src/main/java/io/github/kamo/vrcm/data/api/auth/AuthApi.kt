@@ -1,15 +1,10 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.basicAuth
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.path
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -54,8 +49,7 @@ class AuthApi(private val client: HttpClient) {
     fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendInfo>> = flow {
         var count = 0
         while (true) {
-            val bodyList = runCatching {
-                client.get {
+            val bodyList: List<FriendInfo> = client.get {
                     url {
                         path(AUTH_API_PREFIX, "user", "friends")
                         this.parameters.run {
@@ -64,8 +58,7 @@ class AuthApi(private val client: HttpClient) {
                             append("n", n.toString())
                         }
                     }
-                }.body<List<FriendInfo>>()
-            }.getOrDefault(emptyList())
+                }.body()
             if (bodyList.isEmpty()) break
             emit(bodyList)
             count++
