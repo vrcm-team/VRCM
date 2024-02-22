@@ -1,14 +1,43 @@
 package io.github.kamo.vrcm.ui.home
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -20,15 +49,16 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.ui.home.page.LocationsPage
@@ -37,6 +67,7 @@ import io.github.kamo.vrcm.ui.util.AImage
 import io.github.kamo.vrcm.ui.util.SnackBarToast
 import io.github.kamo.vrcm.ui.util.UserStateIcon
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,67 +207,191 @@ fun LocationFriend(
 @Composable
 fun FriedScreen() {
     val scrollState = rememberScrollState()
-    val nestedScrollInteropConnection: NestedScrollConnection =
-        rememberNestedScrollInteropConnection()
-
-
-    Surface(
+    Box(
         modifier = Modifier
+            .systemBarsPadding()
             .fillMaxSize()
-            .nestedScroll(nestedScrollInteropConnection)
     ) {
-        val height = (LocalConfiguration.current.screenHeightDp / 4)
-        val offset = (scrollState.value / 2)
-        val offsetDp = with(LocalDensity.current) { offset.toDp() }
-        val blurDp =
-            with(LocalDensity.current) { ((scrollState.value / height.toFloat()) * 20).toDp() }
-        val offsetDp2 =
-            with(LocalDensity.current) { ((scrollState.value / height.toFloat()) * (height - 50)).toDp() }
-        println(scrollState.value / height.toFloat())
-        Box(
+        val imageHeight = (LocalConfiguration.current.screenHeightDp / 3)
+        val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
+        val ratio =
+            (((imageHeight - offsetDp.value) / imageHeight.toFloat()).let { if (it >= 0) it else 0f }).let {
+                FastOutSlowInEasing.transform(it)
+            }
+        val fl = scrollState.value / imageHeight.toFloat()
+        val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
+        val inverseRatio = 1 - ratio
+        val topBarHeight = 50
+        val iconSize = (topBarHeight * inverseRatio).dp
+        val initUserIconPadding = imageHeight.toFloat()
+        val lastIconPadding = initUserIconPadding - (topBarHeight * ratio)
+
+        Surface(
             Modifier
                 .verticalScroll(scrollState)
                 .height(2000.dp)
-                .fillMaxSize()
-                .padding(10.dp)
+                .fillMaxWidth()
         ) {
-            AImage(
-                modifier = Modifier
-                    .heightIn(0.dp, max = height.dp)
-                    .fillMaxWidth()
-                    // TODO: Update to use offset to avoid recomposition
-                    .padding(top = offsetDp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .blur(blurDp),
-                imageUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256",
-            )
-            Row(
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .padding(start = 30.dp, end = 30.dp)
             ) {
-                UserStateIcon(
+                AImage(
                     modifier = Modifier
-                        .border(3.dp, Color.White, CircleShape),
-                    iconUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256",
-                    userStatus = UserStatus.Online
+                        .height(imageHeight.dp)
+                        .fillMaxWidth()
+                        .padding(top = offsetDp)
+                        .clip(
+                            RoundedCornerShape(
+                                bottomStart = (30 * ratio).dp,
+                                bottomEnd = (30 * ratio).dp
+                            )
+                        )
+                        .blur(blurDp),
+                    imageUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/1024",
                 )
-                Column {
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = initUserIconPadding.dp),
+                shape = RoundedCornerShape(
+                    topStart = (30 * ratio).dp,
+                    topEnd = (30 * ratio).dp
+                )
+            ) {
+                Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
+                Text(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .padding(horizontal = 6.dp),
+                    text = "Ikutus",
+                    fontSize = 24.sp
+                )
+                Row(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .align(Alignment.CenterHorizontally),
+                ) {
+
+                    Canvas(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .align(Alignment.CenterVertically)
+                    ) {
+                        drawCircle(GameColor.Status.Online)
+                    }
+                    Text(
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .padding(horizontal = 6.dp),
+                        text = "Online",
+                    )
+                    Icon(
+                        modifier = Modifier.size(15.dp),
+                        imageVector = Icons.Rounded.Shield,
+                        contentDescription = null,
+                        tint = GameColor.Level.Trusted
+                    )
+                    Text(
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .padding(horizontal = 6.dp),
+                        text = "Trusted",
+                    )
+                }
+
+            }
+
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .height(topBarHeight.dp)
+                        .offset(y = offsetDp)
+                        .alpha(ratio),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp),
+                        imageVector = Icons.Rounded.ArrowBackIosNew,
+                        tint = Color.White,
+                        contentDescription = null
+                    )
                     Spacer(modifier = Modifier.weight(1f))
                     Icon(
-                        imageVector = Icons.Rounded.Shield,
-                        tint = GameColor.Level.Known,
-                        contentDescription = ""
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp),
+                        imageVector = Icons.Rounded.Menu,
+                        tint = Color.White,
+                        contentDescription = null
                     )
-                    Text(text = "IKUTUS")
-                    Text(text = "IKUTUS")
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .height(topBarHeight.dp)
+                        .offset(y = offsetDp)
+                        .alpha(inverseRatio)
+                        .background(
+                            Color.White, RoundedCornerShape(
+                                bottomStart = 12.dp,
+                                bottomEnd = 12.dp
+                            )
+                        ),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp),
+                        imageVector = Icons.Rounded.ArrowBackIosNew,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp),
+                        imageVector = Icons.Rounded.Menu,
+                        contentDescription = null
+                    )
                 }
             }
+
+
+            Box(modifier = Modifier.height(iconSize)) {
+                Row(
+                    modifier = Modifier
+                        .run { if (initUserIconPadding == lastIconPadding) offset(y = (offsetDp - imageHeight.dp)) else this }
+                        .padding(top = lastIconPadding.dp)
+                        .alpha(inverseRatio)
+                ) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    AsyncImage(
+                        modifier = Modifier
+                            .border((2 * inverseRatio).dp, Color.White, CircleShape)
+                            .clip(CircleShape)
+                            .size(iconSize),
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data("https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256")
+                            .size(100, 100).build(),
+                        contentScale = ContentScale.Crop,
+                        contentDescription = "UserIcon",
+                        imageLoader = koinInject()
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+
         }
 
-
     }
-
 }
 
