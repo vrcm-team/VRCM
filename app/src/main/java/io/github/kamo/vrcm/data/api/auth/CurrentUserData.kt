@@ -3,7 +3,7 @@ package io.github.kamo.vrcm.data.api.auth
 import com.google.gson.annotations.SerializedName
 import io.github.kamo.vrcm.data.api.UserStatus
 
-data class UserInfo(
+data class CurrentUserData(
     val acceptedPrivacyVersion: Int,
     val acceptedTOSVersion: Int,
     val accountDeletionDate: String,

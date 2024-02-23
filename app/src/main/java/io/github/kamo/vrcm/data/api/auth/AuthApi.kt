@@ -1,10 +1,15 @@
 package io.github.kamo.vrcm.data.api.auth
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -26,7 +31,7 @@ class AuthApi(private val client: HttpClient) {
         val response = userRes(username, password)
         return when (response.status) {
             HttpStatusCode.OK -> {
-                val requiresTwoFactorAuth = response.body<AuthInfo>().requiresTwoFactorAuth
+                val requiresTwoFactorAuth = response.body<AuthData>().requiresTwoFactorAuth
                 if (requiresTwoFactorAuth == null) {
                     AuthState.Authed
                 } else if (requiresTwoFactorAuth.contains(EMAIL_OTP)) {
@@ -43,13 +48,13 @@ class AuthApi(private val client: HttpClient) {
         }
     }
 
-    suspend fun currentUser(): UserInfo = userRes().body()
+    suspend fun currentUser(): CurrentUserData = userRes().body()
 
 
-    fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendInfo>> = flow {
+    fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendData>> = flow {
         var count = 0
         while (true) {
-            val bodyList: List<FriendInfo> = client.get {
+            val bodyList: List<FriendData> = client.get {
                     url {
                         path(AUTH_API_PREFIX, "user", "friends")
                         this.parameters.run {
@@ -76,7 +81,7 @@ class AuthApi(private val client: HttpClient) {
         val response = client.get(AUTH_API_PREFIX) {
             url { path(AUTH_API_PREFIX) }
         }
-        return response.status == HttpStatusCode.OK && response.body<AuthInfo>().ok == true
+        return response.status == HttpStatusCode.OK && response.body<AuthData>().ok == true
     }.getOrNull()
 }
 

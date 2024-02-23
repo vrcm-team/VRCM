@@ -3,7 +3,7 @@ package io.github.kamo.vrcm.data.api.instance
 import com.google.gson.annotations.SerializedName
 import io.github.kamo.vrcm.data.api.AccessType
 
-data class InstanceInfo(
+data class InstanceData(
     val active: Boolean,
     val canRequestInvite: Boolean,
     val capacity: Int,
@@ -35,7 +35,7 @@ data class InstanceInfo(
     val tags: List<String>,
     val type: String,
     val userCount: Int,
-    val world: WorldInfo,
+    val world: WorldData,
     val worldId: String
 ) {
     val accessType: AccessType

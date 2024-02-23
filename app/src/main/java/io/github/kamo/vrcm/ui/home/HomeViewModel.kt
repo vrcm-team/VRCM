@@ -1,14 +1,20 @@
 package io.github.kamo.vrcm.ui.home
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.CountryIcon
 import io.github.kamo.vrcm.data.api.LocationType
 import io.github.kamo.vrcm.data.api.auth.AuthApi
-import io.github.kamo.vrcm.data.api.auth.FriendInfo
-import io.github.kamo.vrcm.data.api.auth.UserInfo
+import io.github.kamo.vrcm.data.api.auth.CurrentUserData
+import io.github.kamo.vrcm.data.api.auth.FriendData
 import io.github.kamo.vrcm.data.api.instance.InstanceAPI
+import io.github.kamo.vrcm.data.vo.FriendLocation
+import io.github.kamo.vrcm.data.vo.InstantsVO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -22,7 +28,7 @@ class HomeViewModel(
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
         mutableStateMapOf()
 
-    private val _currentUser = mutableStateOf<UserInfo?>(null)
+    private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
     private val _errorMessage = mutableStateOf("")
 
@@ -46,13 +52,15 @@ class HomeViewModel(
                     }
             }.onFailure {
                 _errorMessage.value = "error: ${it.message}"
-                onError()
+                viewModelScope.launch(Dispatchers.Main) {
+                    onError()
+                }
             }
         }.join()
     }
 
     private fun update(
-        newValue: Map<String, MutableState<FriendInfo>>
+        newValue: Map<String, MutableState<FriendData>>
     ) = viewModelScope.launch(Dispatchers.Main) {
         val friendLocationInfoMap = newValue.values.groupBy {
             when (it.value.location) {

@@ -13,6 +13,9 @@ import androidx.compose.animation.slideOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
@@ -94,13 +97,27 @@ fun MainContent() {
 //                    }
 //                }
 //            }
+            val onNavigate: NavBackStackEntry.(MainRouteEnum, Boolean, List<Any>) -> Unit =
+                remember {
+                    { mainRouter, isPop, arguments ->
+                        val routePath =
+                            "${mainRouter.route}/${arguments.joinToString("/") { it.toString() }}"
+                        if (isPop) {
+                            navController.navigate(routePath, navPopBuilder(this))
+                        } else {
+                            navController.navigate(routePath)
+                        }
+                    }
+                }
+            val popBackStack = remember { { navController.popBackStack() } }
             NavHost(
                 navController = navController,
                 startDestination = MainRouteEnum.StartupAnime.route
             ) {
                 composable(
                     MainRouteEnum.StartupAnime.route,
-                    exitTransition = { ExitTransition.None }) {
+                    exitTransition = { ExitTransition.None }
+                ) {
                     StartupAnime {
                         navController.navigate(MainRouteEnum.Auth.route, navPopBuilder(it))
                     }
@@ -129,34 +146,38 @@ fun MainContent() {
                         navController.navigate(mainRoute.route, navPopBuilder(it))
                     }
                 }
+                println("route:" + this.route)
                 composable(
                     MainRouteEnum.Home.route,
-                    enterTransition = { fadeIn(tween(1000)) },
+                    enterTransition = { fadeIn(tween(600)) },
                     exitTransition = {
-                        fadeOut(tween(500, 500)) +
-                                slideOut(tween(1000)) { IntOffset(0, (it.height * 0.6f).toInt()) }
+                        fadeOut(tween(600)) +
+                                slideOut(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) }
                     }
                 ) {
                     Home { mainRouter, isPop, arguments ->
-                        val routePath =
-                            "${mainRouter.route}/${arguments.joinToString("/") { it.toString() }}"
-                        if (isPop) {
-                            navController.navigate(routePath, navPopBuilder(it))
-                        } else {
-                            navController.navigate(routePath)
-                        }
+                        it.onNavigate(mainRouter, isPop, arguments)
                     }
                 }
                 composable(
-                    "${MainRouteEnum.Profile.route}/{friendId}"
-                ) {
-                    Profile(friendId = it.arguments?.getString("friendId")!!)
+                    "${MainRouteEnum.Profile.route}/{friendId}",
+                    enterTransition = { fadeIn(tween(600)) },
+                    exitTransition = { fadeOut(tween(600)) }
+                ) { stackEntry ->
+                    Profile(
+                        userId = stackEntry.arguments?.getString("friendId")!!,
+                        popBackStack = { popBackStack() }
+                    ) { mainRouter, isPop, arguments ->
+                        stackEntry.onNavigate(mainRouter, isPop, arguments)
+                    }
                 }
             }
         }
     }
 }
 
+val LocalNavController: ProvidableCompositionLocal<(MainRouteEnum, Boolean, List<Any>) -> Unit> =
+    compositionLocalOf { error("LocalNavController not found") }
 
 private fun navPopBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
     launchSingleTop = true

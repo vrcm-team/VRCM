@@ -11,9 +11,14 @@ import io.github.kamo.vrcm.data.api.PersistentCookiesStorage
 import io.github.kamo.vrcm.data.api.auth.AuthApi
 import io.github.kamo.vrcm.data.api.file.FileApi
 import io.github.kamo.vrcm.data.api.instance.InstanceAPI
-import io.ktor.client.*
-import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
+import io.github.kamo.vrcm.data.api.users.UsersApi
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.logging.DEFAULT
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.dsl.bind
@@ -26,6 +31,7 @@ val apiModule = module {
     singleOf(::AuthApi)
     singleOf(::FileApi)
     singleOf(::InstanceAPI)
+    singleOf(::UsersApi)
     single<HttpClient> { apiClientDefinition(it) }
     single<ImageLoader> { imageLoaderDefinition(it) }
 }

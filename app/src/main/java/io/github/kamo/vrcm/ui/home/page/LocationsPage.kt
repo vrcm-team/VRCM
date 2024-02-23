@@ -40,8 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kamo.vrcm.data.api.LocationType
-import io.github.kamo.vrcm.data.api.auth.FriendInfo
-import io.github.kamo.vrcm.ui.home.FriendLocation
+import io.github.kamo.vrcm.data.api.auth.FriendData
+import io.github.kamo.vrcm.data.vo.FriendLocation
 import io.github.kamo.vrcm.ui.home.LocationFriend
 import io.github.kamo.vrcm.ui.util.AImage
 
@@ -125,7 +125,7 @@ private fun SingleLocationCard(
 
 @Composable
 private fun UserIconsRow(
-    friends: MutableList<MutableState<FriendInfo>>,
+    friends: MutableList<MutableState<FriendData>>,
     onClickUserIcon: (String) -> Unit
 ) {
     LazyRow(
@@ -166,7 +166,7 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                     modifier = Modifier
                         .width(120.dp)
                         .clip(shape),
-                    imageUrl = instants.worldImageUrl,
+                    imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
                 Column(
@@ -192,7 +192,7 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                                 .align(Alignment.CenterVertically)
                                 .clip(CircleShape)
                                 .border(1.dp, Color.LightGray, CircleShape),
-                            imageUrl = instants.regionIconUrl
+                            imageData = instants.regionIconUrl
                         )
                         Text(
                             modifier = Modifier

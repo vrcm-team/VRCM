@@ -1,10 +1,13 @@
 package io.github.kamo.vrcm.data.api;
 
-import io.ktor.client.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.http.*
-import io.ktor.serialization.gson.*
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.UserAgent
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.URLProtocol
+import io.ktor.http.path
+import io.ktor.serialization.gson.gson
 
 val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
     defaultRequest {
@@ -20,11 +23,6 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
         socketTimeoutMillis = 15000
     }
     install(UserAgent)
-    install(ContentNegotiation) {
-        gson {
-            this.registerTypeAdapter(UserStatus::class.java, UserStatus.Deserializer)
-            this.registerTypeAdapter(UserStatus::class.java, UserStatus.Serializer)
-        }
-    }
+    install(ContentNegotiation) { gson () }
 }
 

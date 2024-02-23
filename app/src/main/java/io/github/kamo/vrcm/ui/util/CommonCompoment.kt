@@ -152,19 +152,11 @@ fun UserStateIcon(
 ) {
     AImage(
         modifier = Modifier
-            .sateCircle(
-                when (userStatus) {
-                    UserStatus.Online -> GameColor.Status.Online
-                    UserStatus.JoinMe -> GameColor.Status.JoinMe
-                    UserStatus.AskMe -> GameColor.Status.AskMe
-                    UserStatus.Busy -> GameColor.Status.Busy
-                    UserStatus.Offline -> GameColor.Status.Offline
-                }
-            )
+            .sateCircle(GameColor.Status.fromValue(userStatus))
             .then(modifier)
             .aspectRatio(1f)
             .clip(CircleShape),
-        imageUrl = iconUrl,
+        imageData = iconUrl,
         contentDescription = "UserStateIcon"
     )
 }
@@ -172,7 +164,7 @@ fun UserStateIcon(
 @Composable
 fun AImage(
     modifier: Modifier = Modifier,
-    imageUrl: String?,
+    imageData: Any?,
     color: Color = MaterialTheme.colorScheme.inverseOnSurface,
     contentDescription: String? = null,
     imageLoader: ImageLoader = koinInject(),
@@ -181,7 +173,7 @@ fun AImage(
     val placeholder = remember(color) { ColorPainter(color) }
     AsyncImage(
         modifier = modifier,
-        model = imageUrl,
+        model = imageData,
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         placeholder = placeholder,

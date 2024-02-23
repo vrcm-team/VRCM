@@ -1,16 +1,16 @@
-package io.github.kamo.vrcm.ui.home
+package io.github.kamo.vrcm.data.vo
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import io.github.kamo.vrcm.data.api.AccessType
 import io.github.kamo.vrcm.data.api.LocationType
-import io.github.kamo.vrcm.data.api.auth.FriendInfo
+import io.github.kamo.vrcm.data.api.auth.FriendData
 
 data class FriendLocation(
     val location: String,
     val instants: MutableState<InstantsVO> = mutableStateOf(InstantsVO()),
-    val friends: MutableList<MutableState<FriendInfo>>,
+    val friends: MutableList<MutableState<FriendData>>,
 ) {
     companion object {
         val Offline

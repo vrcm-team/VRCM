@@ -2,7 +2,7 @@ package io.github.kamo.vrcm.data.api.instance
 
 import com.google.gson.annotations.SerializedName
 
-data class WorldInfo(
+data class WorldData(
     val authorId: String,
     val authorName: String,
     val capacity: Int,

@@ -1,5 +1,7 @@
 package io.github.kamo.vrcm.ui.theme
+
 import androidx.compose.ui.graphics.Color
+import io.github.kamo.vrcm.data.api.UserStatus
 
 val primaryLight = Color(0xFF2E628C)
 val onPrimaryLight = Color(0xFFFFFFFF)
@@ -225,7 +227,17 @@ object GameColor {
         val Busy = Color(0xFFFF6161)
         val AskMe = Color(0xFFFFD24C)
         val Offline = Color.Gray
+        fun fromValue(status: UserStatus): Color {
+            return when (status) {
+                UserStatus.Active -> Online
+                UserStatus.JoinMe -> JoinMe
+                UserStatus.AskMe -> AskMe
+                UserStatus.Busy -> Busy
+                UserStatus.Offline -> Offline
+            }
+        }
     }
+
     object Level {
         val visitor = Color(0xFFCCCCCC)
         val New = Color(0xFF1778FF)
@@ -233,6 +245,8 @@ object GameColor {
         val Known = Color(0xFFFF7B42)
         val Trusted = Color(0xFF8143E6)
     }
+
+
 }
 
 
