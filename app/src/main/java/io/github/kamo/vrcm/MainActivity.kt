@@ -22,8 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import io.github.kamo.vrcm.ui.auth.Auth
-import io.github.kamo.vrcm.ui.home.FriedScreen
 import io.github.kamo.vrcm.ui.home.Home
+import io.github.kamo.vrcm.ui.profile.Profile
 import io.github.kamo.vrcm.ui.theme.VRCMTheme
 import io.github.kamo.vrcm.ui.util.AuthAnime
 import io.github.kamo.vrcm.ui.util.StartupAnime
@@ -36,7 +36,8 @@ enum class MainRouteEnum(val route: String) {
     StartupAnime("startupAnime"),
     Auth("auth"),
     AuthAnime("authAnime"),
-    Home("home");
+    Home("home"),
+    Profile("profile");
 }
 
 class MainActivity : ComponentActivity() {
@@ -53,7 +54,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             KoinContext {
-                FriedScreen()
+                MainContent()
             }
         }
     }
@@ -145,6 +146,11 @@ fun MainContent() {
                             navController.navigate(routePath)
                         }
                     }
+                }
+                composable(
+                    "${MainRouteEnum.Profile.route}/{friendId}"
+                ) {
+                    Profile(friendId = it.arguments?.getString("friendId")!!)
                 }
             }
         }

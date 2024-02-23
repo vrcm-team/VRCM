@@ -3,7 +3,6 @@ package io.github.kamo.vrcm.ui.home
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,13 +53,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.data.api.UserStatus
+import io.github.kamo.vrcm.data.api.auth.FriendInfo
 import io.github.kamo.vrcm.ui.home.page.LocationsPage
 import io.github.kamo.vrcm.ui.theme.GameColor
 import io.github.kamo.vrcm.ui.util.AImage
@@ -79,6 +78,15 @@ fun Home(
     LaunchedEffect(Unit) {
         homeViewModel.ini()
         pullToRefreshState.startRefresh()
+    }
+    val onClickUserIcon = remember {
+        { friendId: String ->
+            onNavigate(
+                MainRouteEnum.Profile,
+                false,
+                listOf(friendId)
+            )
+        }
     }
 
     val onErrorToAuthPage = remember { { onNavigate(MainRouteEnum.AuthAnime, true, listOf(true)) } }
@@ -161,6 +169,7 @@ fun Home(
             LocationsPage(
                 friendLocationMap = homeViewModel.friendLocationMap,
                 pullToRefreshState = pullToRefreshState,
+                onClickUserIcon = onClickUserIcon,
                 onRefreshLocations = {
                     homeViewModel.refresh(onErrorToAuthPage)
                     pullToRefreshState.endRefresh()
@@ -182,10 +191,11 @@ fun Home(
 fun LocationFriend(
     iconUrl: String,
     name: String,
-    userStatus: UserStatus
+    userStatus: UserStatus,
+    onClickUserIcon: () -> Unit
 ) {
     Column(
-        modifier = Modifier.width(60.dp),
+        modifier = Modifier.width(60.dp).clickable { onClickUserIcon() },
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
@@ -203,9 +213,8 @@ fun LocationFriend(
     }
 }
 
-@Preview
 @Composable
-fun FriedScreen() {
+fun FriedScreen(friend: FriendInfo?) {
     val scrollState = rememberScrollState()
     Box(
         modifier = Modifier
@@ -249,7 +258,7 @@ fun FriedScreen() {
                             )
                         )
                         .blur(blurDp),
-                    imageUrl = "https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/1024",
+                    imageUrl = friend?.currentAvatarThumbnailImageUrl,
                 )
             }
 
@@ -268,7 +277,7 @@ fun FriedScreen() {
                         .padding(top = 10.dp)
                         .align(Alignment.CenterHorizontally)
                         .padding(horizontal = 6.dp),
-                    text = "Ikutus",
+                    text = friend?.displayName ?: "",
                     fontSize = 24.sp
                 )
                 Row(
@@ -282,13 +291,22 @@ fun FriedScreen() {
                             .size(12.dp)
                             .align(Alignment.CenterVertically)
                     ) {
-                        drawCircle(GameColor.Status.Online)
+                        drawCircle(
+                            when (friend?.status) {
+                                UserStatus.Online -> GameColor.Status.Online
+                                UserStatus.JoinMe -> GameColor.Status.JoinMe
+                                UserStatus.AskMe -> GameColor.Status.AskMe
+                                UserStatus.Busy -> GameColor.Status.Busy
+                                UserStatus.Offline -> GameColor.Status.Offline
+                                else -> GameColor.Status.Offline
+                            }
+                        )
                     }
                     Text(
                         modifier = Modifier
                             .align(Alignment.CenterVertically)
                             .padding(horizontal = 6.dp),
-                        text = "Online",
+                        text = friend?.status?.typeName ?: "",
                     )
                     Icon(
                         modifier = Modifier.size(15.dp),
@@ -376,11 +394,10 @@ fun FriedScreen() {
                     Spacer(modifier = Modifier.weight(1f))
                     AsyncImage(
                         modifier = Modifier
-                            .border((2 * inverseRatio).dp, Color.White, CircleShape)
                             .clip(CircleShape)
                             .size(iconSize),
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data("https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256")
+                            .data(friend?.currentAvatarImageUrl)
                             .size(100, 100).build(),
                         contentScale = ContentScale.Crop,
                         contentDescription = "UserIcon",

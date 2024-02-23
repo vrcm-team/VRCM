@@ -2,7 +2,16 @@ package io.github.kamo.vrcm.ui.home.page
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -10,7 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
@@ -37,6 +50,7 @@ import io.github.kamo.vrcm.ui.util.AImage
 fun LocationsPage(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
     pullToRefreshState: PullToRefreshState,
+    onClickUserIcon: (String) -> Unit,
     onRefreshLocations: suspend () -> Unit
 ) {
     Box(
@@ -59,15 +73,19 @@ fun LocationsPage(
         ) {
 
             item(key = LocationType.Offline) {
-                SingleLocationCard(offlineFriendLocation, "Active on the Website")
+                SingleLocationCard(offlineFriendLocation, "Active on the Website", onClickUserIcon)
             }
 
             item(key = LocationType.Private) {
-                SingleLocationCard(privateFriendLocation, "Friends in Private Worlds")
+                SingleLocationCard(
+                    privateFriendLocation,
+                    "Friends in Private Worlds",
+                    onClickUserIcon
+                )
             }
 
             item(key = LocationType.Traveling) {
-                SingleLocationCard(travelingFriendLocation, "Friends is Traveling")
+                SingleLocationCard(travelingFriendLocation, "Friends is Traveling", onClickUserIcon)
             }
 
             if (instanceFriendLocations != null) {
@@ -76,7 +94,7 @@ fun LocationsPage(
                 }
                 items(instanceFriendLocations, key = { it.location }) { locations ->
                     LocationCard(locations) {
-                        UserIconsRow(locations.friends)
+                        UserIconsRow(locations.friends, onClickUserIcon)
                     }
                 }
             }
@@ -94,15 +112,22 @@ fun LocationsPage(
 }
 
 @Composable
-private fun SingleLocationCard(friendLocations: FriendLocation?, text: String) {
+private fun SingleLocationCard(
+    friendLocations: FriendLocation?,
+    text: String,
+    onClickUserIcon: (String) -> Unit
+) {
     if (friendLocations == null) return
     Text(text)
     Spacer(modifier = Modifier.height(6.dp))
-    UserIconsRow(friendLocations.friends)
+    UserIconsRow(friendLocations.friends, onClickUserIcon)
 }
 
 @Composable
-private fun UserIconsRow(friends: MutableList<MutableState<FriendInfo>>) {
+private fun UserIconsRow(
+    friends: MutableList<MutableState<FriendInfo>>,
+    onClickUserIcon: (String) -> Unit
+) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -112,7 +137,7 @@ private fun UserIconsRow(friends: MutableList<MutableState<FriendInfo>>) {
                 it.value.imageUrl,
                 it.value.displayName,
                 it.value.status
-            )
+            ) { onClickUserIcon(it.value.id) }
         }
     }
 }
@@ -148,7 +173,9 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                     modifier = Modifier.padding(horizontal = 6.dp)
                 ) {
                     Text(
-                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
                         text = instants.worldName,
                         fontSize = 15.sp,
                         maxLines = 2,
