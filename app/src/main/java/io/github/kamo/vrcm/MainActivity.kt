@@ -4,8 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,8 +16,6 @@ import androidx.compose.animation.slideOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
@@ -66,37 +67,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent() {
     val navController = rememberNavController()
-//    var isAuthed = false
     VRCMTheme {
         Surface(
             modifier = Modifier.fillMaxSize()
         ) {
-//            var mainRoute by remember { mutableStateOf(MainRouteEnum.StartupAnime) }
-//            AnimatedContent(
-//                label = "AuthSurfaceChange",
-//                targetState = mainRoute,
-//                transitionSpec ={ EnterTransition.None.togetherWith(ExitTransition.None) }
-//            ){
-//                println("AuthAnime $isAuthed")
-//                println("MainRouteEnum $it")
-//                when (it) {
-//
-//                    MainRouteEnum.StartupAnime -> StartupAnime {
-//                        mainRoute = MainRouteEnum.Auth
-//                    }
-//                    MainRouteEnum.Auth -> Auth{
-//                        isAuthed = false
-//                        mainRoute = MainRouteEnum.AuthAnime
-//                    }
-//                    MainRouteEnum.AuthAnime -> AuthAnime(isAuthed) {
-//                        mainRoute  = if (isAuthed) MainRouteEnum.Auth else MainRouteEnum.Home
-//                    }
-//                    MainRouteEnum.Home -> Home {
-//                        isAuthed = true
-//                        mainRoute  = MainRouteEnum.AuthAnime
-//                    }
-//                }
-//            }
             val onNavigate: NavBackStackEntry.(MainRouteEnum, Boolean, List<Any>) -> Unit =
                 remember {
                     { mainRouter, isPop, arguments ->
@@ -146,14 +120,16 @@ fun MainContent() {
                         navController.navigate(mainRoute.route, navPopBuilder(it))
                     }
                 }
-                println("route:" + this.route)
                 composable(
                     MainRouteEnum.Home.route,
-                    enterTransition = { fadeIn(tween(600)) },
+                    enterTransition = { fadeIn(tween(600,300)) },
                     exitTransition = {
-                        fadeOut(tween(600)) +
-                                slideOut(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) }
-                    }
+                        if (!targetState.destination.route!!.startsWith(MainRouteEnum.AuthAnime.route)) {
+                            slideFadeOutTweenContainer(AnimatedContentTransitionScope.SlideDirection.Left)()
+                        } else
+                            fadeOut(tween(600)) +
+                                    slideOut(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) }
+                    },
                 ) {
                     Home { mainRouter, isPop, arguments ->
                         it.onNavigate(mainRouter, isPop, arguments)
@@ -161,8 +137,8 @@ fun MainContent() {
                 }
                 composable(
                     "${MainRouteEnum.Profile.route}/{friendId}",
-                    enterTransition = { fadeIn(tween(600)) },
-                    exitTransition = { fadeOut(tween(600)) }
+                    enterTransition = { fadeIn(tween(600,300)) },
+                    popExitTransition = slideFadeOutTweenContainer(AnimatedContentTransitionScope.SlideDirection.Right),
                 ) { stackEntry ->
                     Profile(
                         userId = stackEntry.arguments?.getString("friendId")!!,
@@ -176,15 +152,26 @@ fun MainContent() {
     }
 }
 
-val LocalNavController: ProvidableCompositionLocal<(MainRouteEnum, Boolean, List<Any>) -> Unit> =
-    compositionLocalOf { error("LocalNavController not found") }
-
 private fun navPopBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
     launchSingleTop = true
     popUpTo(it.destination.route!!) {
         inclusive = true
     }
 }
-
+private fun slideFadeOutTweenContainer(slideDirection :AnimatedContentTransitionScope.SlideDirection) :AnimatedContentTransitionScope<*>.() -> ExitTransition = {
+    this.slideOutOfContainer(
+        slideDirection,
+        tween(500)
+//        spring(stiffness = 150f)
+    ) + fadeOut(
+        tween(500)
+    )
+}
+private fun slideInSpringContainer(slideDirection :AnimatedContentTransitionScope.SlideDirection) :AnimatedContentTransitionScope<*>.() -> EnterTransition = {
+    this.slideIntoContainer(
+        slideDirection,
+        spring(stiffness = Spring.StiffnessLow)
+    )
+}
 
 

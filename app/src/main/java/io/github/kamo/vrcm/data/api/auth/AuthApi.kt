@@ -77,12 +77,13 @@ class AuthApi(private val client: HttpClient) {
         return response.status == HttpStatusCode.OK
     }
 
-    suspend fun isAuthed(): Boolean? = runCatching {
+    suspend fun isAuthed(): Boolean {
         val response = client.get(AUTH_API_PREFIX) {
             url { path(AUTH_API_PREFIX) }
         }
         return response.status == HttpStatusCode.OK && response.body<AuthData>().ok == true
-    }.getOrNull()
+    }
+
 }
 
 

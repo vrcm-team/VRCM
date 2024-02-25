@@ -35,7 +35,7 @@ data class FriendLocation(
 data class InstantsVO(
     val worldName: String = "",
     val worldImageUrl: String? = null,
-    val accessType: AccessType = AccessType.Public,
+    val accessType: AccessType? = null,
     val regionIconUrl: String? = null,
     val userCount: String = "",
 )

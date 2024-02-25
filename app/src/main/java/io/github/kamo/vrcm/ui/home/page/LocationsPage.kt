@@ -53,6 +53,8 @@ fun LocationsPage(
     onClickUserIcon: (String) -> Unit,
     onRefreshLocations: suspend () -> Unit
 ) {
+    val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
+        LinearOutSlowInEasing.transform(pullToRefreshState.progress).coerceIn(0f, 1f)
     Box(
         Modifier.nestedScroll(pullToRefreshState.nestedScrollConnection)
     ) {
@@ -99,8 +101,7 @@ fun LocationsPage(
                 }
             }
         }
-        val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
-            LinearOutSlowInEasing.transform(pullToRefreshState.progress).coerceIn(0f, 1f)
+
         PullToRefreshContainer(
             modifier = Modifier
                 .graphicsLayer(scaleX = scaleFraction, scaleY = scaleFraction)
@@ -197,7 +198,7 @@ fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
                         Text(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
-                            text = instants.accessType.displayName,
+                            text = instants.accessType?.displayName?:"",
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(

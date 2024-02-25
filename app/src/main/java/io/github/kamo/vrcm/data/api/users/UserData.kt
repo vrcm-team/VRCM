@@ -1,6 +1,7 @@
 package io.github.kamo.vrcm.data.api.users
 
 import com.google.gson.annotations.SerializedName
+import io.github.kamo.vrcm.data.api.AccessType
 import io.github.kamo.vrcm.data.api.UserState
 import io.github.kamo.vrcm.data.api.UserStatus
 
@@ -38,5 +39,27 @@ data class UserData(
     val travelingToWorld: String,
     val userIcon: String,
     val worldId: String
-)
+) {
+    val accessType: AccessType
+            get() =
+            if (state == UserState.Offline) {
+                error("user is offline!")
+            } else {
+                if (instanceId.contains(AccessType.Group.typeName)){
+                    when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
+                        AccessType.GroupPublic.typeName -> AccessType.GroupPublic
+                        AccessType.GroupPlus.typeName -> AccessType.GroupPlus
+                        AccessType.GroupMembers.typeName -> AccessType.GroupMembers
+                        else -> AccessType.Group
+                    }
+                }else if (instanceId.contains(AccessType.Private.typeName)) {
+                    if (instanceId.contains( AccessType.InvitePlus.typeName)) AccessType.InvitePlus else AccessType.Invite
+                } else if (instanceId.contains(AccessType.FriendPlus.typeName)) {
+                    AccessType.FriendPlus
+                }else if (instanceId.contains(AccessType.Friend.typeName)) {
+                    AccessType.Friend
+                } else AccessType.Public
+            }
+}
+
 

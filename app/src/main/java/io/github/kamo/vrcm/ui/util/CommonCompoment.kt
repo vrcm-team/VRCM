@@ -3,6 +3,7 @@ package io.github.kamo.vrcm.ui.util
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,11 +33,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import io.github.kamo.vrcm.R
 import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.ui.theme.GameColor
@@ -49,6 +53,7 @@ fun AuthFold(
     cardAlpha: Float = 1.00f,
     cardHeightDp: Dp = 380.dp,
     shapeDp: Dp = 30.dp,
+    context: @Composable BoxScope.() -> Unit = {},
     cardContext: @Composable () -> Unit = {}
 ) {
     Box(
@@ -76,6 +81,7 @@ fun AuthFold(
         ) {
             cardContext()
         }
+        context()
     }
 }
 
@@ -114,8 +120,8 @@ fun LoadingButton(
 
 @Composable
 fun SnackBarToast(
-    modifier: Modifier = Modifier,
     text: String,
+    modifier: Modifier = Modifier,
     onEffect: () -> Unit,
     content: @Composable (SnackbarData) -> Unit = {
         Text(text = it.visuals.message)
@@ -171,9 +177,22 @@ fun AImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val placeholder = remember(color) { ColorPainter(color) }
+    val imageRequest: Any? =
+        when (imageData) {
+            is String ->
+                ImageRequest.Builder(LocalContext.current)
+                    .data(imageData)
+                    .crossfade(600)
+                    .build()
+
+            is ImageRequest -> imageData
+            else -> imageData
+        }
+
+
     AsyncImage(
         modifier = modifier,
-        model = imageData,
+        model = imageRequest,
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         placeholder = placeholder,

@@ -1,9 +1,22 @@
 package io.github.kamo.vrcm.ui.auth
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material3.CircularProgressIndicator
@@ -20,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import io.github.kamo.vrcm.ui.auth.card.LoginCardInput
 import io.github.kamo.vrcm.ui.auth.card.VerifyCardInput
 import io.github.kamo.vrcm.ui.util.AuthFold
+import io.github.kamo.vrcm.ui.util.SnackBarToast
 import io.github.kamo.vrcm.ui.util.fadeSlideHorizontally
 import org.koin.androidx.compose.koinViewModel
 
@@ -33,7 +47,21 @@ fun Auth(
         authViewModel.onCardStateChange(cardState)
     }
 
-    AuthFold {
+
+    AuthFold(
+        context = {
+            SnackBarToast(
+                modifier = Modifier
+                    .systemBarsPadding()
+                    .padding(16.dp)
+                    .align(Alignment.TopCenter),
+                text = authViewModel.uiState.errorMsg,
+                onEffect = { authViewModel.onErrorMessageChange("") }
+            ){
+                Text(modifier = Modifier.fillMaxWidth(), text =  it.visuals.message, textAlign = TextAlign.Center)
+            }
+        }
+    ) {
         AuthCard(
             cardState = authViewModel.uiState.cardState,
         ) { state ->
@@ -109,7 +137,9 @@ private fun AuthCard(
                     direction = -1
                 )
 
-                AuthCardPage.EmailCode, AuthCardPage.TFACode -> fadeSlideHorizontally(cardChangeDurationMillis)
+                AuthCardPage.EmailCode, AuthCardPage.TFACode -> fadeSlideHorizontally(
+                    cardChangeDurationMillis
+                )
 
                 AuthCardPage.Authed -> EnterTransition.None
                     .togetherWith(fadeOut(animationSpec))

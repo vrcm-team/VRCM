@@ -5,13 +5,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.kamo.vrcm.data.api.auth.AuthApi
-import io.github.kamo.vrcm.data.api.auth.AuthState.*
+import io.github.kamo.vrcm.data.api.auth.AuthState.Authed
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedEmailCode
+import io.github.kamo.vrcm.data.api.auth.AuthState.NeedTFA
+import io.github.kamo.vrcm.data.api.auth.AuthState.Unauthorized
 import io.github.kamo.vrcm.data.api.auth.AuthType
 import io.github.kamo.vrcm.data.dao.AccountDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.nio.channels.UnresolvedAddressException
 
 
 enum class AuthCardPage {
@@ -82,7 +86,16 @@ class AuthViewModel(
         _currentVerifyJob = null
     }
 
-    suspend fun awaitAuth(): Boolean = viewModelScope.async(Dispatchers.IO) { authAPI.isAuthed() }.await() == true
+    fun tryAuth(){
+        viewModelScope.launch {
+            val cardState = if (awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
+            onCardStateChange(cardState)
+        }
+    }
+
+    suspend fun awaitAuth(): Boolean = viewModelScope.async(Dispatchers.IO) {
+        runCatching { authAPI.isAuthed() }.onAuthFailure().getOrNull()
+    }.await() == true
 
 
     fun login() {
@@ -124,7 +137,12 @@ class AuthViewModel(
     }
 
     private suspend fun doLogin(username: String, password: String) {
-        val authState = authAPI.login(username, password)
+        val authStateResult = runCatching { authAPI.login(username, password) }
+            .onAuthFailure()
+        println("authState: $authStateResult")
+        if (authStateResult.isFailure) return
+        val authState = authStateResult.getOrNull()!!
+
         if (Unauthorized == authState) {
             onErrorMessageChange("Username or Password is incorrect")
             return
@@ -136,11 +154,15 @@ class AuthViewModel(
 
             NeedEmailCode -> AuthCardPage.EmailCode
 
-            Unauthorized -> error("not supported")
+            else -> error("not supported")
 
         }
         onCardStateChange(authCardPage)
     }
-
-
+    private fun Result<*>.onAuthFailure() =
+        onFailure {
+            val message = if(it is UnresolvedAddressException)  "Unable to connect to the network" else it.message
+            onErrorMessageChange("Failed to Auth: $message")
+            onCardStateChange(AuthCardPage.Login)
+        }
 }

@@ -1,6 +1,5 @@
 package io.github.kamo.vrcm.ui.profile
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -26,9 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,6 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.data.api.UserState
 import io.github.kamo.vrcm.data.api.users.UserData
@@ -72,32 +70,32 @@ fun Profile(
 
     val user = profileViewModel.userState
 
-    Crossfade(
-        targetState = user == null,
-        animationSpec = tween(1000),
-        label = ""
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (it) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 5.dp
-                )
-            } else {
-                FriedScreen(user!!, popBackStack, onNavigate)
-            }
-        }
-    }
+//    Crossfade(
+//        targetState = user == null,
+//        animationSpec = tween(1000),
+//        label = ""
+//    ) {
+//        Box(modifier = Modifier.fillMaxSize()) {
+//            if (it) {
+//                CircularProgressIndicator(
+//                    modifier = Modifier
+//                        .size(60.dp)
+//                        .align(Alignment.Center),
+//                    color = MaterialTheme.colorScheme.primary,
+//                    strokeWidth = 5.dp
+//                )
+//            } else {
+//            }
+//        }
+//    }
+    FriedScreen(user, popBackStack, onNavigate)
 
 
 }
 
 @Composable
 fun FriedScreen(
-    user: UserData,
+    user: UserData?,
     popBackStack: () -> Unit,
     onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
 ) {
@@ -123,6 +121,7 @@ fun FriedScreen(
             .verticalScroll(scrollState)
             .height(2000.dp)
             .fillMaxWidth()
+
     ) {
 
         ProfileUserImage(
@@ -130,8 +129,9 @@ fun FriedScreen(
             offsetDp,
             ratio,
             blurDp,
-            user.currentAvatarImageUrl
+            user?.currentAvatarImageUrl
         )
+
 
         BottomCard(
             initUserIconPadding,
@@ -140,6 +140,8 @@ fun FriedScreen(
             inverseRatio,
             user
         )
+
+
 
         TopMenuBar(
             topBarHeight,
@@ -156,7 +158,7 @@ fun FriedScreen(
             offsetDp,
             imageHeight,
             inverseRatio,
-            user.currentAvatarThumbnailImageUrl,
+            user?.currentAvatarThumbnailImageUrl,
         ) { scrollState.animateScrollTo(0, tween(600)) }
     }
 }
@@ -167,7 +169,7 @@ private fun ProfileUserImage(
     offsetDp: Dp,
     ratio: Float,
     blurDp: Dp,
-    avatarImageUrl: String
+    avatarImageUrl: String?
 ) {
     Box(
         modifier = Modifier
@@ -196,11 +198,8 @@ private fun BottomCard(
     ratio: Float,
     topBarHeight: Int,
     inverseRatio: Float,
-    user: UserData
+    user: UserData?
 ) {
-    val statusColor = GameColor.Status.fromValue(user.status)
-    val stateColor = if (user.state == UserState.Online)
-        GameColor.Status.Online else GameColor.Status.Offline
     Card(
         modifier = Modifier
             .fillMaxSize()
@@ -210,6 +209,10 @@ private fun BottomCard(
             topEnd = (30 * ratio).dp
         )
     ) {
+        if (user == null) return@Card
+        val statusColor = GameColor.Status.fromValue(user.status)
+        val stateColor = if (user.state == UserState.Offline)
+            GameColor.Status.Offline else GameColor.Status.Online
         Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
         Text(
             modifier = Modifier
@@ -233,7 +236,10 @@ private fun BottomCard(
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
                     .padding(horizontal = 6.dp),
-                text = user.statusDescription,
+                text = when (user.statusDescription.isBlank()) {
+                    true -> user.status.typeName
+                    else -> user.statusDescription
+                },
             )
         }
 
@@ -252,7 +258,7 @@ private fun BottomCard(
                         shape = RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 6.dp, vertical = 4.dp),
-                text = user.state.name,
+                text = if (user.state == UserState.Online)  user.accessType.displayName  else user.state.name,
                 color = stateColor
             )
 
@@ -277,7 +283,7 @@ private fun ProfileUserIcon(
     offsetDp: Dp,
     imageHeight: Int,
     inverseRatio: Float,
-    avatarThumbnailImageUrl: String,
+    avatarThumbnailImageUrl: String?,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     onClickIcon: suspend () -> Unit = {}
 ) {
@@ -300,6 +306,7 @@ private fun ProfileUserIcon(
                     .clickable { coroutineScope.launch { onClickIcon() } },
                 imageData = ImageRequest.Builder(LocalContext.current)
                     .data(avatarThumbnailImageUrl)
+                    .crossfade(600)
                     .size(70, 70).build(),
                 contentDescription = "UserIcon",
             )
@@ -379,3 +386,4 @@ private fun TopMenuBar(
         }
     }
 }
+
