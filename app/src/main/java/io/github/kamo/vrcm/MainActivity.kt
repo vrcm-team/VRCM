@@ -99,7 +99,8 @@ fun MainContent() {
 
                 composable(
                     MainRouteEnum.Auth.route,
-                    enterTransition = { EnterTransition.None }
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None }
                 ) {
                     Auth {
                         navController.navigate(

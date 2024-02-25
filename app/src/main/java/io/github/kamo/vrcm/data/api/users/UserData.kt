@@ -9,9 +9,10 @@ data class UserData(
     val allowAvatarCopying: Boolean,
     val bio: String,
     val bioLinks: List<String>,
-    val currentAvatarImageUrl: String,
+    val currentAvatarImageUrl: String?,
     val currentAvatarTags: List<String>,
-    val currentAvatarThumbnailImageUrl: String,
+    val imageUrl:String,
+    val currentAvatarThumbnailImageUrl: String?,
     @SerializedName("date_joined")
     val dateJoined: String,
     val developerType: String,
@@ -37,7 +38,7 @@ data class UserData(
     val travelingToInstance: String,
     val travelingToLocation: String,
     val travelingToWorld: String,
-    val userIcon: String,
+    val userIcon: String?,
     val worldId: String
 ) {
     val accessType: AccessType

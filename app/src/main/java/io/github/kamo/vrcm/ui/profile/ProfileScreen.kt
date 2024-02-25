@@ -129,7 +129,7 @@ fun FriedScreen(
             offsetDp,
             ratio,
             blurDp,
-            user?.currentAvatarImageUrl
+            user?.currentAvatarImageUrl?:user?.imageUrl
         )
 
 
@@ -158,7 +158,7 @@ fun FriedScreen(
             offsetDp,
             imageHeight,
             inverseRatio,
-            user?.currentAvatarThumbnailImageUrl,
+            user?.currentAvatarThumbnailImageUrl?:user?.userIcon,
         ) { scrollState.animateScrollTo(0, tween(600)) }
     }
 }
@@ -169,7 +169,7 @@ private fun ProfileUserImage(
     offsetDp: Dp,
     ratio: Float,
     blurDp: Dp,
-    avatarImageUrl: String?
+    imageUrl: String?
 ) {
     Box(
         modifier = Modifier
@@ -187,7 +187,7 @@ private fun ProfileUserImage(
                     )
                 )
                 .blur(blurDp),
-            imageData = avatarImageUrl,
+            imageData = imageUrl,
         )
     }
 }
