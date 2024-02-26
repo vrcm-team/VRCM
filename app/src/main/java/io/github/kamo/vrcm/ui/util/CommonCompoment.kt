@@ -44,6 +44,7 @@ import coil3.request.crossfade
 import io.github.kamo.vrcm.R
 import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.ui.theme.GameColor
+import io.github.kamo.vrcm.ui.theme.MediumRoundedShape
 import org.koin.compose.koinInject
 
 @Composable
@@ -142,7 +143,7 @@ fun SnackBarToast(
         Snackbar(
             containerColor = MaterialTheme.colorScheme.onPrimary,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(12.dp),
+            shape = MediumRoundedShape,
             actionOnNewLine = true
         ) {
             content(it)
@@ -156,7 +157,7 @@ fun UserStateIcon(
     iconUrl: String?,
     userStatus: UserStatus
 ) {
-    AImage(
+     AImage(
         modifier = Modifier
             .sateCircle(GameColor.Status.fromValue(userStatus))
             .then(modifier)

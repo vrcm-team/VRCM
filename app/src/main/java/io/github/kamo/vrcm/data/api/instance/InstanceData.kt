@@ -2,6 +2,7 @@ package io.github.kamo.vrcm.data.api.instance
 
 import com.google.gson.annotations.SerializedName
 import io.github.kamo.vrcm.data.api.AccessType
+import io.github.kamo.vrcm.data.api.attributes.IAccessType
 
 data class InstanceData(
     val active: Boolean,
@@ -16,7 +17,7 @@ data class InstanceData(
     val hasCapacityForYou: Boolean,
     val hidden: String?,
     val id: String,
-    val instanceId: String,
+    override val instanceId: String,
     val location: String,
     @SerializedName("n_users")
     val nUsers: Int,
@@ -37,26 +38,25 @@ data class InstanceData(
     val userCount: Int,
     val world: WorldData,
     val worldId: String
-) {
-    val accessType: AccessType
-        get() =
-            when (type) {
-                AccessType.Group.typeName -> {
+) :IAccessType{
+    override val accessType: AccessType
+            get() = when (type) {
+                AccessType.Group.value -> {
                     when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
-                        AccessType.GroupPublic.typeName -> AccessType.GroupPublic
-                        AccessType.GroupPlus.typeName -> AccessType.GroupPlus
-                        AccessType.GroupMembers.typeName -> AccessType.GroupMembers
+                        AccessType.GroupPublic.value -> AccessType.GroupPublic
+                        AccessType.GroupPlus.value -> AccessType.GroupPlus
+                        AccessType.GroupMembers.value -> AccessType.GroupMembers
                         else -> AccessType.Group
                     }
                 }
 
-                AccessType.Private.typeName -> {
+                AccessType.Private.value -> {
                     if (canRequestInvite) AccessType.InvitePlus else AccessType.Invite
                 }
 
-                AccessType.FriendPlus.typeName -> AccessType.FriendPlus
+                AccessType.FriendPlus.value -> AccessType.FriendPlus
 
-                AccessType.Friend.typeName -> AccessType.Friend
+                AccessType.Friend.value -> AccessType.Friend
 
                 else -> AccessType.Public
             }

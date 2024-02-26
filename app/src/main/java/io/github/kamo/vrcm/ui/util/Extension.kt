@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.plus
+import java.util.Locale
 import kotlin.math.roundToInt
 
 
@@ -34,6 +35,8 @@ fun Modifier.sateCircle(
     drawCircle(Color.White, borderRadius, borderOffset)
     drawCircle(color, radius, borderOffset)
 }
+
+fun String.capitalizeFirst(locale: Locale = Locale.ROOT) = this.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
 
 
 

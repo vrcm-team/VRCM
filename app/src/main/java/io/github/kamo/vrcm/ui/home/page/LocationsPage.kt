@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +42,7 @@ import io.github.kamo.vrcm.data.api.LocationType
 import io.github.kamo.vrcm.data.api.auth.FriendData
 import io.github.kamo.vrcm.data.vo.FriendLocation
 import io.github.kamo.vrcm.ui.home.LocationFriend
+import io.github.kamo.vrcm.ui.theme.MediumRoundedShape
 import io.github.kamo.vrcm.ui.util.AImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +53,9 @@ fun LocationsPage(
     onClickUserIcon: (String) -> Unit,
     onRefreshLocations: suspend () -> Unit
 ) {
+    LaunchedEffect(Unit) {
+        pullToRefreshState.startRefresh()
+    }
     val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
         LinearOutSlowInEasing.transform(pullToRefreshState.progress).coerceIn(0f, 1f)
     Box(
@@ -147,7 +150,7 @@ private fun UserIconsRow(
 @Composable
 fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
     val instants by location.instants
-    val shape = RoundedCornerShape(12.dp)
+    val shape = MediumRoundedShape
     Surface(
         color = MaterialTheme.colorScheme.onPrimary,
         shape = shape,

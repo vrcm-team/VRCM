@@ -6,21 +6,21 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 
 @JsonAdapter(UserStatus.Adapter::class)
-enum class UserStatus(val typeName: String) {
+enum class UserStatus(val value: String) {
     Active("active"),
     JoinMe("join me"),
     AskMe("ask me"),
     Busy("busy"),
     Offline("offline");
 
-    companion object{
-        fun fromValue(value: String):UserStatus =
-            entries.firstOrNull { it.typeName == value }?: error("Unexpected value '$value'")
+    companion object {
+        fun fromValue(value: String): UserStatus =
+            entries.firstOrNull { it.value == value } ?: error("Unexpected value '$value'")
     }
 
-    class Adapter: TypeAdapter<UserStatus>() {
+    class Adapter : TypeAdapter<UserStatus>() {
         override fun write(out: JsonWriter, value: UserStatus) {
-            out.value(value.typeName)
+            out.value(value.value)
         }
 
         override fun read(`in`: JsonReader): UserStatus {
@@ -32,18 +32,20 @@ enum class UserStatus(val typeName: String) {
 }
 
 @JsonAdapter(UserState.Adapter::class)
-enum class UserState(val typeName:String){
+enum class UserState(val value  : String) {
     Offline("offline"),
     Active("active"),
     Online("online");
-    companion object{
-        fun fromValue(value: String):UserState =
-            UserState.entries.firstOrNull { it.typeName == value }?: error("Unexpected value '$value'")
+
+    companion object {
+        fun fromValue(value: String): UserState =
+            UserState.entries.firstOrNull { it.value == value }
+                ?: error("Unexpected value '$value'")
     }
 
-    class Adapter: TypeAdapter<UserState>() {
+    class Adapter : TypeAdapter<UserState>() {
         override fun write(out: JsonWriter, value: UserState) {
-            out.value(value.typeName)
+            out.value(value.value)
         }
 
         override fun read(`in`: JsonReader): UserState {
@@ -68,7 +70,7 @@ enum class CountryIcon(val iconUrl: String) {
     }
 }
 
-enum class AccessType(val typeName: String, val displayName: String) {
+enum class AccessType(val value: String, val displayName: String) {
     Public("public", "Public"),
 
     GroupPublic("public", "Group Public"),
@@ -86,7 +88,7 @@ enum class AccessType(val typeName: String, val displayName: String) {
 }
 
 
-enum class LocationType(val typeName: String) {
+enum class LocationType(val value: String) {
     /**
      * Friends Active on the Website
      */
@@ -106,4 +108,22 @@ enum class LocationType(val typeName: String) {
      * is Traveling
      */
     Traveling("traveling")
+}
+
+enum class TrustRank(val value: String, val displayName: String) {
+
+    TrustedUser("system_trust_veteran","Trusted"),
+
+    KnownUser("system_trust_trusted","Known"),
+
+    User("system_trust_known","User"),
+
+    NewUser("system_trust_basic","New"),
+
+    Visitor("system_probable_troll","Visitor");
+
+    companion object {
+        fun fromValue(value: String): TrustRank =
+            TrustRank.entries.firstOrNull { it.value == value } ?: Visitor
+    }
 }

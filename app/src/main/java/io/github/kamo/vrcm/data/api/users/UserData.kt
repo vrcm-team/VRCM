@@ -4,63 +4,62 @@ import com.google.gson.annotations.SerializedName
 import io.github.kamo.vrcm.data.api.AccessType
 import io.github.kamo.vrcm.data.api.UserState
 import io.github.kamo.vrcm.data.api.UserStatus
+import io.github.kamo.vrcm.data.api.attributes.IAccessType
+import io.github.kamo.vrcm.data.api.attributes.IUser
 
 data class UserData(
     val allowAvatarCopying: Boolean,
-    val bio: String,
-    val bioLinks: List<String>,
-    val currentAvatarImageUrl: String?,
-    val currentAvatarTags: List<String>,
-    val imageUrl:String,
-    val currentAvatarThumbnailImageUrl: String?,
+    override val bio: String,
+    override val bioLinks: List<String>,
+    override val currentAvatarImageUrl: String,
+    override val currentAvatarTags: List<String>,
+    override val currentAvatarThumbnailImageUrl: String,
     @SerializedName("date_joined")
     val dateJoined: String,
-    val developerType: String,
-    val displayName: String,
+    override val developerType: String,
+    override val displayName: String,
     val friendKey: String,
     val friendRequestStatus: String,
-    val id: String,
-    val instanceId: String,
+    override val userId: String,
+    override val instanceId: String,
     val isFriend: Boolean,
     @SerializedName("last_activity")
     val lastActivity: String,
     @SerializedName("last_login")
-    val lastLogin: String,
+    override val lastLogin: String,
     @SerializedName("last_platform")
-    val lastPlatform: String,
+    override val lastPlatform: String,
     val location: String,
     val note: String,
-    val profilePicOverride: String,
+    override val profilePicOverride: String,
     val state: UserState,
-    val status: UserStatus,
-    val statusDescription: String,
-    val tags: List<String>,
+    override val status: UserStatus,
+    override val statusDescription: String,
+    override val tags: List<String>,
     val travelingToInstance: String,
     val travelingToLocation: String,
     val travelingToWorld: String,
-    val userIcon: String?,
-    val worldId: String
-) {
-    val accessType: AccessType
-            get() =
-            if (state == UserState.Offline) {
-                error("user is offline!")
-            } else {
-                if (instanceId.contains(AccessType.Group.typeName)){
-                    when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
-                        AccessType.GroupPublic.typeName -> AccessType.GroupPublic
-                        AccessType.GroupPlus.typeName -> AccessType.GroupPlus
-                        AccessType.GroupMembers.typeName -> AccessType.GroupMembers
-                        else -> AccessType.Group
-                    }
-                }else if (instanceId.contains(AccessType.Private.typeName)) {
-                    if (instanceId.contains( AccessType.InvitePlus.typeName)) AccessType.InvitePlus else AccessType.Invite
-                } else if (instanceId.contains(AccessType.FriendPlus.typeName)) {
-                    AccessType.FriendPlus
-                }else if (instanceId.contains(AccessType.Friend.typeName)) {
-                    AccessType.Friend
-                } else AccessType.Public
+    override val userIcon: String,
+    val worldId: String,
+) :IUser, IAccessType {
+    override val accessType: AccessType
+        get() =
+        when {
+            instanceId.contains(AccessType.Group.value) -> when (instanceId.substringAfter("groupAccessType(")
+                .substringBefore(")")) {
+                AccessType.GroupPublic.value -> AccessType.GroupPublic
+                AccessType.GroupPlus.value -> AccessType.GroupPlus
+                AccessType.GroupMembers.value -> AccessType.GroupMembers
+                else -> AccessType.Group
             }
+
+            instanceId.contains(AccessType.Private.value) -> AccessType.Private
+            instanceId.contains(AccessType.FriendPlus.value) -> AccessType.FriendPlus
+            instanceId.contains(AccessType.Friend.value) -> AccessType.Friend
+            else -> AccessType.Public
+        }
 }
+
+
 
 

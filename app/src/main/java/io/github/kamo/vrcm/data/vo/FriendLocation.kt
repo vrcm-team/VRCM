@@ -15,18 +15,18 @@ data class FriendLocation(
     companion object {
         val Offline
             get() = FriendLocation(
-                location = LocationType.Offline.typeName,
+                location = LocationType.Offline.value,
                 friends = mutableStateListOf()
             )
         val Private
             get() = FriendLocation(
-                location = LocationType.Private.typeName,
+                location = LocationType.Private.value,
                 friends = mutableStateListOf()
             )
 
         val Traveling
             get() = FriendLocation(
-                location = LocationType.Traveling.typeName,
+                location = LocationType.Traveling.value,
                 friends = mutableStateListOf()
             )
     }

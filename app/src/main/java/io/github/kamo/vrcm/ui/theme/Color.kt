@@ -1,6 +1,7 @@
 package io.github.kamo.vrcm.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import io.github.kamo.vrcm.data.api.TrustRank
 import io.github.kamo.vrcm.data.api.UserStatus
 
 val primaryLight = Color(0xFF2E628C)
@@ -238,14 +239,24 @@ object GameColor {
         }
     }
 
-    object Level {
-        val visitor = Color(0xFFCCCCCC)
+    object Rank {
+        val Visitor = Color(0xFFCCCCCC)
         val New = Color(0xFF1778FF)
         val User = Color(0xFF2BCF5C)
         val Known = Color(0xFFFF7B42)
         val Trusted = Color(0xFF8143E6)
+        fun fromValue(rank: TrustRank): Color {
+            return when (rank) {
+                TrustRank.TrustedUser -> Trusted
+                TrustRank.KnownUser -> Known
+                TrustRank.User -> User
+                TrustRank.NewUser -> New
+                TrustRank.Visitor -> Visitor
+            }
+        }
     }
 
+   val Supporter = Color(0xFFFFFC40)
 
 }
 

@@ -37,7 +37,11 @@ class HomeViewModel(
     val currentUser by _currentUser
 
     fun ini() = viewModelScope.launch(Dispatchers.IO) {
-        _currentUser.value = authAPI.currentUser()
+        runCatching {
+            _currentUser.value = authAPI.currentUser()
+        }.onFailure {
+            _errorMessage.value = "error: ${it.message}"
+        }
     }
 
 
@@ -64,9 +68,9 @@ class HomeViewModel(
     ) = viewModelScope.launch(Dispatchers.Main) {
         val friendLocationInfoMap = newValue.values.groupBy {
             when (it.value.location) {
-                LocationType.Offline.typeName -> LocationType.Offline
-                LocationType.Private.typeName -> LocationType.Private
-                LocationType.Traveling.typeName -> LocationType.Traveling
+                LocationType.Offline.value -> LocationType.Offline
+                LocationType.Private.value -> LocationType.Private
+                LocationType.Traveling.value -> LocationType.Traveling
                 else -> LocationType.Instance
             }
         }

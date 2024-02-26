@@ -4,7 +4,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,14 +21,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,7 +53,10 @@ import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.data.api.UserState
 import io.github.kamo.vrcm.data.api.users.UserData
 import io.github.kamo.vrcm.ui.theme.GameColor
+import io.github.kamo.vrcm.ui.theme.MediumRoundedShape
+import io.github.kamo.vrcm.ui.theme.SmallRoundedShape
 import io.github.kamo.vrcm.ui.util.AImage
+import io.github.kamo.vrcm.ui.util.capitalizeFirst
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -114,14 +121,12 @@ fun FriedScreen(
     val initUserIconPadding = imageHeight.toFloat()
     val lastIconPadding = initUserIconPadding - (topBarHeight * ratio)
     val isHidden = initUserIconPadding == lastIconPadding
-
     Surface(
         Modifier
             .systemBarsPadding()
             .verticalScroll(scrollState)
             .height(2000.dp)
             .fillMaxWidth()
-
     ) {
 
         ProfileUserImage(
@@ -129,7 +134,7 @@ fun FriedScreen(
             offsetDp,
             ratio,
             blurDp,
-            user?.currentAvatarImageUrl?:user?.imageUrl
+            user?.imageUrl
         )
 
 
@@ -140,8 +145,6 @@ fun FriedScreen(
             inverseRatio,
             user
         )
-
-
 
         TopMenuBar(
             topBarHeight,
@@ -158,7 +161,7 @@ fun FriedScreen(
             offsetDp,
             imageHeight,
             inverseRatio,
-            user?.currentAvatarThumbnailImageUrl?:user?.userIcon,
+            user?.iconUrl,
         ) { scrollState.animateScrollTo(0, tween(600)) }
     }
 }
@@ -211,19 +214,46 @@ private fun BottomCard(
     ) {
         if (user == null) return@Card
         val statusColor = GameColor.Status.fromValue(user.status)
-        val stateColor = if (user.state == UserState.Offline)
-            GameColor.Status.Offline else GameColor.Status.Online
+        val accessName = if (user.state == UserState.Online)
+            user.accessType.displayName else user.state.name
+        val trustRank = user.trustRank
+        val rankColor: Color = GameColor.Rank.fromValue(trustRank)
         Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
-        Text(
-            modifier = Modifier
-                .padding(top = 10.dp)
-                .align(Alignment.CenterHorizontally)
-                .padding(horizontal = 6.dp),
-            text = user.displayName,
-            fontSize = 24.sp
-        )
         Row(
-            Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                modifier = Modifier
+                    .size(26.dp)
+                    .align(Alignment.CenterVertically),
+                imageVector = Icons.Outlined.Shield,
+                contentDescription = "TrustRankIcon",
+                tint = rankColor
+            )
+            Text(
+                modifier = Modifier
+                    .padding(start = 6.dp),
+                text = user.displayName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp,
+            )
+            if (user.isSupporter) {
+                Icon(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .align(Alignment.Top),
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "SupporterIcon",
+                    tint = GameColor.Supporter
+                )
+            }
+        }
+        Row(
+            Modifier.align(Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Canvas(
                 modifier = Modifier
@@ -234,12 +264,11 @@ private fun BottomCard(
             }
             Text(
                 modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(horizontal = 6.dp),
+                    .align(Alignment.CenterVertically),
                 text = when (user.statusDescription.isBlank()) {
-                    true -> user.status.typeName
+                    true -> user.status.value
                     else -> user.statusDescription
-                },
+                } + "| ($accessName)",
             )
         }
 
@@ -248,31 +277,21 @@ private fun BottomCard(
                 .padding(top = 10.dp)
                 .align(Alignment.CenterHorizontally),
         ) {
-            Text(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(horizontal = 6.dp)
-                    .border(
-                        width = 3.dp,
-                        color = stateColor,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                text = if (user.state == UserState.Online)  user.accessType.displayName  else user.state.name,
-                color = stateColor
-            )
+            val speakLanguages = remember(user) { user.speakLanguages }
+            speakLanguages.forEach { language ->
+                Text(
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .padding(horizontal = 6.dp)
+                        .background(MaterialTheme.colorScheme.primary, SmallRoundedShape)
+                        .padding(horizontal = 6.dp)
+                        .clip(MediumRoundedShape),
+                    text = remember(language) { language.capitalizeFirst() },
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
 
-            Text(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(horizontal = 6.dp)
-                    .border(3.dp, GameColor.Level.Trusted, shape = RoundedCornerShape(12.dp))
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                text = "Trusted",
-                color = GameColor.Level.Trusted
-            )
         }
-
     }
 }
 
@@ -291,8 +310,8 @@ private fun ProfileUserIcon(
     Box {
         Row(
             modifier = Modifier
-                .run { if (isHidden) offset(y = (offsetDp + 5.dp - imageHeight.dp)) else this }
-                .padding(top = lastIconPadding.dp)
+                .run { if (isHidden) offset(y = (offsetDp - imageHeight.dp)) else this }
+                .padding(top = (lastIconPadding + 5).dp)
                 .alpha(inverseRatio),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,

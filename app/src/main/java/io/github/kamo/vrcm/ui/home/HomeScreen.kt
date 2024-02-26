@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import io.github.kamo.vrcm.MainRouteEnum
 import io.github.kamo.vrcm.data.api.UserStatus
 import io.github.kamo.vrcm.ui.home.page.LocationsPage
+import io.github.kamo.vrcm.ui.theme.MediumRoundedShape
 import io.github.kamo.vrcm.ui.util.SnackBarToast
 import io.github.kamo.vrcm.ui.util.UserStateIcon
 import org.koin.androidx.compose.koinViewModel
@@ -50,9 +50,10 @@ fun Home(
     onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
+    val onErrorToAuthPage = remember { { onNavigate(MainRouteEnum.AuthAnime, true, listOf(true)) } }
+
     LaunchedEffect(Unit) {
         homeViewModel.ini()
-        pullToRefreshState.startRefresh()
     }
     val onClickUserIcon = remember {
         { friendId: String ->
@@ -64,7 +65,6 @@ fun Home(
         }
     }
 
-    val onErrorToAuthPage = remember { { onNavigate(MainRouteEnum.AuthAnime, true, listOf(true)) } }
     Scaffold(
         modifier = Modifier.background(Color.LightGray),
         topBar = {
@@ -172,7 +172,7 @@ fun LocationFriend(
     Column(
         modifier = Modifier
             .width(60.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MediumRoundedShape)
             .clickable { onClickUserIcon() },
         verticalArrangement = Arrangement.Center
     ) {
