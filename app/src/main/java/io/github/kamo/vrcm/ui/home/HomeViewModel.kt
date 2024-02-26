@@ -114,13 +114,17 @@ class HomeViewModel(
                                 userCount = "${instance.userCount}/${instance.world.capacity}"
                             )
                         }.onFailure {
-                            println("location: ${friendLocation.location}")
-                            _errorMessage.value =
-                                "location: ${friendLocation.location} error: ${it.message} "
+                            // 可能延迟导致用户切换了房间,未找到instance,这时候把他的添加到Traveling里
+                            _errorMessage.value = "location: ${friendLocation.location} error: ${it.message} "
+                            this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Traveling) {
+                                mutableStateListOf(FriendLocation.Traveling)
+                            }.first().friends.addAll(locationFriendEntry.value)
+                        }.onSuccess {
+                            friendLocation.friends.addAll(locationFriendEntry.value)
+                            friendLocationList.add(friendLocation)
                         }
                     }
-                    friendLocation.also(friendLocationList::add)
-                }.friends.addAll(locationFriendEntry.value)
+                }
         }
     }
 

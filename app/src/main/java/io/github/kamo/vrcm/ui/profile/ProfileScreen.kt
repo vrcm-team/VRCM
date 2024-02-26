@@ -234,7 +234,7 @@ private fun BottomCard(
         HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 50.dp, vertical = 10.dp)
+                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
                 .align(Alignment.CenterHorizontally),
             color = Color.LightGray,
             thickness = 1.dp,
@@ -305,7 +305,7 @@ private fun ColumnScope.StatusRow(
     Row(
         modifier = Modifier.align(Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Canvas(
             modifier = Modifier
