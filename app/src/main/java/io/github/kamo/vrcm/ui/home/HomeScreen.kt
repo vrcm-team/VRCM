@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
@@ -75,7 +76,10 @@ fun Home(
                 ),
                 navigationIcon = {
                     UserStateIcon(
-                        modifier = Modifier.height(56.dp),
+                        modifier = Modifier
+                            .height(56.dp)
+                            .clip(CircleShape)
+                            .clickable { homeViewModel.currentUser?.let { onClickUserIcon(it.id) } },
                         iconUrl = homeViewModel.currentUser?.currentAvatarThumbnailImageUrl
                             ?: "",
                         userStatus = homeViewModel.currentUser?.status
@@ -83,8 +87,7 @@ fun Home(
                     )
                 },
                 title = {
-                    Column(
-                    ) {
+                    Column {
                         Text(
                             text = homeViewModel.currentUser?.displayName ?: "",
                             fontSize = 20.sp
@@ -130,7 +133,6 @@ fun Home(
                 }
             ) {
                 Icon(
-
                     Icons.Default.Add, contentDescription = "Add"
                 )
             }

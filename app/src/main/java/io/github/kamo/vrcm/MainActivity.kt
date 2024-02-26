@@ -16,7 +16,6 @@ import androidx.compose.animation.slideOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
@@ -71,19 +70,17 @@ fun MainContent() {
         Surface(
             modifier = Modifier.fillMaxSize()
         ) {
-            val onNavigate: NavBackStackEntry.(MainRouteEnum, Boolean, List<Any>) -> Unit =
-                remember {
-                    { mainRouter, isPop, arguments ->
-                        val routePath =
-                            "${mainRouter.route}/${arguments.joinToString("/") { it.toString() }}"
-                        if (isPop) {
-                            navController.navigate(routePath, navPopBuilder(this))
-                        } else {
-                            navController.navigate(routePath)
-                        }
+            val onNavigate: NavBackStackEntry.(MainRouteEnum, Boolean, List<Any>) -> Unit = { mainRouter, isPop, arguments ->
+                    val routePath =
+                        "${mainRouter.route}/${arguments.joinToString("/") { it.toString() }}"
+                    if (isPop) {
+                        navController.navigate(routePath, navPopBuilder(this))
+                    } else {
+                        navController.navigate(routePath)
                     }
-                }
-            val popBackStack = remember { { navController.popBackStack() } }
+            }
+
+            val popBackStack = { navController.popBackStack() }
             NavHost(
                 navController = navController,
                 startDestination = MainRouteEnum.StartupAnime.route
