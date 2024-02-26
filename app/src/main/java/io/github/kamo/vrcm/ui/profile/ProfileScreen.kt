@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.sp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.kamo.vrcm.MainRouteEnum
-import io.github.kamo.vrcm.data.api.UserState
 import io.github.kamo.vrcm.data.api.users.UserData
 import io.github.kamo.vrcm.ui.theme.GameColor
 import io.github.kamo.vrcm.ui.theme.MediumRoundedShape
@@ -214,8 +213,6 @@ private fun BottomCard(
     ) {
         if (user == null) return@Card
         val statusColor = GameColor.Status.fromValue(user.status)
-        val accessName = if (user.state == UserState.Online)
-            user.accessType.displayName else user.state.name
         val trustRank = user.trustRank
         val rankColor: Color = GameColor.Rank.fromValue(trustRank)
         Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
@@ -268,7 +265,7 @@ private fun BottomCard(
                 text = when (user.statusDescription.isBlank()) {
                     true -> user.status.value
                     else -> user.statusDescription
-                } + "| ($accessName)",
+                }
             )
         }
 
