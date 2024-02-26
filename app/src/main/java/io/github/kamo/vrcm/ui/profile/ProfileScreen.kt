@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,11 +22,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -213,81 +216,123 @@ private fun BottomCard(
     ) {
         if (user == null) return@Card
         val statusColor = GameColor.Status.fromValue(user.status)
-        val trustRank = user.trustRank
+        val trustRank = remember(user) { user.trustRank }
         val rankColor: Color = GameColor.Rank.fromValue(trustRank)
+        val speakLanguages = remember(user) { user.speakLanguages }
+        val statusDescription = when (user.statusDescription.isBlank()) {
+            true -> user.status.value
+            else -> user.statusDescription
+        }
         Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
-        Row(
+        // TrustRank + UserName + VRC+
+        UserInfoRow(user.displayName, user.isSupporter, rankColor)
+        // status
+        StatusRow(statusColor, statusDescription)
+        // speakLanguages
+        LanguagesRow(speakLanguages)
+
+        HorizontalDivider(
             modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 50.dp, vertical = 10.dp)
+                .align(Alignment.CenterHorizontally),
+            color = Color.LightGray,
+            thickness = 1.dp,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+                .background(CardDefaults.cardColors().containerColor)
                 .align(Alignment.CenterHorizontally)
-                .padding(horizontal = 10.dp, vertical = 10.dp),
         ) {
+            Text(
+                modifier = Modifier.padding(10.dp),
+                text = user.bio
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.UserInfoRow(
+    userName: String,
+    isSupporter: Boolean,
+    rankColor: Color
+) {
+    Row(
+        modifier = Modifier.Companion
+            .align(Alignment.CenterHorizontally)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            modifier = Modifier
+                .size(26.dp)
+                .align(Alignment.CenterVertically),
+            imageVector = Icons.Rounded.Shield,
+            contentDescription = "TrustRankIcon",
+            tint = rankColor
+        )
+        Text(
+            text = userName,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+        )
+
+        Box(modifier = Modifier
+            .size(26.dp)
+            .align(Alignment.Top)
+        ){
             Icon(
                 modifier = Modifier
-                    .size(26.dp)
-                    .align(Alignment.CenterVertically),
-                imageVector = Icons.Outlined.Shield,
-                contentDescription = "TrustRankIcon",
-                tint = rankColor
-            )
-            Text(
-                modifier = Modifier
-                    .padding(start = 6.dp),
-                text = user.displayName,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-            )
-            if (user.isSupporter) {
-                Icon(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .align(Alignment.Top),
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "SupporterIcon",
-                    tint = GameColor.Supporter
-                )
-            }
-        }
-        Row(
-            Modifier.align(Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Canvas(
-                modifier = Modifier
-                    .size(12.dp)
-                    .align(Alignment.CenterVertically)
-            ) {
-                drawCircle(statusColor)
-            }
-            Text(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically),
-                text = when (user.statusDescription.isBlank()) {
-                    true -> user.status.value
-                    else -> user.statusDescription
-                }
+                    .size(20.dp)
+                    .align(Alignment.TopStart),
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "SupporterIcon",
+                tint = if (isSupporter) GameColor.Supporter else Color.Transparent
             )
         }
+    }
+}
 
-        Row(
+@Composable
+private fun ColumnScope.StatusRow(
+    statusColor: Color,
+    statusDescription: String
+) {
+    Row(
+        modifier = Modifier.align(Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Canvas(
             modifier = Modifier
-                .padding(top = 10.dp)
-                .align(Alignment.CenterHorizontally),
-        ) {
-            val speakLanguages = remember(user) { user.speakLanguages }
-            speakLanguages.forEach { language ->
-                Text(
-                    modifier = Modifier
-                        .align(Alignment.CenterVertically)
-                        .padding(horizontal = 6.dp)
-                        .background(MaterialTheme.colorScheme.primary, SmallRoundedShape)
-                        .padding(horizontal = 6.dp)
-                        .clip(MediumRoundedShape),
-                    text = remember(language) { language.capitalizeFirst() },
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
+                .size(12.dp)
+        ) { drawCircle(statusColor) }
+        Text(text = statusDescription)
+    }
+}
 
+@Composable
+private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
+    Row(
+        modifier = Modifier
+            .padding(top = 10.dp)
+            .align(Alignment.CenterHorizontally),
+    ) {
+        speakLanguages.forEach { language ->
+            Text(
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .padding(horizontal = 6.dp)
+                    .background(MaterialTheme.colorScheme.primary, SmallRoundedShape)
+                    .padding(horizontal = 6.dp)
+                    .clip(MediumRoundedShape),
+                text = remember(language) { language.capitalizeFirst() },
+                color = MaterialTheme.colorScheme.onPrimary
+            )
         }
     }
 }
