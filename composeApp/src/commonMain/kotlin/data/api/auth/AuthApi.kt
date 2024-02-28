@@ -1,11 +1,16 @@
 package io.github.vrcmteam.vrcm.data.api.auth
 
 import io.github.vrcmteam.vrcm.data.api.AuthType
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.path
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -14,6 +19,9 @@ internal const val AUTH_API_PREFIX = "auth"
 internal const val EMAIL_OTP = "emailOtp"
 
 class AuthApi(private val client: HttpClient) {
+
+    suspend fun currentUser(): CurrentUserData = userRes().body()
+
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
         client.get("$AUTH_API_PREFIX/user") {

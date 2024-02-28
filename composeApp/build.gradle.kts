@@ -37,7 +37,7 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
 
                 implementation(libs.navigation.compose)
-//                implementation(libs.koin.androidx.compose)
+                implementation(libs.koin.androidx.compose)
 
             }
 
@@ -54,7 +54,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
 
-            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
 
             implementation(libs.ktor.client.cio)
             implementation(libs.ktor.client.core)

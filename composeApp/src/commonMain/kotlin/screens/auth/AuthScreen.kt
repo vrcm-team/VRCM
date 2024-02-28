@@ -1,9 +1,23 @@
 package io.github.vrcmteam.vrcm.screens.auth
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
@@ -15,25 +29,45 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.*
+import cafe.adriel.voyager.navigator.LocalNavigator
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Authed
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.EmailCode
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Loading
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Login
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.TFACode
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.TTFACode
 import io.github.vrcmteam.vrcm.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.screens.util.AuthFold
 import io.github.vrcmteam.vrcm.screens.util.SnackBarToast
 import io.github.vrcmteam.vrcm.screens.util.fadeSlideHorizontally
 
-class AuthScreen():Screen{
+class AuthScreen() : Screen {
     @Composable
     override fun Content() {
-        Auth(getScreenModel()) {}
+//        val authScreenModel: AuthScreenModel = getScreenModel()
+//        Auth(authScreenModel) {}
+        val current = LocalNavigator.current
+
+        Box(modifier = Modifier.fillMaxSize().background(Color.Red).clickable { current!!.push( AuthScreen1()) })
     }
 
 }
 
+class AuthScreen1() : Screen {
+    @Composable
+    override fun Content() {
+//        val authScreenModel: AuthScreenModel = getScreenModel()
+//        Auth(authScreenModel) {}
+        val current = LocalNavigator.current
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { current!!.pop( ) })
+    }
+
+}
 @Composable
 fun Auth(
     authScreenModel: AuthScreenModel,
@@ -42,8 +76,6 @@ fun Auth(
     LaunchedEffect(Unit) {
         authScreenModel.tryAuth()
     }
-
-
     AuthFold(
         context = {
             SnackBarToast(
@@ -54,7 +86,11 @@ fun Auth(
                 text = authScreenModel.uiState.errorMsg,
                 onEffect = { authScreenModel.onErrorMessageChange("") }
             ) {
-                Text(modifier = Modifier.fillMaxWidth(), text = it.visuals.message, textAlign = TextAlign.Center)
+                Text(
+                    modifier = Modifier.fillMaxWidth(),
+                    text = it.visuals.message,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     ) {
@@ -133,7 +169,7 @@ private fun AuthCard(
                     direction = -1
                 )
 
-                EmailCode, TFACode,TTFACode -> fadeSlideHorizontally(
+                EmailCode, TFACode, TTFACode -> fadeSlideHorizontally(
                     cardChangeDurationMillis
                 )
 

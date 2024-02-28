@@ -4,14 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavOptionsBuilder
-import org.koin.androidx.compose.KoinAndroidContext
-import org.koin.core.annotation.KoinExperimentalAPI
 
 
 enum class MainRouteEnum(val route: String) {
@@ -25,14 +25,11 @@ enum class MainRouteEnum(val route: String) {
 class MainActivity : ComponentActivity() {
 
 
-    @OptIn(KoinExperimentalAPI::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            KoinAndroidContext {
-                Arr()
-            }
+            App()
         }
     }
 }

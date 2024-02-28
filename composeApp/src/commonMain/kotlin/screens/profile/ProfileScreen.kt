@@ -1,9 +1,19 @@
 package io.github.vrcmteam.vrcm.screens.profile
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,9 +21,11 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -22,16 +34,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import io.github.vrcmteam.vrcm.MainRouteEnum
+import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.data.api.users.UserData
 import io.github.vrcmteam.vrcm.screens.theme.GameColor
 import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
@@ -39,43 +47,50 @@ import io.github.vrcmteam.vrcm.screens.theme.SmallRoundedShape
 import io.github.vrcmteam.vrcm.screens.util.AImage
 import io.github.vrcmteam.vrcm.screens.util.capitalizeFirst
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import org.koin.androidx.compose.koinViewModel
+
+class ProfileScreen : Screen {
+    @Composable
+    override fun Content() {
+        val profileScreenModel: ProfileScreenModel = getScreenModel()
+        Profile(profileScreenModel, "", {})
+    }
+
+}
 
 @Composable
 fun Profile(
-    profileViewModel: ProfileViewModel = koinViewModel(),
+    profileScreenModel: ProfileScreenModel,
     userId: String,
     popBackStack: () -> Unit,
-    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
+//    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
 ) {
     // Token失效时返回重新登陆
-    val onErrorToAuthPage = remember { { onNavigate(MainRouteEnum.AuthAnime, true, listOf(true)) } }
-    LaunchedEffect(Unit) {
-        profileViewModel.refreshUser(userId,onErrorToAuthPage)
-    }
-
-    val user = profileViewModel.userState
-
-//    Crossfade(
-//        targetState = user == null,
-//        animationSpec = tween(1000),
-//        label = ""
-//    ) {
-//        Box(modifier = Modifier.fillMaxSize()) {
-//            if (it) {
-//                CircularProgressIndicator(
-//                    modifier = Modifier
-//                        .size(60.dp)
-//                        .align(Alignment.Center),
-//                    color = MaterialTheme.colorScheme.primary,
-//                    strokeWidth = 5.dp
-//                )
-//            } else {
-//            }
-//        }
+//    val onErrorToAuthPage = remember { { onNavigate(MainRouteEnum.AuthAnime, true, listOf(true)) } }
+//    LaunchedEffect(Unit) {
+//        profileScreenModel.refreshUser(userId, onErrorToAuthPage)
 //    }
-    FriedScreen(user, popBackStack, onNavigate)
+//
+//    val user = profileScreenModel.userState
+//
+////    Crossfade(
+////        targetState = user == null,
+////        animationSpec = tween(1000),
+////        label = ""
+////    ) {
+////        Box(modifier = Modifier.fillMaxSize()) {
+////            if (it) {
+////                CircularProgressIndicator(
+////                    modifier = Modifier
+////                        .size(60.dp)
+////                        .align(Alignment.Center),
+////                    color = MaterialTheme.colorScheme.primary,
+////                    strokeWidth = 5.dp
+////                )
+////            } else {
+////            }
+////        }
+////    }
+//    FriedScreen(user, popBackStack, onNavigate)
 
 
 }
@@ -84,66 +99,66 @@ fun Profile(
 fun FriedScreen(
     user: UserData?,
     popBackStack: () -> Unit,
-    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
+//    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
 ) {
-    val scrollState = rememberScrollState()
-    val imageHeight = (LocalConfiguration.current.screenHeightDp / 3)
-    val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
-    val ratio =
-        (((imageHeight - offsetDp.value) / imageHeight.toFloat()).let { if (it >= 0) it else 0f }).let {
-            FastOutSlowInEasing.transform(it)
-        }
-    val fl = scrollState.value / imageHeight.toFloat()
-    val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
-    val inverseRatio = 1 - ratio
-    val topBarHeight = 70
-
-    val initUserIconPadding = imageHeight.toFloat()
-    val lastIconPadding = initUserIconPadding - (topBarHeight * ratio)
-    val isHidden = initUserIconPadding == lastIconPadding
-    Surface(
-        Modifier
-            .systemBarsPadding()
-            .verticalScroll(scrollState)
-            .height(2000.dp)
-            .fillMaxWidth()
-    ) {
-
-        ProfileUserImage(
-            imageHeight,
-            offsetDp,
-            ratio,
-            blurDp,
-            user?.imageUrl
-        )
-
-
-        BottomCard(
-            initUserIconPadding,
-            ratio,
-            topBarHeight,
-            inverseRatio,
-            user
-        )
-
-        TopMenuBar(
-            topBarHeight,
-            offsetDp,
-            ratio,
-            inverseRatio,
-            onReturn = popBackStack,
-            onMenu = { }
-        )
-
-        ProfileUserIcon(
-            isHidden,
-            lastIconPadding,
-            offsetDp,
-            imageHeight,
-            inverseRatio,
-            user?.iconUrl,
-        ) { scrollState.animateScrollTo(0, tween(600)) }
-    }
+//    val scrollState = rememberScrollState()
+//    val imageHeight = (LocalConfiguration.current.screenHeightDp / 3)
+//    val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
+//    val ratio =
+//        (((imageHeight - offsetDp.value) / imageHeight.toFloat()).let { if (it >= 0) it else 0f }).let {
+//            FastOutSlowInEasing.transform(it)
+//        }
+//    val fl = scrollState.value / imageHeight.toFloat()
+//    val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
+//    val inverseRatio = 1 - ratio
+//    val topBarHeight = 70
+//
+//    val initUserIconPadding = imageHeight.toFloat()
+//    val lastIconPadding = initUserIconPadding - (topBarHeight * ratio)
+//    val isHidden = initUserIconPadding == lastIconPadding
+//    Surface(
+//        Modifier
+//            .systemBarsPadding()
+//            .verticalScroll(scrollState)
+//            .height(2000.dp)
+//            .fillMaxWidth()
+//    ) {
+//
+//        ProfileUserImage(
+//            imageHeight,
+//            offsetDp,
+//            ratio,
+//            blurDp,
+//            user?.imageUrl
+//        )
+//
+//
+//        BottomCard(
+//            initUserIconPadding,
+//            ratio,
+//            topBarHeight,
+//            inverseRatio,
+//            user
+//        )
+//
+//        TopMenuBar(
+//            topBarHeight,
+//            offsetDp,
+//            ratio,
+//            inverseRatio,
+//            onReturn = popBackStack,
+//            onMenu = { }
+//        )
+//
+//        ProfileUserIcon(
+//            isHidden,
+//            lastIconPadding,
+//            offsetDp,
+//            imageHeight,
+//            inverseRatio,
+//            user?.iconUrl,
+//        ) { scrollState.animateScrollTo(0, tween(600)) }
+//    }
 }
 
 @Composable
@@ -209,26 +224,26 @@ private fun BottomCard(
         // speakLanguages
         LanguagesRow(speakLanguages)
 
-        HorizontalDivider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
-                .align(Alignment.CenterHorizontally),
-            color = Color.LightGray,
-            thickness = 1.dp,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp)
-                .background(CardDefaults.cardColors().containerColor)
-                .align(Alignment.CenterHorizontally)
-        ) {
-            Text(
-                modifier = Modifier.padding(10.dp),
-                text = user.bio
-            )
-        }
+//        HorizontalDivider(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
+//                .align(Alignment.CenterHorizontally),
+//            color = Color.LightGray,
+//            thickness = 1.dp,
+//        )
+//        Box(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 10.dp, vertical = 10.dp)
+//                .background(CardDefaults.cardColors().containerColor)
+//                .align(Alignment.CenterHorizontally)
+//        ) {
+//            Text(
+//                modifier = Modifier.padding(10.dp),
+//                text = user.bio
+//            )
+//        }
     }
 }
 
@@ -259,10 +274,11 @@ private fun ColumnScope.UserInfoRow(
             fontSize = 24.sp,
         )
 
-        Box(modifier = Modifier
-            .size(26.dp)
-            .align(Alignment.Top)
-        ){
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .align(Alignment.Top)
+        ) {
             Icon(
                 modifier = Modifier
                     .size(20.dp)
@@ -337,18 +353,18 @@ private fun ProfileUserIcon(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(modifier = Modifier.weight(1f))
-            AImage(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .clip(CircleShape)
-                    .size(iconSize)
-                    .clickable { coroutineScope.launch { onClickIcon() } },
-                imageData = ImageRequest.Builder(LocalContext.current)
-                    .data(avatarThumbnailImageUrl)
-                    .crossfade(600)
-                    .size(70, 70).build(),
-                contentDescription = "UserIcon",
-            )
+//            AImage(
+//                modifier = Modifier
+//                    .align(Alignment.CenterVertically)
+//                    .clip(CircleShape)
+//                    .size(iconSize)
+//                    .clickable { coroutineScope.launch { onClickIcon() } },
+//                imageData = ImageRequest.Builder(LocalContext.current)
+//                    .data(avatarThumbnailImageUrl)
+//                    .crossfade(600)
+//                    .size(70, 70).build(),
+//                contentDescription = "UserIcon",
+//            )
             Spacer(modifier = Modifier.weight(1f))
         }
     }

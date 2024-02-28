@@ -1,8 +1,12 @@
 package io.github.vrcmteam.vrcm.screens.home
 
-import androidx.compose.runtime.*
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import cafe.adriel.voyager.core.model.ScreenModel
+import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.data.api.CountryIcon
 import io.github.vrcmteam.vrcm.data.api.LocationType
 import io.github.vrcmteam.vrcm.data.api.VRCApiException
@@ -12,17 +16,17 @@ import io.github.vrcmteam.vrcm.data.api.auth.FriendData
 import io.github.vrcmteam.vrcm.data.api.instance.InstanceAPI
 import io.github.vrcmteam.vrcm.data.vo.FriendLocation
 import io.github.vrcmteam.vrcm.data.vo.InstantsVO
-import io.ktor.util.network.*
+import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
-class HomeViewModel(
+class HomeScreenModel(
     private val authAPI: AuthApi,
     private val instanceAPI: InstanceAPI
-) : ViewModel() {
+) : ScreenModel {
     //    private val uiState = HomeUIState()
 //    val _uiState: HomeUIState = uiState
 
@@ -37,7 +41,8 @@ class HomeViewModel(
 
     val currentUser by _currentUser
 
-    fun ini() = viewModelScope.launch(Dispatchers.IO) {
+    fun ini() = screenModelScope.launch(Dispatchers.IO) {
+        // TODO: 完善异常处理
         runCatching {
             _currentUser.value = authAPI.currentUser()
         }.onFailure {
@@ -47,8 +52,8 @@ class HomeViewModel(
 
 
     suspend fun refresh(onError: () -> Unit) {
-        this@HomeViewModel.friendLocationMap.clear()
-        viewModelScope.launch(Dispatchers.IO) {
+        this@HomeScreenModel.friendLocationMap.clear()
+        screenModelScope.launch(Dispatchers.IO) {
             runCatching {
                 authAPI.friendsFlow()
                     .collect { friends ->
@@ -62,7 +67,7 @@ class HomeViewModel(
     private fun update(
         newValue: Map<String, MutableState<FriendData>>,
         onError: () -> Unit
-    ) = viewModelScope.launch(Dispatchers.Main) {
+    ) = screenModelScope.launch(Dispatchers.Main) {
         val friendLocationInfoMap = newValue.values.groupBy {
             when (it.value.location) {
                 LocationType.Offline.value -> LocationType.Offline
@@ -72,23 +77,23 @@ class HomeViewModel(
             }
         }
         friendLocationInfoMap[LocationType.Offline]?.let { friends ->
-            this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Offline) {
+            this@HomeScreenModel.friendLocationMap.getOrPut(LocationType.Offline) {
                 mutableStateListOf(FriendLocation.Offline)
             }.first().friends.addAll(friends)
         }
         friendLocationInfoMap[LocationType.Private]?.let { friends ->
-            this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Private) {
+            this@HomeScreenModel.friendLocationMap.getOrPut(LocationType.Private) {
                 mutableStateListOf(FriendLocation.Private)
             }.first().friends.addAll(friends)
         }
         friendLocationInfoMap[LocationType.Traveling]?.let { friends ->
-            this@HomeViewModel.friendLocationMap.getOrPut(LocationType.Traveling) {
+            this@HomeScreenModel.friendLocationMap.getOrPut(LocationType.Traveling) {
                 mutableStateListOf(FriendLocation.Traveling)
             }.first().friends.addAll(friends)
         }
         val inInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
         inInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
-            this@HomeViewModel.friendLocationMap
+            this@HomeScreenModel.friendLocationMap
                 .getOrPut(LocationType.Instance, ::mutableStateListOf)
                 // 得到对应location的FriendLocation，将新的好友添加到friends
                 .let { friendLocationList ->
@@ -99,7 +104,7 @@ class HomeViewModel(
                                 location = locationFriendEntry.key,
                                 friends = mutableStateListOf()
                             ))
-                    viewModelScope.launch(Dispatchers.IO) {
+                    screenModelScope.launch(Dispatchers.IO) {
                         instanceAPI.instanceByLocation(friendLocation.location)
                             .onSuccess { instance ->
                                 friendLocation.instants.value = InstantsVO(
@@ -135,7 +140,7 @@ class HomeViewModel(
                 else -> "${it.message}"
             }
             onErrorMessageChange(message)
-            viewModelScope.launch(Dispatchers.Main) {
+            screenModelScope.launch(Dispatchers.Main) {
                 delay(2000L)
                 onError()
             }

@@ -14,14 +14,22 @@ import io.github.vrcmteam.vrcm.data.api.instance.InstanceAPI
 import io.github.vrcmteam.vrcm.data.api.users.UsersApi
 import io.github.vrcmteam.vrcm.data.dao.AccountDao
 import io.github.vrcmteam.vrcm.data.dao.CookiesDao
-import io.ktor.client.*
-import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
+import io.github.vrcmteam.vrcm.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.screens.profile.ProfileScreenModel
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.logging.DEFAULT
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import okio.FileSystem
 import org.koin.core.context.startKoin
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.bind
+import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
@@ -36,11 +44,15 @@ fun initKoin() {
 }
 
 
- val daoModule: Module = module {
+
+val daoModule: Module = module {
      singleOf(::AccountDao)
      singleOf(::CookiesDao)
  }
 val screenModelsModule : Module = module {
+    factoryOf(::AuthScreenModel)
+    factoryOf(::HomeScreenModel)
+    factoryOf(::ProfileScreenModel)
 
 }
 val apiModule = module {

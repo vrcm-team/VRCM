@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 
-class ProfileViewModel(
+class ProfileScreenModel(
     private val usersApi: UsersApi
 ) : ScreenModel {
 
