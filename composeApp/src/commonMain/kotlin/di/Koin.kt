@@ -17,13 +17,9 @@ import io.github.vrcmteam.vrcm.data.dao.CookiesDao
 import io.github.vrcmteam.vrcm.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.screens.profile.ProfileScreenModel
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.cookies.CookiesStorage
-import io.ktor.client.plugins.cookies.HttpCookies
-import io.ktor.client.plugins.logging.DEFAULT
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.*
+import io.ktor.client.plugins.cookies.*
+import io.ktor.client.plugins.logging.*
 import okio.FileSystem
 import org.koin.core.context.startKoin
 import org.koin.core.definition.Definition
@@ -42,7 +38,6 @@ fun initKoin() {
         )
     }
 }
-
 
 
 val daoModule: Module = module {

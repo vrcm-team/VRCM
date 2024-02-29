@@ -1,47 +1,30 @@
 package io.github.vrcmteam.vrcm.screens.auth
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Authed
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.EmailCode
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Loading
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.Login
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.TFACode
-import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.TTFACode
+import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.screens.auth.AuthCardPage.*
 import io.github.vrcmteam.vrcm.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.screens.auth.card.VerifyCardInput
+import io.github.vrcmteam.vrcm.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.screens.util.AuthFold
 import io.github.vrcmteam.vrcm.screens.util.SnackBarToast
 import io.github.vrcmteam.vrcm.screens.util.fadeSlideHorizontally
@@ -49,25 +32,64 @@ import io.github.vrcmteam.vrcm.screens.util.fadeSlideHorizontally
 class AuthScreen() : Screen {
     @Composable
     override fun Content() {
-//        val authScreenModel: AuthScreenModel = getScreenModel()
-//        Auth(authScreenModel) {}
-        val current = LocalNavigator.current
+        val authScreenModel: AuthScreenModel = getScreenModel()
+        val current = LocalNavigator.currentOrThrow
 
-        Box(modifier = Modifier.fillMaxSize().background(Color.Red).clickable { current!!.push( AuthScreen1()) })
+        Auth(authScreenModel) {
+            current.pop()
+            current.push(AuthAnimeScreen(true){
+                current.push(HomeScreen())
+            })
+        }
+//        val current = LocalNavigator.currentOrThrow
+//        current.lastItem
+//        Box(modifier = Modifier.fillMaxSize().background(Color.Red).clickable { current!!.push( AuthScreen1()) })
     }
 
 }
-
-class AuthScreen1() : Screen {
+class AuthAnimeScreen(
+    val isAuthed: Boolean,
+    val onNavigate: () -> Unit
+) : Screen {
     @Composable
     override fun Content() {
-//        val authScreenModel: AuthScreenModel = getScreenModel()
-//        Auth(authScreenModel) {}
-        val current = LocalNavigator.current
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { current!!.pop( ) })
+        BoxWithConstraints {
+            var isAuthedState by remember { mutableStateOf(isAuthed) }
+            val cardUpAnimationSpec = tween<Dp>(1200)
+            val cardHeightDp by animateDpAsState(
+                if (!isAuthedState) 380.dp else maxHeight + 100.dp,
+                cardUpAnimationSpec,
+                label = "AuthCardHeightDp",
+            )
+            val shapeDp by animateDpAsState(
+                if (!isAuthedState) 30.dp else 0.dp,
+                cardUpAnimationSpec,
+                label = "AuthCardShapeDp",
+            ) {
+                onNavigate()
+            }
+            LaunchedEffect(Unit) {
+                isAuthedState = !isAuthedState
+            }
+            AuthFold(
+                cardHeightDp = cardHeightDp,
+                shapeDp = shapeDp,
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 5.dp
+                    )
+                }
+            }
+        }
     }
-
 }
+
+
 @Composable
 fun Auth(
     authScreenModel: AuthScreenModel,

@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.kotlinxSerialization)
-    alias(libs.plugins.mokoResources)
+//    alias(libs.plugins.mokoResources)
 }
 
 kotlin {
@@ -30,33 +30,36 @@ kotlin {
         // Required for moko-resources to work
         applyDefaultHierarchyTemplate()
 
-        androidMain {
-            dependencies {
-                implementation(project.dependencies.platform(libs.compose.bom))
-                implementation(libs.compose.ui.tooling.preview)
-                implementation(libs.androidx.activity.compose)
+        androidMain.dependencies {
 
-                implementation(libs.navigation.compose)
-                implementation(libs.koin.androidx.compose)
+            implementation(project.dependencies.platform(libs.compose.bom))
+            implementation(libs.compose.ui.tooling.preview)
+            implementation(libs.androidx.activity.compose)
 
-            }
+            implementation(libs.navigation.compose)
+            implementation(libs.koin.androidx.compose)
 
+            implementation(libs.ktor.client.cio)
             // Required for moko-resources to work
-            dependsOn(commonMain.get())
+//            dependsOn(commonMain.get())
         }
         iosMain.dependencies {
+            implementation(libs.stately.common)
+            implementation(libs.ktor.client.darwin)
 
         }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)
+            implementation(compose.material)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
+//            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.koin.compose)
 
-            implementation(libs.ktor.client.cio)
+
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.logging)
             implementation(libs.ktor.client.content.negotiation)
@@ -72,7 +75,7 @@ kotlin {
             implementation(libs.voyager.tabNavigator)
             implementation(libs.voyager.bottomSheetNavigator)
             implementation(libs.voyager.koin)
-            implementation(libs.moko.resources.compose)
+//            implementation(libs.moko.resources.compose)
         }
     }
 }
@@ -117,6 +120,8 @@ android {
     }
 }
 
-multiplatformResources {
-    multiplatformResourcesPackage = "io.github.vrcmteam.vrcm"
-}
+//multiplatformResources {
+//    multiplatformResourcesPackage = "io.github.vrcmteam.vrcm"
+//}
+
+

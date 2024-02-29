@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.data.api.users
 
-import io.github.vrcmteam.vrcm.data.api.VRCApiException
 import io.github.vrcmteam.vrcm.data.api.ifOK
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -12,7 +11,6 @@ class UsersApi(
     private val client: HttpClient
 ) {
 
-    @Throws(VRCApiException::class)
     suspend fun fetchUser(userId: String) =
         client.get("$USERS_API_PREFIX/$userId").ifOK { body<UserData>() }
 

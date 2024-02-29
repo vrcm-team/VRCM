@@ -7,7 +7,7 @@ actual class AccountDao actual constructor(context: PlatformContext) {
     }
 
     actual fun accountPair(): Pair<String, String> {
-        TODO("Not yet implemented")
+        return "123" to "123"
     }
 
     actual fun clearAccount() {

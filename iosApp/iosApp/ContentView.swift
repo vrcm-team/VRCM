@@ -5,23 +5,30 @@
 //  Created by 卡莫 SAMA on 2024/2/27.
 //
 
+
 import SwiftUI
 import SwiftData
-import shared
-struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+//
+//struct ContentView: View {
+//    var body: some View {
+//        VStack{
+//            Text("Greeting().greet()")
+//        }.padding()
+//    }
+//}
+import ComposeApp
 
-    var body: some View {
-        VStack{
-            Text(Greeting().greet())
-        }.padding()
+struct ComposeView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        MainViewControllerKt.MainViewController()
     }
 
-  
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+struct ContentView: View {
+    var body: some View {
+        ComposeView()
+                .ignoresSafeArea(.keyboard) // Compose has own keyboard handler
+    }
 }
