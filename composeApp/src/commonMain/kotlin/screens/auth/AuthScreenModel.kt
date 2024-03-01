@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.data.api.auth.AuthState
 import io.github.vrcmteam.vrcm.data.dao.AccountDao
 import io.ktor.util.network.*
 import kotlinx.coroutines.*
+import org.koin.core.logger.Logger
 
 
 enum class AuthCardPage {
@@ -24,7 +25,7 @@ enum class AuthCardPage {
 class AuthScreenModel(
     private val authAPI: AuthApi,
     private val accountDao: AccountDao,
-//    private val logger: Logger
+    private val logger: Logger
 ) : ScreenModel {
 
     private val _uiState = mutableStateOf(accountDao.accountPair().run {
@@ -160,7 +161,7 @@ class AuthScreenModel(
     }
     private fun Result<*>.onAuthFailure() =
         onFailure {
-//            logger.error("AuthScreen Failed : ${it.message}")
+            logger.error("AuthScreen Failed : ${it.message}")
             val message = if(it is UnresolvedAddressException)  "Unable to connect to the network" else it.message
             onErrorMessageChange("Failed to Auth: $message")
             onCardStateChange(AuthCardPage.Login)

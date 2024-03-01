@@ -6,7 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,13 +37,11 @@ class AuthScreen() : Screen {
 
         Auth(authScreenModel) {
             current.pop()
-            current.push(AuthAnimeScreen(true){
+            current.push(AuthAnimeScreen(false){
                 current.push(HomeScreen())
             })
         }
-//        val current = LocalNavigator.currentOrThrow
-//        current.lastItem
-//        Box(modifier = Modifier.fillMaxSize().background(Color.Red).clickable { current!!.push( AuthScreen1()) })
+
     }
 
 }
@@ -213,7 +211,7 @@ private fun ReturnIcon(onClick: () -> Unit) {
             .padding(start = 24.dp, top = 24.dp)
             .size(18.dp)
             .clickable(onClick = onClick),
-        imageVector = Icons.Outlined.KeyboardArrowLeft,
+        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
         contentDescription = "ReturnIcon",
     )
 }
