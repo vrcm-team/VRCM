@@ -8,12 +8,8 @@ import io.github.vrcmteam.vrcm.data.api.AuthType
 import io.github.vrcmteam.vrcm.data.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.data.api.auth.AuthState
 import io.github.vrcmteam.vrcm.data.dao.AccountDao
-import io.ktor.util.network.UnresolvedAddressException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import io.ktor.util.network.*
+import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
 
 
@@ -68,6 +64,7 @@ class AuthScreenModel(
         if (cardState == AuthCardPage.Authed) {
             accountDao.saveAccount(uiState.username, uiState.password)
         }
+        Dispatchers.Main
         _uiState.value = when (cardState) {
             AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
                 cardState = cardState,
