@@ -9,11 +9,12 @@
 /* Begin PBXBuildFile section */
 		1FECE16E2B8DD91600FEB34A /* iosAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FECE16D2B8DD91600FEB34A /* iosAppApp.swift */; };
 		1FECE1702B8DD91600FEB34A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FECE16F2B8DD91600FEB34A /* ContentView.swift */; };
-		1FECE1742B8DD91800FEB34A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1FECE1732B8DD91800FEB34A /* Assets.xcassets */; };
 		1FECE1772B8DD91800FEB34A /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1FECE1762B8DD91800FEB34A /* Preview Assets.xcassets */; };
 		1FECE1812B8DD91800FEB34A /* iosAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FECE1802B8DD91800FEB34A /* iosAppTests.swift */; };
 		1FECE18B2B8DD91800FEB34A /* iosAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FECE18A2B8DD91800FEB34A /* iosAppUITests.swift */; };
 		1FECE18D2B8DD91800FEB34A /* iosAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FECE18C2B8DD91800FEB34A /* iosAppUITestsLaunchTests.swift */; };
+		1FECE1A12B916C6C00FEB34A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1FECE1A02B916C6C00FEB34A /* Assets.xcassets */; };
+		1FECE1A32B916D5F00FEB34A /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1FECE1A22B916D5F00FEB34A /* Media.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,13 +38,15 @@
 		1FECE16A2B8DD91600FEB34A /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1FECE16D2B8DD91600FEB34A /* iosAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppApp.swift; sourceTree = "<group>"; };
 		1FECE16F2B8DD91600FEB34A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		1FECE1732B8DD91800FEB34A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1FECE1762B8DD91800FEB34A /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		1FECE17C2B8DD91800FEB34A /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1FECE1802B8DD91800FEB34A /* iosAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppTests.swift; sourceTree = "<group>"; };
 		1FECE1862B8DD91800FEB34A /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1FECE18A2B8DD91800FEB34A /* iosAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppUITests.swift; sourceTree = "<group>"; };
 		1FECE18C2B8DD91800FEB34A /* iosAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		1FECE1A02B916C6C00FEB34A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = "../../../../../../../Downloads/KotlinProject 2/iosApp/iosApp/Assets.xcassets"; sourceTree = "<group>"; };
+		1FECE1A22B916D5F00FEB34A /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
+		1FECE1A42B916EB200FEB34A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,9 +97,11 @@
 		1FECE16C2B8DD91600FEB34A /* iosApp */ = {
 			isa = PBXGroup;
 			children = (
+				1FECE1A42B916EB200FEB34A /* Info.plist */,
+				1FECE1A22B916D5F00FEB34A /* Media.xcassets */,
+				1FECE1A02B916C6C00FEB34A /* Assets.xcassets */,
 				1FECE16D2B8DD91600FEB34A /* iosAppApp.swift */,
 				1FECE16F2B8DD91600FEB34A /* ContentView.swift */,
-				1FECE1732B8DD91800FEB34A /* Assets.xcassets */,
 				1FECE1752B8DD91800FEB34A /* Preview Content */,
 			);
 			path = iosApp;
@@ -134,7 +139,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1FECE1902B8DD91800FEB34A /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
-				1FECE19C2B907D6E00FEB34A /* ShellScript */,
+				1FECE19D2B91678D00FEB34A /* ShellScript */,
 				1FECE1662B8DD91600FEB34A /* Sources */,
 				1FECE1672B8DD91600FEB34A /* Frameworks */,
 				1FECE1682B8DD91600FEB34A /* Resources */,
@@ -232,8 +237,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FECE1A12B916C6C00FEB34A /* Assets.xcassets in Resources */,
+				1FECE1A32B916D5F00FEB34A /* Media.xcassets in Resources */,
 				1FECE1772B8DD91800FEB34A /* Preview Assets.xcassets in Resources */,
-				1FECE1742B8DD91800FEB34A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -254,7 +260,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		1FECE19C2B907D6E00FEB34A /* ShellScript */ = {
+		1FECE19D2B91678D00FEB34A /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -368,6 +374,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -425,6 +433,8 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -440,6 +450,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -447,11 +458,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)";
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VRCM;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = NO;
-				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -478,6 +488,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -485,11 +496,10 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = "$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)";
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VRCM;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = NO;
-				INFOPLIST_KEY_UILaunchScreen_Generation = NO;
+				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "";
 				LD_RUNPATH_SEARCH_PATHS = (
