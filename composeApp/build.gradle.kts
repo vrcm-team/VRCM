@@ -1,12 +1,17 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.kotlinxSerialization)
-//    alias(libs.plugins.mokoResources)
 }
 
 kotlin {
+
+
+    jvm("desktop")
+
     androidTarget {
         compilations.all {
             kotlinOptions {
@@ -27,27 +32,29 @@ kotlin {
     }
 
     sourceSets {
-        // Required for moko-resources to work
-        applyDefaultHierarchyTemplate()
 
         androidMain.dependencies {
-
             implementation(project.dependencies.platform(libs.compose.bom))
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
 
-            implementation(libs.navigation.compose)
             implementation(libs.koin.androidx.compose)
 
-            implementation(libs.ktor.client.cio)
-            // Required for moko-resources to work
-//            dependsOn(commonMain.get())
+            implementation(libs.ktor.client.okhttp)
         }
+
         iosMain.dependencies {
             implementation(libs.stately.common)
             implementation(libs.ktor.client.darwin)
-
         }
+
+        val desktopMain by getting
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
+            implementation (libs.kotlinx.coroutines.swing)
+            implementation(libs.ktor.client.okhttp)
+        }
+
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -58,8 +65,10 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
 
-            implementation(libs.koin.compose)
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.no.arg)
 
+            implementation(libs.koin.compose)
 
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.logging)
@@ -76,7 +85,6 @@ kotlin {
             implementation(libs.voyager.tabNavigator)
             implementation(libs.voyager.bottomSheetNavigator)
             implementation(libs.voyager.koin)
-//            implementation(libs.moko.resources.compose)
         }
     }
 }
@@ -115,13 +123,19 @@ android {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
-    dependencies {
-        debugImplementation(libs.compose.ui.tooling)
-    }
+
 }
 
-//multiplatformResources {
-//    multiplatformResourcesPackage = "io.github.vrcmteam.vrcm"
-//}
 
+compose.desktop {
+    application {
+        mainClass = "MainKt"
+
+        nativeDistributions {
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "io.github.vrcmteam.vrcm"
+            packageVersion = "1.0.0"
+        }
+    }
+}
 

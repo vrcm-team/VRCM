@@ -2,16 +2,37 @@ package io.github.vrcmteam.vrcm.screens.profile
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -31,6 +52,9 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import coil3.PlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.data.api.users.UserData
 import io.github.vrcmteam.vrcm.screens.theme.GameColor
 import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
@@ -38,6 +62,8 @@ import io.github.vrcmteam.vrcm.screens.theme.SmallRoundedShape
 import io.github.vrcmteam.vrcm.screens.util.AImage
 import io.github.vrcmteam.vrcm.screens.util.capitalizeFirst
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 class ProfileScreen(
     val userId: String,
@@ -353,18 +379,18 @@ private fun ProfileUserIcon(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Spacer(modifier = Modifier.weight(1f))
-//            AImage(
-//                modifier = Modifier
-//                    .align(Alignment.CenterVertically)
-//                    .clip(CircleShape)
-//                    .size(iconSize)
-//                    .clickable { coroutineScope.launch { onClickIcon() } },
-//                imageData = ImageRequest.Builder(LocalContext.current)
-//                    .data(avatarThumbnailImageUrl)
-//                    .crossfade(600)
-//                    .size(70, 70).build(),
-//                contentDescription = "UserIcon",
-//            )
+            AImage(
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .clip(CircleShape)
+                    .size(iconSize)
+                    .clickable { coroutineScope.launch { onClickIcon() } },
+                imageData = ImageRequest.Builder(koinInject<PlatformContext>())
+                    .data(avatarThumbnailImageUrl)
+                    .crossfade(600)
+                    .size(70, 70).build(),
+                contentDescription = "UserIcon",
+            )
             Spacer(modifier = Modifier.weight(1f))
         }
     }

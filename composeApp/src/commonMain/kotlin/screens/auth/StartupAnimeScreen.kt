@@ -11,12 +11,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.screens.util.AuthFold
 
 class StartupAnimeScreen():Screen {
     @Composable
     override fun Content() {
         val durationMillis = 1200
+        val current = LocalNavigator.currentOrThrow
         var isStartUp by remember { mutableStateOf(false) }
         val iconYOffset by animateDpAsState(
             if (isStartUp) (-180).dp else 0.dp,
@@ -33,7 +36,8 @@ class StartupAnimeScreen():Screen {
             tween(durationMillis),
             label = "AuthSurfaceAlpha"
         ) {
-//            onNavigate()
+            current.pop()
+            current.push(AuthScreen())
         }
         LaunchedEffect(Unit) {
             isStartUp = true

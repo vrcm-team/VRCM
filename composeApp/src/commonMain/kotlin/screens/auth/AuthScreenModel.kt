@@ -8,8 +8,12 @@ import io.github.vrcmteam.vrcm.data.api.AuthType
 import io.github.vrcmteam.vrcm.data.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.data.api.auth.AuthState
 import io.github.vrcmteam.vrcm.data.dao.AccountDao
-import io.ktor.util.network.*
-import kotlinx.coroutines.*
+import io.ktor.util.network.UnresolvedAddressException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
 
@@ -84,7 +88,7 @@ class AuthScreenModel(
     }
 
     fun tryAuth(){
-        screenModelScope.launch {
+        screenModelScope.launch{
             val cardState = if (awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
             onCardStateChange(cardState)
         }

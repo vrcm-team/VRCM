@@ -9,7 +9,7 @@ data class WorldData(
     val authorName: String,
     val capacity: Int,
     @SerialName("created_at")
-    val createdAt: String,
+    val createdAt: String?,
     val description: String,
     val favorites: Int,
     val featured: Boolean,
@@ -30,7 +30,7 @@ data class WorldData(
     val udonProducts: List<String>,
     val unityPackages: List<UnityPackage>,
     @SerialName("updated_at")
-    val updatedAt: String,
+    val updatedAt: String?,
     val version: Int,
-    val visits: Int
+    val visits: Int?
 )

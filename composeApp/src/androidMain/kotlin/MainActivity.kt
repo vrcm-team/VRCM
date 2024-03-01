@@ -10,8 +10,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavOptionsBuilder
 
 
 enum class MainRouteEnum(val route: String) {
@@ -23,8 +21,6 @@ enum class MainRouteEnum(val route: String) {
 }
 
 class MainActivity : ComponentActivity() {
-
-
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -120,12 +116,12 @@ class MainActivity : ComponentActivity() {
 //    }
 //}
 
-private fun navPopBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
-    launchSingleTop = true
-    popUpTo(it.destination.route!!) {
-        inclusive = true
-    }
-}
+//private fun navPopBuilder(it: NavBackStackEntry): NavOptionsBuilder.() -> Unit = {
+//    launchSingleTop = true
+//    popUpTo(it.destination.route!!) {
+//        inclusive = true
+//    }
+//}
 private fun slideFadeOutTweenContainer(slideDirection :AnimatedContentTransitionScope.SlideDirection) :AnimatedContentTransitionScope<*>.() -> ExitTransition = {
     this.slideOutOfContainer(
         slideDirection,

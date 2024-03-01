@@ -6,6 +6,7 @@ import coil3.disk.DiskCache
 import coil3.network.ktor.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
+import com.russhwolf.settings.Settings
 import io.github.vrcmteam.vrcm.data.api.ApiClientDefaultBuilder
 import io.github.vrcmteam.vrcm.data.api.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.data.api.auth.AuthApi
@@ -14,43 +15,42 @@ import io.github.vrcmteam.vrcm.data.api.instance.InstanceAPI
 import io.github.vrcmteam.vrcm.data.api.users.UsersApi
 import io.github.vrcmteam.vrcm.data.dao.AccountDao
 import io.github.vrcmteam.vrcm.data.dao.CookiesDao
+import io.github.vrcmteam.vrcm.data.dao.DaoKeys
 import io.github.vrcmteam.vrcm.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.screens.profile.ProfileScreenModel
-import io.ktor.client.*
-import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.logging.DEFAULT
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
 import okio.FileSystem
-import org.koin.core.context.startKoin
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
 
-fun initKoin() {
-    startKoin {
-        modules(
-            apiModule,
-            daoModule,
-            screenModelsModule,
-        )
-    }
+expect val platformModule: Module
+
+
+private val daoModule: Module = module {
+    factory<Settings> { (name: String) -> get<Settings.Factory>().create(name) }
+    single { AccountDao(get { parametersOf(DaoKeys.ACCOUNT_KEY) }) }
+    single { CookiesDao(get { parametersOf(DaoKeys.COOKIE_KEY) }) }
 }
 
-
-val daoModule: Module = module {
-     singleOf(::AccountDao)
-     singleOf(::CookiesDao)
- }
-val screenModelsModule : Module = module {
+private val screenModelsModule: Module = module {
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
     factoryOf(::ProfileScreenModel)
-
 }
-val apiModule = module {
+
+private val apiModule = module {
     singleOf(::PersistentCookiesStorage) { bind<CookiesStorage>() }
     singleOf(::AuthApi)
     singleOf(::FileApi)
@@ -59,6 +59,8 @@ val apiModule = module {
     single<HttpClient> { apiClientDefinition(it) }
     single<ImageLoader> { imageLoaderDefinition(it) }
 }
+
+val commonModules = listOf(daoModule, screenModelsModule, apiModule)
 
 private val imageLoaderDefinition: Definition<ImageLoader> = {
     val context = get<PlatformContext>()

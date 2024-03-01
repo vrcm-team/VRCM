@@ -1,19 +1,22 @@
 package io.github.vrcmteam.vrcm.data.dao
 
-import coil3.PlatformContext
+import com.russhwolf.settings.Settings
+import com.russhwolf.settings.set
 
 
-expect class CookiesDao(context: PlatformContext)  {
+class CookiesDao(
+    private val cookiesSettings: Settings
 
+)  {
+     val allCookies: Map<String, *>
+        get() = cookiesSettings.keys.associateWith { cookiesSettings.getStringOrNull(it) }
 
-    val allCookies: Map<String, *>
+    fun saveCookies(key: String, value: String) =
+        cookiesSettings.set(key, value)
 
-    fun saveCookies(key: String, value: String)
+     fun cookies(key: String): String? = cookiesSettings.getStringOrNull(key)
 
-    fun cookies(key: String): String?
+     fun clearCookies() = cookiesSettings.clear()
 
-    fun clearCookies()
-
-    fun removeCookies(key: String)
-
+     fun removeCookies(key: String) = cookiesSettings.remove(key)
 }
