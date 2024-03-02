@@ -9,7 +9,6 @@ plugins {
 
 kotlin {
 
-
     jvm("desktop")
 
     androidTarget {
@@ -51,8 +50,9 @@ kotlin {
         val desktopMain by getting
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
-            implementation (libs.kotlinx.coroutines.swing)
             implementation(libs.ktor.client.okhttp)
+            // support Dispatchers.Main
+            implementation (libs.kotlinx.coroutines.swing)
         }
 
         commonMain.dependencies {
@@ -94,7 +94,6 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
 
     defaultConfig {
         applicationId = "io.github.vrcmteam.vrcm"
@@ -105,9 +104,6 @@ android {
     }
 //    buildFeatures {
 //        compose = true
-//    }
-//    composeOptions {
-//        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
 //    }
     packaging {
         resources {
@@ -129,7 +125,7 @@ android {
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "io.github.vrcmteam.vrcm.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
