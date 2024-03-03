@@ -29,10 +29,10 @@ import io.ktor.client.plugins.logging.Logging
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.bind
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.parameter.parametersOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 expect val platformModule: Module
@@ -51,7 +51,7 @@ private val screenModelsModule: Module = module {
 }
 
 private val apiModule = module {
-    singleOf(::PersistentCookiesStorage) { bind<CookiesStorage>() }
+    singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
     singleOf(::AuthApi)
     singleOf(::FileApi)
     singleOf(::InstanceAPI)

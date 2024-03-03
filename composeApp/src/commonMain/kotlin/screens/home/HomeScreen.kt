@@ -25,8 +25,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -55,22 +54,17 @@ class HomeScreen : Screen {
         val homeScreenModel: HomeScreenModel = getScreenModel()
         val pullToRefreshState = rememberPullToRefreshState()
         val current = LocalNavigator.currentOrThrow
-
-        val onErrorToAuthPage = remember { {
+        val onErrorToAuthPage =  {
             current.pop()
             current.push(AuthAnimeScreen(false))
-        } }
-
-        LaunchedEffect(Unit) {
-            homeScreenModel.ini()
         }
-        val onClickUserIcon = remember {
-            // TODO :
-            { friendId: String ->
-                current.push(ProfileScreen(friendId))
-            }
+        // to ProfileScreen
+        val onClickUserIcon = { friendId: String ->
+            current.push(ProfileScreen(friendId))
         }
-
+        LifecycleEffect(onStarted = {
+            homeScreenModel.ini(onErrorToAuthPage)
+        })
         Scaffold(
             modifier = Modifier.background(Color.LightGray),
             topBar = {
@@ -148,6 +142,9 @@ class HomeScreen : Screen {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                LifecycleEffect(onStarted = {
+                    pullToRefreshState.startRefresh()
+                })
                 LocationsPage(
                     friendLocationMap = homeScreenModel.friendLocationMap,
                     pullToRefreshState = pullToRefreshState,

@@ -41,13 +41,8 @@ class HomeScreenModel(
 
     val currentUser by _currentUser
 
-    fun ini() = screenModelScope.launch(Dispatchers.IO) {
-        // TODO: 完善异常处理
-        runCatching {
-            _currentUser.value = authAPI.currentUser()
-        }.onFailure {
-            _errorMessage.value = "error: ${it.message}"
-        }.getOrThrow()
+    fun ini(onError: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
+        runCatching { _currentUser.value = authAPI.currentUser() }.onHomeFailure(onError)
     }
 
 

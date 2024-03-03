@@ -2,14 +2,27 @@ package io.github.vrcmteam.vrcm.screens.home.page
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
@@ -40,9 +53,6 @@ fun LocationsPage(
     onClickUserIcon: (String) -> Unit,
     onRefreshLocations: suspend () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        pullToRefreshState.startRefresh()
-    }
     val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
         LinearOutSlowInEasing.transform(pullToRefreshState.progress).coerceIn(0f, 1f)
     Box(

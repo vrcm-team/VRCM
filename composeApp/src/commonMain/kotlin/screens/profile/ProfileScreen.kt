@@ -23,12 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,6 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -56,11 +59,13 @@ import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.data.api.users.UserData
+import io.github.vrcmteam.vrcm.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.screens.theme.GameColor
 import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
 import io.github.vrcmteam.vrcm.screens.theme.SmallRoundedShape
 import io.github.vrcmteam.vrcm.screens.util.AImage
 import io.github.vrcmteam.vrcm.screens.util.capitalizeFirst
+import io.github.vrcmteam.vrcm.screens.util.drawSate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -71,28 +76,17 @@ class ProfileScreen(
     @Composable
     override fun Content() {
         val profileScreenModel: ProfileScreenModel = getScreenModel()
-        val current = LocalNavigator.currentOrThrow
-        Profile(profileScreenModel, userId) {
-            current.pop()
+        val currentNavigator = LocalNavigator.currentOrThrow
+
+        LaunchedEffect(Unit) {
+            profileScreenModel.refreshUser(userId){
+                // Token失效时返回重新登陆
+                currentNavigator.pop()
+                currentNavigator.push(AuthAnimeScreen(false))
+            }
         }
-    }
 
-}
-
-@Composable
-fun Profile(
-    profileScreenModel: ProfileScreenModel,
-    userId: String,
-    popBackStack: () -> Unit,
-//    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
-) {
-    // Token失效时返回重新登陆
-    val onErrorToAuthPage = remember {  popBackStack  }
-    LaunchedEffect(Unit) {
-        profileScreenModel.refreshUser(userId, onErrorToAuthPage)
-    }
-
-    val user = profileScreenModel.userState
+        val user = profileScreenModel.userState
 
 //    Crossfade(
 //        targetState = user == null,
@@ -112,17 +106,15 @@ fun Profile(
 //            }
 //        }
 //    }
-    FriedScreen(user, popBackStack)
-
-
+        FriedScreen(user){ currentNavigator.pop() }
+    }
 }
+
 
 @Composable
 fun FriedScreen(
     user: UserData?,
     popBackStack: () -> Unit,
-    // TODO:
-//    onNavigate: (MainRouteEnum, Boolean, List<Any>) -> Unit
 ) {
     BoxWithConstraints {
         val scrollState = rememberScrollState()
@@ -171,7 +163,7 @@ fun FriedScreen(
                 ratio,
                 inverseRatio,
                 onReturn = popBackStack,
-                onMenu = { }
+                onMenu = { /*TODO*/ }
             )
 
             ProfileUserIcon(
@@ -250,14 +242,14 @@ private fun BottomCard(
         // speakLanguages
         LanguagesRow(speakLanguages)
 
-//        HorizontalDivider(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
-//                .align(Alignment.CenterHorizontally),
-//            color = Color.LightGray,
-//            thickness = 1.dp,
-//        )
+        HorizontalDivider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
+                .align(Alignment.CenterHorizontally),
+            color = Color.LightGray,
+            thickness = 1.dp,
+        )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -295,25 +287,29 @@ private fun ColumnScope.UserInfoRow(
             tint = rankColor
         )
         Text(
+            modifier = Modifier.drawSate(0.25f, false, Alignment.TopEnd,isSupporter) { fl, offset ->
+                // 画一个＋号
+                val width = 4F
+                this.drawContent()
+                drawRoundRect(
+                    color = GameColor.Supporter,
+                    topLeft = offset + Offset((fl + width) / 2, 0f),
+                    size = Size(width, fl * 2),
+                    cornerRadius = CornerRadius(1F,1F)
+                )
+                drawRoundRect(
+                    color = GameColor.Supporter,
+                    topLeft = offset + Offset(0F, (fl + width) / 2),
+                    size = Size(fl * 2, width),
+                    cornerRadius = CornerRadius(1F,1F)
+                )
+            },
             text = userName,
             fontWeight = FontWeight.Bold,
             fontSize = 24.sp,
         )
-
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .align(Alignment.Top)
-        ) {
-            Icon(
-                modifier = Modifier
-                    .size(20.dp)
-                    .align(Alignment.TopStart),
-                imageVector = Icons.Rounded.Add,
-                contentDescription = "SupporterIcon",
-                tint = if (isSupporter) GameColor.Supporter else Color.Transparent
-            )
-        }
+        // 让名字居中
+        Box(modifier = Modifier.size(26.dp).align(Alignment.Top))
     }
 }
 
@@ -325,7 +321,7 @@ private fun ColumnScope.StatusRow(
     Row(
         modifier = Modifier.align(Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Canvas(
             modifier = Modifier

@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -57,9 +58,7 @@ class AuthScreen() : Screen {
     @Composable
     override fun Content() {
         val authScreenModel: AuthScreenModel = getScreenModel()
-        LaunchedEffect(Unit) {
-            authScreenModel.tryAuth()
-        }
+        LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
         AuthFold(
             context = {
                 SnackBarToast(

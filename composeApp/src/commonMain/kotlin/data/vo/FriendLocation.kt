@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.data.vo
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -7,7 +8,7 @@ import io.github.vrcmteam.vrcm.data.api.AccessType
 import io.github.vrcmteam.vrcm.data.api.LocationType
 import io.github.vrcmteam.vrcm.data.api.auth.FriendData
 
-
+@Immutable
 data class FriendLocation(
     val location: String,
     val instants: MutableState<InstantsVO> = mutableStateOf(InstantsVO()),
