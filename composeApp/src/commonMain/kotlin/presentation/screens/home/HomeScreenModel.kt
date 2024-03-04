@@ -3,13 +3,13 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 import androidx.compose.runtime.*
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.network.api.VRCApiException
 import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
 import io.github.vrcmteam.vrcm.network.api.instance.InstanceAPI
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers

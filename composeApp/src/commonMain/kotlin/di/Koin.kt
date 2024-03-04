@@ -7,12 +7,12 @@ import coil3.network.ktor.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import com.russhwolf.settings.Settings
-import io.github.vrcmteam.vrcm.network.api.ApiClientDefaultBuilder
-import io.github.vrcmteam.vrcm.network.api.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.file.FileApi
 import io.github.vrcmteam.vrcm.network.api.instance.InstanceAPI
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
+import io.github.vrcmteam.vrcm.network.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreenModel

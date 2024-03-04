@@ -1,9 +1,8 @@
-package io.github.vrcmteam.vrcm.network.api
+package io.github.vrcmteam.vrcm.network.supports
 
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -32,9 +31,4 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
     }
 }
 
-inline fun <reified T> HttpResponse.ifOK(mapping: HttpResponse.() -> T): Result<T> =
-    if (status.value == 200) {
-        Result.success(this).map(mapping)
-    } else {
-        Result.failure(VRCApiException(status.description, status.value))
-    }
+

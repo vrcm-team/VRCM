@@ -1,10 +1,10 @@
 package io.github.vrcmteam.vrcm.network.api.users
 
-import io.github.vrcmteam.vrcm.network.api.ifOK
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import network.extensions.ifOK
 
 internal const val USERS_API_PREFIX = "users"
 
