@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.CodeTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
-import io.github.vrcmteam.vrcm.screens.theme.SmallRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 
 @Composable
 fun VerifyCardInput(

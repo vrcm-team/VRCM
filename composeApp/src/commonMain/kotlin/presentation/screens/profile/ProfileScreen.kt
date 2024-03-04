@@ -42,8 +42,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSate
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
-import io.github.vrcmteam.vrcm.screens.theme.SmallRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject

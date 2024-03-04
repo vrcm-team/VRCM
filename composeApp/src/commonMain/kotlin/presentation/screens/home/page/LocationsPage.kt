@@ -30,7 +30,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.screens.home.LocationFriend
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

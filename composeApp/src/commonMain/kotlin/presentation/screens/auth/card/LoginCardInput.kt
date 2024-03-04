@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.PasswordMissEndVisualTransformation
-import io.github.vrcmteam.vrcm.screens.theme.BigRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.BigRoundedShape
 
 @Composable
 fun LoginCardInput(

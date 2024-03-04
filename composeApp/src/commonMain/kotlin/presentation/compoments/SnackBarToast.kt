@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 @Composable
 fun SnackBarToast(

@@ -31,7 +31,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.page.LocationsPage
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
-import io.github.vrcmteam.vrcm.screens.theme.MediumRoundedShape
+import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 
 object HomeScreen : Screen {
