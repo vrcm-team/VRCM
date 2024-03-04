@@ -11,7 +11,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import java.io.FileInputStream
 import java.io.FileWriter
-import java.util.Properties
+import java.util.*
 
 actual val platformModule: Module = module {
     singleOf<Logger>(::PrintLogger)
@@ -19,6 +19,7 @@ actual val platformModule: Module = module {
     single<Settings.Factory> {
         object : Settings.Factory {
             override fun create(name: String?): Settings {
+                // TODO：保存到非临时文件夹避免误删
                 val file = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("$name-settings.properties").toFile()
                 if (!file.exists()) {
                     file.createNewFile()

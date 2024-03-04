@@ -11,15 +11,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 
-
-enum class MainRouteEnum(val route: String) {
-    StartupAnime("startupAnime"),
-    Auth("auth"),
-    AuthAnime("authAnime"),
-    Home("home"),
-    Profile("profile");
-}
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
