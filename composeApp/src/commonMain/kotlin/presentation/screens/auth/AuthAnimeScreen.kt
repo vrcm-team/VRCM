@@ -31,8 +31,7 @@ data class AuthAnimeScreen(
             } else {
                 AuthScreen
             }
-            currentNavigator.pop()
-            currentNavigator.push(screen)
+            currentNavigator.replace(screen)
         }
         BoxWithConstraints {
             var isAuthedState by remember { mutableStateOf(isAuthed) }

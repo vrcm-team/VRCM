@@ -31,8 +31,7 @@ object StartupAnimeScreen : Screen {
             tween(durationMillis),
             label = "AuthSurfaceAlpha"
         ) {
-            current.pop()
-            current.push(AuthScreen)
+            current replace AuthScreen
         }
         LaunchedEffect(Unit) {
             isStartUp = true

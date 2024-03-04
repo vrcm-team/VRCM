@@ -29,7 +29,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 
-
 object AuthScreen : Screen {
     @Composable
     override fun Content() {
@@ -98,8 +97,7 @@ object AuthScreen : Screen {
                     AuthCardPage.Authed -> {
                         val currentNavigator = LocalNavigator.currentOrThrow
                         LaunchedEffect(Unit) {
-                            currentNavigator.pop()
-                            currentNavigator.push(AuthAnimeScreen(true))
+                            currentNavigator replace AuthAnimeScreen(true)
                         }
                         Box(modifier = Modifier.fillMaxSize())
                     }
@@ -107,9 +105,7 @@ object AuthScreen : Screen {
             }
         }
     }
-
 }
-
 
 @Composable
 private fun AuthCard(
@@ -181,7 +177,3 @@ private fun NavCard(
         content()
     }
 }
-
-
-
-

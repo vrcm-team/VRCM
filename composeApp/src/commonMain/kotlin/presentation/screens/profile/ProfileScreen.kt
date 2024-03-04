@@ -59,8 +59,7 @@ data class ProfileScreen(
         LaunchedEffect(Unit) {
             profileScreenModel.refreshUser(userId){
                 // Token失效时返回重新登陆
-                currentNavigator.pop()
-                currentNavigator.push(AuthAnimeScreen(false))
+                currentNavigator.replace(AuthAnimeScreen(false))
             }
         }
 
@@ -102,12 +101,12 @@ fun FriedScreen(
             (((imageHeight - offsetDp.value) / imageHeight).let { if (it >= 0) it else 0f }).let {
                 FastOutSlowInEasing.transform(it)
             }
-        val fl = scrollState.value / imageHeight.toFloat()
+        val fl = scrollState.value / imageHeight
         val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
         val inverseRatio = 1 - ratio
         val topBarHeight = 70
 
-        val initUserIconPadding = imageHeight.toFloat()
+        val initUserIconPadding = imageHeight
         val lastIconPadding = initUserIconPadding - (topBarHeight * ratio)
         val isHidden = initUserIconPadding == lastIconPadding
         Surface(

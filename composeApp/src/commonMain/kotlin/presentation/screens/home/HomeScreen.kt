@@ -43,8 +43,7 @@ object HomeScreen : Screen {
         val current = LocalNavigator.currentOrThrow
         println(current)
         val onErrorToAuthPage =  {
-            current.pop()
-            current.push(AuthAnimeScreen(false))
+            current.replace(AuthAnimeScreen(false))
         }
         // to ProfileScreen
         val onClickUserIcon = { friendId: String ->
