@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
-import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.screens.home.LocationFriend
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation

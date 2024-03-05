@@ -7,21 +7,23 @@ import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
-import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
-import io.github.vrcmteam.vrcm.network.api.instance.InstanceAPI
+import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
 import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import presentation.screens.home.data.InstantsVO
 
 
 class HomeScreenModel(
-    private val authAPI: AuthApi,
-    private val instanceAPI: InstanceAPI
+    private val authApi: AuthApi,
+    private val instancesApi: InstancesApi,
+    private val friendsApi: FriendsApi
 ) : ScreenModel {
     //    private val uiState = HomeUIState()
 //    val _uiState: HomeUIState = uiState
@@ -38,7 +40,7 @@ class HomeScreenModel(
     val currentUser by _currentUser
 
     fun ini(onError: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
-        runCatching { _currentUser.value = authAPI.currentUser() }.onHomeFailure(onError)
+        runCatching { _currentUser.value = authApi.currentUser() }.onHomeFailure(onError)
     }
 
 
@@ -46,7 +48,7 @@ class HomeScreenModel(
         this@HomeScreenModel.friendLocationMap.clear()
         screenModelScope.launch(Dispatchers.IO) {
             runCatching {
-                authAPI.friendsFlow()
+                friendsApi.friendsFlow()
                     .collect { friends ->
                         friends.associate { it.id to mutableStateOf(it) }
                             .also { update(it,onError) }
@@ -96,7 +98,7 @@ class HomeScreenModel(
                                 friends = mutableStateListOf()
                             ))
                     screenModelScope.launch(Dispatchers.IO) {
-                        instanceAPI.instanceByLocation(friendLocation.location)
+                        instancesApi.instanceByLocation(friendLocation.location)
                             .onSuccess { instance ->
                                 friendLocation.instants.value = InstantsVO(
                                     worldName = instance.world.name ?: "",

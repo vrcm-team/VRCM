@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.network.supports
+package io.github.vrcmteam.vrcm.di.supports
 
 import io.github.vrcmteam.vrcm.storage.CookiesDao
 import io.ktor.client.plugins.cookies.*

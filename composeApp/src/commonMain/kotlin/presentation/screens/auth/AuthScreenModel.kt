@@ -4,9 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
-import io.github.vrcmteam.vrcm.network.api.auth.AuthState
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.storage.AccountDao
@@ -16,7 +16,7 @@ import org.koin.core.logger.Logger
 
 
 class AuthScreenModel(
-    private val authAPI: AuthApi,
+    private val authApi: AuthApi,
     private val accountDao: AccountDao,
     private val logger: Logger
 ) : ScreenModel {
@@ -85,7 +85,7 @@ class AuthScreenModel(
     }
 
     private suspend fun awaitAuth(): Boolean = screenModelScope.async(Dispatchers.IO) {
-        runCatching { authAPI.isAuthed() }.onAuthFailure().getOrNull()
+        runCatching { authApi.isAuthed() }.onAuthFailure().getOrNull()
     }.await() == true
 
 
@@ -117,7 +117,7 @@ class AuthScreenModel(
                     AuthCardPage.TFACode -> AuthType.TFA
                     else -> error("not supported")
                 }
-                authAPI.verify(verifyCode, authType)
+                authApi.verify(verifyCode, authType)
             }.await()
             if (result) {
                 onCardStateChange(AuthCardPage.Authed)
@@ -128,7 +128,7 @@ class AuthScreenModel(
     }
 
     private suspend fun doLogin(username: String, password: String) {
-        val runCatching = runCatching { authAPI.login(username, password) }
+        val runCatching = runCatching { authApi.login(username, password) }
         val authStateResult = runCatching
             .onAuthFailure()
         runCatching.getOrThrow()

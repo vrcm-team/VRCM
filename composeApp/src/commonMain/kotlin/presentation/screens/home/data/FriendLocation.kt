@@ -5,8 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
-import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
-import presentation.screens.home.data.InstantsVO
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 
 @Stable
 data class FriendLocation(

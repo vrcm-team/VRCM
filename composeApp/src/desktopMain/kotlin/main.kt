@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import io.github.vrcmteam.vrcm.di.commonModules
-import io.github.vrcmteam.vrcm.di.platformModule
+import io.github.vrcmteam.vrcm.di.modules.platformModule
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.context.startKoin

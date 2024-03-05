@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.di
+package io.github.vrcmteam.vrcm.di.modules
 
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
@@ -10,6 +10,6 @@ import org.koin.dsl.bind
 import org.koin.dsl.module
 
 actual val platformModule: Module = module {
-        singleOf<Logger>(::AndroidLogger)
-        singleOf(SharedPreferencesSettings::Factory) bind Settings.Factory::class
-    }
+    singleOf<Logger>(::AndroidLogger)
+    singleOf(SharedPreferencesSettings::Factory) bind Settings.Factory::class
+}

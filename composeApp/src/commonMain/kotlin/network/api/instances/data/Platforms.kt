@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.network.api.instance.data
+package io.github.vrcmteam.vrcm.network.api.instances.data
 
 import kotlinx.serialization.Serializable
 

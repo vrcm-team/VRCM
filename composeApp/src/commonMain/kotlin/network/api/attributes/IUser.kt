@@ -3,6 +3,9 @@ package io.github.vrcmteam.vrcm.network.api.attributes
 
 import kotlinx.serialization.SerialName
 
+/**
+ * 用户持有属性的抽象
+ */
 interface IUser {
     val id: String
     val displayName: String

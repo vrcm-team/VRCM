@@ -1,4 +1,4 @@
-package presentation.screens.home.data
+package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 

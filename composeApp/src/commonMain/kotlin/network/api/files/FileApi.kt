@@ -1,9 +1,9 @@
-package io.github.vrcmteam.vrcm.network.api.file
+package io.github.vrcmteam.vrcm.network.api.files
 
 import io.ktor.client.*
 import io.ktor.client.request.*
 
-internal const val FILE_API_PREFIX = "file"
+
 
 class FileApi(private val client: HttpClient) {
 

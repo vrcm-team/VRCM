@@ -1,7 +1,8 @@
-package io.github.vrcmteam.vrcm.network.api.instance.data
+package io.github.vrcmteam.vrcm.network.api.instances.data
 
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.IAccessType
+import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

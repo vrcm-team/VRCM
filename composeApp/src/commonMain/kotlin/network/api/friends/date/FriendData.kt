@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.network.api.auth.data
+package io.github.vrcmteam.vrcm.network.api.friends.date
 
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus

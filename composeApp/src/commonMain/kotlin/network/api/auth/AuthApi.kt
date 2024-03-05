@@ -1,20 +1,16 @@
 package io.github.vrcmteam.vrcm.network.api.auth
 
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
+import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
-import io.github.vrcmteam.vrcm.network.api.auth.data.FriendData
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.*
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-
-internal const val AUTH_API_PREFIX = "auth"
-
-internal const val EMAIL_OTP = "emailOtp"
 
 class AuthApi(private val client: HttpClient) {
 
@@ -22,8 +18,8 @@ class AuthApi(private val client: HttpClient) {
 
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
-        client.get("$AUTH_API_PREFIX/user") {
-            url { path(AUTH_API_PREFIX, "user") }
+        client.get {
+            url { path(AUTH_API_PREFIX, USER_API_PREFIX) }
             if (username != null && password != null) {
                 basicAuth(username, password)
             }
@@ -56,25 +52,6 @@ class AuthApi(private val client: HttpClient) {
         }
     }
 
-    fun friendsFlow(offline: Boolean = false, offset: Int = 0, n: Int = 50): Flow<List<FriendData>> = flow {
-        var count = 0
-        while (true) {
-            val bodyList: List<FriendData> = client.get {
-                    url {
-                        path(AUTH_API_PREFIX, "user", "friends")
-                        this.parameters.run {
-                            append("offline", offline.toString())
-                            append("offset", (offset + count * n).toString())
-                            append("n", n.toString())
-                        }
-                    }
-                }.body()
-            if (bodyList.isEmpty()) break
-            emit(bodyList)
-            count++
-        }
-    }
-
     suspend fun verify(code: String, authType: AuthType): Boolean {
         // emailOtp -> emailotp
         val authTypePath = authType.typeName.lowercase()
@@ -93,12 +70,6 @@ class AuthApi(private val client: HttpClient) {
 
 }
 
-enum class AuthState {
-    Authed,
-    NeedEmailCode,
-    NeedTFA,
-    NeedTTFA,
-    Unauthorized
-}
+
 
 

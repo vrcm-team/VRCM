@@ -1,10 +1,11 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
-
+/**
+ * 世界实例访问类型持有属性的抽象
+ */
 interface IAccessType {
     val instanceId: String
     val accessType: AccessType
-
         get() =
             when {
                 instanceId.contains(AccessType.Group.value) ->

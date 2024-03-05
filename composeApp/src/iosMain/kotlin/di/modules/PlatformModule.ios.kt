@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.di
+package io.github.vrcmteam.vrcm.di.modules
 
 import coil3.PlatformContext
 import com.russhwolf.settings.NSUserDefaultsSettings
