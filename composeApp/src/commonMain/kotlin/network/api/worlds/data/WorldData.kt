@@ -11,7 +11,7 @@ data class WorldData(
     @SerialName("created_at")
     val createdAt: String?,
     val description: String,
-    val favorites: Int,
+    val favorites: Int?,
     val featured: Boolean,
     val heat: Int,
     val id: String,
