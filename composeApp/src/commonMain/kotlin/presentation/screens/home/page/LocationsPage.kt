@@ -2,14 +2,27 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.page
 
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
@@ -25,6 +38,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
@@ -37,7 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 fun LocationsPage(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
     pullToRefreshState: PullToRefreshState,
-    onClickUserIcon: (String) -> Unit,
+    onClickUserIcon: (IUser) -> Unit,
     onRefreshLocations: suspend () -> Unit
 ) {
     val scaleFraction = if (pullToRefreshState.isRefreshing) 1f else
@@ -103,7 +117,7 @@ fun LocationsPage(
 private fun SingleLocationCard(
     friendLocations: FriendLocation?,
     text: String,
-    onClickUserIcon: (String) -> Unit
+    onClickUserIcon: (IUser) -> Unit
 ) {
     if (friendLocations == null) return
     Text(text)
@@ -114,7 +128,7 @@ private fun SingleLocationCard(
 @Composable
 private fun UserIconsRow(
     friends: MutableList<MutableState<FriendData>>,
-    onClickUserIcon: (String) -> Unit
+    onClickUserIcon: (IUser) -> Unit
 ) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
@@ -125,7 +139,7 @@ private fun UserIconsRow(
                 it.value.iconUrl,
                 it.value.displayName,
                 it.value.status
-            ) { onClickUserIcon(it.value.id) }
+            ) { onClickUserIcon(it.value) }
         }
     }
 }

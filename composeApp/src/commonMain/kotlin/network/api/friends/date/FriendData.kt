@@ -16,7 +16,7 @@ data class FriendData(
     override val displayName: String,
     val friendKey: String,
     override val id: String,
-    override val imageUrl: String,
+    val imageUrl: String,
     val isFriend: Boolean,
     @SerialName("last_login")
     override val lastLogin: String,

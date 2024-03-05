@@ -1,8 +1,10 @@
 package io.github.vrcmteam.vrcm.di.supports
 
 import io.github.vrcmteam.vrcm.storage.CookiesDao
-import io.ktor.client.plugins.cookies.*
-import io.ktor.http.*
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.http.Cookie
+import io.ktor.http.Url
+import io.ktor.http.parseServerSetCookieHeader
 import org.koin.core.logger.Logger
 
 /**
@@ -15,7 +17,7 @@ class PersistentCookiesStorage(
 ) : CookiesStorage {
 
     override suspend fun get(requestUrl: Url): List<Cookie> {
-        logger.debug("requestUrl=$requestUrl")
+        logger.info("requestUrl=$requestUrl")
         return cookiesDao.allCookies
             .filter { it.value is String }
             .map { (key, value) ->

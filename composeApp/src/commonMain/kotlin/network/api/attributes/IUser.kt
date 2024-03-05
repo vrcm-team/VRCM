@@ -27,7 +27,7 @@ interface IUser {
 
     val speakLanguages:List<String>
         get() = tags.filter { it.startsWith("language_") }.map { it.removePrefix("language_") }
-    val imageUrl:String
+    val profileImageUrl:String
         get() = profilePicOverride.ifBlank { currentAvatarImageUrl }
 
     val iconUrl:String

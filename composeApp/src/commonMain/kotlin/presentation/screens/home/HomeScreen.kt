@@ -2,12 +2,26 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.*
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -25,6 +39,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToast
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -40,14 +55,13 @@ object HomeScreen : Screen {
     override fun Content() {
         val homeScreenModel: HomeScreenModel = getScreenModel()
         val pullToRefreshState = rememberPullToRefreshState()
-        val current = LocalNavigator.currentOrThrow
-        println(current)
+        val currentNavigator = LocalNavigator.currentOrThrow
         val onErrorToAuthPage =  {
-            current.replace(AuthAnimeScreen(false))
+            currentNavigator.replace(AuthAnimeScreen(false))
         }
         // to ProfileScreen
-        val onClickUserIcon = { friendId: String ->
-            current.push(ProfileScreen(friendId))
+        val onClickUserIcon = { friend: IUser ->
+            currentNavigator.push(ProfileScreen(friend))
         }
         LifecycleEffect(onStarted = {
             homeScreenModel.ini(onErrorToAuthPage)
@@ -65,7 +79,7 @@ object HomeScreen : Screen {
                             modifier = Modifier
                                 .height(56.dp)
                                 .clip(CircleShape)
-                                .clickable { homeScreenModel.currentUser?.let { onClickUserIcon(it.id) } },
+                                .clickable { homeScreenModel.currentUser?.let { onClickUserIcon(it) } },
                             iconUrl = homeScreenModel.currentUser?.currentAvatarThumbnailImageUrl
                                 ?: "",
                             userStatus = homeScreenModel.currentUser?.status

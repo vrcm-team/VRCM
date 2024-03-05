@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.auth.data
 
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -12,17 +13,17 @@ data class CurrentUserData(
     val accountDeletionLog: List<AccountDeletionLog>?,
     val activeFriends: List<String>,
     val allowAvatarCopying: Boolean,
-    val bio: String,
-    val bioLinks: List<String>,
+    override val bio: String,
+    override val bioLinks: List<String>,
     val currentAvatar: String,
     val currentAvatarAssetUrl: String,
-    val currentAvatarImageUrl: String,
-    val currentAvatarTags: List<String>,
-    val currentAvatarThumbnailImageUrl: String,
+    override val currentAvatarImageUrl: String,
+    override val currentAvatarTags: List<String>,
+    override val currentAvatarThumbnailImageUrl: String,
     @SerialName("date_joined")
     val dateJoined: String,
-    val developerType: String,
-    val displayName: String,
+    override val developerType: String,
+    override val displayName: String,
     val emailVerified: Boolean,
     val fallbackAvatar: String,
     val friendGroupNames: List<String>,
@@ -35,14 +36,14 @@ data class CurrentUserData(
     val hasPendingEmail: Boolean,
     val hideContentFilterSettings: Boolean,
     val homeLocation: String,
-    val id: String,
+    override val id: String,
     val isFriend: Boolean,
     @SerialName("last_activity")
     val lastActivity: String,
     @SerialName("last_login")
-    val lastLogin: String,
+    override val lastLogin: String,
     @SerialName("last_platform")
-    val lastPlatform: String,
+    override val lastPlatform: String,
     val obfuscatedEmail: String,
     val obfuscatedPendingEmail: String,
     val oculusId: String,
@@ -51,23 +52,23 @@ data class CurrentUserData(
     val pastDisplayNames: List<PastDisplayName>,
     val picoId: String,
     val presence: Presence,
-    val profilePicOverride: String,
+    override val profilePicOverride: String,
     val state: String,
-    val status: UserStatus,
-    val statusDescription: String,
+    override val status: UserStatus,
+    override val statusDescription: String,
     val statusFirstTime: Boolean,
     val statusHistory: List<String>,
     val steamDetails: SteamDetails,
     val steamId: String,
-    val tags: List<String>,
+    override val tags: List<String>,
     val twoFactorAuthEnabled: Boolean,
     val twoFactorAuthEnabledDate: String?,
     val unsubscribe: Boolean,
     @SerialName("updated_at")
     val updatedAt: String,
-    val userIcon: String,
+    override val userIcon: String,
     val userLanguage: String,
     val userLanguageCode: String,
     val username: String,
     val viveId: String
-)
+):IUser

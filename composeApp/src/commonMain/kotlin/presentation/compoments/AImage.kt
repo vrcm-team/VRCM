@@ -20,18 +20,18 @@ fun AImage(
     imageData: Any?,
     color: Color = MaterialTheme.colorScheme.inverseOnSurface,
     contentDescription: String? = null,
-    imageLoader: ImageLoader = koinInject(),
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val placeholder = remember(color) { ColorPainter(color) }
+    val imageLoader: ImageLoader = koinInject()
+    val platformContext = koinInject<PlatformContext>()
     val imageRequest: Any? =
         when (imageData) {
-            is String ->
-                ImageRequest.Builder(koinInject<PlatformContext>())
+            is String -> remember(imageData){ ImageRequest.Builder(platformContext)
                     .data(imageData)
                     .crossfade(600)
                     .build()
-
+            }
             is ImageRequest -> imageData
             else -> imageData
         }
