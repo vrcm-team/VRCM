@@ -2,26 +2,12 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -36,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.core.stack.StackEvent
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -60,12 +47,15 @@ object HomeScreen : Screen {
             currentNavigator.replace(AuthAnimeScreen(false))
         }
         // to ProfileScreen
-        val onClickUserIcon = { friend: IUser ->
-            currentNavigator.push(ProfileScreen(friend))
+        val onClickUserIcon = { user: IUser ->
+            currentNavigator.push(ProfileScreen(user))
         }
-        LifecycleEffect(onStarted = {
-            homeScreenModel.ini(onErrorToAuthPage)
-        })
+        if (currentNavigator.lastEvent == StackEvent.Replace){
+            LifecycleEffect(onStarted = {
+                homeScreenModel.ini(onErrorToAuthPage)
+                pullToRefreshState.startRefresh()
+            })
+        }
         Scaffold(
             modifier = Modifier.background(Color.LightGray),
             topBar = {
@@ -143,9 +133,6 @@ object HomeScreen : Screen {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                LifecycleEffect(onStarted = {
-                    pullToRefreshState.startRefresh()
-                })
                 LocationsPage(
                     friendLocationMap = homeScreenModel.friendLocationMap,
                     pullToRefreshState = pullToRefreshState,
@@ -197,6 +184,4 @@ fun LocationFriend(
         )
     }
 }
-
-
 

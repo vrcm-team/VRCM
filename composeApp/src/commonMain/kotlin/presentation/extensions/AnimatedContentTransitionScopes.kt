@@ -17,8 +17,8 @@ inline fun <reified T : Screen, reified K : Screen> AnimatedContentTransitionSco
 
 // A->A || B->A
 inline fun <reified T : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningTo() =
-    targetState::class == T::class
+    targetState is T
 
 // A->A || A->B
 inline fun <reified T : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningFrom() =
-    initialState::class == T::class
+    initialState is T
