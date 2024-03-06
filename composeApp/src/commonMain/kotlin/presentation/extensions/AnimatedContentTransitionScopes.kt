@@ -3,18 +3,22 @@ package io.github.vrcmteam.vrcm.presentation.extensions
 import androidx.compose.animation.AnimatedContentTransitionScope
 import cafe.adriel.voyager.core.screen.Screen
 
-// A->A || A->B || B->A
-inline fun <reified T> AnimatedContentTransitionScope<Screen>.isTransitioning() =
+// Any->A || A->Any
+inline fun <reified T : Screen> AnimatedContentTransitionScope<Screen>.isTransitioning() =
     isTransitioningTo<T>() || isTransitioningFrom<T>()
-// A->B && B->A
-inline fun <reified T,reified K> AnimatedContentTransitionScope<Screen>.isTransitioningOn() =
-    (isTransitioningTo<T>() || isTransitioningFrom<T>()) && (isTransitioningTo<K>() || isTransitioningFrom<K>())
+
+// A->B || B->A
+inline fun <reified T : Screen, reified K : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningOn() =
+    isTransitioningFromTo<T, K>() || isTransitioningFromTo<K, T>()
+
 // A->B
-inline fun <reified T,reified K> AnimatedContentTransitionScope<Screen>.isTransitioningBy() =
+inline fun <reified T : Screen, reified K : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningFromTo() =
     isTransitioningTo<T>() && isTransitioningFrom<K>()
+
 // A->A || B->A
-inline fun <reified T> AnimatedContentTransitionScope<Screen>.isTransitioningTo() =
+inline fun <reified T : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningTo() =
     targetState::class == T::class
+
 // A->A || A->B
-inline fun <reified T> AnimatedContentTransitionScope<Screen>.isTransitioningFrom() =
+inline fun <reified T : Screen> AnimatedContentTransitionScope<Screen>.isTransitioningFrom() =
     initialState::class == T::class

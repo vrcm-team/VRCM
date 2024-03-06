@@ -10,7 +10,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import io.github.vrcmteam.vrcm.presentation.animations.authAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.homeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
-import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningBy
+import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
@@ -33,7 +33,7 @@ fun App(){
 fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator): ContentTransform =
      when {
         isTransitioningOn<HomeScreen,ProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningBy<HomeScreen,AuthAnimeScreen>() -> homeToAuthAnimeTransition
-        isTransitioningBy<AuthAnimeScreen,HomeScreen>() -> authAnimeToHomeTransition
+        isTransitioningFromTo<HomeScreen,AuthAnimeScreen>() -> homeToAuthAnimeTransition
+        isTransitioningFromTo<AuthAnimeScreen,HomeScreen>() -> authAnimeToHomeTransition
         else -> ContentTransform(EnterTransition.None, ExitTransition.None)
     }

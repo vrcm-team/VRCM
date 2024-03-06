@@ -7,16 +7,19 @@ import androidx.compose.ui.Modifier
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransition
+import cafe.adriel.voyager.transitions.ScreenTransitionContent
 
 @Composable
 fun SelectableScreenTransition(
     navigator: Navigator,
     modifier: Modifier = Modifier,
+    content: ScreenTransitionContent = { it.Content() },
     transition : AnimatedContentTransitionScope<Screen>.() -> ContentTransform,
 ) {
     ScreenTransition(
         navigator = navigator,
         modifier = modifier,
-        transition = transition
+        transition = transition,
+        content = content
     )
 }
