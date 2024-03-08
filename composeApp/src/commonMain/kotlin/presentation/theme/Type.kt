@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.screens.theme
+package io.github.vrcmteam.vrcm.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

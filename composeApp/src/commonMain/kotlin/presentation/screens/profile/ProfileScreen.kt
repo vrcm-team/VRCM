@@ -2,37 +2,15 @@ package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -88,25 +66,7 @@ data class ProfileScreen(
             }
         }
         val user = profileScreenModel.userState
-//    Crossfade(
-//        targetState = user == null,
-//        animationSpec = tween(1000),
-//        label = ""
-//    ) {
-//        Box(modifier = Modifier.fillMaxSize()) {
-//            if (it) {
-//                CircularProgressIndicator(
-//                    modifier = Modifier
-//                        .size(60.dp)
-//                        .align(Alignment.Center),
-//                    color = MaterialTheme.colorScheme.primary,
-//                    strokeWidth = 5.dp
-//                )
-//            } else {
-//            }
-//        }
-//    }2024-03-06 00:02:40.273 21539-21539 System.out              io.github.vrcmteam.vrcm              I  QQ 2681881906, bioLinks=[https://twitter.com/Ikuz_Itsuki], currentAvatarImageUrl=https://api.vrchat.cloud/api/1/file/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/file, currentAvatarTags=[], currentAvatarThumbnailImageUrl=https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256, developerType=none, displayName=ikutsuu, friendKey=, id=usr_7d9d1e61-d04b-45e8-bdbb-f764a4c2533f, imageUrl=https://api.vrchat.cloud/api/1/image/file_927f6134-ab99-4003-8039-8150f7a4fc17/3/256, isFriend=true, lastLogin=2024-03-05T16:02:17.437Z, lastPlatform=standalonewindows, location=offline, profilePicOverride=, status=Active, statusDescription=「 恋しちゃっていこう 」, tags=[system_no_captcha, language_zho, language_eng, language_swe, system_world_access, system_trust_basic, system_avatar_access, system_feedback_access, system_trust_known], userIcon=)
-        FriedScreen(user){ currentNavigator.pop() }
+          FriedScreen(user){ currentNavigator.pop() }
     }
 }
 
