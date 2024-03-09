@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.CodeTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
@@ -21,11 +22,17 @@ fun VerifyCardInput(
 ) {
     val verifyCode = uiState.verifyCode
     Spacer(modifier = Modifier.height(68.dp))
+    val focusManager = LocalFocusManager.current
     CodeTextField(
         modifier = Modifier
             .fillMaxWidth(),
         value = verifyCode,
-        onValueChange = onVerifyCodeChange,
+        onValueChange = {
+            if (it.length == 6) {
+                focusManager.clearFocus()
+            }
+            onVerifyCodeChange(it)
+        },
         length = 6,
         boxWidth = 48.dp,
         boxHeight = 48.dp,
