@@ -1,9 +1,9 @@
 package io.github.vrcmteam.vrcm
 import platform.UIKit.UIDevice
 
-class IOSPlatform: Platform {
+class IosAppPlatform: AppPlatform {
     override val name: String = UIDevice.currentDevice.systemName()
     override val version: String = UIDevice.currentDevice.systemVersion
 }
 
-actual fun getPlatform(): Platform = IOSPlatform()
+

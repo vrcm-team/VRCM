@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
@@ -20,9 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -38,19 +38,22 @@ import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
-import io.github.vrcmteam.vrcm.presentation.extensions.drawSate
+import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
+@Serializable
 data class ProfileScreen(
-    private val user:IUser
+    private val user: IUser
 ) : Screen {
     @Composable
     override fun Content() {
@@ -60,13 +63,13 @@ data class ProfileScreen(
             onStarted = { profileScreenModel.initUserState(user) }
         )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(user.id){
+            profileScreenModel.refreshUser(user.id) {
                 // Token失效时返回重新登陆
                 currentNavigator.replace(AuthAnimeScreen(false))
             }
         }
-        val user = profileScreenModel.userState
-          FriedScreen(user){ currentNavigator.pop() }
+        val currentUser = profileScreenModel.userState
+        FriedScreen(currentUser) { currentNavigator.pop() }
     }
 }
 
@@ -78,24 +81,28 @@ fun FriedScreen(
 ) {
     BoxWithConstraints {
         val scrollState = rememberScrollState()
-        val imageHeight = (maxHeight.value / 3)
+        val imageHeight = maxHeight / 2.5f
         val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
+        // 上滑比例
         val ratio =
-            (((imageHeight - offsetDp.value) / imageHeight).let { if (it >= 0) it else 0f }).let {
+            (((imageHeight - offsetDp) / imageHeight).let { if (it >= 0) it else 0f }).let {
                 FastOutSlowInEasing.transform(it)
             }
-        val fl = scrollState.value / imageHeight
-        val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
+        // 上滑反比例
         val inverseRatio = 1 - ratio
-        val topBarHeight = 70
+        // 模糊程度随着上滑的距离增加
+        val fl = scrollState.value / imageHeight.value
+        val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
+        // topBar高度
+        val topBarHeight = 70.dp
 
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val isHidden = imageHeight == lastIconPadding
+
         Surface(
             Modifier
-                .systemBarsPadding()
                 .verticalScroll(scrollState)
-                .height(2000.dp)
+                .height(imageHeight + maxHeight)
                 .fillMaxWidth()
         ) {
 
@@ -139,7 +146,7 @@ fun FriedScreen(
 
 @Composable
 private fun ProfileUserImage(
-    imageHeight: Float,
+    imageHeight: Dp,
     offsetDp: Dp,
     ratio: Float,
     blurDp: Dp,
@@ -151,7 +158,7 @@ private fun ProfileUserImage(
     ) {
         AImage(
             modifier = Modifier
-                .height(imageHeight.dp)
+                .height(imageHeight)
                 .fillMaxWidth()
                 .padding(top = offsetDp)
                 .clip(
@@ -168,60 +175,67 @@ private fun ProfileUserImage(
 
 @Composable
 private fun BottomCard(
-    initUserIconPadding: Float,
+    initUserIconPadding: Dp,
     ratio: Float,
-    topBarHeight: Int,
+    topBarHeight: Dp,
     inverseRatio: Float,
     user: IUser?
 ) {
     Card(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = initUserIconPadding.dp),
+            .padding(top = initUserIconPadding),
         shape = RoundedCornerShape(
             topStart = (30 * ratio).dp,
             topEnd = (30 * ratio).dp
         )
     ) {
         if (user == null) return@Card
-        val statusColor = GameColor.Status.fromValue(user.status)
-        val trustRank = remember(user) { user.trustRank }
-        val rankColor: Color = GameColor.Rank.fromValue(trustRank)
-        val speakLanguages = remember(user) { user.speakLanguages }
-        val statusDescription = when (user.statusDescription.isBlank()) {
-            true -> user.status.value
-            else -> user.statusDescription
-        }
-        Spacer(modifier = Modifier.height((topBarHeight * inverseRatio).dp))
-        // TrustRank + UserName + VRC+
-        UserInfoRow(user.displayName, user.isSupporter, rankColor)
-        // status
-        StatusRow(statusColor, statusDescription)
-        // speakLanguages
-        LanguagesRow(speakLanguages)
-
-        HorizontalDivider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp, start = 50.dp, end = 50.dp)
-                .align(Alignment.CenterHorizontally),
-            color = Color.LightGray,
-            thickness = 1.dp,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp)
-                .background(CardDefaults.cardColors().containerColor)
-                .align(Alignment.CenterHorizontally)
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                modifier = Modifier.padding(10.dp),
-                text = user.bio
+            Spacer(modifier = Modifier.height((topBarHeight * inverseRatio)))
+            val statusColor = GameColor.Status.fromValue(user.status)
+            val trustRank = remember(user) { user.trustRank }
+            val rankColor: Color = GameColor.Rank.fromValue(trustRank)
+            val speakLanguages = remember(user) { user.speakLanguages }
+            val statusDescription = when (user.statusDescription.isBlank()) {
+                true -> user.status.value
+                else -> user.statusDescription
+            }
+            // TrustRank + UserName + VRC+
+            UserInfoRow(user.displayName, user.isSupporter, rankColor)
+            // status
+            StatusRow(statusColor, statusDescription)
+            // speakLanguages
+            LanguagesRow(speakLanguages)
+            // bioLinks
+            LinksRow(user.bioLinks)
+
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 50.dp)
+                    .align(Alignment.CenterHorizontally),
+                color = Color.LightGray,
+                thickness = 1.dp,
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp)
+                    .background(CardDefaults.cardColors().containerColor)
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Text(
+                    modifier = Modifier.padding(10.dp),
+                    text = user.bio
+                )
+            }
         }
     }
 }
+
 
 @Composable
 private fun ColumnScope.UserInfoRow(
@@ -232,7 +246,7 @@ private fun ColumnScope.UserInfoRow(
     Row(
         modifier = Modifier.Companion
             .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 10.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -244,32 +258,28 @@ private fun ColumnScope.UserInfoRow(
             contentDescription = "TrustRankIcon",
             tint = rankColor
         )
-        Text(
-            modifier = Modifier.drawSate(0.25f, false, Alignment.TopEnd,isSupporter) { fl, offset ->
-                // 画一个＋号
-                val width = 4F
-                this.drawContent()
-                drawRoundRect(
-                    color = GameColor.Supporter,
-                    topLeft = offset + Offset((fl + width) / 2, 0f),
-                    size = Size(width, fl * 2),
-                    cornerRadius = CornerRadius(1F,1F)
-                )
-                drawRoundRect(
-                    color = GameColor.Supporter,
-                    topLeft = offset + Offset(0F, (fl + width) / 2),
-                    size = Size(fl * 2, width),
-                    cornerRadius = CornerRadius(1F,1F)
-                )
-            },
-            text = userName,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp,
-        )
+        BadgedBox(
+            badge = {
+                if (isSupporter) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "UserPlusIcon",
+                        tint = GameColor.Supporter
+                    )
+                }
+            }
+        ) {
+            Text(
+                text = userName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp,
+            )
+        }
         // 让名字居中
         Box(modifier = Modifier.size(26.dp).align(Alignment.Top))
     }
 }
+
 
 @Composable
 private fun ColumnScope.StatusRow(
@@ -277,7 +287,9 @@ private fun ColumnScope.StatusRow(
     statusDescription: String
 ) {
     Row(
-        modifier = Modifier.align(Alignment.CenterHorizontally),
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -291,22 +303,65 @@ private fun ColumnScope.StatusRow(
 
 @Composable
 private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
+    if (speakLanguages.isEmpty()) {
+        return
+    }
     Row(
         modifier = Modifier
-            .padding(top = 10.dp)
-            .align(Alignment.CenterHorizontally),
+            .align(Alignment.CenterHorizontally)
+            .padding(horizontal = 20.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         speakLanguages.forEach { language ->
             Text(
                 modifier = Modifier
                     .align(Alignment.CenterVertically)
-                    .padding(horizontal = 6.dp)
-                    .background(MaterialTheme.colorScheme.primary, SmallRoundedShape)
-                    .padding(horizontal = 6.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, SmallRoundedShape)
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
                     .clip(MediumRoundedShape),
                 text = remember(language) { language.capitalizeFirst() },
-                color = MaterialTheme.colorScheme.onPrimary
+                color = MaterialTheme.colorScheme.primary
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun ColumnScope.LinksRow(bioLinks: List<String>) {
+    if (bioLinks.isEmpty()) {
+        return
+    }
+    Row(
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .padding(horizontal = 20.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val appPlatform = getAppPlatform()
+        bioLinks.forEach { link ->
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                tooltip = {
+                    PlainTooltip {
+                        Text(text = link)
+                    }
+                },
+                state = rememberTooltipState()
+            ) {
+                FilledIconButton(
+                    modifier = Modifier.size(36.dp),
+                    onClick = { appPlatform.openUrl(link) },
+                ) {
+                    Icon(
+                        modifier = Modifier.rotate(-45F),
+                        imageVector = Icons.Outlined.Link,
+                        contentDescription = "BioLinkIcon"
+                    )
+                }
+            }
         }
     }
 }
@@ -314,9 +369,9 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
 @Composable
 private fun ProfileUserIcon(
     isHidden: Boolean,
-    lastIconPadding: Float,
+    lastIconPadding: Dp,
     offsetDp: Dp,
-    imageHeight: Float,
+    imageHeight: Dp,
     inverseRatio: Float,
     avatarThumbnailImageUrl: String?,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
@@ -326,8 +381,8 @@ private fun ProfileUserIcon(
     Box {
         Row(
             modifier = Modifier
-                .run { if (isHidden) offset(y = (offsetDp - imageHeight.dp)) else this }
-                .padding(top = (lastIconPadding + 5).dp)
+                .run { if (isHidden) offset(y = offsetDp - imageHeight) else this }
+                .padding(top = lastIconPadding + 5.dp)
                 .alpha(inverseRatio),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
@@ -352,7 +407,7 @@ private fun ProfileUserIcon(
 
 @Composable
 private fun TopMenuBar(
-    topBarHeight: Int,
+    topBarHeight: Dp,
     offsetDp: Dp,
     ratio: Float,
     inverseRatio: Float,
@@ -365,7 +420,7 @@ private fun TopMenuBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .height(topBarHeight.dp)
+                .height(topBarHeight)
                 .offset(y = offsetDp)
                 .alpha(ratio),
             horizontalArrangement = Arrangement.Center,
@@ -393,7 +448,7 @@ private fun TopMenuBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .height(topBarHeight.dp)
+                .height(topBarHeight)
                 .offset(y = offsetDp)
                 .alpha(inverseRatio)
                 .background(

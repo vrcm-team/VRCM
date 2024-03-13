@@ -32,6 +32,7 @@ fun Modifier.drawSate(
     )
     onDraw(borderRadius,borderOffset)
 } else this
+
 fun Modifier.drawSateCircle(
     color: Color,
     percentage: Float = 0.125f,
