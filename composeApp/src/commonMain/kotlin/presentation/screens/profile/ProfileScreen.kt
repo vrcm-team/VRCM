@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -48,22 +47,20 @@ import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
-@Serializable
 data class ProfileScreen(
-    private val user: IUser
+    private val userId: String
 ) : Screen {
     @Composable
     override fun Content() {
         val profileScreenModel: ProfileScreenModel = getScreenModel()
         val currentNavigator = LocalNavigator.currentOrThrow
-        LifecycleEffect(
-            onStarted = { profileScreenModel.initUserState(user) }
-        )
+//        LifecycleEffect(
+//            onStarted = { profileScreenModel.initUserState(user) }
+//        )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(user.id) {
+            profileScreenModel.refreshUser(userId) {
                 // Token失效时返回重新登陆
                 currentNavigator.replace(AuthAnimeScreen(false))
             }

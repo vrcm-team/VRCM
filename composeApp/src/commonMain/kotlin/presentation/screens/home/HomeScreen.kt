@@ -48,7 +48,7 @@ object HomeScreen : Screen {
         }
         // to ProfileScreen
         val onClickUserIcon = { user: IUser ->
-            currentNavigator.push(ProfileScreen(user))
+            currentNavigator.push(ProfileScreen(user.id))
         }
         if (currentNavigator.lastEvent == StackEvent.Replace){
             LifecycleEffect(onStarted = {
