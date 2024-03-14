@@ -73,7 +73,6 @@ data class ProfileScreen(
     }
 }
 
-
 @Composable
 fun FriedScreen(
     user: IUser?,
@@ -81,7 +80,7 @@ fun FriedScreen(
 ) {
     BoxWithConstraints {
         val scrollState = rememberScrollState()
-        val imageHeight = maxHeight / 2.5f
+        val imageHeight = remember { maxHeight / 2.5f }
         val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
         // 上滑比例
         val ratio =

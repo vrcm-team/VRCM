@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.di.modules
 import coil3.PlatformContext
 import com.russhwolf.settings.PropertiesSettings
 import com.russhwolf.settings.Settings
+import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.DesktopAppPlatform
 import okio.FileSystem
 import org.koin.core.logger.Logger
 import org.koin.core.logger.PrintLogger
@@ -31,4 +33,5 @@ actual val platformModule: Module = module {
             }
         }
     }
+    singleOf<AppPlatform>(::DesktopAppPlatform)
 }
