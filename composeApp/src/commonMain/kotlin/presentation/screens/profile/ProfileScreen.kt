@@ -2,17 +2,52 @@ package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -29,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -40,6 +76,7 @@ import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.extensions.interpolateColor
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -50,17 +87,17 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 data class ProfileScreen(
-    private val userId: String
+    private val user: IUser
 ) : Screen {
     @Composable
     override fun Content() {
         val profileScreenModel: ProfileScreenModel = getScreenModel()
         val currentNavigator = LocalNavigator.currentOrThrow
-//        LifecycleEffect(
-//            onStarted = { profileScreenModel.initUserState(user) }
-//        )
+        LifecycleEffect(
+            onStarted = { profileScreenModel.initUserState(user) }
+        )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(userId) {
+            profileScreenModel.refreshUser(user.id) {
                 // Token失效时返回重新登陆
                 currentNavigator.replace(AuthAnimeScreen(false))
             }
@@ -79,9 +116,11 @@ fun FriedScreen(
         val scrollState = rememberScrollState()
         val imageHeight = remember { maxHeight / 2.5f }
         val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
+        // 剩下的距离
+        val remainingDistance = imageHeight - offsetDp
+
         // 上滑比例
-        val ratio =
-            (((imageHeight - offsetDp) / imageHeight).let { if (it >= 0) it else 0f }).let {
+        val ratio = ((remainingDistance / imageHeight).let { if (it >= 0) it else 0f }).let {
                 FastOutSlowInEasing.transform(it)
             }
         // 上滑反比例
@@ -91,10 +130,22 @@ fun FriedScreen(
         val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
         // topBar高度
         val topBarHeight = 70.dp
-
+        // 系统栏高度
+        val sysTopPadding = with(LocalDensity.current) {
+            WindowInsets.systemBars.getTop(this).toDp()
+        }
+        // 头像显示透明度比例
+        val topIconRatio = (remainingDistance /  (topBarHeight + sysTopPadding)).let {
+            when {
+                it >= 1f -> 1f
+                it <= 0f -> 0f
+                else -> it
+            }
+        }.let {
+            FastOutSlowInEasing.transform(1f-it)
+        }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
-        val isHidden = imageHeight == lastIconPadding
-
+        val isHidden = topBarHeight + sysTopPadding < remainingDistance
         Surface(
             Modifier
                 .verticalScroll(scrollState)
@@ -114,14 +165,15 @@ fun FriedScreen(
                 imageHeight,
                 ratio,
                 topBarHeight,
+                sysTopPadding,
                 inverseRatio,
                 user
             )
 
             TopMenuBar(
                 topBarHeight,
+                sysTopPadding,
                 offsetDp,
-                ratio,
                 inverseRatio,
                 onReturn = popBackStack,
                 onMenu = { /*TODO*/ }
@@ -132,7 +184,7 @@ fun FriedScreen(
                 lastIconPadding,
                 offsetDp,
                 imageHeight,
-                inverseRatio,
+                topIconRatio,
                 user?.iconUrl,
             ) { scrollState.animateScrollTo(0, tween(600)) }
         }
@@ -174,6 +226,7 @@ private fun BottomCard(
     initUserIconPadding: Dp,
     ratio: Float,
     topBarHeight: Dp,
+    sysTopPadding: Dp,
     inverseRatio: Float,
     user: IUser?
 ) {
@@ -190,7 +243,7 @@ private fun BottomCard(
         Column(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Spacer(modifier = Modifier.height((topBarHeight * inverseRatio)))
+            Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
             val statusColor = GameColor.Status.fromValue(user.status)
             val trustRank = remember(user) { user.trustRank }
             val rankColor: Color = GameColor.Rank.fromValue(trustRank)
@@ -368,18 +421,20 @@ private fun ProfileUserIcon(
     lastIconPadding: Dp,
     offsetDp: Dp,
     imageHeight: Dp,
-    inverseRatio: Float,
+    topIconRatio: Float,
     avatarThumbnailImageUrl: String?,
     coroutineScope: CoroutineScope = rememberCoroutineScope(),
     onClickIcon: suspend () -> Unit = {}
 ) {
-    val iconSize = (60 * inverseRatio).dp
-    Box {
+    val iconSize = (60 * topIconRatio).dp
+    Box(
+        modifier = Modifier.systemBarsPadding()
+    ) {
         Row(
             modifier = Modifier
                 .run { if (isHidden) offset(y = offsetDp - imageHeight) else this }
                 .padding(top = lastIconPadding + 5.dp)
-                .alpha(inverseRatio),
+                .alpha(topIconRatio),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -404,8 +459,8 @@ private fun ProfileUserIcon(
 @Composable
 private fun TopMenuBar(
     topBarHeight: Dp,
+    sysTopPadding: Dp,
     offsetDp: Dp,
-    ratio: Float,
     inverseRatio: Float,
     color: Color = Color.White,
     onReturn: () -> Unit,
@@ -416,19 +471,24 @@ private fun TopMenuBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .height(topBarHeight)
+                .height(topBarHeight+sysTopPadding)
                 .offset(y = offsetDp)
-                .alpha(ratio),
+                .background(color.copy(alpha = inverseRatio), RoundedCornerShape(
+                    bottomStart = 12.dp,
+                    bottomEnd = 12.dp
+                ))
+                .padding(top = sysTopPadding),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val iconColor = Color.White.interpolateColor(Color.Black, inverseRatio)
             Icon(
                 modifier = Modifier
                     .padding(horizontal = 10.dp)
                     .clip(CircleShape)
                     .clickable(onClick = onReturn),
                 imageVector = Icons.Rounded.ArrowBackIosNew,
-                tint = Color.White,
+                tint = iconColor,
                 contentDescription = "WhiteReturnIcon"
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -436,38 +496,8 @@ private fun TopMenuBar(
                 modifier = Modifier
                     .padding(horizontal = 10.dp),
                 imageVector = Icons.Rounded.Menu,
-                tint = Color.White,
+                tint = iconColor,
                 contentDescription = "WhiteMenuIcon"
-            )
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .height(topBarHeight)
-                .offset(y = offsetDp)
-                .alpha(inverseRatio)
-                .background(
-                    color, RoundedCornerShape(
-                        bottomStart = 12.dp,
-                        bottomEnd = 12.dp
-                    )
-                ),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                modifier = Modifier
-                    .padding(horizontal = 10.dp),
-                imageVector = Icons.Rounded.ArrowBackIosNew,
-                contentDescription = "BlackReturnIcon"
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                modifier = Modifier
-                    .padding(horizontal = 10.dp),
-                imageVector = Icons.Rounded.Menu,
-                contentDescription = "BlackMenuIcon"
             )
         }
     }

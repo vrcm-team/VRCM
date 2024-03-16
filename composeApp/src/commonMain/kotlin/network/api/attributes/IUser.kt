@@ -1,12 +1,13 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import kotlinx.serialization.SerialName
 
 /**
  * 用户持有属性的抽象
  */
-interface IUser {
+interface IUser : JavaSerializable {
     val id: String
     val displayName: String
     val bio: String
