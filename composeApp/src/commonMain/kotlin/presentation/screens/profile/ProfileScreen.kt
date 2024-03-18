@@ -6,6 +6,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,8 +127,8 @@ fun FriedScreen(
 
         // image上滑比例
         val ratio = ((remainingDistance / imageHeight).let { if (it >= 0) it else 0f }).let {
-                FastOutSlowInEasing.transform(it)
-            }
+            FastOutSlowInEasing.transform(it)
+        }
         // image上滑反比例
         val inverseRatio = 1 - ratio
         // 模糊程度随着上滑的距离增加
@@ -138,7 +141,7 @@ fun FriedScreen(
             WindowInsets.systemBars.getTop(this).toDp()
         }
         // icon显示大小与透明度比例 单独一个比例是为了更加自然不会突然出现(因为icon只有当image隐藏时才开始显示)
-        val topIconRatio = (remainingDistance /  (topBarHeight + sysTopPadding)).let {
+        val topIconRatio = (remainingDistance / (topBarHeight + sysTopPadding)).let {
             when {
                 it >= 1f -> 1f
                 it <= 0f -> 0f
@@ -149,11 +152,17 @@ fun FriedScreen(
         }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
+        val thresholdPx = with(LocalDensity.current) { maxWidth.value } / 2f
         Surface(
             Modifier
                 .verticalScroll(scrollState)
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth()
+                .draggable(rememberDraggableState {
+                    if (it > 30f) {
+                        popBackStack()
+                    }
+                }, Orientation.Horizontal)
         ) {
             // 用户Image
             ProfileUserImage(
@@ -247,6 +256,13 @@ private fun BottomCard(
         )
     ) {
         if (user == null) return@Card
+        val scrollState = rememberScrollState()
+        val coroutineScope = rememberCoroutineScope()
+        if (inverseRatio == 0f) {
+            coroutineScope.launch {
+                scrollState.animateScrollTo(0, tween(300))
+            }
+        }
         Column(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -282,6 +298,7 @@ private fun BottomCard(
                     .padding(horizontal = 10.dp)
                     .background(CardDefaults.cardColors().containerColor)
                     .align(Alignment.CenterHorizontally)
+                    .verticalScroll(scrollState, inverseRatio == 1f)
             ) {
                 Text(
                     modifier = Modifier.padding(10.dp),
@@ -482,12 +499,14 @@ private fun TopMenuBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
-                .height(topBarHeight+sysTopPadding)
+                .height(topBarHeight + sysTopPadding)
                 .offset(y = offsetDp)
-                .background(color.copy(alpha = inverseRatio), RoundedCornerShape(
-                    bottomStart = 12.dp,
-                    bottomEnd = 12.dp
-                ))
+                .background(
+                    color.copy(alpha = inverseRatio), RoundedCornerShape(
+                        bottomStart = 12.dp,
+                        bottomEnd = 12.dp
+                    )
+                )
                 .padding(top = sysTopPadding),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically

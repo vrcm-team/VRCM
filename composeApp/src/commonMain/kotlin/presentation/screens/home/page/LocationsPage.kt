@@ -109,7 +109,6 @@ fun LocationsPage(
                 .align(Alignment.TopCenter),
             state = pullToRefreshState,
         )
-
     }
 }
 

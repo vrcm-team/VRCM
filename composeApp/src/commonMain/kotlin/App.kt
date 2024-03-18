@@ -17,13 +17,13 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import org.koin.compose.KoinContext
-import presentation.compoments.SelectableScreenTransition
+import presentation.compoments.SelectableTransitionScreen
 
 @Composable
 fun App(){
     KoinContext {
         Navigator(StartupAnimeScreen){
-            SelectableScreenTransition(it){
+            SelectableTransitionScreen(it){
                 selectTransition(it)
             }
         }

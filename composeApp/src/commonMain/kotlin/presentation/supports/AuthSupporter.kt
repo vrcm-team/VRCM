@@ -46,7 +46,9 @@ class AuthSupporter(
         }
     }
 
-    // 如果验证过期了尝试登陆后再请求一次
+    /**
+     * 如果验证过期了尝试登陆后再请求一次
+     */
     suspend fun <T> tryAuth( callback: suspend () -> Result<T>): Result<T> =
         callback().recoverLogin(callback)
 

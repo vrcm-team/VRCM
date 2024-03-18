@@ -10,7 +10,7 @@ import cafe.adriel.voyager.transitions.ScreenTransition
 import cafe.adriel.voyager.transitions.ScreenTransitionContent
 
 @Composable
-fun SelectableScreenTransition(
+fun SelectableTransitionScreen(
     navigator: Navigator,
     modifier: Modifier = Modifier,
     content: ScreenTransitionContent = { it.Content() },

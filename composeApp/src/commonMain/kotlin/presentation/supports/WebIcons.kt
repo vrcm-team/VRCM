@@ -21,7 +21,6 @@ object WebIcons {
             "jq.qq.com", "qm.qq.com" -> QQIcon
             "github.com" -> GithubIcon
             else -> null
-
         }
 
     val TwitterIcon: ImageVector by lazy {
