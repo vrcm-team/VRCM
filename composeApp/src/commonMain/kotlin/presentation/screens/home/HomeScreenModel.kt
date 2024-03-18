@@ -7,10 +7,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
-import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -18,7 +16,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
-import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -27,8 +25,7 @@ import kotlinx.coroutines.launch
 
 
 class HomeScreenModel(
-    private val authApi: AuthApi,
-    private val accountDao: AccountDao,
+    private val authSupporter: AuthSupporter,
     private val instancesApi: InstancesApi,
     private val friendsApi: FriendsApi
 ) : ScreenModel {
@@ -47,32 +44,18 @@ class HomeScreenModel(
     val currentUser by _currentUser
 
     fun ini(onError: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
-        runCatching {
-            _currentUser.value = authApi.currentUser().recoverLogin(authApi::currentUser).getOrThrow()
-        }.onHomeFailure(onError)
+        authSupporter.tryAuth { authSupporter.currentUser() }
+            .onHomeFailure(onError)
+            .onSuccess { _currentUser.value = it }
     }
 
-    /**
-     * Cookies 失效时重新登陆
-     */
-    private suspend fun <T> Result<T>.recoverLogin(callback: suspend () -> Result<T>): Result<T> {
-        return when (exceptionOrNull()) {
-            null -> this
-            else -> {
-                val (username, password) = accountDao.accountPairOrNull() ?: return this
-                authApi.login(username, password)
-                    .takeIf { it == AuthState.Authed }
-                    ?.let { callback() } ?: this
-            }
-        }
-    }
 
     suspend fun refresh(onError: () -> Unit) {
         this@HomeScreenModel.friendLocationMap.clear()
         screenModelScope.launch(Dispatchers.IO) {
-            friendsApi.friendsFlow()
-                .recoverLogin(friendsApi::friendsFlow)
-                .onHomeFailure(onError)
+            authSupporter.tryAuth {
+                friendsApi.friendsFlow()
+            }.onHomeFailure(onError)
                 .getOrNull()?.collect { friends ->
                     friends.associate { it.id to mutableStateOf(it) }
                         .also { update(it, onError) }
@@ -121,9 +104,9 @@ class HomeScreenModel(
                                 friends = mutableStateListOf()
                             ))
                     screenModelScope.launch(Dispatchers.IO) {
-                        instancesApi.instanceByLocation(friendLocation.location)
-                            .recoverLogin { instancesApi.instanceByLocation(friendLocation.location) }
-                            .onSuccess { instance ->
+                        authSupporter.tryAuth {
+                            instancesApi.instanceByLocation(friendLocation.location)
+                        }.onSuccess { instance ->
                                 friendLocation.instants.value = InstantsVO(
                                     worldName = instance.world.name ?: "",
                                     worldImageUrl = instance.world.thumbnailImageUrl,

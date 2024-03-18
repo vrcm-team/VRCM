@@ -9,17 +9,20 @@ import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreenModel
-import io.ktor.client.*
+import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.ktor.client.HttpClient
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 val presentationModule : Module = module {
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
     factoryOf(::ProfileScreenModel)
+    singleOf(::AuthSupporter)
     single<ImageLoader> { imageLoaderDefinition(it) }
 }
 

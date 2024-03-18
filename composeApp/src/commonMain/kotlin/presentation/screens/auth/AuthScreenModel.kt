@@ -5,23 +5,24 @@ import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
-import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
-import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
-import io.github.vrcmteam.vrcm.storage.AccountDao
-import io.ktor.util.network.*
-import kotlinx.coroutines.*
+import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.ktor.util.network.UnresolvedAddressException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
 
 class AuthScreenModel(
-    private val authApi: AuthApi,
-    private val accountDao: AccountDao,
+    private val authSupporter: AuthSupporter,
     private val logger: Logger
 ) : ScreenModel {
 
-    private val _uiState = mutableStateOf(accountDao.accountPair().run {
+    private val _uiState = mutableStateOf(authSupporter.accountPair().run {
         AuthUIState(username = first, password = second)
     })
 
@@ -54,10 +55,6 @@ class AuthScreenModel(
     }
 
     fun onCardStateChange(cardState: AuthCardPage) {
-        if (cardState == AuthCardPage.Authed) {
-            accountDao.saveAccount(uiState.username, uiState.password)
-        }
-        Dispatchers.Main
         _uiState.value = when (cardState) {
             AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
                 cardState = cardState,
@@ -85,7 +82,7 @@ class AuthScreenModel(
     }
 
     private suspend fun awaitAuth(): Boolean = screenModelScope.async(Dispatchers.IO) {
-        runCatching { authApi.isAuthed() }.onAuthFailure().getOrNull()
+        runCatching { authSupporter.isAuthed() }.onAuthFailure().getOrNull()
     }.await() == true
 
 
@@ -110,15 +107,7 @@ class AuthScreenModel(
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
-
-            val result = async(context = Dispatchers.IO) {
-                val authType = when (_uiState.value.cardState) {
-                    AuthCardPage.EmailCode -> AuthType.Email
-                    AuthCardPage.TFACode -> AuthType.TFA
-                    else -> error("not supported")
-                }
-                authApi.verify(verifyCode, authType)
-            }.await()
+            val result = async(context = Dispatchers.IO) { authSupporter.verify(verifyCode, _uiState.value.cardState) }.await()
             if (result) {
                 onCardStateChange(AuthCardPage.Authed)
             } else {
@@ -128,12 +117,9 @@ class AuthScreenModel(
     }
 
     private suspend fun doLogin(username: String, password: String) {
-        val runCatching = runCatching { authApi.login(username, password) }
-        val authStateResult = runCatching
-            .onAuthFailure()
-        runCatching.getOrThrow()
-        if (authStateResult.isFailure) return
-        val authState = authStateResult.getOrNull()!!
+        val runCatching = runCatching { authSupporter.login(username, password) }.onAuthFailure()
+        if (runCatching.isFailure) return
+        val authState = runCatching.getOrNull()!!
 
         if (AuthState.Unauthorized == authState) {
             onErrorMessageChange("Username or Password is incorrect")
@@ -153,7 +139,7 @@ class AuthScreenModel(
         }
         onCardStateChange(authCardPage)
     }
-    private fun Result<*>.onAuthFailure() =
+    private fun<T> Result<T>.onAuthFailure() =
         onFailure {
             logger.error("AuthScreen Failed : ${it.message}")
             val message = if(it is UnresolvedAddressException)  "Unable to connect to the network" else it.message
