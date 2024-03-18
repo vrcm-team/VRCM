@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -76,9 +77,10 @@ import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
-import io.github.vrcmteam.vrcm.presentation.extensions.interpolateColor
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
@@ -99,7 +101,7 @@ data class ProfileScreen(
         LaunchedEffect(Unit) {
             profileScreenModel.refreshUser(user.id) {
                 // Token失效时返回重新登陆
-                currentNavigator.replace(AuthAnimeScreen(false))
+                currentNavigator replace AuthAnimeScreen(false)
             }
         }
         val currentUser = profileScreenModel.userState
@@ -115,15 +117,16 @@ fun FriedScreen(
     BoxWithConstraints {
         val scrollState = rememberScrollState()
         val imageHeight = remember { maxHeight / 2.5f }
+        // 位移的距离
         val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
         // 剩下的距离
         val remainingDistance = imageHeight - offsetDp
 
-        // 上滑比例
+        // image上滑比例
         val ratio = ((remainingDistance / imageHeight).let { if (it >= 0) it else 0f }).let {
                 FastOutSlowInEasing.transform(it)
             }
-        // 上滑反比例
+        // image上滑反比例
         val inverseRatio = 1 - ratio
         // 模糊程度随着上滑的距离增加
         val fl = scrollState.value / imageHeight.value
@@ -134,7 +137,7 @@ fun FriedScreen(
         val sysTopPadding = with(LocalDensity.current) {
             WindowInsets.systemBars.getTop(this).toDp()
         }
-        // 头像显示透明度比例
+        // icon显示大小与透明度比例 单独一个比例是为了更加自然不会突然出现(因为icon只有当image隐藏时才开始显示)
         val topIconRatio = (remainingDistance /  (topBarHeight + sysTopPadding)).let {
             when {
                 it >= 1f -> 1f
@@ -142,7 +145,7 @@ fun FriedScreen(
                 else -> it
             }
         }.let {
-            FastOutSlowInEasing.transform(1f-it)
+            FastOutSlowInEasing.transform(1f - it)
         }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
@@ -152,7 +155,7 @@ fun FriedScreen(
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth()
         ) {
-
+            // 用户Image
             ProfileUserImage(
                 imageHeight,
                 offsetDp,
@@ -160,7 +163,7 @@ fun FriedScreen(
                 blurDp,
                 user?.profileImageUrl
             )
-
+            // 底部信息卡片
             BottomCard(
                 imageHeight,
                 ratio,
@@ -169,16 +172,17 @@ fun FriedScreen(
                 inverseRatio,
                 user
             )
-
+            // 顶部导航栏
             TopMenuBar(
                 topBarHeight,
                 sysTopPadding,
                 offsetDp,
+                ratio,
                 inverseRatio,
                 onReturn = popBackStack,
                 onMenu = { /*TODO*/ }
             )
-
+            // 用户icon
             ProfileUserIcon(
                 isHidden,
                 lastIconPadding,
@@ -221,6 +225,9 @@ private fun ProfileUserImage(
     }
 }
 
+/**
+ * 底部信息卡片
+ */
 @Composable
 private fun BottomCard(
     initUserIconPadding: Dp,
@@ -391,6 +398,7 @@ fun ColumnScope.LinksRow(bioLinks: List<String>) {
     ) {
         val appPlatform = getAppPlatform()
         bioLinks.forEach { link ->
+            val webIconVector = WebIcons.selectIcon(link)
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                 tooltip = {
@@ -405,8 +413,10 @@ fun ColumnScope.LinksRow(bioLinks: List<String>) {
                     onClick = { appPlatform.openUrl(link) },
                 ) {
                     Icon(
-                        modifier = Modifier.rotate(-45F),
-                        imageVector = Icons.Outlined.Link,
+                        modifier = Modifier
+                            .padding(6.dp)
+                            .enableIf(webIconVector == null) { rotate(-45F) },
+                        imageVector = webIconVector ?: Icons.Outlined.Link,
                         contentDescription = "BioLinkIcon"
                     )
                 }
@@ -432,7 +442,7 @@ private fun ProfileUserIcon(
     ) {
         Row(
             modifier = Modifier
-                .run { if (isHidden) offset(y = offsetDp - imageHeight) else this }
+                .enableIf(isHidden) { offset(y = offsetDp - imageHeight) }
                 .padding(top = lastIconPadding + 5.dp)
                 .alpha(topIconRatio),
             horizontalArrangement = Arrangement.Center,
@@ -461,6 +471,7 @@ private fun TopMenuBar(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     offsetDp: Dp,
+    ratio: Float,
     inverseRatio: Float,
     color: Color = Color.White,
     onReturn: () -> Unit,
@@ -481,12 +492,15 @@ private fun TopMenuBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val iconColor = Color.White.interpolateColor(Color.Black, inverseRatio)
+            val iconColor = lerp(Color.White, Color.Black, inverseRatio)
+            val actionColor = Color.Gray.copy(alpha = 0.3f * ratio)
             Icon(
                 modifier = Modifier
                     .padding(horizontal = 10.dp)
                     .clip(CircleShape)
-                    .clickable(onClick = onReturn),
+                    .background(actionColor)
+                    .clickable(onClick = onReturn)
+                    .padding(5.dp),
                 imageVector = Icons.Rounded.ArrowBackIosNew,
                 tint = iconColor,
                 contentDescription = "WhiteReturnIcon"
@@ -494,7 +508,11 @@ private fun TopMenuBar(
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 modifier = Modifier
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = 10.dp)
+                    .clip(CircleShape)
+                    .background(actionColor)
+                    .clickable(onClick = onMenu)
+                    .padding(5.dp),
                 imageVector = Icons.Rounded.Menu,
                 tint = iconColor,
                 contentDescription = "WhiteMenuIcon"
