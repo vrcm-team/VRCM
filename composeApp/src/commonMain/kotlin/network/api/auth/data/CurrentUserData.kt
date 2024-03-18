@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.auth.data
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import kotlinx.serialization.SerialName
@@ -71,4 +72,4 @@ data class CurrentUserData(
     val userLanguageCode: String,
     val username: String,
     val viveId: String
-):IUser
+):IUser, JavaSerializable

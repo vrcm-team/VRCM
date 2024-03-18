@@ -1,6 +1,11 @@
 package io.github.vrcmteam.vrcm.network.api.users.data
 
-import io.github.vrcmteam.vrcm.network.api.attributes.*
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
+import io.github.vrcmteam.vrcm.network.api.attributes.IAccessType
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -39,7 +44,7 @@ data class UserData(
     val travelingToWorld: String,
     override val userIcon: String,
     val worldId: String,
-) : IUser, IAccessType {
+) : IUser, JavaSerializable, IAccessType {
     override val accessType: AccessType
         get() =
         when {

@@ -6,15 +6,21 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.http.content.*
+import io.github.vrcmteam.vrcm.network.extensions.ifOK
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.path
 
 class AuthApi(private val client: HttpClient) {
 
-    suspend fun currentUser(): CurrentUserData = userRes().body()
+    suspend fun currentUser(): Result<CurrentUserData> = userRes().ifOK { body<CurrentUserData>() }
 
 
     private suspend fun userRes(username: String? = null, password: String? = null) =

@@ -1,8 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
@@ -13,7 +18,8 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
-import io.ktor.util.network.*
+import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
@@ -22,6 +28,7 @@ import kotlinx.coroutines.launch
 
 class HomeScreenModel(
     private val authApi: AuthApi,
+    private val accountDao: AccountDao,
     private val instancesApi: InstancesApi,
     private val friendsApi: FriendsApi
 ) : ScreenModel {
@@ -40,20 +47,36 @@ class HomeScreenModel(
     val currentUser by _currentUser
 
     fun ini(onError: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
-        runCatching { _currentUser.value = authApi.currentUser() }.onHomeFailure(onError)
+        runCatching {
+            _currentUser.value = authApi.currentUser().recoverLogin(authApi::currentUser).getOrThrow()
+        }.onHomeFailure(onError)
     }
 
+    /**
+     * Cookies 失效时重新登陆
+     */
+    private suspend fun <T> Result<T>.recoverLogin(callback: suspend () -> Result<T>): Result<T> {
+        return when (exceptionOrNull()) {
+            null -> this
+            else -> {
+                val (username, password) = accountDao.accountPairOrNull() ?: return this
+                authApi.login(username, password)
+                    .takeIf { it == AuthState.Authed }
+                    ?.let { callback() } ?: this
+            }
+        }
+    }
 
     suspend fun refresh(onError: () -> Unit) {
         this@HomeScreenModel.friendLocationMap.clear()
         screenModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                friendsApi.friendsFlow()
-                    .collect { friends ->
-                        friends.associate { it.id to mutableStateOf(it) }
-                            .also { update(it,onError) }
-                    }
-            }.onHomeFailure(onError)
+            friendsApi.friendsFlow()
+                .recoverLogin(friendsApi::friendsFlow)
+                .onHomeFailure(onError)
+                .getOrNull()?.collect { friends ->
+                    friends.associate { it.id to mutableStateOf(it) }
+                        .also { update(it, onError) }
+                }
         }.join()
     }
 
@@ -99,6 +122,7 @@ class HomeScreenModel(
                             ))
                     screenModelScope.launch(Dispatchers.IO) {
                         instancesApi.instanceByLocation(friendLocation.location)
+                            .recoverLogin { instancesApi.instanceByLocation(friendLocation.location) }
                             .onSuccess { instance ->
                                 friendLocation.instants.value = InstantsVO(
                                     worldName = instance.world.name ?: "",
@@ -119,7 +143,7 @@ class HomeScreenModel(
         _errorMessage.value = errorMessage
     }
 
-    private fun Result<*>.onHomeFailure(onError: () -> Unit) =
+    private fun <T> Result<T>.onHomeFailure(onError: () -> Unit) =
         onFailure {
             val message = when (it) {
                 is UnresolvedAddressException -> {

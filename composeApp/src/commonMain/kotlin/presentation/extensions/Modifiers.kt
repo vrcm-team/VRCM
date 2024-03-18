@@ -53,3 +53,5 @@ fun Modifier.drawSateCircle(
     enable = enable,
     onDraw = onDraw
 )
+
+fun Modifier.enableIf(enable: Boolean = true, effect: Modifier.() -> Modifier) = if (enable) effect() else this
