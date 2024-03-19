@@ -21,7 +21,11 @@ import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 
 class HomeScreenModel(
@@ -35,6 +39,8 @@ class HomeScreenModel(
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
         mutableStateMapOf()
 
+    private val updateMutex = Mutex()
+
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
     private val _errorMessage = mutableStateOf("")
@@ -44,7 +50,7 @@ class HomeScreenModel(
     val currentUser by _currentUser
 
     fun ini(onError: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
-        authSupporter.tryAuth { authSupporter.currentUser() }
+        authSupporter.reTryAuth { authSupporter.currentUser() }
             .onHomeFailure(onError)
             .onSuccess { _currentUser.value = it }
     }
@@ -52,13 +58,17 @@ class HomeScreenModel(
 
     suspend fun refresh(onError: () -> Unit) {
         this@HomeScreenModel.friendLocationMap.clear()
+        // 多次更新时加把锁
+        // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.tryAuth {
-                friendsApi.friendsFlow()
-            }.onHomeFailure(onError)
-                .getOrNull()?.collect { friends ->
+            friendsApi.friendsFlow()
+                .retry(1) {
+                    authSupporter.doReTryAuth()
+                }.catch {
+                    Result.failure<Throwable>(it).onHomeFailure(onError)
+                }.collect { friends ->
                     friends.associate { it.id to mutableStateOf(it) }
-                        .also { update(it, onError) }
+                        .also { updateMutex.withLock { update(it, onError) } }
                 }
         }.join()
     }
@@ -90,35 +100,38 @@ class HomeScreenModel(
                 mutableStateListOf(FriendLocation.Traveling)
             }.first().friends.addAll(friends)
         }
-        val inInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
-        inInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
-            this@HomeScreenModel.friendLocationMap
-                .getOrPut(LocationType.Instance, ::mutableStateListOf)
-                // 得到对应location的FriendLocation，将新的好友添加到friends
-                .let { friendLocationList ->
-                    // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
-                    val friendLocation =
-                        (friendLocationList.find { locationFriendEntry.key == it.location }
-                            ?: FriendLocation(
-                                location = locationFriendEntry.key,
-                                friends = mutableStateListOf()
-                            ))
-                    screenModelScope.launch(Dispatchers.IO) {
-                        authSupporter.tryAuth {
-                            instancesApi.instanceByLocation(friendLocation.location)
-                        }.onSuccess { instance ->
-                                friendLocation.instants.value = InstantsVO(
-                                    worldName = instance.world.name ?: "",
-                                    worldImageUrl = instance.world.thumbnailImageUrl,
-                                    accessType = instance.accessType,
-                                    regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
-                                    userCount = "${instance.userCount}/${instance.world.capacity}"
-                                )
-                                friendLocation.friends.addAll(locationFriendEntry.value)
-                                friendLocationList.add(friendLocation)
-                            }.onHomeFailure(onError)
-                    }
-                }
+
+        val currentInstanceFriendLocations = this@HomeScreenModel.friendLocationMap
+            .getOrPut(LocationType.Instance, ::mutableStateListOf)
+        val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
+
+        // 得到对应location的FriendLocation，将新的好友添加到friends
+        tempInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
+            // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
+            // 找到相同的location的FriendLocation
+            val friendLocation =
+                (currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
+                    ?: FriendLocation(
+                        location = locationFriendEntry.key,
+                        friends = mutableStateListOf()
+                    ))
+
+            screenModelScope.launch(Dispatchers.IO) {
+                authSupporter.reTryAuth {
+                    instancesApi.instanceByLocation(friendLocation.location)
+                }.onSuccess { instance ->
+                    friendLocation.instants.value = InstantsVO(
+                        worldName = instance.world.name ?: "",
+                        worldImageUrl = instance.world.thumbnailImageUrl,
+                        accessType = instance.accessType,
+                        regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
+                        userCount = "${instance.userCount}/${instance.world.capacity}"
+                    )
+                    friendLocation.friends.addAll(locationFriendEntry.value)
+                    currentInstanceFriendLocations.add(friendLocation)
+                }.onHomeFailure(onError)
+            }
+
         }
     }
 

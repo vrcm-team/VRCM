@@ -19,7 +19,7 @@ class FriendsApi(private val client: HttpClient) {
         offline: Boolean = false,
         offset: Int = 0,
         n: Int = 50
-    ): Result<Flow<List<FriendData>>> = runCatching {
+    ): Flow<List<FriendData>> =
         flow {
             var count = 0
             while (true) {
@@ -36,5 +36,4 @@ class FriendsApi(private val client: HttpClient) {
                 count++
             }
         }
-    }
 }

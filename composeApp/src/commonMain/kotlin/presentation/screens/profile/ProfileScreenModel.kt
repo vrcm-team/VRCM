@@ -24,7 +24,7 @@ class ProfileScreenModel(
    }
     suspend fun refreshUser(userId: String, onError: () -> Unit) =
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.tryAuth {
+            authSupporter.reTryAuth {
                 usersApi.fetchUser(userId)
             }.onFailure {
                 onError()

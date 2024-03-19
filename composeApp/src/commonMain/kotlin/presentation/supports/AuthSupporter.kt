@@ -13,6 +13,7 @@ class AuthSupporter(
     fun accountPair(): Pair<String, String> = accountDao.accountPair()
 
     fun accountPairOrNull(): Pair<String, String>? = accountDao.accountPairOrNull()
+
     suspend fun isAuthed()  = authApi.isAuthed()
 
     suspend fun currentUser() = authApi.currentUser()
@@ -37,19 +38,30 @@ class AuthSupporter(
     private suspend fun <T> Result<T>.recoverLogin(callback: suspend () -> Result<T>): Result<T> {
         return when (exceptionOrNull()) {
             null -> this
-            else -> {
-                val (username, password) = accountDao.accountPairOrNull() ?: return this
-                authApi.login(username, password)
-                    .takeIf { it == AuthState.Authed }
-                    ?.let { callback() } ?: this
+            else -> if (doReTryAuth()) {
+                callback()
+            } else {
+                this
             }
         }
+    }
+
+    suspend fun doReTryAuth():Boolean {
+        val (username, password) = accountDao.accountPairOrNull() ?: return false
+        return authApi.login(username, password)
+            .takeIf { it == AuthState.Authed }
+            ?.let { true } ?: false
     }
 
     /**
      * 如果验证过期了尝试登陆后再请求一次
      */
-    suspend fun <T> tryAuth( callback: suspend () -> Result<T>): Result<T> =
+    suspend fun <T> reTryAuth(callback: suspend () -> Result<T>): Result<T> =
         callback().recoverLogin(callback)
+
+    suspend fun <T> reTryAuthCatching(callback: suspend () -> T): Result<T> =
+       reTryAuth {
+           runCatching { callback() }
+       }
 
 }
