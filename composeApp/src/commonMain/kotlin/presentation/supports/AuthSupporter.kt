@@ -3,9 +3,15 @@ package io.github.vrcmteam.vrcm.presentation.supports
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 
+/**
+ * 负责辅助登录验证的类
+ * 主要作用是统一验证失效时的重试逻辑
+ * @author kamosama
+ */
 class AuthSupporter(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
@@ -35,10 +41,14 @@ class AuthSupporter(
             }
         }
 
+    /**
+     * 如果是失败的结果则会判断是否是验证失效了
+     * 如果是则尝试重新登陆
+     */
     private suspend fun <T> Result<T>.recoverLogin(callback: suspend () -> Result<T>): Result<T> {
-        return when (exceptionOrNull()) {
+        return when (val exception = exceptionOrNull()) {
             null -> this
-            else -> if (doReTryAuth()) {
+            else -> if (exception is VRCApiException && doReTryAuth()) {
                 callback()
             } else {
                 this

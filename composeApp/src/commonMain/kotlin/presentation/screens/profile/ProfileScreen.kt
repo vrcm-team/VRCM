@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.profile
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -61,8 +61,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -90,6 +94,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.roundToInt
 
 data class ProfileScreen(
     private val user: IUser
@@ -111,14 +116,34 @@ data class ProfileScreen(
         FriedScreen(currentUser) { currentNavigator.pop() }
     }
 }
+// 自定义NestedScrollConnection以优先让父组件处理滚动事件
+val parentConsumesFirstScrollConnection = object : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        // 父组件首先尝试消耗滚动偏移量
+        val consumed = if (parentCanScroll()) {
+            Offset(available.x, available.y).takeIf { it != Offset.Zero }
+        } else {
+            Offset.Zero
+        }
+        return consumed?: Offset.Zero
+    }
 
+    // 此处省略了其他可能需要重写的方法，如onPostScroll、onPostFling等
+
+    private fun parentCanScroll(): Boolean {
+        // 在这里判断父组件是否还能继续滚动，实际情况根据具体业务逻辑实现
+        return true // 假设总是允许父组件先滚动
+    }
+}
 @Composable
 fun FriedScreen(
     user: IUser?,
     popBackStack: () -> Unit,
 ) {
+
     BoxWithConstraints {
         val scrollState = rememberScrollState()
+
         val imageHeight = remember { maxHeight / 2.5f }
         // 位移的距离
         val offsetDp = with(LocalDensity.current) { scrollState.value.toDp() }
@@ -152,14 +177,13 @@ fun FriedScreen(
         }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
-        val thresholdPx = with(LocalDensity.current) { maxWidth.value } / 2f
         Surface(
             Modifier
                 .verticalScroll(scrollState)
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth()
                 .draggable(rememberDraggableState {
-                    if (it > 30f) {
+                    if (it > 40.dp.value) {
                         popBackStack()
                     }
                 }, Orientation.Horizontal)
@@ -179,6 +203,7 @@ fun FriedScreen(
                 topBarHeight,
                 sysTopPadding,
                 inverseRatio,
+                scrollState,
                 user
             )
             // 顶部导航栏
@@ -244,8 +269,29 @@ private fun BottomCard(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     inverseRatio: Float,
+    prentScrollState: ScrollState,
     user: IUser?
 ) {
+    val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    if (inverseRatio == 0f ) {
+        LaunchedEffect(Unit){
+            scrollState.animateScrollTo(0, tween(300))
+        }
+    }
+    // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val y = available.y
+                if (prentScrollState.value < prentScrollState.maxValue) {
+                    coroutineScope.launch { prentScrollState.scrollTo((prentScrollState.value + -y).roundToInt()) }
+                    return Offset(x = 0f, y = y)
+                }
+                return Offset.Zero
+            }
+        }
+    }
     Card(
         modifier = Modifier
             .fillMaxSize()
@@ -256,14 +302,8 @@ private fun BottomCard(
         )
     ) {
         if (user == null) return@Card
-        val scrollState = rememberScrollState()
-        val coroutineScope = rememberCoroutineScope()
-        if (inverseRatio == 0f) {
-            coroutineScope.launch {
-                scrollState.animateScrollTo(0, tween(300))
-            }
-        }
         Column(
+            modifier = Modifier.nestedScroll(nestedScrollConnection),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
@@ -298,7 +338,7 @@ private fun BottomCard(
                     .padding(horizontal = 10.dp)
                     .background(CardDefaults.cardColors().containerColor)
                     .align(Alignment.CenterHorizontally)
-                    .verticalScroll(scrollState, inverseRatio == 1f)
+                    .verticalScroll(scrollState)
             ) {
                 Text(
                     modifier = Modifier.padding(10.dp),
@@ -400,7 +440,7 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ColumnScope.LinksRow(bioLinks: List<String>) {
     if (bioLinks.isEmpty()) {

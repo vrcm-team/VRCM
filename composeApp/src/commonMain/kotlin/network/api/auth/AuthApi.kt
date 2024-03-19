@@ -58,6 +58,9 @@ class AuthApi(private val client: HttpClient) {
         }
     }
 
+    /**
+     * 请求验证验证码
+     */
     suspend fun verify(code: String, authType: AuthType): Boolean {
         // emailOtp -> emailotp
         val authTypePath = authType.typeName.lowercase()
@@ -67,6 +70,9 @@ class AuthApi(private val client: HttpClient) {
         return response.status == HttpStatusCode.OK
     }
 
+    /**
+     * 判断是否已经登录
+     */
     suspend fun isAuthed(): Boolean {
         val response = client.get(AUTH_API_PREFIX) {
             url { path(AUTH_API_PREFIX) }

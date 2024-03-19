@@ -63,7 +63,11 @@ class HomeScreenModel(
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.friendsFlow()
                 .retry(1) {
-                    authSupporter.doReTryAuth()
+                    if (it is VRCApiException) {
+                        authSupporter.doReTryAuth()
+                    }else{
+                        false
+                    }
                 }.catch {
                     Result.failure<Throwable>(it).onHomeFailure(onError)
                 }.collect { friends ->
@@ -115,7 +119,7 @@ class HomeScreenModel(
                         location = locationFriendEntry.key,
                         friends = mutableStateListOf()
                     ))
-
+            // 通过location查询房间实例信息
             screenModelScope.launch(Dispatchers.IO) {
                 authSupporter.reTryAuth {
                     instancesApi.instanceByLocation(friendLocation.location)
