@@ -72,7 +72,7 @@ class HomeScreenModel(
                     Result.failure<Throwable>(it).onHomeFailure(onError)
                 }.collect { friends ->
                     friends.associate { it.id to mutableStateOf(it) }
-                        .also { updateMutex.withLock { update(it, onError) } }
+                        .also { updateMutex.withLock(friendLocationMap) { update(it, onError) } }
                 }
         }.join()
     }
