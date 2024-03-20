@@ -8,6 +8,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransition
 import cafe.adriel.voyager.transitions.ScreenTransitionContent
+import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
 
 @Composable
 fun SelectableTransitionScreen(
@@ -18,7 +19,7 @@ fun SelectableTransitionScreen(
 ) {
     ScreenTransition(
         navigator = navigator,
-        modifier = modifier,
+        modifier = modifier.slideBack(),
         transition = transition,
         content = content
     )

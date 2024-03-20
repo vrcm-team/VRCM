@@ -1,7 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.extensions
 
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -10,6 +14,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.plus
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import kotlin.math.roundToInt
 
 
@@ -55,3 +61,15 @@ fun Modifier.drawSateCircle(
 )
 
 fun Modifier.enableIf(enable: Boolean = true, effect: Modifier.() -> Modifier) = if (enable) effect() else this
+
+/**
+ * 侧滑返回
+ */
+fun Modifier.slideBack(
+    threshold: Float = 40.dp.value
+) = this.composed {
+    val navigator = LocalNavigator.currentOrThrow
+    draggable(rememberDraggableState {
+        if (navigator.canPop && it > threshold) navigator.pop()
+    }, Orientation.Horizontal)
+}
