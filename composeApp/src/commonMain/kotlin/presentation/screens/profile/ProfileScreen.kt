@@ -7,9 +7,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,6 +85,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
+import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
@@ -151,11 +149,9 @@ fun FriedScreen(
         val remainingDistance = imageHeight - offsetDp
 
         // image上滑比例
-        val ratio = ((remainingDistance / imageHeight).let { if (it >= 0) it else 0f }).let {
+        val ratio = ((remainingDistance / imageHeight).coerceIn(0f, 1f)).let {
             FastOutSlowInEasing.transform(it)
         }
-        // image上滑反比例
-        val inverseRatio = 1 - ratio
         // 模糊程度随着上滑的距离增加
         val fl = scrollState.value / imageHeight.value
         val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
@@ -166,14 +162,9 @@ fun FriedScreen(
             WindowInsets.systemBars.getTop(this).toDp()
         }
         // icon显示大小与透明度比例 单独一个比例是为了更加自然不会突然出现(因为icon只有当image隐藏时才开始显示)
-        val topIconRatio = (remainingDistance / (topBarHeight + sysTopPadding)).let {
-            when {
-                it >= 1f -> 1f
-                it <= 0f -> 0f
-                else -> it
-            }
-        }.let {
-            FastOutSlowInEasing.transform(1f - it)
+        val topIconRatio =
+            (remainingDistance / (topBarHeight + sysTopPadding)).coerceIn(0f, 1f).let {
+                FastOutSlowInEasing.transform(1f - it)
         }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
@@ -182,11 +173,6 @@ fun FriedScreen(
                 .verticalScroll(scrollState)
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth()
-                .draggable(rememberDraggableState {
-                    if (it > 40.dp.value) {
-                        popBackStack()
-                    }
-                }, Orientation.Horizontal)
         ) {
             // 用户Image
             ProfileUserImage(
@@ -202,7 +188,6 @@ fun FriedScreen(
                 ratio,
                 topBarHeight,
                 sysTopPadding,
-                inverseRatio,
                 scrollState,
                 user
             )
@@ -212,7 +197,6 @@ fun FriedScreen(
                 sysTopPadding,
                 offsetDp,
                 ratio,
-                inverseRatio,
                 onReturn = popBackStack,
                 onMenu = { /*TODO*/ }
             )
@@ -268,10 +252,11 @@ private fun BottomCard(
     ratio: Float,
     topBarHeight: Dp,
     sysTopPadding: Dp,
-    inverseRatio: Float,
     prentScrollState: ScrollState,
     user: IUser?
 ) {
+    // image上滑反比例
+    val inverseRatio = 1 - ratio
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     if (inverseRatio == 0f ) {
@@ -280,17 +265,10 @@ private fun BottomCard(
         }
     }
     // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val y = available.y
-                if (prentScrollState.value < prentScrollState.maxValue) {
-                    coroutineScope.launch { prentScrollState.scrollTo((prentScrollState.value + -y).roundToInt()) }
-                    return Offset(x = 0f, y = y)
-                }
-                return Offset.Zero
-            }
-        }
+    val nestedScrollConnection = thresholdNestedScrollConnection(
+        { prentScrollState.value > prentScrollState.maxValue })
+    {
+        coroutineScope.launch { prentScrollState.scrollTo((prentScrollState.value + -it).roundToInt()) }
     }
     Card(
         modifier = Modifier
@@ -529,11 +507,12 @@ private fun TopMenuBar(
     sysTopPadding: Dp,
     offsetDp: Dp,
     ratio: Float,
-    inverseRatio: Float,
     color: Color = Color.White,
     onReturn: () -> Unit,
     onMenu: () -> Unit
 ) {
+    // image上滑反比例
+    val inverseRatio = 1 - ratio
     Box {
         Row(
             modifier = Modifier
