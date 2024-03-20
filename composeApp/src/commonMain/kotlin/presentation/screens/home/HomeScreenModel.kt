@@ -63,7 +63,7 @@ class HomeScreenModel(
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
-            friendsApi.friendsFlow(n = 1)
+            friendsApi.friendsFlow()
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
