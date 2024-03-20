@@ -63,7 +63,7 @@ class HomeScreenModel(
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
-            friendsApi.friendsFlow()
+            friendsApi.friendsFlow(n = 1)
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
@@ -78,13 +78,13 @@ class HomeScreenModel(
         friends: List<FriendData>,
         onError: () -> Unit
     ) = screenModelScope.launch(Dispatchers.Default) {
-
-        friends.find { friendMap.containsKey(it.id) }?.let {
-            when (it.location) {
-                LocationType.Offline.value -> LocationType.Offline
-                LocationType.Private.value -> LocationType.Private
-                LocationType.Traveling.value -> LocationType.Traveling
-                else -> LocationType.Instance
+        // 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
+        if (friendMap.isNotEmpty()) {
+            friends.filter { friendMap.containsKey(it.id) }.forEach{ friend->
+                val locationType = LocationType.fromValue(friend.location)
+                friendLocationMap[locationType]
+                    ?.find { it.location == friend.location }
+                    ?.friends?.removeAll { it.value.id == friend.id }
             }
         }
 
@@ -117,29 +117,33 @@ class HomeScreenModel(
         tempInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
             // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
             // 找到相同的location的FriendLocation
-            val friendLocation =
-                (currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
-                    ?: FriendLocation(
-                        location = locationFriendEntry.key,
-                        friends = mutableStateListOf()
-                    ))
-            // 通过location查询房间实例信息
-            screenModelScope.launch(Dispatchers.IO) {
-                authSupporter.reTryAuth {
-                    instancesApi.instanceByLocation(friendLocation.location)
-                }.onSuccess { instance ->
-                    friendLocation.instants.value = InstantsVO(
-                        worldName = instance.world.name ?: "",
-                        worldImageUrl = instance.world.thumbnailImageUrl,
-                        accessType = instance.accessType,
-                        regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
-                        userCount = "${instance.userCount}/${instance.world.capacity}"
-                    )
-                    friendLocation.friends.addAll(locationFriendEntry.value)
-                    currentInstanceFriendLocations.add(friendLocation)
-                }.onHomeFailure(onError)
-            }
+            val friendLocation = currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
+                    ?: createFriendLocation(locationFriendEntry.key, onError)
+                        .also { currentInstanceFriendLocations.add(it) }
+            friendLocation.friends.addAll(locationFriendEntry.value)
         }
+    }
+
+   private fun createFriendLocation(location: String, onError: () -> Unit): FriendLocation {
+        val friendLocation = FriendLocation(
+            location = location,
+            friends = mutableStateListOf()
+        )
+       // 通过location查询房间实例信息
+        screenModelScope.launch(Dispatchers.IO) {
+            authSupporter.reTryAuth {
+                instancesApi.instanceByLocation(location)
+            }.onSuccess { instance ->
+                friendLocation.instants.value = InstantsVO(
+                    worldName = instance.world.name ?: "",
+                    worldImageUrl = instance.world.thumbnailImageUrl,
+                    accessType = instance.accessType,
+                    regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
+                    userCount = "${instance.userCount}/${instance.world.capacity}"
+                )
+            }.onHomeFailure(onError)
+        }
+       return friendLocation
     }
 
     fun onErrorMessageChange(errorMessage: String) {
