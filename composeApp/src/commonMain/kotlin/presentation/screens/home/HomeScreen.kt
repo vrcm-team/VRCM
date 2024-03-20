@@ -62,7 +62,10 @@ object HomeScreen : Screen {
         }
         // to ProfileScreen
         val onClickUserIcon = { user: IUser ->
-            currentNavigator.push(ProfileScreen(user))
+            // 防止多次点击在栈中存在相同key的屏幕报错
+            if (currentNavigator.size <= 1) {
+                currentNavigator.push(ProfileScreen(user))
+            }
         }
         if (currentNavigator.lastEvent == StackEvent.Replace){
             LifecycleEffect(onStarted = {
@@ -180,7 +183,7 @@ fun LocationFriend(
         modifier = Modifier
             .width(60.dp)
             .clip(MediumRoundedShape)
-            .clickable { onClickUserIcon() },
+            .clickable (onClick = onClickUserIcon),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
