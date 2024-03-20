@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -39,6 +38,8 @@ class HomeScreenModel(
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
         mutableStateMapOf()
 
+    private val friendMap: MutableMap<String, FriendData> = mutableMapOf()
+
     private val updateMutex = Mutex()
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
@@ -58,37 +59,40 @@ class HomeScreenModel(
 
     suspend fun refresh(onError: () -> Unit) {
         this@HomeScreenModel.friendLocationMap.clear()
+        this@HomeScreenModel.friendMap.clear()
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.friendsFlow()
                 .retry(1) {
-                    if (it is VRCApiException) {
-                        authSupporter.doReTryAuth()
-                    }else{
-                        false
-                    }
+                    if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
                     Result.failure<Throwable>(it).onHomeFailure(onError)
                 }.collect { friends ->
-                    friends.associate { it.id to mutableStateOf(it) }
-                        .also { updateMutex.withLock(friendLocationMap) { update(it, onError) } }
+                    updateMutex.withLock(friendLocationMap) { update(friends, onError) }
                 }
         }.join()
     }
 
     private fun update(
-        newValue: Map<String, MutableState<FriendData>>,
+        friends: List<FriendData>,
         onError: () -> Unit
-    ) = screenModelScope.launch(Dispatchers.Main) {
-        val friendLocationInfoMap = newValue.values.groupBy {
-            when (it.value.location) {
+    ) = screenModelScope.launch(Dispatchers.Default) {
+
+        friends.find { friendMap.containsKey(it.id) }?.let {
+            when (it.location) {
                 LocationType.Offline.value -> LocationType.Offline
                 LocationType.Private.value -> LocationType.Private
                 LocationType.Traveling.value -> LocationType.Traveling
                 else -> LocationType.Instance
             }
         }
+
+        friendMap += friends.associateBy { it.id }
+
+        val friendLocationInfoMap = friends.associate { it.id to mutableStateOf(it) }
+            .values.groupBy { LocationType.fromValue(it.value.location) }
+
         friendLocationInfoMap[LocationType.Offline]?.let { friends ->
             this@HomeScreenModel.friendLocationMap.getOrPut(LocationType.Offline) {
                 mutableStateListOf(FriendLocation.Offline)
@@ -135,7 +139,6 @@ class HomeScreenModel(
                     currentInstanceFriendLocations.add(friendLocation)
                 }.onHomeFailure(onError)
             }
-
         }
     }
 

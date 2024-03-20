@@ -19,5 +19,15 @@ enum class LocationType(val value: String) {
     /**
      * is Traveling
      */
-    Traveling("traveling")
+    Traveling("traveling");
+
+    companion object {
+        fun fromValue(value: String): LocationType =
+            when (value) {
+                Offline.value -> Offline
+                Private.value -> Private
+                Traveling.value -> Traveling
+                else -> Instance
+            }
+    }
 }
