@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.home.page
+package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -34,7 +34,7 @@ class FriendLocationTabModel(
 
     private val updateMutex = Mutex()
 
-    suspend fun refreshFriendLocationPage(onHomeFailure: Result<*>.() -> Unit) {
+    suspend fun refreshFriendLocation(onHomeFailure: Result<*>.() -> Unit) {
         this.friendLocationMap.clear()
         this.friendMap.clear()
         // 多次更新时加把锁
