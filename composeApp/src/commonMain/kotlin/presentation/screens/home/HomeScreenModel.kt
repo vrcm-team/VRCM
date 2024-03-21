@@ -40,19 +40,18 @@ class HomeScreenModel(
     }
 
 
-    suspend fun refreshFriendLocationPage(onFailure: () -> Unit) {
-        val onFailureCallback:Result<*>.() -> Unit = {
-            onHomeFailure(onFailure)
+    suspend fun refreshFriendLocationPage(onFailureCallback: () -> Unit) =
+        friendLocationPageModel.refreshFriendLocationPage{
+            onHomeFailure(onFailureCallback)
         }
-        friendLocationPageModel.refreshFriendLocationPage(onFailureCallback)
-    }
+
 
 
     fun onErrorMessageChange(errorMessage: String) {
         _errorMessage.value = errorMessage
     }
 
-    private fun <T> Result<T>.onHomeFailure(onFailure: () -> Unit) =
+    private fun <T> Result<T>.onHomeFailure(onFailureCallback: () -> Unit) =
         onFailure {
             val message = when (it) {
                 is UnresolvedAddressException -> {
@@ -68,7 +67,7 @@ class HomeScreenModel(
             onErrorMessageChange(message)
             screenModelScope.launch(Dispatchers.Main) {
                 delay(2000L)
-                onFailure()
+                onFailureCallback()
             }
         }
 }

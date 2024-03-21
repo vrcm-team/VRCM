@@ -22,12 +22,12 @@ class ProfileScreenModel(
    fun initUserState(user:IUser){
        if ( _userState.value == null) _userState.value = user
    }
-    suspend fun refreshUser(userId: String, onError: () -> Unit) =
+    suspend fun refreshUser(userId: String, onFailureCallback: () -> Unit) =
         screenModelScope.launch(Dispatchers.IO) {
             authSupporter.reTryAuth {
                 usersApi.fetchUser(userId)
             }.onFailure {
-                onError()
+                onFailureCallback()
             }.onSuccess {
                 _userState.value = it
             }
