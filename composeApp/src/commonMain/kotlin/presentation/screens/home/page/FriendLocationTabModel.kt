@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class FriendLocationPageModel(
+class FriendLocationTabModel(
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
     private val authSupporter: AuthSupporter,
@@ -71,22 +71,22 @@ class FriendLocationPageModel(
             .values.groupBy { LocationType.fromValue(it.value.location) }
 
         friendLocationInfoMap[LocationType.Offline]?.let { friends ->
-            this@FriendLocationPageModel.friendLocationMap.getOrPut(LocationType.Offline) {
+            this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Offline) {
                 mutableStateListOf(FriendLocation.Offline)
             }.first().friends.addAll(friends)
         }
         friendLocationInfoMap[LocationType.Private]?.let { friends ->
-            this@FriendLocationPageModel.friendLocationMap.getOrPut(LocationType.Private) {
+            this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Private) {
                 mutableStateListOf(FriendLocation.Private)
             }.first().friends.addAll(friends)
         }
         friendLocationInfoMap[LocationType.Traveling]?.let { friends ->
-            this@FriendLocationPageModel.friendLocationMap.getOrPut(LocationType.Traveling) {
+            this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Traveling) {
                 mutableStateListOf(FriendLocation.Traveling)
             }.first().friends.addAll(friends)
         }
 
-        val currentInstanceFriendLocations = this@FriendLocationPageModel.friendLocationMap
+        val currentInstanceFriendLocations = this@FriendLocationTabModel.friendLocationMap
             .getOrPut(LocationType.Instance, ::mutableStateListOf)
         val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
 

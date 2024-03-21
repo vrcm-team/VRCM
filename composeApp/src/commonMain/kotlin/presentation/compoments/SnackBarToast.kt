@@ -7,6 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
+/**
+ * toast弹窗
+ */
 @Composable
 fun SnackBarToast(
     text: String,

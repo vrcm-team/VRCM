@@ -8,10 +8,10 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
-import io.github.vrcmteam.vrcm.presentation.screens.home.page.FriendLocationPageModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.page.FriendLocationTabModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
@@ -22,7 +22,7 @@ import org.koin.dsl.module
 val presentationModule : Module = module {
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
-    factoryOf(::FriendLocationPageModel)
+    factoryOf(::FriendLocationTabModel)
     factoryOf(::ProfileScreenModel)
     singleOf(::AuthSupporter)
     single<ImageLoader> { imageLoaderDefinition(it) }
