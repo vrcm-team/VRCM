@@ -45,7 +45,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToast
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.page.LocationsPage
+import io.github.vrcmteam.vrcm.presentation.screens.home.page.FriendLocationPage
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
@@ -150,12 +150,12 @@ object HomeScreen : Screen {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                LocationsPage(
+                FriendLocationPage(
                     friendLocationMap = homeScreenModel.friendLocationMap,
                     pullToRefreshState = pullToRefreshState,
                     onClickUserIcon = onClickUserIcon,
                     onRefreshLocations = {
-                        homeScreenModel.refresh(onErrorToAuthPage)
+                        homeScreenModel.refreshFriendLocationPage(onErrorToAuthPage)
                         pullToRefreshState.endRefresh()
                     }
                 )

@@ -58,11 +58,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -114,31 +111,12 @@ data class ProfileScreen(
         FriedScreen(currentUser) { currentNavigator.pop() }
     }
 }
-// 自定义NestedScrollConnection以优先让父组件处理滚动事件
-val parentConsumesFirstScrollConnection = object : NestedScrollConnection {
-    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        // 父组件首先尝试消耗滚动偏移量
-        val consumed = if (parentCanScroll()) {
-            Offset(available.x, available.y).takeIf { it != Offset.Zero }
-        } else {
-            Offset.Zero
-        }
-        return consumed?: Offset.Zero
-    }
 
-    // 此处省略了其他可能需要重写的方法，如onPostScroll、onPostFling等
-
-    private fun parentCanScroll(): Boolean {
-        // 在这里判断父组件是否还能继续滚动，实际情况根据具体业务逻辑实现
-        return true // 假设总是允许父组件先滚动
-    }
-}
 @Composable
 fun FriedScreen(
     user: IUser?,
     popBackStack: () -> Unit,
 ) {
-
     BoxWithConstraints {
         val scrollState = rememberScrollState()
 
@@ -266,7 +244,7 @@ private fun BottomCard(
     }
     // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
     val nestedScrollConnection = thresholdNestedScrollConnection(
-        { prentScrollState.value > prentScrollState.maxValue })
+        { prentScrollState.value < prentScrollState.maxValue })
     {
         coroutineScope.launch { prentScrollState.scrollTo((prentScrollState.value + -it).roundToInt()) }
     }

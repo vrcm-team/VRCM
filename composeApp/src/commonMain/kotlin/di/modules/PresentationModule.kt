@@ -8,6 +8,7 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.page.FriendLocationPageModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.ktor.client.HttpClient
@@ -21,6 +22,7 @@ import org.koin.dsl.module
 val presentationModule : Module = module {
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
+    factoryOf(::FriendLocationPageModel)
     factoryOf(::ProfileScreenModel)
     singleOf(::AuthSupporter)
     single<ImageLoader> { imageLoaderDefinition(it) }

@@ -48,7 +48,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LocationsPage(
+fun FriendLocationPage(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
     pullToRefreshState: PullToRefreshState,
     onClickUserIcon: (IUser) -> Unit,
