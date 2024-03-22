@@ -12,7 +12,6 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.CodeTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
-import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
 
 @Composable
 fun VerifyCardInput(
@@ -37,7 +36,7 @@ fun VerifyCardInput(
         boxWidth = 48.dp,
         boxHeight = 48.dp,
         boxMargin = 12.dp,
-        boxShape = SmallRoundedShape,
+        boxShape = MaterialTheme.shapes.small,
         boxBackgroundColor = MaterialTheme.colorScheme.surface,
         textColor = MaterialTheme.colorScheme.onSurface
     )

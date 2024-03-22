@@ -1,11 +1,15 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 /**
  * toast弹窗
@@ -34,7 +38,7 @@ fun SnackBarToast(
         Snackbar(
             containerColor = MaterialTheme.colorScheme.onPrimary,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = MediumRoundedShape,
+            shape = MaterialTheme.shapes.medium,
             actionOnNewLine = true
         ) {
             content(it)

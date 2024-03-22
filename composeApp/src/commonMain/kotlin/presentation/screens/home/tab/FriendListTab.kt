@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -36,7 +37,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 object FriendListTab: Tab {
 
@@ -99,7 +99,7 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MediumRoundedShape)
+            .clip(MaterialTheme.shapes.medium)
             .clickable { toProfile(friend) },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)

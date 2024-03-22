@@ -1,11 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.theme
-import androidx.compose.foundation.shape.RoundedCornerShape
+
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
 
 
 private val lightScheme = lightColorScheme(
@@ -212,7 +210,3 @@ fun VRCMTheme(
     content = content
   )
 }
-
-val MediumRoundedShape = RoundedCornerShape(12.dp)
-val SmallRoundedShape = RoundedCornerShape(6.dp)
-val BigRoundedShape = RoundedCornerShape(16.dp)

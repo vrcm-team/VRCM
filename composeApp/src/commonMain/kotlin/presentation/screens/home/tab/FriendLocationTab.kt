@@ -51,7 +51,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
-import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
 
 object FriendLocationTab : Tab {
 
@@ -181,7 +180,7 @@ private fun LocationFriend(
     Column(
         modifier = Modifier
             .width(60.dp)
-            .clip(MediumRoundedShape)
+            .clip(MaterialTheme.shapes.medium)
             .clickable (onClick = onClickUserIcon),
         verticalArrangement = Arrangement.Center
     ) {
@@ -203,10 +202,9 @@ private fun LocationFriend(
 @Composable
 private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
     val instants by location.instants
-    val shape = MediumRoundedShape
     Surface(
         color = MaterialTheme.colorScheme.onPrimary,
-        shape = shape,
+        shape = MaterialTheme.shapes.medium,
         shadowElevation = 1.dp
     ) {
         Column(
@@ -222,7 +220,7 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                 AImage(
                     modifier = Modifier
                         .width(120.dp)
-                        .clip(shape),
+                        .clip(MaterialTheme.shapes.medium),
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )

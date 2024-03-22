@@ -7,7 +7,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -384,8 +383,7 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
     Row(
         modifier = Modifier
             .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp)
-            .horizontalScroll(rememberScrollState()),
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         speakLanguages.forEach { language ->
@@ -413,8 +411,7 @@ fun ColumnScope.LinksRow(bioLinks: List<String>) {
     Row(
         modifier = Modifier
             .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp)
-            .horizontalScroll(rememberScrollState()),
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         val appPlatform = getAppPlatform()

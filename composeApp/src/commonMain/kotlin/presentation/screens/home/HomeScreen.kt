@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
@@ -16,14 +17,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,7 +48,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
-import io.github.vrcmteam.vrcm.presentation.theme.BigRoundedShape
 
 
 object HomeScreen : Screen {
@@ -110,7 +113,12 @@ object HomeScreen : Screen {
                 },
                 bottomBar = {
                     NavigationBar(
-                        modifier = Modifier.padding(horizontal = 6.dp).clip(BigRoundedShape),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                            .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = MaterialTheme.shapes.medium,
+                            )
                     ) {
                         TabNavigationItem(FriendLocationTab)
                         TabNavigationItem(FriendListTab)
@@ -144,6 +152,7 @@ object HomeScreen : Screen {
 private fun RowScope.TabNavigationItem(tab: Tab){
     val tabNavigator = LocalTabNavigator.current
     NavigationBarItem(
+        modifier = Modifier.align(Alignment.CenterVertically),
         icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) },
         label = { Text(tab.options.title) },
         selected = tabNavigator.current == tab,
