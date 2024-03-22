@@ -72,7 +72,7 @@ object FriendListTab: Tab {
             return remember {
                 TabOptions(
                     index = 1u,
-                    title = "FriendList",
+                    title = "Friend",
                     icon = painter
                 )
             }

@@ -84,7 +84,7 @@ object FriendLocationTab : Tab {
             return remember {
                 TabOptions(
                     index = 0u,
-                    title = "FriendLocation",
+                    title = "Location",
                     icon = painter
                 )
             }

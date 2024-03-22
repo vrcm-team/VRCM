@@ -1,12 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,11 +59,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -80,7 +77,6 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
@@ -91,9 +87,6 @@ import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import io.github.vrcmteam.vrcm.presentation.theme.MediumRoundedShape
-import io.github.vrcmteam.vrcm.presentation.theme.SmallRoundedShape
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
@@ -118,31 +111,12 @@ data class ProfileScreen(
         FriedScreen(currentUser) { currentNavigator.pop() }
     }
 }
-// 自定义NestedScrollConnection以优先让父组件处理滚动事件
-val parentConsumesFirstScrollConnection = object : NestedScrollConnection {
-    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        // 父组件首先尝试消耗滚动偏移量
-        val consumed = if (parentCanScroll()) {
-            Offset(available.x, available.y).takeIf { it != Offset.Zero }
-        } else {
-            Offset.Zero
-        }
-        return consumed?: Offset.Zero
-    }
 
-    // 此处省略了其他可能需要重写的方法，如onPostScroll、onPostFling等
-
-    private fun parentCanScroll(): Boolean {
-        // 在这里判断父组件是否还能继续滚动，实际情况根据具体业务逻辑实现
-        return true // 假设总是允许父组件先滚动
-    }
-}
 @Composable
 fun FriedScreen(
     user: IUser?,
     popBackStack: () -> Unit,
 ) {
-
     BoxWithConstraints {
         val scrollState = rememberScrollState()
 
@@ -160,7 +134,7 @@ fun FriedScreen(
         val fl = scrollState.value / imageHeight.value
         val blurDp = with(LocalDensity.current) { (fl * 20).toDp() }
         // topBar高度
-        val topBarHeight = 70.dp
+        val topBarHeight = 64.dp
         // 系统栏高度
         val sysTopPadding = with(LocalDensity.current) {
             WindowInsets.systemBars.getTop(this).toDp()
@@ -169,15 +143,28 @@ fun FriedScreen(
         val topIconRatio =
             (remainingDistance / (topBarHeight + sysTopPadding)).coerceIn(0f, 1f).let {
                 FastOutSlowInEasing.transform(1f - it)
-            }
+        }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
+        val scope = rememberCoroutineScope()
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
+        // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
+        val nestedScrollConnection = thresholdNestedScrollConnection({ scrollState.value < scrollState.maxValue }) {
+            scope.launch { scrollState.scrollTo((scrollState.value + -it).roundToInt()) }
+        }
+//        if (ratio in (0.5f..1f)) {
+//            scope.launch {
+//                scrollState.animateScrollTo(0,spring(stiffness = Spring.StiffnessHigh))}
+//        }else  {
+//            scope.launch {
+//                scrollState.animateScrollTo(scrollState.maxValue,spring(stiffness = Spring.StiffnessHigh))}
+//        }
         Surface(
             Modifier
                 .verticalScroll(scrollState)
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth()
         ) {
+
             // 用户Image
             ProfileUserImage(
                 imageHeight,
@@ -192,7 +179,7 @@ fun FriedScreen(
                 ratio,
                 topBarHeight,
                 sysTopPadding,
-                scrollState,
+                nestedScrollConnection,
                 user
             )
             // 顶部导航栏
@@ -212,7 +199,7 @@ fun FriedScreen(
                 imageHeight,
                 topIconRatio,
                 user?.iconUrl,
-            ) { scrollState.animateScrollTo(0, tween(600)) }
+            ) { scope.launch {scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessVeryLow))} }
         }
     }
 
@@ -256,23 +243,16 @@ private fun BottomCard(
     ratio: Float,
     topBarHeight: Dp,
     sysTopPadding: Dp,
-    prentScrollState: ScrollState,
+    nestedScrollConnection: NestedScrollConnection,
     user: IUser?
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
     val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
     if (inverseRatio == 0f ) {
         LaunchedEffect(Unit){
-            scrollState.animateScrollTo(0, tween(300))
+            scrollState.animateScrollTo(0)
         }
-    }
-    // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
-    val nestedScrollConnection = thresholdNestedScrollConnection(
-        { prentScrollState.value > prentScrollState.maxValue })
-    {
-        coroutineScope.launch { prentScrollState.scrollTo((prentScrollState.value + -it).roundToInt()) }
     }
     Card(
         modifier = Modifier
@@ -474,35 +454,30 @@ private fun ProfileUserIcon(
     imageHeight: Dp,
     topIconRatio: Float,
     avatarThumbnailImageUrl: String?,
-    coroutineScope: CoroutineScope = rememberCoroutineScope(),
-    onClickIcon: suspend () -> Unit = {}
+    onClickIcon:  () -> Unit = {}
 ) {
     val iconSize = (60 * topIconRatio).dp
-    Box(
-        modifier = Modifier.systemBarsPadding()
-    ) {
-        Row(
+    Box {
+        Box(
             modifier = Modifier
+                .systemBarsPadding()
+                .fillMaxWidth()
                 .enableIf(isHidden) { offset(y = offsetDp - imageHeight) }
-                .padding(top = lastIconPadding + 5.dp)
+                .padding(top = lastIconPadding)
                 .alpha(topIconRatio),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(modifier = Modifier.weight(1f))
             AImage(
                 modifier = Modifier
-                    .align(Alignment.CenterVertically)
+                    .align(Alignment.Center)
                     .clip(CircleShape)
                     .size(iconSize)
-                    .clickable { coroutineScope.launch { onClickIcon() } },
+                    .clickable(onClick = onClickIcon),
                 imageData = ImageRequest.Builder(koinInject<PlatformContext>())
                     .data(avatarThumbnailImageUrl)
                     .crossfade(600)
                     .size(70, 70).build(),
                 contentDescription = "UserIcon",
             )
-            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
@@ -564,3 +539,4 @@ private fun TopMenuBar(
         }
     }
 }
+
