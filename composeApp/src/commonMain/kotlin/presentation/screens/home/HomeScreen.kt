@@ -9,13 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.BottomNavigationItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -112,7 +112,9 @@ object HomeScreen : Screen {
                     )
                 },
                 bottomBar = {
-                    BottomAppBar(modifier = Modifier.clip(BigRoundedShape)) {
+                    NavigationBar(
+                        modifier = Modifier.padding(horizontal = 6.dp).clip(BigRoundedShape),
+                    ) {
                         TabNavigationItem(FriendLocationTab)
                         TabNavigationItem(FriendListTab)
                     }
@@ -120,9 +122,9 @@ object HomeScreen : Screen {
             ) { innerPadding ->
                 Box(
                     modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                ){
+                        .padding(top = innerPadding.calculateTopPadding())
+                        .fillMaxSize()
+                ) {
                     CurrentTab()
                     SnackBarToast(
                         modifier = Modifier
@@ -132,20 +134,19 @@ object HomeScreen : Screen {
                         onEffect = { homeScreenModel.onErrorMessageChange("") }
                     )
                 }
-
             }
         }
-
     }
 }
 
 @Composable
 private fun RowScope.TabNavigationItem(tab: Tab){
     val tabNavigator = LocalTabNavigator.current
-    BottomNavigationItem(
+    NavigationBarItem(
+        icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) },
+        label = { Text(tab.options.title) },
         selected = tabNavigator.current == tab,
         onClick = { tabNavigator.current = tab },
-        icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) }
     )
 }
 

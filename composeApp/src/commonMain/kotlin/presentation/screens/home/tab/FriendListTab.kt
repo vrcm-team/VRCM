@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -83,8 +84,8 @@ object FriendListTab: Tab {
 private fun FriendListPage(friendData: List<FriendData>, toProfile:  (FriendData) -> Unit) {
     LazyColumn(
         modifier = Modifier
-            .padding(6.dp)
-            .fillMaxWidth(),
+            .fillMaxSize()
+            .padding(horizontal = 6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         items(friendData, key = { it.id }) {

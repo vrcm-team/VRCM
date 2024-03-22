@@ -104,8 +104,8 @@ private fun FriendLocationPage(
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
         LazyColumn(
             modifier = Modifier
-                .padding(6.dp)
-                .fillMaxWidth(),
+                .padding(horizontal = 6.dp)
+                .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
 
