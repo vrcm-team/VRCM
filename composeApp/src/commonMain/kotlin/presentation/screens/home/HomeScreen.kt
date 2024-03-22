@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.core.stack.StackEvent
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -64,10 +63,8 @@ object HomeScreen : Screen {
                 currentNavigator.push(ProfileScreen(user))
             }
         }
+        LifecycleEffect(onStarted = { homeScreenModel.ini(onFailureCallback) })
 
-        if (currentNavigator.lastEvent == StackEvent.Replace){
-            LifecycleEffect(onStarted = { homeScreenModel.ini(onFailureCallback) })
-        }
         TabNavigator(FriendLocationTab){
             Scaffold(
                 modifier = Modifier.background(Color.LightGray),
@@ -118,6 +115,17 @@ object HomeScreen : Screen {
                         TabNavigationItem(FriendLocationTab)
                         TabNavigationItem(FriendListTab)
                     }
+                },
+                floatingActionButton = {
+                   Button(onClick = {homeScreenModel.onErrorMessageChange("hihihihihihihi")}){}
+                },
+                snackbarHost = {
+                    SnackBarToast(
+                        modifier = Modifier
+                            .padding(16.dp),
+                        text = homeScreenModel.errorMessage,
+                        onEffect = { homeScreenModel.onErrorMessageChange("") }
+                    )
                 }
             ) { innerPadding ->
                 Box(
@@ -126,13 +134,6 @@ object HomeScreen : Screen {
                         .fillMaxSize()
                 ) {
                     CurrentTab()
-                    SnackBarToast(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .align(Alignment.TopCenter),
-                        text = homeScreenModel.errorMessage,
-                        onEffect = { homeScreenModel.onErrorMessageChange("") }
-                    )
                 }
             }
         }

@@ -112,9 +112,11 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
             userStatus = friend.status
         )
         Column{
-            Text(friend.displayName)
             Text(
-               text =  friend.statusDescription
+                text = friend.displayName
+            )
+            Text(
+               text = friend.statusDescription
             )
         }
         Spacer(Modifier.weight(1f))
