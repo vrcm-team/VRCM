@@ -1,9 +1,21 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
@@ -12,19 +24,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
-import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToast
+import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
@@ -32,26 +45,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 object AuthScreen : Screen {
     @Composable
     override fun Content() {
-        val authScreenModel: AuthScreenModel = getScreenModel()
+        var snackBarToastText by snackBarToastText
+        val currentNavigator = currentNavigator
+        val authScreenModel: AuthScreenModel = getCallbackScreenModel { text: String ->
+            snackBarToastText = text
+        }
+
         LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
-        AuthFold(
-            context = {
-                SnackBarToast(
-                    modifier = Modifier
-                        .systemBarsPadding()
-                        .padding(16.dp)
-                        .align(Alignment.TopCenter),
-                    text = authScreenModel.uiState.errorMsg,
-                    onEffect = { authScreenModel.onErrorMessageChange("") }
-                ) {
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = it.visuals.message,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        ) {
+        AuthFold {
             AuthCard(
                 cardState = authScreenModel.uiState.cardState,
             ) { state ->
@@ -95,7 +96,6 @@ object AuthScreen : Screen {
                     }
 
                     AuthCardPage.Authed -> {
-                        val currentNavigator = LocalNavigator.currentOrThrow
                         LaunchedEffect(Unit) {
                             currentNavigator replace AuthAnimeScreen(true)
                         }

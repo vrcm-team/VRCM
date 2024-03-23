@@ -27,14 +27,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.koin.getScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
@@ -45,16 +46,15 @@ object FriendListTab: Tab {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val friendListTabModel = getScreenModel<FriendListTabModel>()
-        val currentNavigator = LocalNavigator.currentOrThrow
         val parentNavigator = currentNavigator.parent!!
+        val friendListTabModel: FriendListTabModel= getCallbackScreenModel(
+            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+        )
         RefreshBox(
             isStartRefresh = isRefreshed,
             doRefresh = {
                 isRefreshed = false
-                friendListTabModel.refreshFriendList{
-                    // TODO() 统一错误提示
-                }
+                friendListTabModel.refreshFriendList()
             }
         ) {
             FriendListPage(friendListTabModel.friendList){

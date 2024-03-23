@@ -24,6 +24,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,17 +35,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.CurrentTab
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
-import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToast
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
@@ -54,11 +56,11 @@ object HomeScreen : Screen {
     @Composable
     @OptIn(ExperimentalMaterial3Api::class)
     override fun Content() {
-        val homeScreenModel: HomeScreenModel = getScreenModel()
-        val currentNavigator = LocalNavigator.currentOrThrow
-        val onFailureCallback =  {
-            currentNavigator.replace(AuthAnimeScreen(false))
-        }
+        var snackBarToastText by snackBarToastText
+        val currentNavigator = currentNavigator
+        val homeScreenModel: HomeScreenModel = getCallbackScreenModel(
+            createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
+        )
         // to ProfileScreen
         val onClickUserIcon = { user: IUser ->
             // 防止多次点击在栈中存在相同key的屏幕报错
@@ -66,7 +68,7 @@ object HomeScreen : Screen {
                 currentNavigator.push(ProfileScreen(user))
             }
         }
-        LifecycleEffect(onStarted = { homeScreenModel.ini(onFailureCallback) })
+        LifecycleEffect(onStarted = (homeScreenModel::ini))
 
         TabNavigator(FriendLocationTab){
             Scaffold(
@@ -125,15 +127,7 @@ object HomeScreen : Screen {
                     }
                 },
                 floatingActionButton = {
-                   Button(onClick = {homeScreenModel.onErrorMessageChange("hihihihihihihi")}){}
-                },
-                snackbarHost = {
-                    SnackBarToast(
-                        modifier = Modifier
-                            .padding(16.dp),
-                        text = homeScreenModel.errorMessage,
-                        onEffect = { homeScreenModel.onErrorMessageChange("") }
-                    )
+                    Button(onClick = {snackBarToastText = "132132131"}){}
                 }
             ) { innerPadding ->
                 Box(

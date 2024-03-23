@@ -18,6 +18,7 @@ import org.koin.core.logger.Logger
 
 
 class AuthScreenModel(
+    private val onFailureCallback: (String) -> Unit,
     private val authSupporter: AuthSupporter,
     private val logger: Logger
 ) : ScreenModel {
@@ -48,10 +49,9 @@ class AuthScreenModel(
 
     fun onErrorMessageChange(errorMsg: String) {
         if (_uiState.value.btnIsLoading) {
-            _uiState.value = _uiState.value.copy(errorMsg = errorMsg, btnIsLoading = false)
-        } else {
-            _uiState.value = _uiState.value.copy(errorMsg = errorMsg)
+            _uiState.value = _uiState.value.copy(btnIsLoading = false)
         }
+        onFailureCallback(errorMsg)
     }
 
     fun onCardStateChange(cardState: AuthCardPage) {

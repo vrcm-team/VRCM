@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class FriendListTabModel(
+    private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
     private val authSupporter: AuthSupporter,
@@ -30,7 +31,7 @@ class FriendListTabModel(
 
     private val updateMutex = Mutex()
 
-    suspend fun refreshFriendList(onHomeFailure: Result<*>.() -> Unit) {
+    suspend fun refreshFriendList() {
         friendList.clear()
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
@@ -39,9 +40,9 @@ class FriendListTabModel(
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
-                    Result.failure<Throwable>(it).onHomeFailure()
+                    onFailureCallback(it.message.toString())
                 }.collect { friends ->
-                    updateMutex.withLock(friendList) { update(friends, onHomeFailure) }
+                    updateMutex.withLock(friendList) { update(friends) }
                 }
         }.join()
 
@@ -49,10 +50,13 @@ class FriendListTabModel(
 
     private fun update(
         friends: List<FriendData>,
-        onHomeFailure: Result<*>.() -> Unit
     ) = screenModelScope.launch(Dispatchers.Default) {
-        friendList.removeAll { old -> friends.any { old.id == it.id } }
-        friendList.addAll(friends)
+        runCatching {
+            friendList.removeAll { old -> friends.any { old.id == it.id } }
+            friendList.addAll(friends)
+        }.onFailure {
+            onFailureCallback(it.message.toString())
+        }
     }
 
     private fun createFriendLocation(location: String, onHomeFailure: Result<*>.() -> Unit): FriendLocation {

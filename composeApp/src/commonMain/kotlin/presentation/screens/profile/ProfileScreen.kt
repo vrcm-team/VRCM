@@ -70,16 +70,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
@@ -95,16 +95,15 @@ data class ProfileScreen(
 ) : Screen {
     @Composable
     override fun Content() {
-        val profileScreenModel: ProfileScreenModel = getScreenModel()
-        val currentNavigator = LocalNavigator.currentOrThrow
+        val currentNavigator = currentNavigator
+        val profileScreenModel: ProfileScreenModel = getCallbackScreenModel(
+            createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
+        )
         LifecycleEffect(
             onStarted = { profileScreenModel.initUserState(user) }
         )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(user.id) {
-                // Token失效时返回重新登陆
-                currentNavigator replace AuthAnimeScreen(false)
-            }
+            profileScreenModel.refreshUser(user.id)
         }
         val currentUser = profileScreenModel.userState
         FriedScreen(currentUser) { currentNavigator.pop() }

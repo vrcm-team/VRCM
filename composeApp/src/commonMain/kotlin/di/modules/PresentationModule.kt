@@ -16,16 +16,25 @@ import io.ktor.client.HttpClient
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 val presentationModule : Module = module {
-    factoryOf(::AuthScreenModel)
-    factoryOf(::HomeScreenModel)
-    factoryOf(::ProfileScreenModel)
-    singleOf(::FriendLocationTabModel)
-    singleOf(::FriendListTabModel)
+    factory { (onFailureCallback: (String) -> Unit) ->
+        AuthScreenModel(onFailureCallback, get(), get())
+    }
+    factory { (onFailureCallback: (String) -> Unit) ->
+        HomeScreenModel(onFailureCallback, get())
+    }
+    factory { (onFailureCallback: (String) -> Unit) ->
+        ProfileScreenModel(onFailureCallback, get(), get())
+    }
+    single { (onFailureCallback: (String) -> Unit) ->
+        FriendLocationTabModel(onFailureCallback, get(), get(), get())
+    }
+    single { (onFailureCallback: (String) -> Unit) ->
+        FriendListTabModel(onFailureCallback, get(), get(), get())
+    }
     singleOf(::AuthSupporter)
     single<ImageLoader> { imageLoaderDefinition(it) }
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 
 class ProfileScreenModel(
+    private val onFailureCallback:  (String) -> Unit,
     private val authSupporter: AuthSupporter,
     private val usersApi: UsersApi
 ) : ScreenModel {
@@ -22,12 +23,12 @@ class ProfileScreenModel(
    fun initUserState(user:IUser){
        if ( _userState.value == null) _userState.value = user
    }
-    suspend fun refreshUser(userId: String, onFailureCallback: () -> Unit) =
+    suspend fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
             authSupporter.reTryAuth {
                 usersApi.fetchUser(userId)
             }.onFailure {
-                onFailureCallback()
+                onFailureCallback(it.message.toString())
             }.onSuccess {
                 _userState.value = it
             }

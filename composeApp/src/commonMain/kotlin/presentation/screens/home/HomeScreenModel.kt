@@ -7,36 +7,28 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.*
+import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
 class HomeScreenModel(
+    private val onFailureCallback:  (String) -> Unit,
     private val authSupporter: AuthSupporter,
 ) : ScreenModel {
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
-    private val _errorMessage = mutableStateOf("")
-
-    val errorMessage by _errorMessage
-
     val currentUser by _currentUser
 
-    fun ini(onFailureCallback: () -> Unit) = screenModelScope.launch(Dispatchers.IO) {
+    fun ini() = screenModelScope.launch(Dispatchers.IO) {
         authSupporter.reTryAuth { authSupporter.currentUser() }
-            .onHomeFailure(onFailureCallback)
+            .onHomeFailure()
             .onSuccess { _currentUser.value = it }
     }
 
-    fun onErrorMessageChange(errorMessage: String) {
-        _errorMessage.value = errorMessage
-    }
-
-    private fun <T> Result<T>.onHomeFailure(onFailureCallback: () -> Unit) =
+    private fun <T> Result<T>.onHomeFailure() =
         onFailure {
             val message = when (it) {
                 is UnresolvedAddressException -> {
@@ -49,11 +41,7 @@ class HomeScreenModel(
 
                 else -> "${it.message}"
             }
-            onErrorMessageChange(message)
-            screenModelScope.launch(Dispatchers.Main) {
-                delay(2000L)
-                onFailureCallback()
-            }
+            onFailureCallback(message)
         }
 }
 
