@@ -116,7 +116,7 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                 text = friend.displayName
             )
             Text(
-               text = friend.statusDescription
+               text = friend.statusDescription.ifBlank { friend.status.value }
             )
         }
         Spacer(Modifier.weight(1f))

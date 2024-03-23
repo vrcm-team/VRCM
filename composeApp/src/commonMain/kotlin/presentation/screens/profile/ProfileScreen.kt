@@ -271,10 +271,7 @@ private fun BottomCard(
             val trustRank = remember(user) { user.trustRank }
             val rankColor: Color = GameColor.Rank.fromValue(trustRank)
             val speakLanguages = remember(user) { user.speakLanguages }
-            val statusDescription = when (user.statusDescription.isBlank()) {
-                true -> user.status.value
-                else -> user.statusDescription
-            }
+            val statusDescription = user.statusDescription.ifBlank { user.status.value }
             // TrustRank + UserName + VRC+
             UserInfoRow(user.displayName, user.isSupporter, rankColor)
             // status
