@@ -4,6 +4,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
@@ -24,6 +26,8 @@ fun RefreshBox(
     isStartRefresh : Boolean = true,
     pullToRefreshState: PullToRefreshState = rememberPullToRefreshState(),
     doRefresh: suspend () -> Unit = {},
+    containerColor: Color = MaterialTheme.colorScheme.onPrimary,
+    contentColor: Color =  MaterialTheme.colorScheme.primary,
     content: @Composable BoxScope.() -> Unit
 ) {
     if (isStartRefresh) {
@@ -47,6 +51,8 @@ fun RefreshBox(
             modifier = Modifier
                 .graphicsLayer(scaleX = scaleFraction, scaleY = scaleFraction)
                 .align(Alignment.TopCenter),
+            containerColor =  containerColor,
+            contentColor = contentColor,
             state = pullToRefreshState,
         )
     }

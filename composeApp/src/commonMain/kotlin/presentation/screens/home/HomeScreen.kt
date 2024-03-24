@@ -30,9 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.tab.CurrentTab
@@ -72,9 +70,9 @@ object HomeScreen : Screen {
 
         TabNavigator(FriendLocationTab){
             Scaffold(
-                modifier = Modifier.background(Color.LightGray),
                 topBar = {
                     TopAppBar(
+                        modifier = Modifier.shadow(2.dp),
                         colors = topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.onPrimary,
                             titleContentColor = MaterialTheme.colorScheme.primary,
@@ -95,11 +93,13 @@ object HomeScreen : Screen {
                             Column {
                                 Text(
                                     text = homeScreenModel.currentUser?.displayName ?: "",
-                                    fontSize = 20.sp
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = homeScreenModel.currentUser?.statusDescription ?: "",
-                                    fontSize = 12.sp
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1
                                 )
                             }
                         },
@@ -115,10 +115,10 @@ object HomeScreen : Screen {
                 },
                 bottomBar = {
                     NavigationBar(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp)
                             .windowInsetsPadding(NavigationBarDefaults.windowInsets)
                             .shadow(
-                                elevation = 8.dp,
+                                elevation = 2.dp,
                                 shape = MaterialTheme.shapes.medium,
                             )
                     ) {
@@ -127,12 +127,13 @@ object HomeScreen : Screen {
                     }
                 },
                 floatingActionButton = {
-                    Button(onClick = {snackBarToastText = "132132131"}){}
+                    Button(onClick = { snackBarToastText = "132132131" }) {}
                 }
             ) { innerPadding ->
                 Box(
                     modifier = Modifier
                         .padding(top = innerPadding.calculateTopPadding())
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .fillMaxSize()
                 ) {
                     CurrentTab()
@@ -143,7 +144,7 @@ object HomeScreen : Screen {
 }
 
 @Composable
-private fun RowScope.TabNavigationItem(tab: Tab){
+private fun RowScope.TabNavigationItem(tab: Tab) {
     val tabNavigator = LocalTabNavigator.current
     NavigationBarItem(
         modifier = Modifier.align(Alignment.CenterVertically),

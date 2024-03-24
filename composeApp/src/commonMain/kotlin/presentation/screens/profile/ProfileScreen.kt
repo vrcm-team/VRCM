@@ -75,6 +75,9 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -267,11 +270,18 @@ private fun BottomCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
-            val statusColor = GameColor.Status.fromValue(user.status)
             val trustRank = remember(user) { user.trustRank }
             val rankColor: Color = GameColor.Rank.fromValue(trustRank)
+            val statusColor: Color
+            val statusDescription: String
+            if (user is UserData && user.state == UserState.Offline ){
+                statusColor = GameColor.Status.fromValue(UserStatus.Offline)
+                statusDescription = UserStatus.Offline.value
+            }else{
+                statusColor = GameColor.Status.fromValue(user.status)
+                statusDescription = user.statusDescription.ifBlank { user.status.value }
+            }
             val speakLanguages = remember(user) { user.speakLanguages }
-            val statusDescription = user.statusDescription.ifBlank { user.status.value }
             // TrustRank + UserName + VRC+
             UserInfoRow(user.displayName, user.isSupporter, rankColor)
             // status

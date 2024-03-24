@@ -3,8 +3,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,14 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,44 +35,23 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
-import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetBottomPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 
-object FriendLocationTab : Tab {
-
-    private var isRefreshed = true
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    override fun Content() {
-        val parentNavigator = currentNavigator.parent!!
-        val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
-        )
-        RefreshBox(
-            isStartRefresh = isRefreshed,
-            doRefresh = {
-                isRefreshed = false
-                friendLocationTabModel.refreshFriendLocation()
-            }
-        ) {
-            FriendLocationPage(friendLocationTabModel.friendLocationMap){
-                if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(it)
-            }
-        }
-    }
+object FriendLocationTab : RefreshLazyColumnTab() {
 
     override val options: TabOptions
         @Composable
@@ -88,24 +65,35 @@ object FriendLocationTab : Tab {
                 )
             }
         }
-}
+    @Composable
+    override fun doRefreshCall(): suspend () -> Unit {
+        val parentNavigator = currentNavigator.parent!!
+        val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
+            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+        )
+        return { friendLocationTabModel.refreshFriendLocation() }
+    }
 
-
-@Composable
-private fun FriendLocationPage(
-    friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
-    onClickUserIcon: (IUser) -> Unit,
-) {
-    Box {
+    @Composable
+    override fun BoxContent() {
+        val parentNavigator = currentNavigator.parent!!
+        val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
+            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+        )
+        val friendLocationMap = friendLocationTabModel.friendLocationMap
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
-        LazyColumn(
-            modifier = Modifier
-                .padding(horizontal = 6.dp)
-                .fillMaxSize(),
+        val onClickUserIcon = { user: IUser ->
+            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
+        }
+        val bottomPadding = getInsetBottomPadding(98.dp)
+
+        RememberLazyColumn(
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(start = 6.dp, top = 6.dp, end = 6.dp, bottom = bottomPadding)
         ) {
 
             item(key = LocationType.Offline) {
@@ -135,8 +123,8 @@ private fun FriendLocationPage(
                 }
             }
         }
-
     }
+
 }
 
 @Composable
@@ -180,7 +168,7 @@ private fun LocationFriend(
     Column(
         modifier = Modifier
             .width(60.dp)
-            .clip(MaterialTheme.shapes.medium)
+            .clip(MaterialTheme.shapes.small)
             .clickable (onClick = onClickUserIcon),
         verticalArrangement = Arrangement.Center
     ) {
