@@ -4,3 +4,6 @@ fun String.capitalizeFirst() = this.replaceFirstChar { if (it.isLowerCase()) it.
 
 
 fun CharSequence.isDigitsOnly(): Boolean = this.any { char -> char.isDigit() }
+
+fun String.omission(maxLength: Int)= this.takeIf { it.length < maxLength }
+    ?: "${this.substring(0,maxLength)}..."

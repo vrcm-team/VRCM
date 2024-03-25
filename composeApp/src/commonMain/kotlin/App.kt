@@ -21,20 +21,23 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.theme.VRCMTheme
 import org.koin.compose.KoinContext
 import presentation.compoments.SelectableTransitionScreen
 
 @Composable
 fun App() {
     KoinContext {
-        Navigator(StartupAnimeScreen) {
-            SnackBarToastBox(
-                Modifier
-                    .systemBarsPadding()
-                    .padding(76.dp)
-            ) {
-                SelectableTransitionScreen(it) {
-                    selectTransition(it)
+        VRCMTheme {
+            Navigator(StartupAnimeScreen) {
+                SnackBarToastBox(
+                    Modifier
+                        .systemBarsPadding()
+                        .padding(vertical = 76.dp, horizontal = 12.dp)
+                ) {
+                    SelectableTransitionScreen(it) {
+                        selectTransition(it)
+                    }
                 }
             }
         }

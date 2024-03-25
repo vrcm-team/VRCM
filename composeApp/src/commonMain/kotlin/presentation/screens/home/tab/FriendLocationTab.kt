@@ -20,9 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -35,8 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.tab.TabOptions
+import io.github.vrcmteam.vrcm.core.extensions.omission
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -93,45 +94,57 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding =
             (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
-
-        RememberLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(
-                start = 6.dp,
-                top = 6.dp,
-                end = 6.dp,
-                bottom = bottomPadding
-            )
-        ) {
-
-            item(key = LocationType.Offline) {
-                SingleLocationCard(offlineFriendLocation, "Active on the Website", onClickUserIcon)
-            }
-
-            item(key = LocationType.Private) {
-                SingleLocationCard(
-                    privateFriendLocation,
-                    "Friends in Private Worlds",
-                    onClickUserIcon
+            RememberLazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(
+                    start = 6.dp,
+                    top = 6.dp,
+                    end = 6.dp,
+                    bottom = bottomPadding
                 )
-            }
+            ) {
 
-            item(key = LocationType.Traveling) {
-                SingleLocationCard(travelingFriendLocation, "Friends is Traveling", onClickUserIcon)
-            }
-
-            if (instanceFriendLocations != null) {
-                item(key = LocationType.Instance) {
-                    Text(text = "by Location")
+                item(key = LocationType.Offline) {
+                    SingleLocationCard(
+                        offlineFriendLocation,
+                        "Active on the Website",
+                        onClickUserIcon
+                    )
                 }
-                items(instanceFriendLocations, key = { it.location }) { locations ->
-                    LocationCard(locations) {
-                        UserIconsRow(locations.friends, onClickUserIcon)
+
+                item(key = LocationType.Private) {
+                    SingleLocationCard(
+                        privateFriendLocation,
+                        "Friends in Private Worlds",
+                        onClickUserIcon
+                    )
+                }
+
+                item(key = LocationType.Traveling) {
+                    SingleLocationCard(
+                        travelingFriendLocation,
+                        "Friends is Traveling",
+                        onClickUserIcon
+                    )
+                }
+
+                if (!instanceFriendLocations.isNullOrEmpty()) {
+                    item(key = LocationType.Instance) {
+                        Text(
+                            text = "by Location",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
+                    items(instanceFriendLocations, key = { it.location }) { locations ->
+                        LocationCard(locations) {
+                            UserIconsRow(locations.friends, onClickUserIcon)
+                        }
                     }
                 }
-            }
+
         }
+
     }
 
 }
@@ -143,7 +156,10 @@ private fun SingleLocationCard(
     onClickUserIcon: (IUser) -> Unit
 ) {
     if (friendLocations == null) return
-    Text(text)
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+    )
     Spacer(modifier = Modifier.height(6.dp))
     UserIconsRow(friendLocations.friends, onClickUserIcon)
 }
@@ -191,7 +207,7 @@ private fun LocationFriend(
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            fontSize = 12.sp
+            style = MaterialTheme.typography.labelSmall,
         )
     }
 }
@@ -199,10 +215,12 @@ private fun LocationFriend(
 @Composable
 private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
     val instants by location.instants
-    Surface(
-        color = MaterialTheme.colorScheme.onPrimary,
-        shape = MaterialTheme.shapes.medium,
-        shadowElevation = 1.dp
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.primary
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier.padding(6.dp),
@@ -228,9 +246,9 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(60.dp),
-                        text = instants.worldName,
-                        fontSize = 15.sp,
-                        maxLines = 2,
+                        text = instants.worldName.omission(24),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
                         textAlign = TextAlign.Center,
                     )
                     Row(
@@ -250,12 +268,14 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
                             text = instants.accessType?.displayName ?: "",
+                            style = MaterialTheme.typography.labelMedium,
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
                             text = instants.userCount,
+                            style = MaterialTheme.typography.labelMedium,
                         )
                         Icon(
                             modifier = Modifier

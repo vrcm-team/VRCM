@@ -17,14 +17,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
@@ -93,10 +95,12 @@ object FriendListTab: RefreshLazyColumnTab() {
 
 @Composable
 fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.onPrimary,
-        shape = MaterialTheme.shapes.medium,
-        shadowElevation = 1.dp
+    Card (
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.primary
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ){
         Row(
             modifier = Modifier
@@ -134,9 +138,9 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                 }
 
                 Text(
+                    modifier = Modifier.alpha(0.6f),
                     text = friend.statusDescription.ifBlank { friend.status.value },
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.outline,
                     maxLines = 1
                 )
             }

@@ -9,8 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,14 +46,18 @@ fun AuthFold(
                 .align(Alignment.Center)
                 .offset(y = iconYOffset)
         )
-        Surface(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(y = cardYOffset)
                 .alpha(cardAlpha)
                 .height(cardHeightDp)
                 .align(Alignment.BottomCenter),
-            color = MaterialTheme.colorScheme.onPrimary,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.onPrimary,
+                contentColor = MaterialTheme.colorScheme.primary
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             shape = RoundedCornerShape(topStart = shapeDp, topEnd = shapeDp),
         ) {
             cardContext()

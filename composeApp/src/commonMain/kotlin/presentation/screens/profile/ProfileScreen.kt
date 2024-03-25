@@ -64,10 +64,8 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import coil3.PlatformContext
@@ -75,9 +73,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
-import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -163,7 +158,8 @@ fun FriedScreen(
             Modifier
                 .verticalScroll(scrollState)
                 .height(imageHeight + maxHeight)
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            contentColor = MaterialTheme.colorScheme.primary
         ) {
 
             // 用户Image
@@ -200,7 +196,7 @@ fun FriedScreen(
                 imageHeight,
                 topIconRatio,
                 user?.iconUrl,
-            ) { scope.launch {scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessVeryLow))} }
+            ) { scope.launch {scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessLow))} }
         }
     }
 
@@ -262,25 +258,20 @@ private fun BottomCard(
         shape = RoundedCornerShape(
             topStart = (30 * ratio).dp,
             topEnd = (30 * ratio).dp
-        )
+        ),
+        colors = CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.primary)
     ) {
         if (user == null) return@Card
         Column(
             modifier = Modifier.nestedScroll(nestedScrollConnection),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
             val trustRank = remember(user) { user.trustRank }
-            val rankColor: Color = GameColor.Rank.fromValue(trustRank)
-            val statusColor: Color
-            val statusDescription: String
-            if (user is UserData && user.state == UserState.Offline ){
-                statusColor = GameColor.Status.fromValue(UserStatus.Offline)
-                statusDescription = UserStatus.Offline.value
-            }else{
-                statusColor = GameColor.Status.fromValue(user.status)
-                statusDescription = user.statusDescription.ifBlank { user.status.value }
-            }
+            val rankColor = GameColor.Rank.fromValue(trustRank)
+            val statusColor = GameColor.Status.fromValue(user.status)
+            val statusDescription = user.statusDescription.ifBlank { user.status.value }
+
             val speakLanguages = remember(user) { user.speakLanguages }
             // TrustRank + UserName + VRC+
             UserInfoRow(user.displayName, user.isSupporter, rankColor)
@@ -332,12 +323,13 @@ private fun ColumnScope.UserInfoRow(
     ) {
         Icon(
             modifier = Modifier
-                .size(26.dp)
+                .size(24.dp)
                 .align(Alignment.CenterVertically),
             imageVector = Icons.Rounded.Shield,
             contentDescription = "TrustRankIcon",
             tint = rankColor
         )
+        // vrc+ 标志绘制在名字右上角
         BadgedBox(
             badge = {
                 if (isSupporter) {
@@ -351,12 +343,12 @@ private fun ColumnScope.UserInfoRow(
         ) {
             Text(
                 text = userName,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1
             )
         }
         // 让名字居中
-        Box(modifier = Modifier.size(26.dp).align(Alignment.Top))
+        Box(modifier = Modifier.size(24.dp).align(Alignment.Top))
     }
 }
 
@@ -374,10 +366,15 @@ private fun ColumnScope.StatusRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Canvas(
-            modifier = Modifier
-                .size(12.dp)
-        ) { drawCircle(statusColor) }
-        Text(text = statusDescription)
+            modifier = Modifier.size(12.dp)
+        ) {
+            drawCircle(statusColor)
+        }
+        Text(
+            text = statusDescription,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1
+        )
     }
 }
 
@@ -491,7 +488,7 @@ private fun TopMenuBar(
     sysTopPadding: Dp,
     offsetDp: Dp,
     ratio: Float,
-    color: Color = Color.White,
+    color: Color = MaterialTheme.colorScheme.onPrimary,
     onReturn: () -> Unit,
     onMenu: () -> Unit
 ) {
@@ -514,7 +511,11 @@ private fun TopMenuBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val iconColor = lerp(Color.White, Color.Black, inverseRatio)
+            val iconColor = lerp(
+                MaterialTheme.colorScheme.onPrimary,
+                MaterialTheme.colorScheme.primary,
+                inverseRatio
+            )
             val actionColor = Color.Gray.copy(alpha = 0.3f * ratio)
             Icon(
                 modifier = Modifier

@@ -117,7 +117,7 @@ fun LoginTextField(
                 .padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
             imageVector = imageVector,
             contentDescription = "",
-            tint = MaterialTheme.colorScheme.outline
+            tint = MaterialTheme.colorScheme.primary
         )
         BasicTextField(
             modifier = Modifier

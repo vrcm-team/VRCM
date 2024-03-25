@@ -196,7 +196,6 @@ private val highContrastDarkColorScheme = darkColorScheme(
 @Composable
 fun VRCMTheme(
     darkTheme: Boolean = false,
-    // Dynamic color is available on Android 12+
     content: @Composable() () -> Unit
 ) {
   val colorScheme = when {

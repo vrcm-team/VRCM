@@ -229,13 +229,14 @@ object GameColor {
         val Busy = Color(0xFFFF6161)
         val AskMe = Color(0xFFFFD24C)
         val Offline = Color.Gray
-        fun fromValue(status: UserStatus): Color {
+        fun fromValue(status: UserStatus?): Color {
             return when (status) {
                 UserStatus.Active -> Online
                 UserStatus.JoinMe -> JoinMe
                 UserStatus.AskMe -> AskMe
                 UserStatus.Busy -> Busy
                 UserStatus.Offline -> Offline
+                else -> Offline
             }
         }
     }
@@ -246,13 +247,14 @@ object GameColor {
         val User = Color(0xFF2BCF5C)
         val Known = Color(0xFFFF7B42)
         val Trusted = Color(0xFF8143E6)
-        fun fromValue(rank: TrustRank): Color {
+        fun fromValue(rank: TrustRank?): Color {
             return when (rank) {
                 TrustRank.TrustedUser -> Trusted
                 TrustRank.KnownUser -> Known
                 TrustRank.User -> User
                 TrustRank.NewUser -> New
                 TrustRank.Visitor -> Visitor
+                else -> Visitor
             }
         }
     }

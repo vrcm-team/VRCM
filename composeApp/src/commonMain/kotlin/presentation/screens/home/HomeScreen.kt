@@ -1,34 +1,37 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
@@ -39,9 +42,7 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
@@ -50,13 +51,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 
 object HomeScreen : Screen {
     @Composable
     @OptIn(ExperimentalMaterial3Api::class)
     override fun Content() {
-        var snackBarToastText by snackBarToastText
+//        var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
         val homeScreenModel: HomeScreenModel = getCallbackScreenModel(
             createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
@@ -70,13 +72,15 @@ object HomeScreen : Screen {
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
-        // 如果没有底部系统手势条，默认6dp
+        val trustRank = remember(currentUser) { currentUser?.trustRank }
+        val rankColor = GameColor.Rank.fromValue(trustRank)
         val topBar = @Composable {
             TopAppBar(
                 modifier = Modifier.shadow(2.dp),
                 colors = topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.onPrimary,
                     titleContentColor = MaterialTheme.colorScheme.primary,
+                    actionIconContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 navigationIcon = {
                     UserStateIcon(
@@ -87,19 +91,32 @@ object HomeScreen : Screen {
                         iconUrl = currentUser?.currentAvatarThumbnailImageUrl
                             ?: "",
                         userStatus = currentUser?.status
-                            ?: UserStatus.Offline
                     )
                 },
                 title = {
                     Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .align(Alignment.CenterVertically),
+                                imageVector = Icons.Rounded.Shield,
+                                contentDescription = "CurrentUserTrustRankIcon",
+                                tint = rankColor
+                            )
+                            Text(
+                                text = currentUser?.displayName ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1
+                            )
+                        }
                         Text(
-                            text = currentUser?.displayName ?: "",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1
-                        )
-                        Text(
+                            modifier = Modifier.alpha(0.6f),
                             text = currentUser?.statusDescription ?: "",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
                     }
@@ -115,16 +132,18 @@ object HomeScreen : Screen {
             )
         }
         // 如果没有底部系统手势条，则加12dp
-        println("getBottom"+getInsetPadding(WindowInsets::getBottom))
         val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
         val bottomBar = @Composable {
             NavigationBar(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = bottomPadding)
+                modifier = Modifier
+                    .padding(start = 12.dp, end = 12.dp, bottom = bottomPadding)
                     .windowInsetsPadding(NavigationBarDefaults.windowInsets)
                     .shadow(
                         elevation = 2.dp,
                         shape = MaterialTheme.shapes.extraLarge,
-                    )
+                    ),
+                containerColor = MaterialTheme.colorScheme.onPrimary,
+                contentColor = MaterialTheme.colorScheme.primary,
             ) {
                 TabNavigationItem(FriendLocationTab)
                 TabNavigationItem(FriendListTab)
@@ -132,17 +151,20 @@ object HomeScreen : Screen {
         }
         TabNavigator(FriendLocationTab){
             Scaffold(
+                contentColor = MaterialTheme.colorScheme.primary,
                 topBar = topBar,
                 bottomBar = bottomBar,
                 floatingActionButton = {
-                    Button(onClick = { snackBarToastText = "132132131" }) {}
+//                    Button(onClick = { snackBarToastText = "132132131" }) {}
                 }
             ) { innerPadding ->
-                Box(
+                Surface(
                     modifier = Modifier
                         .padding(top = innerPadding.calculateTopPadding())
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .fillMaxSize()
+                        .fillMaxSize(),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 16.dp
                 ) {
                     CurrentTab()
                 }
@@ -160,6 +182,14 @@ private fun RowScope.TabNavigationItem(tab: Tab) {
         label = { Text(tab.options.title) },
         selected = tabNavigator.current == tab,
         onClick = { tabNavigator.current = tab },
+        alwaysShowLabel = tabNavigator.current == tab,
+        colors = NavigationBarItemDefaults.colors(
+            indicatorColor = MaterialTheme.colorScheme.primary,
+            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+            unselectedIconColor = MaterialTheme.colorScheme.primary,
+            selectedTextColor = MaterialTheme.colorScheme.primary,
+            unselectedTextColor = MaterialTheme.colorScheme.onPrimary,
+        )
     )
 }
 

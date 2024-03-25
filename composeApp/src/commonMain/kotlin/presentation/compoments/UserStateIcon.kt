@@ -13,7 +13,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 fun UserStateIcon(
     modifier: Modifier = Modifier,
     iconUrl: String?,
-    userStatus: UserStatus
+    userStatus: UserStatus?
 ) {
      AImage(
         modifier = Modifier
