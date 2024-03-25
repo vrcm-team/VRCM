@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,7 +35,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetBottomPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
@@ -75,7 +76,9 @@ object FriendListTab: RefreshLazyColumnTab() {
         }
         val friendList = friendListTabModel.friendList
 
-        val bottomPadding = getInsetBottomPadding(98.dp)
+        // 如果没有底部系统手势条，默认12dp
+        val bottomPadding =
+            (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
         RememberLazyColumn (
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),

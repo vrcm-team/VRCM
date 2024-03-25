@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,6 +45,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
@@ -59,6 +61,7 @@ object HomeScreen : Screen {
         val homeScreenModel: HomeScreenModel = getCallbackScreenModel(
             createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
         )
+        val currentUser = homeScreenModel.currentUser
         // to ProfileScreen
         val onClickUserIcon = { user: IUser ->
             // 防止多次点击在栈中存在相同key的屏幕报错
@@ -67,65 +70,70 @@ object HomeScreen : Screen {
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
-
-        TabNavigator(FriendLocationTab){
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        modifier = Modifier.shadow(2.dp),
-                        colors = topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.onPrimary,
-                            titleContentColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        navigationIcon = {
-                            UserStateIcon(
-                                modifier = Modifier
-                                    .height(56.dp)
-                                    .clip(CircleShape)
-                                    .clickable { homeScreenModel.currentUser?.let { onClickUserIcon(it) } },
-                                iconUrl = homeScreenModel.currentUser?.currentAvatarThumbnailImageUrl
-                                    ?: "",
-                                userStatus = homeScreenModel.currentUser?.status
-                                    ?: UserStatus.Offline
-                            )
-                        },
-                        title = {
-                            Column {
-                                Text(
-                                    text = homeScreenModel.currentUser?.displayName ?: "",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = homeScreenModel.currentUser?.statusDescription ?: "",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1
-                                )
-                            }
-                        },
-                        actions = {
-                            Icon(
-                                modifier = Modifier
-                                    .padding(6.dp),
-                                imageVector = Icons.Rounded.Notifications,
-                                contentDescription = "notificationIcon"
-                            )
-                        }
+        // 如果没有底部系统手势条，默认6dp
+        val topBar = @Composable {
+            TopAppBar(
+                modifier = Modifier.shadow(2.dp),
+                colors = topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.onPrimary,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                ),
+                navigationIcon = {
+                    UserStateIcon(
+                        modifier = Modifier
+                            .height(56.dp)
+                            .clip(CircleShape)
+                            .clickable { currentUser?.let { onClickUserIcon(it) } },
+                        iconUrl = currentUser?.currentAvatarThumbnailImageUrl
+                            ?: "",
+                        userStatus = currentUser?.status
+                            ?: UserStatus.Offline
                     )
                 },
-                bottomBar = {
-                    NavigationBar(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp)
-                            .windowInsetsPadding(NavigationBarDefaults.windowInsets)
-                            .shadow(
-                                elevation = 2.dp,
-                                shape = MaterialTheme.shapes.medium,
-                            )
-                    ) {
-                        TabNavigationItem(FriendLocationTab)
-                        TabNavigationItem(FriendListTab)
+                title = {
+                    Column {
+                        Text(
+                            text = currentUser?.displayName ?: "",
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = currentUser?.statusDescription ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
                     }
                 },
+                actions = {
+                    Icon(
+                        modifier = Modifier
+                            .padding(6.dp),
+                        imageVector = Icons.Rounded.Notifications,
+                        contentDescription = "notificationIcon"
+                    )
+                }
+            )
+        }
+        // 如果没有底部系统手势条，则加12dp
+        println("getBottom"+getInsetPadding(WindowInsets::getBottom))
+        val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
+        val bottomBar = @Composable {
+            NavigationBar(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = bottomPadding)
+                    .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                    .shadow(
+                        elevation = 2.dp,
+                        shape = MaterialTheme.shapes.extraLarge,
+                    )
+            ) {
+                TabNavigationItem(FriendLocationTab)
+                TabNavigationItem(FriendListTab)
+            }
+        }
+        TabNavigator(FriendLocationTab){
+            Scaffold(
+                topBar = topBar,
+                bottomBar = bottomBar,
                 floatingActionButton = {
                     Button(onClick = { snackBarToastText = "132132131" }) {}
                 }

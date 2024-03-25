@@ -1,12 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.extensions
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -37,6 +38,7 @@ inline fun createFailureCallbackDoNavigation(
 }
 
 @Composable
-inline fun getInsetBottomPadding(offset: Dp) = with(LocalDensity.current) {
-    NavigationBarDefaults.windowInsets.getBottom(this).toDp() + offset
-}
+inline fun getInsetPadding(direction: (WindowInsets, Density) -> Int) =
+    with(LocalDensity.current) {
+        direction(NavigationBarDefaults.windowInsets, this).toDp()
+    }

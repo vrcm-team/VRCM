@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,7 +46,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetBottomPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
@@ -65,6 +66,7 @@ object FriendLocationTab : RefreshLazyColumnTab() {
                 )
             }
         }
+
     @Composable
     override fun doRefreshCall(): suspend () -> Unit {
         val parentNavigator = currentNavigator.parent!!
@@ -88,12 +90,19 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         val onClickUserIcon = { user: IUser ->
             if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
         }
-        val bottomPadding = getInsetBottomPadding(98.dp)
+        // 如果没有底部系统手势条，默认12dp
+        val bottomPadding =
+            (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
 
         RememberLazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(start = 6.dp, top = 6.dp, end = 6.dp, bottom = bottomPadding)
+            contentPadding = PaddingValues(
+                start = 6.dp,
+                top = 6.dp,
+                end = 6.dp,
+                bottom = bottomPadding
+            )
         ) {
 
             item(key = LocationType.Offline) {
@@ -169,7 +178,7 @@ private fun LocationFriend(
         modifier = Modifier
             .width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable (onClick = onClickUserIcon),
+            .clickable(onClick = onClickUserIcon),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
@@ -240,7 +249,7 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                         Text(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
-                            text = instants.accessType?.displayName?:"",
+                            text = instants.accessType?.displayName ?: "",
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
