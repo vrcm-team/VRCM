@@ -52,6 +52,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 
 object FriendLocationTab : RefreshLazyColumnTab() {
@@ -218,6 +219,8 @@ private fun LocationFriend(
 @Composable
 private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
     val instants by location.instants
+    val parentNavigator = currentNavigator.parent!!
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -238,7 +241,8 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                 AImage(
                     modifier = Modifier
                         .width(120.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { parentNavigator.push(WorldScreen()) },
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
