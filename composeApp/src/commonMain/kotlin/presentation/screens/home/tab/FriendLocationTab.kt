@@ -51,6 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 
 object FriendLocationTab : RefreshLazyColumnTab() {
@@ -94,54 +95,54 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding =
             (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
-            RememberLazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                contentPadding = PaddingValues(
-                    start = 6.dp,
-                    top = 6.dp,
-                    end = 6.dp,
-                    bottom = bottomPadding
+        RememberLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            contentPadding = PaddingValues(
+                start = 6.dp,
+                top = 6.dp,
+                end = 6.dp,
+                bottom = bottomPadding
+            )
+        ) {
+
+            item(key = LocationType.Offline) {
+                SingleLocationCard(
+                    offlineFriendLocation,
+                    "Active on the Website",
+                    onClickUserIcon
                 )
-            ) {
+            }
 
-                item(key = LocationType.Offline) {
-                    SingleLocationCard(
-                        offlineFriendLocation,
-                        "Active on the Website",
-                        onClickUserIcon
+            item(key = LocationType.Private) {
+                SingleLocationCard(
+                    privateFriendLocation,
+                    "Friends in Private Worlds",
+                    onClickUserIcon
+                )
+            }
+
+            item(key = LocationType.Traveling) {
+                SingleLocationCard(
+                    travelingFriendLocation,
+                    "Friends is Traveling",
+                    onClickUserIcon
+                )
+            }
+
+            if (!instanceFriendLocations.isNullOrEmpty()) {
+                item(key = LocationType.Instance) {
+                    Text(
+                        text = "by Location",
+                        style = MaterialTheme.typography.titleSmall,
                     )
                 }
-
-                item(key = LocationType.Private) {
-                    SingleLocationCard(
-                        privateFriendLocation,
-                        "Friends in Private Worlds",
-                        onClickUserIcon
-                    )
-                }
-
-                item(key = LocationType.Traveling) {
-                    SingleLocationCard(
-                        travelingFriendLocation,
-                        "Friends is Traveling",
-                        onClickUserIcon
-                    )
-                }
-
-                if (!instanceFriendLocations.isNullOrEmpty()) {
-                    item(key = LocationType.Instance) {
-                        Text(
-                            text = "by Location",
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                    }
-                    items(instanceFriendLocations, key = { it.location }) { locations ->
-                        LocationCard(locations) {
-                            UserIconsRow(locations.friends, onClickUserIcon)
-                        }
+                items(instanceFriendLocations, key = { it.location }) { locations ->
+                    LocationCard(locations) {
+                        UserIconsRow(locations.friends, onClickUserIcon)
                     }
                 }
+            }
 
         }
 
@@ -214,7 +215,10 @@ private fun LocationFriend(
 
 @Composable
 private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
+
     val instants by location.instants
+    val parentNavigator = currentNavigator.parent!!
+
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -235,7 +239,8 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                 AImage(
                     modifier = Modifier
                         .width(120.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { parentNavigator.push(WorldScreen()) },
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
