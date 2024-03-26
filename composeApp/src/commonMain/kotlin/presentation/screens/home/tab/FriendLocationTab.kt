@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.github.vrcmteam.vrcm.core.extensions.omission
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -69,10 +70,14 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         }
 
     @Composable
-    override fun doRefreshCall(): suspend () -> Unit {
+    override fun initAndCreateRefreshCall(): suspend () -> Unit {
         val parentNavigator = currentNavigator.parent!!
         val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+            createFailureCallbackDoNavigation(parentNavigator) {
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshed = true
+                AuthAnimeScreen(false)
+            }
         )
         return { friendLocationTabModel.refreshFriendLocation() }
     }
@@ -80,9 +85,7 @@ object FriendLocationTab : RefreshLazyColumnTab() {
     @Composable
     override fun BoxContent() {
         val parentNavigator = currentNavigator.parent!!
-        val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
-        )
+        val friendLocationTabModel: FriendLocationTabModel = getScreenModel()
         val friendLocationMap = friendLocationTabModel.friendLocationMap
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)

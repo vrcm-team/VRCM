@@ -18,14 +18,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import kotlinx.coroutines.flow.collectLatest
 
 /**
- * 用于保存刷新状态,和滑动距离状态的父类
+ * 用于保存刷新状态,和LazyColumn滑动距离状态的父类
+ * 子类需要是单例，否则无法保存属性状态
  */
 abstract class RefreshLazyColumnTab: Tab {
 
     /**
      * 刷新状态
      */
-    private var isRefreshed = true
+    protected var isRefreshed = true
 
     /**
      * 滑动偏移量
@@ -37,18 +38,24 @@ abstract class RefreshLazyColumnTab: Tab {
      */
     private var itemIndex = 0
 
+    /**
+     * 初始化与创建刷新回调
+     */
     @Composable
-    protected abstract fun doRefreshCall(): suspend () -> Unit
+    protected abstract fun initAndCreateRefreshCall(): suspend () -> Unit
 
+    /**
+     * 刷新组件内的内容
+     */
     @Composable
-    protected abstract fun BoxContent(): Unit
+    protected abstract fun BoxContent()
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val doRefresh = doRefreshCall()
+        val doRefresh = initAndCreateRefreshCall()
         RefreshBox(
-            isStartRefresh =isRefreshed,
+            isStartRefresh = isRefreshed,
             doRefresh = {
                 isRefreshed = false
                 itemScrollOffset = 0
@@ -59,6 +66,8 @@ abstract class RefreshLazyColumnTab: Tab {
             BoxContent()
         }
     }
+
+
 
     @Composable
      fun RememberLazyColumn(

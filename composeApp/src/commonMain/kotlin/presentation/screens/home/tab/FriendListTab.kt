@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -59,10 +60,14 @@ object FriendListTab: RefreshLazyColumnTab() {
         }
 
     @Composable
-    override fun doRefreshCall(): suspend () -> Unit {
+    override fun initAndCreateRefreshCall(): suspend () -> Unit {
         val parentNavigator = currentNavigator.parent!!
         val friendListTabModel: FriendListTabModel= getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+            createFailureCallbackDoNavigation(parentNavigator) {
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshed = true
+                AuthAnimeScreen(false)
+            }
         )
         return { friendListTabModel.refreshFriendList() }
     }
@@ -70,9 +75,7 @@ object FriendListTab: RefreshLazyColumnTab() {
     @Composable
     override fun BoxContent() {
         val parentNavigator = currentNavigator.parent!!
-        val friendListTabModel: FriendListTabModel= getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
-        )
+        val friendListTabModel: FriendListTabModel= getScreenModel()
         val toProfile = { user: IUser ->
             if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
         }
