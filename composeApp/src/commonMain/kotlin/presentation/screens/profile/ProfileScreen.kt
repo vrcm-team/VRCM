@@ -72,7 +72,6 @@ import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.getAppPlatform
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -80,6 +79,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
@@ -89,7 +89,7 @@ import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
 data class ProfileScreen(
-    private val user: IUser
+    private val profileUserVO: ProfileUserVO
 ) : Screen {
     @Composable
     override fun Content() {
@@ -98,10 +98,10 @@ data class ProfileScreen(
             createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
         )
         LifecycleEffect(
-            onStarted = { profileScreenModel.initUserState(user) }
+            onStarted = { profileScreenModel.initUserState(profileUserVO) }
         )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(user.id)
+            profileScreenModel.refreshUser(profileUserVO.id)
         }
         val currentUser = profileScreenModel.userState
         FriedScreen(currentUser) { currentNavigator.pop() }
@@ -110,7 +110,7 @@ data class ProfileScreen(
 
 @Composable
 fun FriedScreen(
-    user: IUser?,
+    profileUserVO: ProfileUserVO?,
     popBackStack: () -> Unit,
 ) {
     BoxWithConstraints {
@@ -168,7 +168,7 @@ fun FriedScreen(
                 offsetDp,
                 ratio,
                 blurDp,
-                user?.profileImageUrl
+                profileUserVO?.profileImageUrl
             )
             // 底部信息卡片
             BottomCard(
@@ -177,7 +177,7 @@ fun FriedScreen(
                 topBarHeight,
                 sysTopPadding,
                 nestedScrollConnection,
-                user
+                profileUserVO
             )
             // 顶部导航栏
             TopMenuBar(
@@ -195,7 +195,7 @@ fun FriedScreen(
                 offsetDp,
                 imageHeight,
                 topIconRatio,
-                user?.iconUrl,
+                profileUserVO?.iconUrl,
             ) { scope.launch {scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessLow))} }
         }
     }
@@ -241,7 +241,7 @@ private fun BottomCard(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     nestedScrollConnection: NestedScrollConnection,
-    user: IUser?
+    profileUserVO: ProfileUserVO?
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
@@ -261,26 +261,23 @@ private fun BottomCard(
         ),
         colors = CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.primary)
     ) {
-        if (user == null) return@Card
+        if (profileUserVO == null) return@Card
         Column(
             modifier = Modifier.nestedScroll(nestedScrollConnection),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
-            val trustRank = remember(user) { user.trustRank }
-            val rankColor = GameColor.Rank.fromValue(trustRank)
-            val statusColor = GameColor.Status.fromValue(user.status)
-            val statusDescription = user.statusDescription.ifBlank { user.status.value }
-
-            val speakLanguages = remember(user) { user.speakLanguages }
+            val rankColor = GameColor.Rank.fromValue(profileUserVO.trustRank)
+            val statusColor = GameColor.Status.fromValue(profileUserVO.status)
+            val statusDescription = profileUserVO.statusDescription.ifBlank { profileUserVO.status.value }
             // TrustRank + UserName + VRC+
-            UserInfoRow(user.displayName, user.isSupporter, rankColor)
+            UserInfoRow(profileUserVO.displayName, profileUserVO.isSupporter, rankColor)
             // status
             StatusRow(statusColor, statusDescription)
             // speakLanguages
-            LanguagesRow(speakLanguages)
+            LanguagesRow(profileUserVO.speakLanguages )
             // bioLinks
-            LinksRow(user.bioLinks)
+            LinksRow(profileUserVO.bioLinks)
 
             HorizontalDivider(
                 modifier = Modifier
@@ -300,7 +297,7 @@ private fun BottomCard(
             ) {
                 Text(
                     modifier = Modifier.padding(10.dp),
-                    text = user.bio
+                    text = profileUserVO.bio
                 )
             }
         }

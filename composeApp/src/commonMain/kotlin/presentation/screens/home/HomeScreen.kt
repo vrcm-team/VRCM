@@ -51,6 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 
@@ -68,7 +69,7 @@ object HomeScreen : Screen {
         val onClickUserIcon = { user: IUser ->
             // 防止多次点击在栈中存在相同key的屏幕报错
             if (currentNavigator.size <= 1) {
-                currentNavigator.push(ProfileScreen(user))
+                currentNavigator push ProfileScreen(ProfileUserVO(user))
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
@@ -115,7 +116,7 @@ object HomeScreen : Screen {
                         }
                         Text(
                             modifier = Modifier.alpha(0.6f),
-                            text = currentUser?.statusDescription ?: "",
+                            text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )

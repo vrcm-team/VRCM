@@ -41,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
@@ -77,7 +78,7 @@ object FriendListTab: RefreshLazyColumnTab() {
         val parentNavigator = currentNavigator.parent!!
         val friendListTabModel: FriendListTabModel= getScreenModel()
         val toProfile = { user: IUser ->
-            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
+            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(ProfileUserVO(user))
         }
         val friendList = friendListTabModel.friendList
 

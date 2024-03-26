@@ -4,8 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -17,12 +17,12 @@ class ProfileScreenModel(
     private val usersApi: UsersApi
 ) : ScreenModel {
 
-    private val _userState = mutableStateOf<IUser?>(null)
+    private val _userState = mutableStateOf<ProfileUserVO?>(null)
     val userState by _userState
 
-   fun initUserState(user:IUser){
-       if ( _userState.value == null) _userState.value = user
-   }
+    fun initUserState(profileUserVO: ProfileUserVO) {
+        if (_userState.value == null) _userState.value = profileUserVO
+    }
     suspend fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
             authSupporter.reTryAuth {
@@ -30,7 +30,7 @@ class ProfileScreenModel(
             }.onFailure {
                 onFailureCallback(it.message.toString())
             }.onSuccess {
-                _userState.value = it
+                _userState.value = ProfileUserVO(it)
             }
     }.join()
 }
