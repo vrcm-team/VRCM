@@ -39,7 +39,6 @@ import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.tab.CurrentTab
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
-import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -52,6 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 
@@ -175,14 +175,19 @@ object HomeScreen : Screen {
 }
 
 @Composable
-private fun RowScope.TabNavigationItem(tab: Tab) {
+private fun RowScope.TabNavigationItem(tab: RefreshLazyColumnTab) {
     val tabNavigator = LocalTabNavigator.current
     NavigationBarItem(
         modifier = Modifier.align(Alignment.CenterVertically),
         icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) },
         label = { Text(tab.options.title) },
         selected = tabNavigator.current == tab,
-        onClick = { tabNavigator.current = tab },
+        onClick = {
+            if (tabNavigator.current == tab) {
+                tab.toTop()
+            }
+            tabNavigator.current = tab
+        },
         alwaysShowLabel = tabNavigator.current == tab,
         colors = NavigationBarItemDefaults.colors(
             indicatorColor = MaterialTheme.colorScheme.primary,
