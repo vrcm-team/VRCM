@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -96,8 +95,7 @@ object FriendLocationTab : RefreshLazyColumnTab() {
             if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(ProfileUserVO(user))
         }
         // 如果没有底部系统手势条，默认12dp
-        val bottomPadding =
-            (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
             RememberLazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -268,13 +266,13 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                                 .size(15.dp)
                                 .align(Alignment.CenterVertically)
                                 .clip(CircleShape)
-                                .border(1.dp, Color.LightGray, CircleShape),
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
                             imageData = instants.regionIconUrl
                         )
                         Text(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
-                            text = instants.accessType?.displayName ?: "",
+                            text = instants.accessType,
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Spacer(modifier = Modifier.weight(1f))
