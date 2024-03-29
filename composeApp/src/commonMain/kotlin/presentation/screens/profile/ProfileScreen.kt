@@ -41,6 +41,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
@@ -514,29 +516,37 @@ private fun TopMenuBar(
                 inverseRatio
             )
             val actionColor = Color.Gray.copy(alpha = 0.3f * ratio)
-            Icon(
-                modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .clip(CircleShape)
-                    .background(actionColor)
-                    .clickable(onClick = onReturn)
-                    .padding(5.dp),
-                imageVector = Icons.Rounded.ArrowBackIosNew,
-                tint = iconColor,
-                contentDescription = "WhiteReturnIcon"
+            val iconButtonColors = IconButtonColors(
+                containerColor = actionColor,
+                contentColor = iconColor,
+                disabledContainerColor = Color.Unspecified,
+                disabledContentColor = Color.Unspecified,
             )
+            IconButton(
+                modifier = Modifier
+                    .padding(horizontal = 10.dp),
+                colors = iconButtonColors,
+                onClick = onReturn
+            ){
+                Icon(
+                    imageVector = Icons.Rounded.ArrowBackIosNew,
+                    tint = iconColor,
+                    contentDescription = "ReturnIcon"
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
-            Icon(
+            IconButton(
                 modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .clip(CircleShape)
-                    .background(actionColor)
-                    .clickable(onClick = onMenu)
-                    .padding(5.dp),
-                imageVector = Icons.Rounded.Menu,
-                tint = iconColor,
-                contentDescription = "WhiteMenuIcon"
-            )
+                    .padding(horizontal = 10.dp),
+                colors = iconButtonColors,
+                onClick = onMenu
+            ){
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    tint = iconColor,
+                    contentDescription = "MenuIcon"
+                )
+            }
         }
     }
 }

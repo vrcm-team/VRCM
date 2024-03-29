@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
@@ -123,12 +124,16 @@ object HomeScreen : Screen {
                     }
                 },
                 actions = {
-                    Icon(
+                    IconButton(
                         modifier = Modifier
                             .padding(6.dp),
-                        imageVector = Icons.Rounded.Notifications,
-                        contentDescription = "notificationIcon"
-                    )
+                        onClick = {}
+                    ){
+                        Icon(
+                            imageVector = Icons.Rounded.Notifications,
+                            contentDescription = "NotificationIcon"
+                        )
+                    }
                 }
             )
         }
