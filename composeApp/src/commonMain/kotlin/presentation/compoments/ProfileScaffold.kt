@@ -125,7 +125,6 @@ fun ProfileScaffold(
                 .fillMaxWidth(),
             contentColor = MaterialTheme.colorScheme.primary
         ) {
-
             // 用户Image
             ProfileImage(
                 imageHeight,

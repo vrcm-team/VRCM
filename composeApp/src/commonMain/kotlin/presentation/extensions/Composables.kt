@@ -41,7 +41,10 @@ inline fun createFailureCallbackDoNavigation(
 @Composable
 inline fun getInsetPadding(default: Int, direction: (WindowInsets, Density) -> Int) =
     with(LocalDensity.current) {
-        (direction(NavigationBarDefaults.windowInsets, this).takeIf { it != 0 } ?: default).dp
+        val toDp = (direction(NavigationBarDefaults.windowInsets, this).takeIf { it != 0 }
+            ?: default).toDp()
+        // 有时候12.toDp()会得到3+.dp的值
+        default.dp.takeIf { it > toDp } ?: toDp
     }
 
 @Composable

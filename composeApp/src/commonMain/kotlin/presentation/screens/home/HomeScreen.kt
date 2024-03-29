@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -172,15 +171,9 @@ object HomeScreen : Screen {
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 16.dp
                 ) {
-                    AnimatedContent(
-                        tabNavigator.current
-                    ) {
-                        tabNavigator.saveableState(it.key) {
-                            when (it) {
-                                FriendLocationTab -> FriendLocationTab.Content()
-                                FriendListTab -> FriendListTab.Content()
-                            }
-                        }
+                    val currentTab = tabNavigator.current
+                    tabNavigator.saveableState(currentTab.key) {
+                        currentTab.Content()
                     }
                 }
             }

@@ -266,7 +266,7 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                                 .size(15.dp)
                                 .align(Alignment.CenterVertically)
                                 .clip(CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
                             imageData = instants.regionIconUrl
                         )
                         Text(
