@@ -102,9 +102,9 @@ abstract class RefreshLazyColumnTab: Tab {
             // 乘以已经滚动完的Item数量
             targetScrollOffset *= state.firstVisibleItemIndex
             // 加上已经最后一个没有滚完的偏移量
-            targetScrollOffset+= state.firstVisibleItemScrollOffset
+            targetScrollOffset += state.firstVisibleItemScrollOffset
             // TODO() durationMillis根据划过的item数量动态调整,如果划过很多item，durationMillis应该变快
-            state.animateScrollBy((-targetScrollOffset), tween(durationMillis = 2000))
+            state.animateScrollBy(-targetScrollOffset, tween(durationMillis = 2000))
         }
         LaunchedEffect(Unit){
             state.scrollToItem(itemIndex, itemScrollOffset)

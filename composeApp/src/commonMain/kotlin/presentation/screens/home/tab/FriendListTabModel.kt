@@ -3,13 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -59,25 +56,4 @@ class FriendListTabModel(
         }
     }
 
-    private fun createFriendLocation(location: String, onHomeFailure: Result<*>.() -> Unit): FriendLocation {
-        val friendLocation = FriendLocation(
-            location = location,
-            friends = mutableStateListOf()
-        )
-        // 通过location查询房间实例信息
-        screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth {
-                instancesApi.instanceByLocation(location)
-            }.onSuccess { instance ->
-                friendLocation.instants.value = InstantsVO(
-                    worldName = instance.world.name ?: "",
-                    worldImageUrl = instance.world.thumbnailImageUrl,
-                    accessType = instance.accessType,
-                    regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
-                    userCount = "${instance.userCount}/${instance.world.capacity}"
-                )
-            }.onHomeFailure()
-        }
-        return friendLocation
-    }
 }

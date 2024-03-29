@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -79,6 +79,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNa
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
@@ -89,6 +90,11 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
+
+/**
+ * BottomCard和ProfileUserImage接触点的圆角大小
+ */
+private const val ContactPointShape = 36
 
 data class ProfileScreen(
     private val profileUserVO: ProfileUserVO
@@ -223,8 +229,8 @@ private fun ProfileUserImage(
                 .padding(top = offsetDp)
                 .clip(
                     RoundedCornerShape(
-                        bottomStart = (30 * ratio).dp,
-                        bottomEnd = (30 * ratio).dp
+                        bottomStart = (ContactPointShape * ratio).dp,
+                        bottomEnd = (ContactPointShape * ratio).dp
                     )
                 )
                 .blur(blurDp),
@@ -258,15 +264,16 @@ private fun BottomCard(
             .fillMaxSize()
             .padding(top = initUserIconPadding),
         shape = RoundedCornerShape(
-            topStart = (30 * ratio).dp,
-            topEnd = (30 * ratio).dp
+            topStart = (ContactPointShape * ratio).dp,
+            topEnd = (ContactPointShape * ratio).dp
         ),
         colors = CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.primary)
     ) {
         if (profileUserVO == null) return@Card
         Column(
             modifier = Modifier.nestedScroll(nestedScrollConnection),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
             val rankColor = GameColor.Rank.fromValue(profileUserVO.trustRank)
@@ -284,21 +291,22 @@ private fun BottomCard(
             HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 50.dp)
-                    .align(Alignment.CenterHorizontally),
-                color = Color.LightGray,
+                    .padding(horizontal = 50.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 thickness = 1.dp,
             )
-            Box(
+
+            Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .background(CardDefaults.cardColors().containerColor)
-                    .align(Alignment.CenterHorizontally)
-                    .verticalScroll(scrollState)
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = getInsetPadding(12, WindowInsets::getBottom))
+                    .verticalScroll(scrollState),
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                shape =  MaterialTheme.shapes.extraLarge
             ) {
                 Text(
-                    modifier = Modifier.padding(10.dp),
+                    modifier = Modifier.padding(12.dp),
                     text = profileUserVO.bio
                 )
             }
@@ -308,14 +316,13 @@ private fun BottomCard(
 
 
 @Composable
-private fun ColumnScope.UserInfoRow(
+private fun UserInfoRow(
     userName: String,
     isSupporter: Boolean,
     rankColor: Color
 ) {
     Row(
         modifier = Modifier.Companion
-            .align(Alignment.CenterHorizontally)
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -353,13 +360,12 @@ private fun ColumnScope.UserInfoRow(
 
 
 @Composable
-private fun ColumnScope.StatusRow(
+private fun StatusRow(
     statusColor: Color,
     statusDescription: String
 ) {
     Row(
         modifier = Modifier
-            .align(Alignment.CenterHorizontally)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -378,13 +384,12 @@ private fun ColumnScope.StatusRow(
 }
 
 @Composable
-private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
+private fun LanguagesRow(speakLanguages: List<String>) {
     if (speakLanguages.isEmpty()) {
         return
     }
     Row(
         modifier = Modifier
-            .align(Alignment.CenterHorizontally)
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -406,13 +411,12 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ColumnScope.LinksRow(bioLinks: List<String>) {
+fun LinksRow(bioLinks: List<String>) {
     if (bioLinks.isEmpty()) {
         return
     }
     Row(
         modifier = Modifier
-            .align(Alignment.CenterHorizontally)
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -429,7 +433,7 @@ fun ColumnScope.LinksRow(bioLinks: List<String>) {
                 state = rememberTooltipState()
             ) {
                 FilledIconButton(
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(32.dp),
                     onClick = { appPlatform.openUrl(link) },
                 ) {
                     Icon(
@@ -501,9 +505,9 @@ private fun TopMenuBar(
                 .height(topBarHeight + sysTopPadding)
                 .offset(y = offsetDp)
                 .background(
-                    color.copy(alpha = inverseRatio), RoundedCornerShape(
-                        bottomStart = 12.dp,
-                        bottomEnd = 12.dp
+                    color.copy(alpha = inverseRatio), MaterialTheme.shapes.medium.copy(
+                        topStart = CornerSize(0.dp),
+                        topEnd = CornerSize(0.dp)
                     )
                 )
                 .padding(top = sysTopPadding),
