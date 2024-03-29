@@ -6,12 +6,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,13 +27,14 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -38,12 +42,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,16 +68,19 @@ import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNa
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
+import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVO
 ) : Screen {
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
@@ -86,84 +95,128 @@ data class UserProfileScreen(
         }
         val currentUser = userProfileScreenModel.userState
         var openAlertDialog by remember { mutableStateOf(false) }
+        var bottomSheetIsVisible by remember { mutableStateOf(false) }
+        val sheetState = rememberModalBottomSheetState()
+        val scope = rememberCoroutineScope()
 
-        val options = listOf("Look JsonData")
-        // 菜单Item
-        val menuContent: @Composable ColumnScope.() -> Unit = {
-            options.forEach {
-                DropdownMenuItem(
-                    text = { Text(it) },
-                    onClick = {openAlertDialog = true}
-                )
-            }
-        }
         ProfileScaffold(
-            profileImageUrl = currentUser?.iconUrl,
+            profileImageUrl = currentUser?.profileImageUrl,
             iconUrl = currentUser?.iconUrl,
             onReturn = { currentNavigator.pop() },
-            menuContent = menuContent,
+            onMenu = { bottomSheetIsVisible = true },
         ) { ratio ->
             ProfileContent(currentUser, ratio)
         }
-        if (openAlertDialog) {
-            AlertDialog(
-                icon = {
-                    Icon(Icons.Filled.Person4, contentDescription = "AlertDialogIcon")
-                },
-                text = {
-                    Box(
-                        modifier = Modifier.verticalScroll(rememberScrollState())
-                    ){
-                        Text(text = userProfileScreenModel.userJson)
-                    }
-                },
-                onDismissRequest = {
-                    openAlertDialog = false
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { openAlertDialog = false }
-                    ) {
-                        Text("Back")
+
+        MenuBottomSheet(
+            isVisible = bottomSheetIsVisible,
+            sheetState = sheetState,
+            onDismissRequest = {  bottomSheetIsVisible = false }
+        ){
+            TextButton(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                onClick = {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+                        if (sheetState.isVisible) return@invokeOnCompletion
+                        bottomSheetIsVisible = false
+                        openAlertDialog = true
                     }
                 }
-            )
+            ) {
+                Text(text = "Look JsonData")
+            }
+        }
+        JsonAlertDialog(
+            openAlertDialog = openAlertDialog,
+            onDismissRequest = { openAlertDialog = false }
+        ){
+            Text(text = userProfileScreenModel.userJson)
         }
     }
 
-    @Composable
-    private fun ProfileContent(
-        currentUser: UserProfileVO?,
-        ratio: Float
-    ) {
-        if (currentUser == null) return
-        val inverseRatio = 1 - ratio
-        val scrollState = rememberScrollState()
-        // 当上方图片完整显示时子内容自动滚动到顶部
-        if (inverseRatio == 0f) {
-            LaunchedEffect(Unit) {
-                scrollState.animateScrollTo(0)
+}
+
+@Composable
+private fun JsonAlertDialog(
+    openAlertDialog: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    if (openAlertDialog) {
+        AlertDialog(
+            icon = {
+                Icon(Icons.Filled.Person4, contentDescription = "AlertDialogIcon")
+            },
+            text = {
+                Box(
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    content()
+                }
+            },
+            onDismissRequest = onDismissRequest,
+            confirmButton = {
+                TextButton(
+                    onClick = onDismissRequest
+                ) {
+                    Text("Back")
+                }
             }
-        }
-        val rankColor = GameColor.Rank.fromValue(currentUser.trustRank)
-        val statusColor = GameColor.Status.fromValue(currentUser.status)
-        val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
-        // TrustRank + UserName + VRC+
-        UserInfoRow(currentUser.displayName, currentUser.isSupporter, rankColor)
-        // status
-        StatusRow(statusColor, statusDescription)
-        // LanguagesRow && LinksRow
-        LangAndLinkRow(currentUser)
-        Box(
-            modifier = Modifier
-                .padding(top = 12.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuBottomSheet(
+    isVisible: Boolean,
+    sheetState: SheetState,
+    onDismissRequest: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (isVisible) {
+        val bottomInsetPadding = getInsetPadding(0, WindowInsets::getBottom)
+        ModalBottomSheet(
+            modifier = Modifier.offset(y = bottomInsetPadding),
+            onDismissRequest = onDismissRequest,
+            sheetState = sheetState
         ) {
-            BottomCardTab(scrollState, currentUser)
+            content()
+            Spacer(modifier = Modifier.height(bottomInsetPadding))
         }
     }
 }
 
-
+@Composable
+private fun ProfileContent(
+    currentUser: UserProfileVO?,
+    ratio: Float
+) {
+    if (currentUser == null) return
+    val inverseRatio = 1 - ratio
+    val scrollState = rememberScrollState()
+    // 当上方图片完整显示时子内容自动滚动到顶部
+    if (inverseRatio == 0f) {
+        LaunchedEffect(Unit) {
+            scrollState.animateScrollTo(0)
+        }
+    }
+    val rankColor = GameColor.Rank.fromValue(currentUser.trustRank)
+    val statusColor = GameColor.Status.fromValue(currentUser.status)
+    val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
+    // TrustRank + UserName + VRC+
+    UserInfoRow(currentUser.displayName, currentUser.isSupporter, rankColor)
+    // status
+    StatusRow(statusColor, statusDescription)
+    // LanguagesRow && LinksRow
+    LangAndLinkRow(currentUser)
+    Box(
+        modifier = Modifier
+            .padding(top = 12.dp)
+    ) {
+        BottomCardTab(scrollState, currentUser)
+    }
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)

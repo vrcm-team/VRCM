@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
@@ -39,11 +38,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -76,7 +72,7 @@ private const val ContactPointShape = 36
  * @param profileImageUrl 详情页背景图
  * @param iconUrl 详情页头像
  * @param onReturn 返回按钮点击事件
- * @param menuContent 菜单下拉框作用域
+ * @param onMenu 菜单按钮点击事件
  * @param content 详情页内容
  */
 @Composable
@@ -84,7 +80,7 @@ fun ProfileScaffold(
     profileImageUrl: String?,
     iconUrl: String?,
     onReturn: () -> Unit,
-    menuContent: @Composable ColumnScope.() -> Unit,
+    onMenu:  () -> Unit,
     content: @Composable ColumnScope.(Float) -> Unit
 ) {
     BoxWithConstraints {
@@ -154,7 +150,7 @@ fun ProfileScaffold(
                 offsetDp,
                 ratio,
                 onReturn = onReturn,
-                menuContent = menuContent
+                onMenu = onMenu
             )
             // 用户icon
             ProfileIcon(
@@ -296,7 +292,7 @@ private fun TopMenuBar(
     ratio: Float,
     color: Color = MaterialTheme.colorScheme.onPrimary,
     onReturn: () -> Unit,
-    menuContent: @Composable ColumnScope.() -> Unit
+    onMenu: () -> Unit
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
@@ -342,28 +338,17 @@ private fun TopMenuBar(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            Box(
+            IconButton(
                 modifier = Modifier
                     .padding(horizontal = 10.dp),
-            ){
-
-                var expanded by remember { mutableStateOf(false) }
-                IconButton(
-                    colors = iconButtonColors,
-                    onClick = { expanded = !expanded }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Menu,
-                        tint = iconColor,
-                        contentDescription = "MenuIcon"
-                    )
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                ){
-                    menuContent()
-                }
+                colors = iconButtonColors,
+                onClick = onMenu
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    tint = iconColor,
+                    contentDescription = "MenuIcon"
+                )
             }
         }
     }
