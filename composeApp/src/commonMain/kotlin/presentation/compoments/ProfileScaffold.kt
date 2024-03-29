@@ -235,7 +235,6 @@ private fun BottomCard(
                 .padding(
                     start = 12.dp,
                     end = 12.dp,
-                    top = 12.dp,
                     bottom = getInsetPadding(12, WindowInsets::getBottom)
                 ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
