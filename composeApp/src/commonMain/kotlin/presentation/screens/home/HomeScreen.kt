@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.tab.CurrentTab
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -155,7 +155,7 @@ object HomeScreen : Screen {
                 TabNavigationItem(FriendListTab)
             }
         }
-        TabNavigator(FriendLocationTab){
+        TabNavigator(FriendLocationTab){tabNavigator ->
             Scaffold(
                 contentColor = MaterialTheme.colorScheme.primary,
                 topBar = topBar,
@@ -172,7 +172,16 @@ object HomeScreen : Screen {
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 16.dp
                 ) {
-                    CurrentTab()
+                    AnimatedContent(
+                        tabNavigator.current
+                    ) {
+                        tabNavigator.saveableState(it.key) {
+                            when (it) {
+                                FriendLocationTab -> FriendLocationTab.Content()
+                                FriendListTab -> FriendListTab.Content()
+                            }
+                        }
+                    }
                 }
             }
         }
