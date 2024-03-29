@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -115,13 +114,7 @@ class FriendLocationTabModel(
             authSupporter.reTryAuth {
                 instancesApi.instanceByLocation(location)
             }.onSuccess { instance ->
-                friendLocation.instants.value = InstantsVO(
-                    worldName = instance.world.name ?: "",
-                    worldImageUrl = instance.world.thumbnailImageUrl,
-                    accessType = instance.accessType,
-                    regionIconUrl = CountryIcon.fetchIconUrl(instance.region),
-                    userCount = "${instance.userCount}/${instance.world.capacity}"
-                )
+                friendLocation.instants.value = InstantsVO(instance)
             }.onFailure {
                 onFailureCallback(it.message.toString())
             }

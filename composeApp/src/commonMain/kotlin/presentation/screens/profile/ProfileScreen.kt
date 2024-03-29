@@ -1,17 +1,18 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -39,19 +41,26 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -64,6 +73,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
@@ -72,14 +82,15 @@ import coil3.PlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.getAppPlatform
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
@@ -88,8 +99,13 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
+/**
+ * BottomCard和ProfileUserImage接触点的圆角大小
+ */
+private const val ContactPointShape = 36
+
 data class ProfileScreen(
-    private val user: IUser
+    private val profileUserVO: ProfileUserVO
 ) : Screen {
     @Composable
     override fun Content() {
@@ -98,10 +114,10 @@ data class ProfileScreen(
             createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
         )
         LifecycleEffect(
-            onStarted = { profileScreenModel.initUserState(user) }
+            onStarted = { profileScreenModel.initUserState(profileUserVO) }
         )
         LaunchedEffect(Unit) {
-            profileScreenModel.refreshUser(user.id)
+            profileScreenModel.refreshUser(profileUserVO.id)
         }
         val currentUser = profileScreenModel.userState
         FriedScreen(currentUser) { currentNavigator.pop() }
@@ -110,7 +126,7 @@ data class ProfileScreen(
 
 @Composable
 fun FriedScreen(
-    user: IUser?,
+    profileUserVO: ProfileUserVO?,
     popBackStack: () -> Unit,
 ) {
     BoxWithConstraints {
@@ -139,14 +155,15 @@ fun FriedScreen(
         val topIconRatio =
             (remainingDistance / (topBarHeight + sysTopPadding)).coerceIn(0f, 1f).let {
                 FastOutSlowInEasing.transform(1f - it)
-        }
+            }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val scope = rememberCoroutineScope()
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
         // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
-        val nestedScrollConnection = thresholdNestedScrollConnection({ scrollState.value < scrollState.maxValue }) {
-            scope.launch { scrollState.scrollTo((scrollState.value + -it).roundToInt()) }
-        }
+        val nestedScrollConnection =
+            thresholdNestedScrollConnection({ scrollState.value < scrollState.maxValue }) {
+                scope.launch { scrollState.scrollTo((scrollState.value + -it).roundToInt()) }
+            }
 //        if (ratio in (0.5f..1f)) {
 //            scope.launch {
 //                scrollState.animateScrollTo(0,spring(stiffness = Spring.StiffnessHigh))}
@@ -168,7 +185,7 @@ fun FriedScreen(
                 offsetDp,
                 ratio,
                 blurDp,
-                user?.profileImageUrl
+                profileUserVO?.profileImageUrl
             )
             // 底部信息卡片
             BottomCard(
@@ -177,7 +194,7 @@ fun FriedScreen(
                 topBarHeight,
                 sysTopPadding,
                 nestedScrollConnection,
-                user
+                profileUserVO
             )
             // 顶部导航栏
             TopMenuBar(
@@ -195,8 +212,15 @@ fun FriedScreen(
                 offsetDp,
                 imageHeight,
                 topIconRatio,
-                user?.iconUrl,
-            ) { scope.launch {scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessLow))} }
+                profileUserVO?.iconUrl,
+            ) {
+                scope.launch {
+                    scrollState.animateScrollTo(
+                        0,
+                        spring(stiffness = Spring.StiffnessLow)
+                    )
+                }
+            }
         }
     }
 
@@ -221,8 +245,8 @@ private fun ProfileUserImage(
                 .padding(top = offsetDp)
                 .clip(
                     RoundedCornerShape(
-                        bottomStart = (30 * ratio).dp,
-                        bottomEnd = (30 * ratio).dp
+                        bottomStart = (ContactPointShape * ratio).dp,
+                        bottomEnd = (ContactPointShape * ratio).dp
                     )
                 )
                 .blur(blurDp),
@@ -241,13 +265,13 @@ private fun BottomCard(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     nestedScrollConnection: NestedScrollConnection,
-    user: IUser?
+    profileUserVO: ProfileUserVO?
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
     val scrollState = rememberScrollState()
-    if (inverseRatio == 0f ) {
-        LaunchedEffect(Unit){
+    if (inverseRatio == 0f) {
+        LaunchedEffect(Unit) {
             scrollState.animateScrollTo(0)
         }
     }
@@ -256,68 +280,161 @@ private fun BottomCard(
             .fillMaxSize()
             .padding(top = initUserIconPadding),
         shape = RoundedCornerShape(
-            topStart = (30 * ratio).dp,
-            topEnd = (30 * ratio).dp
+            topStart = (ContactPointShape * ratio).dp,
+            topEnd = (ContactPointShape * ratio).dp
         ),
         colors = CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.primary)
     ) {
-        if (user == null) return@Card
+        if (profileUserVO == null) return@Card
         Column(
-            modifier = Modifier.nestedScroll(nestedScrollConnection),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .nestedScroll(nestedScrollConnection)
+                .padding(
+                    start = 12.dp,
+                    end = 12.dp,
+                    top = 12.dp,
+                    bottom = getInsetPadding(12, WindowInsets::getBottom)
+                ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height((topBarHeight + sysTopPadding) * inverseRatio))
-            val trustRank = remember(user) { user.trustRank }
-            val rankColor = GameColor.Rank.fromValue(trustRank)
-            val statusColor = GameColor.Status.fromValue(user.status)
-            val statusDescription = user.statusDescription.ifBlank { user.status.value }
-
-            val speakLanguages = remember(user) { user.speakLanguages }
+            val rankColor = GameColor.Rank.fromValue(profileUserVO.trustRank)
+            val statusColor = GameColor.Status.fromValue(profileUserVO.status)
+            val statusDescription =
+                profileUserVO.statusDescription.ifBlank { profileUserVO.status.value }
             // TrustRank + UserName + VRC+
-            UserInfoRow(user.displayName, user.isSupporter, rankColor)
+            UserInfoRow(profileUserVO.displayName, profileUserVO.isSupporter, rankColor)
             // status
             StatusRow(statusColor, statusDescription)
-            // speakLanguages
-            LanguagesRow(speakLanguages)
-            // bioLinks
-            LinksRow(user.bioLinks)
-
-            HorizontalDivider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 50.dp)
-                    .align(Alignment.CenterHorizontally),
-                color = Color.LightGray,
-                thickness = 1.dp,
-            )
+            // LanguagesRow && LinksRow
+            LangAndLinkRow(profileUserVO)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .background(CardDefaults.cardColors().containerColor)
-                    .align(Alignment.CenterHorizontally)
-                    .verticalScroll(scrollState)
+                    .padding(top = 12.dp)
             ) {
-                Text(
-                    modifier = Modifier.padding(10.dp),
-                    text = user.bio
-                )
+                BottomCardTab(scrollState, profileUserVO)
             }
         }
     }
 }
 
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun BottomCardTab(
+    scrollState: ScrollState,
+    profileUserVO: ProfileUserVO
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        var state by remember { mutableStateOf(0) }
+        val titles = listOf("Bio", "Worlds", "Groups")
+        PrimaryTabRow(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .clip(MaterialTheme.shapes.extraLarge),
+            selectedTabIndex = state
+        ) {
+            titles.forEachIndexed { index, title ->
+                Tab(
+                    selected = state == index,
+                    onClick = { state = index },
+                    text = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                )
+            }
+        }
+        AnimatedContent(targetState = state) {
+            when (it) {
+                0 -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        // 加个内边距
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(12.dp)
+                                .verticalScroll(scrollState),
+                        ) {
+                            Text(
+                                text = profileUserVO.bio
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.extraLarge
+                    ) {
+                        // 加个内边距
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(12.dp)
+                                .verticalScroll(scrollState),
+                        ) {
+                            Text(
+                                text = titles[it]
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
-private fun ColumnScope.UserInfoRow(
+private inline fun LangAndLinkRow(profileUserVO: ProfileUserVO) {
+    val speakLanguages = profileUserVO.speakLanguages
+    val bioLinks = profileUserVO.bioLinks
+    val width = 32.dp
+    val rowSpaced = 6.dp
+    if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
+        Row(
+            modifier = Modifier.height(width),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(rowSpaced),
+        ) {
+            // speakLanguages 和 bioLinks 最大大小为3，填充下让分割线居中
+            repeat(3 - speakLanguages.size){
+                Spacer(modifier = Modifier.width((width)))
+            }
+            // speakLanguages
+            LanguagesRow(speakLanguages, width)
+            VerticalDivider(
+                modifier = Modifier.padding(vertical = 2.dp),
+                color = MaterialTheme.colorScheme.inversePrimary,
+                thickness = 1.dp,
+            )
+            // bioLinks
+            LinksRow(bioLinks, width)
+            repeat(3 - bioLinks.size){
+                Spacer(modifier = Modifier.width((width)))
+            }
+        }
+    } else if (speakLanguages.isNotEmpty()) {
+        LanguagesRow(speakLanguages, width)
+    } else if (bioLinks.isNotEmpty()) {
+        LinksRow(bioLinks, width)
+    }
+}
+
+
+@Composable
+private fun UserInfoRow(
     userName: String,
     isSupporter: Boolean,
     rankColor: Color
 ) {
     Row(
-        modifier = Modifier.Companion
-            .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -354,14 +471,11 @@ private fun ColumnScope.UserInfoRow(
 
 
 @Composable
-private fun ColumnScope.StatusRow(
+private fun StatusRow(
     statusColor: Color,
     statusDescription: String
 ) {
     Row(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -379,15 +493,16 @@ private fun ColumnScope.StatusRow(
 }
 
 @Composable
-private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
+private fun LanguagesRow(
+    speakLanguages: List<String>,
+    width: Dp = 32.dp
+) {
     if (speakLanguages.isEmpty()) {
         return
     }
     Row(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.Bottom,
     ) {
         speakLanguages.forEach { language ->
             LanguageIcon.getFlag(language)?.let {
@@ -397,7 +512,7 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
                     modifier = Modifier
                         .align(Alignment.CenterVertically)
                         .clip(MaterialTheme.shapes.extraSmall)
-                        .width(28.dp),
+                        .width(width),
                     contentScale = ContentScale.FillWidth
                 )
             }
@@ -407,15 +522,16 @@ private fun ColumnScope.LanguagesRow(speakLanguages: List<String>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ColumnScope.LinksRow(bioLinks: List<String>) {
+fun LinksRow(
+    bioLinks: List<String>,
+    width: Dp = 32.dp
+) {
     if (bioLinks.isEmpty()) {
         return
     }
     Row(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         val appPlatform = getAppPlatform()
         bioLinks.forEach { link ->
@@ -430,7 +546,7 @@ fun ColumnScope.LinksRow(bioLinks: List<String>) {
                 state = rememberTooltipState()
             ) {
                 FilledIconButton(
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.size(width),
                     onClick = { appPlatform.openUrl(link) },
                 ) {
                     Icon(
@@ -454,7 +570,7 @@ private fun ProfileUserIcon(
     imageHeight: Dp,
     topIconRatio: Float,
     avatarThumbnailImageUrl: String?,
-    onClickIcon:  () -> Unit = {}
+    onClickIcon: () -> Unit = {}
 ) {
     val iconSize = (60 * topIconRatio).dp
     Box {
@@ -502,9 +618,9 @@ private fun TopMenuBar(
                 .height(topBarHeight + sysTopPadding)
                 .offset(y = offsetDp)
                 .background(
-                    color.copy(alpha = inverseRatio), RoundedCornerShape(
-                        bottomStart = 12.dp,
-                        bottomEnd = 12.dp
+                    color.copy(alpha = inverseRatio), MaterialTheme.shapes.medium.copy(
+                        topStart = CornerSize(0.dp),
+                        topEnd = CornerSize(0.dp)
                     )
                 )
                 .padding(top = sysTopPadding),
@@ -517,29 +633,37 @@ private fun TopMenuBar(
                 inverseRatio
             )
             val actionColor = Color.Gray.copy(alpha = 0.3f * ratio)
-            Icon(
-                modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .clip(CircleShape)
-                    .background(actionColor)
-                    .clickable(onClick = onReturn)
-                    .padding(5.dp),
-                imageVector = Icons.Rounded.ArrowBackIosNew,
-                tint = iconColor,
-                contentDescription = "WhiteReturnIcon"
+            val iconButtonColors = IconButtonColors(
+                containerColor = actionColor,
+                contentColor = iconColor,
+                disabledContainerColor = Color.Unspecified,
+                disabledContentColor = Color.Unspecified,
             )
+            IconButton(
+                modifier = Modifier
+                    .padding(horizontal = 10.dp),
+                colors = iconButtonColors,
+                onClick = onReturn
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowBackIosNew,
+                    tint = iconColor,
+                    contentDescription = "ReturnIcon"
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
-            Icon(
+            IconButton(
                 modifier = Modifier
-                    .padding(horizontal = 10.dp)
-                    .clip(CircleShape)
-                    .background(actionColor)
-                    .clickable(onClick = onMenu)
-                    .padding(5.dp),
-                imageVector = Icons.Rounded.Menu,
-                tint = iconColor,
-                contentDescription = "WhiteMenuIcon"
-            )
+                    .padding(horizontal = 10.dp),
+                colors = iconButtonColors,
+                onClick = onMenu
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Menu,
+                    tint = iconColor,
+                    contentDescription = "MenuIcon"
+                )
+            }
         }
     }
 }

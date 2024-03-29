@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -40,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
@@ -59,10 +61,14 @@ object FriendListTab: RefreshLazyColumnTab() {
         }
 
     @Composable
-    override fun doRefreshCall(): suspend () -> Unit {
+    override fun initAndCreateRefreshCall(): suspend () -> Unit {
         val parentNavigator = currentNavigator.parent!!
         val friendListTabModel: FriendListTabModel= getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+            createFailureCallbackDoNavigation(parentNavigator) {
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshed = true
+                AuthAnimeScreen(false)
+            }
         )
         return { friendListTabModel.refreshFriendList() }
     }
@@ -70,17 +76,14 @@ object FriendListTab: RefreshLazyColumnTab() {
     @Composable
     override fun BoxContent() {
         val parentNavigator = currentNavigator.parent!!
-        val friendListTabModel: FriendListTabModel= getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
-        )
+        val friendListTabModel: FriendListTabModel= getScreenModel()
         val toProfile = { user: IUser ->
-            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
+            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(ProfileUserVO(user))
         }
         val friendList = friendListTabModel.friendList
 
         // 如果没有底部系统手势条，默认12dp
-        val bottomPadding =
-            (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
         RememberLazyColumn (
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),

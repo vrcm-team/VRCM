@@ -18,7 +18,7 @@ data class WorldData(
     val id: String,
     val imageUrl: String,
     val labsPublicationDate: String,
-    val name: String?,
+    val name: String,
     val namespace: String,
     val organization: String,
     val popularity: Int,

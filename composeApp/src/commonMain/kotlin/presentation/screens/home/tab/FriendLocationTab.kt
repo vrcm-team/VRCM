@@ -32,12 +32,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.tab.TabOptions
-import io.github.vrcmteam.vrcm.core.extensions.omission
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -51,6 +50,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 
@@ -70,10 +70,14 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         }
 
     @Composable
-    override fun doRefreshCall(): suspend () -> Unit {
+    override fun initAndCreateRefreshCall(): suspend () -> Unit {
         val parentNavigator = currentNavigator.parent!!
         val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
+            createFailureCallbackDoNavigation(parentNavigator) {
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshed = true
+                AuthAnimeScreen(false)
+            }
         )
         return { friendLocationTabModel.refreshFriendLocation() }
     }
@@ -81,68 +85,65 @@ object FriendLocationTab : RefreshLazyColumnTab() {
     @Composable
     override fun BoxContent() {
         val parentNavigator = currentNavigator.parent!!
-        val friendLocationTabModel: FriendLocationTabModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation(parentNavigator) { AuthAnimeScreen(false) }
-        )
+        val friendLocationTabModel: FriendLocationTabModel = getScreenModel()
         val friendLocationMap = friendLocationTabModel.friendLocationMap
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
         val onClickUserIcon = { user: IUser ->
-            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(user)
+            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(ProfileUserVO(user))
         }
         // 如果没有底部系统手势条，默认12dp
-        val bottomPadding =
-            (getInsetPadding(WindowInsets::getBottom).takeIf { it != 0.dp } ?: 12.dp) + 86.dp
-        RememberLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(
-                start = 6.dp,
-                top = 6.dp,
-                end = 6.dp,
-                bottom = bottomPadding
-            )
-        ) {
-
-            item(key = LocationType.Offline) {
-                SingleLocationCard(
-                    offlineFriendLocation,
-                    "Active on the Website",
-                    onClickUserIcon
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
+            RememberLazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(
+                    start = 6.dp,
+                    top = 6.dp,
+                    end = 6.dp,
+                    bottom = bottomPadding
                 )
-            }
+            ) {
 
-            item(key = LocationType.Private) {
-                SingleLocationCard(
-                    privateFriendLocation,
-                    "Friends in Private Worlds",
-                    onClickUserIcon
-                )
-            }
-
-            item(key = LocationType.Traveling) {
-                SingleLocationCard(
-                    travelingFriendLocation,
-                    "Friends is Traveling",
-                    onClickUserIcon
-                )
-            }
-
-            if (!instanceFriendLocations.isNullOrEmpty()) {
-                item(key = LocationType.Instance) {
-                    Text(
-                        text = "by Location",
-                        style = MaterialTheme.typography.titleSmall,
+                item(key = LocationType.Offline) {
+                    SingleLocationCard(
+                        offlineFriendLocation,
+                        "Active on the Website",
+                        onClickUserIcon
                     )
                 }
-                items(instanceFriendLocations, key = { it.location }) { locations ->
-                    LocationCard(locations) {
-                        UserIconsRow(locations.friends, onClickUserIcon)
+
+                item(key = LocationType.Private) {
+                    SingleLocationCard(
+                        privateFriendLocation,
+                        "Friends in Private Worlds",
+                        onClickUserIcon
+                    )
+                }
+
+                item(key = LocationType.Traveling) {
+                    SingleLocationCard(
+                        travelingFriendLocation,
+                        "Friends is Traveling",
+                        onClickUserIcon
+                    )
+                }
+
+                if (!instanceFriendLocations.isNullOrEmpty()) {
+                    item(key = LocationType.Instance) {
+                        Text(
+                            text = "by Location",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                    }
+                    items(instanceFriendLocations, key = { it.location }) { locations ->
+                        LocationCard(locations) {
+                            UserIconsRow(locations.friends, onClickUserIcon)
+                        }
                     }
                 }
-            }
 
         }
 
@@ -215,7 +216,6 @@ private fun LocationFriend(
 
 @Composable
 private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
-
     val instants by location.instants
     val parentNavigator = currentNavigator.parent!!
 
@@ -251,7 +251,7 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(60.dp),
-                        text = instants.worldName.omission(24),
+                        text = instants.worldName,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
@@ -266,13 +266,13 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                                 .size(15.dp)
                                 .align(Alignment.CenterVertically)
                                 .clip(CircleShape)
-                                .border(1.dp, Color.LightGray, CircleShape),
+                                .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
                             imageData = instants.regionIconUrl
                         )
                         Text(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp),
-                            text = instants.accessType?.displayName ?: "",
+                            text = instants.accessType,
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Spacer(modifier = Modifier.weight(1f))

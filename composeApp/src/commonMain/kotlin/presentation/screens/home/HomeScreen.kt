@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
@@ -37,9 +39,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.tab.CurrentTab
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
-import cafe.adriel.voyager.navigator.tab.Tab
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -51,6 +51,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
 import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 
@@ -68,7 +70,7 @@ object HomeScreen : Screen {
         val onClickUserIcon = { user: IUser ->
             // 防止多次点击在栈中存在相同key的屏幕报错
             if (currentNavigator.size <= 1) {
-                currentNavigator.push(ProfileScreen(user))
+                currentNavigator push ProfileScreen(ProfileUserVO(user))
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
@@ -115,19 +117,23 @@ object HomeScreen : Screen {
                         }
                         Text(
                             modifier = Modifier.alpha(0.6f),
-                            text = currentUser?.statusDescription ?: "",
+                            text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1
                         )
                     }
                 },
                 actions = {
-                    Icon(
+                    IconButton(
                         modifier = Modifier
                             .padding(6.dp),
-                        imageVector = Icons.Rounded.Notifications,
-                        contentDescription = "notificationIcon"
-                    )
+                        onClick = {}
+                    ){
+                        Icon(
+                            imageVector = Icons.Rounded.Notifications,
+                            contentDescription = "NotificationIcon"
+                        )
+                    }
                 }
             )
         }
@@ -149,7 +155,7 @@ object HomeScreen : Screen {
                 TabNavigationItem(FriendListTab)
             }
         }
-        TabNavigator(FriendLocationTab){
+        TabNavigator(FriendLocationTab){tabNavigator ->
             Scaffold(
                 contentColor = MaterialTheme.colorScheme.primary,
                 topBar = topBar,
@@ -166,7 +172,16 @@ object HomeScreen : Screen {
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 16.dp
                 ) {
-                    CurrentTab()
+                    AnimatedContent(
+                        tabNavigator.current
+                    ) {
+                        tabNavigator.saveableState(it.key) {
+                            when (it) {
+                                FriendLocationTab -> FriendLocationTab.Content()
+                                FriendListTab -> FriendListTab.Content()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -174,14 +189,19 @@ object HomeScreen : Screen {
 }
 
 @Composable
-private fun RowScope.TabNavigationItem(tab: Tab) {
+private fun RowScope.TabNavigationItem(tab: RefreshLazyColumnTab) {
     val tabNavigator = LocalTabNavigator.current
     NavigationBarItem(
         modifier = Modifier.align(Alignment.CenterVertically),
         icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) },
         label = { Text(tab.options.title) },
         selected = tabNavigator.current == tab,
-        onClick = { tabNavigator.current = tab },
+        onClick = {
+            if (tabNavigator.current == tab) {
+                tab.toTop()
+            }
+            tabNavigator.current = tab
+        },
         alwaysShowLabel = tabNavigator.current == tab,
         colors = NavigationBarItemDefaults.colors(
             indicatorColor = MaterialTheme.colorScheme.primary,

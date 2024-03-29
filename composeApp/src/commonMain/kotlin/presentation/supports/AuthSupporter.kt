@@ -36,7 +36,7 @@ class AuthSupporter(
 
     suspend fun login(username: String, password: String): AuthState =
         authApi.login(username, password).also {
-            if (it == AuthState.Authed) {
+            if (it == AuthState.Authed && username.isNotBlank() && password.isNotBlank()) {
                 accountDao.saveAccount(username, password)
             }
         }

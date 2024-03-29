@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,14 +20,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import kotlinx.coroutines.flow.collectLatest
 
 /**
- * 用于保存刷新状态,和滑动距离状态的父类
+ * 用于保存刷新状态,和LazyColumn滑动距离状态的父类
+ * 子类需要是单例，否则无法保存属性状态
  */
 abstract class RefreshLazyColumnTab: Tab {
 
     /**
      * 刷新状态
      */
-    private var isRefreshed = true
+    protected var isRefreshed = true
 
     /**
      * 滑动偏移量
@@ -37,18 +40,36 @@ abstract class RefreshLazyColumnTab: Tab {
      */
     private var itemIndex = 0
 
-    @Composable
-    protected abstract fun doRefreshCall(): suspend () -> Unit
+    /**
+     * 返回顶部开关
+     */
+    private var toTopSwitch :Boolean = false
 
+    /**
+     * 初始化与创建刷新回调
+     */
     @Composable
-    protected abstract fun BoxContent(): Unit
+    protected abstract fun initAndCreateRefreshCall(): suspend () -> Unit
+
+    /**
+     * 返回顶部
+     */
+    fun  toTop(){
+       toTopSwitch = !toTopSwitch
+   }
+
+    /**
+     * 刷新组件内的内容
+     */
+    @Composable
+    protected abstract fun BoxContent()
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val doRefresh = doRefreshCall()
+        val doRefresh = initAndCreateRefreshCall()
         RefreshBox(
-            isStartRefresh =isRefreshed,
+            isStartRefresh = isRefreshed,
             doRefresh = {
                 isRefreshed = false
                 itemScrollOffset = 0
@@ -60,15 +81,29 @@ abstract class RefreshLazyColumnTab: Tab {
         }
     }
 
+
+
     @Composable
      fun RememberLazyColumn(
         modifier: Modifier = Modifier,
-        state: LazyListState = rememberLazyListState(itemIndex, itemScrollOffset),
+        state: LazyListState = rememberLazyListState(),
         contentPadding: PaddingValues = PaddingValues(0.dp),
         verticalArrangement: Arrangement.Vertical = Arrangement.Top,
         horizontalAlignment: Alignment.Horizontal = Alignment.Start,
         content: LazyListScope.() -> Unit
     ) {
+        LaunchedEffect(toTopSwitch) {
+
+            if (state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0) return@LaunchedEffect
+            // 计算每一个item的高度加上间距
+            var targetScrollOffset = state.layoutInfo.visibleItemsInfo.last().size + state.layoutInfo.mainAxisItemSpacing.toFloat()
+            // 乘以已经滚动完的Item数量
+            targetScrollOffset *= state.firstVisibleItemIndex
+            // 加上已经最后一个没有滚完的偏移量
+            targetScrollOffset += state.firstVisibleItemScrollOffset
+            // TODO() durationMillis根据划过的item数量动态调整,如果划过很多item，durationMillis应该变快
+            state.animateScrollBy(-targetScrollOffset, tween(durationMillis = 2000))
+        }
         LaunchedEffect(Unit){
             state.scrollToItem(itemIndex, itemScrollOffset)
         }

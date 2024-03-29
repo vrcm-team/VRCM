@@ -38,7 +38,12 @@ inline fun createFailureCallbackDoNavigation(
 }
 
 @Composable
-inline fun getInsetPadding(direction: (WindowInsets, Density) -> Int) =
+inline fun getInsetPadding(default: Int, direction: (WindowInsets, Density) -> Int) =
     with(LocalDensity.current) {
-        direction(NavigationBarDefaults.windowInsets, this).toDp()
+        (direction(NavigationBarDefaults.windowInsets, this).takeIf { it != 0 } ?: default).toDp()
     }
+
+@Composable
+inline fun getInsetPadding(direction: (WindowInsets, Density) -> Int) =
+    getInsetPadding(0, direction)
+
