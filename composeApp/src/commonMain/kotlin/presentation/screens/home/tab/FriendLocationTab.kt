@@ -49,8 +49,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 
@@ -92,7 +92,7 @@ object FriendLocationTab : RefreshLazyColumnTab() {
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
         val onClickUserIcon = { user: IUser ->
-            if (parentNavigator.size <= 1) parentNavigator push ProfileScreen(ProfileUserVO(user))
+            if (parentNavigator.size <= 1) parentNavigator push UserProfileScreen(UserProfileVO(user))
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp

@@ -50,8 +50,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
-import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
@@ -70,7 +70,7 @@ object HomeScreen : Screen {
         val onClickUserIcon = { user: IUser ->
             // 防止多次点击在栈中存在相同key的屏幕报错
             if (currentNavigator.size <= 1) {
-                currentNavigator push ProfileScreen(ProfileUserVO(user))
+                currentNavigator push UserProfileScreen(UserProfileVO(user))
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
