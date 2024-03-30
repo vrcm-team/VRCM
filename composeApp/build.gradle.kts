@@ -52,7 +52,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.ktor.client.okhttp)
             // support Dispatchers.Main
-            implementation (libs.kotlinx.coroutines.swing)
+            implementation(libs.kotlinx.coroutines.swing)
         }
 
         commonMain.dependencies {
@@ -90,6 +90,7 @@ kotlin {
 }
 
 android {
+
     namespace = "io.github.vrcmteam.vrcm"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
@@ -110,11 +111,27 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(rootProject.extra["store_file"] as String)
+            storePassword = rootProject.extra["store_pass"] as String
+            keyAlias = rootProject.extra["key_alias"] as String
+            keyPassword = rootProject.extra["key_pass"] as String
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            isMinifyEnabled = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
