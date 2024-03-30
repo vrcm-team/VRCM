@@ -29,8 +29,10 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = true
+            encodeDefaults = true
             explicitNulls = false
             prettyPrint = true
+            isLenient = true
         })
     }
 }
