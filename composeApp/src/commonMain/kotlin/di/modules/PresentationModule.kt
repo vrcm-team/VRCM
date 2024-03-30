@@ -10,7 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTabModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTabModel
-import io.github.vrcmteam.vrcm.presentation.screens.profile.ProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.ktor.client.HttpClient
 import okio.FileSystem
@@ -27,7 +27,7 @@ val presentationModule : Module = module {
         HomeScreenModel(onFailureCallback, get())
     }
     factory { (onFailureCallback: (String) -> Unit) ->
-        ProfileScreenModel(onFailureCallback, get(), get())
+        UserProfileScreenModel(onFailureCallback, get(), get())
     }
     single { (onFailureCallback: (String) -> Unit) ->
         FriendLocationTabModel(onFailureCallback, get(), get(), get())

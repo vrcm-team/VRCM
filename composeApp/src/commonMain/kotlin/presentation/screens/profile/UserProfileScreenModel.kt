@@ -5,32 +5,36 @@ import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.ProfileUserVO
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.ktor.client.call.body
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 
-class ProfileScreenModel(
+class UserProfileScreenModel(
     private val onFailureCallback:  (String) -> Unit,
     private val authSupporter: AuthSupporter,
     private val usersApi: UsersApi
 ) : ScreenModel {
 
-    private val _userState = mutableStateOf<ProfileUserVO?>(null)
+    private val _userState = mutableStateOf<UserProfileVO?>(null)
     val userState by _userState
-
-    fun initUserState(profileUserVO: ProfileUserVO) {
-        if (_userState.value == null) _userState.value = profileUserVO
+    private val _userJson = mutableStateOf("")
+    val userJson by _userJson
+    fun initUserState(userProfileVO: UserProfileVO) {
+        if (_userState.value == null) _userState.value = userProfileVO
     }
     suspend fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
             authSupporter.reTryAuth {
-                usersApi.fetchUser(userId)
+                usersApi.fetchUserResponse(userId)
             }.onFailure {
                 onFailureCallback(it.message.toString())
             }.onSuccess {
-                _userState.value = ProfileUserVO(it)
+                _userState.value = UserProfileVO(it.body<UserData>())
+                _userJson.value = it.body()
             }
     }.join()
 }

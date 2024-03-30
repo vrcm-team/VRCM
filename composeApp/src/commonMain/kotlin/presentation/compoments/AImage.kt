@@ -18,7 +18,7 @@ import org.koin.compose.koinInject
 fun AImage(
     modifier: Modifier = Modifier,
     imageData: Any?,
-    color: Color = MaterialTheme.colorScheme.inverseOnSurface,
+    color: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     contentDescription: String? = null,
     contentScale: ContentScale = ContentScale.Crop,
 ) {

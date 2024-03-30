@@ -8,6 +8,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -40,7 +41,10 @@ inline fun createFailureCallbackDoNavigation(
 @Composable
 inline fun getInsetPadding(default: Int, direction: (WindowInsets, Density) -> Int) =
     with(LocalDensity.current) {
-        (direction(NavigationBarDefaults.windowInsets, this).takeIf { it != 0 } ?: default).toDp()
+        val toDp = (direction(NavigationBarDefaults.windowInsets, this).takeIf { it != 0 }
+            ?: default).toDp()
+        // 有时候12.toDp()会得到3+.dp的值
+        default.dp.takeIf { it > toDp } ?: toDp
     }
 
 @Composable

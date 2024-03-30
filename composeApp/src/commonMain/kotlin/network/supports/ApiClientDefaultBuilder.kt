@@ -1,10 +1,13 @@
 package io.github.vrcmteam.vrcm.network.supports
 
-import io.ktor.client.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.UserAgent
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.URLProtocol
+import io.ktor.http.path
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
@@ -27,6 +30,7 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
         json(Json {
             ignoreUnknownKeys = true
             explicitNulls = false
+            prettyPrint = true
         })
     }
 }

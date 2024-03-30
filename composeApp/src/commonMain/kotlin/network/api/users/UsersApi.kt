@@ -11,4 +11,7 @@ class UsersApi(private val client: HttpClient) {
 
     suspend fun fetchUser(userId: String) =
         client.get("$USERS_API_PREFIX/$userId").ifOK { body<UserData>() }
+    suspend fun fetchUserResponse(userId: String) =
+        client.get("$USERS_API_PREFIX/$userId").ifOK { this }
+
 }
