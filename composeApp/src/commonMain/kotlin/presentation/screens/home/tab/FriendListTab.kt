@@ -148,7 +148,6 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                 )
             }
             Spacer(Modifier.weight(1f))
-
         }
     }
 }

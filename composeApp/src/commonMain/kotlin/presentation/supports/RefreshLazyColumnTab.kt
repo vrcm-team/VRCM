@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +47,7 @@ abstract class RefreshLazyColumnTab: Tab {
      */
     private var toTopSwitch :Boolean = false
 
+
     /**
      * 初始化与创建刷新回调
      */
@@ -55,8 +58,10 @@ abstract class RefreshLazyColumnTab: Tab {
      * 返回顶部
      */
     fun  toTop(){
-       toTopSwitch = !toTopSwitch
-   }
+        ToTopSwitchList.getOrPut(key){ mutableStateOf(false) }.let {
+            it.value = !it.value
+        }
+    }
 
     /**
      * 刷新组件内的内容
@@ -92,8 +97,7 @@ abstract class RefreshLazyColumnTab: Tab {
         horizontalAlignment: Alignment.Horizontal = Alignment.Start,
         content: LazyListScope.() -> Unit
     ) {
-        LaunchedEffect(toTopSwitch) {
-
+        LaunchedEffect(ToTopSwitchList[key]?.value) {
             if (state.firstVisibleItemIndex == 0 && state.firstVisibleItemScrollOffset == 0) return@LaunchedEffect
             // 计算每一个item的高度加上间距
             var targetScrollOffset = state.layoutInfo.visibleItemsInfo.last().size + state.layoutInfo.mainAxisItemSpacing.toFloat()
@@ -124,5 +128,12 @@ abstract class RefreshLazyColumnTab: Tab {
         ){
             content()
         }
+    }
+
+    /**
+     * 无法被序列化所以迫不得已写成伴生对象
+     */
+    companion object{
+        val ToTopSwitchList: MutableMap<String, MutableState<Boolean>> = mutableMapOf()
     }
 }

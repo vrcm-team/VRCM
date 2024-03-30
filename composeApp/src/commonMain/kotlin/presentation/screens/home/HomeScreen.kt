@@ -154,7 +154,7 @@ object HomeScreen : Screen {
                 TabNavigationItem(FriendListTab)
             }
         }
-        TabNavigator(FriendLocationTab){tabNavigator ->
+        TabNavigator(FriendLocationTab){ tabNavigator ->
             Scaffold(
                 contentColor = MaterialTheme.colorScheme.primary,
                 topBar = topBar,
