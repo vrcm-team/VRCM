@@ -81,7 +81,6 @@ object FriendListTab: RefreshLazyColumnTab() {
             if (parentNavigator.size <= 1) parentNavigator push UserProfileScreen(UserProfileVO(user))
         }
         val friendList = friendListTabModel.friendList
-
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
         RememberLazyColumn (
