@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class FriendLocationTabModel(
+class FriendLocationPagerModel(
     private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
@@ -71,22 +71,22 @@ class FriendLocationTabModel(
                 .values.groupBy { LocationType.fromValue(it.value.location) }
 
             friendLocationInfoMap[LocationType.Offline]?.let { friends ->
-                this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Offline) {
+                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Offline) {
                     mutableStateListOf(FriendLocation.Offline)
                 }.first().friends.addAll(friends)
             }
             friendLocationInfoMap[LocationType.Private]?.let { friends ->
-                this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Private) {
+                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Private) {
                     mutableStateListOf(FriendLocation.Private)
                 }.first().friends.addAll(friends)
             }
             friendLocationInfoMap[LocationType.Traveling]?.let { friends ->
-                this@FriendLocationTabModel.friendLocationMap.getOrPut(LocationType.Traveling) {
+                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Traveling) {
                     mutableStateListOf(FriendLocation.Traveling)
                 }.first().friends.addAll(friends)
             }
 
-            val currentInstanceFriendLocations = this@FriendLocationTabModel.friendLocationMap
+            val currentInstanceFriendLocations = this@FriendLocationPagerModel.friendLocationMap
                 .getOrPut(LocationType.Instance, ::mutableStateListOf)
             val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
 

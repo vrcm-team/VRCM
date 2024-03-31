@@ -1,5 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
@@ -30,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,26 +43,27 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
-import cafe.adriel.voyager.navigator.tab.TabNavigator
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTab
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTab
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
+import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListPagerProvider
+import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationPagerProvider
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.RefreshLazyColumnTab
+import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
+import kotlinx.coroutines.launch
 
 
 object HomeScreen : Screen {
     @Composable
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
     override fun Content() {
 //        var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
@@ -73,6 +79,7 @@ object HomeScreen : Screen {
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
+
         val trustRank = remember(currentUser) { currentUser?.trustRank }
         val rankColor = GameColor.Rank.fromValue(trustRank)
         val topBar = @Composable {
@@ -136,6 +143,30 @@ object HomeScreen : Screen {
                 }
             )
         }
+
+        val pagerProvidersState = createPagerProvidersState(
+            FriendLocationPagerProvider,
+            FriendListPagerProvider
+        )
+        val scope = rememberCoroutineScope()
+        val pagerNavigationItems:@Composable RowScope.() -> Unit = {
+            pagerProvidersState.pagerProviders.forEach {
+                val index = it.index
+                val selected = pagerProvidersState.pagerState.currentPage == index
+                PagerNavigationItem(
+                    provider = it,
+                    selected = selected
+                ) {
+                    scope.launch{
+                        if (selected) {
+                            pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
+                        }else{
+                            pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
+                        }
+                    }
+                }
+            }
+        }
         // 如果没有底部系统手势条，则加12dp
         val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
         val bottomBar = @Composable {
@@ -149,53 +180,53 @@ object HomeScreen : Screen {
                     ),
                 containerColor = MaterialTheme.colorScheme.onPrimary,
                 contentColor = MaterialTheme.colorScheme.primary,
-            ) {
-                TabNavigationItem(FriendLocationTab)
-                TabNavigationItem(FriendListTab)
-            }
+                content = pagerNavigationItems
+            )
         }
-        TabNavigator(FriendLocationTab){ tabNavigator ->
-            Scaffold(
-                contentColor = MaterialTheme.colorScheme.primary,
-                topBar = topBar,
-                bottomBar = bottomBar,
-                floatingActionButton = {
+
+        Scaffold(
+            contentColor = MaterialTheme.colorScheme.primary,
+            topBar = topBar,
+            bottomBar = bottomBar,
+            floatingActionButton = {
 //                    Button(onClick = { snackBarToastText = "132132131" }) {}
-                }
-            ) { innerPadding ->
-                Surface(
-                    modifier = Modifier
-                        .padding(top = innerPadding.calculateTopPadding())
-                        .fillMaxSize(),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 16.dp
-                ) {
-                    val currentTab = tabNavigator.current
-                    tabNavigator.saveableState(currentTab.key) {
-                        currentTab.Content()
-                    }
+            }
+        ) { innerPadding ->
+            Surface(
+                modifier = Modifier
+                    .padding(top = innerPadding.calculateTopPadding())
+                    .fillMaxSize(),
+                contentColor = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 16.dp
+            ) {
+                HorizontalPager(pagerProvidersState.pagerState) {
+                    pagerProvidersState.pagers[it]()
                 }
             }
         }
+
     }
+
 }
 
+
+
 @Composable
-private fun RowScope.TabNavigationItem(tab: RefreshLazyColumnTab) {
-    val tabNavigator = LocalTabNavigator.current
+private fun RowScope.PagerNavigationItem(provider: PagerProvider, selected: Boolean, onClick: () -> Unit) {
     NavigationBarItem(
         modifier = Modifier.align(Alignment.CenterVertically),
-        icon = { Icon(painter = tab.options.icon!!, contentDescription = tab.options.title) },
-        label = { Text(tab.options.title) },
-        selected = tabNavigator.current == tab,
-        onClick = {
-            if (tabNavigator.current == tab) {
-                tab.toTop()
-            }
-            tabNavigator.current = tab
+        icon = {
+            Icon(
+                modifier = Modifier.size(32.dp),
+                painter = provider.icon!!,
+                contentDescription = provider.title
+            )
         },
-        alwaysShowLabel = tabNavigator.current == tab,
+        label = { Text(provider.title) },
+        selected = selected,
+        onClick = onClick,
+        alwaysShowLabel = selected,
         colors = NavigationBarItemDefaults.colors(
             indicatorColor = MaterialTheme.colorScheme.primary,
             selectedIconColor = MaterialTheme.colorScheme.onPrimary,

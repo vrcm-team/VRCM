@@ -8,8 +8,8 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListTabModel
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationTabModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.ktor.client.HttpClient
@@ -30,10 +30,10 @@ val presentationModule : Module = module {
         UserProfileScreenModel(onFailureCallback, get(), get())
     }
     single { (onFailureCallback: (String) -> Unit) ->
-        FriendLocationTabModel(onFailureCallback, get(), get(), get())
+        FriendLocationPagerModel(onFailureCallback, get(), get(), get())
     }
     single { (onFailureCallback: (String) -> Unit) ->
-        FriendListTabModel(onFailureCallback, get(), get(), get())
+        FriendListPagerModel(onFailureCallback, get(), get())
     }
     singleOf(::AuthSupporter)
     single<ImageLoader> { imageLoaderDefinition(it) }

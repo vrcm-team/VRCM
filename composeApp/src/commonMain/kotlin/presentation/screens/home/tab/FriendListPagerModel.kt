@@ -5,7 +5,6 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
-import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import kotlinx.coroutines.Dispatchers
@@ -16,13 +15,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class FriendListTabModel(
+class FriendListPagerModel(
     private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
-    private val instancesApi: InstancesApi,
     private val authSupporter: AuthSupporter,
 ): ScreenModel {
-
 
     val friendList: MutableList<FriendData> = mutableStateListOf()
 
