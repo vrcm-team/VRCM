@@ -33,7 +33,7 @@ inline fun createFailureCallbackDoNavigation(
         scope.launch {
             snackBarToastText = text
             delay(3000L)
-            navigator replace screen()
+            navigator replaceAll screen()
         }
     }
 }
