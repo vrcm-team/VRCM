@@ -3,7 +3,9 @@ package io.github.vrcmteam.vrcm.presentation.screens.profile.data
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.TrustRank
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 
 data class UserProfileVO (
     val id: String,
@@ -22,7 +24,7 @@ data class UserProfileVO (
     constructor(user: IUser): this(
         id = user.id,
         displayName = user.displayName,
-        status = user.status,
+        status = if (user is UserData && user.state == UserState.Offline) UserStatus.Offline else user.status,
         statusDescription = user.statusDescription,
         bio = user.bio,
         bioLinks = user.bioLinks,

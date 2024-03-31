@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -146,14 +146,17 @@ private fun AuthCard(
 
 @Composable
 private fun ReturnIcon(onClick: () -> Unit) {
-    Icon(
+    IconButton(
         modifier = Modifier
-            .padding(start = 24.dp, top = 24.dp)
-            .size(18.dp)
-            .clickable(onClick = onClick),
-        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-        contentDescription = "ReturnIcon",
-    )
+            .padding(start = 6.dp, top = 6.dp),
+        onClick = onClick
+    ){
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+            contentDescription = "ReturnIcon",
+            tint = MaterialTheme.colorScheme.primary
+        )
+    }
 }
 
 
@@ -171,7 +174,7 @@ private fun NavCard(
             modifier = Modifier.fillMaxWidth(),
             text = tileText,
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center
         )
         content()

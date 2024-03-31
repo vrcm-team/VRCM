@@ -312,8 +312,8 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVO) {
             // speakLanguages
             LanguagesRow(speakLanguages, width)
             VerticalDivider(
-                modifier = Modifier.padding(vertical = 2.dp),
-                color = MaterialTheme.colorScheme.inversePrimary,
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.primary,
                 thickness = 1.dp,
             )
             // bioLinks
