@@ -114,10 +114,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(rootProject.extra["store_file"] as String)
-            storePassword = rootProject.extra["store_pass"] as String
-            keyAlias = rootProject.extra["key_alias"] as String
-            keyPassword = rootProject.extra["key_pass"] as String
+            storeFile = file(rootProject.extra["storeFile"] as String)
+            storePassword = rootProject.extra["storePass"] as String
+            keyAlias = rootProject.extra["keyAlias"] as String
+            keyPassword = rootProject.extra["keyPass"] as String
         }
     }
 
