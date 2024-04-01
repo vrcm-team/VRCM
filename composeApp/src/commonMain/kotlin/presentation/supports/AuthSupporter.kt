@@ -1,15 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
-import io.github.vrcmteam.vrcm.core.listener.AuthedSubscriber
+import io.github.vrcmteam.vrcm.core.subscribe.AuthCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 
 /**
  * 负责辅助登录验证的类
@@ -19,25 +16,12 @@ import kotlinx.coroutines.launch
 class AuthSupporter(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
-    private val authedSubscriber: List<AuthedSubscriber>,
 ) {
     fun accountPair(): Pair<String, String> = accountDao.accountPair()
 
     fun accountPairOrNull(): Pair<String, String>? = accountDao.accountPairOrNull()
 
-    @OptIn(DelicateCoroutinesApi::class)
-    suspend fun isAuthed():Boolean {
-
-        if (authApi.isAuthed()) {
-            GlobalScope.launch{
-                authedSubscriber.forEach {
-                    it.onAuthed()
-                }
-            }
-            return true
-        }
-        return false
-    }
+    suspend fun isAuthed():Boolean = authApi.isAuthed().also { if (it) AuthCentre.Publisher.sendAuthed(null, null) }
     suspend fun currentUser() = authApi.currentUser()
 
 
@@ -47,14 +31,16 @@ class AuthSupporter(
             AuthCardPage.TFACode -> AuthType.TFA
             else -> error("not supported")
         }
-       return authApi.verify(code, authType)
+       return authApi.verify(code, authType).also { if (it) AuthCentre.Publisher.sendAuthed(null, null) }
     }
 
     suspend fun login(username: String, password: String): AuthState =
         authApi.login(username, password).also {
-            if (it == AuthState.Authed && username.isNotBlank() && password.isNotBlank()) {
+            if (it != AuthState.Authed) return@also
+            if (username.isNotBlank() && password.isNotBlank()) {
                 accountDao.saveAccount(username, password)
             }
+            AuthCentre.Publisher.sendAuthed(null, null)
         }
 
     /**

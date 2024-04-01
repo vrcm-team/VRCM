@@ -83,7 +83,6 @@ object FriendLocationPagerProvider : ListPagerProvider {
             parameterSetOf(callbackDoNavigation)
         }
 
-
         return remember {
             {
                 FriendLocationPager(

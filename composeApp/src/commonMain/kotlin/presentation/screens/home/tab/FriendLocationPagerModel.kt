@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.subscribe.WebSocketCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import network.websocket.data.WebSocketEvent
 
 class FriendLocationPagerModel(
     private val onFailureCallback:  (String) -> Unit,
@@ -33,6 +35,16 @@ class FriendLocationPagerModel(
     private val friendMap: MutableMap<String, FriendData> = mutableMapOf()
 
     private val updateMutex = Mutex()
+
+    private val onWebSocketEvent: (WebSocketEvent) -> Unit = onWebSocketEvent@{ it: WebSocketEvent ->
+        if (it.type != "friend-location") return@onWebSocketEvent
+    }
+    init {
+        WebSocketCentre.Subscriber.onWebSocketEvent(onWebSocketEvent)
+    }
+
+    override fun onDispose() = WebSocketCentre.Subscriber.unsubscribe(onWebSocketEvent)
+
 
     suspend fun refreshFriendLocation() {
         this.friendLocationMap.clear()

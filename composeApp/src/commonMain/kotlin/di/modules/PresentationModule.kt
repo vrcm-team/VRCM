@@ -34,7 +34,7 @@ val presentationModule : Module = module {
     single { (onFailureCallback: (String) -> Unit) ->
         FriendListPagerModel(onFailureCallback, get(), get())
     }
-    single{ AuthSupporter(get(), get(), getAll()) }
+    single{ AuthSupporter(get(), get()) }
     single<ImageLoader> { imageLoaderDefinition(it) }
 }
 
