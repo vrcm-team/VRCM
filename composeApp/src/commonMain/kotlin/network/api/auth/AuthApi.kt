@@ -18,7 +18,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.path
 
-class AuthApi(private val client: HttpClient) {
+class AuthApi(
+    private val client: HttpClient,
+) {
 
     suspend fun currentUser(): Result<CurrentUserData> = userRes().ifOK { body<CurrentUserData>() }
 

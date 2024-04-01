@@ -16,7 +16,6 @@ import io.ktor.client.HttpClient
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
-import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
 val presentationModule : Module = module {
@@ -35,7 +34,7 @@ val presentationModule : Module = module {
     single { (onFailureCallback: (String) -> Unit) ->
         FriendListPagerModel(onFailureCallback, get(), get())
     }
-    singleOf(::AuthSupporter)
+    single{ AuthSupporter(get(), get(), getAll()) }
     single<ImageLoader> { imageLoaderDefinition(it) }
 }
 

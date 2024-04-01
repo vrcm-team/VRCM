@@ -82,7 +82,9 @@ class AuthScreenModel(
     }
 
     private suspend fun awaitAuth(): Boolean = screenModelScope.async(Dispatchers.IO) {
-        runCatching { authSupporter.isAuthed() }.onAuthFailure().getOrNull()
+        runCatching { authSupporter.isAuthed() }
+            .onAuthFailure()
+            .getOrNull()
     }.await() == true
 
 

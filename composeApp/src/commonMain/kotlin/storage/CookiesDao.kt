@@ -6,7 +6,6 @@ import com.russhwolf.settings.set
 
 class CookiesDao(
     private val cookiesSettings: Settings
-
 )  {
      val allCookies: Map<String, *>
         get() = cookiesSettings.keys.associateWith { cookiesSettings.getStringOrNull(it) }
