@@ -29,7 +29,7 @@ val presentationModule : Module = module {
         UserProfileScreenModel(onFailureCallback, get(), get())
     }
     single { (onFailureCallback: (String) -> Unit) ->
-        FriendLocationPagerModel(onFailureCallback, get(), get(), get())
+        FriendLocationPagerModel(onFailureCallback, get(), get(), get(), get())
     }
     single { (onFailureCallback: (String) -> Unit) ->
         FriendListPagerModel(onFailureCallback, get(), get())

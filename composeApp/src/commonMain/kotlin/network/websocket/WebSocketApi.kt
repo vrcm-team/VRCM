@@ -3,12 +3,18 @@ package io.github.vrcmteam.vrcm.network.websocket
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
 import io.github.vrcmteam.vrcm.storage.DaoKeys
-import io.ktor.client.*
-import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.websocket.*
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.cookies.CookiesStorage
+import io.ktor.client.plugins.websocket.receiveDeserialized
+import io.ktor.client.plugins.websocket.wss
 import io.ktor.client.request.parameter
-import io.ktor.http.*
-import kotlinx.coroutines.*
+import io.ktor.http.Url
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import network.websocket.data.WebSocketEvent
 
 class WebSocketApi(
@@ -17,7 +23,7 @@ class WebSocketApi(
 ) {
 
     private var currentJob: Job? = null
-    private var scope = CoroutineScope(Dispatchers.IO + Job())
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
         scope.launch {
@@ -38,8 +44,6 @@ class WebSocketApi(
                 }) {
                 while (true) {
                     val othersMessage = receiveDeserialized<WebSocketEvent>()
-                    converter
-                    println("othersMessage:$othersMessage")
                     SharedFlowCentre.webSocket.emit(othersMessage)
                 }
             }

@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
@@ -22,13 +23,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
-import network.websocket.data.content.FriendLocationUser
+import network.websocket.data.content.FriendLocationContent
 
 class FriendLocationPagerModel(
     private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
     private val authSupporter: AuthSupporter,
+    private val json: Json
 ): ScreenModel {
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
         mutableStateMapOf()
@@ -39,11 +41,15 @@ class FriendLocationPagerModel(
 
 
     init {
-        screenModelScope.launch { SharedFlowCentre.webSocket.collect{
-            if (it.type != "friend_location") return@collect
-
-            Json.Default.decodeFromString<FriendLocationUser>(it.content)
-            println("sharedFlow1: $it")
+        screenModelScope.launch { SharedFlowCentre.webSocket.collect{ socketEvent ->
+            if (socketEvent.type != FriendEvents.FriendLocation.typeName) return@collect
+            println("content: ${socketEvent.content}")
+            val friendLocationContent = json.decodeFromString<FriendLocationContent>(socketEvent.content)
+            val friendData = friendMap[friendLocationContent.userId]
+            friendData?.let {
+                update(listOf(it.copy(location = friendLocationContent.location)))
+            }
+            println("friendData: $friendData")
         } }
     }
 
@@ -73,8 +79,11 @@ class FriendLocationPagerModel(
             if (friendMap.isNotEmpty()) {
                 friends.filter { friendMap.containsKey(it.id) }.forEach{ friend->
                     val locationType = LocationType.fromValue(friend.location)
-                    friendLocationMap[locationType]
+                    println("friend:$friend")
+                    val friendLocation = friendLocationMap[locationType]
                         ?.find { it.location == friend.location }
+                    friendLocation?.friends?.forEach { println("!!!!!!!!!!!!!!"+it) }
+                    friendLocation
                         ?.friends?.removeAll { it.value.id == friend.id }
                 }
             }
