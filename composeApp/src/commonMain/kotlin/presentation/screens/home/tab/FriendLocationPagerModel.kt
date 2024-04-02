@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.core.subscribe.WebSocketCentre
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -21,7 +21,8 @@ import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import network.websocket.data.WebSocketEvent
+import kotlinx.serialization.json.Json
+import network.websocket.data.content.FriendLocationUser
 
 class FriendLocationPagerModel(
     private val onFailureCallback:  (String) -> Unit,
@@ -36,14 +37,15 @@ class FriendLocationPagerModel(
 
     private val updateMutex = Mutex()
 
-    private val onWebSocketEvent: (WebSocketEvent) -> Unit = onWebSocketEvent@{ it: WebSocketEvent ->
-        if (it.type != "friend-location") return@onWebSocketEvent
-    }
-    init {
-        WebSocketCentre.Subscriber.onWebSocketEvent(onWebSocketEvent)
-    }
 
-    override fun onDispose() = WebSocketCentre.Subscriber.unsubscribe(onWebSocketEvent)
+    init {
+        screenModelScope.launch { SharedFlowCentre.webSocket.collect{
+            if (it.type != "friend_location") return@collect
+
+            Json.Default.decodeFromString<FriendLocationUser>(it.content)
+            println("sharedFlow1: $it")
+        } }
+    }
 
 
     suspend fun refreshFriendLocation() {
