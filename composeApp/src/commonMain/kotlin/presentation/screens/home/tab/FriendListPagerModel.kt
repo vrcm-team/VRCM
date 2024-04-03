@@ -47,7 +47,9 @@ class FriendListPagerModel(
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
             friendList.removeAll { old -> friends.any { old.id == it.id } }
-            friendList.addAll(friends)
+            val temp = friendList + friends
+            friendList.clear()
+            friendList.addAll(temp)
         }.onFailure {
             SharedFlowCentre.error.emit(it.message.toString())}
     }

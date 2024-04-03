@@ -10,3 +10,11 @@ fun <T> MutableList<T>.removeFirst(predicate: (T) -> Boolean) {
         removeAt(index)
     }
 }
+
+fun <T> MutableList<T>.removeIf(predicate: (T) -> Boolean) {
+    for (i in lastIndex downTo 0) {
+        if (predicate(get(i))) {
+            removeAt(i)
+        }
+    }
+}

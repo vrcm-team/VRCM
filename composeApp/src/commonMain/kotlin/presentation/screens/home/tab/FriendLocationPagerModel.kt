@@ -45,8 +45,8 @@ class FriendLocationPagerModel(
             SharedFlowCentre.webSocket.collect { socketEvent ->
                 if (socketEvent.type != FriendEvents.FriendLocation.typeName) return@collect
                 val friendLocationContent = json.decodeFromString<FriendLocationContent>(socketEvent.content)
-//                println("location:${friendLocationContent.location}")
-//                println("displayName:${friendLocationContent.user.displayName}")
+                println("location:${friendLocationContent.location}")
+                println("displayName:${friendLocationContent.user.displayName}")
                 updateMutex.withLock(friendLocationMap) { update(listOf(friendLocationContent.toFriendData())) }
             }
         }
