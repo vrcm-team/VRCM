@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -43,12 +44,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.getScreenModel
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
-import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
@@ -67,9 +68,7 @@ object HomeScreen : Screen {
     override fun Content() {
 //        var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
-        val homeScreenModel: HomeScreenModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
-        )
+        val homeScreenModel: HomeScreenModel = getScreenModel()
         val currentUser = homeScreenModel.currentUser
         // to ProfileScreen
         val onClickUserIcon = { user: IUser ->
@@ -79,7 +78,12 @@ object HomeScreen : Screen {
             }
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
-
+        LaunchedEffect(Unit){
+            // 报错时跳到验证页面
+            SharedFlowCentre.error.collect{
+                currentNavigator replaceAll AuthAnimeScreen(false)
+            }
+        }
         val trustRank = remember(currentUser) { currentUser?.trustRank }
         val rankColor = GameColor.Rank.fromValue(trustRank)
         val topBar = @Composable {

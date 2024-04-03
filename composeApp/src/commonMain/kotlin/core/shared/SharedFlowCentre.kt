@@ -8,4 +8,7 @@ object SharedFlowCentre {
     val webSocket = MutableSharedFlow<WebSocketEvent>()
 
     val authed = MutableSharedFlow<Pair<String?, String?>>()
+
+    val error = MutableSharedFlow<String>()
+
 }

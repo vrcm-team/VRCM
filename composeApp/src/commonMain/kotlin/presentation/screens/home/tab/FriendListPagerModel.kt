@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -16,7 +17,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class FriendListPagerModel(
-    private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
     private val authSupporter: AuthSupporter,
 ): ScreenModel {
@@ -34,7 +34,7 @@ class FriendListPagerModel(
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
-                    onFailureCallback(it.message.toString())
+                    SharedFlowCentre.error.emit(it.message.toString())
                 }.collect { friends ->
                     updateMutex.withLock(friendList) { update(friends) }
                 }
@@ -49,8 +49,7 @@ class FriendListPagerModel(
             friendList.removeAll { old -> friends.any { old.id == it.id } }
             friendList.addAll(friends)
         }.onFailure {
-            onFailureCallback(it.message.toString())
-        }
+            SharedFlowCentre.error.emit(it.message.toString())}
     }
 
 }

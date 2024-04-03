@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -49,17 +51,14 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
 import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
 import org.koin.compose.koinInject
-import org.koin.core.parameter.parameterSetOf
 
 object FriendLocationPagerProvider : ListPagerProvider {
 
@@ -74,14 +73,13 @@ object FriendLocationPagerProvider : ListPagerProvider {
     @Composable
     override fun createPager(lazyListState: LazyListState):@Composable () -> Unit {
         val isRefreshing = rememberSaveable { mutableStateOf(true) }
-        val callbackDoNavigation = createFailureCallbackDoNavigation {
-            // 如果报错跳转登录，并重制刷新标记
-            isRefreshing.value = true
-            AuthAnimeScreen(false)
+        LaunchedEffect(Unit){
+            SharedFlowCentre.error.collect{
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshing.value = true
+            }
         }
-        val friendLocationPagerModel: FriendLocationPagerModel = koinInject {
-            parameterSetOf(callbackDoNavigation)
-        }
+        val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
 
         return remember {
             {

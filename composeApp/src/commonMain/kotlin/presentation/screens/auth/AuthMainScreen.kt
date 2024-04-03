@@ -33,11 +33,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
 import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
@@ -47,9 +47,7 @@ object AuthScreen : Screen {
     override fun Content() {
         var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
-        val authScreenModel: AuthScreenModel = getCallbackScreenModel { text: String ->
-            snackBarToastText = text
-        }
+        val authScreenModel: AuthScreenModel = getScreenModel()
 
         LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
         AuthFold {

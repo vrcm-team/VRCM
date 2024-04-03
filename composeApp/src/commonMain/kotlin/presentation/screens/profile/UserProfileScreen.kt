@@ -63,12 +63,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.getScreenModel
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
-import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
-import io.github.vrcmteam.vrcm.presentation.extensions.getCallbackScreenModel
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -85,12 +85,15 @@ data class UserProfileScreen(
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val userProfileScreenModel: UserProfileScreenModel = getCallbackScreenModel(
-            createFailureCallbackDoNavigation { AuthAnimeScreen(false) }
-        )
+        val userProfileScreenModel: UserProfileScreenModel = getScreenModel()
         LifecycleEffect(
             onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
         )
+        LaunchedEffect(Unit){
+            SharedFlowCentre.error.collect{
+                currentNavigator replaceAll AuthAnimeScreen(false)
+            }
+        }
         LaunchedEffect(Unit) {
             userProfileScreenModel.refreshUser(userProfileVO.id)
         }

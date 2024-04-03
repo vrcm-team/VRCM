@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
@@ -18,7 +19,6 @@ import org.koin.core.logger.Logger
 
 
 class AuthScreenModel(
-    private val onFailureCallback: (String) -> Unit,
     private val authSupporter: AuthSupporter,
     private val logger: Logger
 ) : ScreenModel {
@@ -51,7 +51,9 @@ class AuthScreenModel(
         if (_uiState.value.btnIsLoading) {
             _uiState.value = _uiState.value.copy(btnIsLoading = false)
         }
-        onFailureCallback(errorMsg)
+        screenModelScope.launch {
+            SharedFlowCentre.error.emit(errorMsg)
+        }
     }
 
     fun onCardStateChange(cardState: AuthCardPage) {

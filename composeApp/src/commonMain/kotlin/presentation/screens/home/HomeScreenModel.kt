@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
@@ -14,7 +15,6 @@ import kotlinx.coroutines.launch
 
 
 class HomeScreenModel(
-    private val onFailureCallback:  (String) -> Unit,
     private val authSupporter: AuthSupporter,
 ) : ScreenModel {
 
@@ -41,7 +41,9 @@ class HomeScreenModel(
 
                 else -> "${it.message}"
             }
-            onFailureCallback(message)
+            screenModelScope.launch {
+                SharedFlowCentre.error.emit(message)
+            }
         }
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 
 /**
  * toast弹窗
@@ -69,6 +70,11 @@ fun SnackBarToastBox(
         ) {
             content()
             val sackBarToastText = LocalSnackBarToastText.current
+            LaunchedEffect(Unit){
+                SharedFlowCentre.error.collect {
+                    sackBarToastText.value = it
+                }
+            }
             SnackBarToast(
                 modifier = modifier.align(alignment),
                 text = sackBarToastText.value,

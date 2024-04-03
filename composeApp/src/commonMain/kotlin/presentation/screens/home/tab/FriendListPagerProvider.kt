@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,20 +38,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.extensions.createFailureCallbackDoNavigation
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import org.koin.compose.koinInject
-import org.koin.core.parameter.parameterSetOf
 
 object FriendListPagerProvider : ListPagerProvider {
 
@@ -65,14 +64,13 @@ object FriendListPagerProvider : ListPagerProvider {
     @Composable
     override fun createPager(lazyListState: LazyListState):@Composable ()->Unit {
         val isRefreshing = rememberSaveable { mutableStateOf(true) }
-        val callbackDoNavigation = createFailureCallbackDoNavigation {
-            // 如果报错跳转登录，并重制刷新标记
-            isRefreshing.value = true
-            AuthAnimeScreen(false)
+        LaunchedEffect(Unit){
+            SharedFlowCentre.error.collect{
+                // 如果报错跳转登录，并重制刷新标记
+                isRefreshing.value = true
+            }
         }
-        val friendListPagerModel: FriendListPagerModel = koinInject {
-            parameterSetOf(callbackDoNavigation)
-        }
+        val friendListPagerModel: FriendListPagerModel = koinInject()
 
         return remember {
             {
