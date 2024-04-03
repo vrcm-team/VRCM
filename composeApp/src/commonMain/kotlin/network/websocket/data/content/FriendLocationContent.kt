@@ -3,6 +3,7 @@ package network.websocket.data.content
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -14,7 +15,31 @@ data class FriendLocationContent(
     val user: FriendLocationUser,
     val userId: String,
     val worldId: String
-): JavaSerializable
+): JavaSerializable{
+    fun toFriendData(): FriendData {
+        return FriendData(
+            bio = user.bio,
+            bioLinks = user.bioLinks,
+            currentAvatarImageUrl = user.currentAvatarImageUrl,
+            currentAvatarTags = user.currentAvatarTags,
+            currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
+            developerType = user.developerType,
+            displayName = user.displayName,
+            friendKey = user.friendKey,
+            id = userId,
+            imageUrl = user.profileImageUrl,
+            isFriend = user.isFriend,
+            lastLogin = user.lastLogin,
+            lastPlatform = user.lastPlatform,
+            location = location,
+            profilePicOverride = user.profilePicOverride,
+            status = user.status,
+            statusDescription = user.statusDescription,
+            tags = user.tags,
+            userIcon = user.userIcon
+        )
+    }
+}
 
 @Serializable
 data class FriendLocationUser(

@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -26,7 +27,6 @@ import kotlinx.serialization.json.Json
 import network.websocket.data.content.FriendLocationContent
 
 class FriendLocationPagerModel(
-    private val onFailureCallback:  (String) -> Unit,
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
     private val authSupporter: AuthSupporter,
@@ -41,16 +41,15 @@ class FriendLocationPagerModel(
 
 
     init {
-        screenModelScope.launch { SharedFlowCentre.webSocket.collect{ socketEvent ->
-            if (socketEvent.type != FriendEvents.FriendLocation.typeName) return@collect
-            println("content: ${socketEvent.content}")
-            val friendLocationContent = json.decodeFromString<FriendLocationContent>(socketEvent.content)
-            val friendData = friendMap[friendLocationContent.userId]
-            friendData?.let {
-                update(listOf(it.copy(location = friendLocationContent.location)))
+        screenModelScope.launch {
+            SharedFlowCentre.webSocket.collect { socketEvent ->
+                if (socketEvent.type != FriendEvents.FriendLocation.typeName) return@collect
+                val friendLocationContent = json.decodeFromString<FriendLocationContent>(socketEvent.content)
+//                println("location:${friendLocationContent.location}")
+//                println("displayName:${friendLocationContent.user.displayName}")
+                updateMutex.withLock(friendLocationMap) { update(listOf(friendLocationContent.toFriendData())) }
             }
-            println("friendData: $friendData")
-        } }
+        }
     }
 
 
@@ -64,7 +63,7 @@ class FriendLocationPagerModel(
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
-                    onFailureCallback(it.message.toString())
+                    SharedFlowCentre.error.emit(it.message.toString())
                 }.collect { friends ->
                     updateMutex.withLock(friendLocationMap) { update(friends) }
                 }
@@ -76,18 +75,8 @@ class FriendLocationPagerModel(
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
             // 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
-            if (friendMap.isNotEmpty()) {
-                friends.filter { friendMap.containsKey(it.id) }.forEach{ friend->
-                    val locationType = LocationType.fromValue(friend.location)
-                    println("friend:$friend")
-                    val friendLocation = friendLocationMap[locationType]
-                        ?.find { it.location == friend.location }
-                    friendLocation?.friends?.forEach { println("!!!!!!!!!!!!!!"+it) }
-                    friendLocation
-                        ?.friends?.removeAll { it.value.id == friend.id }
-                }
-            }
-
+            removePre(friends)
+            // 更新好友列表缓存
             friendMap += friends.associateBy { it.id }
 
             val friendLocationInfoMap = friends.associate { it.id to mutableStateOf(it) }
@@ -123,7 +112,29 @@ class FriendLocationPagerModel(
                 friendLocation.friends.addAll(locationFriendEntry.value)
             }
         }.onFailure {
-            onFailureCallback(it.message.toString())
+            SharedFlowCentre.error.emit(it.message.toString())
+        }
+    }
+
+    /**
+     * 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
+     */
+    private fun removePre(friends: List<FriendData>) {
+        if (friendMap.isNotEmpty()) {
+            friends.filter { friendMap.containsKey(it.id) }.map { it.id }.forEach { friendId ->
+                // friendMap里此时是存的老的location
+                val perLocation = friendMap[friendId]!!.location
+                val locationType = LocationType.fromValue(perLocation)
+                friendLocationMap[locationType]?.let { friendLocations ->
+                    friendLocations.find { it.location == perLocation }
+                        ?.also { friendLocation ->
+                            friendLocation.friends.removeFirst { it.value.id == friendId }
+                            if (friendLocation.friends.size < 1 && locationType == LocationType.Instance) {
+                                friendLocations.removeFirst { it.location == perLocation }
+                            }
+                        }
+                }
+            }
         }
     }
 
@@ -139,7 +150,7 @@ class FriendLocationPagerModel(
             }.onSuccess { instance ->
                 friendLocation.instants.value = InstantsVO(instance)
             }.onFailure {
-                onFailureCallback(it.message.toString())
+                SharedFlowCentre.error.emit(it.message.toString())
             }
         }
         return friendLocation
