@@ -21,6 +21,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.theme.VRCMTheme
 import org.koin.compose.KoinContext
 import presentation.compoments.SelectableTransitionScreen
@@ -47,6 +48,7 @@ fun App() {
 fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator): ContentTransform =
     when {
         isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningFromTo<HomeScreen, AuthAnimeScreen>() -> homeToAuthAnimeTransition
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> authAnimeToHomeTransition
         else -> ContentTransform(EnterTransition.None, ExitTransition.None)

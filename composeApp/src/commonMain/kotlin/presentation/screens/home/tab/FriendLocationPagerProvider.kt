@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -56,7 +57,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.screens.world.WorldScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
 import org.koin.compose.koinInject
 
@@ -179,7 +181,7 @@ private fun SingleLocationCard(
     text: String,
     onClickUserIcon: (IUser) -> Unit
 ) {
-    if (friendLocations == null) return
+    if (friendLocations == null || friendLocations.friends.isEmpty()) return
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
@@ -262,7 +264,12 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                     modifier = Modifier
                         .width(120.dp)
                         .clip(MaterialTheme.shapes.medium)
-                        .clickable { currentNavigator.push(WorldScreen()) },
+                        .clickable { currentNavigator.push(WorldProfileScreen(WorldProfileVO(
+                            worldId = instants.worldId,
+                            worldName = instants.worldName,
+                            worldImageUrl = instants.worldImageUrl,
+                            worldDescription = instants.worldDescription,
+                        ))) },
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
@@ -271,13 +278,22 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                 ) {
                     Text(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(60.dp),
+                            .fillMaxWidth(),
                         text = instants.worldName,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        text = instants.worldDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
                     Row(
                         modifier = Modifier
                             .height(20.dp),
