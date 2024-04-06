@@ -12,7 +12,10 @@ import io.ktor.http.path
 
 class InstancesApi(private val client: HttpClient) {
     suspend fun instanceByLocation(location: String): Result<InstanceData> {
-        return client.get { url { path(INSTANCES_API_SUFFIX, location) } }
-            .ifOK { body<InstanceData>() }
+        return runCatching {
+            client.get { url { path(INSTANCES_API_SUFFIX, location) } }
+                .ifOK { body<InstanceData>() }
+                .getOrThrow()
+        }
     }
 }

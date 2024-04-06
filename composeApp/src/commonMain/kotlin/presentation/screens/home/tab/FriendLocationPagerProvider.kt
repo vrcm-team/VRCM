@@ -82,16 +82,18 @@ object FriendLocationPagerProvider : ListPagerProvider {
             }
         }
         val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
-
+        LaunchedEffect(Unit){
+            friendLocationPagerModel.doRefreshFriendLocation()
+        }
         return remember {
             {
                 FriendLocationPager(
-                    friendLocationPagerModel = friendLocationPagerModel,
+                    friendLocationMap = friendLocationPagerModel.friendLocationMap,
                     isRefreshing = isRefreshing.value,
                     lazyListState = lazyListState
                 ) {
-                    isRefreshing.value = false
                     friendLocationPagerModel.refreshFriendLocation()
+                    isRefreshing.value = false
                 }
             }
         }
@@ -101,7 +103,7 @@ object FriendLocationPagerProvider : ListPagerProvider {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun  FriendLocationPager(
-    friendLocationPagerModel: FriendLocationPagerModel,
+    friendLocationMap:  Map<LocationType, MutableList<FriendLocation>>,
     isRefreshing:Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit
@@ -111,8 +113,6 @@ fun  FriendLocationPager(
         doRefresh = doRefresh
     ) {
         val currentNavigator = currentNavigator
-
-        val friendLocationMap = friendLocationPagerModel.friendLocationMap
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
@@ -167,7 +167,7 @@ fun  FriendLocationPager(
                 }
                 items(instanceFriendLocations, key = { it.location }) { locations ->
                     LocationCard(locations) {
-                        UserIconsRow(locations.friends, onClickUserIcon)
+                        UserIconsRow(locations.friends.values.toList(), onClickUserIcon)
                     }
                 }
             }
@@ -187,14 +187,15 @@ private fun SingleLocationCard(
         style = MaterialTheme.typography.titleSmall,
     )
     Spacer(modifier = Modifier.height(6.dp))
-    UserIconsRow(friendLocations.friends, onClickUserIcon)
+    UserIconsRow(friendLocations.friends.values.toList(), onClickUserIcon)
 }
 
 @Composable
 private fun UserIconsRow(
-    friends: MutableList<MutableState<FriendData>>,
+    friends: List<MutableState<FriendData>>,
     onClickUserIcon: (IUser) -> Unit
 ) {
+    if (friends.isEmpty()) return
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)

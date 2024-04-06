@@ -75,7 +75,7 @@ object FriendListPagerProvider : ListPagerProvider {
         return remember {
             {
                 FriendListPager(
-                    friendListPagerModel = friendListPagerModel,
+                    friendList =  friendListPagerModel.friendList,
                     isRefreshing = isRefreshing.value,
                     state = lazyListState,
                 ) {
@@ -94,7 +94,7 @@ object FriendListPagerProvider : ListPagerProvider {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendListPager(
-    friendListPagerModel: FriendListPagerModel,
+    friendList: List<FriendData>,
     isRefreshing: Boolean,
     state: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit
@@ -108,7 +108,6 @@ fun FriendListPager(
         val toProfile = { user: IUser ->
             if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(UserProfileVO(user))
         }
-        val friendList = friendListPagerModel.friendList
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
         LazyColumn(

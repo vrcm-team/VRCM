@@ -1,18 +1,15 @@
 package network.websocket.data.content
 
+import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendEventsContent
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class FriendLocationContent(
-    val canRequestInvite: Boolean,
-    val location: String,
-    val travelingToLocation: String,
+data class FriendActiveContent(
     override val user: UserContent,
-    override val userId: String,
-    val worldId: String
-): FriendEventsContent() {
+    override val userId: String
+): FriendEventsContent(){
     fun toFriendData(): FriendData {
         return FriendData(
             bio = user.bio,
@@ -28,7 +25,7 @@ data class FriendLocationContent(
             isFriend = user.isFriend,
             lastLogin = user.lastLogin,
             lastPlatform = user.lastPlatform,
-            location = location,
+            location = LocationType.Offline.value,
             profilePicOverride = user.profilePicOverride,
             status = user.status,
             statusDescription = user.statusDescription,
@@ -37,4 +34,3 @@ data class FriendLocationContent(
         )
     }
 }
-

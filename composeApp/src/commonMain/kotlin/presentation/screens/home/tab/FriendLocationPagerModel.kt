@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
@@ -24,6 +25,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import network.websocket.data.WebSocketEvent
+import network.websocket.data.content.FriendActiveContent
 import network.websocket.data.content.FriendLocationContent
 
 class FriendLocationPagerModel(
@@ -43,19 +46,50 @@ class FriendLocationPagerModel(
     init {
         screenModelScope.launch {
             SharedFlowCentre.webSocket.collect { socketEvent ->
-                if (socketEvent.type != FriendEvents.FriendLocation.typeName) return@collect
-                val friendLocationContent = json.decodeFromString<FriendLocationContent>(socketEvent.content)
-                println("location:${friendLocationContent.location}")
-                println("displayName:${friendLocationContent.user.displayName}")
-                updateMutex.withLock(friendLocationMap) { update(listOf(friendLocationContent.toFriendData())) }
+                onWebSocketEvent(socketEvent)
             }
         }
     }
 
+    private fun onWebSocketEvent(socketEvent: WebSocketEvent) {
+        when (socketEvent.type) {
+            FriendEvents.FriendActive.typeName -> {
+                val friendActiveContent =
+                    json.decodeFromString<FriendActiveContent>(socketEvent.content)
+                update(listOf(friendActiveContent.toFriendData()))
+            }
+
+            // 当用户下线时根据id找到缓存的数据并根据缓存数据的location找到对应的实例房间,将此id的好友移除实例房间
+            FriendEvents.FriendOffline.typeName -> {
+                val friendOfflineContent =
+                    json.decodeFromString<FriendOfflineContent>(socketEvent.content)
+                friendMap[friendOfflineContent.userId]?.let { friend ->
+                    removeFriend(friend.location, friend.id)
+                }
+            }
+            // 这两个事件接受的content都差不多，所以用一个
+            // 当用户登录游戏时会先发送Online事件这时候location是traveling
+            FriendEvents.FriendLocation.typeName, FriendEvents.FriendOnline.typeName -> {
+                val friendLocationContent =
+                    json.decodeFromString<FriendLocationContent>(socketEvent.content)
+                println("location:${friendLocationContent.location}")
+                println("displayName:${friendLocationContent.user.displayName}")
+                update(listOf(friendLocationContent.toFriendData()))
+            }
+            else -> return
+        }
+        println("type:${socketEvent.type}")
+        println("content:${socketEvent.content}")
+    }
+
 
     suspend fun refreshFriendLocation() {
-        this.friendLocationMap.clear()
-        this.friendMap.clear()
+        friendLocationMap.clear()
+        friendMap.clear()
+        doRefreshFriendLocation()
+    }
+
+    suspend fun doRefreshFriendLocation() {
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
@@ -65,7 +99,7 @@ class FriendLocationPagerModel(
                 }.catch {
                     SharedFlowCentre.error.emit(it.message.toString())
                 }.collect { friends ->
-                    updateMutex.withLock(friendLocationMap) { update(friends) }
+                    update(friends)
                 }
         }.join()
     }
@@ -85,17 +119,17 @@ class FriendLocationPagerModel(
             friendLocationInfoMap[LocationType.Offline]?.let { friends ->
                 this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Offline) {
                     mutableStateListOf(FriendLocation.Offline)
-                }.first().friends.addAll(friends)
+                }.first().friends.putAll(friends.associateBy { it.value.id })
             }
             friendLocationInfoMap[LocationType.Private]?.let { friends ->
                 this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Private) {
                     mutableStateListOf(FriendLocation.Private)
-                }.first().friends.addAll(friends)
+                }.first().friends.putAll(friends.associateBy { it.value.id })
             }
             friendLocationInfoMap[LocationType.Traveling]?.let { friends ->
                 this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Traveling) {
                     mutableStateListOf(FriendLocation.Traveling)
-                }.first().friends.addAll(friends)
+                }.first().friends.putAll(friends.associateBy { it.value.id })
             }
 
             val currentInstanceFriendLocations = this@FriendLocationPagerModel.friendLocationMap
@@ -106,10 +140,13 @@ class FriendLocationPagerModel(
             tempInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
                 // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
                 // 找到相同的location的FriendLocation
-                val friendLocation = currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
-                    ?: createFriendLocation(locationFriendEntry.key)
-                        .also { currentInstanceFriendLocations.add(it) }
-                friendLocation.friends.addAll(locationFriendEntry.value)
+                val friendLocation =  updateMutex.withLock(locationFriendEntry.key) {
+                    currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
+                        ?: createFriendLocation(locationFriendEntry.key)
+                            .also { currentInstanceFriendLocations.add(it) }
+                }
+
+                friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
         }.onFailure {
             SharedFlowCentre.error.emit(it.message.toString())
@@ -117,31 +154,39 @@ class FriendLocationPagerModel(
     }
 
     /**
-     * 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
+     * 如果上次请求的数据中有这次的用户并且在不同的location，则把该用户从上次的房间实例中列表中移除
      */
     private fun removePre(friends: List<FriendData>) {
         if (friendMap.isNotEmpty()) {
-            friends.filter { friendMap.containsKey(it.id) }.map { it.id }.forEach { friendId ->
+            friends.filter { friendMap.containsKey(it.id) }.forEach { friend ->
+                val friendId = friend.id
                 // friendMap里此时是存的老的location
                 val perLocation = friendMap[friendId]!!.location
-                val locationType = LocationType.fromValue(perLocation)
-                friendLocationMap[locationType]?.let { friendLocations ->
-                    friendLocations.find { it.location == perLocation }
-                        ?.also { friendLocation ->
-                            friendLocation.friends.removeFirst { it.value.id == friendId }
-                            if (friendLocation.friends.size < 1 && locationType == LocationType.Instance) {
-                                friendLocations.removeFirst { it.location == perLocation }
-                            }
-                        }
-                }
+
+                if (friend.location == perLocation) return
+                removeFriend(perLocation, friendId)
             }
+        }
+    }
+
+    private fun removeFriend(location: String, friendId: String) {
+        val locationType = LocationType.fromValue(location)
+        friendLocationMap[locationType]?.let { friendLocations ->
+            friendLocations.find { it.location == location }
+                ?.also { friendLocation ->
+                    friendLocation.friends.remove(friendId)
+                    friendMap.remove(friendId)
+                    if (friendLocation.friends.isEmpty() && locationType == LocationType.Instance) {
+                        friendLocations.removeFirst { it.location == location }
+                    }
+                }
         }
     }
 
     private fun createFriendLocation(location: String): FriendLocation {
         val friendLocation = FriendLocation(
             location = location,
-            friends = mutableStateListOf()
+            friends = mutableStateMapOf()
         )
         // 通过location查询房间实例信息
         screenModelScope.launch(Dispatchers.IO) {

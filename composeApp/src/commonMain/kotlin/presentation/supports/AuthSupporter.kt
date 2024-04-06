@@ -32,6 +32,7 @@ class AuthSupporter(
         scope.launch {
             SharedFlowCentre.authed.collect {(username, password) ->
                 if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
+                    println("save account $username $password")
                     accountDao.saveAccount(username, password)
                 }
             }
