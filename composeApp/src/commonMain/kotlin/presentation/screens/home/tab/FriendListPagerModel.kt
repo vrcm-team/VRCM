@@ -36,7 +36,6 @@ class FriendListPagerModel(
 
     init {
         screenModelScope.launch {
-            println("init")
             SharedFlowCentre.webSocket.collect { socketEvent ->
                 when (socketEvent.type) {
                     FriendEvents.FriendActive.typeName,
@@ -44,9 +43,7 @@ class FriendListPagerModel(
                     FriendEvents.FriendOnline.typeName-> {}
                     else -> return@collect
                 }
-                if (socketEvent.type != FriendEvents.FriendActive.typeName) return@collect
-                println("Friend type: ${socketEvent.type}")
-                println("Friend content: ${socketEvent.content}")
+                doRefreshFriendList()
             }
         }
     }
@@ -56,7 +53,7 @@ class FriendListPagerModel(
         doRefreshFriendList()
     }
 
-    suspend fun doRefreshFriendList(){
+    private suspend fun doRefreshFriendList(){
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
