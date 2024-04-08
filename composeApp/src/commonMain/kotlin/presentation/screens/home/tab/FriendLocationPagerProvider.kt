@@ -94,7 +94,8 @@ object FriendLocationPagerProvider : ListPagerProvider {
         }
         val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
         LaunchedEffect(Unit){
-            friendLocationPagerModel.doRefreshFriendLocation()
+            // 未clear()的同步刷新一次
+            friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
         }
         return remember {
             {

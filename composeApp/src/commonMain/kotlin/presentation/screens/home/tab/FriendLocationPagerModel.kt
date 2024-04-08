@@ -88,10 +88,16 @@ class FriendLocationPagerModel(
         doRefreshFriendLocation()
     }
 
-    suspend fun doRefreshFriendLocation() {
+    /**
+     * 刷新好友位置
+     * 未clear()的刷新会因为ws接口失效导致好友下线时未同步产生数据残留, 请让removeNotIncluded = true
+     * @param removeNotIncluded 是否移除不在这一次刷新好友在线列表中的好友
+     */
+    suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
+            val includedIdList: MutableList<String> = mutableListOf()
             friendsApi.friendsFlow()
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
@@ -99,7 +105,16 @@ class FriendLocationPagerModel(
                     SharedFlowCentre.error.emit(it.message.toString())
                 }.collect { friends ->
                     update(friends)
+                    if (removeNotIncluded){
+                        includedIdList.addAll(friends.map { it.id })
+                    }
                 }
+            if (removeNotIncluded){
+                launch(Dispatchers.Main) {
+                    includedIdList.filter { !friendMap.containsKey(it) }
+                        .forEach { removeFriend(it) }
+                }
+            }
         }.join()
     }
 
@@ -157,6 +172,7 @@ class FriendLocationPagerModel(
      */
     private fun removePre(friends: List<FriendData>) {
         if (friendMap.isNotEmpty()) {
+
             friends.filter { friendMap.containsKey(it.id) }.forEach { friend ->
                 val friendId = friend.id
                 // friendMap里此时是存的老的location
