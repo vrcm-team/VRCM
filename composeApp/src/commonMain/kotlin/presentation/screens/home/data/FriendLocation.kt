@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -31,6 +32,9 @@ data class FriendLocation(
                 friends = mutableStateMapOf()
             )
     }
+
+    val friendList:List<State<FriendData>>
+        get() = friends.values.sortedBy { it.value.displayName }
 }
 
 

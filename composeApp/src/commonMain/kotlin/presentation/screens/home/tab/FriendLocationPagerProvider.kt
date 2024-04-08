@@ -4,6 +4,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,14 +30,21 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +69,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 object FriendLocationPagerProvider : ListPagerProvider {
@@ -108,6 +118,13 @@ fun  FriendLocationPager(
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit
 ) {
+    var bottomSheetIsVisible by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val currentLocation: MutableState<FriendLocation?> = remember { mutableStateOf(null) }
+    val onClickLocation : (FriendLocation) -> Unit ={
+        currentLocation.value = it
+        bottomSheetIsVisible = true
+    }
     RefreshBox(
         isStartRefresh = isRefreshing,
         doRefresh = doRefresh
@@ -165,13 +182,40 @@ fun  FriendLocationPager(
                         style = MaterialTheme.typography.titleSmall,
                     )
                 }
-                items(instanceFriendLocations, key = { it.location }) { locations ->
-                    LocationCard(locations) {
-                        UserIconsRow(locations.friends.values.toList(), onClickUserIcon)
+                items(instanceFriendLocations, key = { it.location }) { location ->
+                    LocationCard(location, { onClickLocation(location) }) {
+                        UserIconsRow(location.friendList, onClickUserIcon)
                     }
                 }
             }
 
+        }
+    }
+   val scope = rememberCoroutineScope()
+    MenuBottomSheet(
+        isVisible = bottomSheetIsVisible,
+        sheetState = sheetState,
+        onDismissRequest = { bottomSheetIsVisible = false }
+    ) {
+        AImage(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .padding(horizontal = 6.dp)
+                .clip(MaterialTheme.shapes.medium),
+            imageData = currentLocation.value?.instants?.value?.worldImageUrl,
+            contentDescription = "WorldImage"
+        )
+        TextButton(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            onClick = {
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    if (sheetState.isVisible) return@invokeOnCompletion
+                    bottomSheetIsVisible = false
+                }
+            }
+        ) {
+            Text(text = "Look JsonData")
         }
     }
 }
@@ -187,12 +231,12 @@ private fun SingleLocationCard(
         style = MaterialTheme.typography.titleSmall,
     )
     Spacer(modifier = Modifier.height(6.dp))
-    UserIconsRow(friendLocations.friends.values.toList(), onClickUserIcon)
+    UserIconsRow(friendLocations.friendList, onClickUserIcon)
 }
 
 @Composable
 private fun UserIconsRow(
-    friends: List<MutableState<FriendData>>,
+    friends: List<State<FriendData>>,
     onClickUserIcon: (IUser) -> Unit
 ) {
     if (friends.isEmpty()) return
@@ -240,11 +284,12 @@ private fun LocationFriend(
 }
 
 @Composable
-private fun LocationCard(location: FriendLocation, content: @Composable () -> Unit) {
+private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content: @Composable () -> Unit) {
     val instants by location.instants
     val currentNavigator = currentNavigator
 
     Card(
+        modifier = Modifier.clickable(onClick = clickable),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.primary
@@ -331,6 +376,27 @@ private fun LocationCard(location: FriendLocation, content: @Composable () -> Un
                 }
             }
             content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MenuBottomSheet(
+    isVisible: Boolean,
+    sheetState: SheetState,
+    onDismissRequest: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (isVisible) {
+        val bottomInsetPadding = getInsetPadding(0, WindowInsets::getBottom)
+        ModalBottomSheet(
+            modifier = Modifier.offset(y = bottomInsetPadding),
+            onDismissRequest = onDismissRequest,
+            sheetState = sheetState
+        ) {
+            content()
+            Spacer(modifier = Modifier.height(bottomInsetPadding))
         }
     }
 }
