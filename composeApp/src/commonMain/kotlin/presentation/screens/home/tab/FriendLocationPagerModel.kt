@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -64,7 +63,7 @@ class FriendLocationPagerModel(
                 val friendOfflineContent =
                     json.decodeFromString<FriendOfflineContent>(socketEvent.content)
                 friendMap[friendOfflineContent.userId]?.let { friend ->
-                    removeFriend(friend.location, friend.id)
+                    removeFriend(friend.id)
                 }
             }
             // 这两个事件接受的content都差不多，所以用一个
@@ -164,20 +163,20 @@ class FriendLocationPagerModel(
                 val perLocation = friendMap[friendId]!!.location
 
                 if (friend.location == perLocation) return
-                removeFriend(perLocation, friendId)
+                removeFriend(friendId)
             }
         }
     }
 
-    private fun removeFriend(location: String, friendId: String) {
-        val locationType = LocationType.fromValue(location)
-        friendLocationMap[locationType]?.let { friendLocations ->
-            friendLocations.find { it.location == location }
-                ?.also { friendLocation ->
+    private fun removeFriend(friendId: String) {
+        friendLocationMap.values.forEach { friendLocations ->
+            friendLocations.filter{ it.friends.containsKey(friendId) }
+                .forEach { friendLocation ->
                     friendLocation.friends.remove(friendId)
                     friendMap.remove(friendId)
+                    val locationType = LocationType.fromValue(friendLocation.location)
                     if (friendLocation.friends.isEmpty() && locationType == LocationType.Instance) {
-                        friendLocations.removeFirst { it.location == location }
+                        friendLocations.remove(friendLocation)
                     }
                 }
         }
