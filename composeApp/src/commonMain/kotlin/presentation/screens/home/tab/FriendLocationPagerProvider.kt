@@ -1,10 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +71,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 object FriendLocationPagerProvider : ListPagerProvider {
@@ -110,7 +111,7 @@ object FriendLocationPagerProvider : ListPagerProvider {
     }
 
 }
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun  FriendLocationPager(
     friendLocationMap:  Map<LocationType, MutableList<FriendLocation>>,
@@ -197,26 +198,118 @@ fun  FriendLocationPager(
         sheetState = sheetState,
         onDismissRequest = { bottomSheetIsVisible = false }
     ) {
-        AImage(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .padding(horizontal = 6.dp)
-                .clip(MaterialTheme.shapes.medium),
-            imageData = currentLocation.value?.instants?.value?.worldImageUrl,
-            contentDescription = "WorldImage"
-        )
-        TextButton(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = {
-                scope.launch { sheetState.hide() }.invokeOnCompletion {
-                    if (sheetState.isVisible) return@invokeOnCompletion
-                    bottomSheetIsVisible = false
+        if (currentLocation.value == null) return@MenuBottomSheet
+        val currentInstants by currentLocation.value!!.instants
+        Column(
+            modifier = Modifier.padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ){
+            Box(
+                modifier = Modifier.clip(MaterialTheme.shapes.medium)
+            ){
+                AImage(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    imageData = currentLocation.value?.instants?.value?.worldImageUrl,
+                    contentDescription = "WorldImage"
+                )
+                Box(
+                    modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                        .background(
+                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                        )
+                        .padding(3.dp)
+                ) {
+                    Text(
+                        modifier = Modifier.align(Alignment.Center),
+                        text = currentInstants.worldName,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
-        ) {
-            Text(text = "Look JsonData")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+            ){
+                Column(
+                    modifier = Modifier.padding(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ){
+                    Text(
+                        text = "Author:${currentInstants.worldAuthorName}",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = "AuthorTag:",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = currentInstants.worldAuthorTag.joinToString(",\t"),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Text(
+                        text = "Description:",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = currentInstants.worldDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+//            FlowRow (
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.spacedBy(6.dp),
+//                verticalArrangement = Arrangement.spacedBy(6.dp),
+//            ) {
+//                repeat(9){
+//                    Card(
+//                        modifier = Modifier.size(48.dp),
+//                        colors = CardDefaults.cardColors(
+//                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+//                            contentColor = MaterialTheme.colorScheme.primary
+//                        ),
+//                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+//                    ) {
+//                        Column(
+//                            modifier = Modifier.fillMaxSize(),
+//                            verticalArrangement = Arrangement.Center,
+//                            horizontalAlignment = Alignment.CenterHorizontally,
+//                        ) {
+//                            Icon(
+//                                modifier = Modifier
+//                                    .size(20.dp),
+//                                imageVector = Icons.Rounded.Person,
+//                                contentDescription = "PersonCount"
+//                            )
+//                            Text(
+//                                text = currentInstants.userCount,
+//                                style = MaterialTheme.typography.labelMedium,
+//                            )
+//                        }
+//                    }
+//                }
+//            }
+//            TextButton(
+//                modifier = Modifier.align(Alignment.CenterHorizontally),
+//                onClick = {
+//                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+//                        if (sheetState.isVisible) return@invokeOnCompletion
+//                        bottomSheetIsVisible = false
+//                    }
+//                }
+//            ) {
+//                Text(text = "Look JsonData")
+//            }
         }
+
     }
 }
 @Composable
