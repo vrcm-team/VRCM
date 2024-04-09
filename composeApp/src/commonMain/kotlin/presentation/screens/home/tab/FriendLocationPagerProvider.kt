@@ -1,12 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.tab
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,7 +12,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,8 +29,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -44,7 +38,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,6 +58,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.screens.home.components.FriendLocationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
@@ -193,124 +187,8 @@ fun  FriendLocationPager(
 
         }
     }
-   val scope = rememberCoroutineScope()
-    MenuBottomSheet(
-        isVisible = bottomSheetIsVisible,
-        sheetState = sheetState,
-        onDismissRequest = { bottomSheetIsVisible = false }
-    ) {
-        if (currentLocation.value == null) return@MenuBottomSheet
-        val currentInstants by currentLocation.value!!.instants
-        Column(
-            modifier = Modifier.padding(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ){
-            Box(
-                modifier = Modifier.clip(MaterialTheme.shapes.medium)
-            ){
-                AImage(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    imageData = currentLocation.value?.instants?.value?.worldImageUrl,
-                    contentDescription = "WorldImage"
-                )
-                Box(
-                    modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                        .background(
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                        )
-                        .padding(3.dp)
-                ) {
-                    Text(
-                        modifier = Modifier.align(Alignment.Center),
-                        text = currentInstants.worldName,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ),
-            ){
-                Column(
-                    modifier = Modifier.padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ){
-                    Text(
-                        text = "Author:${currentInstants.worldAuthorName}",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = "AuthorTag:",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = currentInstants.worldAuthorTag.joinToString(",\t"),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    Text(
-                        text = "Description:",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = currentInstants.worldDescription,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-//            FlowRow (
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.spacedBy(6.dp),
-//                verticalArrangement = Arrangement.spacedBy(6.dp),
-//            ) {
-//                repeat(9){
-//                    Card(
-//                        modifier = Modifier.size(48.dp),
-//                        colors = CardDefaults.cardColors(
-//                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-//                            contentColor = MaterialTheme.colorScheme.primary
-//                        ),
-//                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-//                    ) {
-//                        Column(
-//                            modifier = Modifier.fillMaxSize(),
-//                            verticalArrangement = Arrangement.Center,
-//                            horizontalAlignment = Alignment.CenterHorizontally,
-//                        ) {
-//                            Icon(
-//                                modifier = Modifier
-//                                    .size(20.dp),
-//                                imageVector = Icons.Rounded.Person,
-//                                contentDescription = "PersonCount"
-//                            )
-//                            Text(
-//                                text = currentInstants.userCount,
-//                                style = MaterialTheme.typography.labelMedium,
-//                            )
-//                        }
-//                    }
-//                }
-//            }
-//            TextButton(
-//                modifier = Modifier.align(Alignment.CenterHorizontally),
-//                onClick = {
-//                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-//                        if (sheetState.isVisible) return@invokeOnCompletion
-//                        bottomSheetIsVisible = false
-//                    }
-//                }
-//            ) {
-//                Text(text = "Look JsonData")
-//            }
-        }
-
+    FriendLocationBottomSheet(bottomSheetIsVisible, sheetState, currentLocation){
+         bottomSheetIsVisible = false
     }
 }
 @Composable
@@ -474,23 +352,3 @@ private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MenuBottomSheet(
-    isVisible: Boolean,
-    sheetState: SheetState,
-    onDismissRequest: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    if (isVisible) {
-        val bottomInsetPadding = getInsetPadding(0, WindowInsets::getBottom)
-        ModalBottomSheet(
-            modifier = Modifier.offset(y = bottomInsetPadding),
-            onDismissRequest = onDismissRequest,
-            sheetState = sheetState
-        ) {
-            content()
-            Spacer(modifier = Modifier.height(bottomInsetPadding))
-        }
-    }
-}
