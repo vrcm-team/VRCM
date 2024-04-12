@@ -242,7 +242,6 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVO) {
     val rowSpaced = 6.dp
     if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
         Row(
-            modifier = Modifier.height(width),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(rowSpaced),
         ) {
@@ -253,7 +252,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVO) {
             // speakLanguages
             LanguagesRow(speakLanguages, width)
             VerticalDivider(
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.height(width).padding(vertical = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
                 thickness = 1.dp,
             )
@@ -345,6 +344,7 @@ private fun LanguagesRow(
         return
     }
     Row(
+        modifier = Modifier.height(width),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -401,6 +401,7 @@ fun LinksRow(
         return
     }
     Row(
+        modifier = Modifier.height(width),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
