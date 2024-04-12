@@ -2,7 +2,7 @@ package io.github.vrcmteam.vrcm.network.api.notification.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import network.api.notification.data.Response
+import network.api.notification.data.ResponseData
 
 @Serializable
 data class NotificationData(
@@ -25,7 +25,7 @@ data class NotificationData(
     val receiverUserId: String,
     val relatedNotificationsId: String,
     val requireSeen: Boolean,
-    val responses: List<Response>,
+    val responses: List<ResponseData>,
     val seen: Boolean,
     val senderUserId: String?,
     val senderUsername: String?,

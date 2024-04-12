@@ -14,6 +14,7 @@ import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import network.api.notification.data.ResponseData
 
 
 class HomeScreenModel(
@@ -42,6 +43,16 @@ class HomeScreenModel(
                 }
         }
 
+
+    fun responseNotification(id: String, response: ResponseData) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authSupporter.reTryAuth { notificationApi.responseNotification(id,response) }
+                .onHomeFailure()
+                .onSuccess {
+                    refreshNotifications()
+                }
+        }
+    }
 
     private fun refreshCurrentUser() =
         screenModelScope.launch(Dispatchers.IO) {

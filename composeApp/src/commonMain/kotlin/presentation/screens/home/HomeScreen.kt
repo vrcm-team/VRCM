@@ -24,8 +24,6 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
-import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -66,10 +64,7 @@ object HomeScreen : Screen {
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = {
-                HomeTopAppBar(
-                    homeScreenModel.currentUser,
-                    homeScreenModel.notifications
-                ) { homeScreenModel.refreshNotifications() }
+                HomeTopAppBar(homeScreenModel)
             },
             bottomBar = { HomeBottomBar(pagerProvidersState) },
             floatingActionButton = {
@@ -96,10 +91,13 @@ object HomeScreen : Screen {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private inline fun HomeTopAppBar(
-    currentUser: CurrentUserData?,
-    notificationList: List<NotificationData>,
-    crossinline refreshNotification: () -> Unit
+    homeScreenModel: HomeScreenModel
 ) {
+    val currentUser = homeScreenModel.currentUser
+    val refreshNotification = {
+        homeScreenModel.refreshNotifications()
+    }
+    val notifications = homeScreenModel.notifications
     // to ProfileScreen
     val currentNavigator = currentNavigator
     val onClickUserIcon = { user: IUser ->
@@ -178,7 +176,7 @@ private inline fun HomeTopAppBar(
                 BadgedBox(
                     badge = {
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        if (notificationList.isNotEmpty()){
+                        if (notifications.isNotEmpty()){
                             Canvas(modifier = Modifier.size(8.dp)){
                                 drawCircle(color = primaryColor, radius = 4.dp.toPx())
                             }
@@ -195,11 +193,12 @@ private inline fun HomeTopAppBar(
     )
     NotificationBottomSheet(
         bottomSheetIsVisible = bottomSheetIsVisible,
-        notificationList = notificationList
-
-    ){
-        bottomSheetIsVisible = false
-    }
+        notificationList = notifications,
+        onDismissRequest = { bottomSheetIsVisible = false },
+        onResponseNotification = {id, response ->
+            homeScreenModel.responseNotification(id, response)
+        }
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
