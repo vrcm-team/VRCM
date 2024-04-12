@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,15 +24,18 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.components.NotificationBottomSheet
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.PagerProvidersState
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListPagerProvider
-import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationPagerProvider
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerProvider
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerProvider
+import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
@@ -41,23 +45,11 @@ import kotlinx.coroutines.launch
 
 object HomeScreen : Screen {
     @Composable
-    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+    @OptIn(ExperimentalFoundationApi::class)
     override fun Content() {
-//        var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
         val homeScreenModel: HomeScreenModel = getScreenModel()
-        val currentUser = homeScreenModel.currentUser
-        // to ProfileScreen
-        val onClickUserIcon = { user: IUser ->
-            // 防止多次点击在栈中存在相同key的屏幕报错
-            if (currentNavigator.size <= 1) {
-                currentNavigator push UserProfileScreen(UserProfileVO(user))
-            }
-        }
-        var bottomSheetIsVisible by remember { mutableStateOf(false) }
-        val onClickNotification : () -> Unit ={
-            bottomSheetIsVisible = true
-        }
+
         LifecycleEffect(onStarted = (homeScreenModel::ini))
         LaunchedEffect(Unit){
             // 报错时跳到验证页面
@@ -65,112 +57,21 @@ object HomeScreen : Screen {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
-        val trustRank = remember(currentUser) { currentUser?.trustRank }
-        val rankColor = GameColor.Rank.fromValue(trustRank)
-        val topBar = @Composable {
-            TopAppBar(
-                modifier = Modifier.shadow(2.dp),
-                colors = topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.onPrimary,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                    actionIconContentColor = MaterialTheme.colorScheme.primary,
-                ),
-                navigationIcon = {
-                    UserStateIcon(
-                        modifier = Modifier
-                            .height(56.dp)
-                            .clip(CircleShape)
-                            .clickable { currentUser?.let { onClickUserIcon(it) } },
-                        iconUrl = currentUser?.currentAvatarThumbnailImageUrl
-                            ?: "",
-                        userStatus = currentUser?.status
-                    )
-                },
-                title = {
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Icon(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .align(Alignment.CenterVertically),
-                                imageVector = Icons.Rounded.Shield,
-                                contentDescription = "CurrentUserTrustRankIcon",
-                                tint = rankColor
-                            )
-                            Text(
-                                text = currentUser?.displayName ?: "",
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1
-                            )
-                        }
-                        Text(
-                            text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.inversePrimary,
-                            maxLines = 1
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = onClickNotification
-                    ){
-                        Icon(
-                            imageVector = Icons.Rounded.Notifications,
-                            contentDescription = "NotificationIcon"
-                        )
-                    }
-                }
-            )
-        }
 
         val pagerProvidersState = createPagerProvidersState(
             FriendLocationPagerProvider,
             FriendListPagerProvider
         )
-        val scope = rememberCoroutineScope()
-        val pagerNavigationItems:@Composable RowScope.() -> Unit = {
-            pagerProvidersState.pagerProviders.forEach {
-                val index = it.index
-                val selected = pagerProvidersState.pagerState.currentPage == index
-                PagerNavigationItem(
-                    provider = it,
-                    selected = selected
-                ) {
-                    scope.launch{
-                        if (selected) {
-                            pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
-                        }else{
-                            pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
-                        }
-                    }
-                }
-            }
-        }
-        // 如果没有底部系统手势条，则加12dp
-        val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
-        val bottomBar = @Composable {
-            NavigationBar(
-                modifier = Modifier
-                    .padding(start = 12.dp, end = 12.dp, bottom = bottomPadding)
-                    .windowInsetsPadding(NavigationBarDefaults.windowInsets)
-                    .shadow(
-                        elevation = 2.dp,
-                        shape = MaterialTheme.shapes.extraLarge,
-                    ),
-                containerColor = MaterialTheme.colorScheme.onPrimary,
-                contentColor = MaterialTheme.colorScheme.primary,
-                content = pagerNavigationItems
-            )
-        }
 
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
-            topBar = topBar,
-            bottomBar = bottomBar,
+            topBar = {
+                HomeTopAppBar(
+                    homeScreenModel.currentUser,
+                    homeScreenModel.notifications
+                ) { homeScreenModel.refreshNotifications() }
+            },
+            bottomBar = { HomeBottomBar(pagerProvidersState) },
             floatingActionButton = {
 //                    Button(onClick = { snackBarToastText = "132132131" }) {}
             }
@@ -188,16 +89,156 @@ object HomeScreen : Screen {
                 }
             }
         }
-        NotificationBottomSheet(
-            bottomSheetIsVisible = bottomSheetIsVisible,
-        ){
-            bottomSheetIsVisible = false
-        }
-    }
 
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private inline fun HomeTopAppBar(
+    currentUser: CurrentUserData?,
+    notificationList: List<NotificationData>,
+    crossinline refreshNotification: () -> Unit
+) {
+    // to ProfileScreen
+    val currentNavigator = currentNavigator
+    val onClickUserIcon = { user: IUser ->
+        // 防止多次点击在栈中存在相同key的屏幕报错
+        if (currentNavigator.size <= 1) {
+            currentNavigator push UserProfileScreen(UserProfileVO(user))
+        }
+    }
+    val trustRank = remember(currentUser) { currentUser?.trustRank }
+    val rankColor = GameColor.Rank.fromValue(trustRank)
+    // notification
+    var bottomSheetIsVisible by remember { mutableStateOf(false) }
+    val onClickNotification : () -> Unit ={
+        bottomSheetIsVisible = true
+    }
+    // 初始化刷新一次
+    LaunchedEffect(Unit){
+        refreshNotification()
+    }
+    // 每打开一次刷新一次
+    LaunchedEffect(bottomSheetIsVisible) {
+        if (bottomSheetIsVisible) {
+            refreshNotification()
+        }
+    }
+    TopAppBar(
+        modifier = Modifier.shadow(2.dp),
+        colors = topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.onPrimary,
+            titleContentColor = MaterialTheme.colorScheme.primary,
+            actionIconContentColor = MaterialTheme.colorScheme.primary,
+        ),
+        navigationIcon = {
+            UserStateIcon(
+                modifier = Modifier
+                    .height(56.dp)
+                    .clip(CircleShape)
+                    .clickable { currentUser?.let { onClickUserIcon(it) } },
+                iconUrl = currentUser?.currentAvatarThumbnailImageUrl
+                    ?: "",
+                userStatus = currentUser?.status
+            )
+        },
+        title = {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Icon(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .align(Alignment.CenterVertically),
+                        imageVector = Icons.Rounded.Shield,
+                        contentDescription = "CurrentUserTrustRankIcon",
+                        tint = rankColor
+                    )
+                    Text(
+                        text = currentUser?.displayName ?: "",
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1
+                    )
+                }
+                Text(
+                    text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.inversePrimary,
+                    maxLines = 1
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onClickNotification
+            ){
+                BadgedBox(
+                    badge = {
+                        val primaryColor = MaterialTheme.colorScheme.primary
+                        if (notificationList.isNotEmpty()){
+                            Canvas(modifier = Modifier.size(8.dp)){
+                                drawCircle(color = primaryColor, radius = 4.dp.toPx())
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Notifications,
+                        contentDescription = "NotificationIcon"
+                    )
+                }
+            }
+        }
+    )
+    NotificationBottomSheet(
+        bottomSheetIsVisible = bottomSheetIsVisible,
+        notificationList = notificationList
 
+    ){
+        bottomSheetIsVisible = false
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private inline fun HomeBottomBar(pagerProvidersState: PagerProvidersState) {
+    // 如果没有底部系统手势条，则加12dp
+    val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
+    val scope = rememberCoroutineScope()
+    val pagerNavigationItems:@Composable RowScope.() -> Unit = {
+        pagerProvidersState.pagerProviders.forEach {
+            val index = it.index
+            val selected = pagerProvidersState.pagerState.currentPage == index
+            PagerNavigationItem(
+                provider = it,
+                selected = selected
+            ) {
+                scope.launch{
+                    if (selected) {
+                        pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
+                    }else{
+                        pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
+                    }
+                }
+            }
+        }
+    }
+    NavigationBar(
+        modifier = Modifier
+            .padding(start = 12.dp, end = 12.dp, bottom = bottomPadding)
+            .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+            .shadow(
+                elevation = 2.dp,
+                shape = MaterialTheme.shapes.extraLarge,
+            ),
+        containerColor = MaterialTheme.colorScheme.onPrimary,
+        contentColor = MaterialTheme.colorScheme.primary,
+        content = pagerNavigationItems
+    )
+}
 
 @Composable
 private fun RowScope.PagerNavigationItem(provider: PagerProvider, selected: Boolean, onClick: () -> Unit) {

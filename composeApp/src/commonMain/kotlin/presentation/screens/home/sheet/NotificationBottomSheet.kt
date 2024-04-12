@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.home.components
+package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -6,37 +6,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Text
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import org.koin.compose.koinInject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationBottomSheet(
     bottomSheetIsVisible: Boolean,
+    notificationList: List<NotificationData>,
     sheetState: SheetState = rememberModalBottomSheetState(),
     onDismissRequest: () -> Unit,
 ) {
-    val notificationApi = koinInject<NotificationApi>()
-
-    var notificationList by remember { mutableStateOf(listOf<NotificationData>()) }
-    LaunchedEffect(bottomSheetIsVisible) {
-        if (bottomSheetIsVisible) {
-            notificationList = notificationApi.fetchNotifications()
-        }
-    }
     ABottomSheet(
         isVisible = bottomSheetIsVisible,
         sheetState = sheetState,
         onDismissRequest = onDismissRequest
     ){
+
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(
@@ -46,7 +38,7 @@ fun NotificationBottomSheet(
                 bottom = getInsetPadding(6, WindowInsets::getBottom)
             )
         ) {
-            items(notificationList){
+            items(notificationList, key = { it.id }){
                 Card(
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 ) {

@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.home.tab
+package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.ScreenModel
