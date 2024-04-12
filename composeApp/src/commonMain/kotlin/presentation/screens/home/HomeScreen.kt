@@ -4,38 +4,15 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +28,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.components.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendListPagerProvider
 import io.github.vrcmteam.vrcm.presentation.screens.home.tab.FriendLocationPagerProvider
@@ -75,6 +53,10 @@ object HomeScreen : Screen {
             if (currentNavigator.size <= 1) {
                 currentNavigator push UserProfileScreen(UserProfileVO(user))
             }
+        }
+        var bottomSheetIsVisible by remember { mutableStateOf(false) }
+        val onClickNotification : () -> Unit ={
+            bottomSheetIsVisible = true
         }
         LifecycleEffect(onStarted = (homeScreenModel::ini))
         LaunchedEffect(Unit){
@@ -134,7 +116,7 @@ object HomeScreen : Screen {
                 },
                 actions = {
                     IconButton(
-                        onClick = {}
+                        onClick = onClickNotification
                     ){
                         Icon(
                             imageVector = Icons.Rounded.Notifications,
@@ -206,7 +188,11 @@ object HomeScreen : Screen {
                 }
             }
         }
-
+        NotificationBottomSheet(
+            bottomSheetIsVisible = bottomSheetIsVisible,
+        ){
+            bottomSheetIsVisible = false
+        }
     }
 
 }

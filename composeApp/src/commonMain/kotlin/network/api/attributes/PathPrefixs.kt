@@ -14,4 +14,6 @@ internal const val FILE_API_PREFIX = "file"
 
 internal const val WORLDS_API_PREFIX = "worlds"
 
+internal const val NOTIFICATIONS_API_PREFIX = "notifications"
+
 internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"
