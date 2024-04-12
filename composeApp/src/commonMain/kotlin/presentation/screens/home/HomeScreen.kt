@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
@@ -126,17 +125,15 @@ object HomeScreen : Screen {
                             )
                         }
                         Text(
-                            modifier = Modifier.alpha(0.6f),
                             text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
                             style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.inversePrimary,
                             maxLines = 1
                         )
                     }
                 },
                 actions = {
                     IconButton(
-                        modifier = Modifier
-                            .padding(6.dp),
                         onClick = {}
                     ){
                         Icon(
@@ -227,7 +224,7 @@ private fun RowScope.PagerNavigationItem(provider: PagerProvider, selected: Bool
                 contentDescription = provider.title
             )
         },
-        label = { Text(provider.title) },
+            label = { Text(provider.title) },
         selected = selected,
         onClick = onClick,
         alwaysShowLabel = selected,

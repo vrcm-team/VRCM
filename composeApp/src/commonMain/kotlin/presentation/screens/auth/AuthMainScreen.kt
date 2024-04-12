@@ -24,9 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -36,7 +34,6 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
-import io.github.vrcmteam.vrcm.presentation.compoments.snackBarToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
@@ -45,7 +42,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 object AuthScreen : Screen {
     @Composable
     override fun Content() {
-        var snackBarToastText by snackBarToastText
         val currentNavigator = currentNavigator
         val authScreenModel: AuthScreenModel = getScreenModel()
 

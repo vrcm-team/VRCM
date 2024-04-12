@@ -19,7 +19,7 @@ data class WorldData(
     val imageUrl: String,
     val labsPublicationDate: String,
     val name: String,
-    val namespace: String,
+    val namespace: String?,
     val organization: String,
     val popularity: Int,
     val previewYoutubeId: String? = null,
