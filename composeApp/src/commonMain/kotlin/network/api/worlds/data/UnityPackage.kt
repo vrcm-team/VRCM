@@ -12,7 +12,7 @@ data class UnityPackage(
     val createdAt: String?,
     val id: String,
     val platform: String,
-    val pluginUrl: String,
+    val pluginUrl: String?,
     val unitySortNumber: Long,
     val unityVersion: String
 ) : JavaSerializable
