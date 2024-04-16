@@ -1,15 +1,14 @@
 package io.github.vrcmteam.vrcm.network.api.friends
 
+import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.parameter
-import io.ktor.http.parameters
-import io.ktor.http.path
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -48,20 +47,15 @@ class FriendsApi(private val client: HttpClient) {
         offset: Int = 0,
         n: Int = 50
     ){
-        var count = 0
-        while (true) {
-            val bodyList: List<FriendData> = client.get {
+        fetchDataList(offset,n) { currentOffset, _ ->
+            client.get {
                 url { path(AUTH_API_PREFIX, USER_API_PREFIX, "friends") }
                 parameters {
                     parameter("offline", offline.toString())
-                    parameter("offset", (offset + count * n).toString())
+                    parameter("offset", currentOffset.toString())
                     parameter("n", n.toString())
                 }
             }.ifOK { body<List<FriendData>>() }.getOrThrow()
-            if (bodyList.isEmpty()) break
-            this@fetchFriendList.emit(bodyList)
-            count++
         }
     }
-
 }
