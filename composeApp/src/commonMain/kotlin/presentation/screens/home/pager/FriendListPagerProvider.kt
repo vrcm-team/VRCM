@@ -84,10 +84,11 @@ fun FriendListPager(
     state: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit
 ) {
+    val topPadding = getInsetPadding(WindowInsets::getTop) + 70.dp
     RefreshBox(
+        refreshContainerOffsetY = topPadding,
         isStartRefresh = isRefreshing,
         doRefresh = doRefresh
-
     ) {
         val currentNavigator = currentNavigator
         val toProfile = { user: IUser ->
@@ -98,7 +99,12 @@ fun FriendListPager(
         LazyColumn(
             modifier =  Modifier.fillMaxSize(),
             state = state,
-            contentPadding = PaddingValues(start = 6.dp, top = 6.dp, end = 6.dp, bottom = bottomPadding),
+            contentPadding = PaddingValues(
+                start = 6.dp,
+                top = topPadding,
+                end = 6.dp,
+                bottom = bottomPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(friendList, key = { it.id }) {

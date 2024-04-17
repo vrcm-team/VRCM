@@ -96,8 +96,8 @@ class FriendLocationPagerModel(
     suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
         // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
+        val includedIdList: MutableList<String> = mutableListOf()
         screenModelScope.launch(Dispatchers.IO) {
-            val includedIdList: MutableList<String> = mutableListOf()
             friendsApi.friendsFlow()
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
@@ -109,13 +109,11 @@ class FriendLocationPagerModel(
                         includedIdList.addAll(friends.map { it.id })
                     }
                 }
-            if (removeNotIncluded){
-                launch(Dispatchers.Main) {
-                    includedIdList.filter { !friendMap.containsKey(it) }
-                        .forEach { removeFriend(it) }
-                }
-            }
         }.join()
+        if (removeNotIncluded){
+            friendMap.keys.filter { !includedIdList.contains(it) }
+                .forEach { removeFriend(it) }
+        }
     }
 
     private fun update(

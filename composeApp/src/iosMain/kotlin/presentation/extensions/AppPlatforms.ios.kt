@@ -7,3 +7,6 @@ import platform.UIKit.UIApplication
 actual fun AppPlatform.openUrl(url: String) {
     UIApplication.sharedApplication.openURL(NSURL(string = url))
 }
+
+actual val AppPlatform.isSupportBlur: Boolean
+    get() = true

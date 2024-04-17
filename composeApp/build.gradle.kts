@@ -79,6 +79,8 @@ kotlin {
             implementation(libs.coil.compose.core)
             implementation(libs.coil.network.ktor)
 
+            implementation(libs.chrisbanes.haze)
+
 //            implementation(libs.kamel)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenModel)

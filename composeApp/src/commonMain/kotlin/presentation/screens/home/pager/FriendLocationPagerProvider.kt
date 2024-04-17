@@ -99,7 +99,9 @@ fun  FriendLocationPager(
         currentLocation.value = it
         bottomSheetIsVisible = true
     }
+    val topPadding = getInsetPadding(WindowInsets::getTop) + 70.dp
     RefreshBox(
+        refreshContainerOffsetY = topPadding,
         isStartRefresh = isRefreshing,
         doRefresh = doRefresh
     ) {
@@ -113,13 +115,14 @@ fun  FriendLocationPager(
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(
                 start = 6.dp,
-                top = 6.dp,
+                top = topPadding,
                 end = 6.dp,
                 bottom = bottomPadding
             )

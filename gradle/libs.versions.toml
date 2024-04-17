@@ -15,7 +15,7 @@ statelyCommon = "2.0.6"
 voyager = "1.1.0-alpha03"
 coil3 = "3.0.0-alpha04"
 ktor-client = "2.3.8"
-
+chrisbanes-haze = "0.7.0"
 [libraries]
 # compose
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "jetpack-compose-bom" }
@@ -53,6 +53,9 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 # coil3
 coil-compose-core = { module = "io.coil-kt.coil3:coil-compose-core", version.ref = "coil3" }
 coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor", version.ref = "coil3" }
+
+# chrisbanes-haze
+chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }
 
 [plugins]
 androidLibrary = { id = "com.android.library", version.ref = "agp" }

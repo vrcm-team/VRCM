@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.extensions
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import io.github.vrcmteam.vrcm.AndroidAppPlatform
 import io.github.vrcmteam.vrcm.AppPlatform
 
@@ -12,3 +13,6 @@ actual fun AppPlatform.openUrl(url: String) {
         context.startActivity(intent)
     }
 }
+
+actual val AppPlatform.isSupportBlur: Boolean
+    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

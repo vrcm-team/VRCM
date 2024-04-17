@@ -13,21 +13,31 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
+import dev.chrisbanes.haze.HazeDefaults.style
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
-import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.PagerProvidersState
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
@@ -60,21 +70,23 @@ object HomeScreen : Screen {
             FriendLocationPagerProvider,
             FriendListPagerProvider
         )
-
+        // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
+        val supportBlur = getAppPlatform().isSupportBlur
+        val hazeState = if (supportBlur)remember { HazeState() } else null
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = {
-                HomeTopAppBar(homeScreenModel)
+                HomeTopAppBar(homeScreenModel,hazeState)
             },
-            bottomBar = { HomeBottomBar(pagerProvidersState) },
+            bottomBar = { HomeBottomBar(pagerProvidersState,hazeState) },
             floatingActionButton = {
 //                    Button(onClick = { snackBarToastText = "132132131" }) {}
             }
-        ) { innerPadding ->
+        ) {
             Surface(
                 modifier = Modifier
-                    .padding(top = innerPadding.calculateTopPadding())
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .enableIf(supportBlur) { haze(state = hazeState!!) },
                 contentColor = MaterialTheme.colorScheme.primary,
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 16.dp
@@ -91,7 +103,8 @@ object HomeScreen : Screen {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private inline fun HomeTopAppBar(
-    homeScreenModel: HomeScreenModel
+    homeScreenModel: HomeScreenModel,
+    hazeState: HazeState?
 ) {
     val currentUser = homeScreenModel.currentUser
     val refreshNotification = {
@@ -123,10 +136,20 @@ private inline fun HomeTopAppBar(
             refreshNotification()
         }
     }
+    val modifier = if (hazeState != null) {
+        Modifier.hazeChild(
+                state = hazeState,
+                style = style(
+                    backgroundColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            )
+    }else{
+        Modifier.shadow(2.dp)
+    }
     TopAppBar(
-        modifier = Modifier.shadow(2.dp),
+        modifier = modifier,
         colors = topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.onPrimary,
             titleContentColor = MaterialTheme.colorScheme.primary,
             actionIconContentColor = MaterialTheme.colorScheme.primary,
         ),
@@ -203,7 +226,10 @@ private inline fun HomeTopAppBar(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private inline fun HomeBottomBar(pagerProvidersState: PagerProvidersState) {
+private inline fun HomeBottomBar(
+    pagerProvidersState: PagerProvidersState,
+    hazeState: HazeState?
+) {
     // 如果没有底部系统手势条，则加12dp
     val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
     val scope = rememberCoroutineScope()
@@ -229,11 +255,23 @@ private inline fun HomeBottomBar(pagerProvidersState: PagerProvidersState) {
         modifier = Modifier
             .padding(start = 12.dp, end = 12.dp, bottom = bottomPadding)
             .windowInsetsPadding(NavigationBarDefaults.windowInsets)
-            .shadow(
-                elevation = 2.dp,
-                shape = MaterialTheme.shapes.extraLarge,
-            ),
-        containerColor = MaterialTheme.colorScheme.onPrimary,
+            .run {
+                if (hazeState != null) {
+                    hazeChild(
+                        state = hazeState,
+                        shape = MaterialTheme.shapes.extraLarge,
+                        style = style(
+                            backgroundColor = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    )
+                } else {
+                    shadow(
+                        elevation = 2.dp,
+                        shape = MaterialTheme.shapes.extraLarge,
+                    )
+                }
+            },
+        containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.onPrimary,
         contentColor = MaterialTheme.colorScheme.primary,
         content = pagerNavigationItems
     )

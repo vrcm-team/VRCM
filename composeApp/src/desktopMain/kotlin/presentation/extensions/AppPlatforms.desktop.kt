@@ -7,3 +7,6 @@ import java.net.URI
 actual fun AppPlatform.openUrl(url: String) {
     Desktop.getDesktop().browse(URI(url))
 }
+
+actual val AppPlatform.isSupportBlur: Boolean
+    get() = true
