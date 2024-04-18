@@ -5,13 +5,34 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +58,11 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.extensions.*
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.isSupportBlur
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.PagerProvidersState
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
@@ -88,8 +113,7 @@ object HomeScreen : Screen {
                     .fillMaxSize()
                     .enableIf(supportBlur) { haze(state = hazeState!!) },
                 contentColor = MaterialTheme.colorScheme.primary,
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 16.dp
+                color = MaterialTheme.colorScheme.background,
             ) {
                 HorizontalPager(pagerProvidersState.pagerState) {
                     pagerProvidersState.pagers[it]()
@@ -140,7 +164,7 @@ private inline fun HomeTopAppBar(
         Modifier.hazeChild(
                 state = hazeState,
                 style = style(
-                    backgroundColor = MaterialTheme.colorScheme.onPrimary,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
                 )
             )
     }else{
@@ -149,7 +173,7 @@ private inline fun HomeTopAppBar(
     TopAppBar(
         modifier = modifier,
         colors = topAppBarColors(
-            containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.onPrimary,
+            containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
             titleContentColor = MaterialTheme.colorScheme.primary,
             actionIconContentColor = MaterialTheme.colorScheme.primary,
         ),
@@ -261,7 +285,7 @@ private inline fun HomeBottomBar(
                         state = hazeState,
                         shape = MaterialTheme.shapes.extraLarge,
                         style = style(
-                            backgroundColor = MaterialTheme.colorScheme.onPrimary,
+                            backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
                         )
                     )
                 } else {
@@ -271,7 +295,7 @@ private inline fun HomeBottomBar(
                     )
                 }
             },
-        containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.onPrimary,
+        containerColor = if (hazeState != null) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.primary,
         content = pagerNavigationItems
     )
