@@ -111,9 +111,6 @@ class FriendLocationPagerModel(
                 }
         }.join()
         if (removeNotIncluded){
-            println("removeNotIncluded:${includedIdList}")
-            println("friendMap.keys:${friendMap.keys}")
-
             friendMap.keys.filter { !includedIdList.contains(it) }
                 .forEach { removeFriend(it) }
         }
@@ -172,27 +169,16 @@ class FriendLocationPagerModel(
      * 如果上次请求的数据中有这次的用户并且在不同的location，则把该用户从上次的房间实例中列表中移除
      */
     private fun removePre(friends: List<FriendData>) {
-        if (friendMap.isNotEmpty()) {
-            println("removePre friends:${friends}")
-            println("removePre friendMap:${friendMap}")
-            friends.filter { friendMap.containsKey(it.id) }.forEach { friend ->
-                val friendId = friend.id
-                // friendMap里此时是存的老的location
-                val perLocation = friendMap[friendId]!!.location
-                println("removePre perLocation:${perLocation}")
-                println("removePre currtLocation:${friend.location}")
-                if (friend.location == perLocation) return
-                removeFriend(friendId)
-            }
-        }
+        if (friendMap.isEmpty()) return
+        friends.filter {
+            friendMap.containsKey(it.id) && friendMap[it.id]!!.location != it.location
+        }.map { it.id }.forEach(::removeFriend)
     }
 
     private fun removeFriend(friendId: String) {
-        println("removeFriend friendId:$friendId")
         friendLocationMap.values.forEach { friendLocations ->
             friendLocations.filter{ it.friends.containsKey(friendId) }
                 .forEach { friendLocation ->
-                    println("removeFriend friendLocation:${friendLocation.instants.value.worldName}")
                     friendLocation.friends.remove(friendId)
                     friendMap.remove(friendId)
                     val locationType = LocationType.fromValue(friendLocation.location)
