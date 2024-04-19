@@ -113,7 +113,7 @@ object HomeScreen : Screen {
                     .fillMaxSize()
                     .enableIf(supportBlur) { haze(state = hazeState!!) },
                 contentColor = MaterialTheme.colorScheme.primary,
-                color = MaterialTheme.colorScheme.background,
+                color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 HorizontalPager(pagerProvidersState.pagerState) {
                     pagerProvidersState.pagers[it]()
@@ -263,16 +263,17 @@ private inline fun HomeBottomBar(
             val selected = pagerProvidersState.pagerState.currentPage == index
             PagerNavigationItem(
                 provider = it,
-                selected = selected
-            ) {
-                scope.launch{
-                    if (selected) {
-                        pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
-                    }else{
-                        pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
+                selected = selected,
+                onClick = {
+                    scope.launch{
+                        if (selected) {
+                            pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
+                        }else{
+                            pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
+                        }
                     }
                 }
-            }
+            )
         }
     }
     NavigationBar(

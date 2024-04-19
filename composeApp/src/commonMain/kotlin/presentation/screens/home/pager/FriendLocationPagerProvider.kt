@@ -266,7 +266,7 @@ private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content
     Card(
         modifier = Modifier.clickable(onClick = clickable),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.primary
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),

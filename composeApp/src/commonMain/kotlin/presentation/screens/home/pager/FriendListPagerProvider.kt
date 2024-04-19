@@ -133,7 +133,7 @@ fun FriendListPager(
 fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
     Card (
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.primary
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
