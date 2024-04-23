@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -115,23 +116,28 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file(rootProject.extra["storeFile"] as String)
-            storePassword = rootProject.extra["storePass"] as String
-            keyAlias = rootProject.extra["keyAlias"] as String
-            keyPassword = rootProject.extra["keyPass"] as String
+    // 防止没有local.properties文件报错导致没办法构建项目
+    runCatching {
+        val properties = Properties()
+        properties.load(project.rootProject.file("local.properties").inputStream())
+        signingConfigs {
+            create("release") {
+                this.storeFile = file(properties.getProperty("store_file"))
+                this.storePassword = properties.getProperty("store_pass")
+                this.keyAlias = properties.getProperty("key_alias")
+                this.keyPassword = properties.getProperty("key_pass")
+            }
         }
     }
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            this.isMinifyEnabled = false
+            this.signingConfig = signingConfigs.getByName("release")
         }
         getByName("debug") {
-            applicationIdSuffix = ".debug"
-            isMinifyEnabled = false
+            this.applicationIdSuffix = ".debug"
+            this.isMinifyEnabled = false
         }
     }
 
