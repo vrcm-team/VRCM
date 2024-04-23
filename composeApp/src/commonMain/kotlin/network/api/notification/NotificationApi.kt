@@ -3,12 +3,15 @@ package io.github.vrcmteam.vrcm.network.api.notification
 import io.github.vrcmteam.vrcm.network.api.attributes.NOTIFICATIONS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.http.content.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.content.TextContent
 import network.api.notification.data.ResponseData
 
 class NotificationApi(
@@ -23,7 +26,7 @@ class NotificationApi(
 
     suspend fun responseNotification(id: String, response: ResponseData): Result<String> {
         return client.post("$NOTIFICATIONS_API_PREFIX/$id/respond"){
-            setBody(TextContent("""{"responseData":"${response.responseData}","type":"${response.type}""", ContentType.Application.Json))
+            setBody(TextContent("""{"responseData":"${response.responseData}","responseType":"${response.type}"}""", ContentType.Application.Json))
         }.ifOK { bodyAsText() }
     }
 }
