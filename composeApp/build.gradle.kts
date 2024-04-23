@@ -110,23 +110,35 @@ android {
 //    buildFeatures {
 //        compose = true
 //    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 
-    // 防止没有local.properties文件报错导致没办法构建项目
-    runCatching {
+    // 防止没有local.properties文件没有配置签名报错导致没办法构建项目
+    var storeFile: File? = null
+    var storePass: String? = null
+    var keyAlias: String? = null
+    var keyPass: String? = null
+    project.rootProject.file("local.properties").also {
+        if (!it.isFile) return@also
         val properties = Properties()
-        properties.load(project.rootProject.file("local.properties").inputStream())
-        signingConfigs {
-            create("release") {
-                this.storeFile = file(properties.getProperty("store_file"))
-                this.storePassword = properties.getProperty("store_pass")
-                this.keyAlias = properties.getProperty("key_alias")
-                this.keyPassword = properties.getProperty("key_pass")
-            }
+        properties.load(it.inputStream())
+        val storeFilePath = properties.getProperty("store_file")
+         storeFile = if (storeFilePath.isNullOrEmpty()) null else file(storeFilePath)
+         storePass = properties.getProperty("store_pass")
+         keyAlias = properties.getProperty("key_alias")
+         keyPass = properties.getProperty("key_pass")
+    }
+
+    signingConfigs {
+        create("release") {
+            this.storeFile = storeFile
+            this.storePassword = storePass
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPass
         }
     }
 
