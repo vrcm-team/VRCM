@@ -1,12 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.theme
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
+import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
 
 
-private val lightScheme = lightColorScheme(
+val lightScheme = lightColorScheme(
     primary = primaryLight,
     onPrimary = onPrimaryLight,
     primaryContainer = primaryContainerLight,
@@ -37,7 +36,7 @@ private val lightScheme = lightColorScheme(
     inversePrimary = inversePrimaryLight
 )
 
-private val darkScheme = darkColorScheme(
+ val darkScheme = darkColorScheme(
     primary = primaryDark,
     onPrimary = onPrimaryDark,
     primaryContainer = primaryContainerDark,
@@ -68,7 +67,7 @@ private val darkScheme = darkColorScheme(
     inversePrimary = inversePrimaryDark
 )
 
-private val mediumContrastLightColorScheme = lightColorScheme(
+ val mediumContrastLightColorScheme = lightColorScheme(
     primary = primaryLightMediumContrast,
     onPrimary = onPrimaryLightMediumContrast,
     primaryContainer = primaryContainerLightMediumContrast,
@@ -99,7 +98,7 @@ private val mediumContrastLightColorScheme = lightColorScheme(
     inversePrimary = inversePrimaryLightMediumContrast
 )
 
-private val highContrastLightColorScheme = lightColorScheme(
+ val highContrastLightColorScheme = lightColorScheme(
     primary = primaryLightHighContrast,
     onPrimary = onPrimaryLightHighContrast,
     primaryContainer = primaryContainerLightHighContrast,
@@ -130,7 +129,7 @@ private val highContrastLightColorScheme = lightColorScheme(
     inversePrimary = inversePrimaryLightHighContrast,
 )
 
-private val mediumContrastDarkColorScheme = darkColorScheme(
+ val mediumContrastDarkColorScheme = darkColorScheme(
     primary = primaryDarkMediumContrast,
     onPrimary = onPrimaryDarkMediumContrast,
     primaryContainer = primaryContainerDarkMediumContrast,
@@ -161,7 +160,7 @@ private val mediumContrastDarkColorScheme = darkColorScheme(
     inversePrimary = inversePrimaryDarkMediumContrast,
 )
 
-private val highContrastDarkColorScheme = darkColorScheme(
+ val highContrastDarkColorScheme = darkColorScheme(
     primary = primaryDarkHighContrast,
     onPrimary = onPrimaryDarkHighContrast,
     primaryContainer = primaryContainerDarkHighContrast,
@@ -191,21 +190,13 @@ private val highContrastDarkColorScheme = darkColorScheme(
     inverseOnSurface = inverseOnSurfaceDarkHighContrast,
     inversePrimary = inversePrimaryDarkHighContrast,
 )
+data object Customize : ThemeColor("Customize", lightScheme, darkScheme)
+data object HighContrast : ThemeColor("HighContrast", highContrastLightColorScheme, highContrastDarkColorScheme)
+data object MediumContrast : ThemeColor("MediumContrast", mediumContrastLightColorScheme, mediumContrastDarkColorScheme)
 
-
-@Composable
-fun VRCMTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit
-) {
-  val colorScheme = when {
-      darkTheme -> darkScheme
-      else -> lightScheme
-  }
-
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = typography,
-    content = content
-  )
-}
+val themeColors = listOf(
+    ThemeColor.Default,
+    Customize,
+    HighContrast,
+    MediumContrast,
+)

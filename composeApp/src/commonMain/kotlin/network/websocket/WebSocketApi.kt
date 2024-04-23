@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import network.websocket.data.WebSocketEvent
 
@@ -49,6 +50,7 @@ class WebSocketApi(
             }
         }catch (e: Exception){
             e.printStackTrace()
+            coroutineScope { startWebSocket() }
         }
 
     }

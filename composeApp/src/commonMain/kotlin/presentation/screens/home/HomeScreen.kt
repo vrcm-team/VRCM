@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,6 +33,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
@@ -58,6 +61,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.configs.theme.LocalThemeColor
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
@@ -73,6 +77,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
+import io.github.vrcmteam.vrcm.presentation.theme.themeColors
 import kotlinx.coroutines.launch
 
 
@@ -84,9 +89,9 @@ object HomeScreen : Screen {
         val homeScreenModel: HomeScreenModel = getScreenModel()
 
         LifecycleEffect(onStarted = (homeScreenModel::ini))
-        LaunchedEffect(Unit){
+        LaunchedEffect(Unit) {
             // 报错时跳到验证页面
-            SharedFlowCentre.error.collect{
+            SharedFlowCentre.error.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
@@ -97,15 +102,38 @@ object HomeScreen : Screen {
         )
         // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
         val supportBlur = getAppPlatform().isSupportBlur
-        val hazeState = if (supportBlur)remember { HazeState() } else null
+        val hazeState = if (supportBlur) remember { HazeState() } else null
+        var themeColor by LocalThemeColor.current
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = {
-                HomeTopAppBar(homeScreenModel,hazeState)
+                HomeTopAppBar(homeScreenModel, hazeState)
             },
-            bottomBar = { HomeBottomBar(pagerProvidersState,hazeState) },
+            bottomBar = { HomeBottomBar(pagerProvidersState, hazeState) },
             floatingActionButton = {
-//                    Button(onClick = { snackBarToastText = "132132131" }) {}
+                Row {
+                    themeColors.forEach {
+                        TextButton(
+                            onClick = {
+                                if (it.name != themeColor.name) {
+                                    themeColor = it
+                                }
+                            },
+                            modifier = Modifier
+                                .size(60.dp),
+
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = it.colorScheme.primary,
+                                contentColor = it.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text(
+                                text = it.name,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
             }
         ) {
             Surface(
@@ -147,11 +175,11 @@ private inline fun HomeTopAppBar(
     val rankColor = GameColor.Rank.fromValue(trustRank)
     // notification
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    val onClickNotification : () -> Unit ={
+    val onClickNotification: () -> Unit = {
         bottomSheetIsVisible = true
     }
     // 初始化刷新一次
-    LaunchedEffect(Unit){
+    LaunchedEffect(Unit) {
         refreshNotification()
     }
     // 每打开一次刷新一次
@@ -162,12 +190,12 @@ private inline fun HomeTopAppBar(
     }
     val modifier = if (hazeState != null) {
         Modifier.hazeChild(
-                state = hazeState,
-                style = style(
-                    backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
-                )
+            state = hazeState,
+            style = style(
+                backgroundColor = MaterialTheme.colorScheme.surfaceContainer,
             )
-    }else{
+        )
+    } else {
         Modifier.shadow(2.dp)
     }
     TopAppBar(
@@ -209,7 +237,7 @@ private inline fun HomeTopAppBar(
                     )
                 }
                 Text(
-                    text = currentUser?.statusDescription ?:currentUser?.status?.value?: "",
+                    text = currentUser?.statusDescription ?: currentUser?.status?.value ?: "",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.inversePrimary,
                     maxLines = 1
@@ -219,12 +247,12 @@ private inline fun HomeTopAppBar(
         actions = {
             IconButton(
                 onClick = onClickNotification
-            ){
+            ) {
                 BadgedBox(
                     badge = {
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        if (notifications.isNotEmpty()){
-                            Canvas(modifier = Modifier.size(8.dp)){
+                        if (notifications.isNotEmpty()) {
+                            Canvas(modifier = Modifier.size(8.dp)) {
                                 drawCircle(color = primaryColor, radius = 4.dp.toPx())
                             }
                         }
@@ -242,7 +270,7 @@ private inline fun HomeTopAppBar(
         bottomSheetIsVisible = bottomSheetIsVisible,
         notificationList = notifications,
         onDismissRequest = { bottomSheetIsVisible = false },
-        onResponseNotification = {id, response ->
+        onResponseNotification = { id, response ->
             homeScreenModel.responseNotification(id, response)
         }
     )
@@ -257,7 +285,7 @@ private inline fun HomeBottomBar(
     // 如果没有底部系统手势条，则加12dp
     val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
     val scope = rememberCoroutineScope()
-    val pagerNavigationItems:@Composable RowScope.() -> Unit = {
+    val pagerNavigationItems: @Composable RowScope.() -> Unit = {
         pagerProvidersState.pagerProviders.forEach {
             val index = it.index
             val selected = pagerProvidersState.pagerState.currentPage == index
@@ -265,11 +293,14 @@ private inline fun HomeBottomBar(
                 provider = it,
                 selected = selected,
                 onClick = {
-                    scope.launch{
+                    scope.launch {
                         if (selected) {
                             pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
-                        }else{
-                            pagerProvidersState.pagerState.animateScrollToPage(page = index,animationSpec =  spring(stiffness = Spring.StiffnessMediumLow))
+                        } else {
+                            pagerProvidersState.pagerState.animateScrollToPage(
+                                page = index,
+                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                            )
                         }
                     }
                 }
@@ -303,7 +334,11 @@ private inline fun HomeBottomBar(
 }
 
 @Composable
-private fun RowScope.PagerNavigationItem(provider: PagerProvider, selected: Boolean, onClick: () -> Unit) {
+private fun RowScope.PagerNavigationItem(
+    provider: PagerProvider,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     NavigationBarItem(
         modifier = Modifier.align(Alignment.CenterVertically),
         icon = {
@@ -313,10 +348,10 @@ private fun RowScope.PagerNavigationItem(provider: PagerProvider, selected: Bool
                 contentDescription = provider.title
             )
         },
-            label = { Text(provider.title) },
+//        label = { Text(provider.title) },
         selected = selected,
         onClick = onClick,
-        alwaysShowLabel = selected,
+        alwaysShowLabel = false,
         colors = NavigationBarItemDefaults.colors(
             indicatorColor = MaterialTheme.colorScheme.primary,
             selectedIconColor = MaterialTheme.colorScheme.onPrimary,
