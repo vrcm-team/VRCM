@@ -68,8 +68,8 @@ data class CurrentUserData(
     @SerialName("updated_at")
     val updatedAt: String,
     override val userIcon: String,
-    val userLanguage: String,
-    val userLanguageCode: String,
+    val userLanguage: String?,
+    val userLanguageCode: String?,
     val username: String,
     val viveId: String
 ):IUser, JavaSerializable
