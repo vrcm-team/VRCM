@@ -34,6 +34,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
+import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
@@ -64,7 +65,7 @@ object AuthScreen : Screen {
                     }
 
                     AuthCardPage.Login -> {
-                        NavCard("Login") {
+                        NavCard(strings.authLoginTitle) {
                             LoginCardInput(
                                 uiState = authScreenModel.uiState,
                                 onUsernameChange = authScreenModel::onUsernameChange,
@@ -75,7 +76,7 @@ object AuthScreen : Screen {
                     }
 
                     AuthCardPage.EmailCode, AuthCardPage.TFACode, AuthCardPage.TTFACode -> {
-                        NavCard("Verify", barContent = {
+                        NavCard(strings.authVerifyTitle, barContent = {
                             ReturnIcon {
                                 authScreenModel.cancelJob()
                                 authScreenModel.onCardStateChange(AuthCardPage.Login)

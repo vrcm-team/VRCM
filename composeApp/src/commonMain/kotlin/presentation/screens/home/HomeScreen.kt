@@ -61,6 +61,8 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.configs.locale.LanguageTag
+import io.github.vrcmteam.vrcm.presentation.configs.locale.LocalLanguageTag
 import io.github.vrcmteam.vrcm.presentation.configs.theme.LocalThemeColor
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -104,6 +106,7 @@ object HomeScreen : Screen {
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
         var themeColor by LocalThemeColor.current
+        var languageTag by LocalLanguageTag.current
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = {
@@ -111,29 +114,49 @@ object HomeScreen : Screen {
             },
             bottomBar = { HomeBottomBar(pagerProvidersState, hazeState) },
             floatingActionButton = {
-                Row {
-                    themeColors.forEach {
-                        TextButton(
-                            onClick = {
-                                if (it.name != themeColor.name) {
-                                    themeColor = it
-                                }
-                            },
-                            modifier = Modifier
-                                .size(60.dp),
+                Column {
+                    Row {
+                        LanguageTag.entries.forEach {
+                            TextButton(
+                                onClick = {
+                                    if (it.name != languageTag.name) {
+                                        languageTag = it
+                                    }
+                                },
+                                modifier = Modifier.size(60.dp),
+                            ) {
+                                Text(
+                                    text = it.displayName,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                    Row {
+                        themeColors.forEach {
+                            TextButton(
+                                onClick = {
+                                    if (it.name != themeColor.name) {
+                                        themeColor = it
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(60.dp),
 
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = it.colorScheme.primary,
-                                contentColor = it.colorScheme.onPrimary
-                            )
-                        ) {
-                            Text(
-                                text = it.name,
-                                textAlign = TextAlign.Center,
-                            )
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = it.colorScheme.primary,
+                                    contentColor = it.colorScheme.onPrimary
+                                )
+                            ) {
+                                Text(
+                                    text = it.name,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
                 }
+
             }
         ) {
             Surface(

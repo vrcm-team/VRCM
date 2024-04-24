@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.CodeTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
+import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 
 @Composable
@@ -46,7 +47,7 @@ fun VerifyCardInput(
             .fillMaxWidth()
             .padding(horizontal = 64.dp)
             .height(48.dp),
-        text = "VERIFY",
+        text = strings.authVerifyButton,
         enabled = verifyCode.isNotBlank() && verifyCode.length == 6,
         isLoading = uiState.btnIsLoading,
         onClick = onClick

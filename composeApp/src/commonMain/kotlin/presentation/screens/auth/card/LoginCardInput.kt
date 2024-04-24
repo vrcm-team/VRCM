@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
+import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.PasswordMissEndVisualTransformation
 
@@ -51,7 +52,7 @@ fun LoginCardInput(
     Spacer(modifier = Modifier.height(36.dp))
     LoginTextField(
         imageVector = Icons.Outlined.AccountCircle,
-        hintText = "Username",
+        hintText = strings.authLoginUsername,
         textValue = uiState.username,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
@@ -60,7 +61,7 @@ fun LoginCardInput(
     Spacer(modifier = Modifier.height(16.dp))
     LoginTextField(
         imageVector = Icons.Outlined.Lock,
-        hintText = "Password",
+        hintText =  strings.authLoginPassword,
         textValue = uiState.password,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
@@ -79,7 +80,7 @@ fun LoginCardInput(
             .fillMaxWidth()
             .padding(horizontal = 64.dp)
             .height(48.dp),
-        text = "LOGIN",
+        text = strings.authLoginButton,
         enabled = uiState.password.isNotBlank() && uiState.username.isNotBlank(),
         isLoading = uiState.btnIsLoading,
         onClick = onClick

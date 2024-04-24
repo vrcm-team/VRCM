@@ -56,6 +56,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
@@ -153,7 +154,7 @@ fun  FriendLocationPager(
             item(key = LocationType.Offline) {
                 SingleLocationCard(
                     offlineFriendLocation,
-                    "Active on the Website",
+                    strings.fiendLocationPagerWebsite,
                     onClickUserIcon
                 )
             }
@@ -161,7 +162,7 @@ fun  FriendLocationPager(
             item(key = LocationType.Private) {
                 SingleLocationCard(
                     privateFriendLocation,
-                    "Friends in Private Worlds",
+                    strings.fiendLocationPagerPrivate,
                     onClickUserIcon
                 )
             }
@@ -169,7 +170,7 @@ fun  FriendLocationPager(
             item(key = LocationType.Traveling) {
                 SingleLocationCard(
                     travelingFriendLocation,
-                    "Friends is Traveling",
+                    strings.fiendLocationPagerTraveling,
                     onClickUserIcon
                 )
             }
@@ -177,7 +178,7 @@ fun  FriendLocationPager(
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
                     Text(
-                        text = "by Location",
+                        text = strings.fiendLocationPagerLocation,
                         style = MaterialTheme.typography.titleSmall,
                     )
                 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 
 
@@ -162,12 +163,11 @@ open class ThemeColor(
         )
     }
 
-
 }
 
 
 val LocalThemeColor: ProvidableCompositionLocal<MutableState<ThemeColor>> =
-    compositionLocalOf { error("No ThemeColor provided") }
+    compositionLocalOf { mutableStateOf(ThemeColor.Default) }
 
 
 
