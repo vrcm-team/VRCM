@@ -26,7 +26,7 @@ data class UserProfileVO (
         displayName = user.displayName,
         status = if (user is UserData && user.state == UserState.Offline) UserStatus.Offline else user.status,
         statusDescription = user.statusDescription,
-        bio = user.bio,
+        bio = user.bio?: "",
         bioLinks = user.bioLinks,
         tags = user.tags,
         speakLanguages = user.speakLanguages,

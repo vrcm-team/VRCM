@@ -9,7 +9,7 @@ import kotlinx.serialization.SerialName
 interface IUser {
     val id: String
     val displayName: String
-    val bio: String
+    val bio: String?
     val bioLinks: List<String>
     val tags: List<String>
     val currentAvatarImageUrl: String

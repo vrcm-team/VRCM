@@ -149,16 +149,17 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(
+                    text = friend.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Icon(
                     modifier = Modifier.size(16.dp),
                     imageVector = Icons.Rounded.Shield,
                     contentDescription = "TrustRankIcon",
                     tint = GameColor.Rank.fromValue(friend.trustRank)
-                )
-                Text(
-                    text = friend.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1
                 )
             }
         },
@@ -181,7 +182,7 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = dateTime[0].replace('-', ' '),
+                        text = dateTime[0] ,
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1
                     )

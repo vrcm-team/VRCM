@@ -359,7 +359,7 @@ object HomeScreen : Screen {
                     .size(40.dp),
                 painter = provider.icon!!,
                 contentDescription = provider.title,
-                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

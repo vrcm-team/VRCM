@@ -14,7 +14,7 @@ data class CurrentUserData(
     val accountDeletionLog: List<AccountDeletionLog>?,
     val activeFriends: List<String>,
     val allowAvatarCopying: Boolean,
-    override val bio: String,
+    override val bio: String?,
     override val bioLinks: List<String>,
     val currentAvatar: String,
     val currentAvatarAssetUrl: String,

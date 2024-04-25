@@ -220,7 +220,6 @@ private fun LazyItemScope.LocationTitle(
     text: String,
 ) {
     Text(
-        modifier = Modifier.animateItemPlacement(),
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -335,7 +334,7 @@ private fun LazyItemScope.LocationCard(
                         text = instants.worldName,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Row(
                         modifier = Modifier

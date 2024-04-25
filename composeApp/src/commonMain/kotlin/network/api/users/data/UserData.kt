@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UserData(
     val allowAvatarCopying: Boolean,
-    override val bio: String,
+    override val bio: String?,
     override val bioLinks: List<String>,
     override val currentAvatarImageUrl: String,
     override val currentAvatarTags: List<String>,

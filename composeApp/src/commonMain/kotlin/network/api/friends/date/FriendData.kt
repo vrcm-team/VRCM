@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class FriendData(
-    override val bio: String,
+    override val bio: String?,
     override val bioLinks: List<String> = emptyList(),
     override val currentAvatarImageUrl: String,
     override val currentAvatarTags: List<String> = emptyList(),
