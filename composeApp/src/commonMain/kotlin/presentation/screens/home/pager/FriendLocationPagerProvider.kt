@@ -1,34 +1,40 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Explore
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -73,6 +79,7 @@ object FriendLocationPagerProvider : ListPagerProvider {
     override val index: Int
         get() = 0
     override val title: String
+        @Composable
         get() = "Location"
 
     override val icon: Painter
@@ -107,7 +114,7 @@ object FriendLocationPagerProvider : ListPagerProvider {
     }
 
 }
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun  FriendLocationPager(
     friendLocationMap:  Map<LocationType, MutableList<FriendLocation>>,
@@ -118,11 +125,11 @@ fun  FriendLocationPager(
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val currentLocation: MutableState<FriendLocation?> = remember { mutableStateOf(null) }
-    val onClickLocation : (FriendLocation) -> Unit ={
+    val onClickLocation : (FriendLocation) -> Unit = {
         currentLocation.value = it
         bottomSheetIsVisible = true
     }
-    val topPadding = getInsetPadding(WindowInsets::getTop) + 70.dp
+    val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     RefreshBox(
         refreshContainerOffsetY = topPadding,
         isStartRefresh = isRefreshing,
@@ -137,54 +144,47 @@ fun  FriendLocationPager(
             if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(UserProfileVO(user))
         }
         // 如果没有底部系统手势条，默认12dp
-        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 86.dp
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(
-                start = 6.dp,
+                start = 16.dp,
                 top = topPadding,
-                end = 6.dp,
+                end = 16.dp,
                 bottom = bottomPadding
             )
         ) {
 
-            item(key = LocationType.Offline) {
-                SingleLocationCard(
-                    offlineFriendLocation,
-                    strings.fiendLocationPagerWebsite,
-                    onClickUserIcon
-                )
-            }
+            SimpleCLocationCard(
+                offlineFriendLocation,
+                LocationType.Offline,
+                onClickUserIcon
+            ) { strings.fiendLocationPagerWebsite }
 
-            item(key = LocationType.Private) {
-                SingleLocationCard(
-                    privateFriendLocation,
-                    strings.fiendLocationPagerPrivate,
-                    onClickUserIcon
-                )
-            }
+            SimpleCLocationCard(
+                privateFriendLocation,
+                LocationType.Private,
+                onClickUserIcon
+            ) { strings.fiendLocationPagerPrivate }
 
-            item(key = LocationType.Traveling) {
-                SingleLocationCard(
-                    travelingFriendLocation,
-                    strings.fiendLocationPagerTraveling,
-                    onClickUserIcon
-                )
-            }
+            SimpleCLocationCard(
+                travelingFriendLocation,
+                LocationType.Traveling,
+                onClickUserIcon
+            ) { strings.fiendLocationPagerTraveling }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
-                    Text(
+                    LocationTitle(
                         text = strings.fiendLocationPagerLocation,
-                        style = MaterialTheme.typography.titleSmall,
                     )
                 }
                 items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(location, { onClickLocation(location) }) {
-                        UserIconsRow(location.friendList, onClickUserIcon)
+                        UserIconsRow(it, onClickUserIcon)
                     }
                 }
             }
@@ -195,19 +195,36 @@ fun  FriendLocationPager(
          bottomSheetIsVisible = false
     }
 }
-@Composable
-private fun SingleLocationCard(
-    friendLocations: FriendLocation?,
-    text: String,
-    onClickUserIcon: (IUser) -> Unit
+
+private fun LazyListScope.SimpleCLocationCard(
+    friendLocation: FriendLocation?,
+    locationType: LocationType,
+    onClickUserIcon: (IUser) -> Unit,
+    text: @Composable () -> String
+
 ) {
-    if (friendLocations == null || friendLocations.friends.isEmpty()) return
+    friendLocation?.friendList.let {
+        if (it.isNullOrEmpty()) return@let
+        item(key = locationType) {
+            LocationTitle(text())
+        }
+        item(key = locationType.value) {
+            UserIconsRow(it, onClickUserIcon)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LazyItemScope.LocationTitle(
+    text: String,
+) {
     Text(
+        modifier = Modifier.animateItemPlacement(),
         text = text,
         style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Spacer(modifier = Modifier.height(6.dp))
-    UserIconsRow(friendLocations.friendList, onClickUserIcon)
 }
 
 @Composable
@@ -218,7 +235,7 @@ private fun UserIconsRow(
     if (friends.isEmpty()) return
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(friends, key = { it.value.id }) {
             LocationFriend(
@@ -230,8 +247,9 @@ private fun UserIconsRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LocationFriend(
+private fun LazyItemScope.LocationFriend(
     iconUrl: String,
     name: String,
     userStatus: UserStatus,
@@ -241,7 +259,8 @@ private fun LocationFriend(
         modifier = Modifier
             .width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon),
+            .clickable(onClick = onClickUserIcon)
+            .animateItemPlacement(),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
@@ -255,37 +274,50 @@ private fun LocationFriend(
             maxLines = 1,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content: @Composable () -> Unit) {
+private fun LazyItemScope.LocationCard(
+    location: FriendLocation,
+    clickable: () -> Unit,
+    content: @Composable (List<State<FriendData>>) -> Unit
+) {
     val instants by location.instants
     val currentNavigator = currentNavigator
-
-    Card(
-        modifier = Modifier.clickable(onClick = clickable),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    var showUser by rememberSaveable(location.location) { mutableStateOf(false) }
+    val friendList = location.friendList
+    Surface(
+//        modifier = Modifier.animateItemPlacement(),
+        tonalElevation = (-2).dp,
+        shape = MaterialTheme.shapes.large
     ) {
         Column(
-            modifier = Modifier.padding(6.dp),
+            modifier = Modifier
+                .clickable(onClick = clickable)
+                .padding(8.dp)
+                .animateContentSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 modifier = Modifier
-                    .height(80.dp)
                     .fillMaxWidth()
+                    .height(112.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AImage(
                     modifier = Modifier
-                        .width(120.dp)
-                        .clip(MaterialTheme.shapes.medium)
+                        .weight(0.5f)
+                        .clip(RoundedCornerShape(
+                            topStart = 16.dp,
+                            topEnd = 8.dp,
+                            bottomStart = 16.dp,
+                            bottomEnd = 8.dp
+                        ))
                         .clickable { currentNavigator.push(WorldProfileScreen(WorldProfileVO(
                             worldId = instants.worldId,
                             worldName = instants.worldName,
@@ -296,17 +328,40 @@ private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content
                     contentDescription = "WorldImage"
                 )
                 Column(
-                    modifier = Modifier.padding(horizontal = 6.dp)
+                    modifier = Modifier
+                        .weight(0.5f),
                 ) {
                     Text(
-                        modifier = Modifier
-                            .fillMaxWidth(),
                         text = instants.worldName,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
-                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(modifier = Modifier.weight(1f))
+                    Row(
+                        modifier = Modifier
+                            .height(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AImage(
+                            modifier = Modifier
+                                .size(15.dp)
+                                .align(Alignment.CenterVertically)
+                                .clip(CircleShape)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    CircleShape
+                                ),
+                            imageData = instants.regionIconUrl
+                        )
+                        Text(
+                            text = instants.accessType,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+
+                    }
                     Text(
                         modifier = Modifier
                             .fillMaxWidth(),
@@ -314,44 +369,49 @@ private fun LocationCard(location: FriendLocation,clickable: () -> Unit, content
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Row(
                         modifier = Modifier
-                            .height(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .height(24.dp),
                     ) {
-                        AImage(
-                            modifier = Modifier
-                                .size(15.dp)
-                                .align(Alignment.CenterVertically)
-                                .clip(CircleShape)
-                                .border(1.dp, MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
-                            imageData = instants.regionIconUrl
-                        )
-                        Text(
-                            modifier = Modifier
-                                .padding(horizontal = 6.dp),
-                            text = instants.accessType,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+                        friendList.take(5).forEachIndexed { index, state ->
+                            val friend by state
+                            UserStateIcon(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .align(Alignment.CenterVertically)
+                                    .offset(x = (-8 * index).dp)
+                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                iconUrl = friend.iconUrl,
+                            )
+                        }
                         Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            modifier = Modifier
-                                .padding(horizontal = 6.dp),
-                            text = instants.userCount,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        Icon(
-                            modifier = Modifier
-                                .size(15.dp),
-                            imageVector = Icons.Rounded.Person,
-                            contentDescription = "PersonCount"
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxHeight()
+                                .background(
+                                    MaterialTheme.colorScheme.inverseOnSurface,
+                                    MaterialTheme.shapes.medium
+                                )
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable { showUser = !showUser }
+                                .padding(horizontal = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = instants.userCount,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }
-            content()
+            AnimatedVisibility(showUser){
+                content(friendList)
+            }
         }
     }
 }

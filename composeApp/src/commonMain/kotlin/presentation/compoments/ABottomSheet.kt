@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -16,7 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 @Composable
 fun ABottomSheet(
     isVisible: Boolean,
-    sheetState: SheetState,
+    sheetState: SheetState = rememberModalBottomSheetState(),
     onDismissRequest: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {

@@ -12,7 +12,6 @@ import io.github.vrcmteam.vrcm.presentation.configs.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.configs.locale.LocalLanguageTag
 import io.github.vrcmteam.vrcm.presentation.configs.theme.LocalThemeColor
 import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.typography
 
 @Composable
 inline fun Configuration(
@@ -27,7 +26,7 @@ inline fun Configuration(
         MaterialTheme(
             colorScheme = LocalThemeColor.current.value.asAnimateColorScheme(colorAnimationSpec),
             shapes = MaterialTheme.shapes,
-            typography = typography,
+            typography = MaterialTheme.typography,
             content = content
         )
     }

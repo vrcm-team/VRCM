@@ -14,8 +14,11 @@ interface PagerProvider  {
     val index: Int
 
     val title: String
+        @Composable get
+
     val icon: Painter?
         @Composable get
+
     @Composable
     fun createPager():@Composable () -> Unit
 

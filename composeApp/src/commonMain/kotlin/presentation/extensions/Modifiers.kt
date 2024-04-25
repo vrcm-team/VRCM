@@ -1,8 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.extensions
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -26,13 +30,16 @@ fun Modifier.drawSate(
     enable: Boolean = true,
     onDraw: ContentDrawScope.(Float, Offset) -> Unit
 ) = if (enable)  this.drawWithContent {
-    val borderRadius = size.minDimension * percentage
-    val borderTopStart = if (isInLine) Offset(-borderRadius, -borderRadius) else Offset.Zero
+    val borderRadius = size.maxDimension * percentage
     val borderDiameter = borderRadius * 2
+    val borderTopStart = if (isInLine) Offset(-borderRadius, -borderRadius) else Offset.Zero
     val borderOffset = borderTopStart.plus(
         alignment.align(
             IntSize(borderDiameter.roundToInt(), borderDiameter.roundToInt()),
-            space = IntSize((size.width+borderDiameter).toInt(), (size.height+borderDiameter).toInt()),
+            space = IntSize(
+                (size.width + borderDiameter).toInt(),
+                (size.height + borderDiameter).toInt()
+            ),
             layoutDirection = layoutDirection
         )
     )
@@ -47,7 +54,7 @@ fun Modifier.drawSateCircle(
     alignment: Alignment = Alignment.BottomEnd,
     enable: Boolean = true,
     onDraw: ContentDrawScope.(Float, Offset) -> Unit = { borderRadius: Float, borderOffset: Offset ->
-        val radius = (size.minDimension - borderWidth.toPx()) * percentage
+        val radius = (size.maxDimension - borderWidth.toPx()) * percentage
         this.drawContent()
         drawCircle(Color.White, borderRadius, borderOffset)
         drawCircle(color, radius, borderOffset)
@@ -60,7 +67,8 @@ fun Modifier.drawSateCircle(
     onDraw = onDraw
 )
 
-fun Modifier.enableIf(enable: Boolean = true, effect: Modifier.() -> Modifier) = if (enable) effect() else this
+@Composable
+fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) = if (enable) effect() else this
 
 /**
  * 侧滑返回
@@ -73,3 +81,15 @@ fun Modifier.slideBack(
         if (navigator.canPop && it > threshold) navigator.pop()
     }, Orientation.Horizontal)
 }
+
+/**
+ * 去除点击水波纹效果
+ */
+@Composable
+fun Modifier.simpleClickable(
+    onClick: () -> Unit
+) = this.clickable(
+    indication = null,
+    interactionSource = remember { MutableInteractionSource() },
+    onClick = onClick
+)

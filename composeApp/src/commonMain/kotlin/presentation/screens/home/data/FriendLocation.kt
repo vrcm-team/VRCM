@@ -33,6 +33,7 @@ data class FriendLocation(
             )
     }
 
+    @Stable
     val friendList:List<State<FriendData>>
         get() = friends.values.sortedBy { it.value.displayName }
 }
