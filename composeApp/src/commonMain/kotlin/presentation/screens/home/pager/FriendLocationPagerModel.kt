@@ -98,6 +98,9 @@ class FriendLocationPagerModel(
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
         screenModelScope.launch(Dispatchers.IO) {
+            if (removeNotIncluded){
+                authSupporter.currentUser(isRefresh = true)
+            }
             friendsApi.friendsFlow()
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
@@ -120,12 +123,23 @@ class FriendLocationPagerModel(
         friends: List<FriendData>,
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
+            // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
+            val currentUser = authSupporter.currentUser().getOrThrow()
+            val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
+            currentUser.activeFriends.forEach {
+                currentFriendMap[it]?.let { activeFriend ->
+                    if (activeFriend.location == LocationType.Private.value){
+                        currentFriendMap[it] = activeFriend.copy(location = LocationType.Offline.value)
+                    }
+                }
+            }
+            val friendCollection = currentFriendMap.values
             // 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
-            removePre(friends)
+            removePre(friendCollection)
             // 更新好友列表缓存
-            friendMap += friends.associateBy { it.id }
+            friendMap += currentFriendMap
 
-            val friendLocationInfoMap = friends.associate { it.id to mutableStateOf(it) }
+            val friendLocationInfoMap = friendCollection.associate { it.id to mutableStateOf(it) }
                 .values.groupBy { LocationType.fromValue(it.value.location) }
 
             friendLocationInfoMap[LocationType.Offline]?.let { friends ->
@@ -168,7 +182,7 @@ class FriendLocationPagerModel(
     /**
      * 如果上次请求的数据中有这次的用户并且在不同的location，则把该用户从上次的房间实例中列表中移除
      */
-    private fun removePre(friends: List<FriendData>) {
+    private fun removePre(friends: Collection<FriendData>) {
         if (friendMap.isEmpty()) return
         friends.filter {
             friendMap.containsKey(it.id) && friendMap[it.id]!!.location != it.location

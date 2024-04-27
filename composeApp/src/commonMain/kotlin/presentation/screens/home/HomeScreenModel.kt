@@ -10,7 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.*
+import io.ktor.util.network.UnresolvedAddressException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -56,7 +56,7 @@ class HomeScreenModel(
 
     private fun refreshCurrentUser() =
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth { authSupporter.currentUser() }
+            authSupporter.reTryAuth { authSupporter.currentUser(isRefresh = true) }
                 .onHomeFailure()
                 .onSuccess {
                     _currentUser.value = it

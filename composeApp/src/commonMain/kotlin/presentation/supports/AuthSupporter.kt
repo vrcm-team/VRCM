@@ -4,6 +4,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
@@ -21,12 +22,23 @@ class AuthSupporter(
     private val accountDao: AccountDao,
 ) {
     private var scope = CoroutineScope( Job())
+
+    private var currentUser: Result<CurrentUserData>?  = null
+
     fun accountPair(): Pair<String, String> = accountDao.accountPair()
 
     fun accountPairOrNull(): Pair<String, String>? = accountDao.accountPairOrNull()
 
     suspend fun isAuthed():Boolean = authApi.isAuthed().also { if (it) emitAuthed() }
-    suspend fun currentUser() = authApi.currentUser()
+    suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh){
+        currentUser!!
+    }else{
+        authApi.currentUser().also {
+            if (it.isSuccess) {
+                currentUser = it
+            }
+        }
+    }
 
     init {
         scope.launch {
