@@ -28,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,11 +44,11 @@ import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
+import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import org.koin.compose.koinInject
 
-object FriendListPagerProvider : ListPagerProvider {
+object FriendListPagerProvider : PagerProvider {
 
     override val index: Int
         get() = 1
@@ -61,7 +60,7 @@ object FriendListPagerProvider : ListPagerProvider {
         @Composable get() = rememberVectorPainter(image = Icons.Rounded.Group)
 
     @Composable
-    override fun createPager(lazyListState: LazyListState): @Composable () -> Unit {
+    override fun Content(state: LazyListState) {
         val isRefreshing = rememberSaveable { mutableStateOf(true) }
         LaunchedEffect(Unit) {
             SharedFlowCentre.error.collect {
@@ -70,18 +69,13 @@ object FriendListPagerProvider : ListPagerProvider {
             }
         }
         val friendListPagerModel: FriendListPagerModel = koinInject()
-
-        return remember {
-            {
-                FriendListPager(
-                    friendList = friendListPagerModel.friendList,
-                    isRefreshing = isRefreshing.value,
-                    state = lazyListState,
-                ) {
-                    isRefreshing.value = false
-                    friendListPagerModel.refreshFriendList()
-                }
-            }
+        FriendListPager(
+            friendList = friendListPagerModel.friendList,
+            isRefreshing = isRefreshing.value,
+            state = state,
+        ) {
+            isRefreshing.value = false
+            friendListPagerModel.refreshFriendList()
         }
     }
 

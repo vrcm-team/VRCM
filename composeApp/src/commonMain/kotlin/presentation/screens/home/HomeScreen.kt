@@ -20,7 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
@@ -76,8 +80,6 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.isSupportBlur
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.PagerProvidersState
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.createPagerProvidersState
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerProvider
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerProvider
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
@@ -104,18 +106,19 @@ object HomeScreen : Screen {
             }
         }
 
-        val pagerProvidersState = createPagerProvidersState(
-            FriendLocationPagerProvider,
-            FriendListPagerProvider
+        val pagerProvidersState = listOf(
+            FriendLocationPagerProvider to rememberLazyListState(),
+            FriendListPagerProvider to rememberLazyListState()
         )
         // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
+        val pagerState = rememberPagerState { pagerProvidersState.size }
 
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = { HomeTopAppBar(homeScreenModel, hazeState) },
-            bottomBar = { HomeBottomBar(pagerProvidersState, hazeState) },
+            bottomBar = { HomeBottomBar(pagerProvidersState,pagerState, hazeState) },
             floatingActionButton = {
                 SettingActionButton()
             }
@@ -127,8 +130,8 @@ object HomeScreen : Screen {
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 2.dp
             ) {
-                HorizontalPager(pagerProvidersState.pagerState) {
-                    pagerProvidersState.pagers[it]()
+                HorizontalPager(pagerState) {
+                    pagerProvidersState[it].first.Content(pagerProvidersState[it].second)
                 }
             }
         }
@@ -274,7 +277,8 @@ object HomeScreen : Screen {
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
     private inline fun HomeBottomBar(
-        pagerProvidersState: PagerProvidersState,
+        pagerProvidersState: List<Pair<PagerProvider,LazyListState>>,
+        pagerState: PagerState,
         hazeState: HazeState?
     ) {
         // 如果没有底部系统手势条，则加12dp
@@ -282,18 +286,18 @@ object HomeScreen : Screen {
         val scope = rememberCoroutineScope()
         val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
         val pagerNavigationItems: @Composable RowScope.() -> Unit = {
-            pagerProvidersState.pagerProviders.forEach {
-                val index = it.index
-                val selected = pagerProvidersState.pagerState.currentPage == index
+            pagerProvidersState.forEach {
+                val index = it.first.index
+                val selected = pagerState.currentPage == index
                 PagerNavigationItem(
-                    provider = it,
+                    provider = it.first,
                     selected = selected,
                     onClick = {
                         scope.launch {
                             if (selected) {
-                                pagerProvidersState.lazyListStates[it.index].animateScrollToFirst()
+                                it.second.animateScrollToFirst()
                             } else {
-                                pagerProvidersState.pagerState.animateScrollToPage(
+                                pagerState.animateScrollToPage(
                                     page = index,
                                     animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
                                 )

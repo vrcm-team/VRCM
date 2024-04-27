@@ -71,10 +71,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.ListPagerProvider
+import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
 import org.koin.compose.koinInject
 
-object FriendLocationPagerProvider : ListPagerProvider {
+object FriendLocationPagerProvider : PagerProvider {
 
     override val index: Int
         get() = 0
@@ -86,7 +86,7 @@ object FriendLocationPagerProvider : ListPagerProvider {
         @Composable  get() = rememberVectorPainter(image = Icons.Rounded.Explore)
 
     @Composable
-    override fun createPager(lazyListState: LazyListState):@Composable () -> Unit {
+    override fun Content(state: LazyListState) {
         val isRefreshing = rememberSaveable { mutableStateOf(true) }
         LaunchedEffect(Unit){
             SharedFlowCentre.error.collect{
@@ -99,17 +99,13 @@ object FriendLocationPagerProvider : ListPagerProvider {
             // 未clear()的同步刷新一次
             friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
         }
-        return remember {
-            {
-                FriendLocationPager(
-                    friendLocationMap = friendLocationPagerModel.friendLocationMap,
-                    isRefreshing = isRefreshing.value,
-                    lazyListState = lazyListState
-                ) {
-                    friendLocationPagerModel.refreshFriendLocation()
-                    isRefreshing.value = false
-                }
-            }
+        FriendLocationPager(
+            friendLocationMap = friendLocationPagerModel.friendLocationMap,
+            isRefreshing = isRefreshing.value,
+            lazyListState = state
+        ) {
+            friendLocationPagerModel.refreshFriendLocation()
+            isRefreshing.value = false
         }
     }
 
@@ -227,7 +223,7 @@ private fun LazyItemScope.LocationTitle(
 }
 
 @Composable
-private fun UserIconsRow(
+private fun LazyItemScope.UserIconsRow(
     friends: List<State<FriendData>>,
     onClickUserIcon: (IUser) -> Unit
 ) {
@@ -278,7 +274,6 @@ private fun LazyItemScope.LocationFriend(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LazyItemScope.LocationCard(
     location: FriendLocation,
@@ -290,7 +285,7 @@ private fun LazyItemScope.LocationCard(
     var showUser by rememberSaveable(location.location) { mutableStateOf(false) }
     val friendList = location.friendList
     Surface(
-//        modifier = Modifier.animateItemPlacement(),
+        modifier = Modifier.fillParentMaxWidth(),
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large
     ) {

@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.painter.Painter
 
@@ -20,17 +19,7 @@ interface PagerProvider  {
         @Composable get
 
     @Composable
-    fun createPager():@Composable () -> Unit
+    fun Content(state: LazyListState)
 
 }
 
-interface ListPagerProvider: PagerProvider {
-
-    @Composable
-    override fun createPager():@Composable () -> Unit {
-       return createPager(rememberLazyListState())
-    }
-    @Composable
-    fun createPager(lazyListState: LazyListState):@Composable () -> Unit
-
-}
