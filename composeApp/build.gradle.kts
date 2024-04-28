@@ -1,5 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import java.util.Properties
+import java.util.*
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -26,7 +26,7 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "ComposeApp"
+            baseName = "VRCM"
             isStatic = true
         }
     }
