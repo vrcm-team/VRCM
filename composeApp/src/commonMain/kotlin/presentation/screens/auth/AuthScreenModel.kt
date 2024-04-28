@@ -91,8 +91,8 @@ class AuthScreenModel(
 
 
     fun login() {
-        val password = _uiState.value.password.trim()
         val username = _uiState.value.username.trim()
+        val password = _uiState.value.password.trim()
         if (password.isEmpty() || username.isEmpty() || _uiState.value.btnIsLoading) {
             if (password.isEmpty() || username.isEmpty()) {
                 onErrorMessageChange("Username or Password is empty")
@@ -108,10 +108,12 @@ class AuthScreenModel(
 
     fun verify() {
         val verifyCode = _uiState.value.verifyCode
+        val username = _uiState.value.username.trim()
+        val password = _uiState.value.password.trim()
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
-            val result = async(context = Dispatchers.IO) { authSupporter.verify(verifyCode, _uiState.value.cardState) }.await()
+            val result = async(context = Dispatchers.IO) { authSupporter.verify(username, password,verifyCode, _uiState.value.cardState) }.await()
             if (result) {
                 onCardStateChange(AuthCardPage.Authed)
             } else {

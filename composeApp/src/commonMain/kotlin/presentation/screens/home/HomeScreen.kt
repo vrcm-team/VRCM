@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -371,6 +372,7 @@ private fun SettingsActionButton(
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     IconButton(
+        modifier = Modifier.offset(y = 48.dp),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary

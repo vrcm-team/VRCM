@@ -54,13 +54,18 @@ class AuthSupporter(
         }
     }
 
-    suspend fun verify(code: String, authCardPage: AuthCardPage): Boolean {
+    suspend fun verify(
+        username: String,
+        password: String,
+        verifyCode: String,
+        authCardPage: AuthCardPage
+    ): Boolean {
         val authType = when (authCardPage) {
             AuthCardPage.EmailCode -> AuthType.Email
             AuthCardPage.TFACode -> AuthType.TFA
             else -> error("not supported")
         }
-       return authApi.verify(code, authType).also { if (it) emitAuthed() }
+       return authApi.verify(verifyCode, authType).also { if (it) emitAuthed(username, password) }
     }
 
     private suspend fun emitAuthed(username: String? = null, password: String? = null) {
