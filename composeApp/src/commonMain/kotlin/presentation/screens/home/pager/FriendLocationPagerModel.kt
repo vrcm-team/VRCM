@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -164,13 +163,24 @@ class FriendLocationPagerModel(
             tempInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
                 // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
                 // 找到相同的location的FriendLocation
-                val friendLocation =  updateMutex.withLock(locationFriendEntry.key) {
-                    createFriendLocation(locationFriendEntry.key).also {
-                        currentInstanceFriendLocations.removeFirst { f-> locationFriendEntry.key == f.location }
-                        currentInstanceFriendLocations.add(it)
+                val location = locationFriendEntry.key
+                val friendLocation =  updateMutex.withLock(location) {
+                    currentInstanceFriendLocations.find { location == it.location }
+                        ?: FriendLocation(
+                            location = location,
+                            friends = mutableStateMapOf()
+                        ).also { currentInstanceFriendLocations.add(it) }
+                }
+                // 通过location查询房间实例信息
+                screenModelScope.launch(Dispatchers.IO) {
+                    authSupporter.reTryAuth {
+                        instancesApi.instanceByLocation(location)
+                    }.onSuccess { instance ->
+                        friendLocation.instants.value = InstantsVO(instance)
+                    }.onFailure {
+                        SharedFlowCentre.error.emit(it.message.toString())
                     }
                 }
-
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
         }.onFailure {
@@ -202,21 +212,4 @@ class FriendLocationPagerModel(
         }
     }
 
-    private fun createFriendLocation(location: String): FriendLocation {
-        val friendLocation = FriendLocation(
-            location = location,
-            friends = mutableStateMapOf()
-        )
-        // 通过location查询房间实例信息
-        screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth {
-                instancesApi.instanceByLocation(location)
-            }.onSuccess { instance ->
-                friendLocation.instants.value = InstantsVO(instance)
-            }.onFailure {
-                SharedFlowCentre.error.emit(it.message.toString())
-            }
-        }
-        return friendLocation
-    }
 }
