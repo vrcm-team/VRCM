@@ -316,7 +316,7 @@ private fun TopMenuBar(
                 MaterialTheme.colorScheme.primary,
                 inverseRatio
             )
-            val actionColor = Color.Gray.copy(alpha = 0.3f * ratio)
+            val actionColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f * ratio)
             val iconButtonColors = IconButtonColors(
                 containerColor = actionColor,
                 contentColor = iconColor,

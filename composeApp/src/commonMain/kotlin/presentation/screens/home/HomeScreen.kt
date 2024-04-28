@@ -214,6 +214,7 @@ private inline fun HomeTopAppBar(
                         Text(
                             text = currentUser?.displayName ?: "",
                             style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
                         )
                         Icon(
