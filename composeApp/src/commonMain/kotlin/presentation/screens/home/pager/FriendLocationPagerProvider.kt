@@ -69,8 +69,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.FriendLocationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
 import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
 import org.koin.compose.koinInject
 
@@ -291,7 +289,7 @@ private fun LazyItemScope.LocationCard(
     ) {
         Column(
             modifier = Modifier
-                .clickable(onClick = clickable)
+                .clickable { showUser = !showUser }
                 .padding(8.dp)
                 .animateContentSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -312,12 +310,7 @@ private fun LazyItemScope.LocationCard(
                             bottomStart = 16.dp,
                             bottomEnd = 8.dp
                         ))
-                        .clickable { currentNavigator.push(WorldProfileScreen(WorldProfileVO(
-                            worldId = instants.worldId,
-                            worldName = instants.worldName,
-                            worldImageUrl = instants.worldImageUrl,
-                            worldDescription = instants.worldDescription,
-                        ))) },
+                        .clickable(onClick = clickable),
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
@@ -390,7 +383,6 @@ private fun LazyItemScope.LocationCard(
                                     MaterialTheme.shapes.medium
                                 )
                                 .clip(MaterialTheme.shapes.medium)
-                                .clickable { showUser = !showUser }
                                 .padding(horizontal = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
