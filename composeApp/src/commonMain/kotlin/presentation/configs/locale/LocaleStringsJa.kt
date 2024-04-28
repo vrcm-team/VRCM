@@ -17,4 +17,5 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingLightThemeMode = "ライトモード",
     stettingDarkThemeMode = "ダークモード",
     stettingThemeColor = "テーマカラー:",
+    stettingLogout = "ログアウト"
 )

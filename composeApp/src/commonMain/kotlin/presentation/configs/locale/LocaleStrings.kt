@@ -22,7 +22,9 @@ data class LocaleStrings(
     val stettingLightThemeMode: String = "Light",
     val stettingDarkThemeMode: String = "Dark",
     val stettingThemeColor: String = "ThemeColor:",
+    val stettingLogout: String = "Logout"
 )
+
 val strings: LocaleStrings
     @Composable
     get() {

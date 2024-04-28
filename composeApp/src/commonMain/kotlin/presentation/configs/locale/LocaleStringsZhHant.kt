@@ -17,4 +17,5 @@ internal val LocaleStringsZhHant = LocaleStrings(
     stettingLightThemeMode = "明亮主題",
     stettingDarkThemeMode = "深色主題",
     stettingThemeColor = "主題顏色:",
+    stettingLogout = "登出"
 )
