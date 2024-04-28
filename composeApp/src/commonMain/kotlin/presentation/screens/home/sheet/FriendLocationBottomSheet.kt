@@ -14,7 +14,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FriendLocationBottomSheet(
     bottomSheetIsVisible: Boolean,
@@ -93,50 +93,6 @@ fun FriendLocationBottomSheet(
                     )
                 }
             }
-//            FlowRow (
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.spacedBy(6.dp),
-//                verticalArrangement = Arrangement.spacedBy(6.dp),
-//            ) {
-//                repeat(9){
-//                    Card(
-//                        modifier = Modifier.size(48.dp),
-//                        colors = CardDefaults.cardColors(
-//                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-//                            contentColor = MaterialTheme.colorScheme.primary
-//                        ),
-//                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-//                    ) {
-//                        Column(
-//                            modifier = Modifier.fillMaxSize(),
-//                            verticalArrangement = Arrangement.Center,
-//                            horizontalAlignment = Alignment.CenterHorizontally,
-//                        ) {
-//                            Icon(
-//                                modifier = Modifier
-//                                    .size(20.dp),
-//                                imageVector = Icons.Rounded.Person,
-//                                contentDescription = "PersonCount"
-//                            )
-//                            Text(
-//                                text = currentInstants.userCount,
-//                                style = MaterialTheme.typography.labelMedium,
-//                            )
-//                        }
-//                    }
-//                }
-//            }
-//            TextButton(
-//                modifier = Modifier.align(Alignment.CenterHorizontally),
-//                onClick = {
-//                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-//                        if (sheetState.isVisible) return@invokeOnCompletion
-//                        bottomSheetIsVisible = false
-//                    }
-//                }
-//            ) {
-//                Text(text = "Look JsonData")
-//            }
         }
 
     }

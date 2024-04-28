@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.configs.locale
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
 
 @Stable
 data class LocaleStrings(
@@ -16,12 +17,16 @@ data class LocaleStrings(
     val fiendLocationPagerTraveling: String = "Friends is Traveling",
     val fiendLocationPagerLocation: String = "by Location",
     val stettingLanguage: String = "Language:",
+    val stettingThemeMode: String = "ThemeMode:",
+    val stettingSystemThemeMode: String = "System",
+    val stettingLightThemeMode: String = "Light",
+    val stettingDarkThemeMode: String = "Dark",
     val stettingThemeColor: String = "ThemeColor:",
 )
 val strings: LocaleStrings
     @Composable
     get() {
-        return when (LocalLanguageTag.current.value) {
+        return when (LocalConfiguration.current.value.languageTag) {
             LanguageTag.EN -> LocaleStringsEn
             LanguageTag.JA -> LocaleStringsJa
             LanguageTag.ZH_HANS -> LocaleStringsZhHans

@@ -29,4 +29,22 @@ object DaoKeys{
         const val TWO_FACTOR_AUTH_KEY = "twoFactorAuth"
     }
 
+    object Settings {
+        const val NAME = "settings"
+
+        /**
+         * 是否是暗黑模式,为null则为更随系统
+         */
+        const val IS_DARK_THEME_KEY = "isDarkTheme"
+
+        /**
+         * 主题颜色名
+         */
+        const val THEME_COLOR_KEY = "themeColor"
+
+        /**
+         * 语言
+         */
+        const val LANGUAGE_TAG_KEY = "languageTag"
+    }
 }

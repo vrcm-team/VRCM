@@ -8,6 +8,8 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.CookiesDao
+import io.github.vrcmteam.vrcm.storage.DaoKeys
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
 class AuthSupporter(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
+    private val cookiesDao: CookiesDao
 ) {
     private var scope = CoroutineScope( Job())
 
@@ -100,5 +103,10 @@ class AuthSupporter(
        reTryAuth {
            runCatching { callback() }
        }
+
+    fun loginOut() {
+        accountDao.clearAccount()
+        cookiesDao.removeCookies(DaoKeys.Cookies.AUTH_KEY)
+    }
 
 }

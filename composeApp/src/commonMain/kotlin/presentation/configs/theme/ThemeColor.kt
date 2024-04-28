@@ -8,11 +8,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
 
 
 open class ThemeColor(
@@ -23,10 +20,17 @@ open class ThemeColor(
 
     val colorScheme: ColorScheme
         @Composable
-        get() = if (lightColorScheme != darkColorScheme && isSystemInDarkTheme()) darkColorScheme else lightColorScheme
+        get(){
+            val isDarkTheme = LocalConfiguration.current.value.isDarkTheme
+            return if (isDarkTheme == null){
+                if (isSystemInDarkTheme()) darkColorScheme else lightColorScheme
+            }else{
+                if (isDarkTheme) darkColorScheme else lightColorScheme
+            }
+        }
 
     companion object {
-        val Default: ThemeColor = ThemeColor("&Default&", lightColorScheme(), darkColorScheme())
+        val Default: ThemeColor = ThemeColor("Default", lightColorScheme(), darkColorScheme())
     }
 
     @Composable
@@ -164,11 +168,5 @@ open class ThemeColor(
     }
 
 }
-
-
-val LocalThemeColor: ProvidableCompositionLocal<MutableState<ThemeColor>> =
-    compositionLocalOf { mutableStateOf(ThemeColor.Default) }
-
-
 
 

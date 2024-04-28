@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -97,11 +98,6 @@ class FriendLocationPagerModel(
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
         screenModelScope.launch(Dispatchers.IO) {
-            // 当列表下拉刷新时也一同刷新下currentUser,为了同步activeFriends列表
-            // 这里刷新currentUser异常了没事,update时再刷新刷新并处理异常
-            if (removeNotIncluded){
-                authSupporter.currentUser(isRefresh = true)
-            }
             friendsApi.friendsFlow()
                 .retry(1) {
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
@@ -126,7 +122,7 @@ class FriendLocationPagerModel(
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
             // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
-            val currentUser = authSupporter.currentUser().getOrThrow()
+            val currentUser = authSupporter.currentUser(isRefresh = true).getOrThrow()
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
@@ -169,9 +165,10 @@ class FriendLocationPagerModel(
                 // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
                 // 找到相同的location的FriendLocation
                 val friendLocation =  updateMutex.withLock(locationFriendEntry.key) {
-                    currentInstanceFriendLocations.find { locationFriendEntry.key == it.location }
-                        ?: createFriendLocation(locationFriendEntry.key)
-                            .also { currentInstanceFriendLocations.add(it) }
+                    createFriendLocation(locationFriendEntry.key).also {
+                        currentInstanceFriendLocations.removeFirst { f-> locationFriendEntry.key == f.location }
+                        currentInstanceFriendLocations.add(it)
+                    }
                 }
 
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })

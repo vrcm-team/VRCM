@@ -12,5 +12,9 @@ internal val LocaleStringsJa = LocaleStrings(
     fiendLocationPagerTraveling = "移動中",
     fiendLocationPagerLocation = "場所で絞り込み",
     stettingLanguage = "言語:",
+    stettingThemeMode = "テーマモード:",
+    stettingSystemThemeMode = "システム",
+    stettingLightThemeMode = "ライトモード",
+    stettingDarkThemeMode = "ダークモード",
     stettingThemeColor = "テーマカラー:",
 )

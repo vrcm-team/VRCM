@@ -12,5 +12,9 @@ internal val LocaleStringsZhHant = LocaleStrings(
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "按地點",
     stettingLanguage = "語言:",
+    stettingThemeMode = "主題模式:",
+    stettingSystemThemeMode = "跟隨系統",
+    stettingLightThemeMode = "明亮主題",
+    stettingDarkThemeMode = "深色主題",
     stettingThemeColor = "主題顏色:",
 )

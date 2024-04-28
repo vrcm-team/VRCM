@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.CookiesDao
 import io.github.vrcmteam.vrcm.storage.DaoKeys
+import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.ktor.client.plugins.cookies.*
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
@@ -16,5 +17,6 @@ internal val storageModule: Module = module {
     factory<Settings> { (name: String) -> get<Settings.Factory>().create(name) }
     single { AccountDao(get { parametersOf(DaoKeys.Account.NAME) }) }
     single { CookiesDao(get { parametersOf(DaoKeys.Cookies.NAME) }) }
+    single { SettingsDao(get { parametersOf(DaoKeys.Settings.NAME) }) }
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
 }
