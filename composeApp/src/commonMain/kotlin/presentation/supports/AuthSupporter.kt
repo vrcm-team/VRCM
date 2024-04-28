@@ -30,13 +30,12 @@ class AuthSupporter(
     fun accountPairOrNull(): Pair<String, String>? = accountDao.accountPairOrNull()
 
     suspend fun isAuthed():Boolean = authApi.isAuthed().also { if (it) emitAuthed() }
+
     suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh){
         currentUser!!
     }else{
         authApi.currentUser().also {
-            if (it.isSuccess) {
-                currentUser = it
-            }
+            currentUser = it
         }
     }
 

@@ -94,10 +94,11 @@ class FriendLocationPagerModel(
      * @param removeNotIncluded 是否移除不在这一次刷新好友在线列表中的好友
      */
     suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
-        // 多次更新时加把锁
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
         screenModelScope.launch(Dispatchers.IO) {
+            // 当列表下拉刷新时也一同刷新下currentUser,为了同步activeFriends列表
+            // 这里刷新currentUser异常了没事,update时再刷新刷新并处理异常
             if (removeNotIncluded){
                 authSupporter.currentUser(isRefresh = true)
             }
@@ -124,6 +125,7 @@ class FriendLocationPagerModel(
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
+            // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
             val currentUser = authSupporter.currentUser().getOrThrow()
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
