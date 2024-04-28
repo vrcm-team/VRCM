@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -23,6 +26,8 @@ class FriendListPagerModel(
 ): ScreenModel {
 
     private val friendMap: MutableMap<String,FriendData> = mutableStateMapOf()
+
+    var isRefreshing by mutableStateOf(true)
 
     /**
      * 获取好友列表按在线状态最后登录时间与id排序
@@ -48,6 +53,7 @@ class FriendListPagerModel(
     suspend fun refreshFriendList() {
         friendMap.clear()
         doRefreshFriendList()
+        isRefreshing = false
     }
 
     private suspend fun doRefreshFriendList(){

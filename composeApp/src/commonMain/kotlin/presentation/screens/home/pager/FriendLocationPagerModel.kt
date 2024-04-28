@@ -1,8 +1,10 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -41,6 +43,7 @@ class FriendLocationPagerModel(
 
     private val updateMutex = Mutex()
 
+    var isRefreshing by mutableStateOf(true)
 
     init {
         screenModelScope.launch {
@@ -86,6 +89,7 @@ class FriendLocationPagerModel(
         friendLocationMap.clear()
         friendMap.clear()
         doRefreshFriendLocation()
+        isRefreshing = false
     }
 
     /**

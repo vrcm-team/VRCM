@@ -85,26 +85,23 @@ object FriendLocationPagerProvider : PagerProvider {
 
     @Composable
     override fun Content(state: LazyListState) {
-        val isRefreshing = rememberSaveable { mutableStateOf(true) }
+        val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
         LaunchedEffect(Unit){
             SharedFlowCentre.error.collect{
                 // 如果报错跳转登录，并重制刷新标记
-                isRefreshing.value = true
+                friendLocationPagerModel.isRefreshing = true
             }
         }
-        val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
         LaunchedEffect(Unit){
             // 未clear()的同步刷新一次
             friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
         }
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
-            isRefreshing = isRefreshing.value,
-            lazyListState = state
-        ) {
-            friendLocationPagerModel.refreshFriendLocation()
-            isRefreshing.value = false
-        }
+            isRefreshing = friendLocationPagerModel.isRefreshing,
+            lazyListState = state,
+            doRefresh = friendLocationPagerModel::refreshFriendLocation
+        )
     }
 
 }

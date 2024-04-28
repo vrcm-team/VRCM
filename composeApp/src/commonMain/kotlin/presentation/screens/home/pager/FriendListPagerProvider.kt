@@ -27,8 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,25 +60,22 @@ object FriendListPagerProvider : PagerProvider {
 
     @Composable
     override fun Content(state: LazyListState) {
-        val isRefreshing = rememberSaveable { mutableStateOf(true) }
+        val friendListPagerModel: FriendListPagerModel = koinInject()
         LaunchedEffect(Unit) {
             SharedFlowCentre.error.collect {
                 // 如果报错跳转登录，并重制刷新标记
-                isRefreshing.value = true
+                friendListPagerModel.isRefreshing = true
             }
         }
-        val friendListPagerModel: FriendListPagerModel = koinInject()
         val friendList = friendListPagerModel.friendList.sortedByDescending {
             (if (it.status == UserStatus.Offline) "0" else "1" )+ it.lastLogin + it.displayName
         }
         FriendListPager(
             friendList = friendList,
-            isRefreshing = isRefreshing.value,
+            isRefreshing = friendListPagerModel.isRefreshing,
             state = state,
-        ) {
-            isRefreshing.value = false
-            friendListPagerModel.refreshFriendList()
-        }
+            doRefresh = friendListPagerModel::refreshFriendList
+        )
     }
 
 }
