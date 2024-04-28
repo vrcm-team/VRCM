@@ -1,8 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,16 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ListItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -69,8 +70,11 @@ object FriendListPagerProvider : PagerProvider {
             }
         }
         val friendListPagerModel: FriendListPagerModel = koinInject()
+        val friendList = friendListPagerModel.friendList.sortedByDescending {
+            (if (it.status == UserStatus.Offline) "0" else "1" )+ it.lastLogin + it.displayName
+        }
         FriendListPager(
-            friendList = friendListPagerModel.friendList,
+            friendList = friendList,
             isRefreshing = isRefreshing.value,
             state = state,
         ) {
@@ -97,9 +101,7 @@ fun FriendListPager(
         val currentNavigator = currentNavigator
         val toProfile = { user: IUser ->
             if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(
-                UserProfileVO(
-                    user
-                )
+                UserProfileVO(user)
             )
         }
         // 如果没有底部系统手势条，默认12dp
@@ -120,25 +122,26 @@ fun FriendListPager(
     }
 }
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
+fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(68.dp)
+            .padding(horizontal = 6.dp)
+            .clip(MaterialTheme.shapes.large)
             .clickable { toProfile(friend) }
-            .padding(horizontal = 6.dp),
-        icon = {
+            .animateItemPlacement(),
+        leadingContent = {
             UserStateIcon(
                 modifier = Modifier
-                    .size(60.dp)
-                    .clickable { toProfile(friend) },
+                    .size(60.dp),
                 iconUrl = friend.iconUrl,
                 userStatus = friend.status
             )
         },
-        overlineText = {
+        headlineContent = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -157,17 +160,15 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
                 )
             }
         },
-        secondaryText = {
+        supportingContent = {
             Text(
                 text = friend.statusDescription.ifBlank { friend.status.value },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
             )
         },
-        text = {
 
-        },
-        trailing = {
+        trailingContent = {
             // 截取最后登录时间
             // 例如: lastLogin = 2023-04-01T09:03:04.000Z
             val dateTime = friend.lastLogin.split('T')
@@ -189,58 +190,4 @@ fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
             }
         },
     )
-    Box(Modifier.fillMaxSize().padding(6.dp).clip(MaterialTheme.shapes.medium))
-
-//    Card (
-//        colors = CardDefaults.cardColors(
-//            containerColor = MaterialTheme.colorScheme.surface,
-//            contentColor = MaterialTheme.colorScheme.primary
-//        ),
-//        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-//    ){
-//        Row(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .clip(MaterialTheme.shapes.medium)
-//                .clickable { toProfile(friend) }
-//                .padding(6.dp),
-//            verticalAlignment = Alignment.CenterVertically,
-//            horizontalArrangement = Arrangement.spacedBy(6.dp)
-//        ) {
-//            UserStateIcon(
-//                modifier = Modifier
-//                    .height(56.dp)
-//                    .clip(CircleShape),
-//                iconUrl = friend.iconUrl,
-//                userStatus = friend.status
-//            )
-//            Column{
-//                Row(
-//                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-//                    verticalAlignment = Alignment.CenterVertically
-//                ) {
-//                    Icon(
-//                        modifier = Modifier
-//                            .size(16.dp),
-//                        imageVector = Icons.Rounded.Shield,
-//                        contentDescription = "TrustRankIcon",
-//                        tint = GameColor.Rank.fromValue(friend.trustRank)
-//                    )
-//                    Text(
-//                        text = friend.displayName,
-//                        style = MaterialTheme.typography.titleMedium,
-//                        maxLines = 1
-//                    )
-//                }
-//
-//                Text(
-//                    modifier = Modifier.alpha(0.6f),
-//                    text = friend.statusDescription.ifBlank { friend.status.value },
-//                    style = MaterialTheme.typography.labelMedium,
-//                    maxLines = 1
-//                )
-//            }
-//            Spacer(Modifier.weight(1f))
-//        }
-//    }
 }

@@ -65,6 +65,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -291,7 +292,7 @@ private inline fun HomeBottomBar(
                 onClick = {
                     scope.launch {
                         if (selected) {
-                            lazyListState.animateScrollToItem(0,0)
+                            lazyListState.animateScrollToFirst()
                         } else {
                             pagerState.animateScrollToPage(
                                 page = index,

@@ -4,7 +4,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -30,9 +29,7 @@ class FriendListPagerModel(
      * 使用sortedByDescending是因为匹配最后登录时间倒序
      */
     val friendList: List<FriendData>
-        get() = friendMap.values.sortedByDescending {
-            (if (it.status == UserStatus.Offline) "0" else "1" )+ it.lastLogin + it.displayName
-        }
+        get() = friendMap.values.toList()
 
     init {
         screenModelScope.launch {
