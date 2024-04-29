@@ -1,18 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -49,7 +38,7 @@ fun SettingsBottomSheet(
                 .padding(horizontal = 12.dp)
         ) {
             var currentConfiguration by LocalConfiguration.current
-            SettingsItem(strings.stettingLanguage){
+            SettingsItem(strings.stettingLanguage) {
                 LanguageTag.entries.forEach {
                     TextButton(
                         enabled = it.tag != currentConfiguration.languageTag.tag,
@@ -65,8 +54,8 @@ fun SettingsBottomSheet(
                     }
                 }
             }
-            SettingsItem(strings.stettingThemeMode){
-                listOf(null,true,false).forEach{
+            SettingsItem(strings.stettingThemeMode) {
+                listOf(null, true, false).forEach {
                     TextButton(
                         enabled = currentConfiguration.isDarkTheme != it,
                         onClick = {
@@ -86,8 +75,8 @@ fun SettingsBottomSheet(
                     }
                 }
             }
-            val themeColors : List<ThemeColor> = with(currentKoinScope()) { remember(::getAll) }
-            SettingsItem(strings.stettingThemeColor){
+            val themeColors: List<ThemeColor> = with(currentKoinScope()) { remember(::getAll) }
+            SettingsItem(strings.stettingThemeColor) {
                 themeColors.forEach {
                     TextButton(
                         enabled = it.name != currentConfiguration.themeColor.name,
@@ -108,7 +97,7 @@ fun SettingsBottomSheet(
                 }
             }
             val authSupporter = koinInject<AuthSupporter>()
-           val loginOut = LocalNavigator.currentOrThrow.let {
+            val loginOutCall = LocalNavigator.currentOrThrow.let {
                 {
                     onDismissRequest()
                     authSupporter.logout()
@@ -122,7 +111,7 @@ fun SettingsBottomSheet(
                 Spacer(modifier = Modifier.weight(0.25f))
                 TextButton(
                     modifier = Modifier.weight(0.5f),
-                    onClick = loginOut,
+                    onClick = loginOutCall,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.error
@@ -145,7 +134,7 @@ fun SettingsBottomSheet(
 private fun SettingsItem(
     title: String,
     content: @Composable RowScope.() -> Unit
-){
+) {
     Surface {
         Column {
             Text(
