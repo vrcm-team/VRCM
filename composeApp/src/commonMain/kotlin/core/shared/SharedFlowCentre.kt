@@ -9,6 +9,8 @@ object SharedFlowCentre {
 
     val authed = MutableSharedFlow<Pair<String?, String?>>()
 
+    val logout = MutableSharedFlow<Unit>()
+
     val error = MutableSharedFlow<String>()
 
 }

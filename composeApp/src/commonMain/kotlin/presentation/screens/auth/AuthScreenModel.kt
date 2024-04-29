@@ -9,12 +9,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.UnresolvedAddressException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import io.ktor.util.network.*
+import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
 
 
@@ -51,6 +47,7 @@ class AuthScreenModel(
         if (_uiState.value.btnIsLoading) {
             _uiState.value = _uiState.value.copy(btnIsLoading = false)
         }
+        logger.error(errorMsg)
         screenModelScope.launch {
             SharedFlowCentre.error.emit(errorMsg)
         }

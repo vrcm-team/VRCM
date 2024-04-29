@@ -1,10 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -44,11 +40,20 @@ class FriendLocationPagerModel(
     private val updateMutex = Mutex()
 
     var isRefreshing by mutableStateOf(true)
+        private set
+
 
     init {
+        // 监听websocket事件
         screenModelScope.launch {
             SharedFlowCentre.webSocket.collect { socketEvent ->
                 onWebSocketEvent(socketEvent)
+            }
+        }
+        // 监听登出事件, 清除刷新标记
+        screenModelScope.launch {
+            SharedFlowCentre.logout.collect {
+                isRefreshing = true
             }
         }
     }

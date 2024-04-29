@@ -28,6 +28,7 @@ class FriendListPagerModel(
     private val friendMap: MutableMap<String,FriendData> = mutableStateMapOf()
 
     var isRefreshing by mutableStateOf(true)
+        private set
 
     /**
      * 获取好友列表按在线状态最后登录时间与id排序
@@ -37,6 +38,7 @@ class FriendListPagerModel(
         get() = friendMap.values.toList()
 
     init {
+        // 监听WebSocket事件
         screenModelScope.launch {
             SharedFlowCentre.webSocket.collect { socketEvent ->
                 when (socketEvent.type) {
@@ -46,6 +48,12 @@ class FriendListPagerModel(
                     else -> return@collect
                 }
                 doRefreshFriendList()
+            }
+        }
+        // 监听登出事件, 清除刷新标记
+        screenModelScope.launch {
+            SharedFlowCentre.logout.collect {
+                isRefreshing = true
             }
         }
     }

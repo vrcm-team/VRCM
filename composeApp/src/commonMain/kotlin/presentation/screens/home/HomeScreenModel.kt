@@ -10,16 +10,18 @@ import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.UnresolvedAddressException
+import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import network.api.notification.data.ResponseData
+import org.koin.core.logger.Logger
 
 
 class HomeScreenModel(
     private val authSupporter: AuthSupporter,
-    private val notificationApi: NotificationApi
+    private val notificationApi: NotificationApi,
+    private val logger: Logger
 ) : ScreenModel {
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
@@ -77,6 +79,7 @@ class HomeScreenModel(
 
                 else -> "${it.message}"
             }
+            logger.error(message)
             screenModelScope.launch {
                 SharedFlowCentre.error.emit(message)
             }

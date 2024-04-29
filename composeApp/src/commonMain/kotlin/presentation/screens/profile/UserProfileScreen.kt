@@ -49,7 +49,7 @@ data class UserProfileScreen(
             onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
         )
         LaunchedEffect(Unit){
-            SharedFlowCentre.error.collect{
+            SharedFlowCentre.logout.collect{
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
