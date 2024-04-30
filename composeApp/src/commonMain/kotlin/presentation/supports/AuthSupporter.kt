@@ -3,7 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.supports
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
-import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
+import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_HOST
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -11,7 +11,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.CookiesDao
 import io.github.vrcmteam.vrcm.storage.DaoKeys
-import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -111,7 +110,7 @@ class AuthSupporter(
        }
 
     fun logout() {
-        cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@${Url(VRC_API_URL).host}")
+        cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@${VRC_API_HOST}")
     }
 
 }

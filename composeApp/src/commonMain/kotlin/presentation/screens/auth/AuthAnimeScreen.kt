@@ -52,6 +52,7 @@ data class AuthAnimeScreen(
                 isAuthedState = !isAuthedState
             }
             AuthFold(
+                iconYOffset = maxHeight.times(-0.2f),
                 cardHeightDp = cardHeightDp,
                 shapeDp = shapeDp,
             ) {

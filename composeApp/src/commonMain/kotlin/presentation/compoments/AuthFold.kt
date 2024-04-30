@@ -22,10 +22,10 @@ import vrcm.composeapp.generated.resources.logo
 @OptIn(ExperimentalResourceApi::class)
 @Composable
 fun AuthFold(
-    iconYOffset: Dp = (-180).dp,
+    iconYOffset: Dp,
     cardYOffset: Dp = 0.dp,
     cardAlpha: Float = 1.00f,
-    cardHeightDp: Dp = 380.dp,
+    cardHeightDp: Dp,
     shapeDp: Dp = 30.dp,
     cardContext: @Composable () -> Unit = {}
 ) {

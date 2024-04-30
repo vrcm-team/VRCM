@@ -2,20 +2,14 @@ package io.github.vrcmteam.vrcm.network.websocket
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
+import io.github.vrcmteam.vrcm.network.api.attributes.VRC_WSS_URL
 import io.github.vrcmteam.vrcm.storage.DaoKeys
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.cookies.CookiesStorage
-import io.ktor.client.plugins.websocket.receiveDeserialized
-import io.ktor.client.plugins.websocket.wss
+import io.ktor.client.*
+import io.ktor.client.plugins.cookies.*
+import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.parameter
-import io.ktor.http.Url
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import io.ktor.http.*
+import kotlinx.coroutines.*
 import network.websocket.data.WebSocketEvent
 
 class WebSocketApi(
@@ -39,7 +33,7 @@ class WebSocketApi(
         val authToken = cookiesStorage.get(Url(VRC_API_URL)).first { it.name == DaoKeys.Cookies.AUTH_KEY }.value
         try {
             apiClient.wss(
-                urlString = "wss://vrchat.com/?",
+                urlString = VRC_WSS_URL,
                 request = {
                     parameter("authToken", authToken)
                 }) {
