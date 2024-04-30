@@ -69,7 +69,7 @@ object HomeScreen : Screen {
 
         LifecycleEffect(onStarted = (homeScreenModel::ini))
         LaunchedEffect(Unit) {
-            // 报错时跳到验证页面
+            // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }

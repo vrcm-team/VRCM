@@ -51,8 +51,10 @@ class FriendLocationPagerModel(
             }
         }
         // 监听登出事件, 清除刷新标记
-        screenModelScope.launch {
+        screenModelScope.launch(Dispatchers.Default) {
+            println("监听到登出事件")
             SharedFlowCentre.logout.collect {
+                println("监听到登出事件1")
                 isRefreshing = true
             }
         }
@@ -94,7 +96,6 @@ class FriendLocationPagerModel(
         friendLocationMap.clear()
         friendMap.clear()
         doRefreshFriendLocation()
-        isRefreshing = false
     }
 
     /**

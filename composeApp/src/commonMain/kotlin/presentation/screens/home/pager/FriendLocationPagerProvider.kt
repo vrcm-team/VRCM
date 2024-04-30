@@ -61,15 +61,20 @@ object FriendLocationPagerProvider : PagerProvider {
     @Composable
     override fun Content(state: LazyListState) {
         val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
+        // 控制只有第一次跳转到当前页面时自动刷新
+        var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
         LaunchedEffect(Unit){
             // 未clear()的同步刷新一次
             friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
         }
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
-            isRefreshing = friendLocationPagerModel.isRefreshing,
+            isRefreshing = isRefreshing,
             lazyListState = state,
-            doRefresh = friendLocationPagerModel::refreshFriendLocation
+            doRefresh = {
+                friendLocationPagerModel.refreshFriendLocation()
+                isRefreshing = false
+            }
         )
     }
 

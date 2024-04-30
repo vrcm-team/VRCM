@@ -33,7 +33,6 @@ object StartupAnimeScreen : Screen {
                 tween(durationMillis),
                 label = "AuthSurfaceOffset"
             )
-            println("maxHeight1:${authSurfaceOffset}")
             val authSurfaceAlpha by animateFloatAsState(
                 if (isStartUp) 1.00f else 0.00f,
                 tween(durationMillis),

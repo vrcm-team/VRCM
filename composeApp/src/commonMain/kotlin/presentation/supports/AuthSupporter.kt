@@ -111,6 +111,9 @@ class AuthSupporter(
 
     fun logout() {
         cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@${VRC_API_HOST}")
+        scope.launch {
+            SharedFlowCentre.logout.emit(Unit)
+        }
     }
 
 }

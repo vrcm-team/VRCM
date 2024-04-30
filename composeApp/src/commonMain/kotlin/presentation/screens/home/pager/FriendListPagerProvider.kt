@@ -9,6 +9,10 @@ import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,17 +46,21 @@ object FriendListPagerProvider : PagerProvider {
     @Composable
     override fun Content(state: LazyListState) {
         val friendListPagerModel: FriendListPagerModel = koinInject()
+        // 控制只有第一次跳转到当前页面时自动刷新
+        var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
         val friendList = friendListPagerModel.friendList.sortedByDescending {
-            (if (it.status == UserStatus.Offline) "0" else "1" )+ it.lastLogin + it.displayName
+            (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
         }
         FriendListPager(
             friendList = friendList,
-            isRefreshing = friendListPagerModel.isRefreshing,
+            isRefreshing = isRefreshing,
             state = state,
-            doRefresh = friendListPagerModel::refreshFriendList
+            doRefresh = {
+                friendListPagerModel.refreshFriendList()
+                isRefreshing = false
+            }
         )
     }
-
 }
 
 
@@ -147,7 +155,7 @@ fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> 
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = dateTime[0] ,
+                        text = dateTime[0],
                         style = MaterialTheme.typography.labelSmall,
                         maxLines = 1
                     )

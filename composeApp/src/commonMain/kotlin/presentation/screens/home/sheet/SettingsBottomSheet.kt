@@ -17,7 +17,6 @@ import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
 import io.github.vrcmteam.vrcm.presentation.configs.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
@@ -101,7 +100,6 @@ fun SettingsBottomSheet(
                 {
                     onDismissRequest()
                     authSupporter.logout()
-                    it replaceAll AuthAnimeScreen(false)
                 }
             }
             Row(
