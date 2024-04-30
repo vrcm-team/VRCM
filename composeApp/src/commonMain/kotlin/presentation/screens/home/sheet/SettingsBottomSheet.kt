@@ -96,7 +96,7 @@ fun SettingsBottomSheet(
                 }
             }
             val authSupporter = koinInject<AuthSupporter>()
-            val loginOutCall = LocalNavigator.currentOrThrow.let {
+            val logoutCall = LocalNavigator.currentOrThrow.let {
                 {
                     onDismissRequest()
                     authSupporter.logout()
@@ -109,7 +109,7 @@ fun SettingsBottomSheet(
                 Spacer(modifier = Modifier.weight(0.25f))
                 TextButton(
                     modifier = Modifier.weight(0.5f),
-                    onClick = loginOutCall,
+                    onClick = logoutCall,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.error

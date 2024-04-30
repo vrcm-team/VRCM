@@ -116,9 +116,7 @@ fun  FriendLocationPager(
             state = lazyListState,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(
-                start = 16.dp,
                 top = topPadding,
-                end = 16.dp,
                 bottom = bottomPadding
             )
         ) {
@@ -149,7 +147,7 @@ fun  FriendLocationPager(
                 }
                 items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(location, { onClickLocation(location) }) {
-                        UserIconsRow(it, onClickUserIcon)
+                        UserIconsRow(friends = it, onClickUserIcon = onClickUserIcon)
                     }
                 }
             }
@@ -174,17 +172,21 @@ private fun LazyListScope.SimpleCLocationCard(
             LocationTitle(text())
         }
         item(key = locationType.value) {
-            UserIconsRow(it, onClickUserIcon)
+            UserIconsRow(
+                friends = it,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                onClickUserIcon = onClickUserIcon
+            )
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LazyItemScope.LocationTitle(
+private fun LocationTitle(
     text: String,
 ) {
     Text(
+        modifier = Modifier.padding(horizontal = 16.dp),
         text = text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -192,13 +194,15 @@ private fun LazyItemScope.LocationTitle(
 }
 
 @Composable
-private fun LazyItemScope.UserIconsRow(
+private fun UserIconsRow(
     friends: List<State<FriendData>>,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (IUser) -> Unit
 ) {
     if (friends.isEmpty()) return
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
+        contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(friends, key = { it.value.id }) {
@@ -254,7 +258,7 @@ private fun LazyItemScope.LocationCard(
     var showUser by rememberSaveable(location.location) { mutableStateOf(false) }
     val friendList = location.friendList
     Surface(
-        modifier = Modifier.fillParentMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large
     ) {
