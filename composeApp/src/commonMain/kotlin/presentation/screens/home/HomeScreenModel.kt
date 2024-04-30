@@ -8,9 +8,8 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
-import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -66,22 +65,11 @@ class HomeScreenModel(
         }
 
 
-    private fun <T> Result<T>.onHomeFailure() =
-        onFailure {
-            val message = when (it) {
-                is UnresolvedAddressException -> {
-                    "Failed to Home: ${it.message}"
-                }
-
-                is VRCApiException -> {
-                    "Failed to Home: ${it.message}"
-                }
-
-                else -> "${it.message}"
-            }
-            logger.error(message)
+    private inline fun <T> Result<T>.onHomeFailure() =
+        onApiFailure("Home") {
+            logger.error(it)
             screenModelScope.launch {
-                SharedFlowCentre.error.emit(message)
+                SharedFlowCentre.error.emit(it)
             }
         }
 }

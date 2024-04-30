@@ -6,10 +6,10 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
+import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.ktor.util.network.*
 import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
 
@@ -55,11 +55,14 @@ class AuthScreenModel(
 
     fun onCardStateChange(cardState: AuthCardPage) {
         _uiState.value = when (cardState) {
-            AuthCardPage.EmailCode, AuthCardPage.TFACode -> _uiState.value.copy(
-                cardState = cardState,
-                verifyCode = "",
-                btnIsLoading = false,
-            )
+            AuthCardPage.Login -> {
+                authSupporter.logout()
+                _uiState.value.copy(
+                    cardState = cardState,
+                    verifyCode = "",
+                    btnIsLoading = false,
+                )
+            }
 
             else -> _uiState.value.copy(
                 cardState = cardState,
@@ -110,12 +113,12 @@ class AuthScreenModel(
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
-            val result = async(context = Dispatchers.IO) { authSupporter.verify(username, password,verifyCode, _uiState.value.cardState) }.await()
-            if (result) {
-                onCardStateChange(AuthCardPage.Authed)
-            } else {
-                onErrorMessageChange("Invalid Code")
-            }
+            async(context = Dispatchers.IO) {
+                authSupporter.verify(username, password, verifyCode, _uiState.value.cardState)
+            }.await()
+                .onSuccess {
+                    onCardStateChange(AuthCardPage.Authed)
+                }.onAuthFailure()
         }
     }
 
@@ -142,11 +145,11 @@ class AuthScreenModel(
         }
         onCardStateChange(authCardPage)
     }
-    private fun<T> Result<T>.onAuthFailure() =
-        onFailure {
-            logger.error("AuthScreen Failed : ${it.message}")
-            val message = if(it is UnresolvedAddressException)  "Unable to connect to the network" else it.message
-            onErrorMessageChange("Failed to Auth: $message")
-            onCardStateChange(AuthCardPage.Login)
+
+    private inline fun <T> Result<T>.onAuthFailure() =
+        onApiFailure("Auth") {
+            logger.error(it)
+            onErrorMessageChange(it)
         }
+
 }

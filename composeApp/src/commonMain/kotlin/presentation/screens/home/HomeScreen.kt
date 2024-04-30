@@ -173,8 +173,7 @@ private inline fun HomeTopAppBar(
                 UserStateIcon(
                     modifier = Modifier
                         .size(54.dp),
-                    iconUrl = currentUser?.currentAvatarThumbnailImageUrl
-                        ?: "",
+                    iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
                     userStatus = currentUser?.status
                 )
                 Column {
@@ -183,7 +182,7 @@ private inline fun HomeTopAppBar(
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
-                            text = currentUser?.displayName ?: "",
+                            text = currentUser?.displayName.orEmpty(),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
@@ -198,8 +197,7 @@ private inline fun HomeTopAppBar(
                         )
                     }
                     Text(
-                        text = currentUser?.statusDescription ?: currentUser?.status?.value
-                        ?: "",
+                        text = currentUser?.statusDescription ?: currentUser?.status?.value.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 1

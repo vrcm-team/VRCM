@@ -7,16 +7,11 @@ import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.basicAuth
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.path
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 
 class AuthApi(
     private val client: HttpClient,
@@ -63,13 +58,12 @@ class AuthApi(
     /**
      * 请求验证验证码
      */
-    suspend fun verify(code: String, authType: AuthType): Boolean {
+    suspend fun verify(code: String, authType: AuthType): Result<Unit> {
         // emailOtp -> emailotp
         val authTypePath = authType.typeName.lowercase()
-        val response = client.post("$AUTH_API_PREFIX/twofactorauth/$authTypePath/verify") {
+        return client.post("$AUTH_API_PREFIX/twofactorauth/$authTypePath/verify") {
             setBody(TextContent("""{"code":"$code"}""", ContentType.Application.Json))
-        }
-        return response.status == HttpStatusCode.OK
+        }.ifOK { }
     }
 
     /**

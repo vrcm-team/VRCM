@@ -12,7 +12,7 @@ class FileApi(private val client: HttpClient) {
         private val versionRegex = Regex("/[0-9]+/")
         fun findFileId(fileUrl: String): String {
             val match = regex.find(fileUrl)
-            return match?.groupValues?.get(0) ?: ""
+            return match?.groupValues?.get(0).orEmpty()
         }
 
         fun findFileVersion(fileUrl: String): String {

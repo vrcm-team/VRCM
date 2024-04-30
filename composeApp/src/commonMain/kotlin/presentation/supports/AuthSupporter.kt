@@ -11,7 +11,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.CookiesDao
 import io.github.vrcmteam.vrcm.storage.DaoKeys
-import io.ktor.http.Url
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -59,13 +59,13 @@ class AuthSupporter(
         password: String,
         verifyCode: String,
         authCardPage: AuthCardPage
-    ): Boolean {
+    ): Result<Unit> {
         val authType = when (authCardPage) {
             AuthCardPage.EmailCode -> AuthType.Email
             AuthCardPage.TFACode -> AuthType.TFA
             else -> error("not supported")
         }
-       return authApi.verify(verifyCode, authType).also { if (it) emitAuthed(username, password) }
+       return authApi.verify(verifyCode, authType).also { if (it.isSuccess) emitAuthed(username, password) }
     }
 
     private suspend fun emitAuthed(username: String? = null, password: String? = null) {

@@ -2,8 +2,7 @@ package io.github.vrcmteam.vrcm.storage
 
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.set
-import io.ktor.util.decodeBase64String
-import io.ktor.util.encodeBase64
+import io.ktor.util.*
 
 class AccountDao(
     private val accountSettings: Settings
@@ -16,7 +15,7 @@ class AccountDao(
 
     fun accountPair(): Pair<String, String> =
         accountSettings.getString(DaoKeys.Account.USERNAME_KEY,"") to
-                (accountSettings.getStringOrNull(DaoKeys.Account.PASSWORD_KEY)?.decodeBase64String()?:"")
+                (accountSettings.getStringOrNull(DaoKeys.Account.PASSWORD_KEY)?.decodeBase64String().orEmpty())
     fun accountPairOrNull(): Pair<String, String>?=
         accountPair().takeIf { it.first.isNotEmpty() && it.second.isNotEmpty() }
 

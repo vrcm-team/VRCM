@@ -1,27 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -47,58 +31,66 @@ object AuthScreen : Screen {
         val authScreenModel: AuthScreenModel = getScreenModel()
 
         LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
-        AuthFold {
-            AuthCard(
-                cardState = authScreenModel.uiState.cardState,
-            ) { state ->
-                when (state) {
-                    AuthCardPage.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .align(Alignment.Center),
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 5.dp
-                            )
-                        }
-                    }
-
-                    AuthCardPage.Login -> {
-                        NavCard(strings.authLoginTitle) {
-                            LoginCardInput(
-                                uiState = authScreenModel.uiState,
-                                onUsernameChange = authScreenModel::onUsernameChange,
-                                onPasswordChange = authScreenModel::onPasswordChange,
-                                onClick = authScreenModel::login
-                            )
-                        }
-                    }
-
-                    AuthCardPage.EmailCode, AuthCardPage.TFACode, AuthCardPage.TTFACode -> {
-                        NavCard(strings.authVerifyTitle, barContent = {
-                            ReturnIcon {
-                                authScreenModel.cancelJob()
-                                authScreenModel.onCardStateChange(AuthCardPage.Login)
+        BoxWithConstraints(
+            contentAlignment = Alignment.Center,
+        ) {
+            AuthFold(
+                iconYOffset = maxHeight.times(-0.2f),
+                cardHeightDp = maxHeight.times(0.42f),
+            ) {
+                AuthCard(
+                    cardState = authScreenModel.uiState.cardState,
+                ) { state ->
+                    when (state) {
+                        AuthCardPage.Loading -> {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .align(Alignment.Center),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 5.dp
+                                )
                             }
-                        }) {
-                            VerifyCardInput(
-                                uiState = authScreenModel.uiState,
-                                onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
-                                onClick = authScreenModel::verify
-                            )
                         }
-                    }
 
-                    AuthCardPage.Authed -> {
-                        LaunchedEffect(Unit) {
-                            currentNavigator replace AuthAnimeScreen(true)
+                        AuthCardPage.Login -> {
+                            NavCard(strings.authLoginTitle) {
+                                LoginCardInput(
+                                    uiState = authScreenModel.uiState,
+                                    onUsernameChange = authScreenModel::onUsernameChange,
+                                    onPasswordChange = authScreenModel::onPasswordChange,
+                                    onClick = authScreenModel::login
+                                )
+                            }
                         }
-                        Box(modifier = Modifier.fillMaxSize())
+
+                        AuthCardPage.EmailCode, AuthCardPage.TFACode, AuthCardPage.TTFACode -> {
+                            NavCard(strings.authVerifyTitle, barContent = {
+                                ReturnIcon {
+                                    authScreenModel.cancelJob()
+                                    authScreenModel.onCardStateChange(AuthCardPage.Login)
+                                }
+                            }) {
+                                VerifyCardInput(
+                                    uiState = authScreenModel.uiState,
+                                    onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
+                                    onClick = authScreenModel::verify
+                                )
+                            }
+                        }
+
+                        AuthCardPage.Authed -> {
+                            LaunchedEffect(Unit) {
+                                currentNavigator replace AuthAnimeScreen(true)
+                            }
+                            Box(modifier = Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
         }
+
     }
 }
 
@@ -159,19 +151,25 @@ private fun ReturnIcon(onClick: () -> Unit) {
 private fun NavCard(
     tileText: String,
     barContent: @Composable () -> Unit = {
-        Spacer(modifier = Modifier.height(42.dp))
+//        Spacer(modifier = Modifier.height(42.dp))
     },
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column {
+    Box {
         barContent()
-        Text(
-            modifier = Modifier.fillMaxWidth(),
-            text = tileText,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center
-        )
-        content()
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = tileText,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+            content()
+        }
     }
+
 }

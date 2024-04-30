@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth.card
 
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,7 +20,6 @@ fun VerifyCardInput(
     onClick: () -> Unit
 ) {
     val verifyCode = uiState.verifyCode
-    Spacer(modifier = Modifier.height(68.dp))
     val focusManager = LocalFocusManager.current
     CodeTextField(
         modifier = Modifier
@@ -41,7 +39,6 @@ fun VerifyCardInput(
         boxBackgroundColor = MaterialTheme.colorScheme.surface,
         textColor = MaterialTheme.colorScheme.onSurface
     )
-    Spacer(modifier = Modifier.height(68.dp))
     LoadingButton(
         modifier = Modifier
             .fillMaxWidth()
