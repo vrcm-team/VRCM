@@ -1,13 +1,28 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,6 +99,7 @@ fun FriendListPager(
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = state,
@@ -100,17 +116,15 @@ fun FriendListPager(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
+fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(68.dp)
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
-            .clickable { toProfile(friend) }
-            .animateItemPlacement(),
+            .clickable { toProfile(friend) },
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier
