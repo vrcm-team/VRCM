@@ -1,5 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import java.util.*
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -101,11 +101,11 @@ android {
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
 
     defaultConfig {
-        applicationId = "io.github.vrcmteam.vrcm"
+        applicationId = libs.versions.app.packageName.get()
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = libs.versions.app.code.get().toInt()
+        versionName = libs.versions.app.name.get()
     }
 //    buildFeatures {
 //        compose = true
@@ -167,8 +167,8 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "io.github.vrcmteam.vrcm"
-            packageVersion = "1.0.0"
+            packageName = libs.versions.app.packageName.get()
+            packageVersion = libs.versions.app.name.get()
         }
     }
 }

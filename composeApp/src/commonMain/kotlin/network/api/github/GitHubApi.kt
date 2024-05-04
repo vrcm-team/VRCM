@@ -11,7 +11,7 @@ class GitHubApi(
 ) {
 
     companion object{
-        private const val LATEST_RELEASE_URL = "https://api.github.com/repos/KAMO030/MyBatis-Flex-Kotlin/releases/latest"
+        private const val LATEST_RELEASE_URL = "https://api.github.com/repos/vrcm-team/VRCM/releases/latest"
     }
     suspend fun latestRelease(): Result<GitHubReleaseData> =
             client.get(LATEST_RELEASE_URL).result{ body() }
