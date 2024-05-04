@@ -6,6 +6,9 @@ import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
 
 @Stable
 data class LocaleStrings(
+    val startupDialogTitle: String = "New version available",
+    val startupDialogUpdate: String = "Update",
+    val startupDialogIgnore: String = "Ignore",
     val authLoginTitle: String = "Login",
     val authLoginButton: String = "LOGIN",
     val authLoginUsername: String = "Username",
@@ -16,6 +19,7 @@ data class LocaleStrings(
     val fiendLocationPagerPrivate: String = "Friends in Private Worlds",
     val fiendLocationPagerTraveling: String = "Friends is Traveling",
     val fiendLocationPagerLocation: String = "by Location",
+    val fiendListPagerSearch: String = "Search",
     val stettingLanguage: String = "Language:",
     val stettingThemeMode: String = "ThemeMode:",
     val stettingSystemThemeMode: String = "System",
@@ -23,7 +27,9 @@ data class LocaleStrings(
     val stettingDarkThemeMode: String = "Dark",
     val stettingThemeColor: String = "ThemeColor:",
     val stettingLogout: String = "Logout"
-)
+) {
+
+}
 
 val strings: LocaleStrings
     @Composable

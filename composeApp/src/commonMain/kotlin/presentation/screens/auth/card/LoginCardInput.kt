@@ -42,6 +42,7 @@ fun LoginCardInput(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         ITextField(
+            modifier = Modifier.padding(horizontal = 32.dp),
             imageVector = Icons.Outlined.AccountCircle,
             hintText = strings.authLoginUsername,
             textValue = uiState.username,
@@ -53,6 +54,7 @@ fun LoginCardInput(
             onValueChange = onUsernameChange
         )
         IPasswordField(
+            modifier = Modifier.padding(horizontal = 32.dp),
             imageVector = Icons.Outlined.Lock,
             hintText = strings.authLoginPassword,
             textValue = uiState.password,

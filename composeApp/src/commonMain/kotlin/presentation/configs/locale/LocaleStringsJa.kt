@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.configs.locale
 
 internal val LocaleStringsJa = LocaleStrings(
+    startupDialogTitle = "新バージョンが利用可能",
+    startupDialogUpdate = "アップデート",
+    startupDialogIgnore = "無視",
     authLoginTitle = "ログイン",
     authLoginButton = "ログイン",
     authLoginUsername = "ユーザー名",
@@ -11,6 +14,7 @@ internal val LocaleStringsJa = LocaleStrings(
     fiendLocationPagerPrivate = "プライベートワールド中",
     fiendLocationPagerTraveling = "移動中",
     fiendLocationPagerLocation = "場所によって",
+    fiendListPagerSearch = "検索",
     stettingLanguage = "言語:",
     stettingThemeMode = "テーマモード:",
     stettingSystemThemeMode = "システム",

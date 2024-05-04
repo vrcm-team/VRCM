@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,11 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,12 +38,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.presentation.compoments.ITextField
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
@@ -63,7 +72,10 @@ object FriendListPagerProvider : PagerProvider {
         val friendListPagerModel: FriendListPagerModel = koinInject()
         // 控制只有第一次跳转到当前页面时自动刷新
         var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
-        val friendList = friendListPagerModel.friendList.sortedByDescending {
+        var searchText by rememberSaveable(title) { mutableStateOf("") }
+        val friendList = friendListPagerModel.friendList.filter {
+            searchText.isEmpty() || it.displayName.contains(searchText)
+        }.sortedByDescending {
             (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
         }
         FriendListPager(
@@ -73,6 +85,18 @@ object FriendListPagerProvider : PagerProvider {
             doRefresh = {
                 friendListPagerModel.refreshFriendList()
                 isRefreshing = false
+            },
+            searchBar = {
+                val focusManager = LocalFocusManager.current
+                ITextField(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    imageVector = Icons.Rounded.Search,
+                    hintText = strings.fiendListPagerSearch,
+                    textValue = searchText,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    onValueChange = { searchText = it }
+                )
             }
         )
     }
@@ -85,7 +109,8 @@ fun FriendListPager(
     friendList: List<FriendData>,
     isRefreshing: Boolean,
     state: LazyListState = rememberLazyListState(),
-    doRefresh: suspend () -> Unit
+    doRefresh: suspend () -> Unit,
+    searchBar: @Composable () -> Unit
 ) {
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     RefreshBox(
@@ -109,6 +134,9 @@ fun FriendListPager(
             ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            item{
+                searchBar()
+            }
             items(friendList, key = { it.id }) {
                 FriendListItem(it, toProfile)
             }
@@ -116,15 +144,17 @@ fun FriendListPager(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
+fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> Unit) {
     ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(68.dp)
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
-            .clickable { toProfile(friend) },
+            .clickable { toProfile(friend) }
+            .animateItemPlacement(),
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier

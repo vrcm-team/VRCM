@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.configs.locale
 
 internal val LocaleStringsZhHans = LocaleStrings(
+    startupDialogTitle = "新版本可用",
+    startupDialogUpdate = "更新",
+    startupDialogIgnore = "忽略",
     authLoginTitle = "登录",
     authLoginButton = "登录",
     authLoginUsername = "用户名",
@@ -11,6 +14,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     fiendLocationPagerPrivate = "处于私人世界中",
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "按地点",
+    fiendListPagerSearch = "搜索",
     stettingLanguage = "语言:",
     stettingThemeMode = "主题模式:",
     stettingSystemThemeMode = "跟随系统",

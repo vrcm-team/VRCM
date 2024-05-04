@@ -38,18 +38,19 @@ import io.github.vrcmteam.vrcm.presentation.supports.PasswordMissEndVisualTransf
 
 @Composable
 fun ITextField(
+    modifier: Modifier = Modifier,
     imageVector: ImageVector,
     hintText: String,
     textValue: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
-    onFocusChanged: (FocusState) -> Unit = {},
     onValueChange: (String) -> Unit
 ) {
     Row(
         modifier = Modifier
+
             .fillMaxWidth()
-            .padding(horizontal = 32.dp)
+            .then(modifier)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -71,7 +72,6 @@ fun ITextField(
         BasicTextField(
             modifier = Modifier
                 .weight(1f)
-                .onFocusChanged(onFocusChanged)
                 .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
             value = textValue,
             decorationBox = { innerTextField ->
@@ -97,9 +97,9 @@ fun ITextField(
         if (textValue.isEmpty()) return
         Icon(
             modifier = Modifier
+                .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
                 .clip(CircleShape)
-                .clickable { onValueChange("") }
-                .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
+                .clickable { onValueChange("") },
             imageVector = Icons.Default.Clear,
             contentDescription = "ClearIcon",
             tint = MaterialTheme.colorScheme.outlineVariant
@@ -111,6 +111,7 @@ fun ITextField(
 
 @Composable
 fun IPasswordField(
+    modifier: Modifier = Modifier,
     imageVector: ImageVector,
     hintText: String,
     textValue: String,
@@ -129,7 +130,7 @@ fun IPasswordField(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp)
+            .then(modifier)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,

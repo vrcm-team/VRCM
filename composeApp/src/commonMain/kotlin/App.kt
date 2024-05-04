@@ -29,9 +29,7 @@ import presentation.compoments.SelectableTransitionScreen
 @Composable
 fun App() {
     KoinContext {
-        Configuration(
-//            themeColor = themeColors.first()
-        ) {
+        Configuration {
             Navigator(StartupAnimeScreen) {
                 SnackBarToastBox(
                     Modifier
