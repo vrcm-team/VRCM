@@ -14,9 +14,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerMo
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
-import io.ktor.client.*
+import io.ktor.client.HttpClient
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
@@ -34,6 +35,7 @@ val presentationModule: Module = module {
     singleOf (::FriendLocationPagerModel)
     singleOf (::FriendListPagerModel)
     singleOf (::AuthSupporter)
+    singleOf (::VersionManager)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }

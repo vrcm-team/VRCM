@@ -10,12 +10,18 @@ import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import kotlinx.coroutines.*
+import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
 
 class AuthScreenModel(
     private val authSupporter: AuthSupporter,
+    private val versionManager: VersionManager,
     private val logger: Logger
 ) : ScreenModel {
 
@@ -89,6 +95,11 @@ class AuthScreenModel(
             .getOrNull()
     }.await() == true
 
+    suspend fun tryCheckVersion(): String? {
+        return screenModelScope.async(Dispatchers.IO) {
+            versionManager.checkVersion()
+        }.await()
+    }
 
     fun login() {
         val username = _uiState.value.username.trim()

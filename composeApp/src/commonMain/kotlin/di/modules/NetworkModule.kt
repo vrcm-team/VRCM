@@ -3,16 +3,20 @@ package io.github.vrcmteam.vrcm.di.modules
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
+import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.logging.DEFAULT
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
@@ -28,6 +32,7 @@ internal val networkModule = module(true) {
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
     singleOf(::WebSocketApi)
+    singleOf(::GitHubApi)
     single <HttpClient> { apiClientDefinition(it) }
     single { Json {
         ignoreUnknownKeys = true
