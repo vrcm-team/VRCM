@@ -1,11 +1,30 @@
 # VRCM
 ## A Multi-Platform friend "monitor" for VRChat.
 
-
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-![appPreview.png](image%2FappPreview.png)
+## Features:
+- Multi-platform support (Android, iOS, Desktop?)
+- Friend Location
+- Friend list
+- Friend profile
+- Settings(i8n, theme...)
+## Preview:
 
+![PreviewLocation.png](image/PreviewLocation.png)
+![PreviewFriendList.png](image/PreviewFriendList.png)
+![PreviewSettings.png](image/PreviewSettings.png)
+![PreviewProfile.png](image/PreviewProfile.png)
+
+## TODO:
+
+- Friend Profile actions(add friend, block...)
+- World Profile UI(world name, description, tags...) and actions(favorite...)
+- Group Profile UI(group name, description, tags...) and actions(favorite...)
+- Notifications UI and actions(mark as read, delete...)
+- Support for System Notifications
+
+## Dependencies:
 The app uses the following multiplatform dependencies in its implementation:
 - [Ktor](https://ktor.io/) for networking
 - [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) for JSON handling

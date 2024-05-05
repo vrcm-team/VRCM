@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
+import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
@@ -101,6 +102,7 @@ class FriendLocationPagerModel(
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.friendsFlow()
                 .retry(1) {
+                    // 如果是登录失效了就会重新登录并重试一次
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
                     SharedFlowCentre.error.emit(it.message.toString())
@@ -112,7 +114,8 @@ class FriendLocationPagerModel(
                 }
         }.join()
         if (removeNotIncluded){
-            friendMap.keys.filter { !includedIdList.contains(it) }
+            friendMap.keys
+                .filter { !includedIdList.contains(it) }
                 .forEach { removeFriend(it) }
         }
     }
@@ -174,14 +177,8 @@ class FriendLocationPagerModel(
                         ).also { currentInstanceFriendLocations.add(it) }
                 }
                 // 通过location查询房间实例信息
-                screenModelScope.launch(Dispatchers.IO) {
-                    authSupporter.reTryAuth {
-                        instancesApi.instanceByLocation(location)
-                    }.onSuccess { instance ->
-                        friendLocation.instants.value = InstantsVO(instance)
-                    }.onFailure {
-                        SharedFlowCentre.error.emit(it.message.toString())
-                    }
+                fetchInstants(location){
+                    friendLocation.instants.value = InstantsVO(it)
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
@@ -190,14 +187,26 @@ class FriendLocationPagerModel(
         }
     }
 
+    private inline fun fetchInstants(location: String, crossinline updateInstants:(InstanceData) -> Unit){
+        screenModelScope.launch(Dispatchers.IO) {
+            authSupporter.reTryAuth {
+                instancesApi.instanceByLocation(location)
+            }.onSuccess { instance ->
+                updateInstants(instance)
+            }.onFailure {
+                SharedFlowCentre.error.emit(it.message.toString())
+            }
+        }
+    }
+
     /**
      * 如果上次请求的数据中有这次的用户并且在不同的location，则把该用户从上次的房间实例中列表中移除
      */
     private fun removePre(friends: Collection<FriendData>) {
         if (friendMap.isEmpty()) return
-        friends.filter {
-            friendMap.containsKey(it.id) && friendMap[it.id]!!.location != it.location
-        }.map { it.id }.forEach(::removeFriend)
+        friends.filter { friendMap.containsKey(it.id) && friendMap[it.id]!!.location != it.location }
+            .map { it.id }
+            .forEach(::removeFriend)
     }
 
     private fun removeFriend(friendId: String) {
