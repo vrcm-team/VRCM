@@ -52,11 +52,10 @@ class FriendListPagerModel(
     }
 
     private suspend fun doRefreshFriendList(){
-        // 多次更新时加把锁
-        // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.allFriendsFlow()
                 .retry(1) {
+                    // 如果是登录失效了就会重新登录并重试一次
                     if (it is VRCApiException) authSupporter.doReTryAuth() else false
                 }.catch {
                     SharedFlowCentre.error.emit(it.message.toString())
