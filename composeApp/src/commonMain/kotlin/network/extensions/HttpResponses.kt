@@ -17,7 +17,13 @@ suspend inline fun <reified T> HttpResponse.ifOK(mapping: HttpResponse.() -> T):
         )
     }
 
-suspend inline fun <reified T> HttpResponse.result(mapping: HttpResponse.() -> T): Result<T> =
-    runCatching {
-        ifOK(mapping).getOrThrow()
+suspend inline fun <reified T> HttpResponse.ifOKOrThrow(mapping: HttpResponse.() -> T): T =
+    if (status.value == 200) {
+        this.run { mapping() }
+    } else {
+        throw VRCApiException(
+            message = status.description,
+            bodyText = bodyAsText(),
+            code = status.value
+        )
     }
