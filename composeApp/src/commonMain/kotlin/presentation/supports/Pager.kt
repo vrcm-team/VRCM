@@ -1,9 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.painter.Painter
 import cafe.adriel.voyager.core.screen.Screen
 
@@ -25,7 +22,3 @@ interface Pager:Screen  {
     override fun Content()
 
 }
-
-val LocalLazyListState: ProvidableCompositionLocal<LazyListState?> =
-    staticCompositionLocalOf { null }
-

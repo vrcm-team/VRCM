@@ -67,7 +67,6 @@ object FriendListPager : Pager {
                 (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
             }
         LaunchedEffect(Unit){
-            println("lazyListState")
             SharedFlowCentre.toPagerTop.collect{
                 lazyListState.animateScrollToFirst()
             }
