@@ -13,4 +13,5 @@ object SharedFlowCentre {
 
     val error = MutableSharedFlow<String>()
 
+    val toPagerTop = MutableSharedFlow<Unit>()
 }

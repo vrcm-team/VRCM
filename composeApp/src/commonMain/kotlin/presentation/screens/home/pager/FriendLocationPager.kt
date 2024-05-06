@@ -6,37 +6,13 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Explore
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -54,6 +30,8 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -62,16 +40,16 @@ import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.FriendLocationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
-import org.koin.compose.koinInject
+import io.github.vrcmteam.vrcm.presentation.supports.Pager
 
-object FriendLocationPagerProvider : PagerProvider {
+object FriendLocationPager : Pager {
 
     override val index: Int
         get() = 0
@@ -83,18 +61,24 @@ object FriendLocationPagerProvider : PagerProvider {
         @Composable  get() = rememberVectorPainter(image = Icons.Rounded.Explore)
 
     @Composable
-    override fun Content(state: LazyListState) {
-        val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
+    override fun Content() {
+        val friendLocationPagerModel: FriendLocationPagerModel = getScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
         var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
+        val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit){
             // 未clear()的同步刷新一次
             friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
         }
+        LaunchedEffect(Unit){
+            SharedFlowCentre.toPagerTop.collect{
+                lazyListState.animateScrollToFirst()
+            }
+        }
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
             isRefreshing = isRefreshing,
-            lazyListState = state,
+            lazyListState = lazyListState,
             doRefresh = {
                 friendLocationPagerModel.refreshFriendLocation()
                 isRefreshing = false

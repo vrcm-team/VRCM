@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -24,6 +25,8 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.koin.getScreenModel
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -31,15 +34,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ITextField
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
+import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import org.koin.compose.koinInject
 
-object FriendListPagerProvider : PagerProvider {
+object FriendListPager : Pager {
 
     override val index: Int
         get() = 1
@@ -51,10 +54,11 @@ object FriendListPagerProvider : PagerProvider {
         @Composable get() = rememberVectorPainter(image = Icons.Rounded.Group)
 
     @Composable
-    override fun Content(state: LazyListState) {
-        val friendListPagerModel: FriendListPagerModel = koinInject()
+    override fun Content() {
+        val friendListPagerModel: FriendListPagerModel = getScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
         var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
+        val lazyListState = rememberLazyListState()
         var searchText by rememberSaveable(title) { mutableStateOf("") }
         val friendList = friendListPagerModel.friendList
             .filter {
@@ -62,10 +66,16 @@ object FriendListPagerProvider : PagerProvider {
             }.sortedByDescending {
                 (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
             }
+        LaunchedEffect(Unit){
+            println("lazyListState")
+            SharedFlowCentre.toPagerTop.collect{
+                lazyListState.animateScrollToFirst()
+            }
+        }
         FriendListPager(
             friendList = friendList,
             isRefreshing = isRefreshing,
-            state = state,
+            state = lazyListState,
             doRefresh = {
                 friendListPagerModel.refreshFriendList()
                 isRefreshing = false

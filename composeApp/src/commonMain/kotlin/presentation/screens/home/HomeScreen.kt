@@ -4,25 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -31,16 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
@@ -65,30 +39,27 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
-import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.extensions.isSupportBlur
-import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerProvider
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerProvider
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
-import io.github.vrcmteam.vrcm.presentation.supports.PagerProvider
+import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
+import network.api.notification.data.ResponseData
 
 
 object HomeScreen : Screen {
 
     private val pagerList = listOf(
-        FriendLocationPagerProvider,
-        FriendListPagerProvider,
+        FriendLocationPager,
+        FriendListPager,
     )
 
     @Composable
@@ -104,20 +75,15 @@ object HomeScreen : Screen {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
-        // 为了控制点击BottomBar的图标自动回到列表顶部功能,把LazyListState在这里提前声明
-        val pagerProvidersLazyListState = pagerList.map { it to rememberLazyListState() }
         // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
-        val pagerState = rememberPagerState { pagerProvidersLazyListState.size }
+        val pagerState = rememberPagerState { pagerList.size }
 
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
-            topBar = { HomeTopAppBar(homeScreenModel, hazeState) },
-            bottomBar = { HomeBottomBar(pagerProvidersLazyListState, pagerState, hazeState) },
-            floatingActionButton = {
-                SettingsActionButton()
-            }
+            topBar = { HomeTopAppBar(hazeState) },
+            bottomBar = { HomeBottomBar(pagerList,pagerState, hazeState) },
         ) {
             Surface(
                 modifier = Modifier
@@ -126,8 +92,7 @@ object HomeScreen : Screen {
                 tonalElevation = 2.dp
             ) {
                 HorizontalPager(pagerState) {
-                    val (pager, lazyListState) = pagerProvidersLazyListState[it]
-                    pager.Content(lazyListState)
+                    pagerList[it].Content()
                 }
             }
         }
@@ -136,12 +101,11 @@ object HomeScreen : Screen {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private inline fun HomeTopAppBar(
-    homeScreenModel: HomeScreenModel,
+private inline fun Screen.HomeTopAppBar(
     hazeState: HazeState?
 ) {
+    val homeScreenModel: HomeScreenModel = getScreenModel()
     val currentUser = homeScreenModel.currentUser
     val refreshNotification = {
         homeScreenModel.refreshNotifications()
@@ -158,21 +122,12 @@ private inline fun HomeTopAppBar(
     val trustRank = remember(currentUser) { currentUser?.trustRank }
     val rankColor = GameColor.Rank.fromValue(trustRank)
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    // notification
-    var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    val onClickNotification: () -> Unit = {
-        bottomSheetIsVisible = true
-    }
+
     // 初始化刷新一次
     LaunchedEffect(Unit) {
         refreshNotification()
     }
-    // 每打开一次刷新一次
-    LaunchedEffect(bottomSheetIsVisible) {
-        if (bottomSheetIsVisible) {
-            refreshNotification()
-        }
-    }
+
     val modifier = if (hazeState != null) {
         Modifier.hazeChild(
             state = hazeState,
@@ -206,7 +161,9 @@ private inline fun HomeTopAppBar(
                     iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
                     userStatus = currentUser?.status
                 )
-                Column {
+                Column(
+                    modifier = Modifier.widthIn(max = 200.dp),
+                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -227,52 +184,32 @@ private inline fun HomeTopAppBar(
                         )
                     }
                     Text(
-                        text = currentUser?.statusDescription ?: currentUser?.status?.value.orEmpty(),
+                        text = (currentUser?.statusDescription ?: currentUser?.status?.value.orEmpty())+"!!!!!!!!!!!!!!!!!!!!!!!!",
                         style = MaterialTheme.typography.labelMedium,
+                        overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.outline,
                         maxLines = 1
                     )
                 }
             }
-
-
             Spacer(modifier = Modifier.weight(1f))
-            IconButton(
-                onClick = onClickNotification
-            ) {
-                BadgedBox(
-                    badge = {
-                        val primaryColor = MaterialTheme.colorScheme.primary
-                        if (notifications.isNotEmpty()) {
-                            Canvas(modifier = Modifier.size(8.dp)) {
-                                drawCircle(color = primaryColor, radius = 4.dp.toPx())
-                            }
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Notifications,
-                        contentDescription = "NotificationIcon"
-                    )
-                }
+            NotificationActionButton(
+                notifications,
+                homeScreenModel::refreshNotifications
+            ) { id, response ->
+                homeScreenModel.responseNotification(id, response)
             }
+            SettingsActionButton()
         }
     }
 
-    NotificationBottomSheet(
-        bottomSheetIsVisible = bottomSheetIsVisible,
-        notificationList = notifications,
-        onDismissRequest = { bottomSheetIsVisible = false },
-        onResponseNotification = { id, response ->
-            homeScreenModel.responseNotification(id, response)
-        }
-    )
 }
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private inline fun HomeBottomBar(
-    pagerProvidersState: List<Pair<PagerProvider, LazyListState>>,
+    pagerList: List<Pager>,
     pagerState: PagerState,
     hazeState: HazeState?
 ) {
@@ -282,8 +219,7 @@ private inline fun HomeBottomBar(
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
     val pagerNavigationItems: @Composable RowScope.() -> Unit = {
-        pagerProvidersState.forEach {
-            val (pager, lazyListState) = it
+        pagerList.forEach { pager ->
             val index = pager.index
             val selected = pagerState.currentPage == index
             PagerNavigationItem(
@@ -292,7 +228,7 @@ private inline fun HomeBottomBar(
                 onClick = {
                     scope.launch {
                         if (selected) {
-                            lazyListState.animateScrollToFirst()
+                            SharedFlowCentre.toPagerTop.emit(Unit)
                         } else {
                             pagerState.animateScrollToPage(
                                 page = index,
@@ -346,7 +282,7 @@ private inline fun HomeBottomBar(
 
 @Composable
 private fun RowScope.PagerNavigationItem(
-    provider: PagerProvider,
+    provider: Pager,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -366,14 +302,14 @@ private fun RowScope.PagerNavigationItem(
 }
 
 @Composable
-private fun SettingsActionButton(
+ fun SettingsActionButton(
+    modifier: Modifier = Modifier,
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     IconButton(
-        modifier = Modifier.offset(y = 48.dp),
+        modifier = modifier,
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = MaterialTheme.colorScheme.tertiary,
-            contentColor = MaterialTheme.colorScheme.onTertiary
+            contentColor = MaterialTheme.colorScheme.tertiary
         ),
         onClick = { bottomSheetIsVisible = !bottomSheetIsVisible }
     ) {
@@ -386,6 +322,57 @@ private fun SettingsActionButton(
     SettingsBottomSheet(
         isVisible = bottomSheetIsVisible,
         onDismissRequest = { bottomSheetIsVisible = false }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotificationActionButton(
+    notifications: List<NotificationData>,
+    refreshNotification: () -> Unit,
+    onResponseNotification: (String, ResponseData) -> Unit
+) {
+    // notification
+    var bottomSheetIsVisible by remember { mutableStateOf(false) }
+    val onClickNotification: () -> Unit = {
+        bottomSheetIsVisible = true
+    }
+    LaunchedEffect(Unit){
+        refreshNotification()
+    }
+    // 每打开一次刷新一次
+    LaunchedEffect(bottomSheetIsVisible) {
+        if (bottomSheetIsVisible) {
+            refreshNotification()
+        }
+    }
+    IconButton(
+        onClick = onClickNotification,
+        colors = IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.tertiary
+        ),
+    ) {
+        BadgedBox(
+            badge = {
+                val primaryColor = MaterialTheme.colorScheme.tertiary
+                if (notifications.isNotEmpty()) {
+                    Canvas(modifier = Modifier.size(8.dp)) {
+                        drawCircle(color = primaryColor, radius = 4.dp.toPx())
+                    }
+                }
+            }
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Notifications,
+                contentDescription = "NotificationIcon"
+            )
+        }
+    }
+    NotificationBottomSheet(
+        bottomSheetIsVisible = bottomSheetIsVisible,
+        notificationList = notifications,
+        onDismissRequest = { bottomSheetIsVisible = false },
+        onResponseNotification = onResponseNotification
     )
 }
 
