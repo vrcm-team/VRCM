@@ -1,8 +1,8 @@
-package io.github.vrcmteam.vrcm.presentation.configs.locale
+package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 
 @Stable
 data class LocaleStrings(
@@ -34,7 +34,7 @@ data class LocaleStrings(
 val strings: LocaleStrings
     @Composable
     get() {
-        return when (LocalConfiguration.current.value.languageTag) {
+        return when (LocalSettingsState.current.value.languageTag) {
             LanguageTag.EN -> LocaleStringsEn
             LanguageTag.JA -> LocaleStringsJa
             LanguageTag.ZH_HANS -> LocaleStringsZhHans

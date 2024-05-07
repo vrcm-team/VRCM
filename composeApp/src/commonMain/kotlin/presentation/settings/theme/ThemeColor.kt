@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.configs.theme
+package io.github.vrcmteam.vrcm.presentation.settings.theme
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
@@ -9,7 +9,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 
 
 open class ThemeColor(
@@ -21,7 +21,7 @@ open class ThemeColor(
     val colorScheme: ColorScheme
         @Composable
         get(){
-            val isDarkTheme = LocalConfiguration.current.value.isDarkTheme
+            val isDarkTheme = LocalSettingsState.current.value.isDarkTheme
             return if (isDarkTheme == null){
                 if (isSystemInDarkTheme()) darkColorScheme else lightColorScheme
             }else{

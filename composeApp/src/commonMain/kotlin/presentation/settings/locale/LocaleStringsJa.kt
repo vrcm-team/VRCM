@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.configs.locale
+package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal val LocaleStringsJa = LocaleStrings(
     startupDialogTitle = "新バージョンが利用可能",

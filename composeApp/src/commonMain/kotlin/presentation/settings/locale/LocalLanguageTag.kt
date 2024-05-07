@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.configs.locale
+package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 import androidx.compose.ui.text.intl.Locale
 

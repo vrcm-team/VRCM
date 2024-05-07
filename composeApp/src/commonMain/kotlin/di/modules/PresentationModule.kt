@@ -6,18 +6,18 @@ import coil3.disk.DiskCache
 import coil3.network.ktor.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
-import io.github.vrcmteam.vrcm.presentation.configs.ConfigurationModel
-import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
+import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
@@ -27,8 +27,8 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val presentationModule: Module = module {
-    factoryOf (::ConfigurationModel)
-    factory{ ConfigurationModel(get(),getAll()) }
+    factoryOf (::SettingsModel)
+    factory{ SettingsModel(get(),getAll()) }
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
     factoryOf (::UserProfileScreenModel)

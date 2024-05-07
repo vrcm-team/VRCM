@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.configs.locale
+package io.github.vrcmteam.vrcm.presentation.settings.locale
 
 internal val LocaleStringsZhHant = LocaleStrings(
     startupDialogTitle = "新版本可用",

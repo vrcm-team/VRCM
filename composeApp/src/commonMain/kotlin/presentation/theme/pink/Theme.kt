@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.theme.pink
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
-import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
+import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 
 
 private val lightScheme = lightColorScheme(

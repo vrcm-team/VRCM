@@ -13,10 +13,10 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
-import io.github.vrcmteam.vrcm.presentation.configs.LocalConfiguration
-import io.github.vrcmteam.vrcm.presentation.configs.locale.LanguageTag
-import io.github.vrcmteam.vrcm.presentation.configs.locale.strings
-import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
@@ -36,7 +36,7 @@ fun SettingsBottomSheet(
                 .align(Alignment.CenterHorizontally)
                 .padding(horizontal = 12.dp)
         ) {
-            var currentConfiguration by LocalConfiguration.current
+            var currentConfiguration by LocalSettingsState.current
             SettingsItem(strings.stettingLanguage) {
                 LanguageTag.entries.forEach {
                     TextButton(

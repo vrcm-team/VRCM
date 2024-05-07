@@ -1,17 +1,17 @@
-package io.github.vrcmteam.vrcm.presentation.configs
+package io.github.vrcmteam.vrcm.presentation.settings
 
-import io.github.vrcmteam.vrcm.presentation.configs.data.ConfigurationData
-import io.github.vrcmteam.vrcm.presentation.configs.locale.LanguageTag
-import io.github.vrcmteam.vrcm.presentation.configs.theme.ThemeColor
+import io.github.vrcmteam.vrcm.presentation.settings.data.SettingsVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
+import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.data.SettingsData
 
-class ConfigurationModel(
+class SettingsModel(
     private val settingsDao: SettingsDao,
     private val themeColors: List<ThemeColor>
 ) {
-    fun saveConfiguration(configurationData: ConfigurationData) {
-        settingsDao.saveSettings(configurationData.let {
+    fun saveSettings(settingsVo: SettingsVo) {
+        settingsDao.saveSettings(settingsVo.let {
             SettingsData(
                 isDarkTheme = it.isDarkTheme,
                 themeColor = it.themeColor.name,
@@ -20,13 +20,13 @@ class ConfigurationModel(
         })
     }
 
-    val configurationData: ConfigurationData
+    val settingsVo: SettingsVo
         get() {
             val settings = settingsDao.settings()
             val languageTag = settings.languageTag?.let { LanguageTag.fromTag(it) } ?: LanguageTag.Default
             val themeColor = settings.themeColor?.let { name -> themeColors.firstOrNull { it.name == name } }
                     ?: ThemeColor.Default
-            return ConfigurationData(
+            return SettingsVo(
                 isDarkTheme = settings.isDarkTheme,
                 themeColor = themeColor,
                 languageTag = languageTag,

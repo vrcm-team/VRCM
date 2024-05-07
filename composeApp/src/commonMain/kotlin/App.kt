@@ -15,7 +15,6 @@ import io.github.vrcmteam.vrcm.presentation.animations.authAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.homeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
-import io.github.vrcmteam.vrcm.presentation.configs.Configuration
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -23,13 +22,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import org.koin.compose.KoinContext
 import presentation.compoments.SelectableTransitionScreen
 
 @Composable
 fun App() {
     KoinContext {
-        Configuration {
+        SettingsProvider {
             Navigator(StartupAnimeScreen) {
                 SnackBarToastBox(
                     Modifier
