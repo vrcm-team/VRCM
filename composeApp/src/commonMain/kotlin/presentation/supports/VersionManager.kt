@@ -8,7 +8,7 @@ class VersionManager(
     private val settingsDao: SettingsDao
 ) {
     companion object {
-        private const val CURRENT_VERSION = "1.0.1"
+        private const val CURRENT_VERSION = "0.0.1"
     }
 
 
@@ -22,12 +22,13 @@ class VersionManager(
         when {
             it.isSuccess -> {
                 val releaseData = it.getOrNull()!!
-                if (CURRENT_VERSION == releaseData.tagName
-                    || (checkRemember && settingsDao.rememberVersion == releaseData.tagName)
+                val tagName = releaseData.tagName
+                if (CURRENT_VERSION == tagName
+                    || (checkRemember && settingsDao.rememberVersion == tagName)
                 ) {
                     null
                 } else {
-                    releaseData.tagName to releaseData.htmlUrl
+                    tagName to releaseData.htmlUrl
                 }
             }
 

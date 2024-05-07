@@ -7,8 +7,20 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
@@ -79,6 +91,7 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
     }
     if (newVersionUrl.isNotEmpty()) {
         val appPlatform = getAppPlatform()
+        var rememberVersionChecked by remember { mutableStateOf(false) }
         AlertDialog(
             icon = {
                 Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
@@ -89,15 +102,16 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                     )
             },
             text = {
-                Row {
+                // 版本更新提示单选框
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Checkbox(
-                        checked = false,
+                        checked = rememberVersionChecked,
                         onCheckedChange = {
-                            val version = if (it) {
-                                newVersionTagName
-                            }else{
-                                null
-                            }
+                            rememberVersionChecked = it
+                            // 记住或清除此版本更新提示
+                            val version = if (rememberVersionChecked) newVersionTagName else null
                             authScreenModel.rememberVersion(version)
                         }
                     )
@@ -105,7 +119,6 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                         text = strings.startupDialogRememberVersion,
                     )
                 }
-
             },
             onDismissRequest = startUpAnime,
             confirmButton = {
@@ -126,6 +139,7 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     ),
                     onClick = {
+                        // 关闭弹窗
                         newVersionUrl = ""
                         startUpAnime()
                     }

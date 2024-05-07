@@ -2,14 +2,15 @@ package io.github.vrcmteam.vrcm.network.api.github.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import network.api.github.data.GithubAuthorData
+import network.api.github.data.AssetsData
+import network.api.github.data.AuthorData
 
 @Serializable
-data class GitHubReleaseData (
-    val assets: List<String>,
+data class ReleaseData (
+    val assets: List<AssetsData>,
     @SerialName("assets_url")
     val assetsUrl: String,
-    val author: GithubAuthorData,
+    val author: AuthorData,
     val body: String,
     @SerialName("created_at")
     val createdAt: String,
@@ -32,6 +33,6 @@ data class GitHubReleaseData (
     @SerialName("upload_url")
     val uploadUrl: String,
     @SerialName("zipball_url")
-    val zipballUrl: String,
+    val zipBallUrl: String,
     val url: String
 )

@@ -4,11 +4,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class GithubAuthorData(
+data class UploaderData(
     @SerialName("avatar_url")
     val avatarUrl: String,
     @SerialName("events_url")
-    val eventsUrl: String,
+    val eventUrl: String,
     @SerialName("followers_url")
     val followersUrl: String,
     @SerialName("following_url")
