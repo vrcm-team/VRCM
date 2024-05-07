@@ -9,7 +9,7 @@ data class LocaleStrings(
     val startupDialogTitle: String = "New version available",
     val startupDialogUpdate: String = "Update",
     val startupDialogIgnore: String = "Ignore",
-    val startupDialogRememberVersion: String = "Ignore This Update From Next Time",
+    val startupDialogRememberVersion: String = "Ignore This Version Update",
     val authLoginTitle: String = "Login",
     val authLoginButton: String = "LOGIN",
     val authLoginUsername: String = "Username",
