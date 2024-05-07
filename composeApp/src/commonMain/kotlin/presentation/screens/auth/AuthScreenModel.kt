@@ -11,11 +11,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
 import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
 
 
@@ -95,10 +91,14 @@ class AuthScreenModel(
             .getOrNull()
     }.await() == true
 
-    suspend fun tryCheckVersion(): String? {
+    suspend fun tryCheckVersion(): Pair<String,String>? {
         return screenModelScope.async(Dispatchers.IO) {
-            versionManager.checkVersion()
+            versionManager.checkVersion(true)
         }.await()
+    }
+
+    fun rememberVersion(version: String?) = screenModelScope.launch(Dispatchers.IO) {
+        versionManager.rememberVersion(version)
     }
 
     fun login() {

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
@@ -64,11 +65,13 @@ object StartupAnimeScreen : Screen {
 private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
     val authScreenModel: AuthScreenModel  = getScreenModel()
     var newVersionUrl by remember { mutableStateOf("") }
+    var newVersionTagName by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         authScreenModel.tryCheckVersion().let {
             if (it != null) {
-                newVersionUrl = it
+                newVersionTagName = it.first
+                newVersionUrl = it.second
             }else{
                 startUpAnime()
             }
@@ -83,15 +86,27 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
             title = {
                     Text(
                         text = strings.startupDialogTitle,
-
                     )
             },
-//            text = {
-//                Text(
-//                    text = "New version available",
-//                    textAlign = TextAlign.Center,
-//                )
-//            },
+            text = {
+                Row {
+                    Checkbox(
+                        checked = false,
+                        onCheckedChange = {
+                            val version = if (it) {
+                                newVersionTagName
+                            }else{
+                                null
+                            }
+                            authScreenModel.rememberVersion(version)
+                        }
+                    )
+                    Text(
+                        text = strings.startupDialogRememberVersion,
+                    )
+                }
+
+            },
             onDismissRequest = startUpAnime,
             confirmButton = {
                 FilledTonalButton(

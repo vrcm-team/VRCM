@@ -4,6 +4,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     startupDialogTitle = "新版本可用",
     startupDialogUpdate = "更新",
     startupDialogIgnore = "忽略",
+    startupDialogRememberVersion = "記住版本",
     authLoginTitle = "登入",
     authLoginButton = "登入",
     authLoginUsername = "用戶名",

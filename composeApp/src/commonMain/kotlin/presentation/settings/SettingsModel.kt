@@ -11,18 +11,18 @@ class SettingsModel(
     private val themeColors: List<ThemeColor>
 ) {
     fun saveSettings(settingsVo: SettingsVo) {
-        settingsDao.saveSettings(settingsVo.let {
+        settingsDao.settings = settingsVo.let {
             SettingsData(
                 isDarkTheme = it.isDarkTheme,
                 themeColor = it.themeColor.name,
                 languageTag = it.languageTag.tag
             )
-        })
+        }
     }
 
     val settingsVo: SettingsVo
         get() {
-            val settings = settingsDao.settings()
+            val settings = settingsDao.settings
             val languageTag = settings.languageTag?.let { LanguageTag.fromTag(it) } ?: LanguageTag.Default
             val themeColor = settings.themeColor?.let { name -> themeColors.firstOrNull { it.name == name } }
                     ?: ThemeColor.Default

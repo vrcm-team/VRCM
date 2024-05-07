@@ -4,6 +4,7 @@ internal val LocaleStringsJa = LocaleStrings(
     startupDialogTitle = "新バージョンが利用可能",
     startupDialogUpdate = "アップデート",
     startupDialogIgnore = "無視",
+    startupDialogRememberVersion = "このアップデートを次回から無視する",
     authLoginTitle = "ログイン",
     authLoginButton = "ログイン",
     authLoginUsername = "ユーザー名",
@@ -21,5 +22,5 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingLightThemeMode = "ライトモード",
     stettingDarkThemeMode = "ダークモード",
     stettingThemeColor = "テーマカラー:",
-    stettingLogout = "ログアウト"
+    stettingLogout = "ログアウト",
 )

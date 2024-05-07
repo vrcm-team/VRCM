@@ -30,6 +30,7 @@ object DaoKeys{
     }
 
     object Settings {
+
         const val NAME = "settings"
 
         /**
@@ -46,5 +47,11 @@ object DaoKeys{
          * 语言
          */
         const val LANGUAGE_TAG_KEY = "languageTag"
+
+        /**
+         * 记住的版本
+         */
+        const val REMEMBER_VERSION_KEY = "rememberVersion"
+
     }
 }
