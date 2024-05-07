@@ -3,8 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.AlertDialog
@@ -21,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
@@ -97,14 +100,14 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                 Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
             },
             title = {
-                    Text(
-                        text = strings.startupDialogTitle,
-                    )
+                    Text(text = strings.startupDialogTitle)
             },
             text = {
                 // 版本更新提示单选框
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                 ) {
                     Checkbox(
                         checked = rememberVersionChecked,
@@ -115,9 +118,7 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                             authScreenModel.rememberVersion(version)
                         }
                     )
-                    Text(
-                        text = strings.startupDialogRememberVersion,
-                    )
+                    Text(text = strings.startupDialogRememberVersion)
                 }
             },
             onDismissRequest = startUpAnime,
