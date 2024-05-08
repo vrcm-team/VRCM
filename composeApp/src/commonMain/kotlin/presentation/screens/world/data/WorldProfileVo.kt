@@ -2,7 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 
-data class WorldProfileVO(
+data class WorldProfileVo(
     val worldId: String,
     val worldName: String,
     val worldImageUrl: String?,

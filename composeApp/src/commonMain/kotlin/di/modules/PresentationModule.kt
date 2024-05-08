@@ -13,8 +13,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPag
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.ktor.client.*
@@ -34,8 +32,6 @@ val presentationModule: Module = module {
     factoryOf (::UserProfileScreenModel)
     singleOf (::FriendLocationPagerModel)
     singleOf (::FriendListPagerModel)
-    singleOf (::AuthSupporter)
-    singleOf (::VersionManager)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }

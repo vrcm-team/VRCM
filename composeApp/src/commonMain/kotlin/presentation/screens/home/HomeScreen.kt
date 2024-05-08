@@ -48,7 +48,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPag
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
@@ -116,7 +116,7 @@ private inline fun Screen.HomeTopAppBar(
     val onClickUserIcon = { user: IUser ->
         // 防止多次点击在栈中存在相同key的屏幕报错
         if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(UserProfileVO(user))
+            currentNavigator push UserProfileScreen(UserProfileVo(user))
         }
     }
     val trustRank = remember(currentUser) { currentUser?.trustRank }

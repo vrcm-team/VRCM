@@ -17,7 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.github.vrcmteam.vrcm.service.AuthService
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
 
@@ -95,11 +95,11 @@ fun SettingsBottomSheet(
                     }
                 }
             }
-            val authSupporter = koinInject<AuthSupporter>()
+            val authService = koinInject<AuthService>()
             val logoutCall = LocalNavigator.currentOrThrow.let {
                 {
                     onDismissRequest()
-                    authSupporter.logout()
+                    authService.logout()
                 }
             }
             Row(

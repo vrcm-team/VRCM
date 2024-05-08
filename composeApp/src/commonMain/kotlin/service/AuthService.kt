@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.supports
+package io.github.vrcmteam.vrcm.service
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
@@ -20,12 +20,12 @@ import kotlinx.coroutines.launch
  * 主要作用是统一验证失效时的重试逻辑
  * @author kamosama
  */
-class AuthSupporter(
+class AuthService(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
     private val cookiesDao: CookiesDao
 ) {
-    private var scope = CoroutineScope( Job())
+    private var scope = CoroutineScope(Job())
 
     private var currentUser: Result<CurrentUserData>?  = null
 
@@ -45,7 +45,7 @@ class AuthSupporter(
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect {(username, password) ->
+            SharedFlowCentre.authed.collect { (username, password) ->
                 if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
                     accountDao.saveAccount(username, password)
                 }
@@ -110,7 +110,7 @@ class AuthSupporter(
        }
 
     fun logout() {
-        cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@${VRC_API_HOST}")
+        cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@$VRC_API_HOST")
         scope.launch {
             SharedFlowCentre.logout.emit(Unit)
         }

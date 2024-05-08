@@ -9,19 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,6 +22,7 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import presentation.screens.auth.data.VersionVo
 
 object StartupAnimeScreen : Screen {
     @Composable
@@ -79,20 +69,18 @@ object StartupAnimeScreen : Screen {
 @Composable
 private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
     val authScreenModel: AuthScreenModel  = getScreenModel()
-    var newVersionUrl by remember { mutableStateOf("") }
-    var newVersionTagName by remember { mutableStateOf("") }
+    var version by remember { mutableStateOf(VersionVo()) }
 
     LaunchedEffect(Unit) {
         authScreenModel.tryCheckVersion().let {
-            if (it != null) {
-                newVersionTagName = it.first
-                newVersionUrl = it.second
+            if (it.hasNewVersion) {
+                version = it
             }else{
                 startUpAnime()
             }
         }
     }
-    if (newVersionUrl.isNotEmpty()) {
+    if (version.hasNewVersion) {
         val appPlatform = getAppPlatform()
         var rememberVersionChecked by remember { mutableStateOf(false) }
         AlertDialog(
@@ -114,8 +102,8 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                         onCheckedChange = {
                             rememberVersionChecked = it
                             // 记住或清除此版本更新提示
-                            val version = if (rememberVersionChecked) newVersionTagName else null
-                            authScreenModel.rememberVersion(version)
+                            val versionTagName = if (rememberVersionChecked) version.tagName else null
+                            authScreenModel.rememberVersion(versionTagName)
                         }
                     )
                     Text(text = strings.startupDialogRememberVersion)
@@ -129,7 +117,7 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     onClick = {
-                        appPlatform.openUrl(newVersionUrl)
+                        appPlatform.openUrl(version.htmlUrl)
                     }
                 ) {
                     Text(strings.startupDialogUpdate)
@@ -141,7 +129,7 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
                     ),
                     onClick = {
                         // 关闭弹窗
-                        newVersionUrl = ""
+                        version = VersionVo()
                         startUpAnime()
                     }
                 ) {

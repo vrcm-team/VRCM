@@ -1,17 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 
 @Stable
 data class FriendLocation(
     val location: String,
-    val instants: MutableState<InstantsVO> = mutableStateOf(InstantsVO()),
+    val instants: MutableState<InstantsVo> = mutableStateOf(InstantsVo()),
     val friends: MutableMap<String,MutableState<FriendData>>,
 ) {
     companion object {

@@ -15,8 +15,8 @@ import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVO
-import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
+import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.catch
@@ -32,7 +32,7 @@ import network.websocket.data.content.FriendLocationContent
 class FriendLocationPagerModel(
     private val friendsApi: FriendsApi,
     private val instancesApi: InstancesApi,
-    private val authSupporter: AuthSupporter,
+    private val authService: AuthService,
     private val json: Json
 ): ScreenModel {
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
@@ -103,7 +103,7 @@ class FriendLocationPagerModel(
             friendsApi.friendsFlow()
                 .retry(1) {
                     // 如果是登录失效了就会重新登录并重试一次
-                    if (it is VRCApiException) authSupporter.doReTryAuth() else false
+                    if (it is VRCApiException) authService.doReTryAuth() else false
                 }.catch {
                     SharedFlowCentre.error.emit(it.message.toString())
                 }.collect { friends ->
@@ -126,7 +126,7 @@ class FriendLocationPagerModel(
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
             // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
-            val currentUser = authSupporter.currentUser(isRefresh = true).getOrThrow()
+            val currentUser = authService.currentUser(isRefresh = true).getOrThrow()
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
@@ -178,7 +178,7 @@ class FriendLocationPagerModel(
                 }
                 // 通过location查询房间实例信息
                 fetchInstants(location){
-                    friendLocation.instants.value = InstantsVO(it)
+                    friendLocation.instants.value = InstantsVo(it)
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
@@ -189,7 +189,7 @@ class FriendLocationPagerModel(
 
     private inline fun fetchInstants(location: String, crossinline updateInstants:(InstanceData) -> Unit){
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth {
+            authService.reTryAuth {
                 instancesApi.instanceByLocation(location)
             }.onSuccess { instance ->
                 updateInstants(instance)

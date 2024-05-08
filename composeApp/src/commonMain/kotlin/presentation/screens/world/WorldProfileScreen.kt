@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import cafe.adriel.voyager.core.screen.Screen
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVO
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 
@@ -24,7 +24,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * @since 2024/3/23 19:44
  * @version: 1.0
  */
-class WorldProfileScreen(private val worldProfileVO: WorldProfileVO) : Screen {
+class WorldProfileScreen(private val worldProfileVO: WorldProfileVo) : Screen {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator

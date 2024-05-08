@@ -37,7 +37,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -112,7 +112,7 @@ fun FriendListPager(
         val currentNavigator = currentNavigator
         val toProfile = { user: IUser ->
             if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(
-                UserProfileVO(user)
+                UserProfileVo(user)
             )
         }
         // 如果没有底部系统手势条，默认12dp

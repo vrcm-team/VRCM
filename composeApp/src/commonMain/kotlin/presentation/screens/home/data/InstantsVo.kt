@@ -3,7 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.data
 import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 
-data class InstantsVO(
+data class InstantsVo(
     val worldId: String = "",
     val worldName: String = "",
     val worldImageUrl: String? = null,

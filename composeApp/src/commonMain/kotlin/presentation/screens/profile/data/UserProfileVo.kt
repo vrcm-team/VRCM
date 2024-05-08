@@ -7,7 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 
-data class UserProfileVO (
+data class UserProfileVo (
     val id: String,
     val displayName: String,
     val status: UserStatus,

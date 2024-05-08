@@ -9,19 +9,20 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
-import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
-import io.github.vrcmteam.vrcm.presentation.supports.VersionManager
+import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.VersionService
 import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
+import presentation.screens.auth.data.VersionVo
 
 
 class AuthScreenModel(
-    private val authSupporter: AuthSupporter,
-    private val versionManager: VersionManager,
+    private val authService: AuthService,
+    private val versionManager: VersionService,
     private val logger: Logger
 ) : ScreenModel {
 
-    private val _uiState = mutableStateOf(authSupporter.accountPair().run {
+    private val _uiState = mutableStateOf(authService.accountPair().run {
         AuthUIState(username = first, password = second)
     })
 
@@ -58,7 +59,7 @@ class AuthScreenModel(
     fun onCardStateChange(cardState: AuthCardPage) {
         _uiState.value = when (cardState) {
             AuthCardPage.Login -> {
-                authSupporter.logout()
+                authService.logout()
                 _uiState.value.copy(
                     cardState = cardState,
                     verifyCode = "",
@@ -86,14 +87,17 @@ class AuthScreenModel(
     }
 
     private suspend fun awaitAuth(): Boolean = screenModelScope.async(Dispatchers.IO) {
-        runCatching { authSupporter.isAuthed() }
+        runCatching { authService.isAuthed() }
             .onAuthFailure()
             .getOrNull()
     }.await() == true
 
-    suspend fun tryCheckVersion(): Pair<String,String>? {
+    suspend fun tryCheckVersion(): VersionVo {
         return screenModelScope.async(Dispatchers.IO) {
             versionManager.checkVersion(true)
+                .onAuthFailure()
+                .map { VersionVo(it.tagName, it.htmlUrl, it.hasNewVersion) }
+                .getOrElse { VersionVo() }
         }.await()
     }
 
@@ -125,7 +129,7 @@ class AuthScreenModel(
         onLoadingChange(true)
         _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
             async(context = Dispatchers.IO) {
-                authSupporter.verify(username, password, verifyCode, _uiState.value.cardState)
+                authService.verify(username, password, verifyCode, _uiState.value.cardState)
             }.await()
                 .onSuccess {
                     onCardStateChange(AuthCardPage.Authed)
@@ -134,7 +138,7 @@ class AuthScreenModel(
     }
 
     private suspend fun doLogin(username: String, password: String) {
-        val runCatching = runCatching { authSupporter.login(username, password) }.onAuthFailure()
+        val runCatching = runCatching { authService.login(username, password) }.onAuthFailure()
         if (runCatching.isFailure) return
         val authState = runCatching.getOrNull()!!
 

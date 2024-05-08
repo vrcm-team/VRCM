@@ -1,24 +1,24 @@
-package io.github.vrcmteam.vrcm.presentation.supports
+package io.github.vrcmteam.vrcm.service
 
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
+import io.github.vrcmteam.vrcm.service.data.VersionDto
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 
-class VersionManager(
+class VersionService(
     private val gitHubApi: GitHubApi,
     private val settingsDao: SettingsDao
 ) {
     companion object {
-        private const val CURRENT_VERSION = "0.0.1"
+        private const val CURRENT_VERSION = "1.0.0"
     }
 
 
     /**
      * 获取最新的版本号,和版本链接
-     * 如果返回不为null，则表示有新版本
      * @param checkRemember 是否检查记住版本
-     * @return 版本号
+     * @return 最新版本号和最新版本链接
      */
-    suspend fun checkVersion(checkRemember: Boolean): Pair<String,String>? = gitHubApi.latestRelease().let {
+    suspend fun checkVersion(checkRemember: Boolean): Result<VersionDto> = gitHubApi.latestRelease().let {
         when {
             it.isSuccess -> {
                 val releaseData = it.getOrNull()!!
@@ -26,13 +26,14 @@ class VersionManager(
                 if (CURRENT_VERSION == tagName
                     || (checkRemember && settingsDao.rememberVersion == tagName)
                 ) {
-                    null
+                    // 当前版本是最新版本
+                    Result.success(VersionDto(tagName, releaseData.htmlUrl, false))
                 } else {
-                    tagName to releaseData.htmlUrl
+                    // 当前版本不是最新版本
+                    Result.success(VersionDto(tagName, releaseData.htmlUrl, true))
                 }
             }
-
-            else -> null
+            else -> Result.failure(it.exceptionOrNull()!!)
         }
     }
 

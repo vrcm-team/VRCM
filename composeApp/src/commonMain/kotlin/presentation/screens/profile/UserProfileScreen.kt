@@ -1,55 +1,16 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person4
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.QuestionMark
 import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTooltipState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,14 +31,14 @@ import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVO
+import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
-    private val userProfileVO: UserProfileVO
+    private val userProfileVO: UserProfileVo
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -172,7 +133,7 @@ private fun JsonAlertDialog(
 
 @Composable
 private fun ProfileContent(
-    currentUser: UserProfileVO?,
+    currentUser: UserProfileVo?,
     ratio: Float
 ) {
     if (currentUser == null) return
@@ -205,7 +166,7 @@ private fun ProfileContent(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun BottomCardTab(
     scrollState: ScrollState,
-    userProfileVO: UserProfileVO
+    userProfileVO: UserProfileVo
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -275,7 +236,7 @@ private fun BottomCardTab(
 }
 
 @Composable
-private inline fun LangAndLinkRow(userProfileVO: UserProfileVO) {
+private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
     val speakLanguages = userProfileVO.speakLanguages
     val bioLinks = userProfileVO.bioLinks
     val width = 32.dp

@@ -9,7 +9,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
-import io.github.vrcmteam.vrcm.presentation.supports.AuthSupporter
+import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -18,7 +18,7 @@ import org.koin.core.logger.Logger
 
 
 class HomeScreenModel(
-    private val authSupporter: AuthSupporter,
+    private val authService: AuthService,
     private val notificationApi: NotificationApi,
     private val logger: Logger
 ) : ScreenModel {
@@ -37,7 +37,7 @@ class HomeScreenModel(
 
     fun refreshNotifications() =
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth { notificationApi.fetchNotifications() }
+            authService.reTryAuth { notificationApi.fetchNotifications() }
                 .onHomeFailure()
                 .onSuccess {
                     _notifications.value = it
@@ -47,7 +47,7 @@ class HomeScreenModel(
 
     fun responseNotification(id: String, response: ResponseData) {
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth { notificationApi.responseNotification(id,response) }
+            authService.reTryAuth { notificationApi.responseNotification(id,response) }
                 .onHomeFailure()
                 .onSuccess {
                     refreshNotifications()
@@ -57,7 +57,7 @@ class HomeScreenModel(
 
     private fun refreshCurrentUser() =
         screenModelScope.launch(Dispatchers.IO) {
-            authSupporter.reTryAuth { authSupporter.currentUser(isRefresh = true) }
+            authService.reTryAuth { authService.currentUser(isRefresh = true) }
                 .onHomeFailure()
                 .onSuccess {
                     _currentUser.value = it
