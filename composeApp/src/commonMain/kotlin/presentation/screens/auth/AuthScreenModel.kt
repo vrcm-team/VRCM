@@ -6,6 +6,7 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
@@ -52,7 +53,7 @@ class AuthScreenModel(
         }
         logger.error(errorMsg)
         screenModelScope.launch {
-            SharedFlowCentre.error.emit(errorMsg)
+            SharedFlowCentre.toastText.emit(ToastText.Error(errorMsg))
         }
     }
 

@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +70,7 @@ class HomeScreenModel(
         onApiFailure("Home") {
             logger.error(it)
             screenModelScope.launch {
-                SharedFlowCentre.error.emit(it)
+                SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
         }
 }

@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.ktor.client.call.*
@@ -33,7 +34,7 @@ class UserProfileScreenModel(
             authService.reTryAuth {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {
-                SharedFlowCentre.error.emit(it.message.toString())
+                SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
             }.onSuccess {
                 _userState.value = UserProfileVo(it.body<UserData>())
                 _userJson.value = it.bodyAsText().pretty()

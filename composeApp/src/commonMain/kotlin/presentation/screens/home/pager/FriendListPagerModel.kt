@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
+ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -58,7 +59,7 @@ class FriendListPagerModel(
                     // 如果是登录失效了就会重新登录并重试一次
                     if (it is VRCApiException) authService.doReTryAuth() else false
                 }.catch {
-                    SharedFlowCentre.error.emit(it.message.toString())
+                    SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
                 }.collect { friends ->
                     update(friends)
                 }
@@ -71,7 +72,7 @@ class FriendListPagerModel(
         runCatching {
             friendMap.putAll(friends.associateBy { it.id })
         }.onFailure {
-            SharedFlowCentre.error.emit(it.message.toString())}
+            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))}
     }
 
 }

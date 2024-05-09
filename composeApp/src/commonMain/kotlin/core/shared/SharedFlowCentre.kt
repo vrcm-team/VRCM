@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.core.shared
 
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import kotlinx.coroutines.flow.MutableSharedFlow
 import network.websocket.data.WebSocketEvent
 
@@ -11,7 +12,7 @@ object SharedFlowCentre {
 
     val logout = MutableSharedFlow<Unit>()
 
-    val error = MutableSharedFlow<String>()
+    val toastText = MutableSharedFlow<ToastText>()
 
     val toPagerTop = MutableSharedFlow<Unit>()
 }

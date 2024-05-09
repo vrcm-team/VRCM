@@ -2,22 +2,11 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarData
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 
 /**
@@ -28,6 +17,8 @@ fun SnackBarToast(
     text: String,
     modifier: Modifier = Modifier,
     onEffect: () -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.onPrimary,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
     content: @Composable (SnackbarData) -> Unit = {
         Text(text = it.visuals.message)
     }
@@ -45,8 +36,8 @@ fun SnackBarToast(
         hostState = snackBarHostState
     ) {
         Snackbar(
-            containerColor = MaterialTheme.colorScheme.onPrimary,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = containerColor,
+            contentColor = contentColor,
             shape = MaterialTheme.shapes.medium,
             actionOnNewLine = true
         ) {
@@ -66,19 +57,27 @@ fun SnackBarToastBox(
 ) {
     Box {
         CompositionLocalProvider(
-            LocalSnackBarToastText provides mutableStateOf("")
+            LocalSnackBarToastText provides mutableStateOf(ToastText.Normal)
         ) {
             content()
-            val sackBarToastText = LocalSnackBarToastText.current
+            var sackBarToastText by LocalSnackBarToastText.current
             LaunchedEffect(Unit){
-                SharedFlowCentre.error.collect {
-                    sackBarToastText.value = it
+                SharedFlowCentre.toastText.collect {
+                    sackBarToastText = it
                 }
+            }
+            val theme = when (sackBarToastText) {
+                is ToastText.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+                is ToastText.Success ,
+                is ToastText.Info ,
+                ToastText.Normal -> MaterialTheme.colorScheme.onPrimary to MaterialTheme.colorScheme.onSurface
             }
             SnackBarToast(
                 modifier = modifier.align(alignment),
-                text = sackBarToastText.value,
-                onEffect = { sackBarToastText.value = "" },
+                text = sackBarToastText.text,
+                onEffect = { sackBarToastText = ToastText.Normal },
+                containerColor = theme.first,
+                contentColor = theme.second,
                 content = toastContent
             )
         }
@@ -86,9 +85,17 @@ fun SnackBarToastBox(
 
 }
 
-val LocalSnackBarToastText: ProvidableCompositionLocal<MutableState<String>> =
+val LocalSnackBarToastText: ProvidableCompositionLocal<MutableState<ToastText>> =
     compositionLocalOf { error("No text provided") }
 
-val snackBarToastText: MutableState<String>
+val snackBarToastText: MutableState<ToastText>
     @Composable
     get() = LocalSnackBarToastText.current
+
+sealed class ToastText(val text: String) {
+    class Success(text: String) : ToastText(text)
+    class Error(text: String) : ToastText(text)
+    class Info(text: String) : ToastText(text)
+//    class Warning(text: String) : ToastText(text)
+    data object Normal : ToastText("")
+}

@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -105,7 +106,7 @@ class FriendLocationPagerModel(
                     // 如果是登录失效了就会重新登录并重试一次
                     if (it is VRCApiException) authService.doReTryAuth() else false
                 }.catch {
-                    SharedFlowCentre.error.emit(it.message.toString())
+                    SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
                 }.collect { friends ->
                     update(friends)
                     if (removeNotIncluded){
@@ -183,7 +184,7 @@ class FriendLocationPagerModel(
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
         }.onFailure {
-            SharedFlowCentre.error.emit(it.message.toString())
+            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
         }
     }
 
@@ -194,7 +195,7 @@ class FriendLocationPagerModel(
             }.onSuccess { instance ->
                 updateInstants(instance)
             }.onFailure {
-                SharedFlowCentre.error.emit(it.message.toString())
+                SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
             }
         }
     }
