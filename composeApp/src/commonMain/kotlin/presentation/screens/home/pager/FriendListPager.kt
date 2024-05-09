@@ -68,7 +68,10 @@ object FriendListPager : Pager {
             }
         LaunchedEffect(Unit){
             SharedFlowCentre.toPagerTop.collect{
-                lazyListState.animateScrollToFirst()
+                // 防止滑动时手动阻止滑动动画导致任务取消,监听失效的bug
+                kotlin.runCatching {
+                    lazyListState.animateScrollToFirst()
+                }
             }
         }
         FriendListPager(

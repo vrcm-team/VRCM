@@ -57,7 +57,7 @@ fun SnackBarToastBox(
 ) {
     Box {
         CompositionLocalProvider(
-            LocalSnackBarToastText provides mutableStateOf(ToastText.Normal)
+            LocalSnackBarToastText provides remember { mutableStateOf(ToastText.Normal) }
         ) {
             content()
             var sackBarToastText by LocalSnackBarToastText.current
@@ -88,9 +88,6 @@ fun SnackBarToastBox(
 val LocalSnackBarToastText: ProvidableCompositionLocal<MutableState<ToastText>> =
     compositionLocalOf { error("No text provided") }
 
-val snackBarToastText: MutableState<ToastText>
-    @Composable
-    get() = LocalSnackBarToastText.current
 
 sealed class ToastText(val text: String) {
     class Success(text: String) : ToastText(text)
