@@ -3,25 +3,15 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Update
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
-import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
-import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
 object StartupAnimeScreen : Screen {
@@ -32,7 +22,7 @@ object StartupAnimeScreen : Screen {
         var isStartUp by remember { mutableStateOf(false) }
         val startUpAnime = { isStartUp = true }
 
-        UpdateDialog(startUpAnime)
+        VersionDialog(startUpAnime)
 
         BoxWithConstraints {
 
@@ -67,7 +57,7 @@ object StartupAnimeScreen : Screen {
 }
 
 @Composable
-private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
+private fun Screen.VersionDialog(startUpAnime: () -> Unit) {
     val authScreenModel: AuthScreenModel  = getScreenModel()
     var version by remember { mutableStateOf(VersionVo()) }
 
@@ -80,62 +70,14 @@ private fun Screen.UpdateDialog(startUpAnime: () -> Unit) {
             }
         }
     }
-    if (version.hasNewVersion) {
-        val appPlatform = getAppPlatform()
-        var rememberVersionChecked by remember { mutableStateOf(false) }
-        AlertDialog(
-            icon = {
-                Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
-            },
-            title = {
-                    Text(text = strings.startupDialogTitle)
-            },
-            text = {
-                // 版本更新提示单选框
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Checkbox(
-                        checked = rememberVersionChecked,
-                        onCheckedChange = {
-                            rememberVersionChecked = it
-                            // 记住或清除此版本更新提示
-                            val versionTagName = if (rememberVersionChecked) version.tagName else null
-                            authScreenModel.rememberVersion(versionTagName)
-                        }
-                    )
-                    Text(text = strings.startupDialogRememberVersion)
-                }
-            },
-            onDismissRequest = startUpAnime,
-            confirmButton = {
-                FilledTonalButton(
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    onClick = {
-                        appPlatform.openUrl(version.htmlUrl)
-                    }
-                ) {
-                    Text(strings.startupDialogUpdate)
-                }
-                FilledTonalButton(
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    ),
-                    onClick = {
-                        // 关闭弹窗
-                        version = VersionVo()
-                        startUpAnime()
-                    }
-                ) {
-                    Text(strings.startupDialogIgnore)
-                }
-            }
-        )
-    }
+    UpdateDialog(version,
+        {
+            version = VersionVo()
+            startUpAnime()
+        },
+        {
+            authScreenModel.rememberVersion(it)
+        }
+    )
 }
+

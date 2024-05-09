@@ -27,10 +27,10 @@ data class LocaleStrings(
     val stettingLightThemeMode: String = "Light",
     val stettingDarkThemeMode: String = "Dark",
     val stettingThemeColor: String = "ThemeColor:",
-    val stettingLogout: String = "Logout"
-) {
-
-}
+    val stettingLogout: String = "Logout",
+    val stettingAbout: String = "About",
+    val stettingAboutVersion: String = "Version:"
+)
 
 val strings: LocaleStrings
     @Composable

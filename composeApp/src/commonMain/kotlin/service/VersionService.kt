@@ -9,7 +9,7 @@ class VersionService(
     private val settingsDao: SettingsDao
 ) {
     companion object {
-        private const val CURRENT_VERSION = "1.0.0"
+        const val CURRENT_VERSION = "1.0.0"
     }
 
 

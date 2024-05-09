@@ -23,4 +23,6 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingDarkThemeMode = "ダークモード",
     stettingThemeColor = "テーマカラー:",
     stettingLogout = "ログアウト",
+    stettingAbout = "アプリについて",
+    stettingAboutVersion = "バージョン:"
 )

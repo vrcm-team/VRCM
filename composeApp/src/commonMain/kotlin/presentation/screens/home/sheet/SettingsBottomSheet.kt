@@ -2,10 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -18,8 +15,12 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.VersionService
+import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
+import presentation.compoments.UpdateDialog
+import presentation.screens.auth.data.VersionVo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,13 +37,13 @@ fun SettingsBottomSheet(
                 .align(Alignment.CenterHorizontally)
                 .padding(horizontal = 12.dp)
         ) {
-            var currentConfiguration by LocalSettingsState.current
+            var currentSettings by LocalSettingsState.current
             SettingsItem(strings.stettingLanguage) {
                 LanguageTag.entries.forEach {
                     TextButton(
-                        enabled = it.tag != currentConfiguration.languageTag.tag,
+                        enabled = it.tag != currentSettings.languageTag.tag,
                         onClick = {
-                            currentConfiguration = currentConfiguration.copy(languageTag = it)
+                            currentSettings = currentSettings.copy(languageTag = it)
                         }
                     ) {
                         Text(
@@ -56,9 +57,9 @@ fun SettingsBottomSheet(
             SettingsItem(strings.stettingThemeMode) {
                 listOf(null, true, false).forEach {
                     TextButton(
-                        enabled = currentConfiguration.isDarkTheme != it,
+                        enabled = currentSettings.isDarkTheme != it,
                         onClick = {
-                            currentConfiguration = currentConfiguration.copy(isDarkTheme = it)
+                            currentSettings = currentSettings.copy(isDarkTheme = it)
                         },
 
                         ) {
@@ -78,9 +79,9 @@ fun SettingsBottomSheet(
             SettingsItem(strings.stettingThemeColor) {
                 themeColors.forEach {
                     TextButton(
-                        enabled = it.name != currentConfiguration.themeColor.name,
+                        enabled = it.name != currentSettings.themeColor.name,
                         onClick = {
-                            currentConfiguration = currentConfiguration.copy(themeColor = it)
+                            currentSettings = currentSettings.copy(themeColor = it)
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = it.colorScheme.primaryContainer,
@@ -95,36 +96,64 @@ fun SettingsBottomSheet(
                     }
                 }
             }
-            val authService = koinInject<AuthService>()
-            val logoutCall = LocalNavigator.currentOrThrow.let {
-                {
-                    onDismissRequest()
-                    authService.logout()
+            SettingsItem(strings.stettingAbout) {
+                val versionService = koinInject<VersionService>()
+                val scope = rememberCoroutineScope()
+                var version by remember { mutableStateOf(VersionVo()) }
+
+                OutlinedButton(onClick = {
+                    scope.launch {
+                        versionService. checkVersion(false).onSuccess {
+                            version = VersionVo(
+                                it.tagName,
+                                it.htmlUrl,
+                                it.hasNewVersion
+                            )
+                        }
+                    }
+                }){
+                    Text(text = strings.stettingAboutVersion)
+                    Text(text = VersionService.CURRENT_VERSION)
+                }
+                UpdateDialog(version,{ version = VersionVo() }){
+                    versionService.rememberVersion(it)
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Spacer(modifier = Modifier.weight(0.25f))
-                TextButton(
-                    modifier = Modifier.weight(0.5f),
-                    onClick = logoutCall,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text(
-                        text = strings.stettingLogout,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                Spacer(modifier = Modifier.weight(0.25f))
-            }
+            LogoutButton(onDismissRequest)
 
         }
+    }
+}
+
+@Composable
+private fun LogoutButton(onDismissRequest: () -> Unit) {
+    val authService = koinInject<AuthService>()
+    val logoutCall = LocalNavigator.currentOrThrow.let {
+        {
+            onDismissRequest()
+            authService.logout()
+        }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Spacer(modifier = Modifier.weight(0.25f))
+        TextButton(
+            modifier = Modifier.weight(0.5f),
+            onClick = logoutCall,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Text(
+                text = strings.stettingLogout,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+        Spacer(modifier = Modifier.weight(0.25f))
     }
 }
 
