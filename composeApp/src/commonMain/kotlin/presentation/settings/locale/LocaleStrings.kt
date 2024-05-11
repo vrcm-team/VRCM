@@ -29,7 +29,8 @@ data class LocaleStrings(
     val stettingThemeColor: String = "ThemeColor:",
     val stettingLogout: String = "Logout",
     val stettingAbout: String = "About",
-    val stettingAboutVersion: String = "Version:"
+    val stettingVersion: String = "Version:",
+    val stettingAlreadyLatest: String = "Already Latest",
 )
 
 val strings: LocaleStrings

@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,7 +52,12 @@ fun SnackBarToastBox(
     modifier: Modifier = Modifier,
     alignment: Alignment = Alignment.TopCenter,
     toastContent: @Composable (SnackbarData) -> Unit = {
-        Text(text = it.visuals.message)
+        Box(modifier = Modifier.fillMaxWidth()){
+            Text(
+                modifier = Modifier.align(Alignment.Center),
+                text = it.visuals.message
+            )
+        }
     },
     content: @Composable BoxScope.() -> Unit
 ) {

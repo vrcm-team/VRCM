@@ -24,5 +24,6 @@ internal val LocaleStringsZhHans = LocaleStrings(
     stettingThemeColor = "主题颜色:",
     stettingLogout = "登出",
     stettingAbout = "关于",
-    stettingAboutVersion = "版本:",
+    stettingVersion = "版本:",
+    stettingAlreadyLatest = "已是最新版本",
 )
