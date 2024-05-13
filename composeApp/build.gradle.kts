@@ -1,5 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import java.util.Properties
+import java.util.*
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -50,13 +50,17 @@ kotlin {
 
         val desktopMain by getting
         desktopMain.dependencies {
-            implementation(compose.desktop.currentOs)
-            implementation(libs.ktor.client.okhttp)
             // support Dispatchers.Main
             implementation(libs.kotlinx.coroutines.swing)
+
+            implementation(compose.desktop.currentOs)
+
+            implementation(libs.ktor.client.okhttp)
         }
 
         commonMain.dependencies {
+            implementation(libs.kotlinx.datetime)
+
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)

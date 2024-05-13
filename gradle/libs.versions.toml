@@ -4,11 +4,12 @@ app-name = "1.0.0"
 app-packageName = "io.github.vrcmteam.vrcm"
 agp = "8.2.2"
 kotlin = "1.9.22"
+kotlinx-coroutines-swing = "1.8.0"
+kotlinx-datetime = "0.6.0-RC.2"
 android-minSdk = "24"
 android-compileSdk = "34"
 android-targetSdk = "34"
 androidx-activityCompose = "1.9.0"
-kotlinx-coroutines-swing = "1.8.0"
 multiplatform-settings = "1.1.1"
 jetpack-compose-bom = "2024.05.00"
 compose = "1.6.7"
@@ -20,6 +21,9 @@ coil3 = "3.0.0-alpha04"
 ktor-client = "2.3.8"
 chrisbanes-haze = "0.7.0"
 [libraries]
+# kotlinx
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines-swing" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 # compose
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "jetpack-compose-bom" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "compose" }
@@ -30,8 +34,6 @@ multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", vers
 multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatform-settings" }
 multiplatform-settings-serialization = { module = "com.russhwolf:multiplatform-settings-serialization", version.ref = "multiplatform-settings" }
 multiplatform-settings-coroutines = { module = "com.russhwolf:multiplatform-settings-coroutines", version.ref = "multiplatform-settings" }
-# kotlinx
-kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines-swing" }
 # koin
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
