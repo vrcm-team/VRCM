@@ -2,14 +2,33 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -46,17 +65,10 @@ fun SettingsBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SettingsBlockSurface(
-                padding = 12.dp,
-                spacedDp = 4.dp
-            ) {
+            SettingsBlockSurface {
                 CustomBlock()
             }
-
-            SettingsBlockSurface(
-                padding = 0.dp,
-                spacedDp = 0.dp
-            ) {
+            SettingsBlockSurface {
                 AboutBlock()
             }
             LogoutButton(onDismissRequest)
@@ -67,66 +79,69 @@ fun SettingsBottomSheet(
 @Composable
 private inline fun ColumnScope.CustomBlock() {
     var currentSettings by LocalSettingsState.current
-    SettingsItem(strings.stettingLanguage) {
-        LanguageTag.entries.forEach {
-            TextButton(
-                enabled = it.tag != currentSettings.languageTag.tag,
-                onClick = {
-                    currentSettings = currentSettings.copy(languageTag = it)
-                }
-            ) {
-                Text(
-                    text = it.displayName,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-        }
-    }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-    SettingsItem(strings.stettingThemeMode) {
-        listOf(null, true, false).forEach {
-            TextButton(
-                enabled = currentSettings.isDarkTheme != it,
-                onClick = {
-                    currentSettings = currentSettings.copy(isDarkTheme = it)
-                },
-
+    Column(
+        modifier = Modifier.fillMaxWidth()
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SettingsItem("${strings.stettingLanguage}:") {
+            LanguageTag.entries.forEach {
+                TextButton(
+                    enabled = it.tag != currentSettings.languageTag.tag,
+                    onClick = {
+                        currentSettings = currentSettings.copy(languageTag = it)
+                    }
                 ) {
-                Text(
-                    text = when (it) {
-                        null -> strings.stettingSystemThemeMode
-                        true -> strings.stettingDarkThemeMode
-                        false -> strings.stettingLightThemeMode
+                    Text(
+                        text = it.displayName,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        SettingsItem("${strings.stettingThemeMode}:") {
+            listOf(null, true, false).forEach {
+                TextButton(enabled = currentSettings.isDarkTheme != it, onClick = {
+                    currentSettings = currentSettings.copy(isDarkTheme = it)
+                }) {
+                    Text(
+                        text = when (it) {
+                            null -> strings.stettingSystemThemeMode
+                            true -> strings.stettingDarkThemeMode
+                            false -> strings.stettingLightThemeMode
+                        },
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        val themeColors: List<ThemeColor> = with(currentKoinScope()) { remember(::getAll) }
+        SettingsItem("${strings.stettingThemeColor}:") {
+            themeColors.forEach {
+                TextButton(
+                    enabled = it.name != currentSettings.themeColor.name,
+                    onClick = {
+                        currentSettings = currentSettings.copy(themeColor = it)
                     },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium
-                )
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = it.colorScheme.primaryContainer,
+                        contentColor = it.colorScheme.onPrimaryContainer
+                    )
+                ) {
+                    Text(
+                        text = it.name,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
             }
         }
     }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-    val themeColors: List<ThemeColor> = with(currentKoinScope()) { remember(::getAll) }
-    SettingsItem(strings.stettingThemeColor) {
-        themeColors.forEach {
-            TextButton(
-                enabled = it.name != currentSettings.themeColor.name,
-                onClick = {
-                    currentSettings = currentSettings.copy(themeColor = it)
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = it.colorScheme.primaryContainer,
-                    contentColor = it.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Text(
-                    text = it.name,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium
-                )
-            }
-        }
-    }
+
 }
 
 @Composable
@@ -136,44 +151,56 @@ private fun AboutBlock() {
     var version by remember { mutableStateOf(VersionVo()) }
     // 不能直接version.not()因为默认为false会导致一点开就显示
     var isLatestVersion by remember { mutableStateOf(false) }
+    var isLoadingVersion by remember { mutableStateOf(false) }
     val platform = koinInject<AppPlatform>()
-    Row(
-        modifier = Modifier.fillMaxWidth()
-         .clip(MaterialTheme.shapes.large)
-            .clickable {
-                scope.launch {
-                    versionService.checkVersion(false).onSuccess {
-                        isLatestVersion = it.hasNewVersion.not()
-                        version = VersionVo(
-                            it.tagName,
-                            it.htmlUrl,
-                            it.hasNewVersion
-                        )
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    scope.launch {
+                        if (isLoadingVersion) return@launch
+                        isLoadingVersion = true
+                        versionService.checkVersion(false).onSuccess {
+                            isLatestVersion = it.hasNewVersion.not()
+                            version = VersionVo(
+                                it.tagName,
+                                it.htmlUrl,
+                                it.hasNewVersion
+                            )
+                        }
+                        isLoadingVersion = false
                     }
                 }
+                .padding(12.dp)
+        ) {
+            Text(text = "${strings.stettingVersion}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(text = AppConst.APP_VERSION)
+            AnimatedVisibility(isLatestVersion){
+                Text(text = "(${strings.stettingAlreadyLatest})")
             }
-            .padding(12.dp)
-    ) {
-        Text(text = strings.stettingVersion)
-        Spacer(modifier = Modifier.weight(1f))
-        Text(text = AppConst.APP_VERSION)
-        AnimatedVisibility(isLatestVersion) {
-            Text(text = "(${strings.stettingAlreadyLatest})")
+            AnimatedVisibility(isLoadingVersion){
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp).padding(horizontal = 4.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            }
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    platform.openUrl(AppConst.APP_GITHUB_URL)
+                }
+                .padding(12.dp)
+        ) {
+            Text(text = "${strings.stettingAbout}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(text = "GitHub")
         }
     }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-    Row(
-        modifier = Modifier.fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                platform.openUrl(AppConst.APP_GITHUB_URL)
-            }
-            .padding(12.dp)
-    ) {
-        Text(text = strings.stettingAbout)
-        Spacer(modifier = Modifier.weight(1f))
-        Text(text = "GitHub")
-    }
+
 }
 
 @Composable
@@ -186,7 +213,7 @@ private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
         }
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center
     ) {
         Spacer(modifier = Modifier.weight(0.25f))
@@ -210,21 +237,13 @@ private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
 
 @Composable
 private inline fun SettingsBlockSurface(
-    padding: Dp = 12.dp,
-    spacedDp: Dp = 4.dp,
-    crossinline content: @Composable ColumnScope.() -> Unit
+    crossinline content: @Composable () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         shape = MaterialTheme.shapes.large,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .padding(padding),
-            verticalArrangement = Arrangement.spacedBy(spacedDp)
-        ) {
-            content()
-        }
+        content()
     }
 }
 
@@ -241,7 +260,6 @@ private inline fun SettingsItem(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(4.dp)
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
