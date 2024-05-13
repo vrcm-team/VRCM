@@ -1,8 +1,19 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -27,8 +38,8 @@ fun FriendLocationBottomSheet(
         sheetState = sheetState,
         onDismissRequest = onDismissRequest
     ) {
-        if (currentLocation.value == null) return@ABottomSheet
-        val currentInstants by currentLocation.value!!.instants
+        val friendLocation = currentLocation.value ?: return@ABottomSheet
+        val currentInstants by friendLocation.instants
         Column(
             modifier = Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -40,7 +51,7 @@ fun FriendLocationBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp),
-                    imageData = currentLocation.value?.instants?.value?.worldImageUrl,
+                    imageData = friendLocation.instants.value.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
                 Box(

@@ -1,5 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import java.util.*
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
