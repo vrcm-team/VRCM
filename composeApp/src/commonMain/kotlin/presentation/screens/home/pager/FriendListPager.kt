@@ -11,12 +11,8 @@ import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,12 +32,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import kotlinx.datetime.*
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 object FriendListPager : Pager {
 
@@ -58,7 +57,6 @@ object FriendListPager : Pager {
     override fun Content() {
         val friendListPagerModel: FriendListPagerModel = getScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
-        var isRefreshing by rememberSaveable(title) { mutableStateOf(true) }
         val lazyListState = rememberLazyListState()
         var searchText by rememberSaveable(title) { mutableStateOf("") }
         val friendList = friendListPagerModel.friendList
@@ -77,12 +75,9 @@ object FriendListPager : Pager {
         }
         FriendListPager(
             friendList = friendList,
-            isRefreshing = isRefreshing,
+            isRefreshing = friendListPagerModel.isRefreshing,
             state = lazyListState,
-            doRefresh = {
-                friendListPagerModel.refreshFriendList()
-                isRefreshing = false
-            },
+            doRefresh = friendListPagerModel::refreshFriendList,
             searchBar = {
                 val focusManager = LocalFocusManager.current
                 ITextField(
@@ -190,10 +185,10 @@ fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> 
         trailingContent = {
             // 离线好友最后登录时间
             // 例如: lastLogin = 2023-04-01T09:03:04.000Z
-            if (friend.status == UserStatus.Offline || friend.lastLogin.isBlank()) return@ListItem
+            if (friend.status != UserStatus.Offline || friend.lastLogin.isBlank()) return@ListItem
             val lastLogin = Instant.parse(friend.lastLogin).toLocalDateTime(TimeZone.currentSystemDefault())
             Text(
-                text = lastLogin.format(LocalDateTime.Formats.ISO),
+                text = lastLogin.ignoredFormat,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )

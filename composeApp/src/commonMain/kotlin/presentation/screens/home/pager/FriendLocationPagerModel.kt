@@ -43,13 +43,23 @@ class FriendLocationPagerModel(
 
     private val updateMutex = Mutex()
 
-
+    /**
+     * 刷新状态,一次登录成功后只会自动刷新一次
+     */
+    var isRefreshing = true
+        private set
 
     init {
         // 监听websocket事件
         screenModelScope.launch {
             SharedFlowCentre.webSocket.collect { socketEvent ->
                 onWebSocketEvent(socketEvent)
+            }
+        }
+        // 监听登录状态,用于重新登录后更新刷新状态
+        screenModelScope.launch {
+            SharedFlowCentre.authed.collect {
+                isRefreshing = true
             }
         }
     }
@@ -90,6 +100,8 @@ class FriendLocationPagerModel(
         friendLocationMap.clear()
         friendMap.clear()
         doRefreshFriendLocation()
+        // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
+        isRefreshing = false
     }
 
     /**

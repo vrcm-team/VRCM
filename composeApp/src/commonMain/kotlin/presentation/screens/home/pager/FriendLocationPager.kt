@@ -80,12 +80,9 @@ object FriendLocationPager : Pager {
         }
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
-            isRefreshing = isRefreshing,
+            isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
-            doRefresh = {
-                friendLocationPagerModel.refreshFriendLocation()
-                isRefreshing = false
-            }
+            doRefresh = friendLocationPagerModel::refreshFriendLocation
         )
     }
 

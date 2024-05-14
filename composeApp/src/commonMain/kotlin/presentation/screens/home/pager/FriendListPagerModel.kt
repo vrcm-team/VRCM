@@ -32,6 +32,12 @@ class FriendListPagerModel(
     val friendList: List<FriendData>
         get() = friendMap.values.toList()
 
+    /**
+     * 刷新状态,一次登录成功后只会自动刷新一次
+     */
+    var isRefreshing = true
+        private set
+
     init {
         // 监听WebSocket事件
         screenModelScope.launch {
@@ -39,10 +45,18 @@ class FriendListPagerModel(
                 when (socketEvent.type) {
                     FriendEvents.FriendActive.typeName,
                     FriendEvents.FriendOffline.typeName,
+                    FriendEvents.FriendAdd.typeName,
+                    FriendEvents.FriendDelete.typeName,
                     FriendEvents.FriendOnline.typeName-> {}
                     else -> return@collect
                 }
                 doRefreshFriendList()
+            }
+        }
+        // 监听登录状态,用于重新登录后更新刷新状态
+        screenModelScope.launch {
+            SharedFlowCentre.authed.collect {
+                isRefreshing = true
             }
         }
     }
@@ -50,6 +64,8 @@ class FriendListPagerModel(
     suspend fun refreshFriendList() {
         friendMap.clear()
         doRefreshFriendList()
+        // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
+        isRefreshing = false
     }
 
     private suspend fun doRefreshFriendList(){
