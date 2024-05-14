@@ -13,7 +13,10 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.core.shared.AppConst
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
@@ -25,6 +28,7 @@ import io.github.vrcmteam.vrcm.service.VersionService
 import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
+import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,24 +137,27 @@ private fun AboutBlock() {
     var isLatestVersion by remember { mutableStateOf(false) }
     var isLoadingVersion by remember { mutableStateOf(false) }
     val platform = koinInject<AppPlatform>()
+    val checkVersion = {
+        scope.launch {
+            if (isLoadingVersion) return@launch
+            isLoadingVersion = true
+            versionService.checkVersion(false).onSuccess {
+                isLatestVersion = it.hasNewVersion.not()
+                version = VersionVo(
+                    it.tagName,
+                    it.htmlUrl,
+                    it.hasNewVersion
+                )
+            }.onApiFailure("Setting") {
+                SharedFlowCentre.toastText.emit(ToastText.Error(it))
+            }
+            isLoadingVersion = false
+        }
+    }
     Column {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .clickable {
-                    scope.launch {
-                        if (isLoadingVersion) return@launch
-                        isLoadingVersion = true
-                        versionService.checkVersion(false).onSuccess {
-                            isLatestVersion = it.hasNewVersion.not()
-                            version = VersionVo(
-                                it.tagName,
-                                it.htmlUrl,
-                                it.hasNewVersion
-                            )
-                        }
-                        isLoadingVersion = false
-                    }
-                }
+                .clickable { checkVersion() }
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -189,6 +196,13 @@ private fun AboutBlock() {
                 contentDescription = "GithubIcon",
             )
             Text(text = "GitHub")
+        }
+        if (!isLatestVersion) {
+            UpdateDialog(
+                version = version,
+                onDismissRequest = { version = VersionVo() },
+                onRememberVersion = versionService::rememberVersion
+            )
         }
     }
 

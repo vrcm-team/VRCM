@@ -19,7 +19,7 @@ import presentation.screens.auth.data.VersionVo
 
 class AuthScreenModel(
     private val authService: AuthService,
-    private val versionManager: VersionService,
+    private val versionService: VersionService,
     private val logger: Logger
 ) : ScreenModel {
 
@@ -95,7 +95,7 @@ class AuthScreenModel(
 
     suspend fun tryCheckVersion(): VersionVo {
         return screenModelScope.async(Dispatchers.IO) {
-            versionManager.checkVersion(true)
+            versionService.checkVersion(true)
                 .onAuthFailure()
                 .map { VersionVo(it.tagName, it.htmlUrl, it.hasNewVersion) }
                 .getOrElse { VersionVo() }
@@ -103,7 +103,7 @@ class AuthScreenModel(
     }
 
     fun rememberVersion(version: String?) = screenModelScope.launch(Dispatchers.IO) {
-        versionManager.rememberVersion(version)
+        versionService.rememberVersion(version)
     }
 
     fun login() {

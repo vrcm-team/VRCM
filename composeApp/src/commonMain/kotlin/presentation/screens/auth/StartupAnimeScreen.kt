@@ -70,14 +70,13 @@ private fun Screen.VersionDialog(startUpAnime: () -> Unit) {
             }
         }
     }
-    UpdateDialog(version,
-        {
+    UpdateDialog(
+        version = version,
+        onDismissRequest = {
             version = VersionVo()
             startUpAnime()
         },
-        {
-            authScreenModel.rememberVersion(it)
-        }
+        onRememberVersion = authScreenModel::rememberVersion
     )
 }
 
