@@ -41,9 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 
 object FriendListPager : Pager {
 
@@ -190,33 +188,15 @@ fun LazyItemScope.FriendListItem(friend: FriendData, toProfile: (FriendData) -> 
         },
 
         trailingContent = {
-            // 截取最后登录时间
+            // 离线好友最后登录时间
             // 例如: lastLogin = 2023-04-01T09:03:04.000Z
-            if (friend.lastLogin.isBlank()) return@ListItem
+            if (friend.status == UserStatus.Offline || friend.lastLogin.isBlank()) return@ListItem
             val lastLogin = Instant.parse(friend.lastLogin).toLocalDateTime(TimeZone.currentSystemDefault())
-
             Text(
-                text = lastLogin.run { "$year-$monthNumber-$dayOfMonth $hour:$minute" },
+                text = lastLogin.format(LocalDateTime.Formats.ISO),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )
-//            val dateTime = friend.lastLogin.split('T')
-//            if (dateTime.size == 2) {
-//                Column(
-//                    horizontalAlignment = Alignment.CenterHorizontally
-//                ) {
-//                    Text(
-//                        text = dateTime[0],
-//                        style = MaterialTheme.typography.labelSmall,
-//                        maxLines = 1
-//                    )
-//                    Text(
-//                        text = dateTime[1].slice(0..4),
-//                        style = MaterialTheme.typography.labelSmall,
-//                        maxLines = 1
-//                    )
-//                }
-//            }
         },
     )
 }

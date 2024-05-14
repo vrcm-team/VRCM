@@ -1,5 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import java.util.Properties
+import java.util.*
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -90,8 +90,6 @@ kotlin {
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenModel)
             implementation(libs.voyager.transitions)
-            implementation(libs.voyager.tabNavigator)
-            implementation(libs.voyager.bottomSheetNavigator)
             implementation(libs.voyager.koin)
         }
     }
