@@ -2,30 +2,9 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
+import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.VersionService
 import kotlinx.coroutines.launch
@@ -171,18 +151,21 @@ private fun AboutBlock() {
                         isLoadingVersion = false
                     }
                 }
-                .padding(12.dp)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(text = "${strings.stettingVersion}:")
             Spacer(modifier = Modifier.weight(1f))
             Text(text = AppConst.APP_VERSION)
-            AnimatedVisibility(isLatestVersion){
+            AnimatedVisibility(isLatestVersion) {
                 Text(text = "(${strings.stettingAlreadyLatest})")
             }
-            AnimatedVisibility(isLoadingVersion){
+            AnimatedVisibility(isLoadingVersion) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp).padding(horizontal = 4.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .size(20.dp),
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp
                 )
             }
@@ -193,10 +176,18 @@ private fun AboutBlock() {
                 .clickable {
                     platform.openUrl(AppConst.APP_GITHUB_URL)
                 }
-                .padding(12.dp)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(text = "${strings.stettingAbout}:")
             Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .size(20.dp),
+                imageVector = WebIcons.GithubIcon,
+                contentDescription = "GithubIcon",
+            )
             Text(text = "GitHub")
         }
     }
