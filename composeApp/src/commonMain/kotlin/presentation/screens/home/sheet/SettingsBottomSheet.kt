@@ -200,8 +200,7 @@ private fun AboutBlock() {
         if (!isLatestVersion) {
             UpdateDialog(
                 version = version,
-                onDismissRequest = { version = VersionVo() },
-                onRememberVersion = versionService::rememberVersion
+                onDismissRequest = { version = VersionVo() }
             )
         }
     }

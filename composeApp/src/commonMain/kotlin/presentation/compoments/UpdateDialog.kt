@@ -19,7 +19,7 @@ import presentation.screens.auth.data.VersionVo
 fun UpdateDialog(
     version: VersionVo,
     onDismissRequest: () -> Unit = {},
-    onRememberVersion: (String?) -> Unit
+    onRememberVersion: ((String?) -> Unit)? = null
 ) {
     if (version.hasNewVersion) {
         val appPlatform = getAppPlatform()
@@ -39,6 +39,7 @@ fun UpdateDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(text = "Ver.${version.tagName}")
+                    if (onRememberVersion == null) return@Column
                     // 版本更新提示单选框
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -56,7 +57,6 @@ fun UpdateDialog(
                         Text(text = strings.startupDialogRememberVersion)
                     }
                 }
-
             },
             onDismissRequest = onDismissRequest,
             confirmButton = {
