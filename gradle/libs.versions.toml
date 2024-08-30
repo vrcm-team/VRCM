@@ -3,31 +3,28 @@ app-code = "1"
 app-name = "1.0.1"
 app-packageName = "io.github.vrcmteam.vrcm"
 agp = "8.2.2"
-kotlin = "1.9.22"
-kotlinx-coroutines-swing = "1.8.0"
-kotlinx-datetime = "0.6.0-RC.2"
+kotlin = "2.0.0"
+kotlinx-coroutines-swing = "1.8.1"
+kotlinx-datetime = "0.6.0"
 android-minSdk = "24"
 android-compileSdk = "34"
 android-targetSdk = "34"
-androidx-activityCompose = "1.9.0"
+androidx-activityCompose = "1.9.1"
 multiplatform-settings = "1.1.1"
-jetpack-compose-bom = "2024.05.00"
-compose = "1.6.7"
-compose-plugin = "1.6.0"
-koin = "3.6.0-alpha1"
+jetpack-compose-bom = "2024.08.00"
+compose-plugin = "1.6.11"
+koin = "3.6.0-wasm-alpha2"
 stately-common = "2.0.6"
 voyager = "1.1.0-alpha03"
 coil3 = "3.0.0-alpha04"
 ktor-client = "2.3.8"
-chrisbanes-haze = "0.7.0"
+chrisbanes-haze = "0.7.3"
 [libraries]
 # kotlinx
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines-swing" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 # compose
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "jetpack-compose-bom" }
-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "compose" }
-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 # settings
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
@@ -67,6 +64,7 @@ chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisban
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinCocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

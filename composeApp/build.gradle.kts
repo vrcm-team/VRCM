@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.kotlinxSerialization)
+    alias(libs.plugins.compose.compiler)
 }
 
 kotlin {
@@ -35,7 +36,6 @@ kotlin {
 
         androidMain.dependencies {
             implementation(project.dependencies.platform(libs.compose.bom))
-            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
 
             implementation(libs.koin.androidx.compose)
@@ -97,6 +97,14 @@ kotlin {
 
 android {
 
+    applicationVariants.all {
+        outputs.all {
+            val variantName = rootProject.name
+            val versionName = versionName
+            val newApkName = "$variantName-v$versionName.apk"
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = newApkName
+        }
+    }
     namespace = "io.github.vrcmteam.vrcm"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
