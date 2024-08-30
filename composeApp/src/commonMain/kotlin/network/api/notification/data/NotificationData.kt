@@ -12,7 +12,7 @@ data class NotificationData(
     @SerialName("data")
     val dataMap: Map<String,String>,
     val expiresAt: String,
-    val expiryAfterSeen: Int,
+    val expiryAfterSeen: Int?,
     val id: String,
     val ignoreDND: Boolean,
     val imageUrl: String,
@@ -30,7 +30,7 @@ data class NotificationData(
     val senderUserId: String?,
     val senderUsername: String?,
     val title: String,
-    val titleKey: String,
+    val titleKey: String?,
     val type: String,
     val updatedAt: String,
     val version: Int

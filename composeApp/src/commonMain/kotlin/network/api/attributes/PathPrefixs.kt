@@ -10,6 +10,8 @@ internal const val USERS_API_PREFIX = "users"
 
 internal const val USER_API_PREFIX = "user"
 
+internal const val GROUPS_API_PREFIX = "groups"
+
 internal const val FILES_API_PREFIX = "files"
 
 internal const val FILE_API_PREFIX = "file"

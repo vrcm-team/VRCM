@@ -1,11 +1,7 @@
 package io.github.vrcmteam.vrcm.network.api.users.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
-import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
-import io.github.vrcmteam.vrcm.network.api.attributes.IAccessType
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -39,26 +35,26 @@ data class UserData(
     override val status: UserStatus,
     override val statusDescription: String,
     override val tags: List<String>,
-    val travelingToInstance: String,
-    val travelingToLocation: String,
-    val travelingToWorld: String,
+    val travelingToInstance: String?,
+    val travelingToLocation: String?,
+    val travelingToWorld: String?,
     override val userIcon: String,
     val worldId: String,
 ) : IUser, JavaSerializable, IAccessType {
     override val accessType: AccessType
         get() =
-        when {
-            instanceId.contains(AccessType.Group.value) -> when (instanceId.substringAfter("groupAccessType(")
-                .substringBefore(")")) {
-                AccessType.GroupPublic.value -> AccessType.GroupPublic
-                AccessType.GroupPlus.value -> AccessType.GroupPlus
-                AccessType.GroupMembers.value -> AccessType.GroupMembers
-                else -> AccessType.Group
-            }
+            when {
+                instanceId.contains(AccessType.Group.value) -> when (instanceId.substringAfter("groupAccessType(")
+                    .substringBefore(")")) {
+                    AccessType.GroupPublic.value -> AccessType.GroupPublic
+                    AccessType.GroupPlus.value -> AccessType.GroupPlus
+                    AccessType.GroupMembers.value -> AccessType.GroupMembers
+                    else -> AccessType.Group
+                }
 
-            instanceId.contains(AccessType.Private.value) -> AccessType.Private
-            instanceId.contains(AccessType.FriendPlus.value) -> AccessType.FriendPlus
-            instanceId.contains(AccessType.Friend.value) -> AccessType.Friend
-            else -> AccessType.Public
-        }
+                instanceId.contains(AccessType.Private.value) -> AccessType.Private
+                instanceId.contains(AccessType.FriendPlus.value) -> AccessType.FriendPlus
+                instanceId.contains(AccessType.Friend.value) -> AccessType.Friend
+                else -> AccessType.Public
+            }
 }

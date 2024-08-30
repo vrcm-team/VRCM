@@ -31,7 +31,7 @@ class UserProfileScreenModel(
     }
     suspend fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth {
+            authService.reTryAuthCatching {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
