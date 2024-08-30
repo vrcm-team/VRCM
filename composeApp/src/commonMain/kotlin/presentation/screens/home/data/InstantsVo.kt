@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import io.github.vrcmteam.vrcm.network.api.attributes.CountryIcon
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 
@@ -13,6 +15,7 @@ data class InstantsVo(
     val accessType: String = "",
     val regionIconUrl: String? = null,
     val userCount: String = "",
+    val ownerName: MutableState<String?> = mutableStateOf(null),
 ){
     constructor(instance: InstanceData): this(
         worldId = instance.world.id,

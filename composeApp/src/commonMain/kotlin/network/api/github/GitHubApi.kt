@@ -15,5 +15,4 @@ class GitHubApi(
             client.get(releaseUrl).ifOKOrThrow { body<ReleaseData>() }
         }
 
-
 }
