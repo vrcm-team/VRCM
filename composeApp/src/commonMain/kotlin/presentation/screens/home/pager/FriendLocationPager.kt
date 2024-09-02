@@ -42,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.FriendLocationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
@@ -343,71 +344,67 @@ private fun LazyItemScope.LocationCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp),
-                    ) {
-                        // 房间好友头像/房间持有者
-                        Box(modifier = Modifier.fillMaxHeight().weight(0.6f)) {
-                            AnimatedContent(
-                                targetState = showUser,
-                                transitionSpec = {
-                                    (fadeIn() + expandHorizontally()) togetherWith (fadeOut() + shrinkHorizontally())
-                                }
-                            ) {
-                                if (!it) {
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.spacedBy((-8).dp)
-                                    ) {
-                                        friendList.take(5).forEach { friendState ->
-                                            UserStateIcon(
-                                                modifier = Modifier
-                                                    .align(Alignment.CenterVertically)
-                                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                                                iconUrl = friendState.value.iconUrl,
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    instants.ownerName.value?.let { ownerName ->
-                                        Box(
-                                            modifier = Modifier.fillMaxHeight().background(
-                                                MaterialTheme.colorScheme.inverseOnSurface,
-                                                MaterialTheme.shapes.medium
-                                            )
-                                                .clip(MaterialTheme.shapes.medium)
-                                                .padding(horizontal = 8.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "owner: $ownerName",
-                                                overflow = TextOverflow.Ellipsis,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.outline
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    MemberInfoRow(showUser, friendList, instants)
+                }
+            }
+            AnimatedVisibility(showUser) {
+                content(friendList)
+            }
+        }
+    }
+}
 
-                        Spacer(modifier = Modifier.weight(0.1f))
-                        // 房间人数比行
+/**
+ * 房间好友头像/房间持有者与房间人数比
+ */
+@Composable
+private inline fun MemberInfoRow(
+    showUser: Boolean,
+    friendList: List<State<FriendData>>,
+    instants: InstantsVo
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp),
+    ) {
+        // 房间好友头像/房间持有者
+        Box(modifier = Modifier.fillMaxHeight().weight(0.6f)) {
+            AnimatedContent(
+                targetState = showUser,
+                transitionSpec = {
+                    (fadeIn() + expandHorizontally()) togetherWith (fadeOut() + shrinkHorizontally())
+                }
+            ) {
+                if (!it) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy((-8).dp)
+                    ) {
+                        friendList.take(5).forEach { friendState ->
+                            UserStateIcon(
+                                modifier = Modifier
+                                    .align(Alignment.CenterVertically)
+                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                iconUrl = friendState.value.iconUrl,
+                            )
+                        }
+                    }
+                } else {
+                    instants.ownerName.value?.let { ownerName ->
                         Box(
-                            modifier = Modifier.fillMaxHeight()
-                                .weight(0.3f)
-                                .background(
-                                    MaterialTheme.colorScheme.inverseOnSurface,
-                                    MaterialTheme.shapes.medium
-                                )
+                            modifier = Modifier.fillMaxHeight().background(
+                                MaterialTheme.colorScheme.inverseOnSurface,
+                                MaterialTheme.shapes.medium
+                            )
                                 .clip(MaterialTheme.shapes.medium)
                                 .padding(horizontal = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = instants.userCount,
+                                text = ownerName,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -415,9 +412,27 @@ private fun LazyItemScope.LocationCard(
                     }
                 }
             }
-            AnimatedVisibility(showUser) {
-                content(friendList)
-            }
+        }
+
+        Spacer(modifier = Modifier.weight(0.1f))
+        // 房间人数比行
+        if (instants.userCount.isEmpty()) return@Row
+        Box(
+            modifier = Modifier.fillMaxHeight()
+                .weight(0.3f)
+                .background(
+                    MaterialTheme.colorScheme.inverseOnSurface,
+                    MaterialTheme.shapes.medium
+                )
+                .clip(MaterialTheme.shapes.medium)
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = instants.userCount,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline
+            )
         }
     }
 }
