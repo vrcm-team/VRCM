@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -392,15 +393,22 @@ private inline fun MemberInfoRow(
                     }
                 } else {
                     instants.ownerName.value?.let { ownerName ->
-                        Box(
+                        Row(
                             modifier = Modifier.fillMaxHeight().background(
                                 MaterialTheme.colorScheme.inverseOnSurface,
                                 MaterialTheme.shapes.medium
                             )
                                 .clip(MaterialTheme.shapes.medium)
                                 .padding(horizontal = 8.dp),
-                            contentAlignment = Alignment.Center
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Icon(
+                                modifier = Modifier.size(16.dp),
+                                imageVector = Icons.Default.Home,
+                                contentDescription = "OwnerIcon",
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = ownerName,
                                 maxLines = 1,

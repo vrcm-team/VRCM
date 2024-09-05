@@ -44,9 +44,9 @@ class WebSocketApi(
             }
         }catch (e: Exception){
             e.printStackTrace()
-            coroutineScope {
-                this.launch { startWebSocket() }
-            }
+//            coroutineScope {
+//                this.launch { startWebSocket() }
+//            }
         }
 
     }
