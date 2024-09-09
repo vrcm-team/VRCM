@@ -19,12 +19,14 @@ data class UserProfileVo (
     val profileImageUrl:String,
     val iconUrl:String,
     val isSupporter: Boolean,
+    val isSelf:Boolean = false,
+    val isFriend:Boolean = false,
     val trustRank: TrustRank
 ): JavaSerializable{
     constructor(user: IUser): this(
         id = user.id,
         displayName = user.displayName,
-        status = if (user is UserData && user.state == UserState.Offline) UserStatus.Offline else user.status,
+        status = user.status,
         statusDescription = user.statusDescription,
         bio = user.bio.orEmpty(),
         bioLinks = user.bioLinks,
@@ -33,6 +35,25 @@ data class UserProfileVo (
         profileImageUrl = user.profileImageUrl,
         iconUrl = user.iconUrl,
         isSupporter = user.isSupporter,
+        isSelf = false,
+        isFriend = user.isFriend,
+        trustRank = user.trustRank
+    )
+
+    constructor(user: UserData): this(
+        id = user.id,
+        displayName = user.displayName,
+        status = if (user.state == UserState.Offline) UserStatus.Offline else user.status,
+        statusDescription = user.statusDescription,
+        bio = user.bio.orEmpty(),
+        bioLinks = user.bioLinks,
+        tags = user.tags,
+        speakLanguages = user.speakLanguages,
+        profileImageUrl = user.profileImageUrl,
+        iconUrl = user.iconUrl,
+        isSupporter = user.isSupporter,
+        isSelf = !user.isFriend && user.friendKey.isNotEmpty(),
+        isFriend = user.isFriend,
         trustRank = user.trustRank
     )
 }

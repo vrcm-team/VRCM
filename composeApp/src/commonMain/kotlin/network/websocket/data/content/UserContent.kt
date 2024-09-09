@@ -20,7 +20,7 @@ data class UserContent(
     override val displayName: String,
     val friendKey: String,
     override val id: String,
-    val isFriend: Boolean,
+    override val isFriend: Boolean,
     @SerialName("last_activity")
     val lastActivity: String,
     @SerialName("last_login")

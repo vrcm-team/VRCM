@@ -16,6 +16,7 @@ interface IUser {
     val currentAvatarThumbnailImageUrl: String
     val currentAvatarTags: List<String>
     val userIcon:String
+    val isFriend: Boolean
     val profilePicOverride: String
     @SerialName("last_login")
     val lastLogin: String?

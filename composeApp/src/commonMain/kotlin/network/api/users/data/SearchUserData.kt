@@ -15,7 +15,7 @@ data class SearchUserData(
     override val developerType: String,
     override val displayName: String,
     override val id: String,
-    val isFriend: Boolean,
+    override val isFriend: Boolean,
     @SerialName("last_platform")
     override val lastPlatform: String,
     override val profilePicOverride: String,

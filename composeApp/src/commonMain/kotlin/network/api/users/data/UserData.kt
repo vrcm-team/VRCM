@@ -21,7 +21,7 @@ data class UserData(
     val friendRequestStatus: String,
     override val id: String,
     override val instanceId: String,
-    val isFriend: Boolean,
+    override val isFriend: Boolean,
     @SerialName("last_activity")
     val lastActivity: String,
     @SerialName("last_login")

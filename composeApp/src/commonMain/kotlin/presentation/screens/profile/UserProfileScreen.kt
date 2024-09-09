@@ -78,15 +78,18 @@ data class UserProfileScreen(
             sheetState = sheetState,
             onDismissRequest = {  bottomSheetIsVisible = false }
         ){
-            SheetButtonItem(localeStrings.profileSendFriendRequest) {
-                scope.launch {
-                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings)
-                    sheetState.hide()
-                }.invokeOnCompletion {
-                    if (sheetState.isVisible) return@invokeOnCompletion
-                    bottomSheetIsVisible = false
+            if (!currentUser.isFriend && !currentUser.isSelf) {
+                SheetButtonItem(localeStrings.profileSendFriendRequest) {
+                    scope.launch {
+                        userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings)
+                        sheetState.hide()
+                    }.invokeOnCompletion {
+                        if (sheetState.isVisible) return@invokeOnCompletion
+                        bottomSheetIsVisible = false
+                    }
                 }
             }
+
             SheetButtonItem(localeStrings.profileViewJsonData) {
                 scope.launch { sheetState.hide() }.invokeOnCompletion {
                     if (sheetState.isVisible) return@invokeOnCompletion

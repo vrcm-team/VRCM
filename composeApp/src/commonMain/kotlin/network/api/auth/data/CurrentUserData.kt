@@ -38,7 +38,7 @@ data class CurrentUserData(
     val hideContentFilterSettings: Boolean,
     val homeLocation: String,
     override val id: String,
-    val isFriend: Boolean,
+    override val isFriend: Boolean,
     @SerialName("last_activity")
     val lastActivity: String,
     @SerialName("last_login")
