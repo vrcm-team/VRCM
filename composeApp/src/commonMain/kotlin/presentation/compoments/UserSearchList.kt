@@ -38,11 +38,12 @@ import kotlinx.datetime.toLocalDateTime
 fun UserSearchList(
     key: String,
     isRefreshing: Boolean? = null,
-    userList: MutableList<IUser> = remember { mutableStateListOf() },
+    userListInit: List<IUser> = emptyList(),
     doRefresh: (suspend () -> Unit)? = null,
     onUpdateSearch: suspend (searchText: String, userList: MutableList<IUser>) -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
+    val userList: MutableList<IUser> = remember { mutableStateListOf<IUser>().apply { addAll(userListInit) } }
     var searchText by rememberSaveable(key) { mutableStateOf("") }
     LaunchedEffect(searchText) {
         onUpdateSearch(searchText, userList)
