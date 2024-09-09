@@ -11,7 +11,7 @@ data class GroupData(
     val description: String,
     val discriminator: String,
     val galleries: List<Gallery>,
-    val iconId: String,
+    val iconId: String?,
     val iconUrl: String,
     val id: String,
     val isVerified: Boolean,
