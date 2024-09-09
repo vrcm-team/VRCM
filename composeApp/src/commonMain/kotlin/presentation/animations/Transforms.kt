@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.animations
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
 import cafe.adriel.voyager.core.stack.StackEvent
 import cafe.adriel.voyager.navigator.Navigator
@@ -16,23 +17,25 @@ val authAnimeToHomeTransition = fadeIn(tween(600)) togetherWith
 fun slideScreenTransition(
     navigator: Navigator,
     orientation: SlideOrientation = SlideOrientation.Horizontal,
-    animationSpec: FiniteAnimationSpec<IntOffset> = spring(
+    inAnimationSpec: FiniteAnimationSpec<IntOffset> = spring(
         stiffness = Spring.StiffnessMediumLow,
         visibilityThreshold = IntOffset.VisibilityThreshold
-    )
+    ),
+    outAnimationSpec: FiniteAnimationSpec<Float> = spring(
+stiffness = Spring.StiffnessMediumLow,)
 ): ContentTransform {
-    val (initialOffset, targetOffset) = when (navigator.lastEvent) {
-        StackEvent.Pop -> ({ size: Int -> -size }) to ({ size: Int -> size })
-        else -> ({ size: Int -> size }) to ({ size: Int -> -size })
+    val initialOffset = when (navigator.lastEvent) {
+        StackEvent.Pop -> { size: Int -> -size }
+        else -> { size: Int -> size }
     }
 
      return when (orientation) {
         SlideOrientation.Horizontal ->
-            slideInHorizontally(animationSpec, initialOffset) togetherWith
-                    slideOutHorizontally(animationSpec, targetOffset)
+            slideInHorizontally(inAnimationSpec, initialOffset)  togetherWith
+                      scaleOut(outAnimationSpec, 0.8f, TransformOrigin(0.3f, 0.5f)) + fadeOut(outAnimationSpec,0.8f)
 
         SlideOrientation.Vertical ->
-            slideInVertically(animationSpec, initialOffset) togetherWith
-                    slideOutVertically(animationSpec, targetOffset)
+            slideInVertically(inAnimationSpec, initialOffset) togetherWith
+                     scaleOut(outAnimationSpec,0.8f, TransformOrigin(0.5f, 0.3f)) + fadeOut(outAnimationSpec,0.8f)
     }
 }
