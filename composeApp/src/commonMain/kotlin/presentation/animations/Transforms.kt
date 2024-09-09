@@ -1,7 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.animations
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.IntOffset
 import cafe.adriel.voyager.core.stack.StackEvent
@@ -17,12 +18,8 @@ val authAnimeToHomeTransition = fadeIn(tween(600)) togetherWith
 fun slideScreenTransition(
     navigator: Navigator,
     orientation: SlideOrientation = SlideOrientation.Horizontal,
-    inAnimationSpec: FiniteAnimationSpec<IntOffset> = spring(
-        stiffness = Spring.StiffnessMediumLow,
-        visibilityThreshold = IntOffset.VisibilityThreshold
-    ),
-    outAnimationSpec: FiniteAnimationSpec<Float> = spring(
-stiffness = Spring.StiffnessMediumLow,)
+    inAnimationSpec: FiniteAnimationSpec<IntOffset> = tween(),
+    outAnimationSpec: FiniteAnimationSpec<Float> = tween()
 ): ContentTransform {
     val initialOffset = when (navigator.lastEvent) {
         StackEvent.Pop -> { size: Int -> -size }
