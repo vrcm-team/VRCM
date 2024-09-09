@@ -1,4 +1,4 @@
-package network.api.favorite.data
+package io.github.vrcmteam.vrcm.network.api.favorite.data
 
 import kotlinx.serialization.Serializable
 

@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,8 +58,9 @@ fun SnackBarToastBox(
             )
         }
     },
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable () -> Unit
 ) {
+
     Box {
         CompositionLocalProvider(
             LocalSnackBarToastText provides remember { mutableStateOf(ToastText.Normal) }

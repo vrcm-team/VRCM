@@ -1,4 +1,4 @@
-package network.websocket.data
+package io.github.vrcmteam.vrcm.network.websocket.data
 
 import kotlinx.serialization.Serializable
 

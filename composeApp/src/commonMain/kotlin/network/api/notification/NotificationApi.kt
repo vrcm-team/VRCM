@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.network.api.notification
 
 import io.github.vrcmteam.vrcm.network.api.attributes.NOTIFICATIONS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -9,7 +10,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
-import network.api.notification.data.ResponseData
 
 class NotificationApi(
     private val client: HttpClient,

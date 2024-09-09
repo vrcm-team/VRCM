@@ -4,7 +4,8 @@ import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
-import io.github.vrcmteam.vrcm.network.extensions.ifOK
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendRequestData
+import io.github.vrcmteam.vrcm.network.extensions.ifOKOrThrow
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -55,7 +56,12 @@ class FriendsApi(private val client: HttpClient) {
                     parameter("offset", currentOffset.toString())
                     parameter("n", n.toString())
                 }
-            }.ifOK { body<List<FriendData>>() }.getOrThrow()
+            }.ifOKOrThrow { body<List<FriendData>>() }
         }
     }
+
+    suspend fun sendFriendRequest(userId: String) = client.post {
+        url { path( USER_API_PREFIX, userId, "friendRequest") }
+    }.ifOKOrThrow{ body<FriendRequestData>() }
+
 }

@@ -2,8 +2,6 @@ package io.github.vrcmteam.vrcm.network.api.github.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import network.api.github.data.AssetsData
-import network.api.github.data.AuthorData
 
 @Serializable
 data class ReleaseData (

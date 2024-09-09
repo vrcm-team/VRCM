@@ -40,11 +40,13 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
@@ -52,7 +54,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
-import network.api.notification.data.ResponseData
 
 
 object HomeScreen : Screen {
@@ -60,6 +61,7 @@ object HomeScreen : Screen {
     private val pagerList = listOf(
         FriendLocationPager,
         FriendListPager,
+        SearchListPager,
     )
 
     @Composable

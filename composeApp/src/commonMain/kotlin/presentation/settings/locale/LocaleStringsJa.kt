@@ -25,5 +25,8 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingLogout = "ログアウト",
     stettingAbout = "アプリについて",
     stettingVersion = "バージョン",
-    stettingAlreadyLatest = "すでに最新バージョン"
+    stettingAlreadyLatest = "すでに最新バージョン",
+    profileFriendRequestSent = "フレンドリクエストを送信しました",
+    profileSendFriendRequest = "フレンドリクエストを送信",
+    profileViewJsonData = "JSONデータを表示",
 )

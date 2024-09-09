@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.CookiesDao
 import io.github.vrcmteam.vrcm.storage.DaoKeys
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -84,7 +85,7 @@ class AuthService(
     private suspend fun <T> Result<T>.recoverLogin(callback: suspend () -> Result<T>): Result<T> {
         return when (val exception = exceptionOrNull()) {
             null -> this
-            else -> if (exception is VRCApiException && doReTryAuth()) {
+            else -> if (exception is VRCApiException && exception.code == HttpStatusCode.Unauthorized.value && doReTryAuth()) {
                 callback()
             } else {
                 this

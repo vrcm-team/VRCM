@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.network.websocket.data.type
 
-import network.websocket.data.content.FriendLocationContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
+
 
 object FriendEvents {
 
@@ -45,5 +46,5 @@ object FriendEvents {
      * 朋友位置变化
      * 当用户的一位朋友更改实例时，会发送此事件
      */
-    data object FriendLocation : WebSocketEventType("friend-location",FriendLocationContent::class)
+    data object FriendLocation : WebSocketEventType("friend-location", FriendLocationContent::class)
 }

@@ -31,6 +31,9 @@ data class LocaleStrings(
     val stettingAbout: String = "About Application",
     val stettingVersion: String = "Version",
     val stettingAlreadyLatest: String = "Already Latest",
+    val profileFriendRequestSent: String = "Friend Request Sent",
+    val profileSendFriendRequest: String = "Send Friend Request",
+    val profileViewJsonData: String = "Viewing JSON data",
 )
 
 val strings: LocaleStrings

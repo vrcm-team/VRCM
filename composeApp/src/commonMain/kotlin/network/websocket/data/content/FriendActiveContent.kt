@@ -1,8 +1,7 @@
-package network.websocket.data.content
+package io.github.vrcmteam.vrcm.network.websocket.data.content
 
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendEventsContent
 import kotlinx.serialization.Serializable
 
 @Serializable

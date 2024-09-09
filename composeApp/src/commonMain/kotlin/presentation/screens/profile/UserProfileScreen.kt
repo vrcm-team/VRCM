@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -61,6 +62,7 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         val scope = rememberCoroutineScope()
+        val localeStrings = strings
 
         ProfileScaffold(
             profileImageUrl = currentUser?.profileImageUrl,
@@ -70,23 +72,27 @@ data class UserProfileScreen(
         ) { ratio ->
             ProfileContent(currentUser, ratio)
         }
-
+        if (currentUser == null) return
         ABottomSheet(
             isVisible = bottomSheetIsVisible,
             sheetState = sheetState,
             onDismissRequest = {  bottomSheetIsVisible = false }
         ){
-            TextButton(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        if (sheetState.isVisible) return@invokeOnCompletion
-                        bottomSheetIsVisible = false
-                        openAlertDialog = true
-                    }
+            SheetButtonItem(localeStrings.profileSendFriendRequest) {
+                scope.launch {
+                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings)
+                    sheetState.hide()
+                }.invokeOnCompletion {
+                    if (sheetState.isVisible) return@invokeOnCompletion
+                    bottomSheetIsVisible = false
                 }
-            ) {
-                Text(text = "Look JsonData")
+            }
+            SheetButtonItem(localeStrings.profileViewJsonData) {
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    if (sheetState.isVisible) return@invokeOnCompletion
+                    bottomSheetIsVisible = false
+                    openAlertDialog = true
+                }
             }
         }
         JsonAlertDialog(
@@ -97,6 +103,21 @@ data class UserProfileScreen(
         }
     }
 
+
+
+}
+
+@Composable
+private fun ColumnScope.SheetButtonItem(
+    text: String,
+    onClick: () -> Unit
+) {
+    TextButton(
+        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+        onClick = onClick
+    ) {
+        Text(text = text)
+    }
 }
 
 @Composable

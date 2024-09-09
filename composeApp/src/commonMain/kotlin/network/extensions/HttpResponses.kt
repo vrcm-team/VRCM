@@ -1,8 +1,7 @@
 package io.github.vrcmteam.vrcm.network.extensions
 
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.*
 
 suspend inline fun <reified T> HttpResponse.ifOK(mapping: HttpResponse.() -> T): Result<T> =
     if (status.value == 200) {
@@ -10,9 +9,9 @@ suspend inline fun <reified T> HttpResponse.ifOK(mapping: HttpResponse.() -> T):
     } else {
         Result.failure(
             VRCApiException(
-                message = status.description,
-                bodyText = bodyAsText(),
-                code = status.value
+                description = status.description,
+                code = status.value,
+                bodyText = bodyAsText()
             )
         )
     }
@@ -22,8 +21,8 @@ suspend inline fun <reified T> HttpResponse.ifOKOrThrow(mapping: HttpResponse.()
         this.run { mapping() }
     } else {
         throw VRCApiException(
-            message = status.description,
-            bodyText = bodyAsText(),
-            code = status.value
+            description = status.description,
+            code = status.value,
+            bodyText = bodyAsText()
         )
     }

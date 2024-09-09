@@ -1,12 +1,12 @@
 package io.github.vrcmteam.vrcm.network.api.users
 
 import io.github.vrcmteam.vrcm.network.api.attributes.USERS_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.users.data.SearchUserData
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.ifOKOrThrow
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import network.api.users.data.SearchUserData
 
 class UsersApi(private val client: HttpClient) {
 
@@ -27,6 +27,6 @@ class UsersApi(private val client: HttpClient) {
             parameter("n", n)
             parameter("offset", offset)
             parameter("search", search)
-        }.ifOKOrThrow { body<SearchUserData>() }
+        }.ifOKOrThrow { body<List<SearchUserData>>() }
 
 }

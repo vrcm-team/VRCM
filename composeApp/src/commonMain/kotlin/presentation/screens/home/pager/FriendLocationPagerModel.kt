@@ -15,6 +15,9 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -29,9 +32,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
-import network.websocket.data.WebSocketEvent
-import network.websocket.data.content.FriendActiveContent
-import network.websocket.data.content.FriendLocationContent
 
 class FriendLocationPagerModel(
     private val friendsApi: FriendsApi,

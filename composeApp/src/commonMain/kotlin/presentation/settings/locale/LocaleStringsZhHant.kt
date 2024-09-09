@@ -25,5 +25,8 @@ internal val LocaleStringsZhHant = LocaleStrings(
     stettingLogout = "登出",
     stettingAbout = "關於應用程序",
     stettingVersion = "版本",
-    stettingAlreadyLatest = "已是最新版本"
+    stettingAlreadyLatest = "已是最新版本",
+    profileFriendRequestSent = "已發送好友請求",
+    profileSendFriendRequest = "發送好友請求",
+    profileViewJsonData = "查看 JSON 數據",
 )

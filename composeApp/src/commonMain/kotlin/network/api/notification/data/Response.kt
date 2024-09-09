@@ -1,4 +1,4 @@
-package network.api.notification.data
+package io.github.vrcmteam.vrcm.network.api.notification.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

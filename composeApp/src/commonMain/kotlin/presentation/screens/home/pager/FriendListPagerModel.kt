@@ -4,11 +4,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
- import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -20,17 +21,17 @@ import kotlinx.serialization.json.Json
 class FriendListPagerModel(
     private val friendsApi: FriendsApi,
     private val authService: AuthService,
-    private val json: Json
-): ScreenModel {
+    private val json: Json,
+) : ScreenModel {
 
-    private val friendMap: MutableMap<String,FriendData> = mutableStateMapOf()
+    private val friendMap: MutableMap<String, FriendData> = mutableStateMapOf()
 
     /**
      * 获取好友列表按在线状态最后登录时间与id排序
      * 使用sortedByDescending是因为匹配最后登录时间倒序
      */
     val friendList: List<FriendData>
-        get() = friendMap.values.toList()
+        get() = friendMap.values.sortedUserByStatus()
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
@@ -47,10 +48,14 @@ class FriendListPagerModel(
                     FriendEvents.FriendOffline.typeName,
                     FriendEvents.FriendAdd.typeName,
                     FriendEvents.FriendDelete.typeName,
-                    FriendEvents.FriendOnline.typeName-> {}
+                    FriendEvents.FriendOnline.typeName,
+                    -> {
+                        // 这里监听到一个好友的状态变化就会全量刷新一次
+                        // 只更新监听到的那个好友的状态的话怕数据不一致所以全量刷新(暂时)
+                        doRefreshFriendList()
+                    }
                     else -> return@collect
                 }
-                doRefreshFriendList()
             }
         }
         // 监听登录状态,用于重新登录后更新刷新状态
@@ -61,6 +66,17 @@ class FriendListPagerModel(
         }
     }
 
+    fun findFriendList(name: String): List<FriendData> =
+        friendMap.values
+            .filter {
+                name.isEmpty() || it.displayName.contains(name)
+            }.sortedUserByStatus()
+
+
+    private fun Iterable<FriendData>.sortedUserByStatus()  = sortedByDescending {
+        (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
+    }
+
     suspend fun refreshFriendList() {
         friendMap.clear()
         doRefreshFriendList()
@@ -68,7 +84,7 @@ class FriendListPagerModel(
         isRefreshing = false
     }
 
-    private suspend fun doRefreshFriendList(){
+    private suspend fun doRefreshFriendList() {
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.allFriendsFlow()
                 .retry(1) {
@@ -88,7 +104,8 @@ class FriendListPagerModel(
         runCatching {
             friendMap.putAll(friends.associateBy { it.id })
         }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))}
+            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+        }
     }
 
 }

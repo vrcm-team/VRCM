@@ -1,4 +1,4 @@
-package network.websocket.data.content
+package io.github.vrcmteam.vrcm.network.websocket.data.content
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser

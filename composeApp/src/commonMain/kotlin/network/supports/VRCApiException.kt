@@ -1,3 +1,4 @@
 package io.github.vrcmteam.vrcm.network.supports
 
-class VRCApiException(override val message: String,val bodyText: String,val code: Int = -1) : RuntimeException(message)
+class VRCApiException(val description: String, val code: Int = -1, val bodyText: String) :
+    RuntimeException(bodyText.ifEmpty { description })

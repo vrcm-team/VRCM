@@ -1,4 +1,4 @@
-package network.api.github.data
+package io.github.vrcmteam.vrcm.network.api.github.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
