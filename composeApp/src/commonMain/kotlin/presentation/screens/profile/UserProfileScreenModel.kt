@@ -11,7 +11,6 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
-import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
@@ -50,7 +49,7 @@ class UserProfileScreenModel(
             }
     }
 
-    suspend fun sendFriendRequest(userId: String, strings: LocaleStrings) {
+    suspend fun sendFriendRequest(userId: String, message: String) {
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 friendsApi.sendFriendRequest(userId)
@@ -58,7 +57,7 @@ class UserProfileScreenModel(
                 logger.error(it.message.toString())
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
             }.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(strings.profileFriendRequestSent))
+                SharedFlowCentre.toastText.emit(ToastText.Success(message))
             }
         }.join()
     }

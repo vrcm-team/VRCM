@@ -1,10 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.TrustRank
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 
 data class UserProfileVo (
@@ -16,6 +13,7 @@ data class UserProfileVo (
     val bioLinks: List<String>,
     val tags: List<String>,
     val speakLanguages:List<String>,
+    val friendRequestStatus: FriendRequestStatus = FriendRequestStatus.Null,
     val profileImageUrl:String,
     val iconUrl:String,
     val isSupporter: Boolean,
@@ -35,7 +33,6 @@ data class UserProfileVo (
         profileImageUrl = user.profileImageUrl,
         iconUrl = user.iconUrl,
         isSupporter = user.isSupporter,
-        isSelf = false,
         isFriend = user.isFriend,
         trustRank = user.trustRank
     )
@@ -49,6 +46,7 @@ data class UserProfileVo (
         bioLinks = user.bioLinks,
         tags = user.tags,
         speakLanguages = user.speakLanguages,
+        friendRequestStatus = user.friendRequestStatus,
         profileImageUrl = user.profileImageUrl,
         iconUrl = user.iconUrl,
         isSupporter = user.isSupporter,

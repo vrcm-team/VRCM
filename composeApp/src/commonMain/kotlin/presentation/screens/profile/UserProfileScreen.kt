@@ -25,6 +25,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.getScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
+import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -39,7 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
-    private val userProfileVO: UserProfileVo
+    private val userProfileVO: UserProfileVo,
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -49,8 +50,8 @@ data class UserProfileScreen(
         LifecycleEffect(
             onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
         )
-        LaunchedEffect(Unit){
-            SharedFlowCentre.logout.collect{
+        LaunchedEffect(Unit) {
+            SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
@@ -58,11 +59,9 @@ data class UserProfileScreen(
             userProfileScreenModel.refreshUser(userProfileVO.id)
         }
         val currentUser = userProfileScreenModel.userState
-        var openAlertDialog by remember { mutableStateOf(false) }
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
-        val scope = rememberCoroutineScope()
-        val localeStrings = strings
+
 
         ProfileScaffold(
             profileImageUrl = currentUser?.profileImageUrl,
@@ -76,50 +75,118 @@ data class UserProfileScreen(
         ABottomSheet(
             isVisible = bottomSheetIsVisible,
             sheetState = sheetState,
-            onDismissRequest = {  bottomSheetIsVisible = false }
-        ){
-            if (!currentUser.isFriend && !currentUser.isSelf) {
-                SheetButtonItem(localeStrings.profileSendFriendRequest) {
-                    scope.launch {
-                        userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings)
-                        sheetState.hide()
-                    }.invokeOnCompletion {
-                        if (sheetState.isVisible) return@invokeOnCompletion
-                        bottomSheetIsVisible = false
-                    }
-                }
-            }
+            onDismissRequest = { bottomSheetIsVisible = false }
+        ) {
+            SheetItems(
+                currentUser = currentUser,
+                userProfileScreenModel = userProfileScreenModel,
+                hideSheet = { sheetState.hide() },
+                onHideCompletion = {
+                    if (!sheetState.isVisible) bottomSheetIsVisible = false
+                },
+            )
+        }
 
-            SheetButtonItem(localeStrings.profileViewJsonData) {
-                scope.launch { sheetState.hide() }.invokeOnCompletion {
-                    if (sheetState.isVisible) return@invokeOnCompletion
-                    bottomSheetIsVisible = false
-                    openAlertDialog = true
-                }
-            }
-        }
-        JsonAlertDialog(
-            openAlertDialog = openAlertDialog,
-            onDismissRequest = { openAlertDialog = false }
-        ){
-            Text(text = userProfileScreenModel.userJson)
-        }
     }
-
 
 
 }
 
 @Composable
+private fun ColumnScope.SheetItems(
+    currentUser: UserProfileVo,
+    userProfileScreenModel: UserProfileScreenModel,
+    hideSheet: suspend () -> Unit,
+    onHideCompletion: () -> Unit,
+) {
+    var openAlertDialog by remember { mutableStateOf(false) }
+    FriendRequestSheetItem(
+        currentUser,
+        userProfileScreenModel,
+        hideSheet,
+        onHideCompletion,
+    )
+//    SheetButtonItem(localeStrings.profileViewJsonData, {
+//        scope.launch { hideSheet() }.invokeOnCompletion {
+//            onHideCompletion()
+//            openAlertDialog = true
+//        }
+//    })
+    JsonAlertDialog(
+        openAlertDialog = openAlertDialog,
+        onDismissRequest = { openAlertDialog = false }
+    ) {
+        Text(text = userProfileScreenModel.userJson)
+    }
+}
+
+@Composable
+private fun ColumnScope.FriendRequestSheetItem(
+    currentUser: UserProfileVo,
+    userProfileScreenModel: UserProfileScreenModel,
+    hideSheet: suspend () -> Unit,
+    onHideCompletion: () -> Unit,
+) {
+    val action: Pair<String, suspend () -> Unit>? = when {
+        // 当前用户不是朋友且不是自己
+        !currentUser.isFriend && !currentUser.isSelf -> {
+            val localeStrings = strings
+            when(currentUser.friendRequestStatus){
+                // 状态为Null,则发送好友请求
+                Null -> localeStrings.profileSendFriendRequest to {
+                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
+                }
+                // 状态为Outgoing,则取消发送好友请求
+                Outgoing -> localeStrings.profileCancelFriendRequest to {
+                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
+                }
+                // 状态为Completed,则删除好友
+                Completed -> localeStrings.profileDeleteFriend to {
+                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
+                }
+            }
+
+        }
+        else -> null
+    }
+
+    if (action == null) return
+
+    val scope = rememberCoroutineScope()
+    var enabled by remember { mutableStateOf(true) }
+    if (!currentUser.isFriend && !currentUser.isSelf) {
+        TextButton(
+            modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+            enabled = enabled,
+            onClick = {
+                scope.launch {
+                    enabled = false
+                    action.second()
+                    hideSheet()
+                }.invokeOnCompletion {
+                    onHideCompletion()
+                }
+            }
+        ) {
+            Text(text = action.first)
+        }
+    }
+
+}
+
+@Composable
 private fun ColumnScope.SheetButtonItem(
-    text: String,
-    onClick: () -> Unit
+    text: String? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    content: @Composable RowScope.(String) -> Unit = { Text(text = it) },
 ) {
     TextButton(
         modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+        enabled = enabled,
         onClick = onClick
     ) {
-        Text(text = text)
+        content(text.orEmpty())
     }
 }
 
@@ -127,7 +194,7 @@ private fun ColumnScope.SheetButtonItem(
 private fun JsonAlertDialog(
     openAlertDialog: Boolean,
     onDismissRequest: () -> Unit,
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable BoxScope.() -> Unit,
 ) {
     if (openAlertDialog) {
         AlertDialog(
@@ -158,7 +225,7 @@ private fun JsonAlertDialog(
 @Composable
 private fun ProfileContent(
     currentUser: UserProfileVo?,
-    ratio: Float
+    ratio: Float,
 ) {
     if (currentUser == null) return
     val inverseRatio = 1 - ratio
@@ -190,7 +257,7 @@ private fun ProfileContent(
 @OptIn(ExperimentalMaterial3Api::class)
 private fun BottomCardTab(
     scrollState: ScrollState,
-    userProfileVO: UserProfileVo
+    userProfileVO: UserProfileVo,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -271,7 +338,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
             horizontalArrangement = Arrangement.spacedBy(rowSpaced),
         ) {
             // speakLanguages 和 bioLinks 最大大小为3，填充下让分割线居中
-            repeat(3 - speakLanguages.size){
+            repeat(3 - speakLanguages.size) {
                 Spacer(modifier = Modifier.width((width)))
             }
             // speakLanguages
@@ -283,7 +350,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
             )
             // bioLinks
             LinksRow(bioLinks, width)
-            repeat(3 - bioLinks.size){
+            repeat(3 - bioLinks.size) {
                 Spacer(modifier = Modifier.width((width)))
             }
         }
@@ -299,7 +366,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 private fun UserInfoRow(
     userName: String,
     isSupporter: Boolean,
-    rankColor: Color
+    rankColor: Color,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -340,7 +407,7 @@ private fun UserInfoRow(
 @Composable
 private fun StatusRow(
     statusColor: Color,
-    statusDescription: String
+    statusDescription: String,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -363,7 +430,7 @@ private fun StatusRow(
 @Composable
 private fun LanguagesRow(
     speakLanguages: List<String>,
-    width: Dp = 32.dp
+    width: Dp = 32.dp,
 ) {
     if (speakLanguages.isEmpty()) {
         return
@@ -384,14 +451,14 @@ private fun LanguagesRow(
                 },
                 state = rememberTooltipState()
             ) {
-                if (imageVector == null){
+                if (imageVector == null) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(width)
                             .padding(vertical = 3.dp)
-                            .background(MaterialTheme.colorScheme.inversePrimary,MaterialTheme.shapes.extraSmall)
-                    ){
+                            .background(MaterialTheme.colorScheme.inversePrimary, MaterialTheme.shapes.extraSmall)
+                    ) {
                         Icon(
                             modifier = Modifier.align(Alignment.Center),
                             imageVector = Icons.Rounded.QuestionMark,
@@ -399,7 +466,7 @@ private fun LanguagesRow(
                             contentDescription = "NotKnownLanguageIcon",
                         )
                     }
-                }else{
+                } else {
                     Image(
                         imageVector = imageVector,
                         contentDescription = "LanguageIcon",
@@ -420,7 +487,7 @@ private fun LanguagesRow(
 @Composable
 fun LinksRow(
     bioLinks: List<String>,
-    width: Dp = 32.dp
+    width: Dp = 32.dp,
 ) {
     if (bioLinks.isEmpty()) {
         return

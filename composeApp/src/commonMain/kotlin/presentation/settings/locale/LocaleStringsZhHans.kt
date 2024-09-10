@@ -28,5 +28,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     stettingAlreadyLatest = "已是最新版本",
     profileFriendRequestSent = "已发送好友请求",
     profileSendFriendRequest = "发送好友请求",
+    profileCancelFriendRequest = "取消好友请求",
+    profileDeleteFriend = "删除好友",
     profileViewJsonData = "查看JSON数据",
 )

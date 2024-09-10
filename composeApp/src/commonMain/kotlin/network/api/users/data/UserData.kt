@@ -18,7 +18,7 @@ data class UserData(
     override val developerType: String,
     override val displayName: String,
     val friendKey: String,
-    val friendRequestStatus: String,
+    val friendRequestStatus: FriendRequestStatus,
     override val id: String,
     override val instanceId: String,
     override val isFriend: Boolean,

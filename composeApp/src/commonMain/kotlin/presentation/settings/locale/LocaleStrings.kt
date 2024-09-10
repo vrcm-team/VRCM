@@ -33,6 +33,8 @@ data class LocaleStrings(
     val stettingAlreadyLatest: String = "Already Latest",
     val profileFriendRequestSent: String = "Friend Request Sent",
     val profileSendFriendRequest: String = "Send Friend Request",
+    val profileCancelFriendRequest: String = "Cancel Friend Request",
+    val profileDeleteFriend: String = "Delete Friend",
     val profileViewJsonData: String = "Viewing JSON data",
 )
 
