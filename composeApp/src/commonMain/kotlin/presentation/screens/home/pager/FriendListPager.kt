@@ -25,7 +25,7 @@ object FriendListPager : Pager {
         val friendListPagerModel: FriendListPagerModel = getScreenModel()
         UserSearchList(
             key = title,
-            userListInit = friendListPagerModel.friendList,
+            userListInit = friendListPagerModel::findFriendList,
             isRefreshing = friendListPagerModel.isRefreshing,
             doRefresh = friendListPagerModel::refreshFriendList,
         ) { searchText, userList ->

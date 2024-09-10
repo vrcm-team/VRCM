@@ -25,11 +25,14 @@ object SearchListPager : Pager {
     override fun Content() {
         val searchListPagerModel:SearchListPagerModel = getScreenModel()
 
-        UserSearchList(title) { searchText, userList ->
-            userList.clear()
-            if (searchText.isEmpty()) return@UserSearchList
-            searchListPagerModel.refreshSearchList(searchText)
-            userList += searchListPagerModel.searchList
+        UserSearchList(
+            key = title,
+            userListInit = { searchListPagerModel.searchList },
+        ) { searchText, userList ->
+            if (searchListPagerModel.refreshSearchList(searchText)){
+                userList.clear()
+                userList += searchListPagerModel.searchList
+            }
         }
     }
 }

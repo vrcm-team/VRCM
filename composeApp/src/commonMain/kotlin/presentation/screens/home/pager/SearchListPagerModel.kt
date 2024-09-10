@@ -6,7 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.SearchUserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 class SearchListPagerModel(
     private val usersApi: UsersApi
@@ -15,9 +15,19 @@ class SearchListPagerModel(
     var searchList: List<SearchUserData> = emptyList()
     private set
 
-    suspend fun refreshSearchList(name: String) = this.screenModelScope.launch(Dispatchers.IO) {
-        searchList = usersApi.searchUser(name)
-    }.join()
+    private var preSearchText: String = ""
+
+
+    suspend fun refreshSearchList(name: String) = this.screenModelScope.async(Dispatchers.IO) {
+        if (name != preSearchText && name.isNotEmpty() ){
+            searchList = usersApi.searchUser(name)
+            preSearchText = name
+            return@async true
+        }else{
+            preSearchText = name
+            return@async false
+        }
+    }.await()
 
 
 }
