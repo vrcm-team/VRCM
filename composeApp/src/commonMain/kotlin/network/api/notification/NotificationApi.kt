@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.network.api.notification
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.NOTIFICATIONS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
@@ -46,6 +47,26 @@ class NotificationApi(
             parameter("hidden", hidden)
             parameter("n", n)
             parameter("offset", offset)
+        }.checkSuccess()
+
+    suspend fun acceptFriendRequest(notificationId: String): VRChatResponse =
+        client.put {
+            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "accept") }
+        }.checkSuccess()
+
+    suspend fun markNotificationAsRead(notificationId: String): VRChatResponse =
+        client.put {
+            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "see") }
+        }.checkSuccess()
+
+    suspend fun deleteNotification(notificationId: String): VRChatResponse =
+        client.put {
+            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "hide") }
+        }.checkSuccess()
+
+    suspend fun clearAllNotifications(): VRChatResponse  =
+        client.put {
+            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, "clear") }
         }.checkSuccess()
 
 }
