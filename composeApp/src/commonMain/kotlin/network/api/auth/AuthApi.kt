@@ -39,10 +39,10 @@ class AuthApi(
                     when{
                         requiresTwoFactorAuth.contains(AuthType.Email.typeName) ->
                             AuthState.NeedEmailCode
-                        requiresTwoFactorAuth.contains(AuthType.TFA.typeName) ->
-                            AuthState.NeedTFA
                         requiresTwoFactorAuth.contains(AuthType.TTFA.typeName) ->
                             AuthState.NeedTTFA
+                        requiresTwoFactorAuth.contains(AuthType.TFA.typeName) ->
+                            AuthState.NeedTFA
                         else -> error("Unknown auth type: $requiresTwoFactorAuth")
                     }
                 }
