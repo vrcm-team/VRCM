@@ -5,9 +5,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendRequestData
-import io.github.vrcmteam.vrcm.network.extensions.ifOKOrThrow
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
@@ -56,12 +55,16 @@ class FriendsApi(private val client: HttpClient) {
                     parameter("offset", currentOffset.toString())
                     parameter("n", n.toString())
                 }
-            }.ifOKOrThrow { body<List<FriendData>>() }
+            }.checkSuccess<List<FriendData>>()
         }
     }
 
     suspend fun sendFriendRequest(userId: String) = client.post {
         url { path( USER_API_PREFIX, userId, "friendRequest") }
-    }.ifOKOrThrow{ body<FriendRequestData>() }
+    }.checkSuccess<FriendRequestData>()
+
+    suspend fun deleteFriendRequest(userId: String) = client.delete {
+        url { path( USER_API_PREFIX, userId, "friendRequest") }
+    }.checkSuccess<FriendRequestData>()
 
 }
