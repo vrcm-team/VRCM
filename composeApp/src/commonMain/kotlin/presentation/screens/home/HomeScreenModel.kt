@@ -7,7 +7,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
-import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
@@ -28,7 +28,7 @@ class HomeScreenModel(
 
     val currentUser by _currentUser
 
-    private val _notifications = mutableStateOf<List<NotificationData>>(emptyList())
+    private val _notifications = mutableStateOf<List<NotificationDataV2>>(emptyList())
     val notifications by _notifications
 
     fun ini()  {
@@ -38,7 +38,7 @@ class HomeScreenModel(
 
     fun refreshNotifications() =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.fetchNotifications() }
+            authService.reTryAuthCatching { notificationApi.fetchNotificationsV2() }
                 .onHomeFailure()
                 .onSuccess {
                     _notifications.value = it

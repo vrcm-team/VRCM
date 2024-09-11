@@ -39,7 +39,7 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.*
@@ -330,7 +330,7 @@ private fun RowScope.PagerNavigationItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationActionButton(
-    notifications: List<NotificationData>,
+    notifications: List<NotificationDataV2>,
     refreshNotification: () -> Unit,
     onResponseNotification: (String, ResponseData) -> Unit
 ) {
