@@ -28,7 +28,9 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingAlreadyLatest = "すでに最新バージョン",
     profileFriendRequestSent = "フレンドリクエストを送信しました",
     profileSendFriendRequest = "フレンドリクエストを送信",
-    profileCancelFriendRequest = "フレンドリクエストをキャンセル",
-    profileDeleteFriend = "フレンドを解除",
+    profileFriendRequestDeleted = "フレンドリクエストをキャンセルしました",
+    profileDeleteFriendRequest = "フレンドリクエストをキャンセル",
+    profileUnfriended = "フレンド解除しました",
+    profileUnfriend = "フレンド解除",
     profileViewJsonData = "JSONデータを表示",
 )

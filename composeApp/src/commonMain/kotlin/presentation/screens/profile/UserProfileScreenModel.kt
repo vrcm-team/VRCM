@@ -16,6 +16,7 @@ import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
@@ -23,7 +24,7 @@ class UserProfileScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val friendsApi: FriendsApi,
-    private val logger: Logger
+    private val logger: Logger,
 ) : ScreenModel {
 
     private val _userState = mutableStateOf<UserProfileVo?>(null)
@@ -47,19 +48,32 @@ class UserProfileScreenModel(
                 _userState.value = UserProfileVo(it.body<UserData>())
                 _userJson.value = it.bodyAsText().pretty()
             }
+        }
+
+    suspend fun sendFriendRequest(userId: String, message: String): Boolean =
+        friendAction(message) {
+            it.sendFriendRequest(userId)
+        }
+
+    suspend fun deleteFriendRequest(userId: String, message: String): Boolean = friendAction(message) {
+        it.deleteFriendRequest(userId)
     }
 
-    suspend fun sendFriendRequest(userId: String, message: String) {
-        screenModelScope.launch(Dispatchers.IO) {
+    suspend fun unfriend(userId: String, message: String): Boolean = friendAction(message) {
+            it.unfriend(userId)
+        }
+
+    private suspend fun friendAction(message: String, action: suspend (FriendsApi) -> Any): Boolean =
+        screenModelScope.async(Dispatchers.IO) {
             authService.reTryAuthCatching {
-                friendsApi.sendFriendRequest(userId)
+                action(friendsApi)
             }.onFailure {
                 logger.error(it.message.toString())
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
             }.onSuccess {
                 SharedFlowCentre.toastText.emit(ToastText.Success(message))
-            }
-        }.join()
-    }
+                _userState.value?.id?.also { refreshUser(it) }
+            }.isSuccess
+        }.await()
 
 }

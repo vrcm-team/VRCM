@@ -2,9 +2,11 @@ package io.github.vrcmteam.vrcm.network.api.friends
 
 import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.FRIENDS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
-import io.github.vrcmteam.vrcm.network.api.friends.date.FriendRequestData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -20,7 +22,7 @@ class FriendsApi(private val client: HttpClient) {
     fun friendsFlow(
         offline: Boolean = false,
         offset: Int = 0,
-        n: Int = 50
+        n: Int = 50,
     ): Flow<List<FriendData>> =
         flow {
             fetchFriendList(
@@ -45,26 +47,28 @@ class FriendsApi(private val client: HttpClient) {
     private suspend fun FlowCollector<List<FriendData>>.fetchFriendList(
         offline: Boolean = false,
         offset: Int = 0,
-        n: Int = 50
-    ){
-        fetchDataList(offset,n) { currentOffset, _ ->
+        n: Int = 50,
+    ) {
+        fetchDataList(offset, n) { currentOffset, _ ->
             client.get {
-                url { path(AUTH_API_PREFIX, USER_API_PREFIX, "friends") }
-                parameters {
-                    parameter("offline", offline.toString())
-                    parameter("offset", currentOffset.toString())
-                    parameter("n", n.toString())
-                }
+                url { path(AUTH_API_PREFIX, USER_API_PREFIX, FRIENDS_API_PREFIX) }
+                parameter("offline", offline.toString())
+                parameter("offset", currentOffset.toString())
+                parameter("n", n.toString())
             }.checkSuccess<List<FriendData>>()
         }
     }
 
     suspend fun sendFriendRequest(userId: String) = client.post {
-        url { path( USER_API_PREFIX, userId, "friendRequest") }
-    }.checkSuccess<FriendRequestData>()
+        url { path(USER_API_PREFIX, userId, "friendRequest") }
+    }.checkSuccess<NotificationDataV2>()
 
     suspend fun deleteFriendRequest(userId: String) = client.delete {
-        url { path( USER_API_PREFIX, userId, "friendRequest") }
-    }.checkSuccess<FriendRequestData>()
+        url { path(USER_API_PREFIX, userId, "friendRequest") }
+    }.checkSuccess<VRChatResponse>()
+
+    suspend fun unfriend(userId: String) = client.delete {
+        url { path(AUTH_API_PREFIX, USER_API_PREFIX, FRIENDS_API_PREFIX, userId) }
+    }.checkSuccess<VRChatResponse>()
 
 }

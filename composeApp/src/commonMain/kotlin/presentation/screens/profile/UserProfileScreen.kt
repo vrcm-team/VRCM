@@ -61,7 +61,7 @@ data class UserProfileScreen(
         val currentUser = userProfileScreenModel.userState
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
-
+        var openAlertDialog by remember { mutableStateOf(false) }
 
         ProfileScaffold(
             profileImageUrl = currentUser?.profileImageUrl,
@@ -84,9 +84,15 @@ data class UserProfileScreen(
                 onHideCompletion = {
                     if (!sheetState.isVisible) bottomSheetIsVisible = false
                 },
+                openAlertDialog = { openAlertDialog = true }
             )
         }
-
+        JsonAlertDialog(
+            openAlertDialog = openAlertDialog,
+            onDismissRequest = { openAlertDialog = false }
+        ) {
+            Text(text = userProfileScreenModel.userJson)
+        }
     }
 
 
@@ -98,26 +104,23 @@ private fun ColumnScope.SheetItems(
     userProfileScreenModel: UserProfileScreenModel,
     hideSheet: suspend () -> Unit,
     onHideCompletion: () -> Unit,
+    openAlertDialog: () -> Unit,
 ) {
-    var openAlertDialog by remember { mutableStateOf(false) }
     FriendRequestSheetItem(
         currentUser,
         userProfileScreenModel,
         hideSheet,
         onHideCompletion,
     )
-//    SheetButtonItem(localeStrings.profileViewJsonData, {
-//        scope.launch { hideSheet() }.invokeOnCompletion {
-//            onHideCompletion()
-//            openAlertDialog = true
-//        }
-//    })
-    JsonAlertDialog(
-        openAlertDialog = openAlertDialog,
-        onDismissRequest = { openAlertDialog = false }
-    ) {
-        Text(text = userProfileScreenModel.userJson)
-    }
+    val scope = rememberCoroutineScope()
+    val localeStrings = strings
+    SheetButtonItem(localeStrings.profileViewJsonData, onClick = {
+        scope.launch { hideSheet() }.invokeOnCompletion {
+            onHideCompletion()
+            openAlertDialog()
+        }
+    })
+
 }
 
 @Composable
@@ -127,25 +130,26 @@ private fun ColumnScope.FriendRequestSheetItem(
     hideSheet: suspend () -> Unit,
     onHideCompletion: () -> Unit,
 ) {
-    val action: Pair<String, suspend () -> Unit>? = when {
+    val localeStrings = strings
+    val action: Pair<String, suspend () -> Boolean>? = when {
         // 当前用户不是朋友且不是自己
         !currentUser.isFriend && !currentUser.isSelf -> {
-            val localeStrings = strings
             when(currentUser.friendRequestStatus){
                 // 状态为Null,则发送好友请求
                 Null -> localeStrings.profileSendFriendRequest to {
                     userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
                 }
                 // 状态为Outgoing,则取消发送好友请求
-                Outgoing -> localeStrings.profileCancelFriendRequest to {
-                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
+                Outgoing -> localeStrings.profileDeleteFriendRequest to {
+                    userProfileScreenModel.deleteFriendRequest(currentUser.id, localeStrings.profileFriendRequestDeleted)
                 }
-                // 状态为Completed,则删除好友
-                Completed -> localeStrings.profileDeleteFriend to {
-                    userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
-                }
+                else -> null
             }
-
+        }
+        // 状态为Completed,则删除好友
+        currentUser.isFriend && currentUser.friendRequestStatus == Completed  ->
+            localeStrings.profileUnfriend to {
+            userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
         }
         else -> null
     }
@@ -154,22 +158,22 @@ private fun ColumnScope.FriendRequestSheetItem(
 
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(true) }
-    if (!currentUser.isFriend && !currentUser.isSelf) {
-        TextButton(
-            modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
-            enabled = enabled,
-            onClick = {
-                scope.launch {
-                    enabled = false
-                    action.second()
-                    hideSheet()
-                }.invokeOnCompletion {
-                    onHideCompletion()
+    TextButton(
+        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+        enabled = enabled,
+        onClick = {
+            scope.launch {
+                enabled = false
+                when(action.second()){
+                    true -> hideSheet()
+                    false -> enabled = true
                 }
+            }.invokeOnCompletion {
+                onHideCompletion()
             }
-        ) {
-            Text(text = action.first)
         }
+    ) {
+        Text(text = action.first)
     }
 
 }
