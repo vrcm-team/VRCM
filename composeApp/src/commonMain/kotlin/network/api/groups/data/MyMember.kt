@@ -10,11 +10,11 @@ data class MyMember(
     val isRepresenting: Boolean,
     val isSubscribedToAnnouncements: Boolean,
     val joinedAt: String,
-    val lastPostReadAt: String,
+    val lastPostReadAt: String?,
     val mRoleIds: List<String>,
     val membershipStatus: String,
     val permissions: List<String>,
     val roleIds: List<String>,
     val userId: String,
-    val visibility: String
+    val visibility: String,
 )

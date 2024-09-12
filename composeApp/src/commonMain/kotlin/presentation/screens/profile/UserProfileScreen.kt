@@ -143,6 +143,11 @@ private fun ColumnScope.FriendRequestSheetItem(
                 Outgoing -> localeStrings.profileDeleteFriendRequest to {
                     userProfileScreenModel.deleteFriendRequest(currentUser.id, localeStrings.profileFriendRequestDeleted)
                 }
+
+                // 状态为Incoming,则接受好友请求
+                Incoming -> localeStrings.profileAcceptFriendRequest to {
+                    userProfileScreenModel.acceptFriendRequest(currentUser.id, localeStrings.profileFriendRequestAccepted)
+                }
                 else -> null
             }
         }

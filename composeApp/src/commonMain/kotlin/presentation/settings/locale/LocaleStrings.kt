@@ -35,10 +35,13 @@ data class LocaleStrings(
     val profileSendFriendRequest: String = "Send Friend Request",
     val profileFriendRequestDeleted: String = "Friend Request Deleted",
     val profileDeleteFriendRequest: String = "Delete Friend Request",
+    val profileAcceptFriendRequest: String = "Accept Friend Request",
+    val profileFriendRequestAccepted: String = "Friend Request Accepted",
     val profileUnfriended: String = "Friend is Unfriended",
     val profileUnfriend: String = "Unfriend",
     val profileViewJsonData: String = "Viewing JSON data",
-)
+) {
+}
 
 val strings: LocaleStrings
     @Composable
