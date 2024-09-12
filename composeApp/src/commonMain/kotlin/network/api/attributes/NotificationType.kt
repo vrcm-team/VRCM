@@ -4,9 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class NotificationType {
+enum class NotificationType(val value: String) {
 
     @SerialName("friendRequest")
-    FriendRequest
+    FriendRequest("friendRequest"),
+
+    @SerialName("all")
+    All("all"),
 
 }

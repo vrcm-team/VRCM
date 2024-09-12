@@ -1,9 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.notification
 
-import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.NOTIFICATIONS_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
+import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
@@ -36,14 +33,17 @@ class NotificationApi(
             )
         }.ifOK { bodyAsText() }
     }
-
+//微微风风
     suspend fun fetchNotificationsV2(
+        type: String = NotificationType.All.value,
+        // the only type you can see hidden content on is friendRequest
         hidden: Boolean = false,
         n: Int = 100,
         offset: Int = 0,
     ): List<NotificationDataV2> =
         client.get {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX) }
+            parameter("type", type)
             parameter("hidden", hidden)
             parameter("n", n)
             parameter("offset", offset)
