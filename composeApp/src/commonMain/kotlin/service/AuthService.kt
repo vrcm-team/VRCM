@@ -63,6 +63,7 @@ class AuthService(
         val authType = when (authCardPage) {
             AuthCardPage.EmailCode -> AuthType.Email
             AuthCardPage.TFACode -> AuthType.TFA
+            AuthCardPage.TTFACode -> AuthType.TTFA
             else -> error("not supported")
         }
        return authApi.verify(verifyCode, authType).also { if (it.isSuccess) emitAuthed(username, password) }
