@@ -44,6 +44,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
@@ -110,9 +111,9 @@ private inline fun Screen.HomeTopAppBar(
     val homeScreenModel: HomeScreenModel = getScreenModel()
     val currentUser = homeScreenModel.currentUser
     val refreshNotification = {
-        homeScreenModel.refreshNotifications()
+        homeScreenModel.refreshAllNotification()
     }
-    val notifications = homeScreenModel.notifications
+    val notifications = homeScreenModel.friendRequestNotifications + homeScreenModel.notifications
     // to ProfileScreen
     val currentNavigator = currentNavigator
     val onClickUserIcon = { user: IUser ->
@@ -197,9 +198,9 @@ private inline fun Screen.HomeTopAppBar(
             Spacer(modifier = Modifier.weight(1f))
             NotificationActionButton(
                 notifications,
-                homeScreenModel::refreshNotifications
-            ) { id, response ->
-                homeScreenModel.responseNotification(id, response)
+                homeScreenModel::refreshAllNotification
+            ) { id, type, response ->
+                homeScreenModel.responseAllNotification(id, type, response)
             }
             SettingsActionButton()
         }
@@ -330,9 +331,9 @@ private fun RowScope.PagerNavigationItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationActionButton(
-    notifications: List<NotificationDataV2>,
+    notifications: List<NotificationItemData>,
     refreshNotification: () -> Unit,
-    onResponseNotification: (String, ResponseData) -> Unit
+    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit
 ) {
     // notification
     var bottomSheetIsVisible by remember { mutableStateOf(false) }

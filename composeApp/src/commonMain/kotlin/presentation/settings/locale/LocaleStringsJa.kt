@@ -16,6 +16,7 @@ internal val LocaleStringsJa = LocaleStrings(
     fiendLocationPagerTraveling = "移動中",
     fiendLocationPagerLocation = "場所によって",
     fiendListPagerSearch = "検索",
+    notificationFriendRequest = "はあなたの友達になりたい",
     stettingLanguage = "言語",
     stettingThemeMode = "テーマモード",
     stettingSystemThemeMode = "システム",

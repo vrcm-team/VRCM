@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -23,24 +24,24 @@ class NotificationApi(
         }.ifOK<List<NotificationData>> { body() }.getOrThrow()
     }
 
-    suspend fun responseNotification(id: String, response: ResponseData): Result<String> = runCatching {
+    suspend fun responseNotification(id: String, response: NotificationItemData.ActionData): Result<String> = runCatching {
         return client.post("$NOTIFICATIONS_API_PREFIX/$id/respond") {
             setBody(
                 TextContent(
-                    """{"responseData":"${response.responseData}","responseType":"${response.type}"}""",
+                    """{"responseData":"${response.data}","responseType":"${response.type}"}""",
                     ContentType.Application.Json
                 )
             )
         }.ifOK { bodyAsText() }
     }
-//微微风风
+
     suspend fun fetchNotificationsV2(
         type: String = NotificationType.All.value,
         // the only type you can see hidden content on is friendRequest
         hidden: Boolean = false,
         n: Int = 100,
         offset: Int = 0,
-    ): List<NotificationDataV2> =
+    ): Result<List<NotificationDataV2>> = runCatching {
         client.get {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX) }
             parameter("type", type)
@@ -48,23 +49,52 @@ class NotificationApi(
             parameter("n", n)
             parameter("offset", offset)
         }.checkSuccess()
+    }
 
-    suspend fun acceptFriendRequest(notificationId: String): VRChatResponse =
+
+    suspend fun acceptFriendRequest(notificationId: String): Result<VRChatResponse> = runCatching {
         client.put {
-            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "accept") }
+            url {
+                path(
+                    AUTH_API_PREFIX,
+                    USER_API_PREFIX,
+                    NOTIFICATIONS_API_PREFIX,
+                    notificationId,
+                    "accept"
+                )
+            }
         }.checkSuccess()
+    }
+
 
     suspend fun markNotificationAsRead(notificationId: String): VRChatResponse =
         client.put {
-            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "see") }
+            url {
+                path(
+                    AUTH_API_PREFIX,
+                    USER_API_PREFIX,
+                    NOTIFICATIONS_API_PREFIX,
+                    notificationId,
+                    "see"
+                )
+            }
         }.checkSuccess()
 
-    suspend fun deleteNotification(notificationId: String): VRChatResponse =
+    suspend fun deleteNotification(notificationId: String): Result<VRChatResponse> = runCatching {
         client.put {
-            url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, notificationId, "hide") }
+            url {
+                path(
+                    AUTH_API_PREFIX,
+                    USER_API_PREFIX,
+                    NOTIFICATIONS_API_PREFIX,
+                    notificationId,
+                    "hide"
+                )
+            }
         }.checkSuccess()
+    }
 
-    suspend fun clearAllNotifications(): VRChatResponse  =
+    suspend fun clearAllNotifications(): VRChatResponse =
         client.put {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX, "clear") }
         }.checkSuccess()

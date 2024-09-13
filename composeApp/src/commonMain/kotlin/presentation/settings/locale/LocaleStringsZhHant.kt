@@ -16,6 +16,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "按地點",
     fiendListPagerSearch = "搜索",
+    notificationFriendRequest = "想要成為你的好友",
     stettingLanguage = "語言",
     stettingThemeMode = "主題模式",
     stettingSystemThemeMode = "跟隨系統",
