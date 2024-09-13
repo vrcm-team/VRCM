@@ -166,7 +166,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             // 例如: lastLogin = 2023-04-01T09:03:04.000Z
             val lastLoginStr = friend.lastLogin
             if (friend.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@ListItem
-            val lastLogin = Instant.parse(lastLoginStr).toLocalDateTime(TimeZone.currentSystemDefault())
+            val lastLogin = remember {  Instant.parse(lastLoginStr).toLocalDateTime(TimeZone.currentSystemDefault()) }
             Text(
                 text = lastLogin.ignoredFormat, style = MaterialTheme.typography.labelSmall, maxLines = 1
             )

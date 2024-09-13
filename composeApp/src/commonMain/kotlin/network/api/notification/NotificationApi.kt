@@ -49,7 +49,7 @@ class NotificationApi(
 
 
 
-    suspend fun acceptFriendRequest(notificationId: String): Result<VRChatResponse> =
+    suspend fun acceptFriendRequest(notificationId: String): VRChatResponse =
         client.put {
             url {
                 path(
@@ -77,7 +77,7 @@ class NotificationApi(
             }
         }.checkSuccess()
 
-    suspend fun deleteNotification(notificationId: String): Result<VRChatResponse> =
+    suspend fun deleteNotification(notificationId: String): VRChatResponse =
         client.put {
             url {
                 path(

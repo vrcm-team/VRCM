@@ -93,7 +93,8 @@ class UserProfileScreenModel(
                 handleError(it)
             }.onSuccess {
                 SharedFlowCentre.toastText.emit(ToastText.Success(message))
-                _userState.value?.id?.also { refreshUser(it) }
+                runCatching { _userState.value?.id?.also { refreshUser(it) }}
+                    .onFailure { handleError(it) }
             }.isSuccess
         }.await()
 
