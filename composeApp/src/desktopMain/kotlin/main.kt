@@ -8,6 +8,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
 import org.jetbrains.compose.resources.painterResource
@@ -29,7 +30,7 @@ fun main() = run {
         Window(
             state = windowState,
             onCloseRequest = ::exitApplication,
-            title = "VRCM",
+            title = APP_NAME,
             icon =  painterResource(Res.drawable.logo)
         ) {
             App()

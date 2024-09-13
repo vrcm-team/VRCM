@@ -1,38 +1,28 @@
 [versions]
-app-code = "1"
-app-name = "1.0.1"
+app-code = "2"
+app-name = "1.0.2"
 app-packageName = "io.github.vrcmteam.vrcm"
 agp = "8.2.2"
-android-compileSdk = "34"
-android-minSdk = "24"
-android-targetSdk = "34"
-androidx-activityCompose = "1.9.1"
-androidx-appcompat = "1.7.0"
-androidx-constraintlayout = "2.1.4"
-androidx-core-ktx = "1.13.1"
-androidx-espresso-core = "3.6.1"
-androidx-lifecycle = "2.8.0"
-androidx-material = "1.12.0"
-androidx-test-junit = "1.2.1"
-compose-plugin = "1.6.11"
-junit = "4.13.2"
 kotlin = "2.0.20"
 kotlinx-coroutines-swing = "1.8.1"
 kotlinx-datetime = "0.6.0"
+android-minSdk = "24"
+android-compileSdk = "34"
+android-targetSdk = "34"
+androidx-activityCompose = "1.9.2"
 multiplatform-settings = "1.1.1"
-jetpack-compose-bom = "2024.08.00"
-koin = "3.6.0-wasm-alpha2"
+compose-plugin = "1.6.11"
+koin = "3.6.0-alpha1"
 stately-common = "2.0.6"
 voyager = "1.1.0-alpha03"
 coil3 = "3.0.0-alpha04"
-ktor-client = "2.3.8"
+ktor-client = "2.3.12"
 chrisbanes-haze = "0.7.3"
 [libraries]
 # kotlinx
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines-swing" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 # compose
-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "jetpack-compose-bom" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 # settings
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
