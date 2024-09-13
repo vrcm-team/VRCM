@@ -52,26 +52,29 @@ class HomeScreenModel(
             authService.reTryAuthCatching { notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value) }
                 .onHomeFailure()
                 .onSuccess {
-                    _friendRequestNotifications.value = it.map { data ->
-                        val user = usersApi.fetchUser(data.senderUserId)
-                        NotificationItemData(
-                            id = data.id,
-                            imageUrl = user.profileImageUrl,
-                            message = user.displayName,
-                            createdAt = data.createdAt,
-                            type = data.type.value,
-                            actions = listOf(
-                                NotificationItemData.ActionData(
-                                    data = "",
-                                    type = "Accept"
-                                ),
-                                NotificationItemData.ActionData(
-                                    data = "",
-                                    type = "Hide"
+                    runCatching {
+                        _friendRequestNotifications.value = it.map { data ->
+                            val user = usersApi.fetchUser(data.senderUserId)
+                            NotificationItemData(
+                                id = data.id,
+                                imageUrl = user.profileImageUrl,
+                                message = user.displayName,
+                                createdAt = data.createdAt,
+                                senderUserId = data.senderUserId,
+                                type = data.type.value,
+                                actions = listOf(
+                                    NotificationItemData.ActionData(
+                                        data = "",
+                                        type = "Hide"
+                                    ),
+                                    NotificationItemData.ActionData(
+                                        data = "",
+                                        type = "Accept"
+                                    )
                                 )
                             )
-                        )
-                    }
+                        }
+                    }.onHomeFailure()
                 }
         }
 
@@ -81,19 +84,7 @@ class HomeScreenModel(
                 .onHomeFailure()
                 .onSuccess {
                     _notifications.value = it.map { data ->
-                        NotificationItemData(
-                            id = data.id,
-                            imageUrl = data.imageUrl,
-                            message = data.message,
-                            createdAt = data.createdAt,
-                            type = data.type,
-                            actions = data.responses.map { responses ->
-                                NotificationItemData.ActionData(
-                                    data = responses.responseData,
-                                    type = responses.type
-                                )
-                            }
-                        )
+                        NotificationItemData(data)
                     }
                 }
         }
@@ -132,7 +123,8 @@ class HomeScreenModel(
             authService.reTryAuthCatching { action() }
                 .onHomeFailure()
                 .onSuccess {
-                    refreshAllNotification()
+                    runCatching { refreshAllNotification() }
+                        .onHomeFailure()
                 }
         }
     }
