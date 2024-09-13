@@ -49,7 +49,7 @@ class HomeScreenModel(
 
     private fun refreshFriendRequestNotification() =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value) }
+            authService.reTryAuthCatching { notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value) }
                 .onHomeFailure()
                 .onSuccess {
                     _friendRequestNotifications.value = it.map { data ->

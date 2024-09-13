@@ -1,24 +1,15 @@
 package io.github.vrcmteam.vrcm.network.api.notification
 
-import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.NOTIFICATIONS_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
-import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
+import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
-import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.request.parameter
-import io.ktor.client.request.post
-import io.ktor.client.request.put
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.content.TextContent
-import io.ktor.http.path
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 
 class NotificationApi(
     private val client: HttpClient,
@@ -47,7 +38,7 @@ class NotificationApi(
         hidden: Boolean = false,
         n: Int = 100,
         offset: Int = 0,
-    ): Result<List<NotificationDataV2>> =
+    ): List<NotificationDataV2> =
         client.get {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX, NOTIFICATIONS_API_PREFIX) }
             parameter("type", type)

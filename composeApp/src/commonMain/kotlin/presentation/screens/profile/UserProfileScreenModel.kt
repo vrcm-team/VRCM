@@ -74,11 +74,11 @@ class UserProfileScreenModel(
         // 先看没有hidden的, 如果没有再看hidden的 TODO:是不是要单独抽成一个独立方法
         return@friendAction (notificationApi.fetchNotificationsV2(
             type = NotificationType.FriendRequest.value,
-        ).getOrNull()?.firstOrNull { it.senderUserId == userId }
+        ).firstOrNull { it.senderUserId == userId }
             ?: notificationApi.fetchNotificationsV2(
                 type = NotificationType.FriendRequest.value,
                 hidden = true
-            ).getOrNull()?.firstOrNull { it.senderUserId == userId })
+            ).firstOrNull { it.senderUserId == userId })
             ?.let {
                 notificationApi.acceptFriendRequest(it.id).isSuccess
             } ?: error("Not found notification")
