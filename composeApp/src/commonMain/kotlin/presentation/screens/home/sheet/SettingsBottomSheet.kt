@@ -146,6 +146,7 @@ private fun AboutBlock() {
                 version = VersionVo(
                     it.tagName,
                     it.htmlUrl,
+                    it.body,
                     it.hasNewVersion
                 )
             }.onApiFailure("Setting") {

@@ -97,7 +97,7 @@ class AuthScreenModel(
         return screenModelScope.async(Dispatchers.IO) {
             versionService.checkVersion(true)
                 .onAuthFailure()
-                .map { VersionVo(it.tagName, it.htmlUrl, it.hasNewVersion) }
+                .map { VersionVo(it.tagName, it.htmlUrl,it.body, it.hasNewVersion) }
                 .getOrElse { VersionVo() }
         }.await()
     }

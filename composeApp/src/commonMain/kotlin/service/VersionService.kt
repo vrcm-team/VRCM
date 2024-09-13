@@ -25,15 +25,16 @@ class VersionService(
                         || (checkRemember && settingsDao.rememberVersion == tagName)
                     ) {
                         // 当前版本是最新版本
-                        Result.success(VersionDto(tagName, releaseData.htmlUrl, false))
+                        Result.success(VersionDto(tagName, releaseData.htmlUrl, releaseData.body, false))
                     } else {
                         // 当前版本不是最新版本
-                        Result.success(VersionDto(tagName, releaseData.htmlUrl, true))
+                        Result.success(VersionDto(tagName, releaseData.htmlUrl, releaseData.body, true))
                     }
                 }
-            else -> Result.failure(it.exceptionOrNull()!!)
+
+                else -> Result.failure(it.exceptionOrNull()!!)
+            }
         }
-    }
 
     fun rememberVersion(version: String?) {
         settingsDao.rememberVersion = version

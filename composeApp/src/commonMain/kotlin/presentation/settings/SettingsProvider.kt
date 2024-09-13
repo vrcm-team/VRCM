@@ -2,8 +2,11 @@ package io.github.vrcmteam.vrcm.presentation.settings
 
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.github.vrcmteam.vrcm.presentation.settings.data.SettingsVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
@@ -27,9 +30,12 @@ inline fun SettingsProvider(
         MaterialTheme(
             colorScheme = currentSettings.themeColor.asAnimateColorScheme(colorAnimationSpec),
             shapes = MaterialTheme.shapes,
-            typography = MaterialTheme.typography,
-            content = content
-        )
+            typography = MaterialTheme.typography
+        ){
+            Box(Modifier.background(MaterialTheme.colorScheme.background)) {
+                content()
+            }
+        }
     }
 
 }

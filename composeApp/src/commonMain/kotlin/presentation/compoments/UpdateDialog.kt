@@ -1,15 +1,16 @@
 package presentation.compoments
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -29,32 +30,30 @@ fun UpdateDialog(
                 Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
             },
             title = {
-                Text(text = strings.startupDialogTitle)
+                Text(
+                    text = strings.startupDialogTitle,
+                    style = MaterialTheme.typography.titleLarge
+                )
             },
             text = {
                 // 版本更新提示单选框
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(text = "Ver.${version.tagName}")
-                    if (onRememberVersion == null) return@Column
-                    // 版本更新提示单选框
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Checkbox(
-                            checked = rememberVersionChecked,
-                            onCheckedChange = {
-                                rememberVersionChecked = it
-                                // 记住或清除此版本更新提示
-                                val versionTagName = if (rememberVersionChecked) version.tagName else null
-                                onRememberVersion(versionTagName)
-                            }
+                    Text(
+                        text = "Ver.${version.tagName}",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Box(
+                        modifier = Modifier
+                            .verticalScroll(rememberScrollState())
+                            .horizontalScroll(rememberScrollState())
+                    ){
+                        Text(
+                            text = version.body
                         )
-                        Text(text = strings.startupDialogRememberVersion)
                     }
                 }
             },
@@ -83,6 +82,23 @@ fun UpdateDialog(
                 ) {
                     Text(strings.startupDialogIgnore)
                 }
+                if (onRememberVersion == null) return@AlertDialog
+                    // 版本更新提示单选框
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Checkbox(
+                            checked = rememberVersionChecked,
+                            onCheckedChange = {
+                                rememberVersionChecked = it
+                                // 记住或清除此版本更新提示
+                                val versionTagName = if (rememberVersionChecked) version.tagName else null
+                                onRememberVersion(versionTagName)
+                            }
+                        )
+                        Text(text = strings.startupDialogRememberVersion)
+                    }
             }
         )
     }
