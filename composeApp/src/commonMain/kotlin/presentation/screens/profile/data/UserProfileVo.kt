@@ -6,20 +6,20 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 
 data class UserProfileVo (
     val id: String,
-    val displayName: String,
-    val status: UserStatus,
-    val statusDescription: String,
-    val bio: String,
-    val bioLinks: List<String>,
-    val tags: List<String>,
-    val speakLanguages:List<String>,
+    val displayName: String = "",
+    val status: UserStatus = UserStatus.Offline,
+    val statusDescription: String = "",
+    val bio: String = "",
+    val bioLinks: List<String> = listOf(),
+    val tags: List<String> = listOf(),
+    val speakLanguages:List<String> = listOf(),
     val friendRequestStatus: FriendRequestStatus = FriendRequestStatus.Null,
-    val profileImageUrl:String,
-    val iconUrl:String,
-    val isSupporter: Boolean,
+    val profileImageUrl:String = "",
+    val iconUrl:String = "",
+    val isSupporter: Boolean = false,
     val isSelf:Boolean = false,
     val isFriend:Boolean = false,
-    val trustRank: TrustRank
+    val trustRank: TrustRank = TrustRank.Visitor
 ): JavaSerializable{
     constructor(user: IUser): this(
         id = user.id,

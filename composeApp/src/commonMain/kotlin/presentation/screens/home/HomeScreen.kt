@@ -39,8 +39,6 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
-import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
