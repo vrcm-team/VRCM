@@ -8,8 +8,6 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
-import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
-import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
@@ -25,7 +23,7 @@ class HomeScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val notificationApi: NotificationApi,
-    private val logger: Logger
+    private val logger: Logger,
 ) : ScreenModel {
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
@@ -38,7 +36,7 @@ class HomeScreenModel(
     private val _friendRequestNotifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val friendRequestNotifications by _friendRequestNotifications
 
-    fun ini()  {
+    fun ini() {
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
@@ -49,7 +47,7 @@ class HomeScreenModel(
         refreshNotifications()
     }
 
-    fun refreshFriendRequestNotification() =
+    private fun refreshFriendRequestNotification() =
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuth { notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value) }
                 .onHomeFailure()
@@ -77,9 +75,9 @@ class HomeScreenModel(
                 }
         }
 
-    fun refreshNotifications() =
+    private fun refreshNotifications() =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.fetchNotifications() }
+            authService.reTryAuthCatching { notificationApi.fetchNotifications() }
                 .onHomeFailure()
                 .onSuccess {
                     _notifications.value = it.map { data ->
@@ -108,17 +106,7 @@ class HomeScreenModel(
         }
     }
 
-    fun responseNotification(id: String, response: NotificationItemData.ActionData) {
-        screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.responseNotification(id,response) }
-                .onHomeFailure()
-                .onSuccess {
-                    refreshAllNotification()
-                }
-        }
-    }
-
-    fun responseFriendRequest(id: String, response: NotificationItemData.ActionData) {
+    private fun responseFriendRequest(id: String, response: NotificationItemData.ActionData) {
         if (response.type == "Accept") {
             acceptFriendRequest(id)
         } else {
@@ -126,19 +114,22 @@ class HomeScreenModel(
         }
     }
 
-    fun acceptFriendRequest(notificationId: String) {
-        screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.acceptFriendRequest(notificationId) }
-                .onHomeFailure()
-                .onSuccess {
-                    refreshAllNotification()
-                }
-        }
+    private fun responseNotification(id: String, response: NotificationItemData.ActionData) = notificationAction {
+        notificationApi.responseNotification(id, response)
     }
 
-    fun hideNotification(notificationId: String) {
+
+    private fun acceptFriendRequest(notificationId: String) = notificationAction {
+        notificationApi.acceptFriendRequest(notificationId)
+    }
+
+    private fun hideNotification(notificationId: String) = notificationAction {
+        notificationApi.deleteNotification(notificationId)
+    }
+
+    private fun notificationAction(action: suspend () -> Unit) {
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { notificationApi.deleteNotification(notificationId) }
+            authService.reTryAuthCatching { action() }
                 .onHomeFailure()
                 .onSuccess {
                     refreshAllNotification()
