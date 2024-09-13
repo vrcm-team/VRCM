@@ -22,6 +22,7 @@ data class LocaleStrings(
     val fiendLocationPagerLocation: String = "by Location",
     val fiendListPagerSearch: String = "Search",
     val notificationFriendRequest: String = "wants to be your friend",
+    val homeNotificationEmpty: String = "No Notification Yet",
     val stettingLanguage: String = "Language",
     val stettingThemeMode: String = "ThemeMode",
     val stettingSystemThemeMode: String = "System",
@@ -41,8 +42,7 @@ data class LocaleStrings(
     val profileUnfriended: String = "Friend is Unfriended",
     val profileUnfriend: String = "Unfriend",
     val profileViewJsonData: String = "Viewing JSON data",
-) {
-}
+)
 
 val strings: LocaleStrings
     @Composable

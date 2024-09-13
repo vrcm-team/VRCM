@@ -50,11 +50,11 @@ fun NotificationBottomSheet(
     ) {
         if (notificationList.isEmpty()) {
             Text(
-                modifier = Modifier.fillMaxWidth().align(Alignment.CenterHorizontally),
-                text = "No Notification",
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(6.dp),
+                text = strings.homeNotificationEmpty,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.primaryContainer,
-                style = MaterialTheme.typography.displaySmall
+                style = MaterialTheme.typography.titleLarge
             )
 
         } else {
