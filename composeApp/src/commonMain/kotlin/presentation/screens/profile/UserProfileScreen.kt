@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.profile
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person4
 import androidx.compose.material.icons.outlined.Link
@@ -304,9 +305,11 @@ private fun BottomCardTab(
                                 .padding(12.dp)
                                 .verticalScroll(scrollState),
                         ) {
-                            Text(
-                                text = userProfileVO.bio
-                            )
+                            SelectionContainer {
+                                Text(
+                                    text = userProfileVO.bio
+                                )
+                            }
                         }
                     }
                 }
