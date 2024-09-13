@@ -35,7 +35,6 @@ kotlin {
     sourceSets {
 
         androidMain.dependencies {
-            implementation(project.dependencies.platform(libs.compose.bom))
             implementation(libs.androidx.activity.compose)
 
             implementation(libs.koin.androidx.compose)

@@ -3,16 +3,24 @@ app-code = "1"
 app-name = "1.0.1"
 app-packageName = "io.github.vrcmteam.vrcm"
 agp = "8.2.2"
-kotlin = "2.0.0"
-kotlinx-coroutines-swing = "1.8.1"
-kotlinx-datetime = "0.6.0"
-android-minSdk = "24"
 android-compileSdk = "34"
+android-minSdk = "24"
 android-targetSdk = "34"
 androidx-activityCompose = "1.9.1"
+androidx-appcompat = "1.7.0"
+androidx-constraintlayout = "2.1.4"
+androidx-core-ktx = "1.13.1"
+androidx-espresso-core = "3.6.1"
+androidx-lifecycle = "2.8.0"
+androidx-material = "1.12.0"
+androidx-test-junit = "1.2.1"
+compose-plugin = "1.6.11"
+junit = "4.13.2"
+kotlin = "2.0.20"
+kotlinx-coroutines-swing = "1.8.1"
+kotlinx-datetime = "0.6.0"
 multiplatform-settings = "1.1.1"
 jetpack-compose-bom = "2024.08.00"
-compose-plugin = "1.6.11"
 koin = "3.6.0-wasm-alpha2"
 stately-common = "2.0.6"
 voyager = "1.1.0-alpha03"
@@ -61,10 +69,9 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor", version.ref
 chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }
 
 [plugins]
+androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
-kotlinCocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
 jetbrainsCompose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-androidApplication = { id = "com.android.application", version.ref = "agp" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
