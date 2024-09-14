@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.AppPlatformType
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -20,11 +21,22 @@ import presentation.screens.auth.data.VersionVo
 fun UpdateDialog(
     version: VersionVo,
     onDismissRequest: () -> Unit = {},
-    onRememberVersion: ((String?) -> Unit)? = null
+    onRememberVersion: ((String?) -> Unit)? = null,
 ) {
     if (version.hasNewVersion) {
         val appPlatform = getAppPlatform()
         var rememberVersionChecked by remember { mutableStateOf(false) }
+        val url = remember {
+            when (appPlatform.type) {
+                AppPlatformType.Android -> version.downloadUrl.firstOrNull {
+                    it.contains(".apk")
+                }
+                AppPlatformType.Desktop,
+                AppPlatformType.Ios,
+                AppPlatformType.Web,
+                -> null
+            } ?: version.htmlUrl
+        }
         AlertDialog(
             icon = {
                 Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
@@ -50,7 +62,7 @@ fun UpdateDialog(
                         modifier = Modifier
                             .verticalScroll(rememberScrollState())
                             .horizontalScroll(rememberScrollState())
-                    ){
+                    ) {
                         Text(
                             text = version.body
                         )
@@ -65,7 +77,7 @@ fun UpdateDialog(
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     onClick = {
-                        appPlatform.openUrl(version.htmlUrl)
+                        appPlatform.openUrl(url)
                     }
                 ) {
                     Text(strings.startupDialogUpdate)
@@ -83,22 +95,22 @@ fun UpdateDialog(
                     Text(strings.startupDialogIgnore)
                 }
                 if (onRememberVersion == null) return@AlertDialog
-                    // 版本更新提示单选框
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Checkbox(
-                            checked = rememberVersionChecked,
-                            onCheckedChange = {
-                                rememberVersionChecked = it
-                                // 记住或清除此版本更新提示
-                                val versionTagName = if (rememberVersionChecked) version.tagName else null
-                                onRememberVersion(versionTagName)
-                            }
-                        )
-                        Text(text = strings.startupDialogRememberVersion)
-                    }
+                // 版本更新提示单选框
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    Checkbox(
+                        checked = rememberVersionChecked,
+                        onCheckedChange = {
+                            rememberVersionChecked = it
+                            // 记住或清除此版本更新提示
+                            val versionTagName = if (rememberVersionChecked) version.tagName else null
+                            onRememberVersion(versionTagName)
+                        }
+                    )
+                    Text(text = strings.startupDialogRememberVersion)
+                }
             }
         )
     }

@@ -147,7 +147,8 @@ private fun AboutBlock() {
                     it.tagName,
                     it.htmlUrl,
                     it.body,
-                    it.hasNewVersion
+                    it.hasNewVersion,
+                    it.downloadUrl
                 )
             }.onApiFailure("Setting") {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it))
