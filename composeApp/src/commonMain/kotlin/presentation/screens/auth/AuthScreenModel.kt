@@ -20,7 +20,7 @@ import presentation.screens.auth.data.VersionVo
 class AuthScreenModel(
     private val authService: AuthService,
     private val versionService: VersionService,
-    private val logger: Logger
+    private val logger: Logger,
 ) : ScreenModel {
 
     private val _uiState = mutableStateOf(authService.accountPair().run {
@@ -80,8 +80,8 @@ class AuthScreenModel(
         _currentVerifyJob = null
     }
 
-    fun tryAuth(){
-        screenModelScope.launch{
+    fun tryAuth() {
+        screenModelScope.launch {
             val cardState = if (awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
             onCardStateChange(cardState)
         }
@@ -97,7 +97,7 @@ class AuthScreenModel(
         return screenModelScope.async(Dispatchers.IO) {
             versionService.checkVersion(true)
                 .onAuthFailure()
-                .map { VersionVo(it.tagName, it.htmlUrl,it.body, it.hasNewVersion) }
+                .map { VersionVo(it.tagName, it.htmlUrl, it.body, it.hasNewVersion) }
                 .getOrElse { VersionVo() }
         }.await()
     }

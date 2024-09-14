@@ -153,6 +153,7 @@ private fun ColumnScope.FriendRequestSheetItem(
             }
         }
         // 状态为Completed,则删除好友
+        // TODO: 加一个弹窗提示是否删除好友
         currentUser.isFriend && currentUser.friendRequestStatus == Completed  ->
             localeStrings.profileUnfriend to {
             userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
@@ -164,10 +165,8 @@ private fun ColumnScope.FriendRequestSheetItem(
 
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(true) }
-    TextButton(
-        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
-        enabled = enabled,
-        onClick = {
+    SheetButtonItem(action.first, onClick = {
+        scope.launch { hideSheet() }.invokeOnCompletion {
             scope.launch {
                 enabled = false
                 when(action.second()){
@@ -178,10 +177,7 @@ private fun ColumnScope.FriendRequestSheetItem(
                 onHideCompletion()
             }
         }
-    ) {
-        Text(text = action.first)
-    }
-
+    })
 }
 
 @Composable
@@ -192,7 +188,10 @@ private fun ColumnScope.SheetButtonItem(
     content: @Composable RowScope.(String) -> Unit = { Text(text = it) },
 ) {
     TextButton(
-        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .fillMaxWidth()
+            .padding(vertical = 2.dp, horizontal = 24.dp),
         enabled = enabled,
         onClick = onClick
     ) {
