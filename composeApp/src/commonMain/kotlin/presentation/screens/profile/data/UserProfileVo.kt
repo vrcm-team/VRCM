@@ -13,7 +13,7 @@ data class UserProfileVo (
     val bioLinks: List<String> = listOf(),
     val tags: List<String> = listOf(),
     val speakLanguages:List<String> = listOf(),
-    val friendRequestStatus: FriendRequestStatus = FriendRequestStatus.Null,
+    val friendRequestStatus: FriendRequestStatus? = null,
     val profileImageUrl:String = "",
     val iconUrl:String = "",
     val isSupporter: Boolean = false,

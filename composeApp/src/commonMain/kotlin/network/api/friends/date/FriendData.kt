@@ -12,7 +12,7 @@ data class FriendData(
     override val bioLinks: List<String> = emptyList(),
     override val currentAvatarImageUrl: String,
     override val currentAvatarTags: List<String> = emptyList(),
-    override val currentAvatarThumbnailImageUrl: String,
+    override val currentAvatarThumbnailImageUrl: String?,
     override val developerType: String,
     override val displayName: String,
     val friendKey: String,

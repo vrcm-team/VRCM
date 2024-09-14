@@ -13,7 +13,7 @@ interface IUser {
     val bioLinks: List<String>
     val tags: List<String>
     val currentAvatarImageUrl: String
-    val currentAvatarThumbnailImageUrl: String
+    val currentAvatarThumbnailImageUrl: String?
     val currentAvatarTags: List<String>
     val userIcon:String
     val isFriend: Boolean
