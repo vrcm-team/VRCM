@@ -16,7 +16,7 @@ data class InstanceData(
     val closedAt: String? = null,
     val displayName: String? = null,
     val full: Boolean,
-    val gameServerVersion: Int,
+    val gameServerVersion: Int? = null,
     val hardClose: Boolean? = null,
     val hasCapacityForYou: Boolean,
     val hidden: String?,
