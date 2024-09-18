@@ -51,8 +51,10 @@ fun RefreshBox(
         modifier = modifier,
         indicator = {
             Indicator(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = refreshContainerOffsetY)
-                    .scale(scaleFraction),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .scale(scaleFraction)
+                    .padding(top = refreshContainerOffsetY),
                 isRefreshing = isRefreshing,
                 color = contentColor,
                 containerColor = containerColor,
