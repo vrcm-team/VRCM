@@ -64,7 +64,6 @@ object HomeScreen : Screen {
     )
 
     @Composable
-    @OptIn(ExperimentalFoundationApi::class)
     override fun Content() {
         val currentNavigator = currentNavigator
         val homeScreenModel: HomeScreenModel = getScreenModel()

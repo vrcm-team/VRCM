@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import cafe.adriel.voyager.koin.getScreenModel
@@ -23,6 +24,10 @@ object FriendListPager : Pager {
     @Composable
     override fun Content() {
         val friendListPagerModel: FriendListPagerModel = getScreenModel()
+        LaunchedEffect(Unit) {
+            // 未clear()的同步刷新一次
+            friendListPagerModel. doRefreshFriendList()
+        }
         UserSearchList(
             key = title,
             userListInit = friendListPagerModel::findFriendList,

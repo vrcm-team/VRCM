@@ -105,8 +105,8 @@ fun FriendLocationPager(
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     RefreshBox(
-        refreshContainerOffsetY = topPadding,
-        isStartRefresh = isRefreshing,
+        refreshContainerOffsetY = topPadding - 16.dp,
+        isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
         val currentNavigator = currentNavigator

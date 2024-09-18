@@ -113,7 +113,7 @@ fun UserList(
     }
     if (isRefreshing != null && doRefresh != null) {
         RefreshBox(
-            refreshContainerOffsetY = topPadding, isStartRefresh = isRefreshing, doRefresh = doRefresh
+            refreshContainerOffsetY = topPadding  - 16.dp, isRefreshing = isRefreshing, doRefresh = doRefresh
         ) {
             userListLazyColumn()
         }
