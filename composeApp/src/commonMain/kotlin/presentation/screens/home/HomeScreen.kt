@@ -83,7 +83,7 @@ object HomeScreen : Screen {
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = { HomeTopAppBar(hazeState) },
-            bottomBar = { HomeBottomBar(pagerList,pagerState, hazeState) },
+            bottomBar = { HomeBottomBar(pagerList, pagerState, hazeState) },
         ) {
             Surface(
                 modifier = Modifier
@@ -103,7 +103,7 @@ object HomeScreen : Screen {
 
 @Composable
 private inline fun Screen.HomeTopAppBar(
-    hazeState: HazeState?
+    hazeState: HazeState?,
 ) {
     val homeScreenModel: HomeScreenModel = getScreenModel()
     val currentUser = homeScreenModel.currentUser
@@ -211,7 +211,7 @@ private inline fun Screen.HomeTopAppBar(
 private inline fun HomeBottomBar(
     pagerList: List<Pager>,
     pagerState: PagerState,
-    hazeState: HazeState?
+    hazeState: HazeState?,
 ) {
     // 如果没有底部系统手势条，则加12dp
     val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
@@ -284,7 +284,7 @@ private inline fun HomeBottomBar(
 private fun RowScope.PagerNavigationItem(
     provider: Pager,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -302,7 +302,7 @@ private fun RowScope.PagerNavigationItem(
 }
 
 @Composable
- fun SettingsActionButton(
+fun SettingsActionButton(
     modifier: Modifier = Modifier,
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
@@ -330,14 +330,14 @@ private fun RowScope.PagerNavigationItem(
 fun NotificationActionButton(
     notifications: List<NotificationItemData>,
     refreshNotification: () -> Unit,
-    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit
+    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit,
 ) {
     // notification
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     val onClickNotification: () -> Unit = {
         bottomSheetIsVisible = true
     }
-    LaunchedEffect(Unit){
+    LaunchedEffect(Unit) {
         refreshNotification()
     }
     // 每打开一次刷新一次
@@ -356,7 +356,7 @@ fun NotificationActionButton(
             badge = {
                 val primaryColor = MaterialTheme.colorScheme.tertiary
                 if (notifications.isNotEmpty()) {
-                    Canvas(modifier = Modifier.size(8.dp)) {
+                    Canvas(modifier = Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
                         drawCircle(color = primaryColor, radius = 4.dp.toPx())
                     }
                 }
