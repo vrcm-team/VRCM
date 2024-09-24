@@ -32,6 +32,7 @@ object AuthScreen : Screen {
 
         LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
         BoxWithConstraints(
+            modifier = Modifier.imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             AuthFold(
@@ -96,14 +97,16 @@ object AuthScreen : Screen {
 
 @Composable
 private fun AuthCard(
+    modifier: Modifier = Modifier,
     cardState: AuthCardPage,
-    content: @Composable (AuthCardPage) -> Unit
+    content: @Composable (AuthCardPage) -> Unit,
 ) {
     val cardChangeDurationMillis = 600
     val cardChangeAnimationSpec =
         remember { tween<Float>(cardChangeDurationMillis, cardChangeDurationMillis) }
     val animationSpec = remember { tween<Float>(cardChangeDurationMillis) }
     AnimatedContent(
+        modifier = modifier,
         label = "AuthSurfaceChange",
         targetState = cardState,
         transitionSpec = {
@@ -137,7 +140,7 @@ private fun ReturnIcon(onClick: () -> Unit) {
         modifier = Modifier
             .padding(start = 6.dp, top = 6.dp),
         onClick = onClick
-    ){
+    ) {
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
             contentDescription = "ReturnIcon",

@@ -14,12 +14,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import vrcm.composeapp.generated.resources.Res
 import vrcm.composeapp.generated.resources.logo
 
-@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun AuthFold(
     iconYOffset: Dp,
