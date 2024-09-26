@@ -131,7 +131,7 @@ class HomeScreenModel(
 
     private fun refreshCurrentUser() =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { authService.currentUser(isRefresh = true) }
+            authService.reTryAuthCatching { authService.currentUser(isRefresh = true) }
                 .onHomeFailure()
                 .onSuccess {
                     _currentUser.value = it

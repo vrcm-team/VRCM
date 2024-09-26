@@ -28,7 +28,7 @@ class AuthService(
 ) {
     private var scope = CoroutineScope(Job())
 
-    private var currentUser: Result<CurrentUserData>?  = null
+    private var currentUser: CurrentUserData?  = null
 
     fun accountPair(): Pair<String, String> = accountDao.accountPair()
 
