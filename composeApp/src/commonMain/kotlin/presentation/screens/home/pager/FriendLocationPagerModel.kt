@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationCont
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -62,6 +63,8 @@ class FriendLocationPagerModel(
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
+                // 因为是第一个, 并且有移除不存在的元素的机制故无需clear
+                // friendMap.clear()
                 isRefreshing = true
             }
         }
@@ -143,7 +146,7 @@ class FriendLocationPagerModel(
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
             // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
-            val currentUser = authService.currentUser(isRefresh = true).getOrThrow()
+            val currentUser = authService.currentUser(isRefresh = true)
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
@@ -199,8 +202,8 @@ class FriendLocationPagerModel(
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
-        }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+        }.onApiFailure("FriendLocation") {
+            SharedFlowCentre.toastText.emit(ToastText.Error(it))
         }
     }
 

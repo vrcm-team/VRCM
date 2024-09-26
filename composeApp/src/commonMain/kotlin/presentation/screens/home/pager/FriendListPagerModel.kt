@@ -64,6 +64,7 @@ class FriendListPagerModel(
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
+                friendMap.clear()
                 isRefreshing = true
             }
         }
