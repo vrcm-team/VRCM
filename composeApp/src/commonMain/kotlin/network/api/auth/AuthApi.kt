@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.extensions.ifOK
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 
@@ -49,9 +50,9 @@ class AuthApi(
                 }
             }
 
-            HttpStatusCode.Unauthorized -> AuthState.Unauthorized
+            HttpStatusCode.Unauthorized -> AuthState.Unauthorized(response.bodyAsText())
 
-            else -> AuthState.Unauthorized
+            else -> AuthState.Unauthorized(response.bodyAsText())
 
         }
     }

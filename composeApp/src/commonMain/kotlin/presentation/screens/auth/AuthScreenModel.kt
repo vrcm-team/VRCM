@@ -143,8 +143,8 @@ class AuthScreenModel(
         if (runCatching.isFailure) return
         val authState = runCatching.getOrNull()!!
 
-        if (AuthState.Unauthorized == authState) {
-            onErrorMessageChange("Username or Password is incorrect")
+        if (authState is AuthState.Unauthorized) {
+            onErrorMessageChange(authState.message)
             return
         }
         val authCardPage = when (authState) {
