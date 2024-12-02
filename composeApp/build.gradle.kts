@@ -170,6 +170,9 @@ android {
 
 }
 
+dependencies {
+    debugImplementation(compose.uiTooling)
+}
 
 compose.desktop {
     application {
