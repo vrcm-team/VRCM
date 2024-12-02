@@ -64,7 +64,8 @@ class FriendLocationPagerModel(
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
                 // 因为是第一个, 并且有移除不存在的元素的机制故无需clear
-                // friendMap.clear()
+                friendLocationMap.clear()
+                friendMap.clear()
                 isRefreshing = true
             }
         }
