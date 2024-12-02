@@ -8,6 +8,7 @@
 - Friend Location
 - Friend list
 - Friend profile
+- Notification actions( friend request, mark as read, hide...)
 - Settings(i8n, theme...)
 ## Preview:
 

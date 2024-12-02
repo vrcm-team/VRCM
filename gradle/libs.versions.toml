@@ -3,27 +3,30 @@ app-code = "3"
 app-name = "1.0.4"
 app-packageName = "io.github.vrcmteam.vrcm"
 agp = "8.2.2"
-kotlin = "2.0.20"
-kotlinx-coroutines-swing = "1.8.1"
+kotlin = "2.0.21"
+kotlinx-coroutines = "1.9.0"
 kotlinx-datetime = "0.6.0"
 android-minSdk = "24"
 android-compileSdk = "34"
 android-targetSdk = "34"
-androidx-activityCompose = "1.9.2"
+androidx-activityCompose = "1.9.3"
+androidx-lifecycle = "2.8.3"
 multiplatform-settings = "1.1.1"
-compose-plugin = "1.7.0-beta02"
-koin = "3.6.0-alpha1"
+compose-plugin = "1.7.0"
+koin = "4.0.0"
 stately-common = "2.0.6"
-voyager = "1.1.0-alpha03"
-coil3 = "3.0.0-alpha04"
+voyager = "1.1.0-beta03"
+coil3 = "3.0.4"
 ktor-client = "2.3.12"
 chrisbanes-haze = "0.7.3"
 [libraries]
 # kotlinx
-kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines-swing" }
+kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 # compose
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+androidx-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 # settings
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatform-settings" }
 multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatform-settings" }
@@ -53,7 +56,7 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 
 # coil3
 coil-compose-core = { module = "io.coil-kt.coil3:coil-compose-core", version.ref = "coil3" }
-coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor", version.ref = "coil3" }
+coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor2", version.ref = "coil3" }
 
 # chrisbanes-haze
 chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }
