@@ -38,6 +38,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -50,7 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 
-object FriendLocationPager : Pager {
+object FriendLocationPager : SharedScreen(), Pager {
 
     override val index: Int
         get() = 0
@@ -61,8 +62,12 @@ object FriendLocationPager : Pager {
     override val icon: Painter
         @Composable get() = rememberVectorPainter(image = Icons.Rounded.Explore)
 
+    @ExperimentalSharedTransitionApi
     @Composable
-    override fun Content() {
+    override fun SharedContent(
+        sharedTransitionScope: SharedTransitionScope,
+        animatedVisibilityScope: AnimatedVisibilityScope,
+    ) {
         val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
@@ -78,19 +83,24 @@ object FriendLocationPager : Pager {
                 }
             }
         }
-        FriendLocationPager(
-            friendLocationMap = friendLocationPagerModel.friendLocationMap,
-            isRefreshing = friendLocationPagerModel.isRefreshing,
-            lazyListState = lazyListState,
-            doRefresh = friendLocationPagerModel::refreshFriendLocation
-        )
+        with(sharedTransitionScope) {
+            FriendLocationPager(
+                animatedVisibilityScope = animatedVisibilityScope,
+                friendLocationMap = friendLocationPagerModel.friendLocationMap,
+                isRefreshing = friendLocationPagerModel.isRefreshing,
+                lazyListState = lazyListState,
+                doRefresh = friendLocationPagerModel::refreshFriendLocation
+            )
+        }
+
     }
 
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun FriendLocationPager(
+fun SharedTransitionScope.FriendLocationPager(
+    animatedVisibilityScope: AnimatedVisibilityScope,
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
@@ -119,7 +129,8 @@ fun FriendLocationPager(
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
-
+        val iconModifier = Modifier.sharedElement(rememberSharedContentState("UserIcon"),animatedVisibilityScope)
+        val textModifier = Modifier.sharedElement(rememberSharedContentState("UserName"),animatedVisibilityScope)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,
@@ -131,21 +142,27 @@ fun FriendLocationPager(
         ) {
 
             SimpleCLocationCard(
-                offlineFriendLocation,
-                LocationType.Offline,
-                onClickUserIcon
+                iconModifier = iconModifier,
+                textModifier = textModifier,
+                friendLocation = offlineFriendLocation,
+                locationType = LocationType.Offline,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerWebsite }
 
             SimpleCLocationCard(
-                privateFriendLocation,
-                LocationType.Private,
-                onClickUserIcon
+                iconModifier = iconModifier,
+                textModifier = textModifier,
+                friendLocation = privateFriendLocation,
+                locationType = LocationType.Private,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerPrivate }
 
             SimpleCLocationCard(
-                travelingFriendLocation,
-                LocationType.Traveling,
-                onClickUserIcon
+                iconModifier = iconModifier,
+                textModifier = textModifier,
+                friendLocation = travelingFriendLocation,
+                locationType = LocationType.Traveling,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerTraveling }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
@@ -156,7 +173,12 @@ fun FriendLocationPager(
                 }
                 items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(location, { onClickLocation(location) }) {
-                        UserIconsRow(friends = it, onClickUserIcon = onClickUserIcon)
+                        UserIconsRow(
+                            iconModifier = iconModifier,
+                            textModifier = textModifier,
+                            friends = it,
+                            onClickUserIcon = onClickUserIcon
+                        )
                     }
                 }
             }
@@ -169,6 +191,8 @@ fun FriendLocationPager(
 }
 
 private fun LazyListScope.SimpleCLocationCard(
+    iconModifier: Modifier = Modifier,
+    textModifier: Modifier = Modifier,
     friendLocation: FriendLocation?,
     locationType: LocationType,
     onClickUserIcon: (IUser) -> Unit,
@@ -182,6 +206,8 @@ private fun LazyListScope.SimpleCLocationCard(
         }
         item(key = locationType.value) {
             UserIconsRow(
+                iconModifier = iconModifier,
+                textModifier = textModifier,
                 friends = it,
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 onClickUserIcon = onClickUserIcon
@@ -204,6 +230,8 @@ private fun LocationTitle(
 
 @Composable
 private fun UserIconsRow(
+    iconModifier: Modifier = Modifier,
+    textModifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (IUser) -> Unit,
@@ -216,9 +244,11 @@ private fun UserIconsRow(
     ) {
         items(friends, key = { it.value.id }) {
             LocationFriend(
-                it.value.iconUrl,
-                it.value.displayName,
-                it.value.status
+                iconModifier = iconModifier,
+                textModifier = textModifier,
+                iconUrl = it.value.iconUrl,
+                name = it.value.displayName,
+                userStatus = it.value.status
             ) { onClickUserIcon(it.value) }
         }
     }
@@ -227,26 +257,28 @@ private fun UserIconsRow(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LazyItemScope.LocationFriend(
+    iconModifier: Modifier = Modifier,
+    textModifier: Modifier = Modifier,
     iconUrl: String,
     name: String,
     userStatus: UserStatus,
     onClickUserIcon: () -> Unit,
 ) {
+    Modifier
+        .width(60.dp)
+        .clip(MaterialTheme.shapes.small)
+        .clickable(onClick = onClickUserIcon)
     Column(
-        modifier = Modifier
-            .width(60.dp)
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon)
-            .animateItemPlacement(),
+        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
-            modifier = Modifier.fillMaxSize(),
+            modifier = iconModifier.fillMaxSize(),
             iconUrl = iconUrl,
             userStatus = userStatus
         )
         Text(
-            modifier = Modifier.fillMaxSize(),
+            modifier = textModifier.fillMaxSize(),
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
@@ -362,7 +394,7 @@ private fun LazyItemScope.LocationCard(
 private inline fun MemberInfoRow(
     showUser: Boolean,
     friendList: List<State<FriendData>>,
-    instants: InstantsVo
+    instants: InstantsVo,
 ) {
     Row(
         modifier = Modifier

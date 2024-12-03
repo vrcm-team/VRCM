@@ -5,22 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
@@ -29,13 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonColors
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -77,6 +56,7 @@ private const val ContactPointShape = 36
  */
 @Composable
 fun ProfileScaffold(
+    imageModifier: Modifier = Modifier,
     profileImageUrl: String?,
     iconUrl: String?,
     onReturn: () -> Unit,
@@ -127,6 +107,7 @@ fun ProfileScaffold(
         ) {
             // 用户Image
             ProfileImage(
+                imageModifier,
                 imageHeight,
                 offsetDp,
                 ratio,
@@ -171,6 +152,7 @@ fun ProfileScaffold(
 
 @Composable
 private fun ProfileImage(
+    imageModifier: Modifier,
     imageHeight: Dp,
     offsetDp: Dp,
     ratio: Float,
@@ -182,7 +164,7 @@ private fun ProfileImage(
             .fillMaxWidth()
     ) {
         AImage(
-            modifier = Modifier
+            modifier = imageModifier
                 .height(imageHeight)
                 .fillMaxWidth()
                 .padding(top = offsetDp)

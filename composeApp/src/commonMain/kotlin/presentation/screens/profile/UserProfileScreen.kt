@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -21,14 +24,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedScreen
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -42,15 +44,20 @@ import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
-) : Screen {
+) : SharedScreen() {
     @OptIn(ExperimentalMaterial3Api::class)
+    @ExperimentalSharedTransitionApi
     @Composable
-    override fun Content() {
+    override fun SharedContent(
+        sharedTransitionScope: SharedTransitionScope,
+        animatedVisibilityScope: AnimatedVisibilityScope,
+    ) {
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
-        LifecycleEffect(
-            onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
-        )
+
+        LaunchedEffect(Unit){
+            userProfileScreenModel.initUserState(userProfileVO)
+        }
         LaunchedEffect(Unit) {
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
@@ -63,14 +70,24 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
-
+        val imageModifier = with(sharedTransitionScope){
+            Modifier.sharedElement(rememberSharedContentState("UserIcon"),animatedVisibilityScope)
+        }
+        val userNameModifier = with(sharedTransitionScope){
+            Modifier.sharedElement(rememberSharedContentState("UserName"),animatedVisibilityScope)
+        }
         ProfileScaffold(
+            imageModifier = imageModifier,
             profileImageUrl = currentUser?.profileImageUrl,
             iconUrl = currentUser?.iconUrl,
             onReturn = { currentNavigator.pop() },
             onMenu = { bottomSheetIsVisible = true },
         ) { ratio ->
-            ProfileContent(currentUser, ratio)
+            ProfileContent(
+                userNameModifier = userNameModifier,
+                currentUser = currentUser,
+                ratio = ratio
+            )
         }
         if (currentUser == null) return
         ABottomSheet(
@@ -95,7 +112,6 @@ data class UserProfileScreen(
             Text(text = userProfileScreenModel.userJson)
         }
     }
-
 
 }
 
@@ -233,6 +249,7 @@ private fun JsonAlertDialog(
 
 @Composable
 private fun ProfileContent(
+    userNameModifier: Modifier,
     currentUser: UserProfileVo?,
     ratio: Float,
 ) {
@@ -249,7 +266,7 @@ private fun ProfileContent(
     val statusColor = GameColor.Status.fromValue(currentUser.status)
     val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
     // TrustRank + UserName + VRC+
-    UserInfoRow(currentUser.displayName, currentUser.isSupporter, rankColor)
+    UserInfoRow(userNameModifier,currentUser.displayName, currentUser.isSupporter, rankColor)
     // status
     StatusRow(statusColor, statusDescription)
     // LanguagesRow && LinksRow
@@ -375,6 +392,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 
 @Composable
 private fun UserInfoRow(
+    userNameModifier: Modifier,
     userName: String,
     isSupporter: Boolean,
     rankColor: Color,
@@ -404,6 +422,7 @@ private fun UserInfoRow(
             }
         ) {
             Text(
+                modifier = userNameModifier,
                 text = userName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1

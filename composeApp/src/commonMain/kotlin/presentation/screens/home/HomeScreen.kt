@@ -1,5 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -32,6 +35,7 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -48,7 +52,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 
-object HomeScreen : Screen {
+object HomeScreen : SharedScreen() {
 
     private val pagerList = listOf(
         FriendLocationPager,
@@ -56,8 +60,12 @@ object HomeScreen : Screen {
         SearchListPager,
     )
 
+    @ExperimentalSharedTransitionApi
     @Composable
-    override fun Content() {
+    override fun SharedContent(
+        sharedTransitionScope: SharedTransitionScope,
+        animatedVisibilityScope: AnimatedVisibilityScope,
+    ) {
         val currentNavigator = currentNavigator
         val homeScreenModel: HomeScreenModel = koinScreenModel()
 
@@ -85,7 +93,9 @@ object HomeScreen : Screen {
                 tonalElevation = 2.dp
             ) {
                 HorizontalPager(pagerState) {
-                    pagerList[it].Content()
+                    val pager = pagerList[it]
+                    val sharedScreen = pager as? SharedScreen
+                    sharedScreen?.SharedContent(sharedTransitionScope, animatedVisibilityScope) ?: pager.Content()
                 }
             }
         }
