@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -57,7 +56,6 @@ object StartupAnimeScreen : Screen {
 
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun Screen.VersionDialog(startUpAnime: () -> Unit) {
     val authScreenModel: AuthScreenModel  = koinScreenModel()
