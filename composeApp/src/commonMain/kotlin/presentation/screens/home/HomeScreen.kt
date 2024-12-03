@@ -1,8 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -35,8 +33,8 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
@@ -52,7 +50,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 
-object HomeScreen : SharedScreen() {
+object HomeScreen : Screen {
 
     private val pagerList = listOf(
         FriendLocationPager,
@@ -62,10 +60,7 @@ object HomeScreen : SharedScreen() {
 
     @ExperimentalSharedTransitionApi
     @Composable
-    override fun SharedContent(
-        sharedTransitionScope: SharedTransitionScope,
-        animatedVisibilityScope: AnimatedVisibilityScope,
-    ) {
+    override fun Content() {
         val currentNavigator = currentNavigator
         val homeScreenModel: HomeScreenModel = koinScreenModel()
 
@@ -93,9 +88,7 @@ object HomeScreen : SharedScreen() {
                 tonalElevation = 2.dp
             ) {
                 HorizontalPager(pagerState) {
-                    val pager = pagerList[it]
-                    val sharedScreen = pager as? SharedScreen
-                    sharedScreen?.SharedContent(sharedTransitionScope, animatedVisibilityScope) ?: pager.Content()
+                    pagerList[it].Content()
                 }
             }
         }
@@ -125,7 +118,6 @@ private inline fun Screen.HomeTopAppBar(
     val trustRank = remember(currentUser) { currentUser?.trustRank }
     val rankColor = GameColor.Rank.fromValue(trustRank)
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-
     // 初始化刷新一次
     LaunchedEffect(Unit) {
         refreshNotification()
@@ -160,7 +152,10 @@ private inline fun Screen.HomeTopAppBar(
             ) {
                 UserStateIcon(
                     modifier = Modifier
-                        .size(54.dp),
+                        .size(54.dp)
+                        .enableIf(currentUser != null) {
+                            sharedElementBy("${currentUser!!.id}UserIcon")
+                        },
                     iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
                     userStatus = currentUser?.status
                 )
@@ -172,22 +167,35 @@ private inline fun Screen.HomeTopAppBar(
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
+                            modifier = Modifier
+                                .enableIf(currentUser != null) {
+                                    sharedElementBy("${currentUser!!.id}UserName")
+                                },
                             text = currentUser?.displayName.orEmpty(),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
                         )
                         Icon(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .align(Alignment.CenterVertically),
+                            modifier =
+                                Modifier
+                                    .size(16.dp)
+                                    .align(Alignment.CenterVertically)
+                                    .enableIf(currentUser != null) {
+                                        sharedElementBy("${currentUser!!.id}UserTrustRankIcon")
+                                    },
                             imageVector = Icons.Rounded.Shield,
                             contentDescription = "CurrentUserTrustRankIcon",
                             tint = rankColor
                         )
                     }
                     Text(
-                        text = currentUser?.statusDescription ?: currentUser?.status?.value.orEmpty(),
+                        modifier = Modifier
+                            .enableIf(currentUser != null) {
+                                sharedElementBy("${currentUser!!.id}UserStatusDescription")
+                            },
+
+                        text = currentUser?.statusDescription?.ifBlank { currentUser.status.value }.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.outline,

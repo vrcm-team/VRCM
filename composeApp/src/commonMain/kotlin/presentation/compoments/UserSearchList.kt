@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -64,7 +63,8 @@ fun UserSearchList(
         doRefresh
     ) {
         val focusManager = LocalFocusManager.current
-        ITextField(modifier = Modifier.padding(horizontal = 16.dp),
+        ITextField(
+            modifier = Modifier.padding(horizontal = 16.dp),
             imageVector = Icons.Rounded.Search,
             hintText = strings.fiendListPagerSearch,
             textValue = searchText,
@@ -124,37 +124,43 @@ fun UserList(
 
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
     ListItem(
-        modifier = Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 6.dp).clip(MaterialTheme.shapes.large)
-            .clickable { toProfile(friend) }.animateItemPlacement(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .padding(horizontal = 6.dp)
+            .clip(MaterialTheme.shapes.large)
+            .clickable { toProfile(friend) }
+            .animateItem(fadeInSpec = null, fadeOutSpec = null),
         leadingContent = {
             UserStateIcon(
-                modifier = Modifier.size(60.dp), iconUrl = friend.iconUrl, userStatus = friend.status
+                modifier = Modifier.size(60.dp).sharedElementBy("${friend.id}UserIcon"), iconUrl = friend.iconUrl, userStatus = friend.status
             )
         },
         headlineContent = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically
             ) {
+                Icon(
+                    modifier = Modifier.size(16.dp).sharedElementBy("${friend.id}UserTrustRankIcon"),
+                    imageVector = Icons.Rounded.Shield,
+                    contentDescription = "TrustRankIcon",
+                    tint = GameColor.Rank.fromValue(friend.trustRank)
+                )
                 Text(
+                    modifier = Modifier.sharedElementBy("${friend.id}UserName"),
                     text = friend.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Icon(
-                    modifier = Modifier.size(16.dp),
-                    imageVector = Icons.Rounded.Shield,
-                    contentDescription = "TrustRankIcon",
-                    tint = GameColor.Rank.fromValue(friend.trustRank)
-                )
             }
         },
         supportingContent = {
             Text(
+                modifier = Modifier.sharedElementBy("${friend.id}UserStatusDescription"),
                 text = friend.statusDescription.ifBlank { friend.status.value },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
@@ -166,7 +172,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             // 例如: lastLogin = 2023-04-01T09:03:04.000Z
             val lastLoginStr = friend.lastLogin
             if (friend.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@ListItem
-            val lastLogin = remember {  Instant.parse(lastLoginStr).toLocalDateTime(TimeZone.currentSystemDefault()) }
+            val lastLogin = remember { Instant.parse(lastLoginStr).toLocalDateTime(TimeZone.currentSystemDefault()) }
             Text(
                 text = lastLogin.ignoredFormat, style = MaterialTheme.typography.labelSmall, maxLines = 1
             )

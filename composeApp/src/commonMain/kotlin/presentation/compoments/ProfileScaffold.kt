@@ -109,6 +109,7 @@ fun ProfileScaffold(
             ProfileImage(
                 imageModifier,
                 imageHeight,
+                isHidden,
                 offsetDp,
                 ratio,
                 blurDp,
@@ -134,6 +135,7 @@ fun ProfileScaffold(
             )
             // 用户icon
             ProfileIcon(
+                imageModifier,
                 isHidden,
                 lastIconPadding,
                 offsetDp,
@@ -154,6 +156,7 @@ fun ProfileScaffold(
 private fun ProfileImage(
     imageModifier: Modifier,
     imageHeight: Dp,
+    isHidden: Boolean,
     offsetDp: Dp,
     ratio: Float,
     blurDp: Dp,
@@ -164,7 +167,8 @@ private fun ProfileImage(
             .fillMaxWidth()
     ) {
         AImage(
-            modifier = imageModifier
+            modifier = Modifier
+                .enableIf(isHidden) { then(imageModifier) }
                 .height(imageHeight)
                 .fillMaxWidth()
                 .padding(top = offsetDp)
@@ -230,6 +234,7 @@ private fun BottomCard(
 
 @Composable
 private fun ProfileIcon(
+    imageModifier: Modifier,
     isHidden: Boolean,
     lastIconPadding: Dp,
     offsetDp: Dp,
@@ -250,10 +255,12 @@ private fun ProfileIcon(
         ) {
             AImage(
                 modifier = Modifier
+                    .enableIf(!isHidden) { then(imageModifier) }
                     .align(Alignment.Center)
                     .clip(CircleShape)
                     .size(iconSize)
-                    .clickable(onClick = onClickIcon),
+                    .clickable(onClick = onClickIcon)
+                    ,
                 imageData = ImageRequest.Builder(koinInject<PlatformContext>())
                     .data(avatarThumbnailImageUrl)
                     .crossfade(600)

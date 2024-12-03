@@ -19,12 +19,10 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 class FriendListPagerModel(
     private val friendsApi: FriendsApi,
     private val authService: AuthService,
-    private val json: Json,
 ) : ScreenModel {
 
     private val friendMap: MutableMap<String, FriendData> = mutableStateMapOf()
