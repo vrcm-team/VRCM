@@ -5,7 +5,8 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 
 actual fun AppPlatform.openUrl(url: String) {
-    UIApplication.sharedApplication.openURL(NSURL(string = url))
+    UIApplication.sharedApplication.openURL(NSURL(string = url), emptyMap<Any?, Any>()) {
+    }
 }
 
 actual val AppPlatform.isSupportBlur: Boolean

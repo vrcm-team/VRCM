@@ -4,5 +4,6 @@ data class VersionVo(
     val tagName: String = "",
     val htmlUrl: String = "",
     val body: String = "",
-    val hasNewVersion: Boolean = false
+    val hasNewVersion: Boolean = false,
+    val downloadUrl: List<String> = emptyList()
 )

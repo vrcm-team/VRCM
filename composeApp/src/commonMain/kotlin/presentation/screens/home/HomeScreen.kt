@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
@@ -14,13 +15,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import dev.chrisbanes.haze.HazeDefaults.style
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -40,6 +34,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
@@ -63,14 +58,14 @@ object HomeScreen : Screen {
         SearchListPager,
     )
 
+    @ExperimentalSharedTransitionApi
     @Composable
-    @OptIn(ExperimentalFoundationApi::class)
     override fun Content() {
         val currentNavigator = currentNavigator
-        val homeScreenModel: HomeScreenModel = getScreenModel()
+        val homeScreenModel: HomeScreenModel = koinScreenModel()
 
-        LifecycleEffect(onStarted = (homeScreenModel::ini))
         LaunchedEffect(Unit) {
+            homeScreenModel.init()
             // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
@@ -84,7 +79,7 @@ object HomeScreen : Screen {
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = { HomeTopAppBar(hazeState) },
-            bottomBar = { HomeBottomBar(pagerList,pagerState, hazeState) },
+            bottomBar = { HomeBottomBar(pagerList, pagerState, hazeState) },
         ) {
             Surface(
                 modifier = Modifier
@@ -104,9 +99,9 @@ object HomeScreen : Screen {
 
 @Composable
 private inline fun Screen.HomeTopAppBar(
-    hazeState: HazeState?
+    hazeState: HazeState?,
 ) {
-    val homeScreenModel: HomeScreenModel = getScreenModel()
+    val homeScreenModel: HomeScreenModel = koinScreenModel()
     val currentUser = homeScreenModel.currentUser
     val refreshNotification = {
         homeScreenModel.refreshAllNotification()
@@ -123,7 +118,6 @@ private inline fun Screen.HomeTopAppBar(
     val trustRank = remember(currentUser) { currentUser?.trustRank }
     val rankColor = GameColor.Rank.fromValue(trustRank)
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-
     // 初始化刷新一次
     LaunchedEffect(Unit) {
         refreshNotification()
@@ -158,7 +152,10 @@ private inline fun Screen.HomeTopAppBar(
             ) {
                 UserStateIcon(
                     modifier = Modifier
-                        .size(54.dp),
+                        .size(54.dp)
+                        .enableIf(currentUser != null) {
+                            sharedElementBy("${currentUser!!.id}UserIcon")
+                        },
                     iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
                     userStatus = currentUser?.status
                 )
@@ -170,22 +167,35 @@ private inline fun Screen.HomeTopAppBar(
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
+                            modifier = Modifier
+                                .enableIf(currentUser != null) {
+                                    sharedElementBy("${currentUser!!.id}UserName")
+                                },
                             text = currentUser?.displayName.orEmpty(),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
                         )
                         Icon(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .align(Alignment.CenterVertically),
+                            modifier =
+                                Modifier
+                                    .size(16.dp)
+                                    .align(Alignment.CenterVertically)
+                                    .enableIf(currentUser != null) {
+                                        sharedElementBy("${currentUser!!.id}UserTrustRankIcon")
+                                    },
                             imageVector = Icons.Rounded.Shield,
                             contentDescription = "CurrentUserTrustRankIcon",
                             tint = rankColor
                         )
                     }
                     Text(
-                        text = currentUser?.statusDescription ?: currentUser?.status?.value.orEmpty(),
+                        modifier = Modifier
+                            .enableIf(currentUser != null) {
+                                sharedElementBy("${currentUser!!.id}UserStatusDescription")
+                            },
+
+                        text = currentUser?.statusDescription?.ifBlank { currentUser.status.value }.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.outline,
@@ -212,7 +222,7 @@ private inline fun Screen.HomeTopAppBar(
 private inline fun HomeBottomBar(
     pagerList: List<Pager>,
     pagerState: PagerState,
-    hazeState: HazeState?
+    hazeState: HazeState?,
 ) {
     // 如果没有底部系统手势条，则加12dp
     val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
@@ -285,7 +295,7 @@ private inline fun HomeBottomBar(
 private fun RowScope.PagerNavigationItem(
     provider: Pager,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -303,7 +313,7 @@ private fun RowScope.PagerNavigationItem(
 }
 
 @Composable
- fun SettingsActionButton(
+fun SettingsActionButton(
     modifier: Modifier = Modifier,
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
@@ -331,14 +341,14 @@ private fun RowScope.PagerNavigationItem(
 fun NotificationActionButton(
     notifications: List<NotificationItemData>,
     refreshNotification: () -> Unit,
-    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit
+    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit,
 ) {
     // notification
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     val onClickNotification: () -> Unit = {
         bottomSheetIsVisible = true
     }
-    LaunchedEffect(Unit){
+    LaunchedEffect(Unit) {
         refreshNotification()
     }
     // 每打开一次刷新一次
@@ -357,7 +367,7 @@ fun NotificationActionButton(
             badge = {
                 val primaryColor = MaterialTheme.colorScheme.tertiary
                 if (notifications.isNotEmpty()) {
-                    Canvas(modifier = Modifier.size(8.dp)) {
+                    Canvas(modifier = Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
                         drawCircle(color = primaryColor, radius = 4.dp.toPx())
                     }
                 }

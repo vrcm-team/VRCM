@@ -36,7 +36,7 @@ class HomeScreenModel(
     private val _friendRequestNotifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val friendRequestNotifications by _friendRequestNotifications
 
-    fun ini() {
+    fun init() {
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
@@ -131,7 +131,7 @@ class HomeScreenModel(
 
     private fun refreshCurrentUser() =
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuth { authService.currentUser(isRefresh = true) }
+            authService.reTryAuthCatching { authService.currentUser(isRefresh = true) }
                 .onHomeFailure()
                 .onSuccess {
                     _currentUser.value = it

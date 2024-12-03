@@ -28,7 +28,7 @@ class AuthService(
 ) {
     private var scope = CoroutineScope(Job())
 
-    private var currentUser: Result<CurrentUserData>?  = null
+    private var currentUser: CurrentUserData?  = null
 
     fun accountPair(): Pair<String, String> = accountDao.accountPair()
 
@@ -75,7 +75,7 @@ class AuthService(
 
     suspend fun login(username: String, password: String): AuthState =
         authApi.login(username, password).also {
-            if (it == AuthState.Authed) emitAuthed(username, password)
+            if (it is AuthState.Authed) emitAuthed(username, password)
         }
 
     /**
@@ -96,7 +96,7 @@ class AuthService(
     suspend fun doReTryAuth():Boolean {
         val (username, password) = accountDao.accountPairOrNull() ?: return false
         return authApi.login(username, password)
-            .takeIf { it == AuthState.Authed }
+            .takeIf { it is AuthState.Authed }
             ?.let { true } ?: false
     }
 

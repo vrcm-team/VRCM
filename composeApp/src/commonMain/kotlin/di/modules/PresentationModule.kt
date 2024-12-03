@@ -3,7 +3,7 @@ package io.github.vrcmteam.vrcm.di.modules
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.disk.DiskCache
-import coil3.network.ktor.KtorNetworkFetcherFactory
+import coil3.network.ktor2.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel

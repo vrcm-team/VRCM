@@ -10,10 +10,13 @@ import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.SlideOrientation
 
 
-val homeToAuthAnimeTransition = fadeIn(tween(600,300)) + slideIn(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) } togetherWith
+val HomeToAuthAnimeTransition = fadeIn(tween(600,300)) + slideIn(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) } togetherWith
         fadeOut(tween(600))
-val authAnimeToHomeTransition = fadeIn(tween(600)) togetherWith
+val AuthAnimeToHomeTransition = fadeIn(tween(600)) togetherWith
         fadeOut(tween(600)) + slideOut(tween(600)) { IntOffset(0, (it.height * 0.2f).toInt()) }
+val DefaultScreenTransition = (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
+            scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
+        .togetherWith(fadeOut(animationSpec = tween(90)))
 
 fun slideScreenTransition(
     navigator: Navigator,

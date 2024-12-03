@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -16,12 +19,10 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 class FriendListPagerModel(
     private val friendsApi: FriendsApi,
     private val authService: AuthService,
-    private val json: Json,
 ) : ScreenModel {
 
     private val friendMap: MutableMap<String, FriendData> = mutableStateMapOf()
@@ -36,7 +37,7 @@ class FriendListPagerModel(
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
      */
-    var isRefreshing = true
+    var isRefreshing by mutableStateOf(true)
         private set
 
     init {
@@ -61,6 +62,7 @@ class FriendListPagerModel(
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
+                friendMap.clear()
                 isRefreshing = true
             }
         }
@@ -78,13 +80,14 @@ class FriendListPagerModel(
     }
 
     suspend fun refreshFriendList() {
+        // 只有在clear时设置true,用来触发刷新状态动画
+        // 不然切换一个Page就触发动画
+        isRefreshing = true
         friendMap.clear()
         doRefreshFriendList()
-        // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
-        isRefreshing = false
     }
 
-    private suspend fun doRefreshFriendList() {
+    suspend fun doRefreshFriendList() {
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.allFriendsFlow()
                 .retry(1) {
@@ -96,6 +99,8 @@ class FriendListPagerModel(
                     update(friends)
                 }
         }.join()
+        // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
+        isRefreshing = false
     }
 
     private fun update(

@@ -6,6 +6,14 @@ import org.koin.compose.getKoin
 interface AppPlatform {
     val name: String
     val version: String
+    val type: AppPlatformType
+}
+
+enum class AppPlatformType {
+    Android,
+    Desktop,
+    Ios,
+    Web
 }
 
 @Composable

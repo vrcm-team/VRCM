@@ -13,9 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -28,10 +27,14 @@ object AuthScreen : Screen {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val authScreenModel: AuthScreenModel = getScreenModel()
+        val authScreenModel: AuthScreenModel = koinScreenModel()
 
-        LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
+        LaunchedEffect(Unit){
+            authScreenModel.tryAuth()
+        }
+
         BoxWithConstraints(
+            modifier = Modifier.imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             AuthFold(
@@ -96,14 +99,16 @@ object AuthScreen : Screen {
 
 @Composable
 private fun AuthCard(
+    modifier: Modifier = Modifier,
     cardState: AuthCardPage,
-    content: @Composable (AuthCardPage) -> Unit
+    content: @Composable (AuthCardPage) -> Unit,
 ) {
     val cardChangeDurationMillis = 600
     val cardChangeAnimationSpec =
         remember { tween<Float>(cardChangeDurationMillis, cardChangeDurationMillis) }
     val animationSpec = remember { tween<Float>(cardChangeDurationMillis) }
     AnimatedContent(
+        modifier = modifier,
         label = "AuthSurfaceChange",
         targetState = cardState,
         transitionSpec = {
@@ -137,7 +142,7 @@ private fun ReturnIcon(onClick: () -> Unit) {
         modifier = Modifier
             .padding(start = 6.dp, top = 6.dp),
         onClick = onClick
-    ){
+    ) {
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
             contentDescription = "ReturnIcon",

@@ -1,8 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -21,6 +19,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationCont
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -51,7 +50,7 @@ class FriendLocationPagerModel(
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
      */
-    var isRefreshing = true
+    var isRefreshing by mutableStateOf(true)
         private set
 
     init {
@@ -64,6 +63,9 @@ class FriendLocationPagerModel(
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
+                // 因为是第一个, 并且有移除不存在的元素的机制故无需clear
+                friendLocationMap.clear()
+                friendMap.clear()
                 isRefreshing = true
             }
         }
@@ -99,11 +101,14 @@ class FriendLocationPagerModel(
 
 
     suspend fun refreshFriendLocation() {
+        // 只有在clear时设置true,用来触发刷新状态动画
+        // 不然切换一个Page就触发动画
+        isRefreshing = true
         friendLocationMap.clear()
         friendMap.clear()
         doRefreshFriendLocation()
         // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
-        isRefreshing = false
+
     }
 
     /**
@@ -133,6 +138,7 @@ class FriendLocationPagerModel(
                 .filter { !includedIdList.contains(it) }
                 .forEach { removeFriend(it) }
         }
+        isRefreshing = false
     }
 
     private fun update(
@@ -141,7 +147,7 @@ class FriendLocationPagerModel(
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
             // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
-            val currentUser = authService.currentUser(isRefresh = true).getOrThrow()
+            val currentUser = authService.currentUser(isRefresh = true)
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
@@ -197,8 +203,8 @@ class FriendLocationPagerModel(
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
-        }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+        }.onApiFailure("FriendLocation") {
+            SharedFlowCentre.toastText.emit(ToastText.Error(it))
         }
     }
 
@@ -227,7 +233,7 @@ class FriendLocationPagerModel(
         instantsVo: InstantsVo,
     ) {
         val ownerId = instance.ownerId ?: return
-        val fetchOwnerName: suspend (String) -> String = when(BlueprintType.fromValue(ownerId)) {
+        val fetchOwnerName: suspend (String) -> String = when (BlueprintType.fromValue(ownerId)) {
             BlueprintType.User -> {
                 { usersApi.fetchUser(ownerId).displayName }
             }

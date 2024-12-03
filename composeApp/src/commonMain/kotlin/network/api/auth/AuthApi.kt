@@ -6,10 +6,12 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.ifOK
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 
@@ -17,7 +19,7 @@ class AuthApi(
     private val client: HttpClient,
 ) {
 
-    suspend fun currentUser(): Result<CurrentUserData> = userRes().ifOK { body<CurrentUserData>() }
+    suspend fun currentUser(): CurrentUserData = userRes().checkSuccess()
 
 
     private suspend fun userRes(username: String? = null, password: String? = null) =
@@ -48,9 +50,9 @@ class AuthApi(
                 }
             }
 
-            HttpStatusCode.Unauthorized -> AuthState.Unauthorized
+            HttpStatusCode.Unauthorized -> AuthState.Unauthorized(response.bodyAsText())
 
-            else -> AuthState.Unauthorized
+            else -> AuthState.Unauthorized(response.bodyAsText())
 
         }
     }

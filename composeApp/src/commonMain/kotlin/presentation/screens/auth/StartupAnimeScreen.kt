@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
@@ -58,7 +58,7 @@ object StartupAnimeScreen : Screen {
 
 @Composable
 private fun Screen.VersionDialog(startUpAnime: () -> Unit) {
-    val authScreenModel: AuthScreenModel  = getScreenModel()
+    val authScreenModel: AuthScreenModel  = koinScreenModel()
     var version by remember { mutableStateOf(VersionVo()) }
 
     LaunchedEffect(Unit) {

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.profile
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -21,14 +22,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -44,13 +45,16 @@ data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
+    @ExperimentalSharedTransitionApi
     @Composable
-    override fun Content() {
+    override fun Content(
+    ) {
         val currentNavigator = currentNavigator
-        val userProfileScreenModel: UserProfileScreenModel = getScreenModel()
-        LifecycleEffect(
-            onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
-        )
+        val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
+
+        LaunchedEffect(Unit){
+            userProfileScreenModel.initUserState(userProfileVO)
+        }
         LaunchedEffect(Unit) {
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
@@ -65,12 +69,16 @@ data class UserProfileScreen(
         var openAlertDialog by remember { mutableStateOf(false) }
 
         ProfileScaffold(
+            imageModifier = Modifier.sharedElementBy("${userProfileVO.id}UserIcon"),
             profileImageUrl = currentUser?.profileImageUrl,
             iconUrl = currentUser?.iconUrl,
             onReturn = { currentNavigator.pop() },
             onMenu = { bottomSheetIsVisible = true },
         ) { ratio ->
-            ProfileContent(currentUser, ratio)
+            ProfileContent(
+                currentUser = currentUser,
+                ratio = ratio
+            )
         }
         if (currentUser == null) return
         ABottomSheet(
@@ -95,7 +103,6 @@ data class UserProfileScreen(
             Text(text = userProfileScreenModel.userJson)
         }
     }
-
 
 }
 
@@ -153,6 +160,7 @@ private fun ColumnScope.FriendRequestSheetItem(
             }
         }
         // 状态为Completed,则删除好友
+        // TODO: 加一个弹窗提示是否删除好友
         currentUser.isFriend && currentUser.friendRequestStatus == Completed  ->
             localeStrings.profileUnfriend to {
             userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
@@ -164,10 +172,8 @@ private fun ColumnScope.FriendRequestSheetItem(
 
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(true) }
-    TextButton(
-        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
-        enabled = enabled,
-        onClick = {
+    SheetButtonItem(action.first, onClick = {
+        scope.launch { hideSheet() }.invokeOnCompletion {
             scope.launch {
                 enabled = false
                 when(action.second()){
@@ -178,10 +184,7 @@ private fun ColumnScope.FriendRequestSheetItem(
                 onHideCompletion()
             }
         }
-    ) {
-        Text(text = action.first)
-    }
-
+    })
 }
 
 @Composable
@@ -192,7 +195,10 @@ private fun ColumnScope.SheetButtonItem(
     content: @Composable RowScope.(String) -> Unit = { Text(text = it) },
 ) {
     TextButton(
-        modifier = Modifier.Companion.align(Alignment.CenterHorizontally),
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .fillMaxWidth()
+            .padding(vertical = 2.dp, horizontal = 24.dp),
         enabled = enabled,
         onClick = onClick
     ) {
@@ -250,9 +256,9 @@ private fun ProfileContent(
     val statusColor = GameColor.Status.fromValue(currentUser.status)
     val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
     // TrustRank + UserName + VRC+
-    UserInfoRow(currentUser.displayName, currentUser.isSupporter, rankColor)
+    UserInfoRow(currentUser.id, currentUser.displayName, currentUser.isSupporter, rankColor)
     // status
-    StatusRow(statusColor, statusDescription)
+    StatusRow(currentUser.id, statusColor, statusDescription)
     // LanguagesRow && LinksRow
     LangAndLinkRow(currentUser)
     Box(
@@ -376,6 +382,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 
 @Composable
 private fun UserInfoRow(
+    userId: String,
     userName: String,
     isSupporter: Boolean,
     rankColor: Color,
@@ -387,7 +394,8 @@ private fun UserInfoRow(
         Icon(
             modifier = Modifier
                 .size(24.dp)
-                .align(Alignment.CenterVertically),
+                .align(Alignment.CenterVertically)
+                .sharedElementBy("${userId}UserTrustRankIcon"),
             imageVector = Icons.Rounded.Shield,
             contentDescription = "TrustRankIcon",
             tint = rankColor
@@ -405,6 +413,7 @@ private fun UserInfoRow(
             }
         ) {
             Text(
+                modifier = Modifier.sharedElementBy("${userId}UserName"),
                 text = userName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1
@@ -418,6 +427,7 @@ private fun UserInfoRow(
 
 @Composable
 private fun StatusRow(
+    userId: String,
     statusColor: Color,
     statusDescription: String,
 ) {
@@ -431,6 +441,7 @@ private fun StatusRow(
             drawCircle(statusColor)
         }
         Text(
+            modifier = Modifier.sharedElementBy("${userId}UserStatusDescription"),
             text = statusDescription,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1

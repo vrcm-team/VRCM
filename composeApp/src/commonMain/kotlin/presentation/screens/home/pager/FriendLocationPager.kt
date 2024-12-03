@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,7 +29,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -39,6 +38,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -61,9 +61,10 @@ object FriendLocationPager : Pager {
     override val icon: Painter
         @Composable get() = rememberVectorPainter(image = Icons.Rounded.Explore)
 
+    @ExperimentalSharedTransitionApi
     @Composable
     override fun Content() {
-        val friendLocationPagerModel: FriendLocationPagerModel = getScreenModel()
+        val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit) {
@@ -78,12 +79,14 @@ object FriendLocationPager : Pager {
                 }
             }
         }
+
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
             doRefresh = friendLocationPagerModel::refreshFriendLocation
         )
+
     }
 
 }
@@ -106,7 +109,7 @@ fun FriendLocationPager(
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     RefreshBox(
         refreshContainerOffsetY = topPadding,
-        isStartRefresh = isRefreshing,
+        isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
         val currentNavigator = currentNavigator
@@ -119,7 +122,6 @@ fun FriendLocationPager(
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
-
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,
@@ -131,21 +133,21 @@ fun FriendLocationPager(
         ) {
 
             SimpleCLocationCard(
-                offlineFriendLocation,
-                LocationType.Offline,
-                onClickUserIcon
+                friendLocation = offlineFriendLocation,
+                locationType = LocationType.Offline,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerWebsite }
 
             SimpleCLocationCard(
-                privateFriendLocation,
-                LocationType.Private,
-                onClickUserIcon
+                friendLocation = privateFriendLocation,
+                locationType = LocationType.Private,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerPrivate }
 
             SimpleCLocationCard(
-                travelingFriendLocation,
-                LocationType.Traveling,
-                onClickUserIcon
+                friendLocation = travelingFriendLocation,
+                locationType = LocationType.Traveling,
+                onClickUserIcon = onClickUserIcon
             ) { strings.fiendLocationPagerTraveling }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
@@ -156,7 +158,10 @@ fun FriendLocationPager(
                 }
                 items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(location, { onClickLocation(location) }) {
-                        UserIconsRow(friends = it, onClickUserIcon = onClickUserIcon)
+                        UserIconsRow(
+                            friends = it,
+                            onClickUserIcon = onClickUserIcon
+                        )
                     }
                 }
             }
@@ -215,33 +220,33 @@ private fun UserIconsRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(friends, key = { it.value.id }) {
+            val friend = it.value
             LocationFriend(
-                it.value.iconUrl,
-                it.value.displayName,
-                it.value.status
-            ) { onClickUserIcon(it.value) }
+                id = friend.id,
+                iconUrl = friend.iconUrl,
+                name = friend.displayName,
+                userStatus = friend.status
+            ) { onClickUserIcon(friend) }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LazyItemScope.LocationFriend(
+    id: String,
     iconUrl: String,
     name: String,
     userStatus: UserStatus,
     onClickUserIcon: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .width(60.dp)
+        modifier = Modifier.width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon)
-            .animateItemPlacement(),
+            .clickable(onClick = onClickUserIcon).animateItem(fadeInSpec = null, fadeOutSpec = null),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().sharedElementBy("${id}UserIcon"),
             iconUrl = iconUrl,
             userStatus = userStatus
         )
@@ -362,7 +367,7 @@ private fun LazyItemScope.LocationCard(
 private inline fun MemberInfoRow(
     showUser: Boolean,
     friendList: List<State<FriendData>>,
-    instants: InstantsVo
+    instants: InstantsVo,
 ) {
     Row(
         modifier = Modifier

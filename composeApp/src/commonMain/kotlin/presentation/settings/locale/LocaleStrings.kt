@@ -41,7 +41,7 @@ data class LocaleStrings(
     val profileFriendRequestAccepted: String = "Friend Request Accepted",
     val profileUnfriended: String = "Friend is Unfriended",
     val profileUnfriend: String = "Unfriend",
-    val profileViewJsonData: String = "Viewing JSON data",
+    val profileViewJsonData: String = "View JSON data",
 )
 
 val strings: LocaleStrings

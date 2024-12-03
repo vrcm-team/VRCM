@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class GroupData(
     val badges: List<String>,
-    val bannerId: String,
+    val bannerId: String?,
     val bannerUrl: String,
     val createdAt: String,
     val description: String,

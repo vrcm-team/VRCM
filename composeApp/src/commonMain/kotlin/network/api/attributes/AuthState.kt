@@ -1,9 +1,14 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
-enum class AuthState {
-    Authed,
-    NeedEmailCode,
-    NeedTFA,
-    NeedTTFA,
-    Unauthorized
+sealed class AuthState {
+
+    data object Authed: AuthState()
+
+    data object NeedEmailCode: AuthState()
+
+    data object NeedTFA: AuthState()
+
+    data object NeedTTFA: AuthState()
+
+    data class Unauthorized(val message: String): AuthState()
 }
