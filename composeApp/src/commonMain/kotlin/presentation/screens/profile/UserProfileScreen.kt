@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
@@ -47,7 +47,7 @@ data class UserProfileScreen(
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val userProfileScreenModel: UserProfileScreenModel = getScreenModel()
+        val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
         LifecycleEffect(
             onStarted = { userProfileScreenModel.initUserState(userProfileVO) }
         )

@@ -14,13 +14,7 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import dev.chrisbanes.haze.HazeDefaults.style
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
@@ -66,10 +59,10 @@ object HomeScreen : Screen {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val homeScreenModel: HomeScreenModel = getScreenModel()
+        val homeScreenModel: HomeScreenModel = koinScreenModel()
 
-        LifecycleEffect(onStarted = (homeScreenModel::ini))
         LaunchedEffect(Unit) {
+            homeScreenModel.init()
             // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
@@ -105,7 +98,7 @@ object HomeScreen : Screen {
 private inline fun Screen.HomeTopAppBar(
     hazeState: HazeState?,
 ) {
-    val homeScreenModel: HomeScreenModel = getScreenModel()
+    val homeScreenModel: HomeScreenModel = koinScreenModel()
     val currentUser = homeScreenModel.currentUser
     val refreshNotification = {
         homeScreenModel.refreshAllNotification()

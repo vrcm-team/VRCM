@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -63,7 +63,7 @@ object FriendLocationPager : Pager {
 
     @Composable
     override fun Content() {
-        val friendLocationPagerModel: FriendLocationPagerModel = getScreenModel()
+        val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
         // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit) {

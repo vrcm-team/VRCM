@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.presentation.compoments.UserSearchList
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 
@@ -23,7 +23,7 @@ object FriendListPager : Pager {
 
     @Composable
     override fun Content() {
-        val friendListPagerModel: FriendListPagerModel = getScreenModel()
+        val friendListPagerModel: FriendListPagerModel = koinScreenModel()
         LaunchedEffect(Unit) {
             // 未clear()的同步刷新一次
             friendListPagerModel. doRefreshFriendList()

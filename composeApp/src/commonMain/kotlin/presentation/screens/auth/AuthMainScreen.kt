@@ -13,9 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.LifecycleEffect
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.getScreenModel
+import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -28,9 +27,12 @@ object AuthScreen : Screen {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val authScreenModel: AuthScreenModel = getScreenModel()
+        val authScreenModel: AuthScreenModel = koinScreenModel()
 
-        LifecycleEffect(onStarted = { authScreenModel.tryAuth() })
+        LaunchedEffect(Unit){
+            authScreenModel.tryAuth()
+        }
+
         BoxWithConstraints(
             modifier = Modifier.imePadding(),
             contentAlignment = Alignment.Center,

@@ -36,7 +36,7 @@ class HomeScreenModel(
     private val _friendRequestNotifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val friendRequestNotifications by _friendRequestNotifications
 
-    fun ini() {
+    fun init() {
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
