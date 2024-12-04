@@ -29,6 +29,7 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
@@ -380,6 +381,7 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 }
 
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun UserInfoRow(
     userId: String,
@@ -413,7 +415,7 @@ private fun UserInfoRow(
             }
         ) {
             Text(
-                modifier = Modifier.sharedElementBy("${userId}UserName"),
+                modifier = Modifier.sharedBoundsBy("${userId}UserName"),
                 text = userName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1
@@ -425,6 +427,7 @@ private fun UserInfoRow(
 }
 
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun StatusRow(
     userId: String,
@@ -441,7 +444,7 @@ private fun StatusRow(
             drawCircle(statusColor)
         }
         Text(
-            modifier = Modifier.sharedElementBy("${userId}UserStatusDescription"),
+            modifier = Modifier.sharedBoundsBy("${userId}UserStatusDescription"),
             text = statusDescription,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1
@@ -458,6 +461,7 @@ private fun LanguagesRow(
     if (speakLanguages.isEmpty()) {
         return
     }
+    println("speakLanguages:${speakLanguages}")
     Row(
         modifier = Modifier.height(width),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -231,6 +231,7 @@ private fun UserIconsRow(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun LazyItemScope.LocationFriend(
     id: String,

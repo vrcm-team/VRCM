@@ -28,8 +28,8 @@ fun Modifier.drawSate(
     isInLine: Boolean = true,
     alignment: Alignment = Alignment.BottomEnd,
     enable: Boolean = true,
-    onDraw: ContentDrawScope.(Float, Offset) -> Unit
-) = if (enable)  this.drawWithContent {
+    onDraw: ContentDrawScope.(Float, Offset) -> Unit,
+) = if (enable) this.drawWithContent {
     val borderRadius = size.maxDimension * percentage
     val borderDiameter = borderRadius * 2
     val borderTopStart = if (isInLine) Offset(-borderRadius, -borderRadius) else Offset.Zero
@@ -43,7 +43,7 @@ fun Modifier.drawSate(
             layoutDirection = layoutDirection
         )
     )
-    onDraw(borderRadius,borderOffset)
+    onDraw(borderRadius, borderOffset)
 } else this
 
 fun Modifier.drawSateCircle(
@@ -58,7 +58,7 @@ fun Modifier.drawSateCircle(
         this.drawContent()
         drawCircle(Color.White, borderRadius, borderOffset)
         drawCircle(color, radius, borderOffset)
-    }
+    },
 ) = drawSate(
     percentage = percentage,
     isInLine = isInLine,
@@ -68,18 +68,20 @@ fun Modifier.drawSateCircle(
 )
 
 @Composable
-fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) = if (enable) effect() else this
+fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) =
+    if (enable) effect() else this
 
 /**
  * 侧滑返回
  */
 fun Modifier.slideBack(
-    threshold: Float = 40.dp.value
+    threshold: Float = 40.dp.value,
+    orientation: Orientation = Orientation.Horizontal,
 ) = this.composed {
     val navigator = LocalNavigator.currentOrThrow
     draggable(rememberDraggableState {
         if (navigator.canPop && it > threshold) navigator.pop()
-    }, Orientation.Horizontal)
+    }, orientation)
 }
 
 /**
@@ -87,7 +89,7 @@ fun Modifier.slideBack(
  */
 @Composable
 fun Modifier.simpleClickable(
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) = this.clickable(
     indication = null,
     interactionSource = remember { MutableInteractionSource() },

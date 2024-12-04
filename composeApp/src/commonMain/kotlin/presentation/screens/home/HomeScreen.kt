@@ -34,6 +34,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -97,6 +98,7 @@ object HomeScreen : Screen {
 }
 
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private inline fun Screen.HomeTopAppBar(
     hazeState: HazeState?,
@@ -169,7 +171,7 @@ private inline fun Screen.HomeTopAppBar(
                         Text(
                             modifier = Modifier
                                 .enableIf(currentUser != null) {
-                                    sharedElementBy("${currentUser!!.id}UserName")
+                                    sharedBoundsBy("${currentUser!!.id}UserName")
                                 },
                             text = currentUser?.displayName.orEmpty(),
                             style = MaterialTheme.typography.titleSmall,
@@ -192,7 +194,7 @@ private inline fun Screen.HomeTopAppBar(
                     Text(
                         modifier = Modifier
                             .enableIf(currentUser != null) {
-                                sharedElementBy("${currentUser!!.id}UserStatusDescription")
+                                sharedBoundsBy("${currentUser!!.id}UserStatusDescription")
                             },
 
                         text = currentUser?.statusDescription?.ifBlank { currentUser.status.value }.orEmpty(),

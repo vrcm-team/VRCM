@@ -255,12 +255,11 @@ private fun ProfileIcon(
         ) {
             AImage(
                 modifier = Modifier
-                    .enableIf(!isHidden) { then(imageModifier) }
                     .align(Alignment.Center)
-                    .clip(CircleShape)
                     .size(iconSize)
-                    .clickable(onClick = onClickIcon)
-                    ,
+                    .enableIf(!isHidden) { then(imageModifier) }
+                    .clip(CircleShape)
+                    .clickable(onClick = onClickIcon),
                 imageData = ImageRequest.Builder(koinInject<PlatformContext>())
                     .data(avatarThumbnailImageUrl)
                     .crossfade(600)

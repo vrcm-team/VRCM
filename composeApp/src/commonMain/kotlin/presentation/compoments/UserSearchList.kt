@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -124,6 +125,7 @@ fun UserList(
 
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
     ListItem(
@@ -150,7 +152,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
                     tint = GameColor.Rank.fromValue(friend.trustRank)
                 )
                 Text(
-                    modifier = Modifier.sharedElementBy("${friend.id}UserName"),
+                    modifier = Modifier.sharedBoundsBy("${friend.id}UserName"),
                     text = friend.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
@@ -160,7 +162,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
         },
         supportingContent = {
             Text(
-                modifier = Modifier.sharedElementBy("${friend.id}UserStatusDescription"),
+                modifier = Modifier.sharedBoundsBy("${friend.id}UserStatusDescription"),
                 text = friend.statusDescription.ifBlank { friend.status.value },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
