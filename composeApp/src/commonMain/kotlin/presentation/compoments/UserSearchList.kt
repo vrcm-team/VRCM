@@ -139,7 +139,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             .animateItem(fadeInSpec = null, fadeOutSpec = null),
         leadingContent = {
             UserStateIcon(
-                modifier = Modifier.size(60.dp).sharedElementBy("${friend.id}UserIcon"), iconUrl = friend.iconUrl, userStatus = friend.status
+                modifier = Modifier.size(60.dp).sharedBoundsBy("${friend.id}UserIcon"), iconUrl = friend.iconUrl, userStatus = friend.status
             )
         },
         headlineContent = {
@@ -147,7 +147,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    modifier = Modifier.size(16.dp).sharedElementBy("${friend.id}UserTrustRankIcon"),
+                    modifier = Modifier.size(16.dp).sharedBoundsBy("${friend.id}UserTrustRankIcon"),
                     imageVector = Icons.Rounded.Shield,
                     contentDescription = "TrustRankIcon",
                     tint = GameColor.Rank.fromValue(friend.trustRank)

@@ -35,7 +35,6 @@ import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
@@ -160,7 +159,7 @@ private inline fun Screen.HomeTopAppBar(
                     modifier = Modifier
                         .size(54.dp)
                         .enableIf(currentUser != null) {
-                            sharedElementBy("${currentUser!!.id}UserIcon")
+                            sharedBoundsBy("${currentUser!!.id}UserIcon")
                         },
                     iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
                     userStatus = currentUser?.status
@@ -188,7 +187,7 @@ private inline fun Screen.HomeTopAppBar(
                                     .size(16.dp)
                                     .align(Alignment.CenterVertically)
                                     .enableIf(currentUser != null) {
-                                        sharedElementBy("${currentUser!!.id}UserTrustRankIcon")
+                                        sharedBoundsBy("${currentUser!!.id}UserTrustRankIcon")
                                     },
                             imageVector = Icons.Rounded.Shield,
                             contentDescription = "CurrentUserTrustRankIcon",

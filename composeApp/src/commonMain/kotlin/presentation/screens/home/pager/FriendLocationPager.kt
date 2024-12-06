@@ -245,7 +245,7 @@ private fun LazyItemScope.LocationFriend(
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
-            modifier = Modifier.fillMaxSize().sharedElementBy("${id}UserIcon"),
+            modifier = Modifier.fillMaxSize().sharedBoundsBy("${id}UserIcon"),
             iconUrl = iconUrl,
             userStatus = userStatus
         )

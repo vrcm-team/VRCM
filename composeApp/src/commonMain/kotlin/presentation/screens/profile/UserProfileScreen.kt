@@ -27,7 +27,10 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
-import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
+import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -68,7 +71,7 @@ data class UserProfileScreen(
         var openAlertDialog by remember { mutableStateOf(false) }
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey){
             ProfileScaffold(
-                imageModifier = Modifier.sharedElementBy("${userProfileVO.id}UserIcon"),
+                imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
                 profileImageUrl = currentUser?.profileImageUrl,
                 iconUrl = currentUser?.iconUrl,
                 onReturn = { currentNavigator.pop() },
@@ -396,7 +399,7 @@ private fun UserInfoRow(
             modifier = Modifier
                 .size(24.dp)
                 .align(Alignment.CenterVertically)
-                .sharedElementBy("${userId}UserTrustRankIcon"),
+                .sharedBoundsBy("${userId}UserTrustRankIcon"),
             imageVector = Icons.Rounded.Shield,
             contentDescription = "TrustRankIcon",
             tint = rankColor
