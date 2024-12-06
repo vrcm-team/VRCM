@@ -87,10 +87,11 @@ fun UserList(
 ) {
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     val currentNavigator = currentNavigator
+    val sharedSuffixKey = LocalSharedSuffixKey.current
     val toProfile = { user: IUser ->
-        if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(
-            UserProfileVo(user)
-        )
+        if (currentNavigator.size <= 1) {
+            currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
+        }
     }
     // 如果没有底部系统手势条，默认12dp
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp

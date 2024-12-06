@@ -104,7 +104,7 @@ private inline fun NotificationItem(
                         .clickable(isFriendRequest) {
                             onDismissRequest()
                             navigator push UserProfileScreen(
-                                UserProfileVo(
+                                userProfileVO = UserProfileVo(
                                     id = it.senderUserId,
                                     profileImageUrl = it.imageUrl
                                 )

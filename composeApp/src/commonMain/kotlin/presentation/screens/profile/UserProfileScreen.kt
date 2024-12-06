@@ -27,10 +27,7 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
-import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
-import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -43,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
+    private val sharedSuffixKey: String = "",
     private val userProfileVO: UserProfileVo,
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -68,18 +66,19 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
-
-        ProfileScaffold(
-            imageModifier = Modifier.sharedElementBy("${userProfileVO.id}UserIcon"),
-            profileImageUrl = currentUser?.profileImageUrl,
-            iconUrl = currentUser?.iconUrl,
-            onReturn = { currentNavigator.pop() },
-            onMenu = { bottomSheetIsVisible = true },
-        ) { ratio ->
-            ProfileContent(
-                currentUser = currentUser,
-                ratio = ratio
-            )
+        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey){
+            ProfileScaffold(
+                imageModifier = Modifier.sharedElementBy("${userProfileVO.id}UserIcon"),
+                profileImageUrl = currentUser?.profileImageUrl,
+                iconUrl = currentUser?.iconUrl,
+                onReturn = { currentNavigator.pop() },
+                onMenu = { bottomSheetIsVisible = true },
+            ) { ratio ->
+                ProfileContent(
+                    currentUser = currentUser,
+                    ratio = ratio
+                )
+            }
         }
         if (currentUser == null) return
         ABottomSheet(
@@ -461,7 +460,6 @@ private fun LanguagesRow(
     if (speakLanguages.isEmpty()) {
         return
     }
-    println("speakLanguages:${speakLanguages}")
     Row(
         modifier = Modifier.height(width),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -35,10 +35,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
-import io.github.vrcmteam.vrcm.presentation.compoments.AImage
-import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
-import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -93,7 +90,7 @@ object FriendLocationPager : Pager {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FriendLocationPager(
+fun Pager.FriendLocationPager(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
@@ -107,6 +104,7 @@ fun FriendLocationPager(
         bottomSheetIsVisible = true
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
+    val sharedSuffixKey = LocalSharedSuffixKey.current
     RefreshBox(
         refreshContainerOffsetY = topPadding,
         isRefreshing = isRefreshing,
@@ -118,7 +116,7 @@ fun FriendLocationPager(
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
         val onClickUserIcon = { user: IUser ->
-            if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(UserProfileVo(user))
+            if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(sharedSuffixKey,UserProfileVo(user))
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
@@ -252,7 +250,7 @@ private fun LazyItemScope.LocationFriend(
             userStatus = userStatus
         )
         Text(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().sharedBoundsBy("${id}UserName"),
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,

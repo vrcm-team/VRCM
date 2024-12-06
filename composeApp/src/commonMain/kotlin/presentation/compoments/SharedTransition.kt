@@ -28,7 +28,7 @@ fun ScreenSharedTransition(
             navigator = navigator,
             modifier = modifier,
             transition = transitionSpec,
-        ){ screen ->
+        ) { screen ->
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this@SharedTransitionLayout,
                 LocalAnimatedVisibilityScope provides this
@@ -46,6 +46,12 @@ fun ScreenSharedTransition(
 val LocalSharedTransitionScope: ProvidableCompositionLocal<SharedTransitionScope> =
     staticCompositionLocalOf { error("SharedTransitionScope is not provided") }
 
+/**
+ * 用于区分多个同级页面共享元素错位问题:比如两个Page中key相同的元素会在滑动时错位
+ */
+val LocalSharedSuffixKey: ProvidableCompositionLocal<String> =
+    staticCompositionLocalOf { "" }
+
 val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope> =
     staticCompositionLocalOf { error("AnimatedVisibilityScope is not provided") }
 
@@ -57,11 +63,11 @@ fun Modifier.sharedElementBy(
     placeHolderSize: PlaceHolderSize = contentSize,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
-    clipInOverlayDuringTransition: OverlayClip = ParentClip
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
     with(LocalSharedTransitionScope.current) {
         this@sharedElementBy.sharedElement(
-            state =  rememberSharedContentState(key),
+            state = rememberSharedContentState("$key:${LocalSharedSuffixKey.current}"),
             animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
@@ -80,11 +86,11 @@ fun Modifier.sharedBoundsBy(
     placeHolderSize: PlaceHolderSize = contentSize,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
-    clipInOverlayDuringTransition: OverlayClip = ParentClip
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
     with(LocalSharedTransitionScope.current) {
         this@sharedBoundsBy.sharedBounds(
-            sharedContentState =  rememberSharedContentState(key),
+            sharedContentState = rememberSharedContentState("$key:${LocalSharedSuffixKey.current}"),
             animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,

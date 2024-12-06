@@ -4,7 +4,6 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -33,6 +32,7 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedElementBy
@@ -89,7 +89,10 @@ object HomeScreen : Screen {
                 tonalElevation = 2.dp
             ) {
                 HorizontalPager(pagerState) {
-                    pagerList[it].Content()
+                    val pager = pagerList[it]
+                    CompositionLocalProvider(LocalSharedSuffixKey provides pager.title){
+                        pager.Content()
+                    }
                 }
             }
         }
@@ -111,10 +114,11 @@ private inline fun Screen.HomeTopAppBar(
     val notifications = homeScreenModel.friendRequestNotifications + homeScreenModel.notifications
     // to ProfileScreen
     val currentNavigator = currentNavigator
+    val sharedSuffixKey = LocalSharedSuffixKey.current
     val onClickUserIcon = { user: IUser ->
         // 防止多次点击在栈中存在相同key的屏幕报错
         if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(UserProfileVo(user))
+            currentNavigator push UserProfileScreen(sharedSuffixKey,UserProfileVo(user))
         }
     }
     val trustRank = remember(currentUser) { currentUser?.trustRank }
@@ -219,7 +223,6 @@ private inline fun Screen.HomeTopAppBar(
 }
 
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private inline fun HomeBottomBar(
     pagerList: List<Pager>,
