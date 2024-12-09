@@ -11,7 +11,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
-import io.github.vrcmteam.vrcm.presentation.compoments.AAlertDialog
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
@@ -36,7 +36,7 @@ fun App() {
                         .systemBarsPadding()
                         .padding(vertical = 76.dp, horizontal = 12.dp)
                 ) {
-                    AAlertDialog {
+                    SharedTransitionDialog {
                         SharedTransitionScreen(
                             navigator = it,
                             modifier = Modifier.slideBack(),

@@ -68,8 +68,9 @@ fun Modifier.sharedElementBy(
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
     with(sharedTransitionScope) {
+        val suffixKey = LocalSharedSuffixKey.current
         this@sharedElementBy.sharedElement(
-            state = rememberSharedContentState("$key:${if (useSuffixKey)LocalSharedSuffixKey.current else ""}"),
+            state = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
             animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
@@ -94,8 +95,9 @@ fun Modifier.sharedBoundsBy(
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
     with(sharedTransitionScope) {
+        val suffixKey = LocalSharedSuffixKey.current
         this@sharedBoundsBy.sharedBounds(
-            sharedContentState = rememberSharedContentState("$key:${if (useSuffixKey)LocalSharedSuffixKey.current else ""}"),
+            sharedContentState = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
             animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,

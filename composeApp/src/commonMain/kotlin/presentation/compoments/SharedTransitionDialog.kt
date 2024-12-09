@@ -16,7 +16,7 @@ import presentation.compoments.DialogShapeForSharedElement
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun AAlertDialog(
+fun SharedTransitionDialog(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
