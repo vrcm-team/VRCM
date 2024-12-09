@@ -14,7 +14,6 @@ import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +40,12 @@ import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
-import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.FriendLocationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import presentation.compoments.DialogShapeForSharedElement
+import presentation.compoments.LocationDialog
 
 object FriendLocationPager : Pager {
 
@@ -88,6 +88,8 @@ object FriendLocationPager : Pager {
 
 }
 
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Pager.FriendLocationPager(
@@ -96,27 +98,35 @@ fun Pager.FriendLocationPager(
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
 ) {
-    var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-    val currentLocation: MutableState<FriendLocation?> = remember { mutableStateOf(null) }
+    var currentLocation: FriendLocation? by remember { mutableStateOf(null) }
+    val currentNavigator = currentNavigator
+    var currentDialog by LocationDialogContent.current
+    val sharedSuffixKey = LocalSharedSuffixKey.current
     val onClickLocation: (FriendLocation) -> Unit = {
-        currentLocation.value = it
-        bottomSheetIsVisible = true
+        currentLocation = it
+        currentDialog = LocationDialog(it,sharedSuffixKey){
+            currentDialog = null
+            currentLocation = null
+        }
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-    val sharedSuffixKey = LocalSharedSuffixKey.current
+
     RefreshBox(
         refreshContainerOffsetY = topPadding,
         isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
-        val currentNavigator = currentNavigator
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
         val onClickUserIcon = { user: IUser ->
-            if (currentNavigator.size <= 1) currentNavigator push UserProfileScreen(sharedSuffixKey,UserProfileVo(user))
+            if (currentNavigator.size <= 1) {
+                currentNavigator push UserProfileScreen(
+                    sharedSuffixKey,
+                    UserProfileVo(user)
+                )
+            }
         }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
@@ -154,21 +164,32 @@ fun Pager.FriendLocationPager(
                         text = strings.fiendLocationPagerLocation,
                     )
                 }
+
                 items(instanceFriendLocations, key = { it.location }) { location ->
-                    LocationCard(location, { onClickLocation(location) }) {
-                        UserIconsRow(
-                            friends = it,
-                            onClickUserIcon = onClickUserIcon
-                        )
+                    AnimatedVisibility(
+                        visible = location != currentLocation,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                        modifier = Modifier.animateItem()
+                    ){
+                        LocationCard(location, { onClickLocation(location) }) {
+                            UserIconsRow(
+                                friends = it,
+                                onClickUserIcon = onClickUserIcon
+                            )
+                        }
                     }
+
                 }
             }
 
         }
     }
-    FriendLocationBottomSheet(bottomSheetIsVisible, sheetState, currentLocation) {
-        bottomSheetIsVisible = false
-    }
+
+
+//    FriendLocationBottomSheet(bottomSheetIsVisible, sheetState, currentLocation) {
+//        bottomSheetIsVisible = false
+//    }
 }
 
 private fun LazyListScope.SimpleCLocationCard(
@@ -250,7 +271,7 @@ private fun LazyItemScope.LocationFriend(
             userStatus = userStatus
         )
         Text(
-            modifier = Modifier.fillMaxSize().sharedBoundsBy("${id}UserName"),
+            modifier = Modifier.fillMaxSize().wrapContentWidth().sharedBoundsBy("${id}UserName"),
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
@@ -260,8 +281,9 @@ private fun LazyItemScope.LocationFriend(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun LazyItemScope.LocationCard(
+private fun AnimatedVisibilityScope.LocationCard(
     location: FriendLocation,
     clickable: () -> Unit,
     content: @Composable (List<State<FriendData>>) -> Unit,
@@ -270,7 +292,17 @@ private fun LazyItemScope.LocationCard(
     var showUser by rememberSaveable(location.location) { mutableStateOf(false) }
     val friendList = location.friendList
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .sharedBoundsBy(
+                key = location.location + "Container",
+                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                animatedVisibilityScope = this,
+                clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current){
+                    OverlayClip(DialogShapeForSharedElement)
+                }
+            )
+            .fillMaxWidth(),
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large
     ) {
@@ -290,6 +322,11 @@ private fun LazyItemScope.LocationCard(
             ) {
                 AImage(
                     modifier = Modifier
+                        .sharedElementBy(
+                            key = location.location + "WorldImage",
+                            sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                            animatedVisibilityScope = this@LocationCard,
+                        )
                         .weight(0.5f)
                         .clip(
                             RoundedCornerShape(

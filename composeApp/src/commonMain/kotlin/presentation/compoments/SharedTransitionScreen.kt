@@ -18,7 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.ParentClip
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ScreenSharedTransition(
+fun SharedTransitionScreen(
     navigator: Navigator,
     modifier: Modifier = Modifier,
     transitionSpec: AnimatedContentTransitionScope<Screen>.() -> ContentTransform = { DefaultScreenTransition },
@@ -30,7 +30,7 @@ fun ScreenSharedTransition(
             transition = transitionSpec,
         ) { screen ->
             CompositionLocalProvider(
-                LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                LocalSharedTransitionScreenScope provides this@SharedTransitionLayout,
                 LocalAnimatedVisibilityScope provides this
             ) {
                 screen.Content()
@@ -38,12 +38,11 @@ fun ScreenSharedTransition(
         }
     }
 
-
 }
 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
-val LocalSharedTransitionScope: ProvidableCompositionLocal<SharedTransitionScope> =
+val LocalSharedTransitionScreenScope: ProvidableCompositionLocal<SharedTransitionScope> =
     staticCompositionLocalOf { error("SharedTransitionScope is not provided") }
 
 /**
@@ -59,16 +58,19 @@ val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityS
 @Composable
 fun Modifier.sharedElementBy(
     key: String,
+    useSuffixKey: Boolean = true,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
     placeHolderSize: PlaceHolderSize = contentSize,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
-    with(LocalSharedTransitionScope.current) {
+    with(sharedTransitionScope) {
         this@sharedElementBy.sharedElement(
-            state = rememberSharedContentState("$key:${LocalSharedSuffixKey.current}"),
-            animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+            state = rememberSharedContentState("$key:${if (useSuffixKey)LocalSharedSuffixKey.current else ""}"),
+            animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
             renderInOverlayDuringTransition = renderInOverlayDuringTransition,
@@ -82,16 +84,19 @@ fun Modifier.sharedElementBy(
 @Composable
 fun Modifier.sharedBoundsBy(
     key: String,
+    useSuffixKey: Boolean = true,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
     placeHolderSize: PlaceHolderSize = contentSize,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
 ): Modifier =
-    with(LocalSharedTransitionScope.current) {
+    with(sharedTransitionScope) {
         this@sharedBoundsBy.sharedBounds(
-            sharedContentState = rememberSharedContentState("$key:${LocalSharedSuffixKey.current}"),
-            animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+            sharedContentState = rememberSharedContentState("$key:${if (useSuffixKey)LocalSharedSuffixKey.current else ""}"),
+            animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
             renderInOverlayDuringTransition = renderInOverlayDuringTransition,

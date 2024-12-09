@@ -153,7 +153,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
                     tint = GameColor.Rank.fromValue(friend.trustRank)
                 )
                 Text(
-                    modifier = Modifier.sharedBoundsBy("${friend.id}UserName"),
+                    modifier = Modifier.wrapContentWidth().sharedBoundsBy("${friend.id}UserName"),
                     text = friend.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
@@ -163,7 +163,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
         },
         supportingContent = {
             Text(
-                modifier = Modifier.sharedBoundsBy("${friend.id}UserStatusDescription"),
+                modifier = Modifier.wrapContentWidth().sharedBoundsBy("${friend.id}UserStatusDescription"),
                 text = friend.statusDescription.ifBlank { friend.status.value },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1

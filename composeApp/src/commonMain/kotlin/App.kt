@@ -1,9 +1,6 @@
 package io.github.vrcmteam.vrcm
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
@@ -14,7 +11,8 @@ import cafe.adriel.voyager.navigator.Navigator
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
-import io.github.vrcmteam.vrcm.presentation.compoments.ScreenSharedTransition
+import io.github.vrcmteam.vrcm.presentation.compoments.AAlertDialog
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
@@ -27,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import org.koin.compose.KoinContext
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun App() {
     KoinContext {
@@ -37,11 +36,13 @@ fun App() {
                         .systemBarsPadding()
                         .padding(vertical = 76.dp, horizontal = 12.dp)
                 ) {
-                    ScreenSharedTransition(
-                        navigator = it,
-                        modifier = Modifier.slideBack(),
-                        transitionSpec = { selectTransition(it) }
-                    )
+                    AAlertDialog {
+                        SharedTransitionScreen(
+                            navigator = it,
+                            modifier = Modifier.slideBack(),
+                            transitionSpec = { selectTransition(it) }
+                        )
+                    }
                 }
             }
         }

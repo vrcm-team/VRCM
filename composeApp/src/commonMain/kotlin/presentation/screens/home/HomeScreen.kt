@@ -173,6 +173,7 @@ private inline fun Screen.HomeTopAppBar(
                     ) {
                         Text(
                             modifier = Modifier
+                                .wrapContentWidth()
                                 .enableIf(currentUser != null) {
                                     sharedBoundsBy("${currentUser!!.id}UserName")
                                 },
@@ -196,10 +197,10 @@ private inline fun Screen.HomeTopAppBar(
                     }
                     Text(
                         modifier = Modifier
+                            .wrapContentWidth()
                             .enableIf(currentUser != null) {
                                 sharedBoundsBy("${currentUser!!.id}UserStatusDescription")
                             },
-
                         text = currentUser?.statusDescription?.ifBlank { currentUser.status.value }.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
                         overflow = TextOverflow.Ellipsis,

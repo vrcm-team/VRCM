@@ -49,8 +49,7 @@ data class UserProfileScreen(
     @OptIn(ExperimentalMaterial3Api::class)
     @ExperimentalSharedTransitionApi
     @Composable
-    override fun Content(
-    ) {
+    override fun Content() {
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
 
@@ -417,7 +416,7 @@ private fun UserInfoRow(
             }
         ) {
             Text(
-                modifier = Modifier.sharedBoundsBy("${userId}UserName"),
+                modifier = Modifier.wrapContentWidth().sharedBoundsBy("${userId}UserName"),
                 text = userName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1
@@ -446,7 +445,7 @@ private fun StatusRow(
             drawCircle(statusColor)
         }
         Text(
-            modifier = Modifier.sharedBoundsBy("${userId}UserStatusDescription"),
+            modifier = Modifier.wrapContentWidth().sharedBoundsBy("${userId}UserStatusDescription"),
             text = statusDescription,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1
