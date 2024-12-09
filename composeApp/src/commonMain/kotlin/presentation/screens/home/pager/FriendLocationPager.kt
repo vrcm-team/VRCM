@@ -411,7 +411,7 @@ private inline fun MemberInfoRow(
             .height(24.dp),
     ) {
         // 房间好友头像/房间持有者
-        Box(modifier = Modifier.fillMaxHeight().weight(0.6f)) {
+        Box(modifier = Modifier.fillMaxHeight().weight(0.5f)) {
             AnimatedContent(
                 targetState = showUser,
                 transitionSpec = {
@@ -468,7 +468,7 @@ private inline fun MemberInfoRow(
         if (instants.userCount.isEmpty()) return@Row
         Box(
             modifier = Modifier.fillMaxHeight()
-                .weight(0.3f)
+                .weight(0.4f)
                 .background(
                     MaterialTheme.colorScheme.inverseOnSurface,
                     MaterialTheme.shapes.medium
