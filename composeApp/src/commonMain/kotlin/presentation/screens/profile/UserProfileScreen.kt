@@ -27,10 +27,7 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
-import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
-import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
-import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -255,12 +252,11 @@ private fun ProfileContent(
         }
     }
     val rankColor = GameColor.Rank.fromValue(currentUser.trustRank)
-    val statusColor = GameColor.Status.fromValue(currentUser.status)
     val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
     // TrustRank + UserName + VRC+
     UserInfoRow(currentUser.id, currentUser.displayName, currentUser.isSupporter, rankColor)
     // status
-    StatusRow(currentUser.id, statusColor, statusDescription)
+    UserStatusRow(user = currentUser)
     // LanguagesRow && LinksRow
     LangAndLinkRow(currentUser)
     Box(
@@ -428,31 +424,7 @@ private fun UserInfoRow(
 }
 
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun StatusRow(
-    userId: String,
-    statusColor: Color,
-    statusDescription: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Canvas(
-            modifier = Modifier.size(12.dp)
-        ) {
-            drawCircle(color = Color.White, radius = size.minDimension / 1.6f)
-            drawCircle(color = statusColor, radius = size.minDimension / 2f)
-        }
-        Text(
-            modifier = Modifier.sharedBoundsBy("${userId}UserStatusDescription"),
-            text = statusDescription,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1
-        )
-    }
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

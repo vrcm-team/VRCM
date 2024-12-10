@@ -8,11 +8,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
@@ -28,7 +29,6 @@ import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
-import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -139,34 +139,18 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             .animateItem(fadeInSpec = null, fadeOutSpec = null),
         leadingContent = {
             UserStateIcon(
-                modifier = Modifier.sharedBoundsBy("${friend.id}UserIcon"), iconUrl = friend.iconUrl, userStatus = friend.status
+                modifier = Modifier.sharedBoundsBy("${friend.id}UserIcon"),
+                iconUrl = friend.iconUrl,
             )
         },
         headlineContent = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    modifier = Modifier.size(16.dp).sharedBoundsBy("${friend.id}UserTrustRankIcon"),
-                    imageVector = Icons.Rounded.Shield,
-                    contentDescription = "TrustRankIcon",
-                    tint = GameColor.Rank.fromValue(friend.trustRank)
-                )
-                Text(
-                    modifier = Modifier.sharedBoundsBy("${friend.id}UserName"),
-                    text = friend.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            UserInfo(
+                user = friend
+            )
         },
         supportingContent = {
-            Text(
-                modifier = Modifier.sharedBoundsBy("${friend.id}UserStatusDescription"),
-                text = friend.statusDescription.ifBlank { friend.status.value },
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1
+            UserStatusRow(
+                user = friend
             )
         },
 
@@ -182,3 +166,5 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
         },
     )
 }
+
+

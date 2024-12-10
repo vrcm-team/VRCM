@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
@@ -32,9 +30,7 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
-import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
-import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
@@ -89,7 +85,7 @@ object HomeScreen : Screen {
             ) {
                 HorizontalPager(pagerState) {
                     val pager = pagerList[it]
-                    CompositionLocalProvider(LocalSharedSuffixKey provides pager.title){
+                    CompositionLocalProvider(LocalSharedSuffixKey provides pager.title) {
                         pager.Content()
                     }
                 }
@@ -117,7 +113,7 @@ private inline fun Screen.HomeTopAppBar(
     val onClickUserIcon = { user: IUser ->
         // 防止多次点击在栈中存在相同key的屏幕报错
         if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(sharedSuffixKey,UserProfileVo(user))
+            currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
         }
     }
     val trustRank = remember(currentUser) { currentUser?.trustRank }
@@ -157,53 +153,19 @@ private inline fun Screen.HomeTopAppBar(
             ) {
                 UserStateIcon(
                     modifier = Modifier
-                        .size(54.dp)
                         .enableIf(currentUser != null) {
                             sharedBoundsBy("${currentUser!!.id}UserIcon")
-                        },
-                    iconUrl = currentUser?.currentAvatarThumbnailImageUrl.orEmpty(),
-                    userStatus = currentUser?.status
+                        }.size(54.dp),
+                    iconUrl = currentUser?.currentAvatarThumbnailImageUrl
                 )
                 Column(
                     modifier = Modifier.widthIn(max = 220.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            modifier = Modifier
-                                .enableIf(currentUser != null) {
-                                    sharedBoundsBy("${currentUser!!.id}UserName")
-                                },
-                            text = currentUser?.displayName.orEmpty(),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1
-                        )
-                        Icon(
-                            modifier =
-                                Modifier
-                                    .size(16.dp)
-                                    .align(Alignment.CenterVertically)
-                                    .enableIf(currentUser != null) {
-                                        sharedBoundsBy("${currentUser!!.id}UserTrustRankIcon")
-                                    },
-                            imageVector = Icons.Rounded.Shield,
-                            contentDescription = "CurrentUserTrustRankIcon",
-                            tint = rankColor
-                        )
-                    }
-                    Text(
-                        modifier = Modifier
-                            .enableIf(currentUser != null) {
-                                sharedBoundsBy("${currentUser!!.id}UserStatusDescription")
-                            },
-                        text = currentUser?.statusDescription?.ifBlank { currentUser.status.value }.orEmpty(),
-                        style = MaterialTheme.typography.labelMedium,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1
+                    UserInfo(
+                        user = currentUser,
+                    )
+                    UserStatusRow(
+                        user = currentUser,
                     )
                 }
             }
