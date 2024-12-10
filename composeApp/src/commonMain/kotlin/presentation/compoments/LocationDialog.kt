@@ -1,4 +1,4 @@
-package presentation.compoments
+package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -14,11 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 
@@ -40,7 +38,7 @@ class LocationDialog(
         val currentNavigator = currentNavigator
         val onClickUserIcon = { user: IUser ->
             if (currentNavigator.size <= 1) {
-                close()
+//                close()
                 currentNavigator push UserProfileScreen(
                     sharedSuffixKey,
                     UserProfileVo(user)
@@ -62,15 +60,15 @@ class LocationDialog(
                 ) {
                     Box(
                         modifier = Modifier
-                            .sharedElementBy(
-                                key = friendLocation.location + "WorldImage",
-                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                                animatedVisibilityScope = animatedVisibilityScope,
-                            )
                             .clip(MaterialTheme.shapes.medium)
                     ) {
                         AImage(
                             modifier = Modifier
+                                .sharedElementBy(
+                                    key = friendLocation.location + "WorldImage",
+                                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                )
                                 .fillMaxWidth()
                                 .height(200.dp)
                                 .clip(MaterialTheme.shapes.medium),
@@ -137,11 +135,9 @@ class LocationDialog(
                             Text(text = "Save changes")
                         }
                     }
-
                     UserIconsRow(friendLocation.friendList) {
                         onClickUserIcon(it)
                     }
-
                 }
             }
         }

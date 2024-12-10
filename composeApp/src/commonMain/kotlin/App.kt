@@ -41,7 +41,7 @@ fun App() {
                         modifier = Modifier.slideBack(),
                         transitionSpec = { selectTransition(it) }
                     ) {
-                        SharedTransitionDialog {
+                        SharedTransitionDialog(key = it.key) {
                             it.Content()
                         }
                     }

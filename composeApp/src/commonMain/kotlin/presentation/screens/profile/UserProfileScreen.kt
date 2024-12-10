@@ -396,9 +396,9 @@ private fun UserInfoRow(
     ) {
         Icon(
             modifier = Modifier
+                .sharedBoundsBy("${userId}UserTrustRankIcon")
                 .size(24.dp)
-                .align(Alignment.CenterVertically)
-                .sharedBoundsBy("${userId}UserTrustRankIcon"),
+                .align(Alignment.CenterVertically),
             imageVector = Icons.Rounded.Shield,
             contentDescription = "TrustRankIcon",
             tint = rankColor
@@ -416,7 +416,7 @@ private fun UserInfoRow(
             }
         ) {
             Text(
-                modifier = Modifier.wrapContentWidth().sharedBoundsBy("${userId}UserName"),
+                modifier = Modifier.sharedBoundsBy("${userId}UserName"),
                 text = userName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1
@@ -442,10 +442,11 @@ private fun StatusRow(
         Canvas(
             modifier = Modifier.size(12.dp)
         ) {
-            drawCircle(statusColor)
+            drawCircle(color = Color.White, radius = size.minDimension / 1.6f)
+            drawCircle(color = statusColor, radius = size.minDimension / 2f)
         }
         Text(
-            modifier = Modifier.wrapContentWidth().sharedBoundsBy("${userId}UserStatusDescription"),
+            modifier = Modifier.sharedBoundsBy("${userId}UserStatusDescription"),
             text = statusDescription,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1

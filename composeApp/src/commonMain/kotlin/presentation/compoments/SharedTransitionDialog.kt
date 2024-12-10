@@ -5,26 +5,29 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
-import presentation.compoments.DialogShapeForSharedElement
 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SharedTransitionDialog(
     modifier: Modifier = Modifier,
+    key: String,
     content: @Composable () -> Unit,
 ) {
     SharedTransitionLayout(modifier = modifier.fillMaxSize()) {
-        var dialogContent by LocationDialogContent.current
+        val dialogContentState = rememberSaveable(key) { mutableStateOf<SharedDialog?>(null) }
         CompositionLocalProvider(
+            LocationDialogContent provides dialogContentState,
             LocalSharedTransitionDialogScope provides this,
         ) {
+            var dialogContent by LocationDialogContent.current
             content()
             AnimatedContent(
                 modifier = Modifier.fillMaxSize(),
@@ -47,7 +50,7 @@ fun SharedTransitionDialog(
                                 dialogContent = null
                                 targetDialogContent.close()
                             }
-                            .background(Color.Black.copy(alpha = 0.5f))
+                            .background(Color.Black.copy(alpha = 0.6f))
                     )
                     targetDialogContent.Content(
                         animatedVisibilityScope = this@AnimatedContent

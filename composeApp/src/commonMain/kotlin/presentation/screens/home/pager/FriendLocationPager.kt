@@ -19,21 +19,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
@@ -45,8 +43,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import presentation.compoments.DialogShapeForSharedElement
-import presentation.compoments.LocationDialog
+
 
 object FriendLocationPager : Pager {
 
@@ -99,7 +96,7 @@ fun Pager.FriendLocationPager(
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
 ) {
-    var currentLocation: FriendLocation? by remember { mutableStateOf(null) }
+    var currentLocation: FriendLocation? by rememberSaveable(key) { mutableStateOf(null) }
 
     var currentDialog by LocationDialogContent.current
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -220,61 +217,9 @@ private fun LocationTitle(
     )
 }
 
-@Composable
-fun UserIconsRow(
-//    modifier: Modifier = Modifier,
-    friends: List<State<FriendData>>,
-    contentPadding: PaddingValues = PaddingValues(0.dp),
-    onClickUserIcon: (IUser) -> Unit,
-) {
-    if (friends.isEmpty()) return
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(friends, key = { it.value.id }) {
-            val friend = it.value
-            LocationFriend(
-                id = friend.id,
-                iconUrl = friend.iconUrl,
-                name = friend.displayName,
-                userStatus = friend.status
-            ) { onClickUserIcon(friend) }
-        }
-    }
-}
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun LazyItemScope.LocationFriend(
-    id: String,
-    iconUrl: String,
-    name: String,
-    userStatus: UserStatus,
-    onClickUserIcon: () -> Unit,
-) {
-    Column(
-        modifier = Modifier.width(60.dp)
-            .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon).animateItem(),
-        verticalArrangement = Arrangement.Center
-    ) {
-        UserStateIcon(
-            modifier = Modifier.sharedBoundsBy("${id}UserIcon").fillMaxWidth(),
-            iconUrl = iconUrl,
-            userStatus = userStatus
-        )
-        Text(
-            modifier = Modifier.wrapContentWidth().sharedBoundsBy("${id}UserName").fillMaxWidth(),
-            text = name,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
-        )
-    }
-}
+
+
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
