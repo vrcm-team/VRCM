@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -14,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 
+// 为了解决安卓序列化问题, 不能写成rememberSaveable
+private val DialogContentMap = mutableMapOf<String, MutableState<SharedDialog?>>()
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -23,7 +24,7 @@ fun SharedTransitionDialog(
     content: @Composable () -> Unit,
 ) {
     SharedTransitionLayout(modifier = modifier.fillMaxSize()) {
-        val dialogContentState = rememberSaveable(key) { mutableStateOf<SharedDialog?>(null) }
+        val dialogContentState = DialogContentMap.getOrPut(key){ mutableStateOf(null) }
         CompositionLocalProvider(
             LocationDialogContent provides dialogContentState,
             LocalSharedTransitionDialogScope provides this,
