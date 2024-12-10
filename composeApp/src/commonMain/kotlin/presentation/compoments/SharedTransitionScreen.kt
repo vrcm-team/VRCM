@@ -1,14 +1,16 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.*
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
-import androidx.compose.animation.SharedTransitionScope.PlaceHolderSize
+import androidx.compose.animation.SharedTransitionScope.*
 import androidx.compose.animation.SharedTransitionScope.PlaceHolderSize.Companion.contentSize
+import androidx.compose.animation.SharedTransitionScope.ResizeMode.Companion.ScaleToBounds
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment.Companion.Center
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransition
@@ -90,6 +92,7 @@ fun Modifier.sharedBoundsBy(
     useSuffixKey: Boolean = true,
     sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current,
     animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    resizeMode: ResizeMode = ScaleToBounds(ContentScale.FillWidth, Center),
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
     placeHolderSize: PlaceHolderSize = contentSize,
     renderInOverlayDuringTransition: Boolean = true,
@@ -101,6 +104,7 @@ fun Modifier.sharedBoundsBy(
         this@sharedBoundsBy.sharedBounds(
             sharedContentState = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
             animatedVisibilityScope = animatedVisibilityScope,
+            resizeMode = resizeMode,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
             renderInOverlayDuringTransition = renderInOverlayDuringTransition,
