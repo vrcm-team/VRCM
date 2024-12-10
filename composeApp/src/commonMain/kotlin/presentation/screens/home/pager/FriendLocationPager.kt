@@ -301,9 +301,9 @@ private fun AnimatedVisibilityScope.LocationCard(
     ) {
         Column(
             modifier = Modifier
-                .padding(8.dp)
+                .clickable(onClick = clickable)
                 .animateContentSize()
-                .clickable(onClick = clickable),
+                .padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

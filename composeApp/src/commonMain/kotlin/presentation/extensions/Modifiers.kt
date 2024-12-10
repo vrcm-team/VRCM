@@ -85,6 +85,19 @@ fun Modifier.slideBack(
 }
 
 /**
+ * 下滑返回
+ */
+fun Modifier.glideBack(
+    threshold: Float = 30.dp.value,
+    orientation: Orientation = Orientation.Vertical,
+    onBack: () -> Unit,
+) = this.composed {
+    draggable(rememberDraggableState {
+        if (it > threshold) onBack()
+    }, orientation)
+}
+
+/**
  * 去除点击水波纹效果
  */
 @Composable

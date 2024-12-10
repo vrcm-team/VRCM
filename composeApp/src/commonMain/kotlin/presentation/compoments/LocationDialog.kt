@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
@@ -54,19 +55,22 @@ class LocationDialog(
                 animatedVisibilityScope = animatedVisibilityScope,
             ) {
                 Column(
-                    modifier = Modifier.padding(6.dp),
+                    modifier = Modifier
+                        .glideBack{ close() }
+                        .padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
-                        modifier = Modifier.clip(MaterialTheme.shapes.medium)
+                        modifier = Modifier
+                            .sharedElementBy(
+                                key = friendLocation.location + "WorldImage",
+                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
+                            .clip(MaterialTheme.shapes.medium)
                     ) {
                         AImage(
                             modifier = Modifier
-                                .sharedElementBy(
-                                    key = friendLocation.location + "WorldImage",
-                                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                )
                                 .fillMaxWidth()
                                 .height(200.dp)
                                 .clip(MaterialTheme.shapes.medium),
