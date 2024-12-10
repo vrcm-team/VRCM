@@ -139,7 +139,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             .animateItem(fadeInSpec = null, fadeOutSpec = null),
         leadingContent = {
             UserStateIcon(
-                modifier = Modifier.sharedBoundsBy("${friend.id}UserIcon").size(60.dp), iconUrl = friend.iconUrl, userStatus = friend.status
+                modifier = Modifier.sharedBoundsBy("${friend.id}UserIcon"), iconUrl = friend.iconUrl, userStatus = friend.status
             )
         },
         headlineContent = {
