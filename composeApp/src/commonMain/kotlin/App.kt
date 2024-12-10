@@ -36,12 +36,14 @@ fun App() {
                         .systemBarsPadding()
                         .padding(vertical = 76.dp, horizontal = 12.dp)
                 ) {
-                    SharedTransitionDialog {
-                        SharedTransitionScreen(
-                            navigator = it,
-                            modifier = Modifier.slideBack(),
-                            transitionSpec = { selectTransition(it) }
-                        )
+                    SharedTransitionScreen(
+                        navigator = it,
+                        modifier = Modifier.slideBack(),
+                        transitionSpec = { selectTransition(it) }
+                    ) {
+                        SharedTransitionDialog {
+                            it.Content()
+                        }
                     }
                 }
             }

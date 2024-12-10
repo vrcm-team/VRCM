@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransition
+import cafe.adriel.voyager.transitions.ScreenTransitionContent
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.ParentClip
@@ -22,6 +23,7 @@ fun SharedTransitionScreen(
     navigator: Navigator,
     modifier: Modifier = Modifier,
     transitionSpec: AnimatedContentTransitionScope<Screen>.() -> ContentTransform = { DefaultScreenTransition },
+    content: ScreenTransitionContent = { it.Content() }
 ) {
     SharedTransitionLayout(modifier) {
         ScreenTransition(
@@ -33,7 +35,7 @@ fun SharedTransitionScreen(
                 LocalSharedTransitionScreenScope provides this@SharedTransitionLayout,
                 LocalAnimatedVisibilityScope provides this
             ) {
-                screen.Content()
+                content(screen)
             }
         }
     }

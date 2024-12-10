@@ -9,16 +9,17 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.rounded.Explore
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,7 +100,7 @@ fun Pager.FriendLocationPager(
     doRefresh: suspend () -> Unit,
 ) {
     var currentLocation: FriendLocation? by remember { mutableStateOf(null) }
-    val currentNavigator = currentNavigator
+
     var currentDialog by LocationDialogContent.current
     val sharedSuffixKey = LocalSharedSuffixKey.current
     val onClickLocation: (FriendLocation) -> Unit = {
@@ -110,7 +111,15 @@ fun Pager.FriendLocationPager(
         }
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-
+    val currentNavigator = currentNavigator
+    val onClickUserIcon = { user: IUser ->
+        if (currentNavigator.size <= 1) {
+            currentNavigator push UserProfileScreen(
+                sharedSuffixKey,
+                UserProfileVo(user)
+            )
+        }
+    }
     RefreshBox(
         refreshContainerOffsetY = topPadding,
         isRefreshing = isRefreshing,
@@ -120,14 +129,6 @@ fun Pager.FriendLocationPager(
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]
-        val onClickUserIcon = { user: IUser ->
-            if (currentNavigator.size <= 1) {
-                currentNavigator push UserProfileScreen(
-                    sharedSuffixKey,
-                    UserProfileVo(user)
-                )
-            }
-        }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
         LazyColumn(
@@ -172,14 +173,8 @@ fun Pager.FriendLocationPager(
                         exit = fadeOut() + scaleOut(),
                         modifier = Modifier.animateItem()
                     ){
-                        LocationCard(location, { onClickLocation(location) }) {
-                            UserIconsRow(
-                                friends = it,
-                                onClickUserIcon = onClickUserIcon
-                            )
-                        }
+                        LocationCard(location) { onClickLocation(location) }
                     }
-
                 }
             }
 
@@ -197,7 +192,6 @@ private fun LazyListScope.SimpleCLocationCard(
     locationType: LocationType,
     onClickUserIcon: (IUser) -> Unit,
     text: @Composable () -> String,
-
     ) {
     friendLocation?.friendList.let {
         if (it.isNullOrEmpty()) return@let
@@ -227,7 +221,8 @@ private fun LocationTitle(
 }
 
 @Composable
-private fun UserIconsRow(
+fun UserIconsRow(
+//    modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (IUser) -> Unit,
@@ -262,16 +257,16 @@ private fun LazyItemScope.LocationFriend(
     Column(
         modifier = Modifier.width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon).animateItem(fadeInSpec = null, fadeOutSpec = null),
+            .clickable(onClick = onClickUserIcon).animateItem(),
         verticalArrangement = Arrangement.Center
     ) {
         UserStateIcon(
-            modifier = Modifier.fillMaxSize().sharedBoundsBy("${id}UserIcon"),
+            modifier = Modifier.sharedBoundsBy("${id}UserIcon").fillMaxWidth(),
             iconUrl = iconUrl,
             userStatus = userStatus
         )
         Text(
-            modifier = Modifier.fillMaxSize().wrapContentWidth().sharedBoundsBy("${id}UserName"),
+            modifier = Modifier.wrapContentWidth().sharedBoundsBy("${id}UserName").fillMaxWidth(),
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
@@ -286,10 +281,8 @@ private fun LazyItemScope.LocationFriend(
 private fun AnimatedVisibilityScope.LocationCard(
     location: FriendLocation,
     clickable: () -> Unit,
-    content: @Composable (List<State<FriendData>>) -> Unit,
 ) {
     val instants by location.instants
-    var showUser by rememberSaveable(location.location) { mutableStateOf(false) }
     val friendList = location.friendList
     Surface(
         modifier = Modifier
@@ -308,9 +301,9 @@ private fun AnimatedVisibilityScope.LocationCard(
     ) {
         Column(
             modifier = Modifier
-                .clickable { showUser = !showUser }
                 .padding(8.dp)
-                .animateContentSize(),
+                .animateContentSize()
+                .clickable(onClick = clickable),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -335,8 +328,7 @@ private fun AnimatedVisibilityScope.LocationCard(
                                 bottomStart = 16.dp,
                                 bottomEnd = 8.dp
                             )
-                        )
-                        .clickable(onClick = clickable),
+                        ),
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )
@@ -386,11 +378,8 @@ private fun AnimatedVisibilityScope.LocationCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
-                    MemberInfoRow(showUser, friendList, instants)
+                    MemberInfoRow(friendList, instants)
                 }
-            }
-            AnimatedVisibility(showUser) {
-                content(friendList)
             }
         }
     }
@@ -401,7 +390,7 @@ private fun AnimatedVisibilityScope.LocationCard(
  */
 @Composable
 private inline fun MemberInfoRow(
-    showUser: Boolean,
+//    showUser: Boolean,
     friendList: List<State<FriendData>>,
     instants: InstantsVo,
 ) {
@@ -411,56 +400,69 @@ private inline fun MemberInfoRow(
             .height(24.dp),
     ) {
         // 房间好友头像/房间持有者
-        Box(modifier = Modifier.fillMaxHeight().weight(0.5f)) {
-            AnimatedContent(
-                targetState = showUser,
-                transitionSpec = {
-                    (fadeIn() + expandHorizontally()) togetherWith (fadeOut() + shrinkHorizontally())
-                }
+        Box(modifier = Modifier.fillMaxHeight().weight(0.6f)) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy((-8).dp)
             ) {
-                if (!it) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy((-8).dp)
-                    ) {
-                        friendList.take(5).forEach { friendState ->
-                            UserStateIcon(
-                                modifier = Modifier
-                                    .align(Alignment.CenterVertically)
-                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                                iconUrl = friendState.value.iconUrl,
-                            )
-                        }
-                    }
-                } else {
-                    instants.ownerName.value?.let { ownerName ->
-                        Row(
-                            modifier = Modifier.fillMaxHeight().background(
-                                MaterialTheme.colorScheme.inverseOnSurface,
-                                MaterialTheme.shapes.medium
-                            )
-                                .clip(MaterialTheme.shapes.medium)
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                modifier = Modifier.size(16.dp),
-                                imageVector = Icons.Default.Home,
-                                contentDescription = "OwnerIcon",
-                                tint = MaterialTheme.colorScheme.outline
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                text = ownerName,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    }
+                friendList.take(5).forEach { friendState ->
+                    UserStateIcon(
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                        iconUrl = friendState.value.iconUrl,
+                    )
                 }
             }
+//            AnimatedContent(
+//                targetState = showUser,
+//                transitionSpec = {
+//                    (fadeIn() + expandHorizontally()) togetherWith (fadeOut() + shrinkHorizontally())
+//                }
+//            ) {
+//                if (!it) {
+//                    Row(
+//                        modifier = Modifier.fillMaxSize(),
+//                        horizontalArrangement = Arrangement.spacedBy((-8).dp)
+//                    ) {
+//                        friendList.take(5).forEach { friendState ->
+//                            UserStateIcon(
+//                                modifier = Modifier
+//                                    .align(Alignment.CenterVertically)
+//                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+//                                iconUrl = friendState.value.iconUrl,
+//                            )
+//                        }
+//                    }
+//                } else {
+//                    instants.ownerName.value?.let { ownerName ->
+//                        Row(
+//                            modifier = Modifier.fillMaxHeight().background(
+//                                MaterialTheme.colorScheme.inverseOnSurface,
+//                                MaterialTheme.shapes.medium
+//                            )
+//                                .clip(MaterialTheme.shapes.medium)
+//                                .padding(horizontal = 8.dp),
+//                            verticalAlignment = Alignment.CenterVertically,
+//                        ) {
+//                            Icon(
+//                                modifier = Modifier.size(16.dp),
+//                                imageVector = Icons.Default.Home,
+//                                contentDescription = "OwnerIcon",
+//                                tint = MaterialTheme.colorScheme.outline
+//                            )
+//                            Spacer(modifier = Modifier.width(2.dp))
+//                            Text(
+//                                text = ownerName,
+//                                maxLines = 1,
+//                                overflow = TextOverflow.Ellipsis,
+//                                style = MaterialTheme.typography.labelSmall,
+//                                color = MaterialTheme.colorScheme.outline
+//                            )
+//                        }
+//                    }
+//                }
+//            }
         }
 
         Spacer(modifier = Modifier.weight(0.1f))
@@ -468,7 +470,7 @@ private inline fun MemberInfoRow(
         if (instants.userCount.isEmpty()) return@Row
         Box(
             modifier = Modifier.fillMaxHeight()
-                .weight(0.4f)
+                .weight(0.3f)
                 .background(
                     MaterialTheme.colorScheme.inverseOnSurface,
                     MaterialTheme.shapes.medium
