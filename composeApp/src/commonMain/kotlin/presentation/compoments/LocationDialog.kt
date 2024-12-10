@@ -2,14 +2,12 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -75,22 +73,22 @@ class LocationDialog(
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"
                         )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                                .background(
-                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                                )
-                                .padding(3.dp)
-                        ) {
-                            Text(
-                                modifier = Modifier.align(Alignment.Center),
-                                text = currentInstants.worldName,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+//                        Box(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .align(Alignment.BottomCenter)
+//                                .background(
+//                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+//                                )
+//                                .padding(3.dp)
+//                        ) {
+//                            Text(
+//                                modifier = Modifier.align(Alignment.Center),
+//                                text = currentInstants.worldName,
+//                                style = MaterialTheme.typography.titleSmall,
+//                                color = MaterialTheme.colorScheme.primary
+//                            )
+//                        }
                     }
                     Card(
                         modifier = Modifier.fillMaxWidth(),

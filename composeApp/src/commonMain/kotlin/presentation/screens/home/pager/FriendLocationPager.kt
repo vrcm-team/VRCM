@@ -14,13 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -96,7 +90,8 @@ fun Pager.FriendLocationPager(
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
 ) {
-    var currentLocation: FriendLocation? by rememberSaveable(key) { mutableStateOf(null) }
+    val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
+    var currentLocation by friendLocationPagerModel.currentLocation
 
     var currentDialog by LocationDialogContent.current
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -106,6 +101,7 @@ fun Pager.FriendLocationPager(
             currentDialog = null
             currentLocation = null
         }
+
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     val currentNavigator = currentNavigator

@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 
 
@@ -41,7 +42,7 @@ fun SharedTransitionDialog(
                     modifier = Modifier
                         .fillMaxSize(),
                     contentAlignment = Alignment.Center
-                ){
+                ) {
                     if (targetDialogContent == null) return@AnimatedContent
                     Box(
                         modifier = Modifier
@@ -64,7 +65,7 @@ fun SharedTransitionDialog(
 }
 
 val LocationDialogContent: ProvidableCompositionLocal<MutableState<SharedDialog?>> = compositionLocalOf {
-    mutableStateOf(null)
+    error("LocationDialogContent is not provided")
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -72,7 +73,8 @@ val LocalSharedTransitionDialogScope: ProvidableCompositionLocal<SharedTransitio
     staticCompositionLocalOf { error("SharedTransitionScope is not provided") }
 
 
-interface SharedDialog {
+interface SharedDialog : JavaSerializable {
+
     @Composable
     fun Content(animatedVisibilityScope: AnimatedVisibilityScope)
 
@@ -86,8 +88,8 @@ inline fun SharedDialogContainer(
     key: String,
     animatedVisibilityScope: AnimatedVisibilityScope,
     background: Color = MaterialTheme.colorScheme.surfaceContainerLow,
-    content: @Composable ColumnScope.() -> Unit
-){
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
         modifier = Modifier
             .padding(horizontal = 16.dp)
@@ -100,8 +102,7 @@ inline fun SharedDialogContainer(
                 }
             )
             .background(background, DialogShapeForSharedElement)
-            .clip(DialogShapeForSharedElement)
-            ,
+            .clip(DialogShapeForSharedElement),
         content = content
     )
 }
