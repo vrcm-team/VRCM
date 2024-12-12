@@ -18,7 +18,11 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -103,20 +107,20 @@ fun LazyItemScope.LocationFriend(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun UserInfo(
+fun UserInfoRow(
     modifier: Modifier = Modifier,
     spacedBy: Dp = 6.dp,
-    iconSize: Dp = 16.dp,
+    iconSize: Dp = 24.dp,
+    style: TextStyle = MaterialTheme.typography.headlineSmall,
     user:IUser?,
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.sharedBoundsBy("${user?.id}UserInfo").offset(x = (-4).dp),
         horizontalArrangement = Arrangement.spacedBy(spacedBy),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             modifier = Modifier
-                .sharedBoundsBy("${user?.id}UserTrustRankIcon")
                 .size(iconSize),
             imageVector = Icons.Rounded.Shield,
             contentDescription = "TrustRankIcon",
@@ -125,10 +129,30 @@ fun UserInfo(
         Text(
             modifier = Modifier.sharedBoundsBy("${user?.id}UserName"),
             text = user?.displayName.orEmpty(),
-            style = MaterialTheme.typography.titleMedium,
+            style = style,
             maxLines = 1,
             color = MaterialTheme.colorScheme.primary,
         )
+        if (user?.isSupporter == true) {
+            Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)){
+//                drawCircle(GameColor.Supporter)
+                drawOval(
+                    color = GameColor.Supporter,
+                    topLeft =  Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
+                    size = Size(size.width * 0.2f, size.height * 0.8f)
+                )
+                drawOval(
+                    color = GameColor.Supporter,
+                    topLeft = Offset(size.width * 0.1f ,size.height / 2f - (size.height * 0.2f / 2)),
+                    size = Size(size.width * 0.8f,size.height  * 0.2f)
+                )
+            }
+//            Icon(
+//                imageVector = Icons.Rounded.Add,
+//                contentDescription = "SupporterUserIcon",
+//                tint = GameColor.Supporter
+//            )
+        }
     }
 }
 
@@ -138,23 +162,24 @@ fun UserStatusRow(
     modifier: Modifier = Modifier,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 12.dp,
+    style: TextStyle = MaterialTheme.typography.labelLarge,
     user:IUser?,
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.sharedBoundsBy("${user?.id}UserStatusRow"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {
         Canvas(modifier = Modifier
-            .sharedBoundsBy("${user?.id}UserStatusIcon")
+//            .sharedBoundsBy("${user?.id}UserStatusIcon")
             .size(iconSize)
         ) {
             drawCircle(GameColor.Status.fromValue(user?.status))
         }
         Text(
-            modifier = Modifier.sharedBoundsBy("${user?.id}UserStatusDescription"),
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
-            style = MaterialTheme.typography.labelLarge,
+            style = style,
+            overflow = TextOverflow.Ellipsis,
             color =  MaterialTheme.colorScheme.outline,
             maxLines = 1
         )

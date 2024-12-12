@@ -8,16 +8,13 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person4
 import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.QuestionMark
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -36,7 +33,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
-import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
@@ -251,10 +247,8 @@ private fun ProfileContent(
             scrollState.animateScrollTo(0)
         }
     }
-    val rankColor = GameColor.Rank.fromValue(currentUser.trustRank)
-    val statusDescription = currentUser.statusDescription.ifBlank { currentUser.status.value }
     // TrustRank + UserName + VRC+
-    UserInfoRow(currentUser.id, currentUser.displayName, currentUser.isSupporter, rankColor)
+    UserInfoRow(user = currentUser)
     // status
     UserStatusRow(user = currentUser)
     // LanguagesRow && LinksRow
@@ -374,52 +368,6 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
         LanguagesRow(speakLanguages, width)
     } else if (bioLinks.isNotEmpty()) {
         LinksRow(bioLinks, width)
-    }
-}
-
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun UserInfoRow(
-    userId: String,
-    userName: String,
-    isSupporter: Boolean,
-    rankColor: Color,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            modifier = Modifier
-                .sharedBoundsBy("${userId}UserTrustRankIcon")
-                .size(24.dp)
-                .align(Alignment.CenterVertically),
-            imageVector = Icons.Rounded.Shield,
-            contentDescription = "TrustRankIcon",
-            tint = rankColor
-        )
-        // vrc+ 标志绘制在名字右上角
-        BadgedBox(
-            badge = {
-                if (isSupporter) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = "UserPlusIcon",
-                        tint = GameColor.Supporter
-                    )
-                }
-            }
-        ) {
-            Text(
-                modifier = Modifier.sharedBoundsBy("${userId}UserName"),
-                text = userName,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1
-            )
-        }
-        // 让名字居中
-        Box(modifier = Modifier.size(24.dp).align(Alignment.Top))
     }
 }
 

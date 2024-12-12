@@ -160,11 +160,16 @@ private inline fun Screen.HomeTopAppBar(
                 )
                 Column(
                     modifier = Modifier.widthIn(max = 220.dp),
+                    horizontalAlignment = Alignment.Start,
                 ) {
-                    UserInfo(
+                    UserInfoRow(
+                        iconSize = 16.dp,
+                        style = MaterialTheme.typography.titleMedium,
                         user = currentUser,
                     )
                     UserStatusRow(
+                        iconSize = 8.dp,
+                        style = MaterialTheme.typography.labelMedium,
                         user = currentUser,
                     )
                 }

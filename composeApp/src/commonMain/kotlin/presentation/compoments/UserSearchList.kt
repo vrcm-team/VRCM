@@ -144,12 +144,16 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             )
         },
         headlineContent = {
-            UserInfo(
+            UserInfoRow(
+                iconSize = 16.dp,
+                style = MaterialTheme.typography.titleMedium,
                 user = friend
             )
         },
         supportingContent = {
             UserStatusRow(
+                iconSize = 8.dp,
+                style = MaterialTheme.typography.bodyMedium,
                 user = friend
             )
         },

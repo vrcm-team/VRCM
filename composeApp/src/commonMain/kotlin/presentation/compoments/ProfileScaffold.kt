@@ -168,10 +168,10 @@ private fun ProfileImage(
     ) {
         AImage(
             modifier = Modifier
-                .padding(top = offsetDp)
                 .enableIf(isHidden) { then(imageModifier) }
                 .height(imageHeight)
                 .fillMaxWidth()
+                .padding(top = offsetDp)
                 .clip(
                     RoundedCornerShape(
                         bottomStart = (ContactPointShape * ratio).dp,
