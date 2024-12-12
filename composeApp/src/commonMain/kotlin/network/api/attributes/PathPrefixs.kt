@@ -20,6 +20,8 @@ internal const val FILE_API_PREFIX = "file"
 
 internal const val WORLDS_API_PREFIX = "worlds"
 
+internal const val INVITE_API_PREFIX = "invite"
+
 internal const val NOTIFICATIONS_API_PREFIX = "notifications"
 
 internal const val FAVORITE_API_PREFIX = "favorites"

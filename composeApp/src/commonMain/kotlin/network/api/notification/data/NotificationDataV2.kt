@@ -11,7 +11,7 @@ data class NotificationDataV2(
     val details: String,
     val id: String,
     val message: String,
-    val seen: Boolean,
+    val seen: Boolean?,
     val senderUserId: String,
     val receiverUserId: String?,
     val type: NotificationType,

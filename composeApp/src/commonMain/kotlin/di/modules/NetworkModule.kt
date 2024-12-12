@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
@@ -32,6 +33,7 @@ internal val networkModule = module(true) {
     singleOf(::InstancesApi)
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
+    singleOf(::InviteApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)

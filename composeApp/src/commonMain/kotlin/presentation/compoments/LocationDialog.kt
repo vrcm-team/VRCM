@@ -8,15 +8,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 val DialogShapeForSharedElement = RoundedCornerShape(16.dp)
 
@@ -41,6 +47,13 @@ class LocationDialog(
                     sharedSuffixKey,
                     UserProfileVo(user)
                 )
+            }
+        }
+        val inviteApi: InviteApi = koinInject()
+        val scope = rememberCoroutineScope()
+        val onClickInvite = {
+            scope.launch(Dispatchers.IO) {
+                inviteApi.inviteMyselfToInstance(friendLocation.location)
             }
         }
         CompositionLocalProvider(
@@ -73,22 +86,6 @@ class LocationDialog(
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"
                         )
-//                        Box(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .align(Alignment.BottomCenter)
-//                                .background(
-//                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-//                                )
-//                                .padding(3.dp)
-//                        ) {
-//                            Text(
-//                                modifier = Modifier.align(Alignment.Center),
-//                                text = currentInstants.worldName,
-//                                style = MaterialTheme.typography.titleSmall,
-//                                color = MaterialTheme.colorScheme.primary
-//                            )
-//                        }
                     }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -101,6 +98,14 @@ class LocationDialog(
                             modifier = Modifier.padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
+                            Text(
+                                text = currentInstants.worldName,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                text = "Owner:${currentInstants.ownerName}",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
                             Text(
                                 text = "Author:${currentInstants.worldAuthorName}",
                                 style = MaterialTheme.typography.titleSmall,
@@ -123,18 +128,18 @@ class LocationDialog(
                             )
                         }
                     }
+                    UserIconsRow(friendLocation.friendList) {
+                        onClickUserIcon(it)
+                    }
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp, end = 8.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(onClick = { onConfirmClick() }) {
-                            Text(text = "Save changes")
+                        TextButton(onClick = { onClickInvite() }) {
+                            Text(text = "Invite Myself")
                         }
-                    }
-                    UserIconsRow(friendLocation.friendList) {
-                        onClickUserIcon(it)
                     }
                 }
             }
