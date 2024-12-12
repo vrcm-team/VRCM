@@ -36,9 +36,9 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 fun UserStateIcon(
     modifier: Modifier = Modifier,
     iconUrl: String?,
-    userStatus: UserStatus? = null
+    userStatus: UserStatus? = null,
 ) {
-     AImage(
+    AImage(
         modifier = Modifier
             .then(modifier)
             .enableIf(userStatus != null) { drawSateCircle(GameColor.Status.fromValue(userStatus)) }
@@ -112,7 +112,7 @@ fun UserInfoRow(
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 24.dp,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
-    user:IUser?,
+    user: IUser?,
 ) {
     Row(
         modifier = modifier.sharedBoundsBy("${user?.id}UserInfo").offset(x = (-4).dp),
@@ -134,24 +134,18 @@ fun UserInfoRow(
             color = MaterialTheme.colorScheme.primary,
         )
         if (user?.isSupporter == true) {
-            Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)){
-//                drawCircle(GameColor.Supporter)
+            Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)) {
                 drawOval(
                     color = GameColor.Supporter,
-                    topLeft =  Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
+                    topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
                     size = Size(size.width * 0.2f, size.height * 0.8f)
                 )
                 drawOval(
                     color = GameColor.Supporter,
-                    topLeft = Offset(size.width * 0.1f ,size.height / 2f - (size.height * 0.2f / 2)),
-                    size = Size(size.width * 0.8f,size.height  * 0.2f)
+                    topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
+                    size = Size(size.width * 0.8f, size.height * 0.2f)
                 )
             }
-//            Icon(
-//                imageVector = Icons.Rounded.Add,
-//                contentDescription = "SupporterUserIcon",
-//                tint = GameColor.Supporter
-//            )
         }
     }
 }
@@ -163,16 +157,17 @@ fun UserStatusRow(
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 12.dp,
     style: TextStyle = MaterialTheme.typography.labelLarge,
-    user:IUser?,
+    user: IUser?,
 ) {
     Row(
         modifier = modifier.sharedBoundsBy("${user?.id}UserStatusRow"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {
-        Canvas(modifier = Modifier
+        Canvas(
+            modifier = Modifier
 //            .sharedBoundsBy("${user?.id}UserStatusIcon")
-            .size(iconSize)
+                .size(iconSize)
         ) {
             drawCircle(GameColor.Status.fromValue(user?.status))
         }
@@ -180,7 +175,7 @@ fun UserStatusRow(
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
             overflow = TextOverflow.Ellipsis,
-            color =  MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.outline,
             maxLines = 1
         )
     }
