@@ -2,13 +2,14 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -50,10 +52,14 @@ class LocationDialog(
             }
         }
         val inviteApi: InviteApi = koinInject()
+        val authService: AuthService = koinInject()
+        var isInvited by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val onClickInvite = {
             scope.launch(Dispatchers.IO) {
-                inviteApi.inviteMyselfToInstance(friendLocation.location)
+                authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(friendLocation.location) }.onSuccess {
+                    isInvited = true
+                }
             }
         }
         CompositionLocalProvider(
@@ -65,27 +71,43 @@ class LocationDialog(
             ) {
                 Column(
                     modifier = Modifier
-                        .glideBack{ close() }
+                        .glideBack { close() }
                         .padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
                         modifier = Modifier
+                            .sharedElementBy(
+                                key = friendLocation.location + "WorldImage",
+                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                            )
                             .clip(MaterialTheme.shapes.medium)
                     ) {
                         AImage(
                             modifier = Modifier
-                                .sharedElementBy(
-                                    key = friendLocation.location + "WorldImage",
-                                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                )
                                 .fillMaxWidth()
                                 .height(200.dp)
                                 .clip(MaterialTheme.shapes.medium),
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                )
+                                .padding(3.dp)
+                        ) {
+                            Text(
+                                modifier = Modifier.align(Alignment.Center),
+                                text = currentInstants.worldName,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -98,34 +120,42 @@ class LocationDialog(
                             modifier = Modifier.padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Text(
-                                text = currentInstants.worldName,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Owner:${currentInstants.ownerName}",
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Text(
-                                text = "Author:${currentInstants.worldAuthorName}",
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Text(
-                                text = "AuthorTag:",
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            Text(
-                                text = currentInstants.worldAuthorTag.joinToString(",\t"),
-                                style = MaterialTheme.typography.labelSmall,
-                            )
+                            Row (
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                SelectionContainer {
+                                    Text(
+                                        text = "Owner:${currentInstants.ownerName.value}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                }
+                                SelectionContainer {
+                                    Text(
+                                        text = "Author:${currentInstants.worldAuthorName}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                }
+                            }
                             Text(
                                 text = "Description:",
                                 style = MaterialTheme.typography.titleSmall,
                             )
+                            SelectionContainer {
+                                Text(
+                                    text = currentInstants.worldDescription,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                             Text(
-                                text = currentInstants.worldDescription,
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "AuthorTag:",
+                                style = MaterialTheme.typography.titleSmall,
                             )
+                            SelectionContainer {
+                                Text(
+                                    text = currentInstants.worldAuthorTag.joinToString(",\t"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                     }
                     UserIconsRow(friendLocation.friendList) {
@@ -137,8 +167,12 @@ class LocationDialog(
                             .padding(bottom = 8.dp, end = 8.dp),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(onClick = { onClickInvite() }) {
-                            Text(text = "Invite Myself")
+                        Button(
+                            modifier = Modifier.animateContentSize(),
+                            enabled = !isInvited,
+                            onClick = { onClickInvite() }
+                        ) {
+                            Text(text = if (isInvited) "Invited" else "Invite Me")
                         }
                     }
                 }
