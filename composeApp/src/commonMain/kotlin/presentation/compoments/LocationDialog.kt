@@ -120,19 +120,33 @@ class LocationDialog(
                             modifier = Modifier.padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Row (
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                SelectionContainer {
+                            currentInstants.ownerName.value?.let {ownerName->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
                                     Text(
-                                        text = "Owner:${currentInstants.ownerName.value}",
+                                        text = "Owner:",
                                         style = MaterialTheme.typography.titleSmall,
                                     )
+                                    SelectionContainer {
+                                        Text(
+                                            text = ownerName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    }
                                 }
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "Author:",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
                                 SelectionContainer {
                                     Text(
-                                        text = "Author:${currentInstants.worldAuthorName}",
-                                        style = MaterialTheme.typography.titleSmall,
+                                        text = currentInstants.worldAuthorName,
+                                        style = MaterialTheme.typography.bodyMedium,
                                     )
                                 }
                             }

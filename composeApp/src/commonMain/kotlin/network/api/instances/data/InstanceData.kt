@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.network.api.instances.data
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.IAccessType
+import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,7 +34,7 @@ data class InstanceData(
     val queueEnabled: Boolean,
     val queueSize: Int,
     val recommendedCapacity: Int,
-    val region: String,
+    val region: RegionType,
     val secureName: String,
     val shortName: String? = null,
     val strict: Boolean,
