@@ -30,4 +30,8 @@ internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"
 
 internal const val VRC_WSS_URL = "wss://vrchat.com/?"
 
-internal  val VRC_API_HOST = Url(VRC_API_URL).host
+internal val VRC_API_HOST = Url(VRC_API_URL).host
+
+const val AUTH_COOKIE = "auth"
+
+const val TWO_FACTOR_AUTH_COOKIE = "twoFactorAuth"

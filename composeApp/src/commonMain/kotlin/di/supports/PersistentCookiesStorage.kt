@@ -1,10 +1,7 @@
 package io.github.vrcmteam.vrcm.di.supports
 
-import io.github.vrcmteam.vrcm.storage.CookiesDao
-import io.ktor.client.plugins.cookies.CookiesStorage
-import io.ktor.http.Cookie
-import io.ktor.http.Url
-import io.ktor.http.parseServerSetCookieHeader
+import io.ktor.client.plugins.cookies.*
+import io.ktor.http.*
 import org.koin.core.logger.Logger
 
 /**
@@ -12,28 +9,29 @@ import org.koin.core.logger.Logger
  * 数据库持久化Cookie存储
  */
 class PersistentCookiesStorage(
-    private val cookiesDao: CookiesDao,
     private val logger: Logger
 ) : CookiesStorage {
 
+    private val cookieCache: MutableMap<String, Cookie> = mutableMapOf()
+
     override suspend fun get(requestUrl: Url): List<Cookie> {
-        logger.info("requestUrl=$requestUrl")
-        return cookiesDao.allCookies
-            .filter { it.value is String }
-            .map { (key, value) ->
-                val cookie = parseServerSetCookieHeader(value as String)
-                val currentKey = cookie.name + "@" + requestUrl.host
-                if (currentKey == key) cookie else null
-            }.filterNotNull()
+        return cookieCache.values.toList()
     }
 
+    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) {
+        logger.info("requestUrl=$requestUrl")
+        cookieCache[cookie.name] = cookie
+    }
 
-    override suspend fun addCookie(requestUrl: Url, cookie: Cookie) =
-        cookiesDao.saveCookies(
-            cookie.name + "@" + requestUrl.host,
-            "${cookie.name}=${cookie.value}"
-        )
+    fun addCookie(key: String, value: String?) =
+        value?.takeIf { it.isNotEmpty() }
+            ?.let { cookieCache[key] = parseServerSetCookieHeader("$key=$it") }
 
-    override fun close(): Unit = Unit
+
+    override fun close() = cookieCache.clear()
+
+    fun removeCookie(key: String) {
+        cookieCache.remove(key)
+    }
 
 }

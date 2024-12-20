@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
@@ -25,7 +28,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import org.koin.compose.KoinContext
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun App() {
     KoinContext {

@@ -148,7 +148,7 @@ class FriendLocationPagerModel(
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
-            // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent些死LocationType为Offline
+            // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent写死LocationType为Offline
             val currentUser = authService.currentUser(isRefresh = true)
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {

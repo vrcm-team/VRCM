@@ -38,6 +38,7 @@ object AuthScreen : Screen {
             contentAlignment = Alignment.Center,
         ) {
             AuthFold(
+                authUIState = authScreenModel.uiState,
                 iconYOffset = maxHeight.times(-0.2f),
                 cardHeightDp = maxHeight.times(0.42f),
             ) {

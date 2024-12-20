@@ -1,8 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -11,16 +12,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import org.jetbrains.compose.resources.painterResource
 import vrcm.composeapp.generated.resources.Res
 import vrcm.composeapp.generated.resources.logo
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AuthFold(
     iconYOffset: Dp,
+    authUIState: AuthUIState,
+    enabledIconAnime: Boolean = false,
     cardYOffset: Dp = 0.dp,
     cardAlpha: Float = 1.00f,
     cardHeightDp: Dp,
@@ -34,14 +42,6 @@ fun AuthFold(
             .fillMaxSize()
             .background(color = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Image(
-            painter = painterResource(Res.drawable.logo),
-            contentDescription = "logo",
-            modifier = Modifier
-                .width(128.dp)
-                .align(Alignment.Center)
-                .offset(y = iconYOffset)
-        )
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -58,5 +58,21 @@ fun AuthFold(
         ) {
             cardContext()
         }
+        AImage(
+            modifier = Modifier
+                .offset(y = iconYOffset)
+                .size(128.dp)
+                .align(Alignment.Center)
+                .enableIf(enabledIconAnime) {
+                    sharedBoundsBy(
+                        key = "${authUIState.userId}UserIcon",
+                        boundsTransform = IconBoundsTransform
+                    )
+                }
+                .clip(CircleShape),
+            imageData = authUIState.iconUrl,
+            error = painterResource(Res.drawable.logo),
+            contentDescription = "AuthFoldLogo"
+        )
     }
 }

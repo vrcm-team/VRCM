@@ -7,7 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
-import io.github.vrcmteam.vrcm.network.extensions.ifOK
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -22,7 +22,7 @@ class AuthApi(
     suspend fun currentUser(): CurrentUserData = userRes().checkSuccess()
 
 
-    private suspend fun userRes(username: String? = null, password: String? = null) =
+    suspend fun userRes(username: String? = null, password: String? = null) =
         client.get {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX) }
             if (username != null && password != null) {
@@ -37,14 +37,17 @@ class AuthApi(
                 val requiresTwoFactorAuth = response.body<AuthData>().requiresTwoFactorAuth
                 if (requiresTwoFactorAuth == null) {
                     AuthState.Authed
-                } else{
-                    when{
+                } else {
+                    when {
                         requiresTwoFactorAuth.contains(AuthType.Email.typeName) ->
                             AuthState.NeedEmailCode
+
                         requiresTwoFactorAuth.contains(AuthType.TTFA.typeName) ->
                             AuthState.NeedTTFA
+
                         requiresTwoFactorAuth.contains(AuthType.TFA.typeName) ->
                             AuthState.NeedTFA
+
                         else -> error("Unknown auth type: $requiresTwoFactorAuth")
                     }
                 }
@@ -65,7 +68,7 @@ class AuthApi(
         val authTypePath = authType.typeName.lowercase()
         return client.post("$AUTH_API_PREFIX/twofactorauth/$authTypePath/verify") {
             setBody(TextContent("""{"code":"$code"}""", ContentType.Application.Json))
-        }.ifOK { }
+        }.checkSuccessResult()
     }
 
     /**

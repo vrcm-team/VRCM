@@ -21,9 +21,9 @@ object StartupAnimeScreen : Screen {
         val current = LocalNavigator.currentOrThrow
         var isStartUp by remember { mutableStateOf(false) }
         val startUpAnime = { isStartUp = true }
+        val authScreenModel = koinScreenModel<AuthScreenModel>()
 
         VersionDialog(startUpAnime)
-
         BoxWithConstraints {
 
             val iconYOffset by animateDpAsState(
@@ -44,6 +44,7 @@ object StartupAnimeScreen : Screen {
                 finishedListener = {  current replace AuthScreen }
             )
             AuthFold(
+                authUIState = authScreenModel.uiState,
                 iconYOffset = iconYOffset,
                 cardYOffset = authSurfaceOffset,
                 cardAlpha = authSurfaceAlpha,

@@ -37,6 +37,11 @@ val TextBoundsTransform = BoundsTransform { initialBounds, targetBounds ->
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
+val IconBoundsTransform = BoundsTransform { _, _ ->
+    tween(800)
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
 val DefaultBoundsTransform = BoundsTransform { _, _ -> DefaultSpring }
 
 val DefaultSpring = spring(

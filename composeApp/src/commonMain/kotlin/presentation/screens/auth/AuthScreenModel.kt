@@ -23,8 +23,13 @@ class AuthScreenModel(
     private val logger: Logger,
 ) : ScreenModel {
 
-    private val _uiState = mutableStateOf(authService.accountPair().run {
-        AuthUIState(username = first, password = second)
+    private val _uiState = mutableStateOf(authService.accountDto().run {
+        AuthUIState(
+            userId = userId,
+            iconUrl = iconUrl,
+            username = username,
+            password = password.orEmpty()
+        )
     })
 
     private var _currentVerifyJob: Job? = null
@@ -107,30 +112,28 @@ class AuthScreenModel(
     }
 
     fun login() {
+        if (_uiState.value.btnIsLoading) return
         val username = _uiState.value.username.trim()
         val password = _uiState.value.password.trim()
-        if (password.isEmpty() || username.isEmpty() || _uiState.value.btnIsLoading) {
-            if (password.isEmpty() || username.isEmpty()) {
-                onErrorMessageChange("Username or Password is empty")
+        if (password.isEmpty() || username.isEmpty()) {
+            onErrorMessageChange("Username or Password is empty")
+        } else {
+            onLoadingChange(true)
+            screenModelScope.launch(context = Dispatchers.Default) {
+                doLogin(username, password)
             }
-            return
-        }
-        onLoadingChange(true)
-        screenModelScope.launch(context = Dispatchers.Default) {
-            doLogin(username, password)
         }
     }
 
 
     fun verify() {
         val verifyCode = _uiState.value.verifyCode
-        val username = _uiState.value.username.trim()
         val password = _uiState.value.password.trim()
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
         _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
             async(context = Dispatchers.IO) {
-                authService.verify(username, password, verifyCode, _uiState.value.cardState)
+                authService.verify( password, verifyCode, _uiState.value.cardState)
             }.await()
                 .onSuccess {
                     onCardStateChange(AuthCardPage.Authed)

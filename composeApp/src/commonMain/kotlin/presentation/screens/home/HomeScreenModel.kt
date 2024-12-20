@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -28,7 +29,13 @@ class HomeScreenModel(
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
-    val currentUser by _currentUser
+    val userId: String
+        get() = authService.accountDto().userId
+
+    val iconUrl: String
+        get() = authService.accountDto().iconUrl.orEmpty()
+
+    var currentUser by _currentUser
 
     private val _notifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val notifications by _notifications

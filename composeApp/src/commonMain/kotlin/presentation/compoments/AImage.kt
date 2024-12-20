@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -20,9 +21,10 @@ fun AImage(
     imageData: Any?,
     color: Color = MaterialTheme.colorScheme.outlineVariant,
     contentDescription: String? = null,
+    error : Painter? = remember(color) { ColorPainter(color) },
+    placeholder : Painter? = error,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
-    val placeholder = remember(color) { ColorPainter(color) }
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
     val imageRequest: Any? =
@@ -41,7 +43,7 @@ fun AImage(
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         placeholder = placeholder,
-        error = placeholder,
+        error = error,
         contentScale = contentScale,
     )
 }

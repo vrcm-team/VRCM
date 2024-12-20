@@ -22,15 +22,17 @@ class WebSocketApi(
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect { (_, _) ->
+            SharedFlowCentre.authed.collect {
                 currentJob?.cancel()
                 currentJob = launch { startWebSocket() }
             }
         }
     }
 
-    private suspend fun startWebSocket() {
-        val authToken = cookiesStorage.get(Url(VRC_API_URL)).first { it.name == DaoKeys.Cookies.AUTH_KEY }.value
+    suspend fun startWebSocket() {
+        val authToken = cookiesStorage
+                .get(Url(VRC_API_URL)).firstOrNull { it.name == DaoKeys.Cookies.AUTH_KEY }
+                ?.value ?: return
         try {
             apiClient.wss(
                 urlString = VRC_WSS_URL,
@@ -42,13 +44,13 @@ class WebSocketApi(
                     SharedFlowCentre.webSocket.emit(othersMessage)
                 }
             }
-        }catch (e: Exception){
+        } catch (e: Exception) {
             e.printStackTrace()
 //            coroutineScope {
 //                this.launch { startWebSocket() }
 //            }
         }
-
     }
+
 
 }

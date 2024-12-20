@@ -30,6 +30,7 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -42,7 +43,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomShe
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import kotlinx.coroutines.launch
 
 
@@ -64,6 +64,8 @@ object HomeScreen : Screen {
             homeScreenModel.init()
             // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
+                // 为了切换头像的共享元素动画
+                homeScreenModel.currentUser = null
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
@@ -116,8 +118,6 @@ private inline fun Screen.HomeTopAppBar(
             currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
         }
     }
-    val trustRank = remember(currentUser) { currentUser?.trustRank }
-    val rankColor = GameColor.Rank.fromValue(trustRank)
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     // 初始化刷新一次
     LaunchedEffect(Unit) {
@@ -154,9 +154,19 @@ private inline fun Screen.HomeTopAppBar(
                 UserStateIcon(
                     modifier = Modifier
                         .enableIf(currentUser != null) {
-                            sharedBoundsBy("${currentUser!!.id}UserIcon")
-                        }.size(54.dp),
-                    iconUrl = currentUser?.currentAvatarThumbnailImageUrl
+                            sharedBoundsBy(
+                                key = "${currentUser!!.id}UserIcon",
+                            )
+
+                        }
+                        .enableIf(currentUser == null) {
+                            sharedBoundsBy(
+                                key = "${homeScreenModel.userId}UserIcon",
+                                boundsTransform = IconBoundsTransform
+                            )
+                        }
+                        .size(54.dp),
+                    iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl
                 )
                 Column(
                     modifier = Modifier.widthIn(max = 220.dp),

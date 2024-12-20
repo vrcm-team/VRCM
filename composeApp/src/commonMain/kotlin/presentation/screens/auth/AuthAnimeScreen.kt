@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
@@ -33,6 +34,7 @@ data class AuthAnimeScreen(
             }
             currentNavigator replace screen
         }
+        val authScreenModel = koinScreenModel<AuthScreenModel>()
         BoxWithConstraints {
             var isAuthedState by remember { mutableStateOf(isAuthed) }
             val cardUpAnimationSpec = tween<Dp>(1200)
@@ -52,6 +54,8 @@ data class AuthAnimeScreen(
                 isAuthedState = !isAuthedState
             }
             AuthFold(
+                authUIState = authScreenModel.uiState,
+                enabledIconAnime = true,
                 iconYOffset = maxHeight.times(-0.2f),
                 cardHeightDp = cardHeightDp,
                 shapeDp = shapeDp,

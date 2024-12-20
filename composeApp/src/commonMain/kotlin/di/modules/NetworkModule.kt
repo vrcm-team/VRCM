@@ -57,7 +57,7 @@ private val apiClientDefinition: Definition<HttpClient> = {
             json(get())
         }
         install(Logging) {
-            logger = Logger.DEFAULT
+            logger = Logger.SIMPLE
             level = LogLevel.ALL
         }
         install(HttpCookies) {

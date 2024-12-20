@@ -1,16 +1,20 @@
 package io.github.vrcmteam.vrcm.service
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
-import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_HOST
+import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
-import io.github.vrcmteam.vrcm.storage.CookiesDao
-import io.github.vrcmteam.vrcm.storage.DaoKeys
+import io.ktor.client.call.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -24,21 +28,22 @@ import kotlinx.coroutines.launch
 class AuthService(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
-    private val cookiesDao: CookiesDao
+    private val cookiesStorage: PersistentCookiesStorage
 ) {
     private var scope = CoroutineScope(Job())
 
     private var currentUser: CurrentUserData?  = null
 
-    fun accountPair(): Pair<String, String> = accountDao.accountPair()
+    private var currentAccountDto : AccountDto? = null
+    fun accountDto(): AccountDto = currentAccountDto ?: accountDao.currentAccountDto()
 
-    fun accountPairOrNull(): Pair<String, String>? = accountDao.accountPairOrNull()
+    fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
 
     suspend fun isAuthed():Boolean = authApi.isAuthed().also { if (it) emitAuthed() }
 
-    suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh){
+    suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh) {
         currentUser!!
-    }else{
+    } else {
         authApi.currentUser().also {
             currentUser = it
         }
@@ -46,16 +51,14 @@ class AuthService(
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect { (username, password) ->
-                if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
-                    accountDao.saveAccount(username, password)
-                }
+            SharedFlowCentre.authed.collect { accountDto ->
+                currentAccountDto = accountDto
+                accountDao.saveAccountInfo(accountDto)
             }
         }
     }
 
     suspend fun verify(
-        username: String,
         password: String,
         verifyCode: String,
         authCardPage: AuthCardPage
@@ -66,17 +69,52 @@ class AuthService(
             AuthCardPage.TTFACode -> AuthType.TTFA
             else -> error("not supported")
         }
-       return authApi.verify(verifyCode, authType).also { if (it.isSuccess) emitAuthed(username, password) }
+       return authApi.verify(verifyCode, authType)
+           .also { if (it.isSuccess) emitAuthed(password) }
     }
 
-    private suspend fun emitAuthed(username: String? = null, password: String? = null) {
-        SharedFlowCentre.authed.emit(username to password)
-    }
-
-    suspend fun login(username: String, password: String): AuthState =
-        authApi.login(username, password).also {
-            if (it is AuthState.Authed) emitAuthed(username, password)
+    private suspend fun emitAuthed(password: String? = null) {
+        authApi.userRes().let {
+            if (!it.status.isSuccess()){
+                SharedFlowCentre.toastText.emit(ToastText.Error("emitAuthed: ${it.status} ${it.bodyAsText()} "))
+                return
+            }
+            var authCookie: String? = null
+            var twoFactorAuthCookie: String? = null
+            it.request.headers[HttpHeaders.Cookie]?.let { cookieHeader ->
+                parseClientCookiesHeader(cookieHeader)
+                    .forEach {(name, encodedValue) ->
+                        when(name){
+                            AUTH_COOKIE -> authCookie = encodedValue
+                            TWO_FACTOR_AUTH_COOKIE -> twoFactorAuthCookie = encodedValue
+                        }
+                    }
+            }
+            val userData = it.body<CurrentUserData>()
+            val accountDto = AccountDto(
+                userId = userData.id,
+                username = userData.username,
+                password = password,
+                iconUrl = userData.iconUrl,
+                authCookie = authCookie,
+                twoFactorAuthCookie = twoFactorAuthCookie
+            )
+            SharedFlowCentre.authed.emit(accountDto)
         }
+
+    }
+
+    suspend fun login(username: String, password: String): AuthState {
+        val info = accountDao.accountDtoByUserName(username)
+            info?.let {
+                cookiesStorage.addCookie(AUTH_COOKIE, it.authCookie)
+                cookiesStorage.addCookie(TWO_FACTOR_AUTH_COOKIE, it.twoFactorAuthCookie)
+            }
+        return authApi.login(username, password).also {
+            if (it is AuthState.Authed) emitAuthed(password)
+        }
+    }
+
 
     /**
      * 如果是失败的结果则会判断是否是验证失效了
@@ -94,10 +132,8 @@ class AuthService(
     }
 
     suspend fun doReTryAuth():Boolean {
-        val (username, password) = accountDao.accountPairOrNull() ?: return false
-        return authApi.login(username, password)
-            .takeIf { it is AuthState.Authed }
-            ?.let { true } ?: false
+        val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
+        return authApi.login(accountInfo.username, accountInfo.password!!) is AuthState.Authed
     }
 
     /**
@@ -107,12 +143,13 @@ class AuthService(
         callback().recoverLogin(callback)
 
     suspend fun <T> reTryAuthCatching(callback: suspend () -> T): Result<T> =
-       reTryAuth {
-           runCatching { callback() }
-       }
+        reTryAuth {
+            runCatching { callback() }
+        }
 
     fun logout() {
-        cookiesDao.removeCookies("${DaoKeys.Cookies.AUTH_KEY}@$VRC_API_HOST")
+        cookiesStorage.removeCookie(AUTH_COOKIE)
+        accountDao.logout(currentUser?.id ?: accountDto().userId)
         scope.launch {
             SharedFlowCentre.logout.emit(Unit)
         }
