@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -415,23 +414,11 @@ private inline fun MemberInfoRow(
         Spacer(modifier = Modifier.weight(0.1f))
         // 房间人数比行
         if (instants.userCount.isEmpty()) return@Row
-        Box(
-            modifier = Modifier.fillMaxHeight()
-                .weight(0.3f)
-                .background(
-                    MaterialTheme.colorScheme.inverseOnSurface,
-                    MaterialTheme.shapes.medium
-                )
-                .clip(MaterialTheme.shapes.medium)
-                .padding(horizontal = 8.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = instants.userCount,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
+        TextLabel(
+            modifier = Modifier.fillMaxHeight().weight(0.3f),
+            text = instants.userCount,
+        )
     }
 }
+
 

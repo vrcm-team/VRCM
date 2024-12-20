@@ -68,7 +68,7 @@ fun Modifier.drawSateCircle(
 )
 
 @Composable
-fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) =
+inline fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) =
     if (enable) effect() else this
 
 /**

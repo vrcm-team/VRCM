@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,13 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
-import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.vectorResource
 import vrcm.composeapp.generated.resources.Res
 import vrcm.composeapp.generated.resources.logo
 
@@ -28,6 +30,7 @@ import vrcm.composeapp.generated.resources.logo
 fun AuthFold(
     iconYOffset: Dp,
     authUIState: AuthUIState,
+    clickIcon: (() -> Unit)? = null,
     enabledIconAnime: Boolean = false,
     cardYOffset: Dp = 0.dp,
     cardAlpha: Float = 1.00f,
@@ -69,9 +72,12 @@ fun AuthFold(
                         boundsTransform = IconBoundsTransform
                     )
                 }
-                .clip(CircleShape),
+                .clip(CircleShape)
+                .enableIf(clickIcon != null && authUIState.iconUrl != null) {
+                    clickable(onClick = clickIcon!!)
+                },
             imageData = authUIState.iconUrl,
-            error = painterResource(Res.drawable.logo),
+            error = rememberVectorPainter(vectorResource(Res.drawable.logo)),
             contentDescription = "AuthFoldLogo"
         )
     }

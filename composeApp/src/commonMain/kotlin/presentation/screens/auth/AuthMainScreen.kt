@@ -2,48 +2,59 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
+import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
+import io.github.vrcmteam.vrcm.presentation.compoments.TextLabel
+import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.LoginCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
+import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 
 object AuthScreen : Screen {
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
         val authScreenModel: AuthScreenModel = koinScreenModel()
-
-        LaunchedEffect(Unit){
+        var showAccountMenu by remember { mutableStateOf(false) }
+        val onAccountChange:(AccountDto) -> Unit = {
+            authScreenModel.onAccountChange(it)
+        }
+        LaunchedEffect(Unit) {
             authScreenModel.tryAuth()
         }
 
+        val authUIState = authScreenModel.uiState
         BoxWithConstraints(
             modifier = Modifier.imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             AuthFold(
-                authUIState = authScreenModel.uiState,
+                authUIState = authUIState,
+                clickIcon = { showAccountMenu = true },
                 iconYOffset = maxHeight.times(-0.2f),
                 cardHeightDp = maxHeight.times(0.42f),
             ) {
                 AuthCard(
-                    cardState = authScreenModel.uiState.cardState,
+                    cardState = authUIState.cardState,
                 ) { state ->
                     when (state) {
                         AuthCardPage.Loading -> {
@@ -61,7 +72,7 @@ object AuthScreen : Screen {
                         AuthCardPage.Login -> {
                             NavCard(strings.authLoginTitle) {
                                 LoginCardInput(
-                                    uiState = authScreenModel.uiState,
+                                    uiState = authUIState,
                                     onUsernameChange = authScreenModel::onUsernameChange,
                                     onPasswordChange = authScreenModel::onPasswordChange,
                                     onClick = authScreenModel::login
@@ -77,7 +88,7 @@ object AuthScreen : Screen {
                                 }
                             }) {
                                 VerifyCardInput(
-                                    uiState = authScreenModel.uiState,
+                                    uiState = authUIState,
                                     onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
                                     onClick = authScreenModel::verify
                                 )
@@ -91,6 +102,71 @@ object AuthScreen : Screen {
                             Box(modifier = Modifier.fillMaxSize())
                         }
                     }
+                }
+            }
+        }
+        AccountBottomSheet(
+            showAccountMenu = showAccountMenu,
+            onDismissRequest = { showAccountMenu = false },
+            findAccountList = authScreenModel::accountDtoList,
+            onAccountChange = onAccountChange,
+            authUIState = authUIState
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AccountBottomSheet(
+    showAccountMenu: Boolean,
+    onDismissRequest: () -> Unit,
+    findAccountList: ()-> List<AccountDto>,
+    onAccountChange: (AccountDto) -> Unit,
+    authUIState: AuthUIState,
+) {
+    ABottomSheet(
+        isVisible = showAccountMenu,
+        onDismissRequest = onDismissRequest,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            shape = MaterialTheme.shapes.large,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                findAccountList().forEach { accountDto ->
+                    ListItem(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.large)
+                            .clickable {
+                                onAccountChange(accountDto)
+                                onDismissRequest()
+                            },
+                        leadingContent = {
+                            UserStateIcon(
+                                modifier = Modifier.size(60.dp),
+                                iconUrl = accountDto.iconUrl,
+                            )
+                        },
+                        headlineContent = {
+                            Text(
+                                text = accountDto.username,
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        },
+                        trailingContent = {
+                            if (authUIState.userId == accountDto.userId) {
+                                TextLabel(
+                                    text = "Current"
+                                )
+                            }
+                        }
+                    )
                 }
             }
         }

@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.VersionService
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
 import presentation.screens.auth.data.VersionVo
@@ -34,6 +35,8 @@ class AuthScreenModel(
 
     private var _currentVerifyJob: Job? = null
 
+    fun accountDtoList():List<AccountDto> = authService.accountDtoList()
+
     val uiState: AuthUIState by _uiState
 
     fun onUsernameChange(username: String) {
@@ -50,6 +53,15 @@ class AuthScreenModel(
 
     fun onLoadingChange(isLoading: Boolean) {
         _uiState.value = _uiState.value.copy(btnIsLoading = isLoading)
+    }
+
+    fun onAccountChange(accountDto: AccountDto) {
+        _uiState.value = _uiState.value.copy(
+            userId = accountDto.userId,
+            iconUrl = accountDto.iconUrl,
+            username = accountDto.username,
+            password = accountDto.password.orEmpty(),
+        )
     }
 
     fun onErrorMessageChange(errorMsg: String) {
@@ -170,5 +182,7 @@ class AuthScreenModel(
             logger.error(it)
             onErrorMessageChange(it)
         }
+
+
 
 }

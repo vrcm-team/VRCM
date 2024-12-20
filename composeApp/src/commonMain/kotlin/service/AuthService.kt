@@ -35,19 +35,6 @@ class AuthService(
     private var currentUser: CurrentUserData?  = null
 
     private var currentAccountDto : AccountDto? = null
-    fun accountDto(): AccountDto = currentAccountDto ?: accountDao.currentAccountDto()
-
-    fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
-
-    suspend fun isAuthed():Boolean = authApi.isAuthed().also { if (it) emitAuthed() }
-
-    suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh) {
-        currentUser!!
-    } else {
-        authApi.currentUser().also {
-            currentUser = it
-        }
-    }
 
     init {
         scope.launch {
@@ -57,6 +44,35 @@ class AuthService(
             }
         }
     }
+
+    fun accountDto(): AccountDto = currentAccountDto ?: accountDao.currentAccountDto()
+
+    fun accountDtoList(): List<AccountDto> = accountDao.accountDtoList()
+
+    fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
+
+    suspend fun isAuthed():Boolean {
+        applyAuthCookie(accountDto().username)
+        return authApi.isAuthed().also { if (it) emitAuthed() }
+    }
+
+    private fun applyAuthCookie(username: String) {
+        accountDao.accountDtoByUserName(username)
+            ?.let {
+                cookiesStorage.addCookie(AUTH_COOKIE, it.authCookie)
+                cookiesStorage.addCookie(TWO_FACTOR_AUTH_COOKIE, it.twoFactorAuthCookie)
+            }
+    }
+
+    suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh) {
+        currentUser!!
+    } else {
+        authApi.currentUser().also {
+            currentUser = it
+        }
+    }
+
+
 
     suspend fun verify(
         password: String,
@@ -105,11 +121,7 @@ class AuthService(
     }
 
     suspend fun login(username: String, password: String): AuthState {
-        val info = accountDao.accountDtoByUserName(username)
-            info?.let {
-                cookiesStorage.addCookie(AUTH_COOKIE, it.authCookie)
-                cookiesStorage.addCookie(TWO_FACTOR_AUTH_COOKIE, it.twoFactorAuthCookie)
-            }
+        applyAuthCookie(username)
         return authApi.login(username, password).also {
             if (it is AuthState.Authed) emitAuthed(password)
         }
