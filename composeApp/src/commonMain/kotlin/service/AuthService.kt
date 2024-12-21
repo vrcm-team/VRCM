@@ -53,7 +53,7 @@ class AuthService(
 
     suspend fun isAuthed():Boolean {
         applyAuthCookie(accountDto().username)
-        return authApi.isAuthed().also { if (it) emitAuthed() }
+        return authApi.isAuthed().also { if (it) emitAuthed(accountDto().password) }
     }
 
     private fun applyAuthCookie(username: String) {
