@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth.data
 
 data class AuthUIState(
-    val userId: String? = "",
+    val userId: String = "",
     val iconUrl: String? = null,
     val username: String = "",
     val password: String = "",

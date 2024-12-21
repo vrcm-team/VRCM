@@ -27,9 +27,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import kotlinx.coroutines.launch
 
 object AuthScreen : Screen {
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
@@ -41,7 +41,6 @@ object AuthScreen : Screen {
         LaunchedEffect(Unit) {
             authScreenModel.tryAuth()
         }
-
         val authUIState = authScreenModel.uiState
         BoxWithConstraints(
             modifier = Modifier.imePadding(),
@@ -49,7 +48,9 @@ object AuthScreen : Screen {
         ) {
             AuthFold(
                 authUIState = authUIState,
-                clickIcon = { showAccountMenu = true },
+                clickIcon = if (authUIState.cardState == AuthCardPage.Login && !authUIState.btnIsLoading)
+                    { { showAccountMenu = true }} else  null
+                ,
                 iconYOffset = maxHeight.times(-0.2f),
                 cardHeightDp = maxHeight.times(0.42f),
             ) {
@@ -124,8 +125,11 @@ private fun AccountBottomSheet(
     onAccountChange: (AccountDto) -> Unit,
     authUIState: AuthUIState,
 ) {
+    val scope = rememberCoroutineScope()
+    val sheetState: SheetState = rememberModalBottomSheetState()
     ABottomSheet(
         isVisible = showAccountMenu,
+        sheetState = sheetState,
         onDismissRequest = onDismissRequest,
     ) {
         Surface(
@@ -144,7 +148,8 @@ private fun AccountBottomSheet(
                             .clip(MaterialTheme.shapes.large)
                             .clickable {
                                 onAccountChange(accountDto)
-                                onDismissRequest()
+                                scope.launch { sheetState.hide() }
+                                    .invokeOnCompletion {  onDismissRequest() }
                             },
                         leadingContent = {
                             UserStateIcon(

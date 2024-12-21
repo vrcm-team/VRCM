@@ -79,7 +79,7 @@ interface SharedDialog : JavaSerializable {
     @Composable
     fun Content(animatedVisibilityScope: AnimatedVisibilityScope)
 
-    fun close()
+    fun close() = Unit
 
 }
 
