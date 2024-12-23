@@ -16,6 +16,7 @@ data class LocaleStrings(
     val authLoginPassword: String = "Password",
     val authVerifyTitle: String = "Verify",
     val authVerifyButton: String = "VERIFY",
+    val authCurrent: String = "Current",
     val fiendLocationPagerWebsite: String = "Active on the Website",
     val fiendLocationPagerPrivate: String = "Friends in Private Worlds",
     val fiendLocationPagerTraveling: String = "Friends is Traveling",
@@ -42,6 +43,12 @@ data class LocaleStrings(
     val profileUnfriended: String = "Friend is Unfriended",
     val profileUnfriend: String = "Unfriend",
     val profileViewJsonData: String = "View JSON data",
+    val locationDialogOwner: String = "Owner",
+    val locationDialogAuthor: String = "Author",
+    val locationDialogDescription: String = "Description",
+    val locationDialogTags: String = "Tags",
+    val locationInvited : String = "Invited",
+    val locationInviteMe : String = "Invite Me"
 )
 
 val strings: LocaleStrings

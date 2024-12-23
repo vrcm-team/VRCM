@@ -9,17 +9,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun TextLabel(
     modifier: Modifier = Modifier,
-    text: String
+    text: String,
+    color: Color = MaterialTheme.colorScheme.outline,
+    backgroundColor: Color = MaterialTheme.colorScheme.inverseOnSurface
 ) {
     Box(
         modifier = modifier
             .background(
-                MaterialTheme.colorScheme.inverseOnSurface,
+                backgroundColor,
                 MaterialTheme.shapes.medium
             )
             .clip(MaterialTheme.shapes.medium)
@@ -29,7 +32,7 @@ fun TextLabel(
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
+            color = color
         )
     }
 }

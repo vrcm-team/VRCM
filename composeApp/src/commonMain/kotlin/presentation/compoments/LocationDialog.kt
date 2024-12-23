@@ -20,6 +20,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -55,6 +56,7 @@ class LocationDialog(
         val authService: AuthService = koinInject()
         var isInvited by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+        val localeStrings = strings
         val onClickInvite = {
             scope.launch(Dispatchers.IO) {
                 authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(friendLocation.location) }.onSuccess {
@@ -125,13 +127,14 @@ class LocationDialog(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     Text(
-                                        text = "Owner:",
+                                        text = "${localeStrings.locationDialogOwner}:",
                                         style = MaterialTheme.typography.titleSmall,
                                     )
                                     SelectionContainer {
                                         Text(
                                             text = ownerName,
                                             style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.outline,
                                         )
                                     }
                                 }
@@ -140,35 +143,41 @@ class LocationDialog(
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
-                                    text = "Author:",
+                                    text = "${localeStrings.locationDialogAuthor}:",
                                     style = MaterialTheme.typography.titleSmall,
                                 )
                                 SelectionContainer {
                                     Text(
                                         text = currentInstants.worldAuthorName,
+                                        color = MaterialTheme.colorScheme.outline,
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                 }
                             }
                             Text(
-                                text = "Description:",
+                                text = "${localeStrings.locationDialogDescription}:",
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             SelectionContainer {
                                 Text(
                                     text = currentInstants.worldDescription,
+                                    color = MaterialTheme.colorScheme.outline,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
                             Text(
-                                text = "AuthorTag:",
+                                text = "${localeStrings.locationDialogTags}:",
                                 style = MaterialTheme.typography.titleSmall,
                             )
-                            SelectionContainer {
-                                Text(
-                                    text = currentInstants.worldAuthorTag.joinToString(",\t"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                currentInstants.worldAuthorTag.forEach { tag ->
+                                    TextLabel(
+                                        text = tag,
+                                        backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    )
+                                }
                             }
                         }
                     }
@@ -186,7 +195,7 @@ class LocationDialog(
                             enabled = !isInvited,
                             onClick = { onClickInvite() }
                         ) {
-                            Text(text = if (isInvited) "Invited" else "Invite Me")
+                            Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
                         }
                     }
                 }

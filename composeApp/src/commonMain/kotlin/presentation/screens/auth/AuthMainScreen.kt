@@ -140,7 +140,7 @@ private fun AccountBottomSheet(
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 findAccountList().forEach { accountDto ->
                     ListItem(
@@ -161,13 +161,15 @@ private fun AccountBottomSheet(
                             Text(
                                 text = accountDto.username,
                                 style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center,
                             )
                         },
                         trailingContent = {
                             if (authUIState.userId == accountDto.userId) {
                                 TextLabel(
-                                    text = "Current"
+                                    text = strings.authCurrent,
+                                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
                                 )
                             }
                         }
