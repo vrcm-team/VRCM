@@ -23,7 +23,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import org.koin.compose.KoinContext

@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.profile.data
+package io.github.vrcmteam.vrcm.presentation.screens.user.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.*

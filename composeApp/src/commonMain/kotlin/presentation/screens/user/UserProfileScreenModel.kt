@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.profile
+package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,7 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
-import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.ktor.client.call.*
 import io.ktor.client.statement.*

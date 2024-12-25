@@ -11,7 +11,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
-import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
