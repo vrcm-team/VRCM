@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -108,11 +109,22 @@ fun LazyItemScope.LocationFriend(
 @Composable
 fun UserInfoRow(
     modifier: Modifier = Modifier,
+    canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 24.dp,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
     user: IUser?,
 ) {
+    val userNameText = @Composable {
+        Text(
+            modifier = Modifier.sharedBoundsBy("${user?.id}UserName"),
+            text = user?.displayName.orEmpty(),
+            style = style,
+            maxLines = 1,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+
     Row(
         modifier = modifier.sharedBoundsBy("${user?.id}UserInfo").offset(x = (-4).dp),
         horizontalArrangement = Arrangement.spacedBy(spacedBy),
@@ -125,13 +137,13 @@ fun UserInfoRow(
             contentDescription = "TrustRankIcon",
             tint = GameColor.Rank.fromValue(user?.trustRank)
         )
-        Text(
-            modifier = Modifier.sharedBoundsBy("${user?.id}UserName"),
-            text = user?.displayName.orEmpty(),
-            style = style,
-            maxLines = 1,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        if (canCopy) {
+            SelectionContainer {
+                userNameText()
+            }
+        } else {
+            userNameText()
+        }
         if (user?.isSupporter == true) {
             Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)) {
                 drawOval(
@@ -153,23 +165,13 @@ fun UserInfoRow(
 @Composable
 fun UserStatusRow(
     modifier: Modifier = Modifier,
+    canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 12.dp,
     style: TextStyle = MaterialTheme.typography.labelLarge,
     user: IUser?,
 ) {
-    Row(
-        modifier = modifier.sharedBoundsBy("${user?.id}UserStatusRow"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacedBy)
-    ) {
-        Canvas(
-            modifier = Modifier
-//            .sharedBoundsBy("${user?.id}UserStatusIcon")
-                .size(iconSize)
-        ) {
-            drawCircle(GameColor.Status.fromValue(user?.status))
-        }
+    val statusText = @Composable {
         Text(
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
@@ -177,5 +179,25 @@ fun UserStatusRow(
             color = MaterialTheme.colorScheme.outline,
             maxLines = 1
         )
+    }
+
+    Row(
+        modifier = modifier.sharedBoundsBy("${user?.id}UserStatusRow"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacedBy)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .size(iconSize)
+        ) {
+            drawCircle(GameColor.Status.fromValue(user?.status))
+        }
+        if (canCopy) {
+            SelectionContainer {
+                statusText()
+            }
+        } else {
+            statusText()
+        }
     }
 }

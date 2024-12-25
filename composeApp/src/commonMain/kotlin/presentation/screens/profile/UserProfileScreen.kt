@@ -245,9 +245,9 @@ private fun ProfileContent(
         }
     }
     // TrustRank + UserName + VRC+
-    UserInfoRow(user = currentUser)
+    UserInfoRow(user = currentUser, canCopy = true)
     // status
-    UserStatusRow(user = currentUser)
+    UserStatusRow(user = currentUser, canCopy = true)
     // LanguagesRow && LinksRow
     LangAndLinkRow(currentUser)
     Box(
