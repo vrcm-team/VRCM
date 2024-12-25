@@ -4,8 +4,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +13,7 @@ import io.github.vrcmteam.vrcm.AppPlatformType
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.screens.auth.data.VersionVo
 
 @Composable
@@ -39,7 +38,7 @@ fun UpdateDialog(
         }
         AlertDialog(
             icon = {
-                Icon(Icons.Filled.Update, contentDescription = "AlertDialogIcon")
+                Icon(AppIcons.Update, contentDescription = "AlertDialogIcon")
             },
             title = {
                 Text(

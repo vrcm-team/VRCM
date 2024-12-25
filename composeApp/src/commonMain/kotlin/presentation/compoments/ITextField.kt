@@ -11,10 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.PasswordMissEndVisualTransformation
 
 @Composable
@@ -96,7 +93,7 @@ fun ITextField(
                 .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
                 .clip(CircleShape)
                 .clickable { onValueChange("") },
-            imageVector = Icons.Default.Clear,
+            imageVector = AppIcons.Clear,
             contentDescription = "ClearIcon",
             tint = MaterialTheme.colorScheme.outlineVariant
         )
@@ -181,8 +178,8 @@ fun IPasswordField(
                     .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
                     .clip(CircleShape)
                     .clickable { isShowPassword = !isShowPassword },
-                imageVector =  if(isShowPassword) Icons.Default.VisibilityOff
-                else Icons.Default.Visibility,
+                imageVector =  if(isShowPassword) AppIcons.VisibilityOff
+                else AppIcons.Visibility,
                 contentDescription = "ClearIcon",
                 tint = MaterialTheme.colorScheme.outlineVariant
             )
@@ -192,7 +189,7 @@ fun IPasswordField(
                 .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
                 .clip(CircleShape)
                 .clickable { onValueChange("") },
-            imageVector = Icons.Default.Clear,
+            imageVector = AppIcons.Clear,
             contentDescription = "ClearIcon",
             tint = MaterialTheme.colorScheme.outlineVariant
         )

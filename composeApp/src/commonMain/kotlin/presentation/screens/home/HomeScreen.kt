@@ -9,9 +9,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +39,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBotto
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import kotlinx.coroutines.launch
 
@@ -305,7 +303,7 @@ fun SettingsActionButton(
         onClick = { bottomSheetIsVisible = !bottomSheetIsVisible }
     ) {
         Icon(
-            painter = rememberVectorPainter(image = Icons.Rounded.Settings),
+            painter = rememberVectorPainter(image = AppIcons.Settings),
             contentDescription = "Settings",
         )
 
@@ -354,7 +352,7 @@ fun NotificationActionButton(
             }
         ) {
             Icon(
-                imageVector = Icons.Rounded.Notifications,
+                imageVector = AppIcons.Notifications,
                 contentDescription = "NotificationIcon"
             )
         }

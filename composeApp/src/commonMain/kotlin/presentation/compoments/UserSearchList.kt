@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -66,7 +65,7 @@ fun UserSearchList(
         val focusManager = LocalFocusManager.current
         ITextField(
             modifier = Modifier.padding(horizontal = 16.dp),
-            imageVector = Icons.Rounded.Search,
+            imageVector = AppIcons.Search,
             hintText = strings.fiendListPagerSearch,
             textValue = searchText,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),

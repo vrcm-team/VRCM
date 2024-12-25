@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemDa
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -162,7 +160,7 @@ private inline fun NotificationItem(
                     onClick = { isExpand = !isExpand }
                 ) {
                     Icon(
-                        imageVector = if (isExpand) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        imageVector = if (isExpand) AppIcons.ExpandLess else AppIcons.ExpandMore,
                         contentDescription = "ExpandIconButton"
                     )
                 }

@@ -3,9 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth.card
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +16,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ITextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 @Composable
 fun LoginCardInput(
@@ -35,7 +33,7 @@ fun LoginCardInput(
     ) {
         ITextField(
             modifier = Modifier.padding(horizontal = 32.dp),
-            imageVector = Icons.Outlined.AccountCircle,
+            imageVector = AppIcons.AccountCircle,
             hintText = strings.authLoginUsername,
             textValue = uiState.username,
             keyboardOptions = KeyboardOptions(
@@ -47,7 +45,7 @@ fun LoginCardInput(
         )
         IPasswordField(
             modifier = Modifier.padding(horizontal = 32.dp),
-            imageVector = Icons.Outlined.Lock,
+            imageVector = AppIcons.Lock,
             hintText = strings.authLoginPassword,
             textValue = uiState.password,
             isFocus = isFocus,

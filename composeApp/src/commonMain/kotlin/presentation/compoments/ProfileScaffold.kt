@@ -11,9 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +33,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -318,7 +316,7 @@ private fun TopMenuBar(
                 onClick = onReturn
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.ArrowBackIosNew,
+                    imageVector = AppIcons.ArrowBackIosNew,
                     tint = iconColor,
                     contentDescription = "ReturnIcon"
                 )
@@ -331,7 +329,7 @@ private fun TopMenuBar(
                 onClick = onMenu
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Menu,
+                    imageVector = AppIcons.Menu,
                     tint = iconColor,
                     contentDescription = "MenuIcon"
                 )

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,6 +35,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
 import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import io.github.vrcmteam.vrcm.presentation.supports.RegionIcons
 import org.jetbrains.compose.resources.painterResource
@@ -51,7 +50,7 @@ object FriendLocationPager : Pager {
         get() = "Location"
 
     override val icon: Painter
-        @Composable get() = rememberVectorPainter(image = Icons.Rounded.Explore)
+        @Composable get() = rememberVectorPainter(image = AppIcons.Explore)
 
     @ExperimentalSharedTransitionApi
     @Composable

@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +28,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 @Composable
@@ -122,7 +121,7 @@ fun UserInfoRow(
         Icon(
             modifier = Modifier
                 .size(iconSize),
-            imageVector = Icons.Rounded.Shield,
+            imageVector = AppIcons.Shield,
             contentDescription = "TrustRankIcon",
             tint = GameColor.Rank.fromValue(user?.trustRank)
         )

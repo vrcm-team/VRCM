@@ -5,10 +5,6 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person4
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.rounded.QuestionMark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import kotlinx.coroutines.launch
@@ -210,7 +207,7 @@ private fun JsonAlertDialog(
     if (openAlertDialog) {
         AlertDialog(
             icon = {
-                Icon(Icons.Filled.Person4, contentDescription = "AlertDialogIcon")
+                Icon(AppIcons.Person4, contentDescription = "AlertDialogIcon")
             },
             text = {
                 Box(
@@ -409,7 +406,7 @@ private fun LanguagesRow(
                     ) {
                         Icon(
                             modifier = Modifier.align(Alignment.Center),
-                            imageVector = Icons.Rounded.QuestionMark,
+                            imageVector = AppIcons.QuestionMark,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             contentDescription = "NotKnownLanguageIcon",
                         )
@@ -465,7 +462,7 @@ fun LinksRow(
                         modifier = Modifier
                             .padding(6.dp)
                             .enableIf(webIconVector == null) { rotate(-45F) },
-                        imageVector = webIconVector ?: Icons.Outlined.Link,
+                        imageVector = webIconVector ?: AppIcons.Link,
                         contentDescription = "BioLinkIcon"
                     )
                 }

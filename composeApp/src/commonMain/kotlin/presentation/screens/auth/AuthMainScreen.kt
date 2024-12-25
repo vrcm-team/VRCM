@@ -4,8 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +24,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.card.VerifyCardInput
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.launch
 
@@ -228,7 +227,7 @@ private fun ReturnIcon(onClick: () -> Unit) {
         onClick = onClick
     ) {
         Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
+            imageVector =AppIcons.KeyboardArrowLeft,
             contentDescription = "ReturnIcon",
             tint = MaterialTheme.colorScheme.primary
         )
