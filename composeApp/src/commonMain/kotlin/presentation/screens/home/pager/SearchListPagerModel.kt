@@ -1,5 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -19,7 +22,7 @@ class SearchListPagerModel(
     private val logger: Logger
 ) : ScreenModel {
 
-    var searchList: List<SearchUserData> = emptyList()
+    var searchList: List<SearchUserData> by mutableStateOf(emptyList())
     private set
 
     private var preSearchText: String = ""

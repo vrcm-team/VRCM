@@ -43,8 +43,7 @@ fun UserSearchList(
 ) {
     val lazyListState = rememberLazyListState()
     var searchText by rememberSaveable(key) { mutableStateOf("") }
-    // TODO: 优化此处
-    val userList: MutableList<IUser> = userListInit(searchText).toMutableStateList()
+    val userList: MutableList<IUser> by derivedStateOf { userListInit(searchText).toMutableStateList() }
     LaunchedEffect(searchText) {
         onUpdateSearch(searchText, userList)
     }
@@ -135,7 +134,7 @@ fun LazyItemScope.UserListItem(friend: IUser, toProfile: (IUser) -> Unit) {
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
             .clickable { toProfile(friend) }
-            .animateItem(fadeInSpec = null, fadeOutSpec = null),
+            .animateItem(),
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier.sharedBoundsBy("${friend.id}UserIcon"),

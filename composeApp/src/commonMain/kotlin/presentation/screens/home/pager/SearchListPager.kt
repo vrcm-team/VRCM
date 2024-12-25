@@ -27,11 +27,8 @@ object SearchListPager : Pager {
         UserSearchList(
             key = title,
             userListInit = { searchListPagerModel.searchList },
-        ) { searchText, userList ->
-            if (searchListPagerModel.refreshSearchList(searchText)) {
-                userList.clear()
-                userList += searchListPagerModel.searchList
-            }
+        ) { searchText, _ ->
+            searchListPagerModel.refreshSearchList(searchText)
         }
     }
 }

@@ -31,11 +31,10 @@ import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
-import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.NotificationBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -138,7 +137,7 @@ private inline fun Screen.HomeTopAppBar(
     ) {
         Row(
             modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                .padding(top = getInsetPadding(WindowInsets::getTop))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -184,11 +183,9 @@ private inline fun Screen.HomeTopAppBar(
             }
             Spacer(modifier = Modifier.weight(1f))
             NotificationActionButton(
-                notifications,
+                notifications.isNotEmpty(),
                 homeScreenModel::refreshAllNotification
-            ) { id, type, response ->
-                homeScreenModel.responseAllNotification(id, type, response)
-            }
+            )
             SettingsActionButton()
         }
     }
@@ -203,7 +200,7 @@ private inline fun HomeBottomBar(
     hazeState: HazeState?,
 ) {
     // 如果没有底部系统手势条，则加12dp
-    val bottomPadding = if (getInsetPadding(WindowInsets::getBottom) != 0.dp) 0.dp else 12.dp
+    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
     val scope = rememberCoroutineScope()
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
@@ -232,8 +229,7 @@ private inline fun HomeBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding)
-            .windowInsetsPadding(NavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom)),
+            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -314,29 +310,17 @@ fun SettingsActionButton(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationActionButton(
-    notifications: List<NotificationItemData>,
-    refreshNotification: () -> Unit,
-    onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit,
+inline fun NotificationActionButton(
+    hasNotifications: Boolean,
+    crossinline refreshNotification: () -> Unit,
 ) {
-    // notification
-    var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    val onClickNotification: () -> Unit = {
-        bottomSheetIsVisible = true
-    }
+    val (_, onClickNotification) = LocationDialogContent.current
     LaunchedEffect(Unit) {
         refreshNotification()
     }
-    // 每打开一次刷新一次
-    LaunchedEffect(bottomSheetIsVisible) {
-        if (bottomSheetIsVisible) {
-            refreshNotification()
-        }
-    }
     IconButton(
-        onClick = onClickNotification,
+        onClick = { onClickNotification(NotificationDialog) },
         colors = IconButtonDefaults.iconButtonColors(
             contentColor = MaterialTheme.colorScheme.tertiary
         ),
@@ -344,7 +328,7 @@ fun NotificationActionButton(
         BadgedBox(
             badge = {
                 val primaryColor = MaterialTheme.colorScheme.tertiary
-                if (notifications.isNotEmpty()) {
+                if (hasNotifications) {
                     Canvas(modifier = Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
                         drawCircle(color = primaryColor, radius = 4.dp.toPx())
                     }
@@ -357,11 +341,5 @@ fun NotificationActionButton(
             )
         }
     }
-    NotificationBottomSheet(
-        bottomSheetIsVisible = bottomSheetIsVisible,
-        notificationList = notifications,
-        onDismissRequest = { bottomSheetIsVisible = false },
-        onResponseNotification = onResponseNotification
-    )
 }
 

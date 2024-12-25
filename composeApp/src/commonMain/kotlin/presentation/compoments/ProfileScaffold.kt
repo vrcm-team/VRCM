@@ -80,9 +80,7 @@ fun ProfileScaffold(
         // topBar高度
         val topBarHeight = 64.dp
         // 系统栏高度
-        val sysTopPadding = with(LocalDensity.current) {
-            WindowInsets.systemBars.getTop(this).toDp()
-        }
+        val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         // icon显示大小与透明度比例 单独一个比例是为了更加自然不会突然出现(因为icon只有当image隐藏时才开始显示)
         val topIconRatio =
             (remainingDistance / (topBarHeight + sysTopPadding)).coerceIn(0f, 1f).let {

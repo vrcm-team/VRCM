@@ -11,6 +11,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 
 // 为了解决安卓序列化问题, 不能写成rememberSaveable
@@ -24,7 +26,7 @@ fun SharedTransitionDialog(
     content: @Composable () -> Unit,
 ) {
     SharedTransitionLayout(modifier = modifier.fillMaxSize()) {
-        val dialogContentState = DialogContentMap.getOrPut(key){ mutableStateOf(null) }
+        val dialogContentState = DialogContentMap.getOrPut(key) { mutableStateOf(null) }
         CompositionLocalProvider(
             LocationDialogContent provides dialogContentState,
             LocalSharedTransitionDialogScope provides this,
@@ -86,22 +88,29 @@ interface SharedDialog : JavaSerializable {
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 inline fun SharedDialogContainer(
-    key: String,
-    animatedVisibilityScope: AnimatedVisibilityScope,
+    key: String = "",
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     background: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
-            .sharedBoundsBy(
-                key = key + "Container",
-                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                animatedVisibilityScope = animatedVisibilityScope,
-                clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
-                    OverlayClip(DialogShapeForSharedElement)
-                }
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = getInsetPadding(16, WindowInsets::getTop) + 16.dp,
+                bottom = getInsetPadding(16, WindowInsets::getBottom)  + 16.dp,
             )
+            .enableIf(animatedVisibilityScope != null) {
+                sharedBoundsBy(
+                    key = key + "Container",
+                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                    animatedVisibilityScope = animatedVisibilityScope!!,
+                    clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
+                        OverlayClip(DialogShapeForSharedElement)
+                    }
+                )
+            }
             .background(background, DialogShapeForSharedElement)
             .clip(DialogShapeForSharedElement),
         content = content
