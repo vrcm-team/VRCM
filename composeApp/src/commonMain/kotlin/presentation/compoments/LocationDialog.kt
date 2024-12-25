@@ -35,6 +35,7 @@ class LocationDialog(
     private val onConfirmClick: () -> Unit,
 ) : SharedDialog {
 
+    @OptIn(ExperimentalLayoutApi::class)
     @ExperimentalSharedTransitionApi
     @Composable
     override fun Content(
@@ -169,8 +170,9 @@ class LocationDialog(
                                 text = "${localeStrings.locationDialogTags}:",
                                 style = MaterialTheme.typography.titleSmall,
                             )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
                                 currentInstants.worldAuthorTag.forEach { tag ->
                                     TextLabel(
