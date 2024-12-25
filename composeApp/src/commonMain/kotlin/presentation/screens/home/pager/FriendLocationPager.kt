@@ -38,7 +38,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.profile.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import io.github.vrcmteam.vrcm.presentation.supports.RegionIcon
+import io.github.vrcmteam.vrcm.presentation.supports.RegionIcons
 import org.jetbrains.compose.resources.painterResource
 
 
@@ -293,7 +293,7 @@ private fun AnimatedVisibilityScope.LocationCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Image(
-                            painter = painterResource(RegionIcon[instants.region]) ,
+                            painter = painterResource(RegionIcons[instants.region]) ,
                             contentDescription = "RegionIcon",
                             modifier = Modifier
                                 .size(15.dp)

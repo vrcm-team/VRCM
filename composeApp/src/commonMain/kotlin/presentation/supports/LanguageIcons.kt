@@ -1,16 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.group
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
-object LanguageIcon {
+object LanguageIcons {
     fun getFlag(language: String): ImageVector? {
         return when (language) {
             "eng" -> English

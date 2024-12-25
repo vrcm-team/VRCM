@@ -31,7 +31,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.profile.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
-import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcon
+import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import kotlinx.coroutines.launch
 
@@ -389,7 +389,7 @@ private fun LanguagesRow(
         verticalAlignment = Alignment.Bottom,
     ) {
         speakLanguages.forEach { language ->
-            val imageVector = LanguageIcon.getFlag(language)
+            val imageVector = LanguageIcons.getFlag(language)
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                 tooltip = {

@@ -7,7 +7,7 @@ import vrcm.composeapp.generated.resources.region_eu
 import vrcm.composeapp.generated.resources.region_jp
 import vrcm.composeapp.generated.resources.region_us
 
-object RegionIcon {
+object RegionIcons {
 
     operator fun get(region: RegionType): DrawableResource =
         when (region) {
