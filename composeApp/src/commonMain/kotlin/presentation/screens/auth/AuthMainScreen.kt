@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -109,7 +110,8 @@ object AuthScreen : Screen {
             showAccountMenu = showAccountMenu,
             onDismissRequest = { showAccountMenu = false },
             findAccountList = authScreenModel::accountDtoList,
-            onAccountChange = onAccountChange,
+            onAccountChange = authScreenModel::onAccountChange,
+            removeAccount = authScreenModel::removeAccount,
             authUIState = authUIState
         )
     }
@@ -122,10 +124,12 @@ private fun AccountBottomSheet(
     onDismissRequest: () -> Unit,
     findAccountList: ()-> List<AccountDto>,
     onAccountChange: (AccountDto) -> Unit,
+    removeAccount: (String) -> Result<Unit>,
     authUIState: AuthUIState,
 ) {
     val scope = rememberCoroutineScope()
     val sheetState: SheetState = rememberModalBottomSheetState()
+    val accountList = remember { mutableStateListOf<AccountDto>().apply { addAll(findAccountList()) } }
     ABottomSheet(
         isVisible = showAccountMenu,
         sheetState = sheetState,
@@ -141,7 +145,7 @@ private fun AccountBottomSheet(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                findAccountList().forEach { accountDto ->
+                accountList.forEach { accountDto ->
                     ListItem(
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.large)
@@ -165,10 +169,22 @@ private fun AccountBottomSheet(
                             )
                         },
                         trailingContent = {
-                            if (authUIState.userId == accountDto.userId) {
+                            if (authUIState.userId == accountDto.userId){
                                 TextLabel(
                                     text = strings.authCurrent,
                                     backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                                )
+                            } else {
+                                Icon(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            removeAccount(accountDto.userId)
+                                                .onSuccess { accountList.remove(accountDto) }
+                                        },
+                                    imageVector = AppIcons.Clear,
+                                    contentDescription = "ClearIcon",
+                                    tint = MaterialTheme.colorScheme.outlineVariant
                                 )
                             }
                         }

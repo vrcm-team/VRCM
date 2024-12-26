@@ -180,7 +180,7 @@ fun IPasswordField(
                     .clickable { isShowPassword = !isShowPassword },
                 imageVector =  if(isShowPassword) AppIcons.VisibilityOff
                 else AppIcons.Visibility,
-                contentDescription = "ClearIcon",
+                contentDescription = "ShowPasswordIcon",
                 tint = MaterialTheme.colorScheme.outlineVariant
             )
         }

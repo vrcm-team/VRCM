@@ -28,13 +28,13 @@ import kotlinx.coroutines.launch
 class AuthService(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
-    private val cookiesStorage: PersistentCookiesStorage
+    private val cookiesStorage: PersistentCookiesStorage,
 ) {
     private var scope = CoroutineScope(Job())
 
-    private var currentUser: CurrentUserData?  = null
+    private var currentUser: CurrentUserData? = null
 
-    private var currentAccountDto : AccountDto? = null
+    private var currentAccountDto: AccountDto? = null
 
     init {
         scope.launch {
@@ -51,7 +51,7 @@ class AuthService(
 
     fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
 
-    suspend fun isAuthed():Boolean {
+    suspend fun isAuthed(): Boolean {
         applyAuthCookie(accountDto().username)
         return authApi.isAuthed().also { if (it) emitAuthed(accountDto().password) }
     }
@@ -73,11 +73,10 @@ class AuthService(
     }
 
 
-
     suspend fun verify(
         password: String,
         verifyCode: String,
-        authCardPage: AuthCardPage
+        authCardPage: AuthCardPage,
     ): Result<Unit> {
         val authType = when (authCardPage) {
             AuthCardPage.EmailCode -> AuthType.Email
@@ -85,13 +84,13 @@ class AuthService(
             AuthCardPage.TTFACode -> AuthType.TTFA
             else -> error("not supported")
         }
-       return authApi.verify(verifyCode, authType)
-           .also { if (it.isSuccess) emitAuthed(password) }
+        return authApi.verify(verifyCode, authType)
+            .also { if (it.isSuccess) emitAuthed(password) }
     }
 
     private suspend fun emitAuthed(password: String? = null) {
         authApi.userRes().let {
-            if (!it.status.isSuccess()){
+            if (!it.status.isSuccess()) {
                 SharedFlowCentre.toastText.emit(ToastText.Error("emitAuthed: ${it.status} ${it.bodyAsText()} "))
                 return
             }
@@ -99,8 +98,8 @@ class AuthService(
             var twoFactorAuthCookie: String? = null
             it.request.headers[HttpHeaders.Cookie]?.let { cookieHeader ->
                 parseClientCookiesHeader(cookieHeader)
-                    .forEach {(name, encodedValue) ->
-                        when(name){
+                    .forEach { (name, encodedValue) ->
+                        when (name) {
                             AUTH_COOKIE -> authCookie = encodedValue
                             TWO_FACTOR_AUTH_COOKIE -> twoFactorAuthCookie = encodedValue
                         }
@@ -143,7 +142,7 @@ class AuthService(
         }
     }
 
-    suspend fun doReTryAuth():Boolean {
+    suspend fun doReTryAuth(): Boolean {
         val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
         return authApi.login(accountInfo.username, accountInfo.password!!) is AuthState.Authed
     }
@@ -165,6 +164,10 @@ class AuthService(
         scope.launch {
             SharedFlowCentre.logout.emit(Unit)
         }
+    }
+
+    fun removeAccount(userId: String) = runCatching {
+        accountDao.removeAccount(userId)
     }
 
 }

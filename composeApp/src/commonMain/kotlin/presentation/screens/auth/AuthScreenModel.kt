@@ -183,6 +183,6 @@ class AuthScreenModel(
             onErrorMessageChange(it)
         }
 
-
+    fun removeAccount(userId: String) = authService.removeAccount(userId)
 
 }
