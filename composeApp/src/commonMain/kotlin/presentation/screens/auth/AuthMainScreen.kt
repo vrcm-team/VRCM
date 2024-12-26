@@ -35,9 +35,6 @@ object AuthScreen : Screen {
         val currentNavigator = currentNavigator
         val authScreenModel: AuthScreenModel = koinScreenModel()
         var showAccountMenu by remember { mutableStateOf(false) }
-        val onAccountChange:(AccountDto) -> Unit = {
-            authScreenModel.onAccountChange(it)
-        }
         LaunchedEffect(Unit) {
             authScreenModel.tryAuth()
         }
