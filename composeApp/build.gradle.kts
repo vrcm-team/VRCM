@@ -115,7 +115,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = libs.versions.app.code.get().toInt()
-        versionName = libs.versions.app.name.get()
+        versionName = libs.versions.app.version.get()
     }
 //    buildFeatures {
 //        compose = true
@@ -178,7 +178,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = libs.versions.app.packageName.get()
-            packageVersion = libs.versions.app.name.get()
+            packageVersion = libs.versions.app.version.get()
         }
     }
 }
