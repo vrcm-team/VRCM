@@ -18,7 +18,7 @@ class UsersApi(private val client: HttpClient) {
     suspend fun searchUser(
         search: String,
         sort: String = "relevance",
-        n: Int = 50,
+        n: Int = 20,
         offset: Int = 0
     ) =
         client.get(USERS_API_PREFIX) {
