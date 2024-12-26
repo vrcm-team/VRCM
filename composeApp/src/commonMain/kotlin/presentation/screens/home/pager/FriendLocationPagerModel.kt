@@ -219,7 +219,7 @@ class FriendLocationPagerModel(
             }.onSuccess { instance ->
                 val instantsVo = InstantsVo(instance)
                 updateInstants(instantsVo)
-                fetchAndSetOwnerName(instance, instantsVo)
+                fetchAndSetOwner(instance, instantsVo)
             }
         }
     }
@@ -230,26 +230,41 @@ class FriendLocationPagerModel(
      * @param instance 房间实例
      * @param instantsVo 房间实例的视图对象
      */
-    private suspend fun fetchAndSetOwnerName(
+    private suspend fun fetchAndSetOwner(
         instance: InstanceData,
         instantsVo: InstantsVo,
     ) {
         val ownerId = instance.ownerId ?: return
-        val fetchOwnerName: suspend (String) -> String = when (BlueprintType.fromValue(ownerId)) {
-            BlueprintType.User -> {
-                { usersApi.fetchUser(ownerId).displayName }
-            }
+        val fetchOwner: suspend (String) -> InstantsVo.Owner =
+            when (BlueprintType.fromValue(ownerId)) {
+                BlueprintType.User -> {
+                    {
+                        val user = usersApi.fetchUser(ownerId)
+                        InstantsVo.Owner(
+                            id = user.id,
+                            displayName = user.displayName,
+                            type = BlueprintType.User
+                        )
+                    }
+                }
 
-            BlueprintType.Group -> {
-                { groupsApi.fetchGroup(ownerId).name }
-            }
+                BlueprintType.Group -> {
+                    {
+                        val group = groupsApi.fetchGroup(ownerId)
+                        InstantsVo.Owner(
+                            id = group.id,
+                            displayName = group.name,
+                            type = BlueprintType.Group
+                        )
 
+                }
+            }
             else -> return
         }
         authService.reTryAuthCatching {
-            fetchOwnerName(ownerId)
+            fetchOwner(ownerId)
         }.onSuccess {
-            instantsVo.ownerName.value = it
+            instantsVo.owner = it
         }.onFailure {
             SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
         }
