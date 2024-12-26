@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserData(
+    val ageVerificationStatus : VerificationStatus,
     val allowAvatarCopying: Boolean,
     override val bio: String?,
     override val bioLinks: List<String>,

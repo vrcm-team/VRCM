@@ -3,11 +3,14 @@ package io.github.vrcmteam.vrcm.network.api.auth.data
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.VerificationStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class CurrentUserData(
+    val ageVerificationStatus: VerificationStatus,
+    val ageVerified: Boolean,
     val acceptedPrivacyVersion: Int,
     val acceptedTOSVersion: Int,
     val accountDeletionDate: String?,
