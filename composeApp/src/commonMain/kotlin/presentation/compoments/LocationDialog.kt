@@ -36,7 +36,7 @@ import org.koin.compose.koinInject
 val DialogShapeForSharedElement = RoundedCornerShape(16.dp)
 
 class LocationDialog(
-    private val location: FriendLocation,
+    private val friendLocation: FriendLocation,
     private val sharedSuffixKey: String,
     private val onConfirmClick: () -> Unit,
 ) : SharedDialog {
@@ -46,8 +46,8 @@ class LocationDialog(
     override fun Content(
         animatedVisibilityScope: AnimatedVisibilityScope,
     ) {
-        val friendLocation = location
-        val currentInstants by friendLocation.instants
+        // remember一下防止owner被刷新为null
+        val currentInstants by remember(friendLocation.location) { friendLocation.instants }
         val owner = currentInstants.owner
         val currentNavigator = currentNavigator
         val onClickUserIcon = { user: IUser ->
@@ -130,30 +130,25 @@ class LocationDialog(
                             modifier = Modifier.padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            owner?.let { owner ->
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "${localeStrings.locationDialogOwner}:",
-                                        fontWeight = FontWeight.Medium,
-                                        style = MaterialTheme.typography.titleSmall,
-                                    )
-                                    SelectionContainer {
-                                        // TODO: Group详情页跳转
-                                        Text(
-                                            modifier = if (owner.type == BlueprintType.User) Modifier.clickable {
-                                                onClickUserIcon(
-                                                    UserProfileVo(owner.id)
-                                                )
-                                            } else Modifier,
-                                            textDecoration = if (owner.type == BlueprintType.User) TextDecoration.Underline else null,
-                                            text = owner.displayName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.outline,
-                                        )
-                                    }
-                                }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (owner == null) return@Row
+                                Text(
+                                    text = "${localeStrings.locationDialogOwner}:",
+                                    fontWeight = FontWeight.Medium,
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                // TODO: Group详情页跳转
+                                Text(
+                                    modifier = if (owner.type == BlueprintType.User)
+                                        Modifier.clickable { onClickUserIcon(UserProfileVo(owner.id)) }
+                                    else Modifier,
+                                    textDecoration = if (owner.type == BlueprintType.User) TextDecoration.Underline else null,
+                                    text = owner.displayName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline,
+                                )
                             }
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -163,15 +158,13 @@ class LocationDialog(
                                     fontWeight = FontWeight.Medium,
                                     style = MaterialTheme.typography.titleSmall,
                                 )
-                                SelectionContainer {
-                                    Text(
-                                        modifier = Modifier.clickable { onClickUserIcon(UserProfileVo(currentInstants.worldAuthorId)) },
-                                        textDecoration = TextDecoration.Underline,
-                                        text = currentInstants.worldAuthorName,
-                                        color = MaterialTheme.colorScheme.outline,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                }
+                                Text(
+                                    modifier = Modifier.clickable { onClickUserIcon(UserProfileVo(currentInstants.worldAuthorId)) },
+                                    textDecoration = TextDecoration.Underline,
+                                    text = currentInstants.worldAuthorName,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
                             }
                             Text(
                                 text = "${localeStrings.locationDialogDescription}:",
