@@ -46,9 +46,9 @@ class LocationDialog(
     override fun Content(
         animatedVisibilityScope: AnimatedVisibilityScope,
     ) {
+        val currentInstants by friendLocation.instants
         // remember一下防止owner被刷新为null
-        val currentInstants by remember(friendLocation.location) { friendLocation.instants }
-        val owner = currentInstants.owner
+        val owner = remember { currentInstants.owner }
         val currentNavigator = currentNavigator
         val onClickUserIcon = { user: IUser ->
             if (currentNavigator.size <= 1) {
