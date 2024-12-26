@@ -11,7 +11,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
 import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
@@ -55,9 +57,18 @@ fun SettingsBottomSheet(
             SettingsBlockSurface {
                 AboutBlock()
             }
+            SettingsBlockSurface {
+                ClearCacheBlock()
+            }
             LogoutButton(onDismissRequest)
         }
     }
+}
+
+@Composable
+fun ClearCacheBlock() {
+    val imageLoader = koinInject<ImageLoader>()
+
 }
 
 @Composable
@@ -131,6 +142,7 @@ private inline fun ColumnScope.CustomBlock() {
 @Composable
 private fun AboutBlock() {
     val versionService = koinInject<VersionService>()
+    val imageLoader = koinInject<ImageLoader>()
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(VersionVo()) }
     // 不能直接version.not()因为默认为false会导致一点开就显示
@@ -157,6 +169,23 @@ private fun AboutBlock() {
         }
     }
     Column {
+        imageLoader.diskCache?.let { diskCache ->
+            var size by remember { mutableStateOf(diskCache.size) }
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable {
+                        diskCache.clear()
+                        size = 0
+                    }
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(text = "${strings.stettingClearCache}:")
+                Spacer(modifier = Modifier.weight(1f))
+                Text(text = "${size.bytesToMb()}/${diskCache.maxSize.bytesToMb()}MB")
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        }
         Row(
             modifier = Modifier.fillMaxWidth()
                 .clickable { checkVersion() }
@@ -243,7 +272,7 @@ private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
 
 @Composable
 private inline fun SettingsBlockSurface(
-    crossinline content: @Composable () -> Unit
+    crossinline content: @Composable () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -256,7 +285,7 @@ private inline fun SettingsBlockSurface(
 @Composable
 private inline fun SettingsItem(
     title: String,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
 
     Column(

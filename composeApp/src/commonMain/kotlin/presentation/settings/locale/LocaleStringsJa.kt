@@ -28,6 +28,7 @@ internal val LocaleStringsJa = LocaleStrings(
     stettingLogout = "ログアウト",
     stettingAbout = "アプリについて",
     stettingVersion = "バージョン",
+    stettingClearCache = "キャッシュをクリア",
     stettingAlreadyLatest = "すでに最新バージョン",
     profileFriendRequestSent = "フレンドリクエストを送信しました",
     profileSendFriendRequest = "フレンドリクエストを送信",
@@ -43,5 +44,5 @@ internal val LocaleStringsJa = LocaleStrings(
     locationDialogDescription = "説明",
     locationDialogTags = "タグ",
     locationInvited= "誘い済み",
-    locationInviteMe= "自分を誘う"
+    locationInviteMe= "自分を誘う",
 )

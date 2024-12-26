@@ -33,6 +33,7 @@ data class LocaleStrings(
     val stettingLogout: String = "Logout",
     val stettingAbout: String = "About Application",
     val stettingVersion: String = "Version",
+    val stettingClearCache: String = "Clear Cache",
     val stettingAlreadyLatest: String = "Already Latest",
     val profileFriendRequestSent: String = "Friend Request Sent",
     val profileSendFriendRequest: String = "Send Friend Request",
@@ -47,8 +48,8 @@ data class LocaleStrings(
     val locationDialogAuthor: String = "Author",
     val locationDialogDescription: String = "Description",
     val locationDialogTags: String = "Tags",
-    val locationInvited : String = "Invited",
-    val locationInviteMe : String = "Invite Me"
+    val locationInvited: String = "Invited",
+    val locationInviteMe: String = "Invite Me",
 )
 
 val strings: LocaleStrings

@@ -28,6 +28,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     stettingLogout = "登出",
     stettingAbout = "關於應用程序",
     stettingVersion = "版本",
+    stettingClearCache = "清除快取",
     stettingAlreadyLatest = "已是最新版本",
     profileFriendRequestSent = "已發送好友請求",
     profileSendFriendRequest = "發送好友請求",
@@ -43,5 +44,5 @@ internal val LocaleStringsZhHant = LocaleStrings(
     locationDialogDescription = "描述",
     locationDialogTags = "標簽",
     locationInvited= "己邀請",
-    locationInviteMe= "邀請自己"
+    locationInviteMe= "邀請自己",
 )
