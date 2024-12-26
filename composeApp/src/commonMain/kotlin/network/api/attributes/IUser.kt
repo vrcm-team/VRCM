@@ -40,5 +40,5 @@ interface IUser {
         get() = tags.contains("system_supporter")
 
     val trustRank: TrustRank
-        get() = TrustRank.entries.firstOrNull { tags.contains(it.value) } ?: TrustRank.Visitor
+        get() = TrustRank.fromValue(tags)
 }
