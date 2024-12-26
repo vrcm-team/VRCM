@@ -51,14 +51,14 @@ fun UserStateIcon(
 
 @Composable
 fun UserIconsRow(
-//    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (IUser) -> Unit,
 ) {
     if (friends.isEmpty()) return
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {

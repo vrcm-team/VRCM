@@ -10,7 +10,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,13 +122,12 @@ class LocationDialog(
                             )
                         }
                     }
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            contentColor = MaterialTheme.colorScheme.primary
-                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        contentColor = MaterialTheme.colorScheme.primary
                     ) {
+
                         Column(
                             modifier = Modifier.padding(6.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -197,23 +199,39 @@ class LocationDialog(
                                     }
                                 }
                             }
-                        }
-                    }
-                    UserIconsRow(friendLocation.friendList) {
-                        onClickUserIcon(it)
-                    }
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp, end = 8.dp),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Button(
-                            modifier = Modifier.animateContentSize(),
-                            enabled = !isInvited,
-                            onClick = { onClickInvite() }
-                        ) {
-                            Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row {
+                                UserIconsRow(friends = friendLocation.friendList) {
+                                    onClickUserIcon(it)
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        RegionIcon(
+                                            region = currentInstants.region
+                                        )
+                                        Text(
+                                            text = currentInstants.accessType,
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                    Button(
+                                        modifier = Modifier.animateContentSize(),
+                                        enabled = !isInvited,
+                                        onClick = { onClickInvite() }
+                                    ) {
+                                        Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

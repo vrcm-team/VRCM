@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.koin.koinScreenModel
@@ -37,8 +35,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import io.github.vrcmteam.vrcm.presentation.supports.RegionIcons
-import org.jetbrains.compose.resources.painterResource
 
 
 object FriendLocationPager : Pager {
@@ -291,19 +287,9 @@ private fun AnimatedVisibilityScope.LocationCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Image(
-                            painter = painterResource(RegionIcons[instants.region]) ,
-                            contentDescription = "RegionIcon",
-                            modifier = Modifier
-                                .size(15.dp)
-                                .align(Alignment.CenterVertically)
-                                .clip(CircleShape)
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    CircleShape
-                                ),
-                            contentScale = ContentScale.FillWidth
+                        RegionIcon(
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            region = instants.region
                         )
                         Text(
                             text = instants.accessType,
