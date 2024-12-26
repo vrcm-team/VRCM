@@ -21,15 +21,16 @@ fun AImage(
     imageData: Any?,
     color: Color = MaterialTheme.colorScheme.outlineVariant,
     contentDescription: String? = null,
-    error : Painter? = remember(color) { ColorPainter(color) },
-    placeholder : Painter? = error,
+    error: Painter? = remember(color) { ColorPainter(color) },
+    placeholder: Painter? = error,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
     val imageRequest: Any? =
         when (imageData) {
-            is String -> remember(imageData){ ImageRequest.Builder(platformContext)
+            is String -> remember(imageData) {
+                ImageRequest.Builder(platformContext)
                     .data(imageData)
                     .crossfade(600)
                     .build()
