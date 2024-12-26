@@ -28,11 +28,13 @@ interface IUser {
 
     val speakLanguages:List<String>
         get() = tags.filter { it.startsWith("language_") }.map { it.removePrefix("language_") }
+
     val profileImageUrl:String
         get() = profilePicOverride.ifBlank { currentAvatarImageUrl }
 
     val iconUrl:String
         get() = userIcon.ifBlank { profileImageUrl }
+
     val isSupporter: Boolean
         get() = tags.contains("system_supporter")
 
