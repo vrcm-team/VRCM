@@ -43,7 +43,7 @@ fun UserSearchList(
 ) {
     val lazyListState = rememberLazyListState()
     var searchText by rememberSaveable(key) { mutableStateOf("") }
-    val userList: MutableList<IUser> by derivedStateOf { userListInit(searchText).toMutableStateList() }
+    val userList: MutableList<IUser> by remember { derivedStateOf { userListInit(searchText).toMutableStateList() } }
     LaunchedEffect(searchText) {
         onUpdateSearch(searchText, userList)
     }

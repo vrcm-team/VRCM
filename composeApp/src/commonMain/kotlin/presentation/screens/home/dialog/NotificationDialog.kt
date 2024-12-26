@@ -51,7 +51,7 @@ object NotificationDialog : SharedDialog {
             homeScreenModel.refreshAllNotification()
         }
         val notifications: List<NotificationItemData>
-                by derivedStateOf { homeScreenModel.friendRequestNotifications + homeScreenModel.notifications }
+                by remember { derivedStateOf { homeScreenModel.friendRequestNotifications + homeScreenModel.notifications } }
         val onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit = { id, type, response ->
             homeScreenModel.responseAllNotification(id, type, response)
         }
@@ -104,7 +104,6 @@ private inline fun LazyItemScope.NotificationItem(
         modifier = Modifier.fillMaxWidth().animateItem()
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surface)
-
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(6.dp),
@@ -163,6 +162,7 @@ private inline fun LazyItemScope.NotificationItem(
                 Spacer(modifier = Modifier.weight(1f))
                 item.actions.forEach { action ->
                     FilledTonalButton(
+                        modifier = Modifier.animateContentSize(),
                         enabled = !responded,
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,

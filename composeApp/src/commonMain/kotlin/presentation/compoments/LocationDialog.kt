@@ -34,7 +34,6 @@ class LocationDialog(
     private val sharedSuffixKey: String,
     private val onConfirmClick: () -> Unit,
 ) : SharedDialog {
-
     @OptIn(ExperimentalLayoutApi::class)
     @ExperimentalSharedTransitionApi
     @Composable
@@ -46,7 +45,6 @@ class LocationDialog(
         val currentNavigator = currentNavigator
         val onClickUserIcon = { user: IUser ->
             if (currentNavigator.size <= 1) {
-//                close()
                 currentNavigator push UserProfileScreen(
                     sharedSuffixKey,
                     UserProfileVo(user)
@@ -166,19 +164,21 @@ class LocationDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
-                            Text(
-                                text = "${localeStrings.locationDialogTags}:",
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                currentInstants.worldAuthorTag.forEach { tag ->
-                                    TextLabel(
-                                        text = tag,
-                                        backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    )
+                            if (currentInstants.worldAuthorTag.isNotEmpty()) {
+                                Text(
+                                    text = "${localeStrings.locationDialogTags}:",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    currentInstants.worldAuthorTag.forEach { tag ->
+                                        TextLabel(
+                                            text = tag,
+                                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -206,5 +206,4 @@ class LocationDialog(
     }
 
     override fun close(): Unit = onConfirmClick()
-
 }

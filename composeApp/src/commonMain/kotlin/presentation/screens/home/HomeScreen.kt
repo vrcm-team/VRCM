@@ -102,10 +102,7 @@ private inline fun Screen.HomeTopAppBar(
 ) {
     val homeScreenModel: HomeScreenModel = koinScreenModel()
     val currentUser = homeScreenModel.currentUser
-    val refreshNotification = {
-        homeScreenModel.refreshAllNotification()
-    }
-    val notifications = homeScreenModel.friendRequestNotifications + homeScreenModel.notifications
+    val hasNotifications by remember { derivedStateOf { (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications).isNotEmpty() } }
     // to ProfileScreen
     val currentNavigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -118,7 +115,7 @@ private inline fun Screen.HomeTopAppBar(
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     // 初始化刷新一次
     LaunchedEffect(Unit) {
-        refreshNotification()
+        homeScreenModel.refreshAllNotification()
     }
 
     val modifier = if (hazeState != null) {
@@ -183,7 +180,7 @@ private inline fun Screen.HomeTopAppBar(
             }
             Spacer(modifier = Modifier.weight(1f))
             NotificationActionButton(
-                notifications.isNotEmpty(),
+                hasNotifications,
                 homeScreenModel::refreshAllNotification
             )
             SettingsActionButton()
