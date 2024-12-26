@@ -215,7 +215,9 @@ private fun JsonAlertDialog(
                         .verticalScroll(rememberScrollState())
                         .horizontalScroll(rememberScrollState())
                 ) {
-                    content()
+                    SelectionContainer {
+                        content()
+                    }
                 }
             },
             onDismissRequest = onDismissRequest,
