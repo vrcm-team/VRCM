@@ -11,7 +11,7 @@
         android:pivotY="346"
         android:rotation="-30">
         <path
-            android:fillColor="#FFFFFF"
+            android:fillColor="#CDE5FF"
             android:pathData="M290 346H290A72 72 0 0 1 362 418V786A72 72 0 0 1 290 858H290A72 72 0 0 1 218 786V418A72 72 0 0 1 290 346Z" />
     </group>
     <group
@@ -19,7 +19,7 @@
         android:pivotY="540"
         android:rotation="-30">
         <path
-            android:fillColor="#FFFFFF"
+            android:fillColor="#CDE5FF"
             android:pathData="M757 540H757A72 72 0 0 1 829 612V756A72 72 0 0 1 757 828H757A72 72 0 0 1 685 756V612A72 72 0 0 1 757 540Z" />
     </group>
     <group
@@ -27,7 +27,7 @@
         android:pivotY="274"
         android:rotation="30">
         <path
-            android:fillColor="#FFFFFF"
+            android:fillColor="#CDE5FF"
             android:pathData="M732 274H732A72 72 0 0 1 804 346V714A72 72 0 0 1 732 786H732A72 72 0 0 1 660 714V346A72 72 0 0 1 732 274Z" />
     </group>
     <path

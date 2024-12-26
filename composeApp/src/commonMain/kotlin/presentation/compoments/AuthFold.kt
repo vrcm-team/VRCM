@@ -36,7 +36,7 @@ fun AuthFold(
     cardAlpha: Float = 1.00f,
     cardHeightDp: Dp,
     shapeDp: Dp = 30.dp,
-    cardContext: @Composable () -> Unit = {}
+    cardContext: @Composable () -> Unit = {},
 ) {
     // 底部栏高度
     val bottomPadding = getInsetPadding(WindowInsets::getBottom)
@@ -73,6 +73,7 @@ fun AuthFold(
                     )
                 }
                 .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.background)
                 .enableIf(clickIcon != null && authUIState.iconUrl != null) {
                     clickable(onClick = clickIcon!!)
                 },
