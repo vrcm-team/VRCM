@@ -128,7 +128,7 @@ class LocationDialog(
                     ) {
                         Column(
                             modifier = Modifier.padding(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -186,8 +186,8 @@ class LocationDialog(
                                     style = MaterialTheme.typography.titleSmall,
                                 )
                                 FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
                                     currentInstants.worldAuthorTag.forEach { tag ->
                                         TextLabel(
