@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
 
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import kotlinx.serialization.SerialName
 
 /**
@@ -30,7 +31,7 @@ interface IUser {
         get() = tags.filter { it.startsWith("language_") }.map { it.removePrefix("language_") }
 
     val profileImageUrl:String
-        get() = profilePicOverride.ifBlank { currentAvatarImageUrl }
+        get() = profilePicOverride.ifBlank { currentAvatarImageUrl }.let { FileApi.convertFileUrl(it) }
 
     val iconUrl:String
         get() = userIcon.ifBlank { profileImageUrl }

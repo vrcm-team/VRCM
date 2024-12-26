@@ -19,6 +19,12 @@ class FileApi(private val client: HttpClient) {
             val versionMatch = versionRegex.find(fileUrl, 30)
             return versionMatch?.groupValues?.last()?.replace("/", "") ?: "1"
         }
+        fun convertFileUrl(fileUrl: String, fileSize: Int = 1024): String {
+            if (fileUrl.isEmpty()) return ""
+            val fileId = findFileId(fileUrl)
+            val fileVersion = findFileVersion(fileUrl)
+            return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
+        }
     }
 
     suspend fun findImageFileLocal(fileUrl: String, fileSize: Int = 128): String {
