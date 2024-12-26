@@ -57,19 +57,11 @@ fun SettingsBottomSheet(
             SettingsBlockSurface {
                 AboutBlock()
             }
-            SettingsBlockSurface {
-                ClearCacheBlock()
-            }
             LogoutButton(onDismissRequest)
         }
     }
 }
 
-@Composable
-fun ClearCacheBlock() {
-    val imageLoader = koinInject<ImageLoader>()
-
-}
 
 @Composable
 private inline fun ColumnScope.CustomBlock() {
