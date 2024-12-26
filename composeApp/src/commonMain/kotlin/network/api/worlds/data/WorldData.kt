@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.network.api.worlds.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -34,4 +35,6 @@ data class WorldData(
     val updatedAt: String?,
     val version: Int,
     val visits: Int?
-) : JavaSerializable
+) : JavaSerializable{
+    val imageUrlThumbnail:String = FileApi.convertFileUrl(imageUrl)
+}

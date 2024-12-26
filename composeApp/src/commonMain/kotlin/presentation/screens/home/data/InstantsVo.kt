@@ -20,7 +20,7 @@ data class InstantsVo(
     constructor(instance: InstanceData): this(
         worldId = instance.world.id,
         worldName = instance.world.name,
-        worldImageUrl = instance.world.imageUrl,
+        worldImageUrl = instance.world.imageUrlThumbnail,
         worldAuthorName = instance.world.authorName,
         worldAuthorId = instance.world.authorId,
         worldDescription = instance.world.description,

@@ -11,7 +11,7 @@ data class WorldProfileVo(
     constructor(world: WorldData):this(
         worldId = world.id,
         worldName = world.name,
-        worldImageUrl = world.imageUrl,
+        worldImageUrl = world.imageUrlThumbnail,
         worldDescription = world.description
     )
 }
