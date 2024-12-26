@@ -70,13 +70,14 @@ class FriendListPagerModel(
 
     fun findFriendList(name: String): List<FriendData> =
         friendMap.values
-            .filter {
-                name.isEmpty() || it.displayName.contains(name)
-            }.sortedUserByStatus()
+            .filter { name.isEmpty() || it.displayName.lowercase().contains(name.lowercase()) }
+            .sortedUserByStatus()
 
 
+    // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
     private fun Iterable<FriendData>.sortedUserByStatus()  = sortedByDescending {
-        (if (it.status == UserStatus.Offline) "0" else "1") + it.lastLogin + it.displayName
+        val isOffline = it.status == UserStatus.Offline
+        if (isOffline) "0" else "1" + if (isOffline) it.lastLogin else "" + it.displayName
     }
 
     suspend fun refreshFriendList() {
