@@ -218,7 +218,6 @@ class LocationDialog(
                                         )
                                         Text(
                                             text = currentInstants.accessType,
-                                            fontWeight = FontWeight.SemiBold,
                                             style = MaterialTheme.typography.titleSmall,
                                             color = MaterialTheme.colorScheme.outline
                                         )
