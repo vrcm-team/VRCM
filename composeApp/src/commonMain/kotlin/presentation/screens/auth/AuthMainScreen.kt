@@ -43,7 +43,6 @@ object AuthScreen : Screen {
         }
         val authUIState = authScreenModel.uiState
         BoxWithConstraints(
-            modifier = Modifier.imePadding(),
             contentAlignment = Alignment.Center,
         ) {
             AuthFold(
