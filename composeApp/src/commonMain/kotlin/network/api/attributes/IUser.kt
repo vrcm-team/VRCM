@@ -32,7 +32,7 @@ interface IUser {
         get() = profilePicOverride.ifBlank { currentAvatarImageUrl }
 
     val iconUrl:String
-        get() = userIcon.ifBlank { currentAvatarImageUrl }
+        get() = userIcon.ifBlank { profileImageUrl }
     val isSupporter: Boolean
         get() = tags.contains("system_supporter")
 
