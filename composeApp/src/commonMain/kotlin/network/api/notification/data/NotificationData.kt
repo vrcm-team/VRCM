@@ -22,7 +22,7 @@ data class NotificationData(
     val message: String,
     val messageKey: String?,
     val receiverUserId: String,
-    val relatedNotificationsId: String,
+    val relatedNotificationsId: String?,
     val requireSeen: Boolean,
     val responses: List<ResponseData>,
     val seen: Boolean,
