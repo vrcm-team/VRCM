@@ -2,17 +2,14 @@ package io.github.vrcmteam.vrcm
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -22,12 +19,7 @@ import androidx.compose.ui.window.rememberWindowState
 import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
-import io.github.vrcmteam.vrcm.presentation.compoments.UserInfoRow
-import io.github.vrcmteam.vrcm.presentation.compoments.UserStatusRow
-import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.context.startKoin
