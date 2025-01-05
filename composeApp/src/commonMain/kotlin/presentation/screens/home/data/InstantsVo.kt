@@ -16,6 +16,7 @@ data class InstantsVo(
     val region: RegionType = RegionType.Us,
     val userCount: String = "",
     var owner: Owner? = null,
+    val name: String = "",
 ){
     constructor(instance: InstanceData): this(
         worldId = instance.world.id,
@@ -28,6 +29,7 @@ data class InstantsVo(
         accessType = instance.accessType.displayName,
         region = instance.region,
         userCount = "${instance.userCount}/${instance.world.capacity}",
+        name = instance.name
     )
 
     data class Owner(
