@@ -27,11 +27,13 @@ import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
+import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
@@ -106,11 +108,15 @@ private inline fun Screen.HomeTopAppBar(
     // to ProfileScreen
     val currentNavigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current
+    var currentDialog by LocationDialogContent.current
     val onClickUserIcon = { user: IUser ->
         // 防止多次点击在栈中存在相同key的屏幕报错
         if (currentNavigator.size <= 1) {
             currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
         }
+    }
+    var onClickShowStatusDialog ={ currentUser : CurrentUserData ->
+        currentDialog = UserStatusDialog(currentUser)
     }
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     // 初始化刷新一次
@@ -140,18 +146,16 @@ private inline fun Screen.HomeTopAppBar(
         ) {
             Row(
                 modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .simpleClickable { currentUser?.let { onClickUserIcon(it) } },
+                    .clip(MaterialTheme.shapes.medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 UserStateIcon(
-                    modifier = Modifier
+                    modifier = Modifier.simpleClickable { currentUser?.let { onClickUserIcon(it) } }
                         .enableIf(currentUser != null) {
                             sharedBoundsBy(
                                 key = "${currentUser!!.id}UserIcon",
                             )
-
                         }
                         .enableIf(currentUser == null) {
                             sharedBoundsBy(
@@ -163,7 +167,7 @@ private inline fun Screen.HomeTopAppBar(
                     iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl
                 )
                 Column(
-                    modifier = Modifier.widthIn(max = 220.dp),
+                    modifier = Modifier.widthIn(max = 220.dp).simpleClickable { currentUser?.let { onClickShowStatusDialog(currentUser)} },
                     horizontalAlignment = Alignment.Start,
                 ) {
                     UserInfoRow(
