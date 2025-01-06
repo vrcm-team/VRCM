@@ -200,35 +200,34 @@ class LocationDialog(
                                 }
                             }
                             Spacer(modifier = Modifier.height(2.dp))
-                            Row {
-                                UserIconsRow(friends = friendLocation.friendList) {
-                                    onClickUserIcon(it)
-                                }
+                            UserIconsRow(friends = friendLocation.friendList) {
+                                onClickUserIcon(it)
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Spacer(modifier = Modifier.weight(1f))
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
+                                RegionIcon(
+                                    region = currentInstants.region
+                                )
+                                Text(
+                                    text = currentInstants.accessType,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                TextLabel(
+                                    text = currentInstants.userCount,
+                                )
+                                TextLabel(
+                                    text = currentInstants.name,
+                                )
+                                Button(
+                                    modifier = Modifier.animateContentSize(),
+                                    enabled = !isInvited,
+                                    onClick = { onClickInvite() }
                                 ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        RegionIcon(
-                                            region = currentInstants.region
-                                        )
-                                        Text(
-                                            text = currentInstants.accessType,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.outline
-                                        )
-                                    }
-                                    Button(
-                                        modifier = Modifier.animateContentSize(),
-                                        enabled = !isInvited,
-                                        onClick = { onClickInvite() }
-                                    ) {
-                                        Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
-                                    }
+                                    Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
                                 }
                             }
                         }
