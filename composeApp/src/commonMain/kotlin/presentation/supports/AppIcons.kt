@@ -69,31 +69,21 @@ object AppIcons {
         }
     }
 
-    val Person4: ImageVector by lazy {
-        materialIcon(name = "Filled.Person4") {
-            materialPath {
-                moveTo(18.39f, 14.56f)
-                curveTo(16.71f, 13.7f, 14.53f, 13.0f, 12.0f, 13.0f)
-                curveToRelative(-2.53f, 0.0f, -4.71f, 0.7f, -6.39f, 1.56f)
-                curveTo(4.61f, 15.07f, 4.0f, 16.1f, 4.0f, 17.22f)
-                verticalLineTo(20.0f)
-                horizontalLineToRelative(16.0f)
-                verticalLineToRelative(-2.78f)
-                curveTo(20.0f, 16.1f, 19.39f, 15.07f, 18.39f, 14.56f)
-                close()
-            }
+    val Person: ImageVector by lazy {
+        materialIcon(name = "Filled.Person") {
             materialPath {
                 moveTo(12.0f, 12.0f)
                 curveToRelative(2.21f, 0.0f, 4.0f, -1.79f, 4.0f, -4.0f)
-                curveToRelative(0.0f, -1.37f, 0.0f, -3.5f, 0.0f, -3.5f)
-                curveTo(16.0f, 3.67f, 15.33f, 3.0f, 14.5f, 3.0f)
-                curveToRelative(-0.52f, 0.0f, -0.98f, 0.27f, -1.25f, 0.67f)
-                curveTo(12.98f, 3.27f, 12.52f, 3.0f, 12.0f, 3.0f)
-                reflectiveCurveToRelative(-0.98f, 0.27f, -1.25f, 0.67f)
-                curveTo(10.48f, 3.27f, 10.02f, 3.0f, 9.5f, 3.0f)
-                curveTo(8.67f, 3.0f, 8.0f, 3.67f, 8.0f, 4.5f)
-                curveToRelative(0.0f, 0.0f, 0.0f, 2.12f, 0.0f, 3.5f)
-                curveTo(8.0f, 10.21f, 9.79f, 12.0f, 12.0f, 12.0f)
+                reflectiveCurveToRelative(-1.79f, -4.0f, -4.0f, -4.0f)
+                reflectiveCurveToRelative(-4.0f, 1.79f, -4.0f, 4.0f)
+                reflectiveCurveToRelative(1.79f, 4.0f, 4.0f, 4.0f)
+                close()
+                moveTo(12.0f, 14.0f)
+                curveToRelative(-2.67f, 0.0f, -8.0f, 1.34f, -8.0f, 4.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineToRelative(16.0f)
+                verticalLineToRelative(-2.0f)
+                curveToRelative(0.0f, -2.66f, -5.33f, -4.0f, -8.0f, -4.0f)
                 close()
             }
         }
