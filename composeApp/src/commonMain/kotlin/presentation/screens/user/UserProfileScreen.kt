@@ -207,7 +207,7 @@ private fun JsonAlertDialog(
     if (openAlertDialog) {
         AlertDialog(
             icon = {
-                Icon(AppIcons.Person4, contentDescription = "AlertDialogIcon")
+                Icon(AppIcons.Person, contentDescription = "AlertDialogIcon")
             },
             text = {
                 Box(

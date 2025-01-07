@@ -115,8 +115,8 @@ private inline fun Screen.HomeTopAppBar(
             currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
         }
     }
-    var onClickShowStatusDialog ={ currentUser : CurrentUserData ->
-        currentDialog = UserStatusDialog(currentUser)
+    val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
+        currentDialog = UserStatusDialog(it)
     }
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     // 初始化刷新一次

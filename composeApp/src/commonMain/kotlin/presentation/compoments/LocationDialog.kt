@@ -10,10 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,11 +27,15 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
+import vrcm.composeapp.generated.resources.Res
+import vrcm.composeapp.generated.resources.groups
 
 val DialogShapeForSharedElement = RoundedCornerShape(16.dp)
 
@@ -133,7 +134,8 @@ class LocationDialog(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (owner == null) return@Row
                                 Text(
@@ -141,6 +143,11 @@ class LocationDialog(
                                     fontWeight = FontWeight.Medium,
                                     style = MaterialTheme.typography.titleSmall,
                                 )
+                                if (owner.type == BlueprintType.User) {
+                                    Icon(modifier = Modifier.size(16.dp), imageVector =  AppIcons.Person , contentDescription = "OwnerIcon")
+                                } else {
+                                    Icon(modifier = Modifier.size(16.dp), painter = painterResource(Res.drawable.groups), contentDescription = "OwnerIcon")
+                                }
                                 // TODO: Group详情页跳转
                                 Text(
                                     modifier = if (owner.type == BlueprintType.User)
