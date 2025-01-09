@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.notification.data
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -8,8 +7,7 @@ data class NotificationData(
     val canDelete: Boolean,
     val category: String,
     val createdAt: String,
-    @SerialName("data")
-    val dataMap: Map<String,String>,
+    val data: Data,
     val expiresAt: String,
     val expiryAfterSeen: Int?,
     val id: String,
@@ -33,4 +31,10 @@ data class NotificationData(
     val type: String,
     val updatedAt: String,
     val version: Int
-)
+){
+    @Serializable
+    data class Data(
+        val announcementTitle: String,
+        val groupName: String,
+    )
+}

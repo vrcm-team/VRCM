@@ -65,6 +65,7 @@ class HomeScreenModel(
                             NotificationItemData(
                                 id = data.id,
                                 imageUrl = user.profileImageUrl,
+                                title = user.displayName,
                                 message = user.displayName,
                                 createdAt = data.createdAt,
                                 senderUserId = data.senderUserId,

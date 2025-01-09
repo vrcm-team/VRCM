@@ -127,14 +127,13 @@ private inline fun LazyItemScope.NotificationItem(
                         }
                         .size(120.dp, 80.dp)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.medium)
-
                         .clip(MaterialTheme.shapes.medium),
                     imageData = item.imageUrl
                 )
                 Column {
                     Text(
                         modifier = Modifier.fillMaxWidth(),
-                        text = contentText,
+                        text = item.title,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         overflow = TextOverflow.Ellipsis,
