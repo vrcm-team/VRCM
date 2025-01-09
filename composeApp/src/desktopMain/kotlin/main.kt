@@ -33,6 +33,7 @@ fun main() = run {
             title = APP_NAME,
             icon = painterResource(Res.drawable.logo)
         ) {
+//            AppDesktopPreview()
             App()
         }
     }
