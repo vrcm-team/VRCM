@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.Text
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -89,7 +88,7 @@ object NotificationDialog : SharedDialog {
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private inline fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
@@ -131,14 +130,24 @@ private inline fun LazyItemScope.NotificationItem(
                     imageData = item.imageUrl
                 )
                 Column {
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = item.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        overflow = TextOverflow.Ellipsis,
-                        maxLines = 2,
-                    )
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(text = item.title)
+                            }
+                        },
+                        state = rememberTooltipState()
+                    ){
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = item.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 2,
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
                     Text(
                         text = item.type,
