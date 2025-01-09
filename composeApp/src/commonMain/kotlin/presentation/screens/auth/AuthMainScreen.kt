@@ -145,7 +145,7 @@ private fun AccountBottomSheet(
                     ListItem(
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.large)
-                            .clickable {
+                            .clickable(enabled = authUIState.userId != accountDto.userId) {
                                 onAccountChange(accountDto)
                                 scope.launch { sheetState.hide() }
                                     .invokeOnCompletion {  onDismissRequest() }
