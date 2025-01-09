@@ -136,24 +136,24 @@ fun Pager.FriendLocationPager(
                 friendLocation = offlineFriendLocation,
                 locationType = LocationType.Offline,
                 onClickUserIcon = onClickUserIcon
-            ) { strings.fiendLocationPagerWebsite }
+            ) { "${strings.fiendLocationPagerWebsite}${offlineFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = privateFriendLocation,
                 locationType = LocationType.Private,
                 onClickUserIcon = onClickUserIcon
-            ) { strings.fiendLocationPagerPrivate }
+            ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = travelingFriendLocation,
                 locationType = LocationType.Traveling,
                 onClickUserIcon = onClickUserIcon
-            ) { strings.fiendLocationPagerTraveling }
+            ) { "${strings.fiendLocationPagerTraveling}${travelingFriendLocation?.let { "(${it.friends.size})" }}" }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
                     LocationTitle(
-                        text = strings.fiendLocationPagerLocation,
+                        text = "${strings.fiendLocationPagerLocation}(${instanceFriendLocations.map { it.friends.size }.count()})",
                     )
                 }
 

@@ -219,15 +219,12 @@ class LocationDialog(
                                     region = currentInstants.region
                                 )
                                 Text(
-                                    text = currentInstants.accessType,
+                                    text = "${currentInstants.accessType}(${currentInstants.name})",
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
                                 TextLabel(
                                     text = currentInstants.userCount,
-                                )
-                                TextLabel(
-                                    text = currentInstants.name,
                                 )
                                 Button(
                                     modifier = Modifier.animateContentSize(),
