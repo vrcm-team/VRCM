@@ -2,9 +2,58 @@ package io.github.vrcmteam.vrcm.presentation.supports
 
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.unit.dp
 
 object AppIcons {
+    val Groups: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Groups",
+            defaultWidth = 64.dp,
+            defaultHeight = 64.dp,
+            viewportWidth = 64f,
+            viewportHeight = 64f
+        ).apply {
+            path(fill = SolidColor(Color(0xFF000000))) {
+                moveTo(41.61f, 24.28f)
+                lineTo(47.92f, 37.57f)
+                lineTo(49.218f, 40.324f)
+                curveTo(50.111f, 40.112f, 51.042f, 40f, 52f, 40f)
+                curveTo(58.627f, 40f, 64f, 45.373f, 64f, 52f)
+                curveTo(64f, 58.627f, 58.627f, 64f, 52f, 64f)
+                curveTo(45.373f, 64f, 40f, 58.627f, 40f, 52f)
+                curveTo(40f, 48.118f, 41.843f, 44.667f, 44.702f, 42.474f)
+                lineTo(43.4f, 39.72f)
+                lineTo(37.09f, 26.43f)
+                curveTo(38.73f, 25.97f, 40.25f, 25.23f, 41.61f, 24.28f)
+                close()
+                moveTo(12f, 40f)
+                curveTo(17.77f, 40f, 22.589f, 44.073f, 23.739f, 49.5f)
+                lineTo(37.21f, 49.5f)
+                curveTo(37.07f, 50.31f, 37f, 51.15f, 37f, 52f)
+                curveTo(37f, 52.85f, 37.07f, 53.69f, 37.21f, 54.5f)
+                lineTo(23.739f, 54.501f)
+                curveTo(22.589f, 59.928f, 17.77f, 64f, 12f, 64f)
+                curveTo(5.373f, 64f, 0f, 58.627f, 0f, 52f)
+                curveTo(0f, 45.373f, 5.373f, 40f, 12f, 40f)
+                close()
+                moveTo(33f, 0f)
+                lineTo(33.305f, 0.004f)
+                curveTo(39.791f, 0.166f, 45f, 5.475f, 45f, 12f)
+                curveTo(45f, 18.627f, 39.627f, 24f, 33f, 24f)
+                curveTo(31.876f, 24f, 30.788f, 23.845f, 29.756f, 23.556f)
+                lineTo(21.08f, 40.07f)
+                curveTo(19.76f, 39.06f, 18.27f, 38.27f, 16.66f, 37.75f)
+                lineTo(25.33f, 21.24f)
+                curveTo(22.686f, 19.031f, 21f, 15.712f, 21f, 12f)
+                curveTo(21f, 5.373f, 26.373f, 0f, 33f, 0f)
+                close()
+            }
+        }.build()
+    }
     val Link: ImageVector by lazy {
         materialIcon(name = "Outlined.Link") {
             materialPath {

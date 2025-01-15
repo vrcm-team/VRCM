@@ -32,10 +32,7 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
-import vrcm.composeapp.generated.resources.Res
-import vrcm.composeapp.generated.resources.groups
 
 val DialogShapeForSharedElement = RoundedCornerShape(16.dp)
 
@@ -143,11 +140,7 @@ class LocationDialog(
                                     fontWeight = FontWeight.Medium,
                                     style = MaterialTheme.typography.titleSmall,
                                 )
-                                if (owner.type == BlueprintType.User) {
-                                    Icon(modifier = Modifier.size(16.dp), imageVector =  AppIcons.Person , contentDescription = "OwnerIcon")
-                                } else {
-                                    Icon(modifier = Modifier.size(16.dp), painter = painterResource(Res.drawable.groups), contentDescription = "OwnerIcon")
-                                }
+                                Icon(modifier = Modifier.size(16.dp), imageVector = if (owner.type == BlueprintType.User) AppIcons.Person else AppIcons.Groups, contentDescription = "OwnerIcon")
                                 // TODO: Group详情页跳转
                                 Text(
                                     modifier = if (owner.type == BlueprintType.User)
