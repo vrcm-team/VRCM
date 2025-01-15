@@ -8,7 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 data class FriendLocation(
     val location: String,
     val instants: MutableState<InstantsVo> = mutableStateOf(InstantsVo()),
-    val friends: MutableMap<String,MutableState<FriendData>>,
+    val friends: MutableMap<String, MutableState<FriendData>>,
 ) {
     companion object {
         val Offline
