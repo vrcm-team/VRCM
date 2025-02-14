@@ -16,9 +16,11 @@ compose-plugin = "1.7.0"
 koin = "4.0.0"
 stately-common = "2.0.6"
 voyager = "1.1.0-beta03"
-coil3 = "3.0.4"
-ktor-client = "2.3.12"
+coil3 = "3.1.0"
+ktor-client = "3.0.3"
 chrisbanes-haze = "0.7.3"
+vrchatapi-kotlin = "0.0.1"
+
 [libraries]
 # kotlinx
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
@@ -60,6 +62,8 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor2", version.re
 
 # chrisbanes-haze
 chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }
+
+vrchatapi-kotlin = { module = "io.github.kamo030:vrchatapi-kotlin", version.ref = "vrchatapi-kotlin" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

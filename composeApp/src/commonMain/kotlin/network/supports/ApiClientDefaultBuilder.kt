@@ -1,14 +1,13 @@
 package io.github.vrcmteam.vrcm.network.supports
 
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
-import io.ktor.client.HttpClientConfig
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.UserAgent
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.websocket.WebSockets
-import io.ktor.http.takeFrom
-import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
+import io.ktor.client.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.websocket.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.*
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * 默认的http client配置
@@ -26,7 +25,7 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
         // json 序列化配置
         contentConverter = KotlinxWebsocketSerializationConverter(Json)
         // ping间隔
-        pingInterval = 20_000L
+        pingInterval = 5.seconds
     }
     // user agent用户代理信息 (就是添加一个header)
     install(UserAgent)
