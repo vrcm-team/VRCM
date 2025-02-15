@@ -20,10 +20,8 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
+import dev.chrisbanes.haze.*
 import dev.chrisbanes.haze.HazeDefaults.style
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -81,7 +79,7 @@ object HomeScreen : Screen {
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .enableIf(supportBlur) { haze(state = hazeState!!) },
+                    .enableIf(supportBlur) { hazeSource(state = hazeState!!) },
                 tonalElevation = 2.dp
             ) {
                 HorizontalPager(pagerState) {
@@ -167,7 +165,8 @@ private inline fun Screen.HomeTopAppBar(
                     iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl
                 )
                 Column(
-                    modifier = Modifier.widthIn(max = 220.dp).simpleClickable { currentUser?.let { onClickShowStatusDialog(currentUser)} },
+                    modifier = Modifier.widthIn(max = 220.dp)
+                        .simpleClickable { currentUser?.let { onClickShowStatusDialog(currentUser) } },
                     horizontalAlignment = Alignment.Start,
                 ) {
                     UserInfoRow(
@@ -238,13 +237,13 @@ private inline fun HomeBottomBar(
                 .height(64.dp)
                 .run {
                     if (hazeState != null) {
-                        hazeChild(
-                            state = hazeState,
-                            shape = CircleShape,
-                            style = style(
-                                backgroundColor = backgroundColor,
+                        clip(CircleShape)
+                            .hazeEffect(
+                                state = hazeState,
+                                style = style(
+                                    backgroundColor = backgroundColor
+                                )
                             )
-                        )
                     } else {
                         shadow(
                             elevation = 2.dp,
