@@ -8,9 +8,6 @@ enum class VerificationStatus {
     @SerialName("hidden")
     Hidden,
 
-    @SerialName("verified")
-    Verified,
-
     @SerialName("18+")
     EighteenPlus
 }
