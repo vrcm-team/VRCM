@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
@@ -78,5 +75,5 @@ jobs:
       - name: Upload Debug Artifact # 上传构建好的 Debug APK 作为工作流产物
         uses: actions/upload-artifact@v4
         with:
-          name: VRCM-CI
+          name: VRCM-DEBUG
           path: artifact/*.apk
