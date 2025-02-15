@@ -1,16 +1,17 @@
 package io.github.vrcmteam.vrcm.network.websocket
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.CookieNames
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_WSS_URL
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
-import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.ktor.client.*
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.plugins.websocket.*
-import io.ktor.client.request.parameter
+import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.*
+import kotlin.time.Duration.Companion.seconds
 
 class WebSocketApi(
     private val apiClient: HttpClient,
@@ -31,10 +32,10 @@ class WebSocketApi(
 
     suspend fun startWebSocket() {
         val authToken = cookiesStorage
-                .get(Url(VRC_API_URL)).firstOrNull { it.name == DaoKeys.Cookies.AUTH_KEY }
+                .get(Url(VRC_API_URL)).firstOrNull { it.name == CookieNames.AUTH }
                 ?.value ?: return
         try {
-            apiClient.wss(
+            apiClient.ws(
                 urlString = VRC_WSS_URL,
                 request = {
                     parameter("authToken", authToken)
@@ -46,9 +47,10 @@ class WebSocketApi(
             }
         } catch (e: Exception) {
             e.printStackTrace()
-//            coroutineScope {
-//                this.launch { startWebSocket() }
-//            }
+            delay(3.seconds)
+            coroutineScope {
+                this.launch { startWebSocket() }
+            }
         }
     }
 

@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.storage
 
+import io.github.vrcmteam.vrcm.network.api.attributes.CookieNames
+
 object DaoKeys{
 
     const val PREFIX = "vrcm"
@@ -32,25 +34,12 @@ object DaoKeys{
         /**
          * authCookie Token
          */
-        const val AUTH_KEY = "${PREFIX}.auth"
+        const val AUTH_KEY = "${PREFIX}.${CookieNames.AUTH}"
 
         /**
          * 二步验证Token
          */
-        const val TWO_FACTOR_AUTH_KEY = "${PREFIX}.twoFactorAuth"
-    }
-
-    object Cookies {
-        const val NAME = "${PREFIX}.cookies"
-        /**
-         * authCookie Token
-         */
-        const val AUTH_KEY = "${PREFIX}.auth"
-
-        /**
-         * 二步验证Token
-         */
-        const val TWO_FACTOR_AUTH_KEY = "${PREFIX}.twoFactorAuth"
+        const val TWO_FACTOR_AUTH_KEY = "${PREFIX}.${CookieNames.TWO_FACTOR_AUTH}"
     }
 
     object Settings {
