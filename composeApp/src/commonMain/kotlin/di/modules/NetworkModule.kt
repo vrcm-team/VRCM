@@ -19,13 +19,11 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 
-@OptIn(ExperimentalSerializationApi::class)
 internal val networkModule = module(true) {
     singleOf(::AuthApi)
     singleOf(::FileApi)
