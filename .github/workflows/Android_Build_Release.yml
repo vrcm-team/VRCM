@@ -1,0 +1,103 @@
+name: Android Build Release
+
+# 仅支持手动触发工作流（workflow_dispatch）
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest   # 在最新的 Ubuntu 环境下运行
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Generate Debug Keystore File
+        run: |
+          keytool -genkeypair -noprompt \
+            -alias androiddebugkey \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keystore debug.keystore \
+            -storepass android \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+          
+      - name: Create local.properties file
+        run: |
+          echo "store_file=debug.keystore" > local.properties
+          echo "store_pass=android" >> local.properties
+          echo "key_alias=androiddebugkey" >> local.properties
+          echo "key_pass=android" >> local.properties
+          
+      - name: Create gradle.properties file
+        run: |
+          echo "#Kotlin" > gradle.properties
+          echo "kotlin.code.style=official" >> gradle.properties
+          echo "kotlin.daemon.jvmargs=-Xmx2048M" >> gradle.properties
+          echo "" >> gradle.properties
+          echo "#Gradle" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx8192M -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=\"-Xmx8192M\"" >> gradle.properties
+          echo "systemProp.https.protocols=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3" >> gradle.properties
+          echo "" >> gradle.properties
+          echo "#Android" >> gradle.properties
+          echo "android.nonTransitiveRClass=true" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          
+      - name: Copy Debug Keystore to Module Directory
+        run: |
+          mkdir -p composeApp
+          cp debug.keystore composeApp/debug.keystore
+          
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        
+      - name: Build Release APK with Gradle
+        run: ./gradlew assembleRelease --info
+        
+      - name: List APK files (for debugging)
+        run: find . -name "*.apk"
+        
+      - name: Extract App Version
+        id: extract_version
+        run: |
+          APP_VERSION=$(grep -oP '^app-version\s*=\s*"\K[^"]+' gradle/libs.versions.toml | head -n 1)
+          if [ -z "$APP_VERSION" ]; then
+            echo "未能提取到版本号，请检查 gradle/libs.versions.toml 中是否存在 app-version = \"x.y.z\""
+            exit 1
+          fi
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "::notice::提取到的版本号: $APP_VERSION"
+
+      - name: Move Release APK
+        run: |
+          mkdir -p artifact
+          APK_NAME="VRCM-v${APP_VERSION}.apk"
+          find . -name "*.apk" -exec cp {} artifact/${APK_NAME} \;
+          
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          release_name: "VRCM v${{ env.APP_VERSION }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifact/VRCM-v${{ env.APP_VERSION }}.apk
+          asset_name: VRCM-v${{ env.APP_VERSION }}.apk
+          asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
