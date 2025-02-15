@@ -1,0 +1,82 @@
+name: Android Build CI
+
+# 触发条件：推送代码到 main 分支或从 main 分支发起 pull request 或者手动触发
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # 在最新的 Ubuntu 环境下运行
+
+    steps:
+      - uses: actions/checkout@v3 # 检出代码仓库
+
+      - name: Set up JDK 17 # 设置 JDK 版本为 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Generate Debug Keystore File # 生成调试用的 keystore 文件
+        run: |
+          keytool -genkeypair -noprompt \
+            -alias androiddebugkey \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keystore debug.keystore \
+            -storepass android \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+
+      - name: Create local.properties file # 创建 local.properties 文件，设置 keystore 相关信息
+        run: |
+          echo "store_file=debug.keystore" > local.properties
+          echo "store_pass=android" >> local.properties
+          echo "key_alias=androiddebugkey" >> local.properties
+          echo "key_pass=android" >> local.properties
+
+      - name: Create gradle.properties file # 创建 gradle.properties 文件，设置 Gradle 和 Kotlin 编译选项
+        run: |
+          echo "#Kotlin" > gradle.properties
+          echo "kotlin.code.style=official" >> gradle.properties
+          echo "kotlin.daemon.jvmargs=-Xmx2048M" >> gradle.properties
+          echo "" >> gradle.properties
+          echo "#Gradle" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx8192M -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=\"-Xmx8192M\"" >> gradle.properties
+          echo "systemProp.https.protocols=TLSv1,TLSv1.1,TLSv1.2,TLSv1.3" >> gradle.properties
+          echo "" >> gradle.properties
+          echo "#Android" >> gradle.properties
+          echo "android.nonTransitiveRClass=true" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+
+      - name: Grant execute permission for gradlew # 给 gradlew 脚本添加执行权限
+        run: chmod +x gradlew
+
+      - name: Build Debug APK with Gradle # 使用 Gradle 构建 Debug APK
+        run: ./gradlew assembleDebug --info
+
+      - name: List APK files (for debugging) # 列出所有生成的 APK 文件（用于调试）
+        run: find . -name "*.apk"
+
+      # 将生成的 APK 文件复制到单独目录，并可选地重命名为 app-debug.apk
+      - name: Move Debug APK # 移动 Debug APK 文件到指定目录
+        run: |
+          mkdir -p artifact
+          # 如果只会生成一个 .apk，可直接执行重命名：
+          # find . -name "*.apk" -exec mv {} artifact/app-debug.apk \;
+          #
+          # 如果可能生成多个 .apk，这里示例是复制到 artifact 目录下：
+          find . -name "*.apk" -exec cp {} artifact/ \;
+
+      - name: Upload Debug Artifact # 上传构建好的 Debug APK 作为工作流产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: VRCM-CI
+          path: artifact/*.apk
