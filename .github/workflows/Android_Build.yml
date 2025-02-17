@@ -1,6 +1,6 @@
 name: Android Build CI
 
-# 触发条件：推送代码到 main 分支或从 main 分支发起 pull request 或者手动触发
+# 触发条件：推送代码到 main 分支或手动触发
 on:
   push:
     branches:
@@ -9,18 +9,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest # 在最新的 Ubuntu 环境下运行
+    runs-on: ubuntu-latest  # 在最新的 Ubuntu 环境下运行
 
     steps:
-      - uses: actions/checkout@v3 # 检出代码仓库
+      - uses: actions/checkout@v3
+        # 检出代码仓库
 
-      - name: Set up JDK 17 # 设置 JDK 版本为 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
+        # 设置 JDK 17 环境
 
-      - name: Generate Debug Keystore File # 生成调试用的 keystore 文件
+      - name: Generate Debug Keystore File
         run: |
           keytool -genkeypair -noprompt \
             -alias androiddebugkey \
@@ -31,15 +33,17 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000
+        # 生成用于签名的 debug.keystore 文件
 
-      - name: Create local.properties file # 创建 local.properties 文件，设置 keystore 相关信息
+      - name: Create local.properties file
         run: |
           echo "store_file=debug.keystore" > local.properties
           echo "store_pass=android" >> local.properties
           echo "key_alias=androiddebugkey" >> local.properties
           echo "key_pass=android" >> local.properties
+        # 创建 local.properties 文件，设置签名相关信息
 
-      - name: Create gradle.properties file # 创建 gradle.properties 文件，设置 Gradle 和 Kotlin 编译选项
+      - name: Create gradle.properties file
         run: |
           echo "#Kotlin" > gradle.properties
           echo "kotlin.code.style=official" >> gradle.properties
@@ -52,28 +56,89 @@ jobs:
           echo "#Android" >> gradle.properties
           echo "android.nonTransitiveRClass=true" >> gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
+        # 创建 gradle.properties 文件，设置 Gradle 与 Kotlin 编译参数
 
-      - name: Grant execute permission for gradlew # 给 gradlew 脚本添加执行权限
+      - name: Extract App Version
+        id: extract_version
+        run: |
+          # 从 gradle/libs.versions.toml 中提取 app-version 的值，例如：app-version = "1.0.5"
+          APP_VERSION=$(grep -oP '^app-version\s*=\s*"\K[^"]+' gradle/libs.versions.toml | head -n 1)
+          if [ -z "$APP_VERSION" ]; then
+            echo "未能提取到版本号，请检查 gradle/libs.versions.toml 中是否存在 app-version = \"x.y.z\""
+            exit 1
+          fi
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "::notice::提取到的版本号: $APP_VERSION"
+        shell: bash
+        # 从 gradle/libs.versions.toml 中提取版本号，并写入环境变量 APP_VERSION
+
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+        # 为 gradlew 脚本添加执行权限
 
-      - name: Build Debug APK with Gradle # 使用 Gradle 构建 Debug APK
+      - name: Build Debug APK with Gradle
         run: ./gradlew assembleDebug --info
+        # 使用 Gradle 构建 Debug 版 APK
 
-      - name: List APK files (for debugging) # 列出所有生成的 APK 文件（用于调试）
+      - name: List APK files (for debugging)
         run: find . -name "*.apk"
+        # 列出所有生成的 APK 文件，便于调试确认生成路径
 
-      # 将生成的 APK 文件复制到单独目录，并可选地重命名为 app-debug.apk
-      - name: Move Debug APK # 移动 Debug APK 文件到指定目录
+      - name: Move and Rename Debug APK
         run: |
           mkdir -p artifact
-          # 如果只会生成一个 .apk，可直接执行重命名：
-          # find . -name "*.apk" -exec mv {} artifact/app-debug.apk \;
-          #
-          # 如果可能生成多个 .apk，这里示例是复制到 artifact 目录下：
-          find . -name "*.apk" -exec cp {} artifact/ \;
+          # 将找到的 APK 文件移动并重命名为 VRCM-v<版本号>.apk
+          find . -name "*.apk" -exec mv {} artifact/VRCM-v${{ env.APP_VERSION }}.apk \;
+        # 将生成的 APK 文件统一放入 artifact 目录下
 
-      - name: Upload Debug Artifact # 上传构建好的 Debug APK 作为工作流产物
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # 获取最近一个 Tag（若不存在，则显示所有提交）
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+              echo "未找到上一个 Tag，显示所有提交记录"
+              CHANGELOG=$(git log --pretty=format:"- %s")
+          else
+              echo "获取从 $PREV_TAG 到 HEAD 的提交记录"
+              CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s")
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        shell: bash
+        # 生成变更日志，读取最近 Tag 到当前的所有提交记录，并保存为输出变量 changelog
+
+      - name: Upload Debug Artifact
         uses: actions/upload-artifact@v4
         with:
           name: VRCM-DEBUG
           path: artifact/*.apk
+        # 上传构建好的 Debug APK 作为工作流产物
+
+      - name: Create Pre-Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.APP_VERSION }}-build-${{ github.run_number }}
+          release_name: "VRCM v${{ env.APP_VERSION }}-build-${{ github.run_number }}"
+          body: |
+            变更日志：
+            ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: true
+        # 创建预发布 Release，Tag 与 Release 名称中均包含版本号和 build 编号，
+        # 变更日志从之前的步骤读取 commits
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifact/VRCM-v${{ env.APP_VERSION }}.apk
+          asset_name: VRCM-v${{ env.APP_VERSION }}-DEBUG.apk
+          asset_content_type: application/vnd.android.package-archive
+        # 将生成的 APK 文件上传到 Release
