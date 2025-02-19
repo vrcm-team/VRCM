@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
+import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.ktor.client.*
 import okio.FileSystem
@@ -61,4 +62,5 @@ private fun Module.configThemeColor() {
     single(named(ThemeColor.Default.name)){ ThemeColor.Default }
     single(named(BlueThemeColor.name)){ BlueThemeColor }
     single(named(PinkThemeColor.name)){ PinkThemeColor }
+    single (named(GreenThemeColor.name)){ GreenThemeColor}
 }
