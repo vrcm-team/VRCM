@@ -15,7 +15,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
@@ -26,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
+import io.github.vrcmteam.vrcm.presentation.extensions.koinScreenModelByLastItem
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -40,11 +40,7 @@ object NotificationDialog : SharedDialog {
 
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
-        val currentScreen = LocalNavigator.currentOrThrow.lastItem
-        // 不这样拿拿不到页面上同一个HomeScreenModel对象, 导致notifications一开始为空
-        val homeScreenModel: HomeScreenModel = with(currentScreen) {
-            koinScreenModel()
-        }
+        val homeScreenModel: HomeScreenModel = koinScreenModelByLastItem()
         // 每打开一次刷新一次
         LaunchedEffect(Unit) {
             homeScreenModel.refreshAllNotification()

@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
-import dev.chrisbanes.haze.*
 import dev.chrisbanes.haze.HazeDefaults.style
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
@@ -114,7 +116,9 @@ private inline fun Screen.HomeTopAppBar(
         }
     }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
-        currentDialog = UserStatusDialog(it)
+        currentDialog = UserStatusDialog(it){
+            currentDialog = null
+        }
     }
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     // 初始化刷新一次
@@ -123,7 +127,7 @@ private inline fun Screen.HomeTopAppBar(
     }
 
     val modifier = if (hazeState != null) {
-        Modifier.hazeChild(
+        Modifier.hazeEffect(
             state = hazeState,
             style = style(
                 backgroundColor = backgroundColor,

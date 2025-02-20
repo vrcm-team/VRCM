@@ -24,6 +24,7 @@ data class LocaleStrings(
     val fiendListPagerSearch: String = "Search",
     val notificationFriendRequest: String = "wants to be your friend",
     val homeNotificationEmpty: String = "No Notification Yet",
+    val homeUpdateStatus: String = "Update Status",
     val stettingLanguage: String = "Language",
     val stettingThemeMode: String = "ThemeMode",
     val stettingSystemThemeMode: String = "System",

@@ -19,6 +19,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     fiendListPagerSearch = "搜索",
     notificationFriendRequest = "想要成為你的好友",
     homeNotificationEmpty = "暂无新訊息",
+    homeUpdateStatus = "更新狀態",
     stettingLanguage = "語言",
     stettingThemeMode = "主題模式",
     stettingSystemThemeMode = "跟隨系統",

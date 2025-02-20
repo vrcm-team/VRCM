@@ -1,21 +1,23 @@
-package io.github.vrcmteam.vrcm.network.api.auth.data
+package network.api.users.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AgeVerificationStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.auth.data.AccountDeletionLog
+import io.github.vrcmteam.vrcm.network.api.auth.data.PastDisplayName
+import io.github.vrcmteam.vrcm.network.api.auth.data.SteamDetails
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class CurrentUserData(
+data class CurrentUpdateUserData(
     val ageVerificationStatus: AgeVerificationStatus,
     val ageVerified: Boolean,
     val acceptedPrivacyVersion: Int,
     val acceptedTOSVersion: Int,
     val accountDeletionDate: String?,
     val accountDeletionLog: List<AccountDeletionLog>?,
-    val activeFriends: List<String>,
     val allowAvatarCopying: Boolean,
     override val bio: String?,
     override val bioLinks: List<String>,
@@ -51,11 +53,8 @@ data class CurrentUserData(
     val obfuscatedEmail: String,
     val obfuscatedPendingEmail: String,
     val oculusId: String,
-    val offlineFriends: List<String>,
-    val onlineFriends: List<String>,
     val pastDisplayNames: List<PastDisplayName>,
     val picoId: String,
-    val presence: Presence,
     override val profilePicOverride: String,
     val state: String,
     override val status: UserStatus,

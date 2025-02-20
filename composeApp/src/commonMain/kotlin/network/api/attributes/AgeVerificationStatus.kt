@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class VerificationStatus {
+enum class AgeVerificationStatus {
     @SerialName("hidden")
     Hidden,
 

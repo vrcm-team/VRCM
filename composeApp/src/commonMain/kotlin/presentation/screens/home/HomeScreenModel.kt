@@ -7,6 +7,7 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
@@ -17,6 +18,7 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import network.api.users.data.UpdateUserInfoData
 import org.koin.core.logger.Logger
 
 
@@ -154,6 +156,24 @@ class HomeScreenModel(
                 SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
         }
+    fun updateUserStatus(userStatus: UserStatus, statusDescription: String) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching {
+                usersApi.updateUserInfo(
+                    userId = userId,
+                    updateUserInfoData = UpdateUserInfoData(
+                        status = userStatus,
+                        statusDescription = statusDescription
+                    )
+                )
+            }.onHomeFailure()
+                .onSuccess {
+                    refreshCurrentUser()
+                }
+        }
+    }
+
+
 }
 
 
