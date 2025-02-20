@@ -121,6 +121,10 @@ class FriendLocationPagerModel(
     suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
+        // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
+        // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent写死LocationType为Offline
+        // 刷新当前用户的好友在线信息
+        authService.currentUser(isRefresh = true)
         screenModelScope.launch(Dispatchers.IO) {
             friendsApi.friendsFlow()
                 .retry(1) {
@@ -147,9 +151,7 @@ class FriendLocationPagerModel(
         friends: List<FriendData>,
     ) = screenModelScope.launch(Dispatchers.Default) {
         runCatching {
-            // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
-            // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent写死LocationType为Offline
-            val currentUser = authService.currentUser(isRefresh = true)
+            val currentUser = authService.currentUser()
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
             currentUser.activeFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
