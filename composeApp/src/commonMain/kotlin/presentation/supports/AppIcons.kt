@@ -90,6 +90,73 @@ object AppIcons {
         }
     }
 
+    val Computer: ImageVector by lazy {
+        materialIcon(name = "Filled.Computer") {
+            materialPath {
+                moveTo(20.0f, 18.0f)
+                curveToRelative(1.1f, 0.0f, 2.0f, -0.9f, 2.0f, -2.0f)
+                lineTo(22.0f, 6.0f)
+                curveToRelative(0.0f, -1.1f, -0.9f, -2.0f, -2.0f, -2.0f)
+                lineTo(4.0f, 4.0f)
+                curveToRelative(-1.1f, 0.0f, -2.0f, 0.9f, -2.0f, 2.0f)
+                verticalLineToRelative(10.0f)
+                curveToRelative(0.0f, 1.1f, 0.9f, 2.0f, 2.0f, 2.0f)
+                lineTo(0.0f, 18.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineToRelative(24.0f)
+                verticalLineToRelative(-2.0f)
+                horizontalLineToRelative(-4.0f)
+                close()
+                moveTo(4.0f, 6.0f)
+                horizontalLineToRelative(16.0f)
+                verticalLineToRelative(10.0f)
+                lineTo(4.0f, 16.0f)
+                lineTo(4.0f, 6.0f)
+                close()
+            }
+        }
+    }
+
+    val Smartphone: ImageVector by lazy {
+        materialIcon(name = "Filled.Smartphone") {
+            materialPath {
+                moveTo(17.0f, 1.01f)
+                lineTo(7.0f, 1.0f)
+                curveToRelative(-1.1f, 0.0f, -2.0f, 0.9f, -2.0f, 2.0f)
+                verticalLineToRelative(18.0f)
+                curveToRelative(0.0f, 1.1f, 0.9f, 2.0f, 2.0f, 2.0f)
+                horizontalLineToRelative(10.0f)
+                curveToRelative(1.1f, 0.0f, 2.0f, -0.9f, 2.0f, -2.0f)
+                verticalLineTo(3.0f)
+                curveToRelative(0.0f, -1.1f, -0.9f, -1.99f, -2.0f, -1.99f)
+                close()
+                moveTo(17.0f, 19.0f)
+                horizontalLineTo(7.0f)
+                verticalLineTo(5.0f)
+                horizontalLineToRelative(10.0f)
+                verticalLineTo(19.0f)
+                close()
+            }
+        }
+    }
+
+    val Favorite: ImageVector by lazy {
+        materialIcon(name = "Filled.Favorite") {
+            materialPath {
+                moveTo(12.0f, 21.35f)
+                lineTo(10.55f, 20.03f)
+                curveTo(4.0f, 14.08f, 2.0f, 11.0f, 2.0f, 8.5f)
+                curveTo(2.0f, 5.42f, 4.42f, 3.0f, 7.5f, 3.0f)
+                curveToRelative(1.74f, 0.0f, 3.41f, 0.81f, 4.5f, 2.09f)
+                curveTo(13.09f, 3.81f, 14.76f, 3.0f, 16.5f, 3.0f)
+                curveTo(19.58f, 3.0f, 22.0f, 5.42f, 22.0f, 8.5f)
+                curveToRelative(0.0f, 3.78f, -3.4f, 6.86f, -8.55f, 11.54f)
+                lineTo(12.0f, 21.35f)
+                close()
+            }
+        }
+    }
+
     val QuestionMark: ImageVector by lazy {
         materialIcon(name = "Rounded.QuestionMark") {
             materialPath {
@@ -358,7 +425,7 @@ object AppIcons {
         materialIcon(name = "Rounded.Shield") {
             materialPath {
                 moveTo(11.3f, 2.26f)
-                lineToRelative(-6.0f, 2.25f)
+                lineTo(6.0f, 2.25f)
                 curveTo(4.52f, 4.81f, 4.0f, 5.55f, 4.0f, 6.39f)
                 verticalLineToRelative(4.7f)
                 curveToRelative(0.0f, 4.83f, 3.13f, 9.37f, 7.43f, 10.75f)
@@ -366,8 +433,7 @@ object AppIcons {
                 curveToRelative(4.3f, -1.38f, 7.43f, -5.91f, 7.43f, -10.75f)
                 verticalLineToRelative(-4.7f)
                 curveToRelative(0.0f, -0.83f, -0.52f, -1.58f, -1.3f, -1.87f)
-                lineToRelative(-6.0f, -2.25f)
-                curveTo(12.25f, 2.09f, 11.75f, 2.09f, 11.3f, 2.26f)
+                lineTo(11.3f, 2.26f)
                 close()
             }
         }
@@ -386,9 +452,6 @@ object AppIcons {
                 curveToRelative(2.03f, 0.34f, 3.94f, -0.28f, 5.34f, -1.48f)
                 lineToRelative(0.27f, 0.28f)
                 verticalLineToRelative(0.79f)
-                lineToRelative(4.25f, 4.25f)
-                curveToRelative(0.41f, 0.41f, 1.08f, 0.41f, 1.49f, 0.0f)
-                curveToRelative(0.41f, -0.41f, 0.41f, -1.08f, 0.0f, -1.49f)
                 lineTo(15.5f, 14.0f)
                 close()
                 moveTo(9.5f, 14.0f)
@@ -406,12 +469,7 @@ object AppIcons {
             materialPath {
                 moveTo(21.0f, 10.12f)
                 horizontalLineToRelative(-6.78f)
-                lineToRelative(2.74f, -2.82f)
-                curveToRelative(-2.73f, -2.7f, -7.15f, -2.8f, -9.88f, -0.1f)
-                curveToRelative(-2.73f, 2.71f, -2.73f, 7.08f, 0.0f, 9.79f)
-                reflectiveCurveToRelative(7.15f, 2.71f, 9.88f, 0.0f)
-                curveTo(18.32f, 15.65f, 19.0f, 14.08f, 19.0f, 12.1f)
-                horizontalLineToRelative(2.0f)
+                lineTo(22.0f, 10.12f)
                 curveToRelative(0.0f, 1.98f, -0.88f, 4.55f, -2.64f, 6.29f)
                 curveToRelative(-3.51f, 3.48f, -9.21f, 3.48f, -12.72f, 0.0f)
                 curveToRelative(-3.5f, -3.47f, -3.53f, -9.11f, -0.02f, -12.58f)
@@ -421,10 +479,8 @@ object AppIcons {
                 close()
                 moveTo(12.5f, 8.0f)
                 verticalLineToRelative(4.25f)
-                lineToRelative(3.5f, 2.08f)
-                lineToRelative(-0.72f, 1.21f)
-                lineTo(11.0f, 13.0f)
-                verticalLineTo(8.0f)
+                lineTo(16.0f, 12.25f)
+                lineTo(16.0f, 8.0f)
                 horizontalLineTo(12.5f)
                 close()
             }
@@ -518,9 +574,9 @@ object AppIcons {
                 close()
                 moveTo(14.19f, 14.19f)
                 lineTo(6.0f, 18.0f)
-                lineToRelative(3.81f, -8.19f)
+                lineTo(10.8f, 13.41f)
                 lineTo(18.0f, 6.0f)
-                lineToRelative(-3.81f, 8.19f)
+                lineTo(14.19f, 14.19f)
                 close()
             }
         }
@@ -550,17 +606,12 @@ object AppIcons {
                 curveToRelative(-2.63f, -0.34f, -4.85f, 1.87f, -4.5f, 4.5f)
                 curveToRelative(0.22f, 1.66f, 1.52f, 3.04f, 3.16f, 3.38f)
                 curveToRelative(1.05f, 0.22f, 2.02f, -0.01f, 2.82f, -0.48f)
-                lineToRelative(1.86f, 1.86f)
-                curveToRelative(0.39f, 0.39f, 1.02f, 0.39f, 1.41f, 0.0f)
-                lineToRelative(0.0f, 0.0f)
-                curveToRelative(0.39f, -0.39f, 0.39f, -1.02f, 0.0f, -1.41f)
                 lineTo(19.43f, 18.02f)
                 close()
                 moveTo(16.0f, 18.0f)
                 curveToRelative(-1.1f, 0.0f, -2.0f, -0.9f, -2.0f, -2.0f)
                 curveToRelative(0.0f, -1.1f, 0.9f, -2.0f, 2.0f, -2.0f)
-                reflectiveCurveToRelative(2.0f, 0.9f, 2.0f, 2.0f)
-                curveTo(18.0f, 17.1f, 17.1f, 18.0f, 16.0f, 18.0f)
+                curveTo(18.0f, 16.0f, 19.1f, 16.9f, 19.0f, 18.0f)
                 close()
             }
         }
@@ -590,42 +641,46 @@ object AppIcons {
         materialIcon(name = "Filled.VisibilityOff") {
             materialPath {
                 moveTo(12.0f, 7.0f)
-                curveToRelative(2.76f, 0.0f, 5.0f, 2.24f, 5.0f, 5.0f)
+                curveTo(2.76f, 0.0f, 5.0f, 2.24f, 5.0f, 5.0f)
                 curveToRelative(0.0f, 0.65f, -0.13f, 1.26f, -0.36f, 1.83f)
-                lineToRelative(2.92f, 2.92f)
+                lineTo(2.92f, 2.92f)
                 curveToRelative(1.51f, -1.26f, 2.7f, -2.89f, 3.43f, -4.75f)
                 curveToRelative(-1.73f, -4.39f, -6.0f, -7.5f, -11.0f, -7.5f)
                 curveToRelative(-1.4f, 0.0f, -2.74f, 0.25f, -3.98f, 0.7f)
-                lineToRelative(2.16f, 2.16f)
-                curveTo(10.74f, 7.13f, 11.35f, 7.0f, 12.0f, 7.0f)
+                lineTo(2.16f, 2.16f)
+                curveToRelative(0.39f, 0.39f, 0.39f, 1.02f, 0.0f, 1.41f)
+                curveToRelative(-0.39f, 0.39f, -1.02f, 0.39f, -1.41f, 0.0f)
+                lineTo(0.0f, 0.0f)
+                lineTo(12.0f, 7.0f)
                 close()
                 moveTo(2.0f, 4.27f)
-                lineToRelative(2.28f, 2.28f)
-                lineToRelative(0.46f, 0.46f)
+                lineTo(4.28f, 4.28f)
+                lineTo(4.74f, 4.74f)
                 curveTo(3.08f, 8.3f, 1.78f, 10.02f, 1.0f, 12.0f)
                 curveToRelative(1.73f, 4.39f, 6.0f, 7.5f, 11.0f, 7.5f)
                 curveToRelative(1.55f, 0.0f, 3.03f, -0.3f, 4.38f, -0.84f)
-                lineToRelative(0.42f, 0.42f)
-                lineTo(19.73f, 22.0f)
-                lineTo(21.0f, 20.73f)
-                lineTo(3.27f, 3.0f)
-                lineTo(2.0f, 4.27f)
+                lineTo(4.8f, 4.8f)
+                curveToRelative(-0.46f, 0.2f, -1.0f, 0.02f, -1.25f, -0.42f)
+                lineTo(2.41f, 2.41f)
+                curveToRelative(-0.25f, -0.44f, -0.14f, -0.99f, 0.26f, -1.25f)
+                lineTo(2.0f, 0.0f)
+                lineTo(0.0f, 2.0f)
+                lineTo(3.27f, 5.27f)
                 close()
                 moveTo(7.53f, 9.8f)
-                lineToRelative(1.55f, 1.55f)
+                lineTo(9.08f, 9.8f)
                 curveToRelative(-0.05f, 0.21f, -0.08f, 0.43f, -0.08f, 0.65f)
                 curveToRelative(0.0f, 1.66f, 1.34f, 3.0f, 3.0f, 3.0f)
                 curveToRelative(0.22f, 0.0f, 0.44f, -0.03f, 0.65f, -0.08f)
-                lineToRelative(1.55f, 1.55f)
+                lineTo(9.08f, 9.8f)
                 curveToRelative(-0.67f, 0.33f, -1.41f, 0.53f, -2.2f, 0.53f)
                 curveToRelative(-2.76f, 0.0f, -5.0f, -2.24f, -5.0f, -5.0f)
                 curveToRelative(0.0f, -0.79f, 0.2f, -1.53f, 0.53f, -2.2f)
                 close()
                 moveTo(11.84f, 9.02f)
-                lineToRelative(3.15f, 3.15f)
-                lineToRelative(0.02f, -0.16f)
-                curveToRelative(0.0f, -1.66f, -1.34f, -3.0f, -3.0f, -3.0f)
-                lineToRelative(-0.17f, 0.01f)
+                lineTo(15.0f, 12.17f)
+                lineTo(15.0f, 9.0f)
+                lineTo(11.84f, 9.02f)
                 close()
             }
         }
@@ -669,8 +724,8 @@ object AppIcons {
                 lineToRelative(0.0f, 0.0f)
                 curveToRelative(0.49f, -0.49f, 0.49f, -1.28f, 0.0f, -1.77f)
                 lineTo(9.54f, 12.0f)
-                lineToRelative(7.35f, -7.35f)
-                curveTo(17.37f, 4.16f, 17.37f, 3.37f, 16.88f, 2.88f)
+                lineTo(16.88f, 4.66f)
+                curveTo(17.37f, 4.17f, 17.37f, 3.38f, 16.88f, 2.88f)
                 close()
             }
         }
