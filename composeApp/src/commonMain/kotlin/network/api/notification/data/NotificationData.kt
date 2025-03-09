@@ -14,9 +14,9 @@ data class NotificationData(
     val ignoreDND: Boolean,
     val imageUrl: String,
     val isSystem: Boolean,
-    val link: String,
-    val linkText: String,
-    val linkTextKey: String,
+    val link: String?,
+    val linkText: String?,
+    val linkTextKey: String?,
     val message: String,
     val messageKey: String?,
     val receiverUserId: String,
@@ -34,7 +34,7 @@ data class NotificationData(
 ){
     @Serializable
     data class Data(
-        val announcementTitle: String,
+        val announcementTitle: String?,
         val groupName: String?,
     )
 }

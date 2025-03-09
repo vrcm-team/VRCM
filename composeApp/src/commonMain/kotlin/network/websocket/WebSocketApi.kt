@@ -48,8 +48,9 @@ class WebSocketApi(
         } catch (e: Exception) {
             e.printStackTrace()
             delay(3.seconds)
+
             coroutineScope {
-                this.launch { startWebSocket() }
+                launch { startWebSocket() }
             }
         }
     }
