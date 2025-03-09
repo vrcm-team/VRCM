@@ -95,7 +95,10 @@ fun Pager.FriendLocationPager(
     val sharedSuffixKey = LocalSharedSuffixKey.current
     val onClickLocation: (FriendLocation) -> Unit = {
         currentLocation = it
-        currentDialog = LocationDialog(it,sharedSuffixKey){
+        currentDialog = LocationDialog(
+            friendLocation = it,
+            sharedSuffixKey = sharedSuffixKey
+        ){
             currentDialog = null
             currentLocation = null
         }

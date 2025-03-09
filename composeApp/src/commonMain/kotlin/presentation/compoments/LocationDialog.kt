@@ -26,6 +26,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -51,6 +53,15 @@ class LocationDialog(
         // remember一下防止owner被刷新为null
         val owner = remember { currentInstants.owner }
         val currentNavigator = currentNavigator
+        val onClickWorldImage = { instansId:String ->
+            if (currentNavigator.size <= 1) {
+                currentNavigator push WorldProfileScreen(
+                    WorldProfileVo(currentInstants),
+                    id = instansId,
+                    sharedSuffixKey = sharedSuffixKey
+                )
+            }
+        }
         val onClickUserIcon = { user: IUser ->
             if (currentNavigator.size <= 1) {
                 currentNavigator push UserProfileScreen(
@@ -93,11 +104,15 @@ class LocationDialog(
                             )
                             .clip(MaterialTheme.shapes.medium)
                     ) {
-                        // TODO: World详情页跳转
+                        // 添加世界详情页跳转功能
                         AImage(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
+                                .sharedBoundsBy(
+                                    key = currentInstants.worldId + "WorldImage"
+                                )
+                                .clickable { onClickWorldImage(friendLocation.location) }
                                 .clip(MaterialTheme.shapes.medium),
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"

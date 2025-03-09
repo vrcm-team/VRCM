@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -17,7 +18,6 @@ import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
@@ -32,6 +32,7 @@ internal val networkModule = module(true) {
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
     singleOf(::InviteApi)
+    singleOf(::WorldsApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
@@ -54,10 +55,10 @@ private val apiClientDefinition: Definition<HttpClient> = {
         install(ContentNegotiation) {
             json(get())
         }
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.ALL
-        }
+//        install(Logging) {
+//            logger = Logger.SIMPLE
+//            level = LogLevel.ALL
+//        }
         install(HttpCookies) {
             this.storage = get()
         }
