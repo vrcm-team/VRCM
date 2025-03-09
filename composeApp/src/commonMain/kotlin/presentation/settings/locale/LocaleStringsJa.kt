@@ -19,6 +19,7 @@ internal val LocaleStringsJa = LocaleStrings(
     fiendListPagerSearch = "検索",
     notificationFriendRequest = "はあなたの友達になりたい",
     homeNotificationEmpty = "お知らせはまだありません",
+    homeStatusEdit = "ステータスを編集",
     homeUpdateStatus = "ステータスを更新",
     stettingLanguage = "言語",
     stettingThemeMode = "テーマモード",

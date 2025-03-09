@@ -3,10 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -37,11 +34,39 @@ fun ITextField(
     textValue: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    supportingText: @Composable (() -> Unit)? = null
+) =  ITextField(
+    modifier = modifier,
+    leadingIcon = {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = "leadingIcon",
+            tint = MaterialTheme.colorScheme.primary
+        )
+    },
+    hintText = hintText,
+    textValue = textValue,
+    keyboardOptions = keyboardOptions,
+    keyboardActions = keyboardActions,
+    onValueChange = onValueChange,
+    supportingText = supportingText
+)
+
+
+@Composable
+fun ITextField(
+    modifier: Modifier = Modifier,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    hintText: String,
+    textValue: String,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    onValueChange: (String) -> Unit,
+    supportingText: @Composable (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
-
             .fillMaxWidth()
             .then(modifier)
             .border(
@@ -55,17 +80,19 @@ fun ITextField(
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            modifier = Modifier
-                .padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
-            imageVector = imageVector,
-            contentDescription = "",
-            tint = MaterialTheme.colorScheme.primary
-        )
+        if (leadingIcon != null) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 12.dp, end = 6.dp, top = 12.dp, bottom = 12.dp)
+            ) {
+                leadingIcon()
+            }
+        }
+
         BasicTextField(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
+                .padding(end = 6.dp, top = 12.dp, bottom = 12.dp),
             value = textValue,
             decorationBox = { innerTextField ->
                 Box {
@@ -87,10 +114,19 @@ fun ITextField(
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface)
         )
+        // 显示辅助文本
+        supportingText?.let {
+            Box(
+                modifier = Modifier
+                    .padding( end = 6.dp)
+            ) {
+                it()
+            }
+        }
         if (textValue.isEmpty()) return
         Icon(
             modifier = Modifier
-                .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
+                .padding(end = 12.dp)
                 .clip(CircleShape)
                 .clickable { onValueChange("") },
             imageVector = AppIcons.Clear,
