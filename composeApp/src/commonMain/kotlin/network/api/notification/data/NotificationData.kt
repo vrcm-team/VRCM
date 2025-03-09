@@ -35,6 +35,6 @@ data class NotificationData(
     @Serializable
     data class Data(
         val announcementTitle: String,
-        val groupName: String,
+        val groupName: String?,
     )
 }
