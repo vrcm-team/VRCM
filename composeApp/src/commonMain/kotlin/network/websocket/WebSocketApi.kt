@@ -28,6 +28,11 @@ class WebSocketApi(
                 currentJob = launch { startWebSocket() }
             }
         }
+        scope.launch {
+            SharedFlowCentre.logout.collect {
+                currentJob?.cancel()
+            }
+        }
     }
 
     suspend fun startWebSocket() {
@@ -47,7 +52,7 @@ class WebSocketApi(
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            delay(3.seconds)
+            delay(5.seconds)
 
             coroutineScope {
                 launch { startWebSocket() }
