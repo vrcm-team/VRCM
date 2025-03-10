@@ -55,9 +55,10 @@ class LocationDialog(
         val currentNavigator = currentNavigator
         val onClickWorldImage = { instansId:String ->
             if (currentNavigator.size <= 1) {
+                // 创建临时的 WorldProfileVo
+                val tempWorldProfileVo = WorldProfileVo(currentInstants)
                 currentNavigator push WorldProfileScreen(
-                    WorldProfileVo(currentInstants),
-                    id = instansId,
+                    tempWorldProfileVo,
                     sharedSuffixKey = sharedSuffixKey
                 )
             }
@@ -109,10 +110,8 @@ class LocationDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
-                                .sharedBoundsBy(
-                                    key = currentInstants.worldId + "WorldImage"
-                                )
                                 .clickable { onClickWorldImage(friendLocation.location) }
+                                .sharedBoundsBy( currentInstants.worldId + "WorldImage")
                                 .clip(MaterialTheme.shapes.medium),
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"

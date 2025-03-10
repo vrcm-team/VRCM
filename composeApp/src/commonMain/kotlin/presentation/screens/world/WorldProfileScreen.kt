@@ -10,6 +10,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -59,8 +63,7 @@ import kotlin.math.abs
  */
 class WorldProfileScreen(
     private val worldProfileVO: WorldProfileVo,
-    private val id: String,
-    private val sharedSuffixKey: String
+    private val sharedSuffixKey: String,
 ) : Screen {
 
     @Composable
@@ -87,23 +90,33 @@ class WorldProfileScreen(
                     authService.reTryAuthCatching {
                         worldsApi.getWorldById(currentWorldProfileVo.worldId)
                     }.onSuccess { worldData ->
-                        // 直接使用WorldData创建新的WorldProfileVo
-                        val newWorldProfileVo = WorldProfileVo(world = worldData)
+                        println("worldData" + worldData)
+                        // 获取实例ID列表
+                        val instanceIds = worldData.instances?.map { it.firstOrNull() ?: "" }
+                            ?.filter { it.isNotBlank() } ?: emptyList()
+                        println("instanceIds" + instanceIds)
+                        // 如果有实例ID，则获取实例信息
+                        val instancesList = if (instanceIds.isNotEmpty()) {
+                            authService.reTryAuthCatching {
+                                instanceIds.map {
+                                    worldsApi.getWorldInstanceById(currentWorldProfileVo.worldId, it)
+                                }
+                            }.getOrDefault(emptyList())
+                        } else {
+                            emptyList()
+                        }
+                        println("instancesList" + instancesList)
+                        // 转换为InstanceVo列表,刷新覆盖原始数据
+                        val instanceVoList = currentWorldProfileVo.instances.associate { it.instanceId to it } +
+                                instancesList.associate{ it.instanceId to InstanceVo(it) }
 
-                        // 复制原始WorldProfileVo中的实例相关信息到新的WorldProfileVo
-                        currentWorldProfileVo = newWorldProfileVo.copy(
-                            // 保留实例相关信息
-                            instanceID = currentWorldProfileVo.instanceID,
-                            currentUsers = currentWorldProfileVo.currentUsers,
-                            pcUsers = currentWorldProfileVo.pcUsers,
-                            androidUsers = currentWorldProfileVo.androidUsers,
-                            queueEnabled = currentWorldProfileVo.queueEnabled,
-                            queueSize = currentWorldProfileVo.queueSize,
-                            isActive = currentWorldProfileVo.isActive,
-                            isFull = currentWorldProfileVo.isFull,
-                            hasCapacity = currentWorldProfileVo.hasCapacity,
-                            regionType = currentWorldProfileVo.regionType,
-                            regionName = currentWorldProfileVo.regionName
+                        // 确定当前实例ID
+
+
+                        // 创建新的WorldProfileVo
+                        currentWorldProfileVo = WorldProfileVo(
+                            world = worldData,
+                            instancesList = instanceVoList.values.toList(),
                         )
                     }.onFailure {
                         // 获取失败时保持使用原有数据
@@ -126,7 +139,7 @@ class WorldProfileScreen(
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
-                onRefresh = { refreshWorldData() }
+                onRefresh = { refreshWorldData() },
             )
         }
 
@@ -139,7 +152,7 @@ class WorldProfileScreen(
         onReturn: () -> Unit = {},
         onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
-        onRefresh: () -> Unit = {}
+        onRefresh: () -> Unit = {},
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
@@ -161,7 +174,7 @@ class WorldProfileScreen(
             }
 
             // ========== BottomSheet状态管理 ==========
-            var sheetState by remember { mutableStateOf(SheetState.COLLAPSED) }
+            var sheetState by remember { mutableStateOf(SheetState.HALF_EXPANDED) }
             var dragOffset by remember { mutableStateOf(0f) }
 
             // 计算目标高度和当前高度
@@ -173,8 +186,7 @@ class WorldProfileScreen(
 
             // ========== 渲染背景图像 ==========
             RenderBackgroundImage(
-                worldId = worldProfileVO.worldId,
-                id = id,
+                worldId = worldProfileVo.worldId,
                 imageUrl = worldProfileVo.worldImageUrl ?: "",
                 hazeState = hazeState,
                 imageHeight = sizes.imageHigh * 2
@@ -191,7 +203,7 @@ class WorldProfileScreen(
             RenderMainContent(
                 worldProfileVo = worldProfileVo,
                 sizes = sizes,
-                collapsedAlphaVariant = 1 - bottomSheetState.collapsedAlpha
+                collapsedAlphaVariant = 1 - bottomSheetState.collapsedAlpha,
             )
 
             // ========== 顶部菜单栏 ==========
@@ -222,7 +234,7 @@ class WorldProfileScreen(
                         sizes = sizes
                     )
                     dragOffset = 0f
-                }
+                },
             )
         }
     }
@@ -247,7 +259,7 @@ private data class WorldDetailSizes(
     val halfExpandedHeight: Dp,
     val expandedHeight: Dp,
     val topBarHeight: Dp,
-    val sysTopPadding: Dp
+    val sysTopPadding: Dp,
 )
 
 /**
@@ -262,7 +274,7 @@ private data class BottomSheetUIState(
     val blurAlpha: Float,
     val overlayAlpha: Float,
     val collapsedProgress: Float,
-    val collapsedAlpha: Float
+    val collapsedAlpha: Float,
 )
 
 // ======================================
@@ -276,7 +288,7 @@ private data class BottomSheetUIState(
 private fun calculateBottomSheetState(
     sheetState: SheetState,
     dragOffset: Float,
-    sizes: WorldDetailSizes
+    sizes: WorldDetailSizes,
 ): BottomSheetUIState {
     // 计算目标高度
     val targetHeight = when (sheetState) {
@@ -286,7 +298,7 @@ private fun calculateBottomSheetState(
     }
 
     // 计算当前显示高度（原目标高度 + 拖动偏移）
-    val currentHeight = (targetHeight.value + dragOffset).coerceIn(
+    val currentHeight = (targetHeight.value + dragOffset / 2).coerceIn(
         sizes.collapsedHeight.value,
         sizes.expandedHeight.value
     ).dp
@@ -348,7 +360,7 @@ private fun determineSheetState(
     currentHeightValue: Float,
     velocity: Float,
     currentState: SheetState,
-    sizes: WorldDetailSizes
+    sizes: WorldDetailSizes,
 ): SheetState {
     // 根据速度快速决定下一个状态
     if (abs(velocity) > 800f) {
@@ -393,18 +405,17 @@ private fun determineSheetState(
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private inline fun RenderBackgroundImage(
+private fun RenderBackgroundImage(
     worldId: String,
-    id: String,
     imageUrl: String,
     hazeState: HazeState,
-    imageHeight: Dp
+    imageHeight: Dp,
 ) {
     AImage(
         modifier = Modifier
-            .sharedBoundsBy(worldId + "WorldImage")
             .height(imageHeight)
-            .hazeSource(hazeState),
+            .hazeSource(hazeState)
+            .sharedBoundsBy(worldId + "WorldImage"),
         imageData = imageUrl,
     )
 }
@@ -416,7 +427,7 @@ private inline fun RenderBackgroundImage(
 private fun ApplyBlurEffect(
     hazeState: HazeState,
     blurRadius: Dp,
-    overlayAlpha: Float
+    overlayAlpha: Float,
 ) {
     Box(
         modifier = Modifier
@@ -426,7 +437,7 @@ private fun ApplyBlurEffect(
                 style = HazeStyle(
                     blurRadius = blurRadius,
                     tint = null,
-                    backgroundColor = Color.Black.copy(alpha = overlayAlpha)
+                    backgroundColor = MaterialTheme.colorScheme.onSurface.copy(alpha = overlayAlpha)
                 )
             )
     )
@@ -440,18 +451,17 @@ private fun ApplyBlurEffect(
 private fun RenderMainContent(
     worldProfileVo: WorldProfileVo,
     sizes: WorldDetailSizes,
-    collapsedAlphaVariant: Float
+    collapsedAlphaVariant: Float,
 ) {
     // 渐变和卡片样式
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
-            Color.Black // 结束（黑色）
+            MaterialTheme.colorScheme.primaryContainer // 结束
         ),
-        startY = sizes.imageHigh.value * 0.5f,
-        endY = (sizes.imageHigh * 2).value,
+        startY = (sizes.imageHigh.value * 2f * 0.8f),
+        endY = (sizes.imageHigh.value * 2f),
     )
-
     val cardBrush = Brush.verticalGradient(
         colors = listOf(
             MaterialTheme.colorScheme.primary,
@@ -504,30 +514,34 @@ private fun RenderMainContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // 世界容量
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Person,
-                    label = "${worldProfileVo.currentUsers ?: 0}/${worldProfileVo.capacity ?: 0}",
-                    description = "用户"
+                    label = "${worldProfileVo.capacity ?: 0}",
+                    description = "容量"
                 )
 
+                // 推荐容量
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
-                    icon = AppIcons.Computer,
-                    label = "${worldProfileVo.pcUsers ?: 0}",
-                    description = "PC"
+                    icon = AppIcons.Group,
+                    label = "${worldProfileVo.recommendedCapacity ?: 0}",
+                    description = "推荐容量"
                 )
 
+                // 访问次数
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
-                    icon = AppIcons.Smartphone,
-                    label = "${worldProfileVo.androidUsers ?: 0}",
-                    description = "Quest"
+                    icon = AppIcons.Visibility,
+                    label = "${worldProfileVo.visits ?: 0}",
+                    description = "访问"
                 )
 
+                // 收藏数
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
@@ -536,43 +550,59 @@ private fun RenderMainContent(
                     description = "收藏"
                 )
 
+                // 热度
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
-                    icon = AppIcons.Shield,
-                    label = worldProfileVo.regionName ?: "未知",
-                    description = "区域"
+                    icon = AppIcons.Whatshot,
+                    label = "${worldProfileVo.heat ?: 0}",
+                    description = "热度"
                 )
 
+                // 热门程度
+                InfoItemBlock(
+                    cardBrush = cardBrush,
+                    size = itemSize,
+                    icon = AppIcons.Trending,
+                    label = "${worldProfileVo.popularity ?: 0}",
+                    description = "热门度"
+                )
+
+                // 版本
                 InfoItemBlock(
                     cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Update,
+                    label = "v${worldProfileVo.version ?: 1}",
+                    description = "版本"
+                )
+
+                // 更新时间
+                InfoItemBlock(
+                    cardBrush = cardBrush,
+                    size = itemSize,
+                    icon = AppIcons.DateRange,
                     label = worldProfileVo.updatedAt?.substringBefore("T") ?: "未知",
-                    description = "更新"
+                    description = "更新日期"
                 )
 
-                InfoItemBlock(
-                    cardBrush = cardBrush,
-                    size = itemSize,
-                    icon = AppIcons.Group,
-                    label = "${worldProfileVo.visits ?: 0}",
-                    description = "访问"
-                )
-
-                InfoItemBlock(
-                    cardBrush = cardBrush,
-                    size = itemSize,
-                    icon = AppIcons.Search,
-                    label = if (worldProfileVo.queueEnabled == true) "已启用" else "未启用",
-                    description = "队列"
-                )
+                // 可用实例数
+                if (worldProfileVo.instances.isNotEmpty()) {
+                    InfoItemBlock(
+                        cardBrush = cardBrush,
+                        size = itemSize,
+                        icon = AppIcons.Dashboard,
+                        label = "${worldProfileVo.instances.size}",
+                        description = "实例数"
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
     }
 }
+
 
 /**
  * 渲染顶部菜单栏
@@ -587,7 +617,7 @@ private fun RenderTopBar(
     onMenu: () -> Unit,
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
-    onRefresh: () -> Unit = {}
+    onRefresh: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -666,7 +696,7 @@ private fun RenderBottomSheet(
     bottomSheetState: BottomSheetUIState,
     sizes: WorldDetailSizes,
     onDragDelta: (Float) -> Unit,
-    onDragStopped: (Float) -> Unit
+    onDragStopped: (Float) -> Unit,
 ) {
     // BottomSheet容器
     Box(
@@ -680,7 +710,6 @@ private fun RenderBottomSheet(
                 .height(bottomSheetState.animatedHeight)
                 .align(Alignment.BottomCenter),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 16.dp,
         ) {
             Column(
@@ -715,8 +744,9 @@ private fun RenderBottomSheet(
 @Composable
 private fun RenderBottomSheetContent(
     worldProfileVo: WorldProfileVo,
-    bottomSheetState: BottomSheetUIState
+    bottomSheetState: BottomSheetUIState,
 ) {
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -779,31 +809,24 @@ private fun RenderBottomSheetContent(
                 }
             }
         }
-
+        val sharedSuffixKey = LocalSharedSuffixKey.current
         // 堆叠卡片
-        AnimatedVisibility(
+        StackedCards(
+            instances = worldProfileVo.instances,
             visible = visible,
-        ) {
-            Box {
-                (0..1).forEach { index ->
-                    StackCards(
-                        size = 2,
-                        index = index,
-                    )
-                }
-                StackCards(
-                    size = 2,
-                    index = 2,
-                    onClick = {
+            maxVisibleCards = 3,
+            onCardClick = {
+                visible = !visible
+                currentDialog = InstancesDialog(
+                    instances = worldProfileVo.instances,
+                    sharedSuffixKey = sharedSuffixKey,
+                    onClose = {
                         visible = !visible
-                        currentDialog = TestDialog {
-                            visible = !visible
-                            currentDialog = null
-                        }
-                    }
+                        currentDialog = null
+                    },
                 )
             }
-        }
+        )
 
         // 详细信息区域
         AnimatedVisibility(
@@ -824,16 +847,19 @@ private fun RenderBottomSheetContent(
                     InfoRow("访问次数", "${worldProfileVo.visits ?: 0}")
                     InfoRow("推荐容量", "${worldProfileVo.recommendedCapacity ?: 0}")
                     InfoRow("最大容量", "${worldProfileVo.capacity ?: 0}")
-                    InfoRow("活跃状态", if (worldProfileVo.isActive == true) "活跃" else "不活跃")
-                    InfoRow("是否已满", if (worldProfileVo.isFull == true) "已满" else "未满")
-                    InfoRow(
-                        "队列状态",
-                        if (worldProfileVo.queueEnabled == true) "已启用 (${worldProfileVo.queueSize ?: 0}人等待)" else "未启用"
-                    )
-                    InfoRow(
-                        "可加入性",
-                        if (worldProfileVo.hasCapacity == true) "可加入" else "不可加入"
-                    )
+//                    InfoRow("活跃状态", if (currentInstance?.isActive == true) "活跃" else "不活跃")
+//                    InfoRow("是否已满", if (currentInstance?.isFull == true) "已满" else "未满")
+//                    InfoRow(
+//                        "队列状态",
+//                        if (currentInstance?.queueEnabled == true) "已启用 (${currentInstance.queueSize ?: 0}人等待)" else "未启用"
+//                    )
+//                    InfoRow(
+//                        "可加入性",
+//                        if (currentInstance?.hasCapacity == true) "可加入" else "不可加入"
+//                    )
+                    if (worldProfileVo.instances.size > 1) {
+                        InfoRow("可用实例数", "${worldProfileVo.instances.size}")
+                    }
                 }
             }
         }
@@ -850,7 +876,7 @@ private fun RenderBottomSheetContent(
         ) {
             Button(
                 onClick = { /* 处理加入世界逻辑 */ },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text("加入世界")
             }
@@ -920,7 +946,7 @@ private fun InfoItemBlock(
     size: DpSize,
     icon: ImageVector,
     label: String,
-    description: String
+    description: String,
 ) {
     Column(
         modifier = Modifier
@@ -953,14 +979,24 @@ private fun InfoItemBlock(
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun AnimatedVisibilityScope.StackCards(
+fun AnimatedVisibilityScope.InstanceCard(
+    instance: InstanceVo? = null,
     size: Int,
     index: Int,
     unfold: Boolean = false,
     shape: Shape = RoundedCornerShape(32.dp),
     onClick: (() -> Unit)? = null,
-    content: @Composable (ColumnScope.() -> Unit) = {}
 ) {
+    val animatedScale by animateFloatAsState(
+        targetValue = if (unfold) 1f else 1f - ((size - index) * 0.05f),
+        label = "scale"
+    )
+
+    val animatedOffset by animateDpAsState(
+        targetValue = if (unfold) 0.dp else ((size - index) * 8).dp,
+        label = "offset"
+    )
+
     val modifier = Modifier.fillMaxWidth().height(120.dp)
         .sharedBoundsBy(
             key = "StackCards${(size - index)}Container",
@@ -971,12 +1007,12 @@ fun AnimatedVisibilityScope.StackCards(
             }
         )
         .enableIf(!unfold) {
-            offset(y = ((size - index) * 8).dp)
+            offset(y = animatedOffset)
                 .graphicsLayer(
                     alpha = 1f - ((size - index) * 0.2f),
                     clip = false,
                     shape = shape,
-                    scaleX = 1f - ((size - index) * 0.05f),
+                    scaleX = animatedScale,
                 )
         }
 
@@ -984,48 +1020,316 @@ fun AnimatedVisibilityScope.StackCards(
         containerColor = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary
     )
+
     if (onClick != null) {
         Card(
             modifier = modifier,
             colors = colors,
             onClick = onClick,
             shape = shape,
-            content = content
-        )
+        ) {
+            if (instance != null) {
+                InstanceCardContent(instance)
+            }
+        }
     } else {
         Card(
             modifier = modifier,
             colors = colors,
             shape = shape,
-            content = content
-        )
+        ) {
+            if (instance != null) {
+                InstanceCardContent(instance)
+            }
+        }
     }
 }
 
-class TestDialog(
-    private val onClose: () -> Unit = {}
+@Composable
+private fun ColumnScope.InstanceCardContent(instance: InstanceVo) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        // 左侧实例信息
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // 实例名称
+            Text(
+                text = instance.instanceName.takeIf { it.isNotBlank() } ?: "实例",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            // 区域信息
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Shield,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = instance.regionName ?: "未知区域",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        // 右侧用户统计
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // 总用户数
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${instance.currentUsers ?: 0} 用户",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Icon(
+                    imageVector = AppIcons.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            // PC用户
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${instance.pcUsers ?: 0} PC",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Icon(
+                    imageVector = AppIcons.Computer,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            // Quest用户
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "${instance.androidUsers ?: 0} Quest",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Icon(
+                    imageVector = AppIcons.Smartphone,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
+
+    // 底部状态信息
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 活跃状态标签
+        if (instance.isActive == true) {
+            StatusChip(
+                text = "活跃",
+                icon = AppIcons.Check,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+
+        // 队列状态标签
+        if (instance.queueEnabled == true) {
+            StatusChip(
+                text = "队列: ${instance.queueSize ?: 0}",
+                icon = AppIcons.Queue,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+
+        // 满员状态标签
+        if (instance.isFull == true) {
+            StatusChip(
+                text = "已满",
+                icon = AppIcons.Block,
+                color = MaterialTheme.colorScheme.error
+            )
+        } else if (instance.hasCapacity == true) {
+            StatusChip(
+                text = "可加入",
+                icon = AppIcons.Login,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // 所有者信息
+        instance.ownerName?.let { name ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusChip(
+    text: String,
+    icon: ImageVector,
+    color: Color,
+) {
+    Surface(
+        color = color.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = color
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = color
+            )
+        }
+    }
+}
+
+class InstancesDialog(
+    private val instances: List<InstanceVo> = emptyList(),
+    private val onClose: () -> Unit = {},
+    private val sharedSuffixKey: String,
 ) : SharedDialog {
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-
+        CompositionLocalProvider(
+            LocalSharedSuffixKey provides sharedSuffixKey
         ) {
-            with(animatedVisibilityScope) {
-                (0..2).forEach { index ->
-                    StackCards(
-                        size = 2,
+            Box(
+                modifier = Modifier.fillMaxSize().padding(8.dp).systemBarsPadding()
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 标题作为第一个项目
+                    item {
+                        Text(
+                            text = "可用实例列表 (${instances.size})",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    // 实例列表
+                    itemsIndexed(instances) { index, instance ->
+                        with(animatedVisibilityScope) {
+                            InstanceCard(
+                                instance = instance,
+                                size = instances.size - 1,
+                                index = index,
+                                unfold = true,
+                                onClick = { onClose() }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun close() = onClose()
+}
+
+@Composable
+fun ColumnScope.StackedCards(
+    instances: List<InstanceVo>,
+    visible: Boolean,
+    maxVisibleCards: Int = 3,
+    onCardClick: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            val visibleInstances = instances.take(maxVisibleCards)
+            val size = visibleInstances.size
+            
+            // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
+            if (size > 1) {
+                visibleInstances.drop(1).forEachIndexed { index, instance ->
+                    InstanceCard(
+                        instance = instance,
+                        size = size - 1,
                         index = index,
-                        unfold = true
+                    )
+                }
+            }
+            
+            // 显示顶部卡片
+            InstanceCard(
+                instance = visibleInstances.firstOrNull(),
+                size = size,
+                index = size,
+                onClick = onCardClick
+            )
+            
+            // 显示剩余卡片数量的指示器
+            if (instances.size > maxVisibleCards) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 16.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.tertiary,
+                            shape = CircleShape
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "+${instances.size - maxVisibleCards}",
+                        color = MaterialTheme.colorScheme.onTertiary,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
         }
-
-
     }
-
-    override fun close() = onClose()
 }

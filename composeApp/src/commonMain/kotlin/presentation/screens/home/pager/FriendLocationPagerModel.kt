@@ -21,7 +21,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.InstantsVo
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -210,14 +210,14 @@ class FriendLocationPagerModel(
         }
     }
 
-    private inline fun fetchInstants(location: String, crossinline updateInstants: (InstantsVo) -> Unit) {
+    private inline fun fetchInstants(location: String, crossinline updateInstants: (HomeInstanceVo) -> Unit) {
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)
             }.onFailure {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
             }.onSuccess { instance ->
-                val instantsVo = InstantsVo(instance)
+                val instantsVo = HomeInstanceVo(instance)
                 updateInstants(instantsVo)
                 fetchAndSetOwner(instance, instantsVo)
             }
@@ -232,15 +232,15 @@ class FriendLocationPagerModel(
      */
     private suspend fun fetchAndSetOwner(
         instance: InstanceData,
-        instantsVo: InstantsVo,
+        instantsVo: HomeInstanceVo,
     ) {
         val ownerId = instance.ownerId ?: return
-        val fetchOwner: suspend (String) -> InstantsVo.Owner =
+        val fetchOwner: suspend (String) -> HomeInstanceVo.Owner =
             when (BlueprintType.fromValue(ownerId)) {
                 BlueprintType.User -> {
                     {
                         val user = usersApi.fetchUser(ownerId)
-                        InstantsVo.Owner(
+                        HomeInstanceVo.Owner(
                             id = user.id,
                             displayName = user.displayName,
                             type = BlueprintType.User
@@ -251,7 +251,7 @@ class FriendLocationPagerModel(
                 BlueprintType.Group -> {
                     {
                         val group = groupsApi.fetchGroup(ownerId)
-                        InstantsVo.Owner(
+                        HomeInstanceVo.Owner(
                             id = group.id,
                             displayName = group.name,
                             type = BlueprintType.Group

@@ -31,6 +31,8 @@ data class WorldData(
     val thumbnailImageUrl: String?,
     val udonProducts: List<String>,
     val unityPackages: List<UnityPackage>,
+    @SerialName(value = "instances")
+    val instances: List<List<String>>? = null,
     @SerialName("updated_at")
     val updatedAt: String?,
     val version: Int,
