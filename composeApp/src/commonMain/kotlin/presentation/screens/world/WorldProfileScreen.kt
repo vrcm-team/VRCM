@@ -816,12 +816,12 @@ private fun RenderBottomSheetContent(
             visible = visible,
             maxVisibleCards = 3,
             onCardClick = {
-                visible = !visible
+                visible = false
                 currentDialog = InstancesDialog(
                     instances = worldProfileVo.instances,
                     sharedSuffixKey = sharedSuffixKey,
                     onClose = {
-                        visible = !visible
+                        visible = true
                         currentDialog = null
                     },
                 )
@@ -847,19 +847,7 @@ private fun RenderBottomSheetContent(
                     InfoRow("访问次数", "${worldProfileVo.visits ?: 0}")
                     InfoRow("推荐容量", "${worldProfileVo.recommendedCapacity ?: 0}")
                     InfoRow("最大容量", "${worldProfileVo.capacity ?: 0}")
-//                    InfoRow("活跃状态", if (currentInstance?.isActive == true) "活跃" else "不活跃")
-//                    InfoRow("是否已满", if (currentInstance?.isFull == true) "已满" else "未满")
-//                    InfoRow(
-//                        "队列状态",
-//                        if (currentInstance?.queueEnabled == true) "已启用 (${currentInstance.queueSize ?: 0}人等待)" else "未启用"
-//                    )
-//                    InfoRow(
-//                        "可加入性",
-//                        if (currentInstance?.hasCapacity == true) "可加入" else "不可加入"
-//                    )
-                    if (worldProfileVo.instances.size > 1) {
-                        InfoRow("可用实例数", "${worldProfileVo.instances.size}")
-                    }
+                    InfoRow("可用实例数", "${worldProfileVo.instances.size}")
                 }
             }
         }
@@ -949,7 +937,7 @@ private fun InfoItemBlock(
     description: String,
 ) {
     Column(
-        modifier = Modifier
+                    modifier = Modifier
             .size(size)
             .clip(RoundedCornerShape(16.dp))
             .background(cardBrush)
@@ -1015,69 +1003,60 @@ fun AnimatedVisibilityScope.InstanceCard(
                     scaleX = animatedScale,
                 )
         }
+        .clip(MaterialTheme.shapes.medium)
+        .background(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium)
+        .enableIf(onClick != null) {
+            clickable { onClick?.invoke() }
+        }
+
 
     val colors = CardDefaults.cardColors(
         containerColor = MaterialTheme.colorScheme.primary,
         contentColor = MaterialTheme.colorScheme.onPrimary
     )
 
-    if (onClick != null) {
-        Card(
-            modifier = modifier,
-            colors = colors,
-            onClick = onClick,
-            shape = shape,
-        ) {
-            if (instance != null) {
-                InstanceCardContent(instance)
-            }
-        }
-    } else {
-        Card(
-            modifier = modifier,
-            colors = colors,
-            shape = shape,
-        ) {
-            if (instance != null) {
-                InstanceCardContent(instance)
-            }
-        }
+    Box(
+        modifier = modifier
+    ) {
+        if (instance == null) return@Box
+        InstanceCardContent(instance)
     }
 }
 
 @Composable
-private fun ColumnScope.InstanceCardContent(instance: InstanceVo) {
-    Row(
+private fun InstanceCardContent(instance: InstanceVo) {
+    Column(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
     ) {
         // 左侧实例信息
-        Column(
+        Row (
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             // 实例名称
             Text(
-                text = instance.instanceName.takeIf { it.isNotBlank() } ?: "实例",
+                text = "#${instance.instanceName}",
                 style = MaterialTheme.typography.titleMedium
             )
 
             // 区域信息
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = AppIcons.Shield,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = instance.regionName ?: "未知区域",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            instance.regionType?.let {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    RegionIcon(
+                        region = it,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = instance.regionName ?: "未知区域",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
+
         }
 
         // 右侧用户统计
