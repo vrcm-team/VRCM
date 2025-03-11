@@ -53,7 +53,7 @@ class LocationDialog(
         // remember一下防止owner被刷新为null
         val owner = remember { currentInstants.owner }
         val currentNavigator = currentNavigator
-        val onClickWorldImage = { instansId:String ->
+        val onClickWorldImage = {
             if (currentNavigator.size <= 1) {
                 // 创建临时的 WorldProfileVo
                 val tempWorldProfileVo = WorldProfileVo(currentInstants)
@@ -110,7 +110,7 @@ class LocationDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
-                                .clickable { onClickWorldImage(friendLocation.location) }
+                                .clickable { onClickWorldImage() }
                                 .sharedBoundsBy( currentInstants.worldId + "WorldImage")
                                 .clip(MaterialTheme.shapes.medium),
                             imageData = friendLocation.instants.value.worldImageUrl,
@@ -130,7 +130,8 @@ class LocationDialog(
                                 text = currentInstants.worldName,
                                 fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
                             )
                         }
                     }

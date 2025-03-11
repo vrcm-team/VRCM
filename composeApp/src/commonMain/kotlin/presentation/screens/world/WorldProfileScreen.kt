@@ -1,18 +1,17 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -23,8 +22,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,8 +38,9 @@ import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -52,6 +50,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import presentation.compoments.TopMenuBar
+import presentation.screens.world.InstancesDialog
 import kotlin.math.abs
 
 /**
@@ -445,7 +444,7 @@ private fun ApplyBlurEffect(
 /**
  * 渲染主内容区域
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun RenderMainContent(
     worldProfileVo: WorldProfileVo,
@@ -456,17 +455,12 @@ private fun RenderMainContent(
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
-            MaterialTheme.colorScheme.primaryContainer // 结束
+            MaterialTheme.colorScheme.secondary // 结束
         ),
-        startY = (sizes.imageHigh.value * 2f * 0.8f),
+        startY = (sizes.imageHigh.value * 2f * 0.5f),
         endY = (sizes.imageHigh.value * 2f),
     )
-    val cardBrush = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.tertiary
-        ),
-    )
+
 
     val itemSize = DpSize(86.dp, 70.dp)
 
@@ -475,7 +469,8 @@ private fun RenderMainContent(
         modifier = Modifier
             .fillMaxSize()
             .background(gradientBrush)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 8.dp)
+            .systemBarsPadding(),
     ) {
         Spacer(modifier = Modifier.height(sizes.imageHigh * 1.25f))
 
@@ -492,13 +487,34 @@ private fun RenderMainContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.Start
             ) {
-                Text(text = worldProfileVo.worldName, color = Color.White, style = MaterialTheme.typography.titleLarge)
+                ATooltipBox(
+                    tooltip = {
+                        Text(text = worldProfileVo.worldName,)
+                    },
+                ){
+                    Text(
+                        text = worldProfileVo.worldName,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 HorizontalDivider(thickness = 2.dp)
-                Text(
-                    text = worldProfileVo.authorName ?: "未知作者",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium
-                )
+                ATooltipBox(
+                    tooltip = {
+                        Text(text = worldProfileVo.authorName ?: "未知作者",)
+                    }
+                ){
+                    Text(
+                        text = worldProfileVo.authorName ?: "未知作者",
+                        color =  MaterialTheme.colorScheme.onTertiary,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
             }
         }
 
@@ -515,7 +531,6 @@ private fun RenderMainContent(
             ) {
                 // 世界容量
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Person,
                     label = "${worldProfileVo.capacity ?: 0}",
@@ -524,7 +539,6 @@ private fun RenderMainContent(
 
                 // 推荐容量
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Group,
                     label = "${worldProfileVo.recommendedCapacity ?: 0}",
@@ -533,7 +547,6 @@ private fun RenderMainContent(
 
                 // 访问次数
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Visibility,
                     label = "${worldProfileVo.visits ?: 0}",
@@ -542,7 +555,6 @@ private fun RenderMainContent(
 
                 // 收藏数
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Favorite,
                     label = "${worldProfileVo.favorites ?: 0}",
@@ -551,7 +563,6 @@ private fun RenderMainContent(
 
                 // 热度
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Whatshot,
                     label = "${worldProfileVo.heat ?: 0}",
@@ -560,7 +571,6 @@ private fun RenderMainContent(
 
                 // 热门程度
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Trending,
                     label = "${worldProfileVo.popularity ?: 0}",
@@ -569,7 +579,6 @@ private fun RenderMainContent(
 
                 // 版本
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.Update,
                     label = "v${worldProfileVo.version ?: 1}",
@@ -578,7 +587,6 @@ private fun RenderMainContent(
 
                 // 更新时间
                 InfoItemBlock(
-                    cardBrush = cardBrush,
                     size = itemSize,
                     icon = AppIcons.DateRange,
                     label = worldProfileVo.updatedAt?.substringBefore("T") ?: "未知",
@@ -588,7 +596,6 @@ private fun RenderMainContent(
                 // 可用实例数
                 if (worldProfileVo.instances.isNotEmpty()) {
                     InfoItemBlock(
-                        cardBrush = cardBrush,
                         size = itemSize,
                         icon = AppIcons.Dashboard,
                         label = "${worldProfileVo.instances.size}",
@@ -646,8 +653,9 @@ private fun RenderTopBar(
         ) {
             Row(
                 modifier = Modifier
+                    .widthIn(max = 200.dp)
                     .align(Alignment.Center)
-                    .clickable(onClick = onCollapse),
+                    .simpleClickable(onCollapse),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -655,7 +663,9 @@ private fun RenderTopBar(
                     text = worldName,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 // 刷新状态指示
@@ -665,21 +675,19 @@ private fun RenderTopBar(
                         strokeWidth = 2.dp
                     )
                 }
-            }
-
-            // 刷新按钮
-            if (blurProgress > 0.5f && !isRefreshing) {
-                IconButton(
-                    onClick = onRefresh,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 16.dp)
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Explore,
-                        contentDescription = "刷新",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                // 刷新按钮
+                if (blurProgress > 0.5f && !isRefreshing) {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier
+                            .padding(end = 16.dp)
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Update,
+                            contentDescription = "refresh",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -929,7 +937,7 @@ private fun InfoRow(label: String, value: String) {
  */
 @Composable
 private fun InfoItemBlock(
-    cardBrush: Brush,
+    color: Color = MaterialTheme.colorScheme.tertiary ,
     size: DpSize,
     icon: ImageVector,
     label: String,
@@ -939,7 +947,7 @@ private fun InfoItemBlock(
         modifier = Modifier
             .size(size)
             .clip(RoundedCornerShape(16.dp))
-            .background(cardBrush)
+            .background(color)
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -964,344 +972,6 @@ private fun InfoItemBlock(
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalSharedTransitionApi::class)
-@Composable
-fun AnimatedVisibilityScope.InstanceCard(
-    instance: InstanceVo,
-    size: Int,
-    index: Int,
-    unfold: Boolean = false,
-    shape: Shape = RoundedCornerShape(32.dp),
-    onClick: (() -> Unit)? = null,
-) {
-    val animatedScale by animateFloatAsState(
-        targetValue = if (unfold) 1f else 1f - ((size - index) * 0.05f),
-        label = "scale"
-    )
-
-    val animatedOffset by animateDpAsState(
-        targetValue = if (unfold) 0.dp else ((size - index) * 8).dp,
-        label = "offset"
-    )
-
-    val modifier = Modifier.fillMaxWidth().height(120.dp)
-        .sharedBoundsBy(
-            key = "${instance.instanceName}:StackCardsContainer",
-            sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-            animatedVisibilityScope = this,
-            clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
-                OverlayClip(DialogShapeForSharedElement)
-            }
-        )
-        .enableIf(!unfold) {
-            offset(y = animatedOffset)
-                .graphicsLayer(
-                    alpha = 1f - ((size - index) * 0.2f),
-                    clip = false,
-                    shape = shape,
-                    scaleX = animatedScale,
-                )
-        }
-        .clip(MaterialTheme.shapes.medium)
-        .background(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium)
-        .enableIf(onClick != null) {
-            clickable { onClick?.invoke() }
-        }
-
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 10.dp
-    ) {
-        Column {
-            InstanceCardContent(instance)
-        }
-    }
-}
-
-@Composable
-fun InstanceCardContent(instance: InstanceVo) {
-    // 提取常用尺寸常量
-    val iconSize = 16.dp
-    val smallIconSize = 14.dp
-    val elementSpacing = 4.dp
-    val cardPadding = 12.dp
-
-    // 主内容区域
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(cardPadding),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        // 左侧信息区域（占剩余空间）
-        InstanceInfoSection(
-            instance = instance,
-            iconSize = iconSize,
-            elementSpacing = elementSpacing
-        )
-
-        // 右侧用户统计（固定最小宽度）
-        UserStatsSection(
-            instance = instance,
-            iconSize = iconSize,
-            smallIconSize = smallIconSize,
-            elementSpacing = elementSpacing
-        )
-    }
-
-    // 底部状态区域
-    StatusSection(instance = instance, cardPadding = cardPadding)
-}
-
-@Composable
-private fun RowScope.InstanceInfoSection(
-    instance: InstanceVo,
-    iconSize: Dp,
-    elementSpacing: Dp,
-) {
-    Column(
-        modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(elementSpacing)
-    ) {
-        // 实例名称（带溢出处理）
-        Text(
-            text = "#${instance.instanceName}",
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        // 区域信息
-        IconLabelRow(
-            iconScope = {
-                RegionIcon(
-                    size = iconSize,
-                    region = instance.regionType
-                )
-            },
-            text = instance.regionName,
-            spacing = elementSpacing
-        )
-    }
-}
-
-@Composable
-private fun UserStatsSection(
-    instance: InstanceVo,
-    iconSize: Dp,
-    smallIconSize: Dp,
-    elementSpacing: Dp,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(elementSpacing),
-        horizontalAlignment = Alignment.End
-    ) {
-        // 总用户数
-        IconLabelRow(
-            icon = AppIcons.Person,
-            text = "${instance.currentUsers ?: 0} 用户",
-            iconSize = iconSize,
-            spacing = elementSpacing,
-            textStyle = MaterialTheme.typography.titleSmall
-        )
-
-        // 设备统计（复用组件）
-        DeviceStatsRow(
-            pcUsers = instance.pcUsers,
-            androidUsers = instance.androidUsers,
-            iconSize = smallIconSize,
-            spacing = elementSpacing
-        )
-    }
-}
-
-@Composable
-private fun DeviceStatsRow(
-    pcUsers: Int?,
-    androidUsers: Int?,
-    iconSize: Dp,
-    spacing: Dp,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing * 2),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconLabelRow(
-            icon = AppIcons.Computer,
-            text = "${pcUsers ?: 0} PC",
-            iconSize = iconSize,
-            spacing = spacing
-        )
-        IconLabelRow(
-            icon = AppIcons.Smartphone,
-            text = "${androidUsers ?: 0} Quest",
-            iconSize = iconSize,
-            spacing = spacing
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = cardPadding, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        // 状态标签
-        if (instance.isActive == true){
-            StatusChip(
-                text = "活跃",
-                icon = AppIcons.Check,
-                color = MaterialTheme.colorScheme.tertiary
-            )
-        }
-        if(instance.queueEnabled == true && instance.queueSize != null){
-            StatusChip(
-                text = "队列: ${instance.queueSize}",
-                icon = AppIcons.Queue,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-
-        if (instance.isFull == true){
-            StatusChip(
-                text = "已满",
-                icon = AppIcons.Block,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
-        if (instance.hasCapacity == true){
-            StatusChip(
-                text = "可加入",
-                icon = AppIcons.Login,
-                color = MaterialTheme.colorScheme.tertiary
-            )
-        }
-
-        // 弹性空间
-        Spacer(Modifier.weight(1f))
-
-        // 所有者信息
-        instance.ownerName?.let { name ->
-            IconLabelRow(
-                icon = AppIcons.Person,
-                text = name,
-                iconSize = 14.dp,
-                spacing = 4.dp,
-                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                iconAlpha = 0.7f
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusChip(
-    text: String,
-    icon: ImageVector,
-    color: Color,
-) {
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = color
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = color
-            )
-        }
-    }
-}
-
-
-class InstancesDialog(
-    private val instances: List<InstanceVo> = emptyList(),
-    private val onClose: () -> Unit = {},
-    private val sharedSuffixKey: String,
-) : SharedDialog {
-    @Composable
-    override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
-        val lazyListState = rememberLazyListState()
-        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo}}
-        CompositionLocalProvider(
-            LocalSharedSuffixKey provides sharedSuffixKey
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(8.dp).systemBarsPadding()
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    state = lazyListState,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // 实例列表
-                    itemsIndexed(instances) { index, instance ->
-                        val visibleItemInfo by remember { derivedStateOf {
-                            layoutInfo.visibleItemsInfo.find { it.index == index }
-                        } }
-                        // 计算缩放比例
-                        val scale by animateFloatAsState(
-                            targetValue = visibleItemInfo?.let {
-                                val itemBottom = it.offset + it.size
-                                val viewportBottom = layoutInfo.viewportEndOffset
-                                val distanceFromBottom = viewportBottom - itemBottom
-
-                                when {
-                                    // 元素完全在视口下方
-                                    distanceFromBottom < -it.size -> 0.7f
-                                    // 元素开始进入视口
-                                    distanceFromBottom < 0 -> 0.7f + 0.3f * (1 - distanceFromBottom / -it.size.toFloat())
-                                    // 元素完全可见
-                                    else -> 1f
-                                }
-                            } ?: 0.7f,  // 不可见元素保持最小缩放
-                            animationSpec = tween(300)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                        ) {
-                            with(animatedVisibilityScope) {
-                                InstanceCard(
-                                    instance = instance,
-                                    size = instances.size - 1,
-                                    index = index,
-                                    unfold = true,
-                                    onClick = onClose
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    override fun close() = onClose()
-}
 
 @Composable
 fun ColumnScope.StackedCards(

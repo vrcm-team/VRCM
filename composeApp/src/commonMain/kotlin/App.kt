@@ -33,8 +33,11 @@ import org.koin.compose.KoinContext
 fun App() {
     KoinContext {
         SettingsProvider {
-            var current = LocalOnBackHook.current
-            Navigator(StartupAnimeScreen,onBackPressed = { current.value() }) {
+            val current = LocalOnBackHook.current
+            Navigator(
+                screen = StartupAnimeScreen,
+                onBackPressed = { current.value() }
+            ) {
                 SnackBarToastBox(
                     Modifier
                         .systemBarsPadding()
@@ -63,3 +66,4 @@ fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> AuthAnimeToHomeTransition
         else -> ContentTransform(EnterTransition.None, ExitTransition.None)
     }
+

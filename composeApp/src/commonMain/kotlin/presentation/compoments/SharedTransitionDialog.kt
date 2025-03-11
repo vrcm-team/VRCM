@@ -36,10 +36,8 @@ fun SharedTransitionDialog(
             // 监听返回键
             var onBackHook by LocalOnBackHook.current
             onBackHook = {
-                dialogContent?.close()
                 dialogContent == null
             }
-
             content()
             AnimatedContent(
                 modifier = Modifier.fillMaxSize(),
