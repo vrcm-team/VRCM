@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
@@ -34,7 +35,7 @@ data class WorldProfileVo(
     // 实例信息列表
     val instances: List<InstanceVo> = emptyList(),
 
-) {
+): JavaSerializable {
     
     // 从WorldData构造，不包含实例信息
     constructor(world: WorldData, instancesList: List<InstanceVo> = emptyList()): this(

@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
+import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
@@ -9,7 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
  */
 data class InstanceVo(
     val instanceId: String,
-    val instanceName: String = "",
+    val instanceName: String = "unknown",
     val currentUsers: Int? = null,
     val pcUsers: Int? = null,
     val androidUsers: Int? = null,
@@ -18,11 +19,11 @@ data class InstanceVo(
     val isActive: Boolean? = null,
     val isFull: Boolean? = null,
     val hasCapacity: Boolean? = null,
-    val regionType: RegionType? = null,
-    val regionName: String? = null,
+    val regionType: RegionType = RegionType.Us,
+    val regionName: String = "unknown",
     val ownerId: String? = null,
-    val ownerName: String? = null
-) {
+    val ownerName: String? = null,
+) : JavaSerializable {
     constructor(instance: InstanceData) : this(
         instanceId = instance.id,
         instanceName = instance.name,
@@ -38,7 +39,7 @@ data class InstanceVo(
         regionName = instance.region.name,
         ownerId = instance.ownerId
     )
-    
+
     constructor(instants: HomeInstanceVo) : this(
         instanceId = instants.id,
         instanceName = instants.name,

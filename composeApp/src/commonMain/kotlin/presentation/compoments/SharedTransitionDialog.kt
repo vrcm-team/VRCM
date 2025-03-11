@@ -11,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.presentation.extensions.LocalOnBackHook
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -32,6 +33,13 @@ fun SharedTransitionDialog(
             LocalSharedTransitionDialogScope provides this,
         ) {
             var dialogContent by LocationDialogContent.current
+            // 监听返回键
+            var onBackHook by LocalOnBackHook.current
+            onBackHook = {
+                dialogContent?.close()
+                dialogContent == null
+            }
+
             content()
             AnimatedContent(
                 modifier = Modifier.fillMaxSize(),
@@ -47,6 +55,7 @@ fun SharedTransitionDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     if (targetDialogContent == null) return@AnimatedContent
+
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -99,7 +108,7 @@ inline fun SharedDialogContainer(
                 start = 16.dp,
                 end = 16.dp,
                 top = getInsetPadding(16, WindowInsets::getTop) + 16.dp,
-                bottom = getInsetPadding(16, WindowInsets::getBottom)  + 16.dp,
+                bottom = getInsetPadding(16, WindowInsets::getBottom) + 16.dp,
             )
             .enableIf(animatedVisibilityScope != null) {
                 sharedBoundsBy(

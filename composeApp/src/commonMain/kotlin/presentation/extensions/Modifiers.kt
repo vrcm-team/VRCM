@@ -5,8 +5,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -97,10 +96,12 @@ fun Modifier.glideBack(
     }, orientation)
 }
 
+val LocalOnBackHook = compositionLocalOf<MutableState<() -> Boolean>> { mutableStateOf({ true }) }
+
 /**
  * 去除点击水波纹效果
- */
-@Composable
+  */
+ @Composable
 fun Modifier.simpleClickable(
     onClick: () -> Unit,
 ) = this.clickable(

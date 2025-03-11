@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -90,11 +92,9 @@ class WorldProfileScreen(
                     authService.reTryAuthCatching {
                         worldsApi.getWorldById(currentWorldProfileVo.worldId)
                     }.onSuccess { worldData ->
-                        println("worldData" + worldData)
                         // 获取实例ID列表
                         val instanceIds = worldData.instances?.map { it.firstOrNull() ?: "" }
                             ?.filter { it.isNotBlank() } ?: emptyList()
-                        println("instanceIds" + instanceIds)
                         // 如果有实例ID，则获取实例信息
                         val instancesList = if (instanceIds.isNotEmpty()) {
                             authService.reTryAuthCatching {
@@ -105,10 +105,9 @@ class WorldProfileScreen(
                         } else {
                             emptyList()
                         }
-                        println("instancesList" + instancesList)
                         // 转换为InstanceVo列表,刷新覆盖原始数据
                         val instanceVoList = currentWorldProfileVo.instances.associate { it.instanceId to it } +
-                                instancesList.associate{ it.instanceId to InstanceVo(it) }
+                                instancesList.associate { it.instanceId to InstanceVo(it) }
 
                         // 确定当前实例ID
 
@@ -937,7 +936,7 @@ private fun InfoItemBlock(
     description: String,
 ) {
     Column(
-                    modifier = Modifier
+        modifier = Modifier
             .size(size)
             .clip(RoundedCornerShape(16.dp))
             .background(cardBrush)
@@ -968,7 +967,7 @@ private fun InfoItemBlock(
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun AnimatedVisibilityScope.InstanceCard(
-    instance: InstanceVo? = null,
+    instance: InstanceVo,
     size: Int,
     index: Int,
     unfold: Boolean = false,
@@ -987,7 +986,7 @@ fun AnimatedVisibilityScope.InstanceCard(
 
     val modifier = Modifier.fillMaxWidth().height(120.dp)
         .sharedBoundsBy(
-            key = "StackCards${(size - index)}Container",
+            key = "${instance.instanceName}:StackCardsContainer",
             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
             animatedVisibilityScope = this,
             clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
@@ -1009,145 +1008,176 @@ fun AnimatedVisibilityScope.InstanceCard(
             clickable { onClick?.invoke() }
         }
 
-
-    val colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
-    )
-
-    Box(
-        modifier = modifier
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 10.dp
     ) {
-        if (instance == null) return@Box
-        InstanceCardContent(instance)
+        Column {
+            InstanceCardContent(instance)
+        }
     }
 }
 
 @Composable
-private fun InstanceCardContent(instance: InstanceVo) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(12.dp),
-    ) {
-        // 左侧实例信息
-        Row (
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 实例名称
-            Text(
-                text = "#${instance.instanceName}",
-                style = MaterialTheme.typography.titleMedium
-            )
+fun InstanceCardContent(instance: InstanceVo) {
+    // 提取常用尺寸常量
+    val iconSize = 16.dp
+    val smallIconSize = 14.dp
+    val elementSpacing = 4.dp
+    val cardPadding = 12.dp
 
-            // 区域信息
-            instance.regionType?.let {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    RegionIcon(
-                        region = it,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = instance.regionName ?: "未知区域",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-        }
-
-        // 右侧用户统计
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            // 总用户数
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "${instance.currentUsers ?: 0} 用户",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Icon(
-                    imageVector = AppIcons.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-
-            // PC用户
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "${instance.pcUsers ?: 0} PC",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Icon(
-                    imageVector = AppIcons.Computer,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-
-            // Quest用户
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "${instance.androidUsers ?: 0} Quest",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Icon(
-                    imageVector = AppIcons.Smartphone,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
-    }
-
-    // 底部状态信息
+    // 主内容区域
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(cardPadding),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // 左侧信息区域（占剩余空间）
+        InstanceInfoSection(
+            instance = instance,
+            iconSize = iconSize,
+            elementSpacing = elementSpacing
+        )
+
+        // 右侧用户统计（固定最小宽度）
+        UserStatsSection(
+            instance = instance,
+            iconSize = iconSize,
+            smallIconSize = smallIconSize,
+            elementSpacing = elementSpacing
+        )
+    }
+
+    // 底部状态区域
+    StatusSection(instance = instance, cardPadding = cardPadding)
+}
+
+@Composable
+private fun RowScope.InstanceInfoSection(
+    instance: InstanceVo,
+    iconSize: Dp,
+    elementSpacing: Dp,
+) {
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(elementSpacing)
+    ) {
+        // 实例名称（带溢出处理）
+        Text(
+            text = "#${instance.instanceName}",
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        // 区域信息
+        IconLabelRow(
+            iconScope = {
+                RegionIcon(
+                    size = iconSize,
+                    region = instance.regionType
+                )
+            },
+            text = instance.regionName,
+            spacing = elementSpacing
+        )
+    }
+}
+
+@Composable
+private fun UserStatsSection(
+    instance: InstanceVo,
+    iconSize: Dp,
+    smallIconSize: Dp,
+    elementSpacing: Dp,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(elementSpacing),
+        horizontalAlignment = Alignment.End
+    ) {
+        // 总用户数
+        IconLabelRow(
+            icon = AppIcons.Person,
+            text = "${instance.currentUsers ?: 0} 用户",
+            iconSize = iconSize,
+            spacing = elementSpacing,
+            textStyle = MaterialTheme.typography.titleSmall
+        )
+
+        // 设备统计（复用组件）
+        DeviceStatsRow(
+            pcUsers = instance.pcUsers,
+            androidUsers = instance.androidUsers,
+            iconSize = smallIconSize,
+            spacing = elementSpacing
+        )
+    }
+}
+
+@Composable
+private fun DeviceStatsRow(
+    pcUsers: Int?,
+    androidUsers: Int?,
+    iconSize: Dp,
+    spacing: Dp,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing * 2),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 活跃状态标签
-        if (instance.isActive == true) {
+        IconLabelRow(
+            icon = AppIcons.Computer,
+            text = "${pcUsers ?: 0} PC",
+            iconSize = iconSize,
+            spacing = spacing
+        )
+        IconLabelRow(
+            icon = AppIcons.Smartphone,
+            text = "${androidUsers ?: 0} Quest",
+            iconSize = iconSize,
+            spacing = spacing
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = cardPadding, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        // 状态标签
+        if (instance.isActive == true){
             StatusChip(
                 text = "活跃",
                 icon = AppIcons.Check,
                 color = MaterialTheme.colorScheme.tertiary
             )
         }
-
-        // 队列状态标签
-        if (instance.queueEnabled == true) {
+        if(instance.queueEnabled == true && instance.queueSize != null){
             StatusChip(
-                text = "队列: ${instance.queueSize ?: 0}",
+                text = "队列: ${instance.queueSize}",
                 icon = AppIcons.Queue,
                 color = MaterialTheme.colorScheme.secondary
             )
         }
 
-        // 满员状态标签
-        if (instance.isFull == true) {
+        if (instance.isFull == true){
             StatusChip(
                 text = "已满",
                 icon = AppIcons.Block,
                 color = MaterialTheme.colorScheme.error
             )
-        } else if (instance.hasCapacity == true) {
+        }
+
+        if (instance.hasCapacity == true){
             StatusChip(
                 text = "可加入",
                 icon = AppIcons.Login,
@@ -1155,26 +1185,19 @@ private fun InstanceCardContent(instance: InstanceVo) {
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        // 弹性空间
+        Spacer(Modifier.weight(1f))
 
         // 所有者信息
         instance.ownerName?.let { name ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = AppIcons.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                )
-            }
+            IconLabelRow(
+                icon = AppIcons.Person,
+                text = name,
+                iconSize = 14.dp,
+                spacing = 4.dp,
+                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                iconAlpha = 0.7f
+            )
         }
     }
 }
@@ -1209,6 +1232,7 @@ private fun StatusChip(
     }
 }
 
+
 class InstancesDialog(
     private val instances: List<InstanceVo> = emptyList(),
     private val onClose: () -> Unit = {},
@@ -1216,6 +1240,8 @@ class InstancesDialog(
 ) : SharedDialog {
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
+        val lazyListState = rememberLazyListState()
+        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo}}
         CompositionLocalProvider(
             LocalSharedSuffixKey provides sharedSuffixKey
         ) {
@@ -1225,28 +1251,48 @@ class InstancesDialog(
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+                    state = lazyListState,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // 标题作为第一个项目
-                    item {
-                        Text(
-                            text = "可用实例列表 (${instances.size})",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-
                     // 实例列表
                     itemsIndexed(instances) { index, instance ->
-                        with(animatedVisibilityScope) {
-                            InstanceCard(
-                                instance = instance,
-                                size = instances.size - 1,
-                                index = index,
-                                unfold = true,
-                                onClick = { onClose() }
-                            )
+                        val visibleItemInfo by remember { derivedStateOf {
+                            layoutInfo.visibleItemsInfo.find { it.index == index }
+                        } }
+                        // 计算缩放比例
+                        val scale by animateFloatAsState(
+                            targetValue = visibleItemInfo?.let {
+                                val itemBottom = it.offset + it.size
+                                val viewportBottom = layoutInfo.viewportEndOffset
+                                val distanceFromBottom = viewportBottom - itemBottom
+
+                                when {
+                                    // 元素完全在视口下方
+                                    distanceFromBottom < -it.size -> 0.7f
+                                    // 元素开始进入视口
+                                    distanceFromBottom < 0 -> 0.7f + 0.3f * (1 - distanceFromBottom / -it.size.toFloat())
+                                    // 元素完全可见
+                                    else -> 1f
+                                }
+                            } ?: 0.7f,  // 不可见元素保持最小缩放
+                            animationSpec = tween(300)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                        ) {
+                            with(animatedVisibilityScope) {
+                                InstanceCard(
+                                    instance = instance,
+                                    size = instances.size - 1,
+                                    index = index,
+                                    unfold = true,
+                                    onClick = onClose
+                                )
+                            }
                         }
                     }
                 }
@@ -1262,7 +1308,7 @@ fun ColumnScope.StackedCards(
     instances: List<InstanceVo>,
     visible: Boolean,
     maxVisibleCards: Int = 3,
-    onCardClick: () -> Unit
+    onCardClick: () -> Unit,
 ) {
     AnimatedVisibility(
         visible = visible
@@ -1270,31 +1316,30 @@ fun ColumnScope.StackedCards(
         Box(modifier = Modifier.fillMaxWidth()) {
             val visibleInstances = instances.take(maxVisibleCards)
             val size = visibleInstances.size
-            
+
             // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-            if (size > 1) {
-                visibleInstances.drop(1).forEachIndexed { index, instance ->
-                    InstanceCard(
-                        instance = instance,
-                        size = size - 1,
-                        index = index,
-                    )
-                }
+            if (size == 0) return@Box
+            visibleInstances.drop(1).forEachIndexed { index, instance ->
+                InstanceCard(
+                    instance = instance,
+                    size = size - 1,
+                    index = index,
+                )
             }
-            
             // 显示顶部卡片
             InstanceCard(
-                instance = visibleInstances.firstOrNull(),
+                instance = visibleInstances.first(),
                 size = size,
                 index = size,
                 onClick = onCardClick
             )
-            
+
+
             // 显示剩余卡片数量的指示器
             if (instances.size > maxVisibleCards) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.BottomEnd)
                         .padding(top = 8.dp, end = 16.dp)
                         .background(
                             color = MaterialTheme.colorScheme.tertiary,
