@@ -5,12 +5,15 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,8 +38,8 @@ import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
@@ -103,7 +106,7 @@ class WorldProfileScreen(
                         }
                         // 转换为InstanceVo列表,刷新覆盖原始数据
                         val instanceVoList = currentWorldProfileVo.instances.associate { it.instanceId to it } +
-                                instancesList.associate { it.instanceId to InstanceVo(it) }
+                                instancesList.associate { it.id to InstanceVo(it) }
 
                         // 确定当前实例ID
 
@@ -639,24 +642,23 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = onMenu
         )
-
         // 标题显示
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(topBarHeight)
+                .height(topBarHeight + sysTopPadding)
                 .alpha(blurProgress)
                 .padding(top = sysTopPadding)
         ) {
             Row(
                 modifier = Modifier
-                    .widthIn(max = 200.dp)
                     .align(Alignment.Center)
-                    .simpleClickable(onCollapse),
+                    .clickable(onClick = onCollapse),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
+                    modifier = Modifier.widthIn(max = 200.dp),
                     text = worldName,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.titleMedium,
@@ -754,38 +756,40 @@ private fun RenderBottomSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = getInsetPadding(WindowInsets::getBottom)),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 描述标题
-        Text(
-            text = "世界描述",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(
-                alpha = 1f - (0.3f * abs(
-                    (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
-                        -30f,
-                        30f
-                    )
-                ) / 30f)
-            )
-        )
-
-        // 描述内容
-        Text(
-            text = worldProfileVo.worldDescription,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
 
         var visible by remember { mutableStateOf(true) }
         var currentDialog by LocationDialogContent.current
 
         // 标签区域
         AnimatedVisibility(
-            visible = bottomSheetState.collapsedAlpha > 0f,
+            visible = 1 - bottomSheetState.blurProgress > 0f,
         ) {
-            Column(modifier = Modifier.alpha(bottomSheetState.collapsedAlpha)) {
+            Column(modifier = Modifier.alpha(1 - bottomSheetState.blurProgress)) {
+                // 描述标题
+                Text(
+                    text = "世界描述",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 1f - (0.3f * abs(
+                            (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
+                                -30f,
+                                30f
+                            )
+                        ) / 30f)
+                    )
+                )
+
+                // 描述内容
+                Text(
+                    text = worldProfileVo.worldDescription,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+
                 if (worldProfileVo.tags?.isNotEmpty() == true) {
                     Text(
                         text = "所有标签",
@@ -814,75 +818,67 @@ private fun RenderBottomSheetContent(
             }
         }
         val sharedSuffixKey = LocalSharedSuffixKey.current
-        // 堆叠卡片
-        AnimatedVisibility(
-            visible = visible
-        ) {
-            StackedCards(
-                instances = worldProfileVo.instances,
-                maxVisibleCards = 3,
-                onCardClick = {
-                    visible = false
-                    currentDialog = InstancesDialog(
-                        instances = worldProfileVo.instances,
-                        sharedSuffixKey = sharedSuffixKey,
-                        onClose = {
-                            visible = true
-                            currentDialog = null
-                        },
-                    )
-                }
-            )
-        }
 
-        // 详细信息区域
+        // 堆叠卡片 - 改为随着滑动过程展开
         AnimatedVisibility(
-            visible = bottomSheetState.blurProgress > 0.1f
+            visible = visible && bottomSheetState.collapsedAlpha > 0f,
+            modifier = Modifier
+                .fillMaxWidth()
         ) {
-            Column(modifier = Modifier.alpha(bottomSheetState.blurProgress)) {
-                Text(
-                    text = "详细信息",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 8.dp)
+            Box(modifier =  Modifier.alpha(bottomSheetState.collapsedAlpha)){
+                //            if (visible) {
+                StackedCards(
+                    instances = worldProfileVo.instances,
+                    maxVisibleCards = 3,
+                    // 传递展开程度，用于调整卡片样式
+                    expandProgress = bottomSheetState.blurProgress,
+                    onCardClick = {
+                        visible = false
+                        currentDialog = InstancesDialog(
+                            instances = worldProfileVo.instances,
+                            sharedSuffixKey = sharedSuffixKey,
+                            onClose = {
+                                visible = true
+                                currentDialog = null
+                            },
+                        )
+                    }
                 )
-
-                // 详细属性信息
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    InfoRow("访问次数", "${worldProfileVo.visits ?: 0}")
-                    InfoRow("推荐容量", "${worldProfileVo.recommendedCapacity ?: 0}")
-                    InfoRow("最大容量", "${worldProfileVo.capacity ?: 0}")
-                    InfoRow("可用实例数", "${worldProfileVo.instances.size}")
-                }
+//            }
             }
+
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        // 操作按钮 - 始终显示在底部
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .padding(16.dp)
+        val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
+        AnimatedVisibility(
+            visible = buttonAlpha > 0f,
         ) {
-            Button(
-                onClick = { /* 处理加入世界逻辑 */ },
-                modifier = Modifier.weight(1f),
+            // 操作按钮 - 始终显示在底部
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .alpha(buttonAlpha)
+                    .padding(16.dp)
             ) {
-                Text("加入世界")
-            }
+                Button(
+                    onClick = { /* 处理加入世界逻辑 */ },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("加入世界")
+                }
 
-            OutlinedButton(
-                onClick = { /* 处理收藏世界逻辑 */ },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("收藏世界")
+                OutlinedButton(
+                    onClick = { /* 处理收藏世界逻辑 */ },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("收藏世界")
+                }
             }
         }
+
     }
 }
 
@@ -977,48 +973,107 @@ private fun InfoItemBlock(
 fun AnimatedVisibilityScope.StackedCards(
     instances: List<InstanceVo>,
     maxVisibleCards: Int = 3,
+    expandProgress: Float = 0f,  // 默认值为0，表示未展开
     onCardClick: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        val visibleInstances = instances.take(maxVisibleCards)
-        val size = visibleInstances.size
+    val visibleInstances = instances
+    val size = visibleInstances.size
+    val isFullyExpanded = expandProgress >= 0.99f
 
-        // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-        if (size == 0) return@Box
-        visibleInstances.drop(1).forEachIndexed { index, instance ->
-            InstanceCard(
-                instance = instance,
-                size = size - 1,
-                index = index,
-            )
-        }
-        // 显示顶部卡片
-        InstanceCard(
-            instance = visibleInstances.first(),
-            size = size,
-            index = size,
-            onClick = onCardClick
-        )
-
-
-        // 显示剩余卡片数量的指示器
-        if (instances.size > maxVisibleCards) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(top = 8.dp, end = 16.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.tertiary,
-                        shape = CircleShape
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "+${instances.size - maxVisibleCards}",
-                    color = MaterialTheme.colorScheme.onTertiary,
-                    style = MaterialTheme.typography.labelMedium
+    // 如果没有实例，直接返回
+    if (size == 0) return
+    val doCardClick = if (expandProgress == 0f) onCardClick else null
+    // 创建滚动状态
+    val scrollState = rememberScrollState()
+    if (isFullyExpanded){
+        // 在完全展开状态下使用Column布局垂直排列所有卡片
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 依次显示其他卡片
+            instances.forEachIndexed { index, instance ->
+                InstanceCard(
+                    instance = instance,
+                    size = instances.size - index,
+                    index = index,
+                    verticalOffset = 0.dp, // 在Column中不需要手动设置偏移
+                    scaleEffect = 1f,
+                    alphaEffect = 1f,
+                    onClick = onCardClick
                 )
             }
         }
+    }else{
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .enableIf(expandProgress >= 1f) {
+                    fillMaxHeight()
+                }
+        ) {
+            val visibleInstances = instances
+
+            // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
+            visibleInstances.drop(1).forEachIndexed { index, instance ->
+                // 修改计算逻辑，使卡片从下方展开
+                // 当expandProgress为0时，卡片堆叠在一起
+                // 当expandProgress接近1时，卡片向下展开，每张卡片之间有固定间距
+                val cardIndex = size - index - 2  // 调整索引，使其从0开始
+                val stackedOffset = 8f  // 堆叠状态下的偏移
+                val expandedOffset = (cardIndex + 1) * 130f  // 展开状态下的间距
+
+                // 新的计算方式：从堆叠状态过渡到展开状态
+                val cardOffset = stackedOffset + (expandedOffset - stackedOffset) * expandProgress
+
+                InstanceCard(
+                    instance = instance,
+                    size = size - 1,
+                    index = index,
+                    // 使用计算出的偏移量
+                    verticalOffset = cardOffset.dp,
+                    // 随着展开减少透明度效果，但增加缩放效果
+                    scaleEffect = 1f - ((size - index - 1) * 0.05f * (1f - expandProgress)),
+                    alphaEffect = 1f - ((size - index - 1) * 0.6f * (1f - expandProgress)),
+                    onClick = doCardClick
+                )
+            }
+
+            // 显示顶部卡片（始终在最上方）
+            InstanceCard(
+                instance = visibleInstances.first(),
+                size = size,
+                index = size,
+                verticalOffset = 0.dp,  // 顶部卡片始终保持在顶部位置
+                scaleEffect = 1f, // 顶层卡片始终保持原始大小
+                alphaEffect = 1f, // 顶层卡片始终完全不透明
+                onClick = doCardClick
+            )
+
+            // 显示剩余卡片数量的指示器
+            if (instances.size > maxVisibleCards) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 12.dp, end = 16.dp)
+                        .alpha(1f - expandProgress) // 随着展开进度增加而变透明
+                        .background(
+                            color = MaterialTheme.colorScheme.tertiary,
+                            shape = CircleShape
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "+${instances.size - maxVisibleCards}",
+                        color = MaterialTheme.colorScheme.onTertiary,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
     }
+
+
 }

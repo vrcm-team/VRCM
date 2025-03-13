@@ -37,22 +37,24 @@ fun AnimatedVisibilityScope.InstanceCard(
     size: Int,
     index: Int,
     unfold: Boolean = false,
+    verticalOffset: Dp = ((size - index) * 8).dp, // 新增参数，控制垂直偏移
+    scaleEffect: Float = 1f - ((size - index) * 0.05f), // 新增参数，控制缩放
+    alphaEffect: Float = 1f - ((size - index) * 0.6f), // 新增参数，控制透明度
     shape: Shape = RoundedCornerShape(32.dp),
     onClick: (() -> Unit)? = null,
 ) {
     val animatedScale by animateFloatAsState(
-        targetValue = if (unfold) 1f else 1f - ((size - index) * 0.05f),
+        targetValue = if (unfold) 1f else scaleEffect,
         label = "scale"
     )
 
     val animatedOffset by animateDpAsState(
-        targetValue = if (unfold) 0.dp else ((size - index) * 8).dp,
+        targetValue = if (unfold) 0.dp else verticalOffset,
         label = "offset"
     )
-
     val modifier = Modifier.fillMaxWidth().height(120.dp)
         .sharedBoundsBy(
-            key = "${instance.instanceName}:StackCardsContainer",
+            key = "${instance.instanceId}:StackCardsContainer",
             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
             animatedVisibilityScope = this,
             clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
@@ -62,7 +64,7 @@ fun AnimatedVisibilityScope.InstanceCard(
         .enableIf(!unfold) {
             offset(y = animatedOffset)
                 .graphicsLayer(
-                    alpha = 1f - ((size - index) * 0.2f),
+                    alpha = alphaEffect,
                     clip = false,
                     shape = shape,
                     scaleX = animatedScale,
