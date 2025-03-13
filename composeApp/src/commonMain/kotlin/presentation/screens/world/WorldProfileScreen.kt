@@ -1,12 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -818,22 +815,25 @@ private fun RenderBottomSheetContent(
         }
         val sharedSuffixKey = LocalSharedSuffixKey.current
         // 堆叠卡片
-        StackedCards(
-            instances = worldProfileVo.instances,
-            visible = visible,
-            maxVisibleCards = 3,
-            onCardClick = {
-                visible = false
-                currentDialog = InstancesDialog(
-                    instances = worldProfileVo.instances,
-                    sharedSuffixKey = sharedSuffixKey,
-                    onClose = {
-                        visible = true
-                        currentDialog = null
-                    },
-                )
-            }
-        )
+        AnimatedVisibility(
+            visible = visible
+        ) {
+            StackedCards(
+                instances = worldProfileVo.instances,
+                maxVisibleCards = 3,
+                onCardClick = {
+                    visible = false
+                    currentDialog = InstancesDialog(
+                        instances = worldProfileVo.instances,
+                        sharedSuffixKey = sharedSuffixKey,
+                        onClose = {
+                            visible = true
+                            currentDialog = null
+                        },
+                    )
+                }
+            )
+        }
 
         // 详细信息区域
         AnimatedVisibility(
@@ -974,55 +974,50 @@ private fun InfoItemBlock(
 
 
 @Composable
-fun ColumnScope.StackedCards(
+fun AnimatedVisibilityScope.StackedCards(
     instances: List<InstanceVo>,
-    visible: Boolean,
     maxVisibleCards: Int = 3,
     onCardClick: () -> Unit,
 ) {
-    AnimatedVisibility(
-        visible = visible
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            val visibleInstances = instances.take(maxVisibleCards)
-            val size = visibleInstances.size
+    Box(modifier = Modifier.fillMaxWidth()) {
+        val visibleInstances = instances.take(maxVisibleCards)
+        val size = visibleInstances.size
 
-            // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-            if (size == 0) return@Box
-            visibleInstances.drop(1).forEachIndexed { index, instance ->
-                InstanceCard(
-                    instance = instance,
-                    size = size - 1,
-                    index = index,
-                )
-            }
-            // 显示顶部卡片
+        // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
+        if (size == 0) return@Box
+        visibleInstances.drop(1).forEachIndexed { index, instance ->
             InstanceCard(
-                instance = visibleInstances.first(),
-                size = size,
-                index = size,
-                onClick = onCardClick
+                instance = instance,
+                size = size - 1,
+                index = index,
             )
+        }
+        // 显示顶部卡片
+        InstanceCard(
+            instance = visibleInstances.first(),
+            size = size,
+            index = size,
+            onClick = onCardClick
+        )
 
 
-            // 显示剩余卡片数量的指示器
-            if (instances.size > maxVisibleCards) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(top = 8.dp, end = 16.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.tertiary,
-                            shape = CircleShape
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "+${instances.size - maxVisibleCards}",
-                        color = MaterialTheme.colorScheme.onTertiary,
-                        style = MaterialTheme.typography.labelMedium
+        // 显示剩余卡片数量的指示器
+        if (instances.size > maxVisibleCards) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(top = 8.dp, end = 16.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiary,
+                        shape = CircleShape
                     )
-                }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "+${instances.size - maxVisibleCards}",
+                    color = MaterialTheme.colorScheme.onTertiary,
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
     }
