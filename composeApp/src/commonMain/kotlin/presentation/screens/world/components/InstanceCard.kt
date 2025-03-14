@@ -149,7 +149,7 @@ private fun RowScope.InstanceInfoSection(
                     region = instance.regionType
                 )
             },
-            text = instance.regionName,
+            text = instance.accessType.displayName,
             spacing = elementSpacing
         )
     }

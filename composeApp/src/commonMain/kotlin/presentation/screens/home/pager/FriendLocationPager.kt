@@ -295,7 +295,7 @@ private fun AnimatedVisibilityScope.LocationCard(
                             region = instants.region
                         )
                         Text(
-                            text = instants.accessType,
+                            text = instants.accessType.displayName,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.outline
                         )

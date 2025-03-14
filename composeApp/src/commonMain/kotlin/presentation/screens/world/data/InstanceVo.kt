@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
@@ -23,6 +24,7 @@ data class InstanceVo(
     val regionName: String = "unknown",
     val ownerId: String? = null,
     val ownerName: String? = null,
+    val accessType: AccessType = AccessType.Public,
 ) : JavaSerializable {
     constructor(instance: InstanceData) : this(
         instanceId = instance.id,
@@ -37,7 +39,8 @@ data class InstanceVo(
         hasCapacity = instance.hasCapacityForYou,
         regionType = instance.region,
         regionName = instance.region.name,
-        ownerId = instance.ownerId
+        ownerId = instance.ownerId,
+        accessType = instance.accessType
     )
 
     constructor(instants: HomeInstanceVo) : this(
@@ -48,6 +51,7 @@ data class InstanceVo(
         regionName = instants.region.name,
         ownerId = instants.owner?.id,
         ownerName = instants.owner?.displayName,
-        isActive = true // 如果是从InstantsVo创建，通常是活跃的实例
+        isActive = true, // 如果是从InstantsVo创建，通常是活跃的实例
+        accessType = instants.accessType
     )
 } 

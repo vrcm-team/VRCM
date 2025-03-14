@@ -360,37 +360,53 @@ private fun determineSheetState(
     currentState: SheetState,
     sizes: WorldDetailSizes,
 ): SheetState {
-    // 根据速度快速决定下一个状态
-    if (abs(velocity) > 800f) {
-        return when {
-            velocity < 0 -> { // 快速向上
-                when (currentState) {
-                    SheetState.COLLAPSED -> SheetState.HALF_EXPANDED
-                    SheetState.HALF_EXPANDED -> SheetState.EXPANDED
-                    SheetState.EXPANDED -> SheetState.EXPANDED
-                }
-            }
+    // 计算各状态高度
+    val collapsedHeight = sizes.collapsedHeight.value
+    val halfExpandedHeight = sizes.halfExpandedHeight.value
+    val expandedHeight = sizes.expandedHeight.value
+    
+    // 速度因子（正值表示向下拖动，负值表示向上拖动）
+    val velocityFactor = (velocity / 800f).coerceIn(-1f, 1f)
+    
+    // 距离因子计算 - 使用归一化距离以统一评分标准
+    val totalRange = expandedHeight - collapsedHeight
+    val distToCollapsed = abs(currentHeightValue - collapsedHeight) / totalRange
+    val distToHalf = abs(currentHeightValue - halfExpandedHeight) / totalRange
+    val distToExpanded = abs(currentHeightValue - expandedHeight) / totalRange
+    
+    // 增加状态偏好因子 - 使评分受当前接近哪个阈值边界的影响
+    val statePreferenceFactor = when {
+        currentHeightValue < (collapsedHeight + halfExpandedHeight) / 2 -> -0.2f // 偏好收起状态
+        currentHeightValue > (halfExpandedHeight + expandedHeight) / 2 -> 0.2f  // 偏好展开状态
+        else -> 0f  // 中间区域不偏好
+    }
 
-            else -> { // 快速向下
-                when (currentState) {
-                    SheetState.COLLAPSED -> SheetState.COLLAPSED
-                    SheetState.HALF_EXPANDED -> SheetState.COLLAPSED
-                    SheetState.EXPANDED -> SheetState.HALF_EXPANDED
-                }
+    // 位置和速度的综合评分（越低越倾向于该状态）
+    val collapsedScore =
+        distToCollapsed - velocityFactor * 0.8f - (if (statePreferenceFactor < 0) abs(statePreferenceFactor) else 0f)
+    val halfScore = distToHalf - abs(velocityFactor) * 0.2f
+    val expandedScore =
+        distToExpanded + velocityFactor * 0.8f - (if (statePreferenceFactor > 0) statePreferenceFactor else 0f)
+
+    // 如果速度很大，直接基于方向决定
+    if (abs(velocity) > 1500f) {
+        return when {
+            velocity < 0 -> when (currentState) {
+                SheetState.COLLAPSED -> SheetState.HALF_EXPANDED
+                else -> SheetState.EXPANDED
+            }
+            else -> when (currentState) {
+                SheetState.EXPANDED -> SheetState.HALF_EXPANDED
+                else -> SheetState.COLLAPSED
             }
         }
-    } else {
-        // 根据当前高度决定最接近的状态
-        return when {
-            currentHeightValue < (sizes.collapsedHeight.value + sizes.halfExpandedHeight.value) / 2 ->
-                SheetState.COLLAPSED
-
-            currentHeightValue < (sizes.halfExpandedHeight.value + sizes.expandedHeight.value) / 2 ->
-                SheetState.HALF_EXPANDED
-
-            else ->
-                SheetState.EXPANDED
-        }
+    }
+    
+    // 根据综合评分选择最佳状态
+    return when {
+        collapsedScore <= halfScore && collapsedScore <= expandedScore -> SheetState.COLLAPSED
+        halfScore <= collapsedScore && halfScore <= expandedScore -> SheetState.HALF_EXPANDED
+        else -> SheetState.EXPANDED
     }
 }
 
@@ -976,12 +992,13 @@ fun AnimatedVisibilityScope.StackedCards(
     expandProgress: Float = 0f,  // 默认值为0，表示未展开
     onCardClick: () -> Unit,
 ) {
+
     val visibleInstances = instances
     val size = visibleInstances.size
-    val isFullyExpanded = expandProgress >= 0.99f
-
     // 如果没有实例，直接返回
     if (size == 0) return
+    val isFullyExpanded = expandProgress >= 1f
+
     val doCardClick = if (expandProgress == 0f) onCardClick else null
     // 创建滚动状态
     val scrollState = rememberScrollState()
@@ -1017,7 +1034,7 @@ fun AnimatedVisibilityScope.StackedCards(
             val visibleInstances = instances
 
             // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-            visibleInstances.drop(1).forEachIndexed { index, instance ->
+            visibleInstances.drop(1).reversed().forEachIndexed { index, instance ->
                 // 修改计算逻辑，使卡片从下方展开
                 // 当expandProgress为0时，卡片堆叠在一起
                 // 当expandProgress接近1时，卡片向下展开，每张卡片之间有固定间距
