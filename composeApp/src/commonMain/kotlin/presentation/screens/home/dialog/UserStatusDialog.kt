@@ -7,16 +7,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
@@ -30,7 +26,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.extensions.koinScreenModelByLastItem
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
-import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -191,7 +186,8 @@ fun StatusDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            UserStatus.entries.forEach { status ->
+            val userStatuses = remember { UserStatus.entries.filter { it != UserStatus.Offline && it != currentStatus } }
+            userStatuses.forEach { status ->
                 DropdownMenuItem(
                     modifier = Modifier.clip(MaterialTheme.shapes.medium),
                     text = {
