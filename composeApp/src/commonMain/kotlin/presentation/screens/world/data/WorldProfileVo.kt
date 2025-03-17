@@ -8,8 +8,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 data class WorldProfileVo(
     // 基本信息
     val worldId: String,
-    val worldName: String,
-    val worldImageUrl: String?,
+    val worldName: String = "",
+    val worldImageUrl: String? = null,
     val thumbnailImageUrl: String? = null,
     val worldDescription: String,
     val authorID: String? = null,

@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
@@ -40,6 +42,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
@@ -64,6 +68,7 @@ import kotlin.math.abs
  */
 class WorldProfileScreen(
     private val worldProfileVO: WorldProfileVo,
+    private val location: String? = null,
     private val sharedSuffixKey: String,
 ) : Screen {
 
@@ -184,7 +189,7 @@ class WorldProfileScreen(
 
             // ========== 渲染背景图像 ==========
             RenderBackgroundImage(
-                worldId = worldProfileVo.worldId,
+                worldId = location ?: worldProfileVo.worldId,
                 imageUrl = worldProfileVo.worldImageUrl ?: "",
                 hazeState = hazeState,
                 imageHeight = sizes.imageHigh * 2
@@ -479,6 +484,7 @@ private fun RenderMainContent(
 
 
     val itemSize = DpSize(86.dp, 70.dp)
+    val navigator = LocalNavigator.currentOrThrow
 
     // 主内容区域
     Column(
@@ -518,6 +524,17 @@ private fun RenderMainContent(
                 }
                 HorizontalDivider(thickness = 2.dp)
                 ATooltipBox(
+                    modifier = Modifier.clickable {
+                        worldProfileVo.authorID?.let {
+                            val userProfileScreen = UserProfileScreen(
+                                userProfileVO = UserProfileVo(
+                                    id = it
+                                )
+                            )
+                            navigator.push(userProfileScreen)
+                        }
+
+                    },
                     tooltip = {
                         Text(text = worldProfileVo.authorName ?: "未知作者",)
                     }
