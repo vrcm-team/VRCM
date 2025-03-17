@@ -1,9 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 data class HomeInstanceVo(
     val id: String = "",
@@ -40,5 +42,7 @@ data class HomeInstanceVo(
         val id: String,
         val displayName: String,
         val type: BlueprintType,
-    )
+    ){
+        val iconVector: ImageVector get() = if (type == BlueprintType.User) AppIcons.Person else AppIcons.Groups
+    }
 }
