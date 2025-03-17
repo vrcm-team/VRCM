@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
+import cafe.adriel.voyager.transitions.SlideOrientation
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
@@ -62,6 +63,7 @@ fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator
     when {
         isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
         isTransitioningFromTo<HomeScreen, AuthAnimeScreen>() -> HomeToAuthAnimeTransition
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> AuthAnimeToHomeTransition
         else -> ContentTransform(EnterTransition.None, ExitTransition.None)
