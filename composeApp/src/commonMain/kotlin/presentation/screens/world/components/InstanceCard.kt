@@ -257,7 +257,7 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
         Spacer(Modifier.weight(1f))
 
         // 所有者信息
-        instance.ownerName?.let { name ->
+        instance.owner?.displayName?.let { name ->
             IconLabelRow(
                 icon = AppIcons.Person,
                 text = name,

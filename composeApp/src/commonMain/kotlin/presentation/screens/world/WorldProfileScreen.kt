@@ -10,10 +10,11 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +44,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
@@ -227,6 +230,7 @@ class WorldProfileScreen(
                 worldProfileVo = worldProfileVo,
                 bottomSheetState = bottomSheetState,
                 sizes = sizes,
+                onExpanded = { sheetState = SheetState.EXPANDED },
                 onDragDelta = { delta -> dragOffset += -delta },
                 onDragStopped = { velocity ->
                     // 决定最终状态并重置拖动偏移
@@ -686,7 +690,7 @@ private fun RenderTopBar(
             Row(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .clickable(onClick = onCollapse),
+                    .simpleClickable(onClick = onCollapse),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -734,9 +738,20 @@ private fun RenderBottomSheet(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     sizes: WorldDetailSizes,
+    onExpanded: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onDragStopped: (Float) -> Unit,
 ) {
+    var currentDialog by LocationDialogContent.current
+    val sharedSuffixKey = LocalSharedSuffixKey.current
+    val onShrinkCardClick: (InstanceVo) -> Unit = {
+        if (currentDialog == null) {
+            currentDialog = InstancesDialog(
+                instance = it,
+                sharedSuffixKey = sharedSuffixKey
+            )
+        }
+    }
     // BottomSheet容器
     Box(
         modifier = Modifier
@@ -770,6 +785,8 @@ private fun RenderBottomSheet(
                 RenderBottomSheetContent(
                     worldProfileVo = worldProfileVo,
                     bottomSheetState = bottomSheetState,
+                    onShrinkCardClick = onShrinkCardClick,
+                    onExpanded = onExpanded
                 )
             }
         }
@@ -784,8 +801,9 @@ private fun RenderBottomSheet(
 private fun RenderBottomSheetContent(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
+    onShrinkCardClick: (InstanceVo) -> Unit ,
+    onExpanded: () -> Unit,
 ) {
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -793,10 +811,6 @@ private fun RenderBottomSheetContent(
             .padding(bottom = getInsetPadding(WindowInsets::getBottom)),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-
-        var visible by remember { mutableStateOf(true) }
-        var currentDialog by LocationDialogContent.current
-
         // 标签区域
         AnimatedVisibility(
             visible = 1 - bottomSheetState.blurProgress > 0f,
@@ -850,34 +864,23 @@ private fun RenderBottomSheetContent(
                 }
             }
         }
-        val sharedSuffixKey = LocalSharedSuffixKey.current
 
         // 堆叠卡片 - 改为随着滑动过程展开
         AnimatedVisibility(
-            visible = visible && bottomSheetState.collapsedAlpha > 0f,
+            visible = bottomSheetState.collapsedAlpha > 0f,
             modifier = Modifier
                 .fillMaxWidth()
         ) {
             Box(modifier =  Modifier.alpha(bottomSheetState.collapsedAlpha)){
-                //            if (visible) {
                 StackedCards(
                     instances = worldProfileVo.instances,
                     maxVisibleCards = 3,
                     // 传递展开程度，用于调整卡片样式
                     expandProgress = bottomSheetState.blurProgress,
-                    onCardClick = {
-                        visible = false
-                        currentDialog = InstancesDialog(
-                            instances = worldProfileVo.instances,
-                            sharedSuffixKey = sharedSuffixKey,
-                            onClose = {
-                                visible = true
-                                currentDialog = null
-                            },
-                        )
-                    }
+                    onShrinkCardClick = { onShrinkCardClick(it)},
+                    onExpandCardClick = { onExpanded() },
+
                 )
-//            }
             }
 
         }
@@ -1007,40 +1010,68 @@ fun AnimatedVisibilityScope.StackedCards(
     instances: List<InstanceVo>,
     maxVisibleCards: Int = 3,
     expandProgress: Float = 0f,  // 默认值为0，表示未展开
-    onCardClick: () -> Unit,
+    onShrinkCardClick: (InstanceVo) -> Unit = {},
+    onExpandCardClick: () -> Unit,
 ) {
 
-    val visibleInstances = instances
-    val size = visibleInstances.size
+    val size = instances.size
     // 如果没有实例，直接返回
     if (size == 0) return
     val isFullyExpanded = expandProgress >= 1f
 
-    val doCardClick = if (expandProgress == 0f) onCardClick else null
-    // 创建滚动状态
-    val scrollState = rememberScrollState()
-    if (isFullyExpanded){
+    val doExpandCardClick = if (expandProgress == 0f) onExpandCardClick else null
+    if (isFullyExpanded) {
         // 在完全展开状态下使用Column布局垂直排列所有卡片
-        Column(
+        val lazyListState = rememberLazyListState()
+        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo}}
+        LazyColumn(
             modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState),
+                .fillMaxWidth(),
+            state = lazyListState,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 依次显示其他卡片
-            instances.forEachIndexed { index, instance ->
-                InstanceCard(
-                    instance = instance,
-                    size = instances.size - index,
-                    index = index,
-                    verticalOffset = 0.dp, // 在Column中不需要手动设置偏移
-                    scaleEffect = 1f,
-                    alphaEffect = 1f,
-                    onClick = onCardClick
+            itemsIndexed(instances) { index, instance ->
+                val visibleItemInfo by remember { derivedStateOf {
+                    layoutInfo.visibleItemsInfo.find { it.index == index }
+                } }
+                // 计算缩放比例
+                val scale by animateFloatAsState(
+                    targetValue = visibleItemInfo?.let {
+                        val itemBottom = it.offset + it.size
+                        val viewportBottom = layoutInfo.viewportEndOffset
+                        val distanceFromBottom = viewportBottom - itemBottom
+
+                        when {
+                            // 元素完全在视口下方
+                            distanceFromBottom < -it.size -> 0.7f
+                            // 元素开始进入视口
+                            distanceFromBottom < 0 -> 0.7f + 0.3f * (1 - distanceFromBottom / -it.size.toFloat())
+                            // 元素完全可见
+                            else -> 1f
+                        }
+                    } ?: 0.7f,  // 不可见元素保持最小缩放
+                    animationSpec = tween(300)
                 )
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                ) {
+                    InstanceCard(
+                        instance = instance,
+                        size = instances.size - index,
+                        index = index,
+                        verticalOffset = 0.dp, // 在Column中不需要手动设置偏移
+                        scaleEffect = 1f,
+                        alphaEffect = 1f,
+                        onClick = { onShrinkCardClick(instance) }
+                    )
+                }
             }
         }
-    }else{
+    } else {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1048,15 +1079,14 @@ fun AnimatedVisibilityScope.StackedCards(
                     fillMaxHeight()
                 }
         ) {
-            val visibleInstances = instances
 
             // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-            visibleInstances.drop(1).reversed().forEachIndexed { index, instance ->
+            instances.drop(1).reversed().forEachIndexed { index, instance ->
                 // 修改计算逻辑，使卡片从下方展开
                 // 当expandProgress为0时，卡片堆叠在一起
                 // 当expandProgress接近1时，卡片向下展开，每张卡片之间有固定间距
                 val cardIndex = size - index - 2  // 调整索引，使其从0开始
-                val stackedOffset = 8f  // 堆叠状态下的偏移
+                val stackedOffset = cardIndex * 8f  // 堆叠状态下的偏移
                 val expandedOffset = (cardIndex + 1) * 130f  // 展开状态下的间距
 
                 // 新的计算方式：从堆叠状态过渡到展开状态
@@ -1071,19 +1101,18 @@ fun AnimatedVisibilityScope.StackedCards(
                     // 随着展开减少透明度效果，但增加缩放效果
                     scaleEffect = 1f - ((size - index - 1) * 0.05f * (1f - expandProgress)),
                     alphaEffect = 1f - ((size - index - 1) * 0.6f * (1f - expandProgress)),
-                    onClick = doCardClick
                 )
             }
 
             // 显示顶部卡片（始终在最上方）
             InstanceCard(
-                instance = visibleInstances.first(),
+                instance = instances.first(),
                 size = size,
                 index = size,
                 verticalOffset = 0.dp,  // 顶部卡片始终保持在顶部位置
                 scaleEffect = 1f, // 顶层卡片始终保持原始大小
                 alphaEffect = 1f, // 顶层卡片始终完全不透明
-                onClick = doCardClick
+                onClick = doExpandCardClick
             )
 
             // 显示剩余卡片数量的指示器

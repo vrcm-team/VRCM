@@ -1,10 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
+import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 /**
  * 表示单个世界实例的数据类
@@ -22,8 +25,7 @@ data class InstanceVo(
     val hasCapacity: Boolean? = null,
     val regionType: RegionType = RegionType.Us,
     val regionName: String = "unknown",
-    val ownerId: String? = null,
-    val ownerName: String? = null,
+    val owner: Owner? = null,
     val accessType: AccessType = AccessType.Public,
 ) : JavaSerializable {
     constructor(instance: InstanceData) : this(
@@ -39,7 +41,6 @@ data class InstanceVo(
         hasCapacity = instance.hasCapacityForYou,
         regionType = instance.region,
         regionName = instance.region.name,
-        ownerId = instance.ownerId,
         accessType = instance.accessType
     )
 
@@ -49,9 +50,19 @@ data class InstanceVo(
         currentUsers = instants.userCount.substringBefore("/").toIntOrNull(),
         regionType = instants.region,
         regionName = instants.region.name,
-        ownerId = instants.owner?.id,
-        ownerName = instants.owner?.displayName,
         isActive = true, // 如果是从InstantsVo创建，通常是活跃的实例
+        owner = instants.owner?.let { Owner(
+            id = it.id,
+            displayName = it.displayName,
+            type = it.type
+        )},
         accessType = instants.accessType
     )
+    data class Owner(
+        val id: String,
+        val displayName: String,
+        val type: BlueprintType,
+    ){
+        val iconVector: ImageVector get() = if (type == BlueprintType.User) AppIcons.Person else AppIcons.Groups
+    }
 } 
