@@ -90,34 +90,15 @@ fun Pager.FriendLocationPager(
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
 ) {
-    val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
-
-    var currentDialog by LocationDialogContent.current
-    val sharedSuffixKey = LocalSharedSuffixKey.current
-
     val navigator = currentNavigator
-    val onClickWorldImage: (String) -> Unit = { worldId ->
-//        if (navigator.size <= 1) {
-//            val locationList = friendLocationMap[LocationType.Instance]?.filter {
-//                it.instants.value.worldId == worldId
-//            } ?: emptyList()
-//            // 创建临时的 WorldProfileVo
-//            val tempWorldProfileVo = WorldProfileVo( locationList)
-//            navigator push WorldProfileScreen(
-//                tempWorldProfileVo,
-//                sharedSuffixKey = sharedSuffixKey
-//            )
-//        }
+    val sharedSuffixKey = LocalSharedSuffixKey.current
+    // 只会有一个实例被打开
+    var selectLocation by rememberSaveable { mutableStateOf<String?>(null) }
+    val onClickLocationCard: (FriendLocation) -> Unit = { friendLocation ->
+        // 如果当前位置实例和点击的位置实例相同，则收起卡片，否则展开选中的，收起之前的
+        selectLocation = if (selectLocation == friendLocation.location) null else friendLocation.location
     }
-    val onClickLocation: (FriendLocation) -> Unit = { friendLocation ->
-//        currentLocation = it
-//        currentDialog = LocationDialog(
-//            friendLocation = it,
-//            sharedSuffixKey = sharedSuffixKey
-//        ){
-//            currentDialog = null
-//            currentLocation = null
-//        }
+    val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
         if (navigator.size <= 1) {
             val currentLocation = friendLocation.instants.value
             val instances = friendLocationMap[LocationType.Instance]
@@ -198,7 +179,12 @@ fun Pager.FriendLocationPager(
                 }
 
                 items(instanceFriendLocations, key = { it.location }) { location ->
-                    LocationCard(location, { onClickLocation(location) }) {
+                    LocationCard(
+                        location = location,
+                        isSelected = selectLocation == location.location,
+                        onClickWorldImage = { onClickWorldImage(location) },
+                        onClickLocationCard = { onClickLocationCard(location) }
+                    ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),
                             friends = it,
@@ -258,13 +244,13 @@ private fun LocationTitle(
 @Composable
 private fun LocationCard(
     location: FriendLocation,
-    clickable: () -> Unit,
-    content: @Composable (List<State<FriendData>>) -> Unit ,
+    isSelected: Boolean,
+    onClickWorldImage: () -> Unit,
+    onClickLocationCard: () -> Unit,
+    content: @Composable (List<State<FriendData>>) -> Unit,
 ) {
     val instants by location.instants
     val friendList = location.friendList
-    var extended by rememberSaveable(location.location) { mutableStateOf(false) }
-    val onClickLocationCard = { extended = !extended }
     Surface(
         modifier = Modifier
             .padding(horizontal = 16.dp)
@@ -293,7 +279,7 @@ private fun LocationCard(
                             key = location.location + "WorldImage",
                         )
                         .weight(0.5f)
-                        .clickable(onClick = clickable)
+                        .clickable(onClick = onClickWorldImage)
                         .clip(
                             RoundedCornerShape(
                                 topStart = 16.dp,
@@ -349,10 +335,10 @@ private fun LocationCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
-                    MemberInfoRow(extended, friendList, instants)
+                    MemberInfoRow(isSelected, friendList, instants)
                 }
             }
-            AnimatedVisibility(extended) {
+            AnimatedVisibility(isSelected) {
                 content(friendList)
             }
         }

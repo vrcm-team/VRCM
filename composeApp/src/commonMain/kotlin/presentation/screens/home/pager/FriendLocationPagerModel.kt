@@ -45,8 +45,6 @@ class FriendLocationPagerModel(
 
     private val friendMap: MutableMap<String, FriendData> = mutableMapOf()
 
-    var currentLocation: MutableState<FriendLocation?> = mutableStateOf(null)
-
     private val updateMutex = Mutex()
 
     /**
