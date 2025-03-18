@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
+import io.github.vrcmteam.vrcm.network.extensions.urlEncode
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -26,7 +27,7 @@ class AuthApi(
         client.get {
             url { path(AUTH_API_PREFIX, USER_API_PREFIX) }
             if (username != null && password != null) {
-                basicAuth(username, password)
+                basicAuth(username.urlEncode(), password.urlEncode())
             }
         }
 
