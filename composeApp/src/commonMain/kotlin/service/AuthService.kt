@@ -144,7 +144,7 @@ class AuthService(
 
     suspend fun doReTryAuth(): Boolean {
         val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
-        return authApi.login(accountInfo.username, accountInfo.password!!) is AuthState.Authed
+        return login(accountInfo.username, accountInfo.password!!) is AuthState.Authed
     }
 
     /**
