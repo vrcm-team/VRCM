@@ -99,7 +99,13 @@ class WorldProfileScreen(
                     authService.reTryAuthCatching {
                         worldsApi.getWorldById(currentWorldProfileVo.worldId)
                     }.onSuccess { worldData ->
+                        // 创建新的WorldProfileVo
+                        currentWorldProfileVo = WorldProfileVo(
+                            world = worldData,
+                            instancesList = worldProfileVO.instances.toMutableStateList(),
+                        )
                         // 获取实例ID列表
+
                         val instanceIds = worldData.instances?.map { it.firstOrNull() ?: "" }
                             ?.filter { it.isNotBlank() } ?: emptyList()
                         // 如果有实例ID，则获取实例信息
@@ -107,23 +113,25 @@ class WorldProfileScreen(
                             authService.reTryAuthCatching {
                                 instanceIds.map {
                                     worldsApi.getWorldInstanceById(currentWorldProfileVo.worldId, it)
+                                }. onEach {
+                                    currentWorldProfileVo.instances.add(InstanceVo(it))
                                 }
                             }.getOrDefault(emptyList())
                         } else {
                             emptyList()
                         }
                         // 转换为InstanceVo列表,刷新覆盖原始数据
-                        val instanceVoList = currentWorldProfileVo.instances.associate { it.instanceId to it } +
+                        val instanceVoList = currentWorldProfileVo.instances.associateBy { it.instanceId } +
                                 instancesList.associate { it.id to InstanceVo(it) }
 
                         // 确定当前实例ID
 
 
                         // 创建新的WorldProfileVo
-                        currentWorldProfileVo = WorldProfileVo(
-                            world = worldData,
-                            instancesList = instanceVoList.values.toList(),
-                        )
+                        currentWorldProfileVo.instances.let {
+                            it.clear()
+                            it.addAll(instanceVoList.values)
+                        }
                     }.onFailure {
                         // 获取失败时保持使用原有数据
                         println("获取世界数据失败: ${it.message}")

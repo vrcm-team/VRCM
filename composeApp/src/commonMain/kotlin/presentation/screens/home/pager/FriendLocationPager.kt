@@ -114,7 +114,7 @@ fun Pager.FriendLocationPager(
                 authorID = currentLocation.worldAuthorId,
                 authorName = currentLocation.worldAuthorName,
                 tags = currentLocation.worldAuthorTag,
-                instances = instances
+                instances = instances.toMutableStateList()
             )
             navigator push WorldProfileScreen(
                 worldProfileVO = tempWorldProfileVo,
