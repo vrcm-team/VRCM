@@ -82,8 +82,10 @@ fun Modifier.slideBack(
 ) = this.composed {
     val navigator = LocalNavigator.currentOrThrow
     val onBackHook = LocalOnBackHook.current.value
+    // 防止一次返回多个页面
+    val key = navigator.lastItem.key
     draggable(rememberDraggableState {
-        if (navigator.canPop && it > threshold && onBackHook()) navigator.pop()
+        if (navigator.lastItem.key == key && navigator.canPop && it > threshold && onBackHook()) navigator.pop()
     }, orientation)
 }
 
