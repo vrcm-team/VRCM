@@ -77,7 +77,7 @@ inline fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifie
  * 侧滑返回
  */
 fun Modifier.slideBack(
-    threshold: Float = 40.dp.value,
+    threshold: Float = 100.dp.value,
     orientation: Orientation = Orientation.Horizontal,
 ) = this.composed {
     val navigator = LocalNavigator.currentOrThrow
