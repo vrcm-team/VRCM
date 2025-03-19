@@ -382,48 +382,92 @@ private fun determineSheetState(
     val halfExpandedHeight = sizes.halfExpandedHeight.value
     val expandedHeight = sizes.expandedHeight.value
     
-    // 速度因子（正值表示向下拖动，负值表示向上拖动）
-    val velocityFactor = (velocity / 800f).coerceIn(-1f, 1f)
+    // 计算当前高度距离各状态的距离
+    val distToCollapsed = abs(currentHeightValue - collapsedHeight)
+    val distToHalfExpanded = abs(currentHeightValue - halfExpandedHeight)
+    val distToExpanded = abs(currentHeightValue - expandedHeight)
     
-    // 距离因子计算 - 使用归一化距离以统一评分标准
-    val totalRange = expandedHeight - collapsedHeight
-    val distToCollapsed = abs(currentHeightValue - collapsedHeight) / totalRange
-    val distToHalf = abs(currentHeightValue - halfExpandedHeight) / totalRange
-    val distToExpanded = abs(currentHeightValue - expandedHeight) / totalRange
+    // 计算相对位置 - 当前高度在整个范围内的位置比例(0~1)
+    val positionRatio = (currentHeightValue - collapsedHeight) / (expandedHeight - collapsedHeight)
     
-    // 增加状态偏好因子 - 使评分受当前接近哪个阈值边界的影响
-    val statePreferenceFactor = when {
-        currentHeightValue < (collapsedHeight + halfExpandedHeight) / 2 -> -0.2f // 偏好收起状态
-        currentHeightValue > (halfExpandedHeight + expandedHeight) / 2 -> 0.2f  // 偏好展开状态
-        else -> 0f  // 中间区域不偏好
+    // 速度处理 - 正规化速度值 (正值表示向下拖动/收起，负值表示向上拖动/展开)
+    val normalizedVelocity = (velocity / 800f).coerceIn(-3f, 3f)
+    
+    // 防止状态跳跃：根据当前状态和速度限制可达状态
+    val allowedStates = when (currentState) {
+        SheetState.COLLAPSED -> {
+            // 从折叠状态只能到达半展开
+            if (normalizedVelocity < -1.5f) listOf(SheetState.HALF_EXPANDED)
+            else listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED)
+        }
+        SheetState.HALF_EXPANDED -> {
+            // 从半展开可到达任何状态，但需要根据位置和速度判断
+            listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED, SheetState.EXPANDED)
+        }
+        SheetState.EXPANDED -> {
+            // 从展开状态只能到达半展开
+            if (normalizedVelocity > 1.5f) listOf(SheetState.HALF_EXPANDED)
+            else listOf(SheetState.HALF_EXPANDED, SheetState.EXPANDED)
+        }
     }
-
-    // 位置和速度的综合评分（越低越倾向于该状态）
-    val collapsedScore =
-        distToCollapsed - velocityFactor * 0.8f - (if (statePreferenceFactor < 0) abs(statePreferenceFactor) else 0f)
-    val halfScore = distToHalf - abs(velocityFactor) * 0.2f
-    val expandedScore =
-        distToExpanded + velocityFactor * 0.8f - (if (statePreferenceFactor > 0) statePreferenceFactor else 0f)
-
-    // 如果速度很大，直接基于方向决定
-    if (abs(velocity) > 1500f) {
+    
+    // 强磁吸效果：如果非常接近某个状态且没有明显反向速度，直接返回该状态
+    when {
+        // 非常接近折叠状态 (距离小于总范围的10%)
+        distToCollapsed < (expandedHeight - collapsedHeight) * 0.1f && 
+                normalizedVelocity > -1f && 
+                SheetState.COLLAPSED in allowedStates -> 
+            return SheetState.COLLAPSED
+            
+        // 非常接近半展开状态 (距离小于总范围的10%)
+        distToHalfExpanded < (expandedHeight - collapsedHeight) * 0.1f && 
+                abs(normalizedVelocity) < 1f && 
+                SheetState.HALF_EXPANDED in allowedStates -> 
+            return SheetState.HALF_EXPANDED
+            
+        // 非常接近展开状态 (距离小于总范围的10%)
+        distToExpanded < (expandedHeight - collapsedHeight) * 0.1f && 
+                normalizedVelocity < 1f && 
+                SheetState.EXPANDED in allowedStates -> 
+            return SheetState.EXPANDED
+    }
+    
+    // 处理中等速度滑动 - 主要根据方向和位置决定
+    if (abs(normalizedVelocity) > 1f) {
         return when {
-            velocity < 0 -> when (currentState) {
-                SheetState.COLLAPSED -> SheetState.HALF_EXPANDED
-                else -> SheetState.EXPANDED
+            normalizedVelocity < 0 -> { // 向上滑动
+                // 在底部区域向上滑，到达半展开
+                if (positionRatio < 0.4f && SheetState.HALF_EXPANDED in allowedStates) 
+                    SheetState.HALF_EXPANDED
+                // 在上部区域向上滑，且允许展开，则展开
+                else if (positionRatio > 0.6f && SheetState.EXPANDED in allowedStates) 
+                    SheetState.EXPANDED
+                // 默认保持在半展开
+                else SheetState.HALF_EXPANDED
             }
-            else -> when (currentState) {
-                SheetState.EXPANDED -> SheetState.HALF_EXPANDED
-                else -> SheetState.COLLAPSED
+            else -> { // 向下滑动
+                // 在上部区域向下滑，到达半展开
+                if (positionRatio > 0.6f && SheetState.HALF_EXPANDED in allowedStates) 
+                    SheetState.HALF_EXPANDED
+                // 在底部区域向下滑，且允许折叠，则折叠
+                else if (positionRatio < 0.4f && SheetState.COLLAPSED in allowedStates) 
+                    SheetState.COLLAPSED
+                // 默认保持在半展开
+                else SheetState.HALF_EXPANDED
             }
         }
     }
     
-    // 根据综合评分选择最佳状态
+    // 对于低速或停止的情况，纯粹根据位置决定
     return when {
-        collapsedScore <= halfScore && collapsedScore <= expandedScore -> SheetState.COLLAPSED
-        halfScore <= collapsedScore && halfScore <= expandedScore -> SheetState.HALF_EXPANDED
-        else -> SheetState.EXPANDED
+        // 位于下1/3区域，倾向于折叠
+        positionRatio < 0.33f && SheetState.COLLAPSED in allowedStates -> 
+            SheetState.COLLAPSED
+        // 位于上1/3区域，倾向于展开
+        positionRatio > 0.67f && SheetState.EXPANDED in allowedStates -> 
+            SheetState.EXPANDED
+        // 中间区域或其他情况，倾向于半展开
+        else -> SheetState.HALF_EXPANDED
     }
 }
 
