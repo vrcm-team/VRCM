@@ -82,11 +82,26 @@ fun Modifier.slideBack(
 ) = this.composed {
     val navigator = LocalNavigator.currentOrThrow
     val onBackHook = LocalOnBackHook.current.value
-    // 防止一次返回多个页面
-    val key = navigator.lastItem.key
-    draggable(rememberDraggableState {
-        if (navigator.lastItem.key == key && navigator.canPop && it > threshold && onBackHook()) navigator.pop()
-    }, orientation)
+    // 添加一个标志变量，用于确保在一次拖动手势中只pop一次
+    val hasPopped = remember { mutableStateOf(false) }
+    
+    draggable(
+        state = rememberDraggableState {
+            if (navigator.canPop && it > threshold && !hasPopped.value && onBackHook()) {
+                navigator.pop()
+                hasPopped.value = true
+            }
+        },
+        orientation = orientation,
+        onDragStarted = {
+            // 当新的拖动手势开始时，重置标志
+            hasPopped.value = false
+        },
+        onDragStopped = {
+            // 当拖动手势结束时，重置标志（可选，取决于需求）
+            hasPopped.value = false
+        }
+    )
 }
 
 /**
