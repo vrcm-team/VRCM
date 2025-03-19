@@ -856,90 +856,97 @@ private fun RenderBottomSheetContent(
     onShrinkCardClick: (InstanceVo) -> Unit ,
     onExpanded: () -> Unit,
 ) {
-    Column(
+    // 上滑渐变小
+    val fl = 1 - bottomSheetState.blurProgress
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(horizontal = 16.dp)
-            .padding(bottom = getInsetPadding(WindowInsets::getBottom)),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(bottom = getInsetPadding(WindowInsets::getBottom))
     ) {
-        // 标签区域
-        AnimatedVisibility(
-            visible = 1 - bottomSheetState.blurProgress > 0f,
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.alpha(1 - bottomSheetState.blurProgress)) {
-                // 描述标题
-                Text(
-                    text = "世界描述",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = 1f - (0.3f * abs(
-                            (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
-                                -30f,
-                                30f
-                            )
-                        ) / 30f)
-                    )
-                )
-
-                // 描述内容
-                Text(
-                    text = worldProfileVo.worldDescription,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-
-                if (worldProfileVo.tags?.isNotEmpty() == true) {
+            // 标签区域
+            AnimatedVisibility(
+                visible = fl > 0f,
+            ) {
+                Column(
+                    modifier = Modifier.alpha(fl)
+                ) {
+                    // 描述标题
                     Text(
-                        text = "所有标签",
+                        text = "世界描述",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        color = MaterialTheme.colorScheme.onSurface.copy(
+                            alpha = 1f - (0.3f * abs(
+                                (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
+                                    -30f,
+                                    30f
+                                )
+                            ) / 30f)
+                        )
                     )
 
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    ) {
-                        worldProfileVo.tags.forEach { tag ->
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
+                    // 描述内容
+                    Text(
+                        text = worldProfileVo.worldDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height((4.dp * fl)))
+                    if (worldProfileVo.tags?.isNotEmpty() == true) {
+                        Text(
+                            text = "所有标签",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height((4.dp * fl)))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            worldProfileVo.tags.forEach { tag ->
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height((4.dp * fl)))
                     }
                 }
             }
-        }
 
-        // 堆叠卡片 - 改为随着滑动过程展开
-        AnimatedVisibility(
-            visible = bottomSheetState.collapsedAlpha > 0f,
-            modifier = Modifier
-                .fillMaxWidth()
-        ) {
-            Box(modifier =  Modifier.alpha(bottomSheetState.collapsedAlpha)){
-                StackedCards(
-                    instances = worldProfileVo.instances,
-                    maxVisibleCards = 3,
-                    // 传递展开程度，用于调整卡片样式
-                    expandProgress = bottomSheetState.blurProgress,
-                    onShrinkCardClick = { onShrinkCardClick(it)},
-                    onExpandCardClick = { onExpanded() },
-
-                )
+            // 堆叠卡片 - 改为随着滑动过程展开
+            AnimatedVisibility(
+                visible = bottomSheetState.collapsedAlpha > 0f,
+                modifier = Modifier
+                    .fillMaxWidth()
+            ) {
+                Box(modifier = Modifier.alpha(bottomSheetState.collapsedAlpha)) {
+                    StackedCards(
+                        instances = worldProfileVo.instances,
+                        maxVisibleCards = 3,
+                        // 传递展开程度，用于调整卡片样式
+                        expandProgress = bottomSheetState.blurProgress,
+                        onShrinkCardClick = { onShrinkCardClick(it) },
+                        onExpandCardClick = { onExpanded() },
+                    )
+                }
             }
-
         }
-
-        Spacer(modifier = Modifier.weight(1f))
         val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
         AnimatedVisibility(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp),
+            enter = slideInVertically{ it },
+            exit = slideOutVertically{ it },
             visible = buttonAlpha > 0f,
         ) {
             // 操作按钮 - 始终显示在底部
@@ -966,8 +973,8 @@ private fun RenderBottomSheetContent(
                 }
             }
         }
-
     }
+
 }
 
 /**
@@ -1065,7 +1072,6 @@ fun AnimatedVisibilityScope.StackedCards(
     onShrinkCardClick: (InstanceVo) -> Unit = {},
     onExpandCardClick: () -> Unit,
 ) {
-
     val size = instances.size
     // 如果没有实例，直接返回
     if (size == 0) return
@@ -1131,41 +1137,57 @@ fun AnimatedVisibilityScope.StackedCards(
                     fillMaxHeight()
                 }
         ) {
-
-            // 显示背景卡片（最多显示maxVisibleCards-1张背景卡片）
-            instances.drop(1).reversed().forEachIndexed { index, instance ->
-                // 修改计算逻辑，使卡片从下方展开
-                // 当expandProgress为0时，卡片堆叠在一起
-                // 当expandProgress接近1时，卡片向下展开，每张卡片之间有固定间距
-                val cardIndex = size - index - 2  // 调整索引，使其从0开始
-                val stackedOffset = cardIndex * 8f  // 堆叠状态下的偏移
-                val expandedOffset = (cardIndex + 1) * 130f  // 展开状态下的间距
-
-                // 新的计算方式：从堆叠状态过渡到展开状态
-                val cardOffset = stackedOffset + (expandedOffset - stackedOffset) * expandProgress
-
+            // 计算需要显示的卡片数量
+            val visibleCardsCount = minOf(maxVisibleCards, size)
+            
+            // 只显示前visibleCardsCount张卡片，并且倒序渲染（最后一张卡片最先渲染，在最底层）
+            // 获取要显示的卡片子列表
+            val visibleCards = instances.take(visibleCardsCount)
+            
+            // 从下往上渲染卡片（索引从visibleCards.size-1到0）
+            for (i in visibleCards.size - 1 downTo 1) {
+                val instance = visibleCards[i]
+                val cardIndex = i
+                
+                // 计算堆叠效果值
+                // cardIndex为0是最顶层卡片，值越大表示越底层
+                val stackFactor = cardIndex.toFloat() / visibleCards.size
+                
+                // 基础偏移和视觉效果
+                val baseOffset = 15.dp * cardIndex
+                val baseScale = 1f - (0.05f * cardIndex)
+                val baseAlpha = 1f - (0.2f * cardIndex)
+                
+                // 随展开程度调整的偏移量（展开时增加间距）
+                val expandedOffset = cardIndex * 130f
+                val currentOffset = baseOffset + (expandedOffset.dp - baseOffset) * expandProgress
+                
+                // 随展开程度调整的透明度和缩放（展开时减少透明度和缩放效果）
+                val currentScale = baseScale + ((1f - baseScale) * expandProgress)
+                val currentAlpha = baseAlpha + ((1f - baseAlpha) * expandProgress)
+                
                 InstanceCard(
                     instance = instance,
-                    size = size - 1,
-                    index = index,
-                    // 使用计算出的偏移量
-                    verticalOffset = cardOffset.dp,
-                    // 随着展开减少透明度效果，但增加缩放效果
-                    scaleEffect = 1f - ((size - index - 1) * 0.05f * (1f - expandProgress)),
-                    alphaEffect = 1f - ((size - index - 1) * 0.6f * (1f - expandProgress)),
+                    size = size,
+                    index = cardIndex,
+                    verticalOffset = currentOffset,
+                    scaleEffect = currentScale,
+                    alphaEffect = currentAlpha
                 )
             }
 
-            // 显示顶部卡片（始终在最上方）
-            InstanceCard(
-                instance = instances.first(),
-                size = size,
-                index = size,
-                verticalOffset = 0.dp,  // 顶部卡片始终保持在顶部位置
-                scaleEffect = 1f, // 顶层卡片始终保持原始大小
-                alphaEffect = 1f, // 顶层卡片始终完全不透明
-                onClick = doExpandCardClick
-            )
+            // 显示顶部卡片（始终在最上方且完全不透明不缩小）
+            if (visibleCards.isNotEmpty()) {
+                InstanceCard(
+                    instance = visibleCards.first(),
+                    size = size,
+                    index = 0,
+                    verticalOffset = 0.dp,
+                    scaleEffect = 1f,
+                    alphaEffect = 1f,
+                    onClick = doExpandCardClick
+                )
+            }
 
             // 显示剩余卡片数量的指示器
             if (instances.size > maxVisibleCards) {
@@ -1189,6 +1211,4 @@ fun AnimatedVisibilityScope.StackedCards(
             }
         }
     }
-
-
 }
