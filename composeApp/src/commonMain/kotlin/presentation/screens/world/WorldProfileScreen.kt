@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,7 +76,7 @@ class WorldProfileScreen(
     override fun Content() {
         // 创建ViewModel
         val screenModel: WorldProfileScreenModel = koinScreenModel()
-        
+
         // 收集ViewModel状态
         var currentWorldProfileVo by screenModel.worldProfileState
         val isLoading by screenModel.isLoading.collectAsState()
@@ -89,7 +91,7 @@ class WorldProfileScreen(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             WorldProfileContent(
-                worldProfileVo = currentWorldProfileVo?:worldProfileVO,
+                worldProfileVo = currentWorldProfileVo ?: worldProfileVO,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
@@ -320,18 +322,18 @@ private fun determineSheetState(
     val collapsedHeight = sizes.collapsedHeight.value
     val halfExpandedHeight = sizes.halfExpandedHeight.value
     val expandedHeight = sizes.expandedHeight.value
-    
+
     // 计算当前高度距离各状态的距离
     val distToCollapsed = abs(currentHeightValue - collapsedHeight)
     val distToHalfExpanded = abs(currentHeightValue - halfExpandedHeight)
     val distToExpanded = abs(currentHeightValue - expandedHeight)
-    
+
     // 计算相对位置 - 当前高度在整个范围内的位置比例(0~1)
     val positionRatio = (currentHeightValue - collapsedHeight) / (expandedHeight - collapsedHeight)
-    
+
     // 速度处理 - 正规化速度值 (正值表示向下拖动/收起，负值表示向上拖动/展开)
     val normalizedVelocity = (velocity / 800f).coerceIn(-3f, 3f)
-    
+
     // 防止状态跳跃：根据当前状态和速度限制可达状态
     val allowedStates = when (currentState) {
         SheetState.COLLAPSED -> {
@@ -339,71 +341,74 @@ private fun determineSheetState(
             if (normalizedVelocity < -1.5f) listOf(SheetState.HALF_EXPANDED)
             else listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED)
         }
+
         SheetState.HALF_EXPANDED -> {
             // 从半展开可到达任何状态，但需要根据位置和速度判断
             listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED, SheetState.EXPANDED)
         }
+
         SheetState.EXPANDED -> {
             // 从展开状态只能到达半展开
             if (normalizedVelocity > 1.5f) listOf(SheetState.HALF_EXPANDED)
             else listOf(SheetState.HALF_EXPANDED, SheetState.EXPANDED)
         }
     }
-    
+
     // 强磁吸效果：如果非常接近某个状态且没有明显反向速度，直接返回该状态
     when {
         // 非常接近折叠状态 (距离小于总范围的10%)
-        distToCollapsed < (expandedHeight - collapsedHeight) * 0.1f && 
-                normalizedVelocity > -1f && 
-                SheetState.COLLAPSED in allowedStates -> 
+        distToCollapsed < (expandedHeight - collapsedHeight) * 0.1f &&
+                normalizedVelocity > -1f &&
+                SheetState.COLLAPSED in allowedStates ->
             return SheetState.COLLAPSED
-            
+
         // 非常接近半展开状态 (距离小于总范围的10%)
-        distToHalfExpanded < (expandedHeight - collapsedHeight) * 0.1f && 
-                abs(normalizedVelocity) < 1f && 
-                SheetState.HALF_EXPANDED in allowedStates -> 
+        distToHalfExpanded < (expandedHeight - collapsedHeight) * 0.1f &&
+                abs(normalizedVelocity) < 1f &&
+                SheetState.HALF_EXPANDED in allowedStates ->
             return SheetState.HALF_EXPANDED
-            
+
         // 非常接近展开状态 (距离小于总范围的10%)
-        distToExpanded < (expandedHeight - collapsedHeight) * 0.1f && 
-                normalizedVelocity < 1f && 
-                SheetState.EXPANDED in allowedStates -> 
+        distToExpanded < (expandedHeight - collapsedHeight) * 0.1f &&
+                normalizedVelocity < 1f &&
+                SheetState.EXPANDED in allowedStates ->
             return SheetState.EXPANDED
     }
-    
+
     // 处理中等速度滑动 - 主要根据方向和位置决定
     if (abs(normalizedVelocity) > 1f) {
         return when {
             normalizedVelocity < 0 -> { // 向上滑动
                 // 在底部区域向上滑，到达半展开
-                if (positionRatio < 0.4f && SheetState.HALF_EXPANDED in allowedStates) 
+                if (positionRatio < 0.4f && SheetState.HALF_EXPANDED in allowedStates)
                     SheetState.HALF_EXPANDED
                 // 在上部区域向上滑，且允许展开，则展开
-                else if (positionRatio > 0.6f && SheetState.EXPANDED in allowedStates) 
+                else if (positionRatio > 0.6f && SheetState.EXPANDED in allowedStates)
                     SheetState.EXPANDED
                 // 默认保持在半展开
                 else SheetState.HALF_EXPANDED
             }
+
             else -> { // 向下滑动
                 // 在上部区域向下滑，到达半展开
-                if (positionRatio > 0.6f && SheetState.HALF_EXPANDED in allowedStates) 
+                if (positionRatio > 0.6f && SheetState.HALF_EXPANDED in allowedStates)
                     SheetState.HALF_EXPANDED
                 // 在底部区域向下滑，且允许折叠，则折叠
-                else if (positionRatio < 0.4f && SheetState.COLLAPSED in allowedStates) 
+                else if (positionRatio < 0.4f && SheetState.COLLAPSED in allowedStates)
                     SheetState.COLLAPSED
                 // 默认保持在半展开
                 else SheetState.HALF_EXPANDED
             }
         }
     }
-    
+
     // 对于低速或停止的情况，纯粹根据位置决定
     return when {
         // 位于下1/3区域，倾向于折叠
-        positionRatio < 0.33f && SheetState.COLLAPSED in allowedStates -> 
+        positionRatio < 0.33f && SheetState.COLLAPSED in allowedStates ->
             SheetState.COLLAPSED
         // 位于上1/3区域，倾向于展开
-        positionRatio > 0.67f && SheetState.EXPANDED in allowedStates -> 
+        positionRatio > 0.67f && SheetState.EXPANDED in allowedStates ->
             SheetState.EXPANDED
         // 中间区域或其他情况，倾向于半展开
         else -> SheetState.HALF_EXPANDED
@@ -506,9 +511,9 @@ private fun RenderMainContent(
             ) {
                 ATooltipBox(
                     tooltip = {
-                        Text(text = worldProfileVo.worldName,)
+                        Text(text = worldProfileVo.worldName)
                     },
-                ){
+                ) {
                     Text(
                         text = worldProfileVo.worldName,
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -531,12 +536,12 @@ private fun RenderMainContent(
 
                     },
                     tooltip = {
-                        Text(text = worldProfileVo.authorName ?: "未知作者",)
+                        Text(text = worldProfileVo.authorName ?: "未知作者")
                     }
-                ){
+                ) {
                     Text(
                         text = worldProfileVo.authorName ?: "未知作者",
-                        color =  MaterialTheme.colorScheme.onTertiary,
+                        color = MaterialTheme.colorScheme.onTertiary,
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -792,7 +797,7 @@ private fun RenderBottomSheet(
 private fun RenderBottomSheetContent(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
-    onShrinkCardClick: (InstanceVo) -> Unit ,
+    onShrinkCardClick: (InstanceVo) -> Unit,
     onExpanded: () -> Unit,
 ) {
     // 上滑渐变小
@@ -829,6 +834,7 @@ private fun RenderBottomSheetContent(
 
                     // 描述内容
                     Text(
+                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 4).verticalScroll(rememberScrollState()),
                         text = worldProfileVo.worldDescription,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -882,10 +888,9 @@ private fun RenderBottomSheetContent(
         val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
         AnimatedVisibility(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp),
-            enter = slideInVertically{ it },
-            exit = slideOutVertically{ it },
+                .align(Alignment.BottomCenter),
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
             visible = buttonAlpha > 0f,
         ) {
             // 操作按钮 - 始终显示在底部
@@ -895,7 +900,7 @@ private fun RenderBottomSheetContent(
                     .fillMaxWidth()
                     .height(80.dp)
                     .alpha(buttonAlpha)
-                    .padding(16.dp)
+                    .padding(vertical = 16.dp)
             ) {
                 Button(
                     onClick = { /* 处理加入世界逻辑 */ },
@@ -942,64 +947,50 @@ private fun DragBar(dragOffset: Float = 100f) {
 }
 
 /**
- * 信息行
- */
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
-
-/**
  * 信息块
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InfoItemBlock(
-    color: Color = MaterialTheme.colorScheme.tertiary ,
+    color: Color = MaterialTheme.colorScheme.tertiary,
     size: DpSize,
     icon: ImageVector,
     label: String,
     description: String,
 ) {
-    Column(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(16.dp))
-            .background(color)
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    ATooltipBox(
+        tooltip = {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
     ) {
-        Icon(
-            imageVector = icon,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            contentDescription = description,
-            modifier = Modifier.size(24.dp)
-        )
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onPrimary,
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 4.dp)
-        )
-        Text(
-            text = description,
-            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.labelSmall
-        )
+        Column(
+            modifier = Modifier
+                .size(size)
+                .clip(RoundedCornerShape(16.dp))
+                .background(color)
+                .padding(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                contentDescription = description,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.titleSmall,
+            )
+
+        }
     }
+
 }
 
 
@@ -1020,7 +1011,7 @@ fun AnimatedVisibilityScope.StackedCards(
     if (isFullyExpanded) {
         // 在完全展开状态下使用Column布局垂直排列所有卡片
         val lazyListState = rememberLazyListState()
-        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo}}
+        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo } }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth(),
@@ -1028,9 +1019,11 @@ fun AnimatedVisibilityScope.StackedCards(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             itemsIndexed(instances) { index, instance ->
-                val visibleItemInfo by remember { derivedStateOf {
-                    layoutInfo.visibleItemsInfo.find { it.index == index }
-                } }
+                val visibleItemInfo by remember {
+                    derivedStateOf {
+                        layoutInfo.visibleItemsInfo.find { it.index == index }
+                    }
+                }
                 // 计算缩放比例
                 val scale by animateFloatAsState(
                     targetValue = visibleItemInfo?.let {
@@ -1078,33 +1071,33 @@ fun AnimatedVisibilityScope.StackedCards(
         ) {
             // 计算需要显示的卡片数量
             val visibleCardsCount = minOf(maxVisibleCards, size)
-            
+
             // 只显示前visibleCardsCount张卡片，并且倒序渲染（最后一张卡片最先渲染，在最底层）
             // 获取要显示的卡片子列表
             val visibleCards = instances.take(visibleCardsCount)
-            
+
             // 从下往上渲染卡片（索引从visibleCards.size-1到0）
             for (i in visibleCards.size - 1 downTo 1) {
                 val instance = visibleCards[i]
                 val cardIndex = i
-                
+
                 // 计算堆叠效果值
                 // cardIndex为0是最顶层卡片，值越大表示越底层
                 val stackFactor = cardIndex.toFloat() / visibleCards.size
-                
+
                 // 基础偏移和视觉效果
                 val baseOffset = 15.dp * cardIndex
                 val baseScale = 1f - (0.05f * cardIndex)
                 val baseAlpha = 1f - (0.2f * cardIndex)
-                
+
                 // 随展开程度调整的偏移量（展开时增加间距）
                 val expandedOffset = cardIndex * 130f
                 val currentOffset = baseOffset + (expandedOffset.dp - baseOffset) * expandProgress
-                
+
                 // 随展开程度调整的透明度和缩放（展开时减少透明度和缩放效果）
                 val currentScale = baseScale + ((1f - baseScale) * expandProgress)
                 val currentAlpha = baseAlpha + ((1f - baseAlpha) * expandProgress)
-                
+
                 InstanceCard(
                     instance = instance,
                     size = size,

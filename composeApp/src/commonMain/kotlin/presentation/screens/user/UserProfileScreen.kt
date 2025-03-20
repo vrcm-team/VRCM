@@ -389,14 +389,8 @@ private fun LanguagesRow(
     ) {
         speakLanguages.forEach { language ->
             val imageVector = LanguageIcons.getFlag(language)
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = {
-                    PlainTooltip {
-                        Text(text = language)
-                    }
-                },
-                state = rememberTooltipState()
+            ATooltipBox(
+                tooltip = { Text(text = language) }
             ) {
                 if (imageVector == null) {
                     Box(

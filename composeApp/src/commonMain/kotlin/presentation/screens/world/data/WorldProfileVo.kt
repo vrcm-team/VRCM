@@ -41,7 +41,7 @@ data class WorldProfileVo(
     constructor(world: WorldData, instancesList: MutableList<InstanceVo> = arrayListOf()): this(
         worldId = world.id,
         worldName = world.name,
-        worldImageUrl = world.imageUrlThumbnail,
+        worldImageUrl = world.imageUrl,
         thumbnailImageUrl = world.thumbnailImageUrl,
         worldDescription = world.description,
         authorID = world.authorId,
