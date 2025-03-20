@@ -6,7 +6,6 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
-import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
@@ -25,7 +24,6 @@ import kotlinx.coroutines.withContext
  */
 class WorldProfileScreenModel(
     private val worldsApi: WorldsApi,
-    private val instancesApi: InstancesApi,
     private val usersApi: UsersApi,
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
@@ -50,24 +48,7 @@ class WorldProfileScreenModel(
                 worldsApi.getWorldById(currentProfile.worldId)
             }.onSuccess { worldData ->
                 // 更新世界基本信息
-                worldProfileState.value =  currentProfile.copy(
-                    worldId = worldData.id,
-                    worldName = worldData.name,
-                    worldDescription = worldData.description,
-                    worldImageUrl = worldData.imageUrl,
-                    thumbnailImageUrl = worldData.thumbnailImageUrl,
-                    authorName = worldData.authorName,
-                    authorID = worldData.authorId,
-                    capacity = worldData.capacity,
-                    recommendedCapacity = worldData.recommendedCapacity,
-                    visits = worldData.visits ?: currentProfile.visits,
-                    favorites = worldData.favorites ?: currentProfile.favorites,
-                    heat = worldData.heat,
-                    popularity = worldData.popularity,
-                    version = worldData.version,
-                    updatedAt = worldData.updatedAt ?: currentProfile.updatedAt,
-                    tags = worldData.tags.toList()
-                )
+                worldProfileState.value =  WorldProfileVo(worldData, currentProfile.instances)
 
                 // 获取实例ID列表
                 val instanceIds = worldData.instances?.mapNotNull { it.firstOrNull() }

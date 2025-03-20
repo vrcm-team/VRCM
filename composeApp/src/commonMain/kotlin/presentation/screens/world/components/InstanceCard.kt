@@ -229,7 +229,7 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
                 color = MaterialTheme.colorScheme.tertiary
             )
         }
-        if(instance.queueEnabled == true && instance.queueSize != null){
+        if(instance.queueEnabled == true && instance.queueSize != null && instance.queueSize > 0){
             StatusChip(
                 text = "队列: ${instance.queueSize}",
                 icon = AppIcons.Queue,
