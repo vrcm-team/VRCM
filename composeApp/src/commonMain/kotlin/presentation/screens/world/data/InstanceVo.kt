@@ -25,10 +25,11 @@ data class InstanceVo(
     val hasCapacity: Boolean? = null,
     val regionType: RegionType = RegionType.Us,
     val regionName: String = "unknown",
+    val ownerId: String? = null,
     val owner: Owner? = null,
     val accessType: AccessType = AccessType.Public,
 ) : JavaSerializable {
-    constructor(instance: InstanceData) : this(
+    constructor(instance: InstanceData, owner: Owner? = null) : this(
         instanceId = instance.id,
         instanceName = instance.name,
         currentUsers = instance.nUsers,
@@ -41,6 +42,7 @@ data class InstanceVo(
         hasCapacity = instance.hasCapacityForYou,
         regionType = instance.region,
         regionName = instance.region.name,
+        owner = owner,
         accessType = instance.accessType
     )
 

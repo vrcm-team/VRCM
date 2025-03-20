@@ -33,13 +33,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
-import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
@@ -51,11 +51,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCar
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.service.AuthService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 import presentation.compoments.TopMenuBar
 import presentation.screens.world.InstancesDialog
 import kotlin.math.abs
@@ -77,86 +72,30 @@ class WorldProfileScreen(
 
     @Composable
     override fun Content() {
-        val worldsApi: WorldsApi = koinInject()
-        val authService: AuthService = koinInject()
-
-        // 创建一个可变状态的WorldProfileVo，初始值为传入的worldProfileVO
-        var currentWorldProfileVo by remember { mutableStateOf(worldProfileVO) }
-
-        // 用于标记是否正在加载
-        var isLoading by remember { mutableStateOf(false) }
-
+        // 创建ViewModel
+        val screenModel: WorldProfileScreenModel = koinScreenModel()
+        
+        // 收集ViewModel状态
+        var currentWorldProfileVo by screenModel.worldProfileState
+        val isLoading by screenModel.isLoading.collectAsState()
         val currentNavigator = currentNavigator
-
-        // 启动协程获取最新世界数据
-        val scope = rememberCoroutineScope()
-
-        // 定义刷新世界数据的函数
-        val refreshWorldData = {
-            if (!isLoading && currentWorldProfileVo.worldId.isNotBlank()) {
-                isLoading = true
-                scope.launch(Dispatchers.IO) {
-                    authService.reTryAuthCatching {
-                        worldsApi.getWorldById(currentWorldProfileVo.worldId)
-                    }.onSuccess { worldData ->
-                        // 创建新的WorldProfileVo
-                        currentWorldProfileVo = WorldProfileVo(
-                            world = worldData,
-                            instancesList = worldProfileVO.instances.toMutableStateList(),
-                        )
-                        // 获取实例ID列表
-
-                        val instanceIds = worldData.instances?.map { it.firstOrNull() ?: "" }
-                            ?.filter { it.isNotBlank() } ?: emptyList()
-                        // 如果有实例ID，则获取实例信息
-                        val instancesList = if (instanceIds.isNotEmpty()) {
-                            authService.reTryAuthCatching {
-                                instanceIds.map {
-                                    worldsApi.getWorldInstanceById(currentWorldProfileVo.worldId, it)
-                                }. onEach {
-                                    currentWorldProfileVo.instances.add(InstanceVo(it))
-                                }
-                            }.getOrDefault(emptyList())
-                        } else {
-                            emptyList()
-                        }
-                        // 转换为InstanceVo列表,刷新覆盖原始数据
-                        val instanceVoList = currentWorldProfileVo.instances.associateBy { it.instanceId } +
-                                instancesList.associate { it.id to InstanceVo(it) }
-
-                        // 确定当前实例ID
-
-
-                        // 创建新的WorldProfileVo
-                        currentWorldProfileVo.instances.let {
-                            it.clear()
-                            it.addAll(instanceVoList.values)
-                        }
-                    }.onFailure {
-                        // 获取失败时保持使用原有数据
-                        println("获取世界数据失败: ${it.message}")
-                    }
-                    isLoading = false
-                }
-            }
-        }
-
         // 组件首次加载时自动刷新数据
         LaunchedEffect(worldProfileVO.worldId) {
-            refreshWorldData()
+            currentWorldProfileVo = worldProfileVO
+            screenModel.refreshWorldData()
         }
+
         CompositionLocalProvider(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             WorldProfileContent(
-                worldProfileVo = currentWorldProfileVo,
+                worldProfileVo = currentWorldProfileVo?:worldProfileVO,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
-                onRefresh = { refreshWorldData() },
+                onRefresh = { screenModel.refreshWorldData() },
             )
         }
-
     }
 
     // 主要内容组件

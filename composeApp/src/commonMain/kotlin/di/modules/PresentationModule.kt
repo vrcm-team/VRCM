@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerMo
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
@@ -35,6 +36,7 @@ val presentationModule: Module = module {
     singleOf (::FriendLocationPagerModel)
     singleOf (::FriendListPagerModel)
     singleOf(::SearchListPagerModel)
+    singleOf(::WorldProfileScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }

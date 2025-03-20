@@ -26,7 +26,7 @@ data class HomeInstanceVo(
         id = instance.id,
         worldId = instance.world.id,
         worldName = instance.world.name,
-        worldImageUrl = instance.world.imageUrlThumbnail,
+        worldImageUrl = instance.world.imageUrl,
         worldAuthorName = instance.world.authorName,
         worldAuthorId = instance.world.authorId,
         worldDescription = instance.world.description,
