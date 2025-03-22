@@ -111,24 +111,31 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-
-        Box(
+        val itemSize = DpSize(86.dp, 70.dp)
+        BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
-            val maxHeight = 800.dp
             // ========== 尺寸计算 ==========
             val sysTopPadding = getInsetPadding(WindowInsets::getTop)
-            val sizes = remember {
+            val imageHigh = maxHeight / 5 // 图片高度为屏幕高度的1/5
+            val contentPadding = 8.dp // 内容区域内边距
+
+            val sizes = remember(maxHeight) {
                 WorldDetailSizes(
-                    imageHigh = maxHeight / 5,
-                    collapsedHeight = sysTopPadding + maxHeight / 2.25f + 16.dp,  // 底部基本信息高度
-                    halfExpandedHeight = (sysTopPadding + maxHeight / 1.5f) - 8.dp,  // 半展开高度
-                    expandedHeight =  maxHeight - sysTopPadding,  // 完全展开高度
+                    maxHeight = maxHeight,
+                    imageHigh = imageHigh,
+                    // 折叠高度：留出图片高度+顶部信息+两行信息块的空间
+                    collapsedHeight = (maxHeight * 2/3) - contentPadding - (itemSize.height * 2 + contentPadding * 2),
+                    // 半展开高度：屏幕高度的2/3
+                    halfExpandedHeight = (maxHeight * 2/3) - contentPadding,
+                    // 完全展开高度：完整屏幕高度减去状态栏
+                    expandedHeight = maxHeight - sysTopPadding,
                     topBarHeight = 64.dp,
-                    sysTopPadding = sysTopPadding
+                    sysTopPadding = sysTopPadding,
+                    itemSize = itemSize
                 )
             }
-
+            println("sizes: $sizes")
             // ========== BottomSheet状态管理 ==========
             var sheetState by remember { mutableStateOf(SheetState.HALF_EXPANDED) }
             var dragOffset by remember { mutableStateOf(0f) }
@@ -211,12 +218,14 @@ enum class SheetState { COLLAPSED, HALF_EXPANDED, EXPANDED }
  * 世界详情界面的尺寸计算
  */
 private data class WorldDetailSizes(
+    val maxHeight: Dp,
     val imageHigh: Dp,
     val collapsedHeight: Dp,
     val halfExpandedHeight: Dp,
     val expandedHeight: Dp,
     val topBarHeight: Dp,
     val sysTopPadding: Dp,
+    val itemSize: DpSize
 )
 
 /**
@@ -480,23 +489,22 @@ private fun RenderMainContent(
             Color.Transparent, // 起始颜色（完全透明）
             MaterialTheme.colorScheme.secondary // 结束
         ),
-        startY = ((sizes.sysTopPadding + sizes.imageHigh )* 4 * 0.5f).value,
-        endY = ((sizes.sysTopPadding + sizes.imageHigh) * 4f).value,
+        endY = 300f,
     )
 
 
-    val itemSize = DpSize(86.dp, 70.dp)
+    val itemSize = sizes.itemSize
     val navigator = LocalNavigator.currentOrThrow
 
     // 主内容区域
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(top = sizes.maxHeight - sizes.halfExpandedHeight - sizes.imageHigh * 0.75f)
             .background(gradientBrush)
             .padding(horizontal = 8.dp),
     ) {
-        Spacer(modifier = Modifier.height(sizes.imageHigh * 1.25f))
-
+        Spacer(modifier = Modifier.height(sizes.imageHigh * 0.25f))
         // 顶部信息区
         Column(
             modifier = Modifier
@@ -505,11 +513,6 @@ private fun RenderMainContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = sizes.imageHigh * 0.5f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
                 ATooltipBox(
                     tooltip = {
                         Text(text = worldProfileVo.worldName)
@@ -548,10 +551,7 @@ private fun RenderMainContent(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
-            }
         }
-
         // 信息卡片区域
         AnimatedVisibility(
             visible = collapsedAlphaVariant > 0,
@@ -826,7 +826,7 @@ private fun RenderBottomSheetContent(
 
                     // 描述内容
                     Text(
-                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 4).verticalScroll(rememberScrollState()),
+                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 3).verticalScroll(rememberScrollState()),
                         text = worldProfileVo.worldDescription,
                         style = MaterialTheme.typography.bodyMedium,
                     )
