@@ -112,16 +112,17 @@ class WorldProfileScreen(
         // 模糊效果状态
         val hazeState = remember { HazeState() }
 
-        BoxWithConstraints(
+        Box(
             modifier = Modifier.fillMaxSize()
         ) {
+            val maxHeight = 800.dp
             // ========== 尺寸计算 ==========
             val sysTopPadding = getInsetPadding(WindowInsets::getTop)
-            val sizes = remember(maxHeight) {
+            val sizes = remember {
                 WorldDetailSizes(
                     imageHigh = maxHeight / 5,
-                    collapsedHeight = sysTopPadding + maxHeight / 2.25f,  // 底部基本信息高度
-                    halfExpandedHeight = (maxHeight / 1.5f) - 8.dp,  // 半展开高度
+                    collapsedHeight = sysTopPadding + maxHeight / 2.25f + 16.dp,  // 底部基本信息高度
+                    halfExpandedHeight = (sysTopPadding + maxHeight / 1.5f) - 8.dp,  // 半展开高度
                     expandedHeight =  maxHeight - sysTopPadding,  // 完全展开高度
                     topBarHeight = 64.dp,
                     sysTopPadding = sysTopPadding
