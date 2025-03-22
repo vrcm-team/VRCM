@@ -120,9 +120,9 @@ class WorldProfileScreen(
             val sizes = remember(maxHeight) {
                 WorldDetailSizes(
                     imageHigh = maxHeight / 5,
-                    collapsedHeight = maxHeight / 2.25f,  // 底部基本信息高度
+                    collapsedHeight = sysTopPadding + maxHeight / 2.25f,  // 底部基本信息高度
                     halfExpandedHeight = (maxHeight / 1.5f) - 8.dp,  // 半展开高度
-                    expandedHeight = maxHeight,  // 完全展开高度
+                    expandedHeight =  maxHeight - sysTopPadding,  // 完全展开高度
                     topBarHeight = 64.dp,
                     sysTopPadding = sysTopPadding
                 )
@@ -472,14 +472,15 @@ private fun RenderMainContent(
     sizes: WorldDetailSizes,
     collapsedAlphaVariant: Float,
 ) {
+
     // 渐变和卡片样式
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
             MaterialTheme.colorScheme.secondary // 结束
         ),
-        startY = (sizes.imageHigh.value * 2f * 0.5f),
-        endY = (sizes.imageHigh.value * 2f),
+        startY = ((sizes.sysTopPadding + sizes.imageHigh )* 4 * 0.5f).value,
+        endY = ((sizes.sysTopPadding + sizes.imageHigh) * 4f).value,
     )
 
 
@@ -491,8 +492,7 @@ private fun RenderMainContent(
         modifier = Modifier
             .fillMaxSize()
             .background(gradientBrush)
-            .padding(horizontal = 8.dp)
-            .systemBarsPadding(),
+            .padding(horizontal = 8.dp),
     ) {
         Spacer(modifier = Modifier.height(sizes.imageHigh * 1.25f))
 
@@ -625,16 +625,6 @@ private fun RenderMainContent(
                     label = worldProfileVo.updatedAt?.substringBefore("T") ?: "未知",
                     description = "更新日期"
                 )
-
-                // 可用实例数
-                if (worldProfileVo.instances.isNotEmpty()) {
-                    InfoItemBlock(
-                        size = itemSize,
-                        icon = AppIcons.Dashboard,
-                        label = "${worldProfileVo.instances.size}",
-                        description = "实例数"
-                    )
-                }
             }
         }
 
@@ -775,7 +765,7 @@ private fun RenderBottomSheet(
                 DragBar(dragOffset = bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value)
 
                 // 全屏时添加额外空间
-                Spacer(modifier = Modifier.height(bottomSheetState.blurProgress * (sizes.topBarHeight + sizes.sysTopPadding - 24.dp)))
+                Spacer(modifier = Modifier.height(bottomSheetState.blurProgress * (sizes.topBarHeight - 24.dp)))
 
                 // 主要信息内容
                 RenderBottomSheetContent(
@@ -816,7 +806,8 @@ private fun RenderBottomSheetContent(
                 visible = fl > 0f,
             ) {
                 Column(
-                    modifier = Modifier.alpha(fl)
+                    modifier = Modifier.alpha(fl),
+                    verticalArrangement = Arrangement.spacedBy(4.dp * fl)
                 ) {
                     // 描述标题
                     Text(
@@ -838,13 +829,11 @@ private fun RenderBottomSheetContent(
                         text = worldProfileVo.worldDescription,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Spacer(modifier = Modifier.height((4.dp * fl)))
                     if (worldProfileVo.tags?.isNotEmpty() == true) {
                         Text(
                             text = "所有标签",
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        Spacer(modifier = Modifier.height((4.dp * fl)))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -862,7 +851,6 @@ private fun RenderBottomSheetContent(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height((4.dp * fl)))
                     }
                 }
             }
@@ -1081,14 +1069,11 @@ fun AnimatedVisibilityScope.StackedCards(
                 val instance = visibleCards[i]
                 val cardIndex = i
 
-                // 计算堆叠效果值
-                // cardIndex为0是最顶层卡片，值越大表示越底层
-                val stackFactor = cardIndex.toFloat() / visibleCards.size
 
                 // 基础偏移和视觉效果
-                val baseOffset = 15.dp * cardIndex
-                val baseScale = 1f - (0.05f * cardIndex)
-                val baseAlpha = 1f - (0.2f * cardIndex)
+                val baseOffset = 10.dp * cardIndex
+                val baseScale = 1f - (0.1f * cardIndex)
+                val baseAlpha = 1f - (0.25f * cardIndex)
 
                 // 随展开程度调整的偏移量（展开时增加间距）
                 val expandedOffset = cardIndex * 130f
