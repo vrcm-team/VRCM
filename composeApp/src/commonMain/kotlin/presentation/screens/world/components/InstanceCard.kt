@@ -257,10 +257,10 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
         Spacer(Modifier.weight(1f))
 
         // 所有者信息
-        instance.owner?.displayName?.let { name ->
+        instance.owner?.let { owner ->
             IconLabelRow(
-                icon = AppIcons.Person,
-                text = name,
+                icon = owner.iconVector,
+                text = owner.displayName,
                 iconSize = 14.dp,
                 spacing = 4.dp,
                 textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
