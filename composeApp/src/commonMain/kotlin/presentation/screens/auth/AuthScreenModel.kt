@@ -110,14 +110,15 @@ class AuthScreenModel(
             .getOrNull()
     }.await() == true
 
-    suspend fun tryCheckVersion(): VersionVo {
-        return screenModelScope.async(Dispatchers.IO) {
+    fun tryCheckVersion(onCheckVersion:(VersionVo) -> Unit)=
+         screenModelScope.launch(Dispatchers.IO) {
             versionService.checkVersion(true)
                 .onAuthFailure()
                 .map { VersionVo(it.tagName, it.htmlUrl, it.body, it.hasNewVersion) }
                 .getOrElse { VersionVo() }
-        }.await()
-    }
+                .also(onCheckVersion)
+        }
+
 
     fun rememberVersion(version: String?) = screenModelScope.launch(Dispatchers.IO) {
         versionService.rememberVersion(version)

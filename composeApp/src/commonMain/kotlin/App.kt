@@ -24,6 +24,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.auth.VersionDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
@@ -44,6 +45,7 @@ fun App() {
                         .systemBarsPadding()
                         .padding(vertical = 76.dp, horizontal = 12.dp)
                 ) {
+                    VersionDialog()
                     SharedTransitionScreen(
                         navigator = it,
                         modifier = Modifier.slideBack(),

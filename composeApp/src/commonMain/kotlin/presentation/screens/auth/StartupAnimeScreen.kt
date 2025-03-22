@@ -11,6 +11,8 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
+import kotlinx.coroutines.delay
+import org.koin.compose.koinInject
 import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
@@ -23,7 +25,10 @@ object StartupAnimeScreen : Screen {
         val startUpAnime = { isStartUp = true }
         val authScreenModel = koinScreenModel<AuthScreenModel>()
 
-        VersionDialog(startUpAnime)
+        LaunchedEffect(Unit) {
+            delay(500)
+            startUpAnime()
+        }
         BoxWithConstraints {
 
             val iconYOffset by animateDpAsState(
@@ -58,24 +63,21 @@ object StartupAnimeScreen : Screen {
 }
 
 @Composable
-private fun Screen.VersionDialog(startUpAnime: () -> Unit) {
-    val authScreenModel: AuthScreenModel  = koinScreenModel()
+fun VersionDialog() {
+    val authScreenModel: AuthScreenModel  = koinInject()
     var version by remember { mutableStateOf(VersionVo()) }
-
-    LaunchedEffect(Unit) {
-        authScreenModel.tryCheckVersion().let {
-            if (it.hasNewVersion) {
-                version = it
-            }else{
-                startUpAnime()
-            }
+    val onCheckVersion: (VersionVo) -> Unit = {
+        if (it.hasNewVersion) {
+            version = it
         }
+    }
+    LaunchedEffect(Unit) {
+        authScreenModel.tryCheckVersion(onCheckVersion)
     }
     UpdateDialog(
         version = version,
         onDismissRequest = {
             version = VersionVo()
-            startUpAnime()
         },
         onRememberVersion = authScreenModel::rememberVersion
     )
