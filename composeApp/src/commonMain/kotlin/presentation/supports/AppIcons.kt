@@ -2,8 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.supports
 
 import androidx.compose.material.icons.materialIcon
 import androidx.compose.material.icons.materialPath
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
@@ -916,59 +915,115 @@ object AppIcons {
         }
     }
 
-    val Whatshot: ImageVector by lazy {
-        materialIcon(name = "Rounded.Whatshot") {
-            materialPath {
-                moveTo(11.57f, 13.16f)
-                curveToRelative(-1.36f, 0.28f, -2.17f, 1.16f, -2.17f, 2.41f)
-                curveToRelative(0.0f, 1.34f, 1.11f, 2.42f, 2.49f, 2.42f)
-                curveToRelative(2.05f, 0.0f, 3.71f, -1.66f, 3.71f, -3.71f)
-                curveToRelative(0.0f, -1.07f, -0.15f, -2.12f, -0.46f, -3.12f)
-                curveToRelative(-0.79f, 1.07f, -2.2f, 1.72f, -3.57f, 2.0f)
+    val Hot: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Mode_heat",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 960f,
+            viewportHeight = 960f
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(240f, 560f)
+                quadToRelative(0f, 52f, 21f, 98.5f)
+                reflectiveQuadToRelative(60f, 81.5f)
+                quadToRelative(-1f, -5f, -1f, -9f)
+                verticalLineToRelative(-9f)
+                quadToRelative(0f, -32f, 12f, -60f)
+                reflectiveQuadToRelative(35f, -51f)
+                lineToRelative(113f, -111f)
+                lineToRelative(113f, 111f)
+                quadToRelative(23f, 23f, 35f, 51f)
+                reflectiveQuadToRelative(12f, 60f)
+                verticalLineToRelative(9f)
+                quadToRelative(0f, 4f, -1f, 9f)
+                quadToRelative(39f, -35f, 60f, -81.5f)
+                reflectiveQuadToRelative(21f, -98.5f)
+                quadToRelative(0f, -50f, -18.5f, -94.5f)
+                reflectiveQuadTo(648f, 386f)
+                quadToRelative(-20f, 13f, -42f, 19.5f)
+                reflectiveQuadToRelative(-45f, 6.5f)
+                quadToRelative(-62f, 0f, -107.5f, -41f)
+                reflectiveQuadTo(401f, 270f)
+                quadToRelative(-39f, 33f, -69f, 68.5f)
+                reflectiveQuadToRelative(-50.5f, 72f)
+                reflectiveQuadToRelative(-31f, 74.5f)
+                reflectiveQuadToRelative(-10.5f, 75f)
+                moveToRelative(240f, 52f)
+                lineToRelative(-57f, 56f)
+                quadToRelative(-11f, 11f, -17f, 25f)
+                reflectiveQuadToRelative(-6f, 29f)
+                quadToRelative(0f, 32f, 23.5f, 55f)
+                reflectiveQuadToRelative(56.5f, 23f)
+                reflectiveQuadToRelative(56.5f, -23f)
+                reflectiveQuadToRelative(23.5f, -55f)
+                quadToRelative(0f, -16f, -6f, -29.5f)
+                reflectiveQuadTo(537f, 668f)
                 close()
-                moveTo(13.5f, 0.67f)
-                reflectiveCurveToRelative(-0.74f, 2.65f, -0.74f, 4.8f)
-                curveToRelative(0.0f, 2.06f, 1.35f, 3.73f, 3.41f, 3.73f)
-                curveToRelative(2.07f, 0.0f, 3.63f, -1.67f, 3.63f, -3.73f)
-                lineTo(19.8f, 5.0f)
-                curveToRelative(0.0f, -4.26f, -4.59f, -9.31f, -6.3f, -10.0f)
-                curveToRelative(0.0f, 0.0f, -1.31f, 1.21f, -1.31f, 1.21f)
-                curveTo(7.60f, 0.77f, 4.08f, 6.78f, 4.08f, 11.0f)
-                curveToRelative(0.0f, 4.83f, 3.89f, 8.77f, 8.67f, 8.77f)
-                curveToRelative(3.57f, 0.0f, 6.69f, -2.2f, 7.95f, -5.38f)
-                curveToRelative(-4.0f, 0.93f, -6.78f, -2.14f, -9.38f, -7.86f)
-                curveTo(10.8f, 8.3f, 10.85f, 9.63f, 10.85f, 9.63f)
-                curveTo(11.34f, 6.63f, 13.5f, 0.67f, 13.5f, 0.67f)
-                close()
+                moveToRelative(0f, -492f)
+                verticalLineToRelative(132f)
+                quadToRelative(0f, 34f, 23.5f, 57f)
+                reflectiveQuadToRelative(57.5f, 23f)
+                quadToRelative(18f, 0f, 33.5f, -7.5f)
+                reflectiveQuadTo(622f, 302f)
+                lineToRelative(18f, -22f)
+                quadToRelative(74f, 42f, 117f, 117f)
+                reflectiveQuadToRelative(43f, 163f)
+                quadToRelative(0f, 134f, -93f, 227f)
+                reflectiveQuadTo(480f, 880f)
+                reflectiveQuadToRelative(-227f, -93f)
+                reflectiveQuadToRelative(-93f, -227f)
+                quadToRelative(0f, -129f, 86.5f, -245f)
+                reflectiveQuadTo(480f, 120f)
             }
-        }
+        }.build()
     }
 
     val Trending: ImageVector by lazy {
-        materialIcon(name = "Rounded.TrendingUp") {
-            materialPath {
-                moveTo(16.85f, 6.85f)
-                lineToRelative(1.44f, 1.44f)
-                lineTo(14.0f, 12.59f)
-                lineToRelative(-3.29f, -3.29f)
-                curveToRelative(-0.39f, -0.39f, -1.02f, -0.39f, -1.41f, 0.0f)
-                lineToRelative(-6.0f, 6.0f)
-                curveToRelative(-0.39f, 0.39f, -0.39f, 1.02f, 0.0f, 1.41f)
-                curveToRelative(0.39f, 0.39f, 1.02f, 0.39f, 1.41f, 0.0f)
-                lineTo(10.0f, 11.41f)
-                lineTo(13.29f, 14.7f)
-                curveToRelative(0.39f, 0.39f, 1.02f, 0.39f, 1.41f, 0.0f)
-                lineTo(18.0f, 14.0f)
-                lineToRelative(1.44f, 1.44f)
-                curveToRelative(0.31f, 0.31f, 0.85f, 0.09f, 0.85f, -0.35f)
-                verticalLineTo(4.5f)
-                curveToRelative(0.0f, -0.28f, -0.22f, -0.5f, -0.5f, -0.5f)
-                horizontalLineToRelative(-5.7f)
-                curveToRelative(-0.44f, 0.0f, -0.67f, 0.54f, -0.35f, 0.85f)
-                lineToRelative(1.44f, 1.44f)
+        ImageVector.Builder(
+            name = "Trending_up",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 960f,
+            viewportHeight = 960f
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(136f, 720f)
+                lineToRelative(-56f, -56f)
+                lineToRelative(296f, -298f)
+                lineToRelative(160f, 160f)
+                lineToRelative(208f, -206f)
+                horizontalLineTo(640f)
+                verticalLineToRelative(-80f)
+                horizontalLineToRelative(240f)
+                verticalLineToRelative(240f)
+                horizontalLineToRelative(-80f)
+                verticalLineToRelative(-104f)
+                lineTo(536f, 640f)
+                lineTo(376f, 480f)
                 close()
             }
-        }
+        }.build()
     }
 
     val DateRange: ImageVector by lazy {
