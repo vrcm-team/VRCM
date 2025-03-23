@@ -13,12 +13,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -82,7 +86,7 @@ class WorldProfileScreen(
         val isLoading by screenModel.isLoading.collectAsState()
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
-        LaunchedEffect(worldProfileVO.worldId) {
+        LaunchedEffect(Unit) {
             screenModel.refreshWorldData(worldProfileVO)
         }
 
@@ -94,7 +98,7 @@ class WorldProfileScreen(
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
-                onRefresh = { screenModel.refreshWorldData(profileVoState ?: worldProfileVO) },
+                onRefresh = { screenModel.refreshWorldData(worldProfileVO) },
             )
         }
     }
@@ -110,7 +114,8 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-        val itemSize = DpSize(86.dp, 70.dp)
+        val itemSize = DpSize(width = 80.dp, height = 68.dp) // 增加信息块大小，但保持每行四个布局
+
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -135,7 +140,7 @@ class WorldProfileScreen(
                 )
             }
             // ========== BottomSheet状态管理 ==========
-            var sheetState by remember { mutableStateOf(SheetState.HALF_EXPANDED) }
+            var sheetState by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(SheetState.HALF_EXPANDED) }
             var dragOffset by remember { mutableStateOf(0f) }
 
             // 计算目标高度和当前高度
@@ -144,6 +149,7 @@ class WorldProfileScreen(
                 dragOffset = dragOffset,
                 sizes = sizes
             )
+            // 组件首次加载时自动刷新数据
 
             // ========== 渲染背景图像 ==========
             RenderBackgroundImage(
@@ -473,7 +479,7 @@ private fun ApplyBlurEffect(
 /**
  * 渲染主内容区域
  */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RenderMainContent(
     worldProfileVo: WorldProfileVo,
@@ -550,84 +556,132 @@ private fun RenderMainContent(
                 )
             }
         }
-        // 信息卡片区域
-        AnimatedVisibility(
-            visible = collapsedAlphaVariant > 0,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().alpha(collapsedAlphaVariant),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // 世界容量
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Person,
-                    label = "${worldProfileVo.capacity ?: 0}",
-                    description = "容量"
-                )
 
-                // 推荐容量
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Group,
-                    label = "${worldProfileVo.recommendedCapacity ?: 0}",
-                    description = "推荐容量"
-                )
-
-                // 访问次数
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Visibility,
-                    label = "${worldProfileVo.visits ?: 0}",
-                    description = "访问"
-                )
-
-                // 收藏数
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Favorite,
-                    label = "${worldProfileVo.favorites ?: 0}",
-                    description = "收藏"
-                )
-
-                // 热度
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Whatshot,
-                    label = "${worldProfileVo.heat ?: 0}",
-                    description = "热度"
-                )
-
-                // 热门程度
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Trending,
-                    label = "${worldProfileVo.popularity ?: 0}",
-                    description = "热门度"
-                )
-
-                // 版本
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.Update,
-                    label = "v${worldProfileVo.version ?: 1}",
-                    description = "版本"
-                )
-
-                // 更新时间
-                InfoItemBlock(
-                    size = itemSize,
-                    icon = AppIcons.DateRange,
-                    label = worldProfileVo.updatedAt?.substringBefore("T") ?: "未知",
-                    description = "更新日期"
-                )
-            }
-        }
+        InfoAre(worldProfileVo, collapsedAlphaVariant, itemSize)
 
         Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private inline fun ColumnScope.InfoAre(
+    worldProfileVo: WorldProfileVo,
+    collapsedAlphaVariant: Float,
+    itemSize: DpSize
+) {
+    val infoCards = listOf(
+        // 世界容量
+        Triple(AppIcons.Person, "${worldProfileVo.capacity}", "容量"),
+        // 推荐容量
+        Triple(
+            AppIcons.Group,
+            "${worldProfileVo.publicOccupants + worldProfileVo.privateOccupants}",
+            "地图内总在线人数"
+        ),
+        // 访问次数
+        Triple(AppIcons.Visibility, "${worldProfileVo.visits}", "访问"),
+        // 收藏数
+        Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", "收藏"),
+        // 热度
+        Triple(AppIcons.Hot, "${worldProfileVo.heat}", "热度"),
+        // 热门程度
+        Triple(AppIcons.Trending, "${worldProfileVo.popularity}", "知名度"),
+        // 版本
+        Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", "版本"),
+        // 更新时间
+        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.substringBefore("T") ?: "未知", "更新日期"),
+        Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", "收藏"),
+        // 热度
+        Triple(AppIcons.Hot, "${worldProfileVo.heat}", "热度"),
+        // 热门程度
+        Triple(AppIcons.Trending, "${worldProfileVo.popularity}", "知名度"),
+        // 版本
+        Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", "版本"),
+        // 更新时间
+        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.substringBefore("T") ?: "未知", "更新日期")
+    )
+
+    // 计算每页显示的卡片数量
+    val cardsPerRow = 4 // 每行显示4个卡片
+    val rowsPerPage = 2 // 每页显示2行
+    val cardsPerPage = cardsPerRow * rowsPerPage // 每页8个卡片
+    val pageCount = (infoCards.size + cardsPerPage - 1) / cardsPerPage
+    // 使用HorizontalPager实现水平滑动
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    // 信息卡片区域
+    AnimatedVisibility(
+        visible = collapsedAlphaVariant > 0,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(collapsedAlphaVariant),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
+            ) { page ->
+                // 计算当前页应显示的卡片
+                val startIndex = page * cardsPerPage
+                val endIndex = minOf(startIndex + cardsPerPage, infoCards.size)
+                val pageCards = infoCards.subList(startIndex, endIndex)
+
+                // 添加页面过渡动画
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 第一行卡片
+                    val firstRowEnd = minOf(startIndex + cardsPerRow, endIndex)
+                    if (startIndex < firstRowEnd) {
+                        val firstRowCards = pageCards.subList(0, firstRowEnd - startIndex)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            for ((icon, label, description) in firstRowCards) {
+                                InfoItemBlock(
+                                    size = itemSize,
+                                    icon = icon,
+                                    label = label,
+                                    description = description
+                                )
+                            }
+                        }
+                    }
+
+                    // 第二行卡片
+                    val secondRowStart = firstRowEnd
+                    val secondRowEnd = minOf(secondRowStart + cardsPerRow, endIndex)
+                    if (secondRowStart < secondRowEnd) {
+                        val secondRowCards = pageCards.subList(firstRowEnd - startIndex, secondRowEnd - startIndex)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            for ((icon, label, description) in secondRowCards) {
+                                InfoItemBlock(
+                                    size = itemSize,
+                                    icon = icon,
+                                    label = label,
+                                    description = description
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+
+        }
     }
 }
 
@@ -952,9 +1006,8 @@ private fun InfoItemBlock(
         Column(
             modifier = Modifier
                 .size(size)
-                .clip(RoundedCornerShape(16.dp))
-                .background(color)
-                .padding(4.dp),
+                .clip(RoundedCornerShape(12.dp))
+                .background(color),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -964,16 +1017,17 @@ private fun InfoItemBlock(
                 contentDescription = description,
                 modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = label,
                 color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
             )
-
         }
     }
-
 }
 
 
@@ -1121,6 +1175,43 @@ fun AnimatedVisibilityScope.StackedCards(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * 水平分页指示器组件
+ */
+@Composable
+private fun HorizontalPagerIndicator(
+    pagerState: PagerState,
+    modifier: Modifier = Modifier,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+    indicatorWidth: Dp = 8.dp,
+    indicatorHeight: Dp = 8.dp,
+    spacing: Dp = 8.dp
+) {
+    val pageCount = pagerState.pageCount
+    
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (i in 0 until pageCount) {
+            // 计算当前指示器的颜色
+            val isSelected = i == pagerState.currentPage
+            val color = if (isSelected) activeColor else inactiveColor
+            
+            // 创建指示器点
+            Box(
+                modifier = Modifier
+                    .size(if (isSelected) indicatorWidth else indicatorWidth / 1.5f, indicatorHeight / 1.5f)
+                    .clip(CircleShape)
+                    .background(color)
+                    .alpha(if (isSelected) 1f else 0.5f)
+            )
         }
     }
 }

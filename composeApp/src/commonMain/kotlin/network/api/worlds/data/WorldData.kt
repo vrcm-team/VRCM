@@ -24,6 +24,8 @@ data class WorldData(
     val organization: String,
     val popularity: Int,
     val previewYoutubeId: String? = null,
+    val privateOccupants: Int? = null,
+    val publicOccupants: Int? = null,
     val publicationDate: String,
     val recommendedCapacity: Int,
     val releaseStatus: String,
