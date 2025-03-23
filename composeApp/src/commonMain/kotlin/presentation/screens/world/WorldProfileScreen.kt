@@ -78,24 +78,23 @@ class WorldProfileScreen(
         val screenModel: WorldProfileScreenModel = koinScreenModel()
 
         // 收集ViewModel状态
-        var currentWorldProfileVo by screenModel.worldProfileState
+        val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
         LaunchedEffect(worldProfileVO.worldId) {
-            currentWorldProfileVo = worldProfileVO
-            screenModel.refreshWorldData()
+            screenModel.refreshWorldData(worldProfileVO)
         }
 
         CompositionLocalProvider(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             WorldProfileContent(
-                worldProfileVo = currentWorldProfileVo ?: worldProfileVO,
+                worldProfileVo = profileVoState ?: worldProfileVO,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
-                onRefresh = { screenModel.refreshWorldData() },
+                onRefresh = { screenModel.refreshWorldData(profileVoState ?: worldProfileVO) },
             )
         }
     }
@@ -125,9 +124,9 @@ class WorldProfileScreen(
                     maxHeight = maxHeight,
                     imageHigh = imageHigh,
                     // 折叠高度：留出图片高度+顶部信息+两行信息块的空间
-                    collapsedHeight = (maxHeight * 2/3) - contentPadding - (itemSize.height * 2 + contentPadding * 2),
+                    collapsedHeight = (maxHeight * 2 / 3) - contentPadding - (itemSize.height * 2 + contentPadding * 2),
                     // 半展开高度：屏幕高度的2/3
-                    halfExpandedHeight = (maxHeight * 2/3) - contentPadding,
+                    halfExpandedHeight = (maxHeight * 2 / 3) - contentPadding,
                     // 完全展开高度：完整屏幕高度减去状态栏
                     expandedHeight = maxHeight - sysTopPadding,
                     topBarHeight = 64.dp,
@@ -135,7 +134,6 @@ class WorldProfileScreen(
                     itemSize = itemSize
                 )
             }
-            println("sizes: $sizes")
             // ========== BottomSheet状态管理 ==========
             var sheetState by remember { mutableStateOf(SheetState.HALF_EXPANDED) }
             var dragOffset by remember { mutableStateOf(0f) }
@@ -513,44 +511,44 @@ private fun RenderMainContent(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.Start
         ) {
-                ATooltipBox(
-                    tooltip = {
-                        Text(text = worldProfileVo.worldName)
-                    },
-                ) {
-                    Text(
-                        text = worldProfileVo.worldName,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                HorizontalDivider(thickness = 2.dp)
-                ATooltipBox(
-                    modifier = Modifier.clickable {
-                        worldProfileVo.authorID?.let {
-                            val userProfileScreen = UserProfileScreen(
-                                userProfileVO = UserProfileVo(
-                                    id = it
-                                )
+            ATooltipBox(
+                tooltip = {
+                    Text(text = worldProfileVo.worldName)
+                },
+            ) {
+                Text(
+                    text = worldProfileVo.worldName,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            HorizontalDivider(thickness = 2.dp)
+            ATooltipBox(
+                modifier = Modifier.clickable {
+                    worldProfileVo.authorID?.let {
+                        val userProfileScreen = UserProfileScreen(
+                            userProfileVO = UserProfileVo(
+                                id = it
                             )
-                            navigator.push(userProfileScreen)
-                        }
-
-                    },
-                    tooltip = {
-                        Text(text = worldProfileVo.authorName ?: "未知作者")
+                        )
+                        navigator.push(userProfileScreen)
                     }
-                ) {
-                    Text(
-                        text = worldProfileVo.authorName ?: "未知作者",
-                        color = MaterialTheme.colorScheme.onTertiary,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                },
+                tooltip = {
+                    Text(text = worldProfileVo.authorName ?: "未知作者")
                 }
+            ) {
+                Text(
+                    text = worldProfileVo.authorName ?: "未知作者",
+                    color = MaterialTheme.colorScheme.onTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         // 信息卡片区域
         AnimatedVisibility(
@@ -826,7 +824,8 @@ private fun RenderBottomSheetContent(
 
                     // 描述内容
                     Text(
-                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 3).verticalScroll(rememberScrollState()),
+                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 3)
+                            .verticalScroll(rememberScrollState()),
                         text = worldProfileVo.worldDescription,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -875,35 +874,30 @@ private fun RenderBottomSheetContent(
             }
         }
         val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
-        AnimatedVisibility(
+        // 操作按钮 - 始终显示在底部
+        if (buttonAlpha <= 0f) return@Box
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
-                .align(Alignment.BottomCenter),
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it },
-            visible = buttonAlpha > 0f,
+                .fillMaxWidth()
+                .height(80.dp)
+                .offset(y = 80.dp * bottomSheetState.blurProgress)
+                .alpha(buttonAlpha)
+                .align(Alignment.BottomCenter)
+                .padding(vertical = 16.dp)
         ) {
-            // 操作按钮 - 始终显示在底部
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
-                    .alpha(buttonAlpha)
-                    .padding(vertical = 16.dp)
+            Button(
+                onClick = { /* 处理创建房间逻辑 */ },
+                modifier = Modifier.weight(1f),
             ) {
-                Button(
-                    onClick = { /* 处理加入世界逻辑 */ },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("加入世界")
-                }
+                Text("创建房间")
+            }
 
-                OutlinedButton(
-                    onClick = { /* 处理收藏世界逻辑 */ },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("收藏世界")
-                }
+            OutlinedButton(
+                onClick = { /* 处理收藏世界逻辑 */ },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("收藏世界")
             }
         }
     }
@@ -991,6 +985,7 @@ fun AnimatedVisibilityScope.StackedCards(
     onShrinkCardClick: (InstanceVo) -> Unit = {},
     onExpandCardClick: () -> Unit,
 ) {
+
     val size = instances.size
     // 如果没有实例，直接返回
     if (size == 0) return
@@ -1007,7 +1002,7 @@ fun AnimatedVisibilityScope.StackedCards(
             state = lazyListState,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            itemsIndexed(instances) { index, instance ->
+            itemsIndexed(instances, key = { _, instance -> instance.id }) { index, instance ->
                 val visibleItemInfo by remember {
                     derivedStateOf {
                         layoutInfo.visibleItemsInfo.find { it.index == index }
@@ -1068,16 +1063,15 @@ fun AnimatedVisibilityScope.StackedCards(
             // 从下往上渲染卡片（索引从visibleCards.size-1到0）
             for (i in visibleCards.size - 1 downTo 1) {
                 val instance = visibleCards[i]
-                val cardIndex = i
 
 
                 // 基础偏移和视觉效果
-                val baseOffset = 10.dp * cardIndex
-                val baseScale = 1f - (0.1f * cardIndex)
-                val baseAlpha = 1f - (0.25f * cardIndex)
+                val baseOffset = 10.dp * i
+                val baseScale = 1f - (0.1f * i)
+                val baseAlpha = 1f - (0.25f * i)
 
                 // 随展开程度调整的偏移量（展开时增加间距）
-                val expandedOffset = cardIndex * 130f
+                val expandedOffset = i * 130f
                 val currentOffset = baseOffset + (expandedOffset.dp - baseOffset) * expandProgress
 
                 // 随展开程度调整的透明度和缩放（展开时减少透明度和缩放效果）
@@ -1087,7 +1081,7 @@ fun AnimatedVisibilityScope.StackedCards(
                 InstanceCard(
                     instance = instance,
                     size = size,
-                    index = cardIndex,
+                    index = i,
                     verticalOffset = currentOffset,
                     scaleEffect = currentScale,
                     alphaEffect = currentAlpha
@@ -1108,7 +1102,7 @@ fun AnimatedVisibilityScope.StackedCards(
             }
 
             // 显示剩余卡片数量的指示器
-            if (instances.size > maxVisibleCards) {
+            if (instances.size > 1) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -1121,7 +1115,7 @@ fun AnimatedVisibilityScope.StackedCards(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "+${instances.size - maxVisibleCards}",
+                        text = "+${instances.size - 1}",
                         color = MaterialTheme.colorScheme.onTertiary,
                         style = MaterialTheme.typography.labelMedium
                     )

@@ -50,7 +50,7 @@ class InstancesDialog(
         val localeStrings = strings
         val onClickInvite = {
             scope.launch(Dispatchers.IO) {
-                authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instance.instanceId) }.onSuccess {
+                authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instance.id) }.onSuccess {
                     isInvited = true
                 }
             }
@@ -59,14 +59,14 @@ class InstancesDialog(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             SharedDialogContainer(
-                key = instance.instanceId,
+                key = instance.id,
                 animatedVisibilityScope = animatedVisibilityScope,
             ) {
                 Column(
                     modifier = Modifier
                         .glideBack { close() }
                         .sharedElementBy(
-                            key = instance.instanceId + "WorldImage",
+                            key = instance.id + "WorldImage",
                             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                             animatedVisibilityScope = animatedVisibilityScope,
                         )
@@ -87,8 +87,7 @@ class InstancesDialog(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                val owner = instance.owner
-                                if (owner == null) return@Row
+                                val owner = instance.owner.collectAsState().value ?: return@Row
                                 Text(
                                     text = "${localeStrings.locationDialogOwner}:",
                                     fontWeight = FontWeight.Medium,

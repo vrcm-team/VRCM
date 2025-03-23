@@ -9,6 +9,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 data class HomeInstanceVo(
     val id: String = "",
+    val instanceId: String = "",
     val worldId: String = "",
     val worldName: String = "",
     val worldImageUrl: String? = null,
@@ -24,6 +25,7 @@ data class HomeInstanceVo(
 ) {
     constructor(instance: InstanceData) : this(
         id = instance.id,
+        instanceId = instance.instanceId,
         worldId = instance.world.id,
         worldName = instance.world.name,
         worldImageUrl = instance.world.imageUrl,

@@ -33,12 +33,12 @@ data class WorldProfileVo(
     val publicationDate: String? = null,
     
     // 实例信息列表
-    val instances: MutableList<InstanceVo>,
+    val instances: List<InstanceVo>,
 
     ): JavaSerializable {
     
     // 从WorldData构造，不包含实例信息
-    constructor(world: WorldData, instancesList: MutableList<InstanceVo> = arrayListOf()): this(
+    constructor(world: WorldData, instancesList: List<InstanceVo> = listOf()): this(
         worldId = world.id,
         worldName = world.name,
         worldImageUrl = world.imageUrl,
@@ -85,7 +85,7 @@ data class WorldProfileVo(
         createdAt = instance.world.createdAt,
         updatedAt = instance.world.updatedAt,
         publicationDate = instance.world.publicationDate,
-        instances = arrayListOf(InstanceVo(instance)),
+        instances = mutableListOf(InstanceVo(instance)),
     )
     
     // 从InstantsVo构造临时对象
@@ -97,6 +97,6 @@ data class WorldProfileVo(
         authorID = instant.worldAuthorId,
         authorName = instant.worldAuthorName,
         tags = instant.worldAuthorTag,
-        instances = arrayListOf(InstanceVo(instant)),
+        instances = mutableListOf(InstanceVo(instant)),
     )
 }
