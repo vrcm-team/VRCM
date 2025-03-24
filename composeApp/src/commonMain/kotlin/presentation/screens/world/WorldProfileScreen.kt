@@ -54,8 +54,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
 import presentation.screens.world.InstancesDialog
@@ -114,18 +114,21 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-        val itemSize = DpSize(width = 80.dp, height = 68.dp) // 增加信息块大小，但保持每行四个布局
+
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
+            // 屏幕宽度减去左右中间边距
+
+            val itemSize = DpSize(width = (maxWidth - 8.dp * 5) / 4 , height = 68.dp) // 增加信息块大小，但保持每行四个布局
             // ========== 尺寸计算 ==========
             val sysTopPadding = getInsetPadding(WindowInsets::getTop)
             val imageHigh = maxHeight / 5 // 图片高度为屏幕高度的1/5
             val contentPadding = 8.dp // 内容区域内边距
 
             val sizes = remember(maxHeight) {
-                WorldDetailSizes(
+                WorldDetailSizesState(
                     maxHeight = maxHeight,
                     imageHigh = imageHigh,
                     // 折叠高度：留出图片高度+顶部信息+两行信息块的空间
@@ -210,42 +213,7 @@ class WorldProfileScreen(
 
 }
 
-// 定义 SheetState 枚举，与 MainScreen 中保持一致
-enum class SheetState { COLLAPSED, HALF_EXPANDED, EXPANDED }
 
-
-// ======================================
-// 数据类型
-// ======================================
-
-/**
- * 世界详情界面的尺寸计算
- */
-private data class WorldDetailSizes(
-    val maxHeight: Dp,
-    val imageHigh: Dp,
-    val collapsedHeight: Dp,
-    val halfExpandedHeight: Dp,
-    val expandedHeight: Dp,
-    val topBarHeight: Dp,
-    val sysTopPadding: Dp,
-    val itemSize: DpSize
-)
-
-/**
- * BottomSheet的状态信息
- */
-private data class BottomSheetUIState(
-    val targetHeight: Dp,
-    val currentHeight: Dp,
-    val animatedHeight: Dp,
-    val blurProgress: Float,
-    val blurRadius: Float,
-    val blurAlpha: Float,
-    val overlayAlpha: Float,
-    val collapsedProgress: Float,
-    val collapsedAlpha: Float,
-)
 
 // ======================================
 // 状态计算函数
@@ -258,7 +226,7 @@ private data class BottomSheetUIState(
 private fun calculateBottomSheetState(
     sheetState: SheetState,
     dragOffset: Float,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
 ): BottomSheetUIState {
     // 计算目标高度
     val targetHeight = when (sheetState) {
@@ -330,7 +298,7 @@ private fun determineSheetState(
     currentHeightValue: Float,
     velocity: Float,
     currentState: SheetState,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
 ): SheetState {
     // 计算各状态高度
     val collapsedHeight = sizes.collapsedHeight.value
@@ -483,7 +451,7 @@ private fun ApplyBlurEffect(
 @Composable
 private fun RenderMainContent(
     worldProfileVo: WorldProfileVo,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
     collapsedAlphaVariant: Float,
 ) {
 
@@ -557,14 +525,14 @@ private fun RenderMainContent(
             }
         }
 
-        InfoAre(worldProfileVo, collapsedAlphaVariant, itemSize)
+        InfoArea(worldProfileVo, collapsedAlphaVariant, itemSize)
 
         Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private inline fun ColumnScope.InfoAre(
+private fun ColumnScope.InfoArea(
     worldProfileVo: WorldProfileVo,
     collapsedAlphaVariant: Float,
     itemSize: DpSize
@@ -622,6 +590,7 @@ private inline fun ColumnScope.InfoAre(
         ) {
             HorizontalPager(
                 state = pagerState,
+                pageSpacing = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
@@ -776,7 +745,7 @@ private fun RenderTopBar(
 private fun RenderBottomSheet(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
     onExpanded: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onDragStopped: (Float) -> Unit,
