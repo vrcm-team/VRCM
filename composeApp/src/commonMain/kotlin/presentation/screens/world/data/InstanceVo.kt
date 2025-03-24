@@ -46,6 +46,7 @@ data class InstanceVo(
         hasCapacity = instance.hasCapacityForYou,
         regionType = instance.region,
         regionName = instance.region.name,
+        ownerId = instance.ownerId,
         owner = owner,
         accessType = instance.accessType
     )
@@ -58,6 +59,7 @@ data class InstanceVo(
         regionType = instants.region,
         regionName = instants.region.name,
         isActive = true, // 如果是从InstantsVo创建，通常是活跃的实例
+        ownerId = instants.owner?.id,
         owner = MutableStateFlow(instants.owner?.let {
             Owner(
                 id = it.id,
