@@ -19,7 +19,7 @@ data class InstanceData(
     val full: Boolean,
     val gameServerVersion: Int? = null,
     val hardClose: Boolean? = null,
-    val hasCapacityForYou: Boolean,
+    val hasCapacityForYou: Boolean? = null,
     val hidden: String?,
     val id: String,
     override val instanceId: String,

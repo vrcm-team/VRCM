@@ -19,4 +19,5 @@ class WorldsApi(private val client: HttpClient)  {
 
     suspend fun getWorldInstanceById(worldId: String, instanceId: String): InstanceData =
         client.get("$WORLDS_API_PREFIX/$worldId/$instanceId").checkSuccess()
+
 }

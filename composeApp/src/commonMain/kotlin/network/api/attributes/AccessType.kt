@@ -5,13 +5,13 @@ enum class AccessType(val value: String, val displayName: String) {
 
     GroupPublic("public", "Group Public"),
     GroupPlus("plus", "Group+"),
-    GroupMembers("members", "Group"),
+    GroupMembers("members", "Group Members"),
     Group("group", "Group"),
 
     FriendPlus("hidden", "Friends+"),
     Friend("friends", "Friends"),
 
-    InvitePlus("canRequestInvite", "Invite"),
+    InvitePlus("canRequestInvite", "Invite+"),
     Invite("!canRequestInvite", "Invite"),
     Private("private", "Private"),
 

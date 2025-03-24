@@ -46,6 +46,8 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
+import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
@@ -114,14 +116,14 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-
+        val screenModel = koinScreenModel<WorldProfileScreenModel>()
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
             // 屏幕宽度减去左右中间边距
 
-            val itemSize = DpSize(width = (maxWidth - 8.dp * 5) / 4 , height = 68.dp) // 增加信息块大小，但保持每行四个布局
+            val itemSize = DpSize(width = (maxWidth - 8.dp * 5) / 4, height = 68.dp) // 增加信息块大小，但保持每行四个布局
             // ========== 尺寸计算 ==========
             val sysTopPadding = getInsetPadding(WindowInsets::getTop)
             val imageHigh = maxHeight / 5 // 图片高度为屏幕高度的1/5
@@ -206,13 +208,22 @@ class WorldProfileScreen(
                     )
                     dragOffset = 0f
                 },
+                onCreateInstance = { accessType, regionType, queueEnabled, groupId, groupAccessType, roleIds ->
+                    screenModel.createInstanceAndInviteSelf(
+                        accessType = accessType,
+                        region = regionType,
+                        queueEnabled = queueEnabled,
+                        groupId = groupId,
+                        groupAccessType = groupAccessType,
+                        roleIds = roleIds
+                    )
+                }
             )
         }
     }
 
 
 }
-
 
 
 // ======================================
@@ -459,7 +470,7 @@ private fun RenderMainContent(
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
-            MaterialTheme.colorScheme.secondary // 结束
+            MaterialTheme.colorScheme.surfaceContainerLowest// 结束
         ),
         endY = 300f,
     )
@@ -517,7 +528,7 @@ private fun RenderMainContent(
             ) {
                 Text(
                     text = worldProfileVo.authorName ?: "未知作者",
-                    color = MaterialTheme.colorScheme.onTertiary,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -535,7 +546,7 @@ private fun RenderMainContent(
 private fun ColumnScope.InfoArea(
     worldProfileVo: WorldProfileVo,
     collapsedAlphaVariant: Float,
-    itemSize: DpSize
+    itemSize: DpSize,
 ) {
     val infoCards = listOf(
         // 世界容量
@@ -749,6 +760,7 @@ private fun RenderBottomSheet(
     onExpanded: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onDragStopped: (Float) -> Unit,
+    onCreateInstance:  (AccessType, RegionType, queueEnabled: Boolean, groupId: String?, groupAccessType: String?, roleIds: List<String>? ) -> Unit,
 ) {
     var currentDialog by LocationDialogContent.current
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -794,7 +806,8 @@ private fun RenderBottomSheet(
                     worldProfileVo = worldProfileVo,
                     bottomSheetState = bottomSheetState,
                     onShrinkCardClick = onShrinkCardClick,
-                    onExpanded = onExpanded
+                    onExpanded = onExpanded,
+                    onCreateInstance = onCreateInstance
                 )
             }
         }
@@ -811,7 +824,30 @@ private fun RenderBottomSheetContent(
     bottomSheetState: BottomSheetUIState,
     onShrinkCardClick: (InstanceVo) -> Unit,
     onExpanded: () -> Unit,
+    onCreateInstance: (
+        AccessType,
+        RegionType,
+        queueEnabled: Boolean,
+        groupId: String?,
+        groupAccessType: String?,
+        roleIds: List<String>?,
+    ) -> Unit,
 ) {
+    // 创建实例对话框状态
+    var showCreateInstanceDialog by remember { mutableStateOf(false) }
+    // 如果显示创建实例对话框，则显示对话框内容
+    if (showCreateInstanceDialog) {
+        CreateInstanceDialog(
+            onDismiss = { showCreateInstanceDialog = false },
+            onConfirm = { accessType, regionType, queueEnabled, groupId, groupAccessType, roleIds ->
+                // 关闭对话框
+                showCreateInstanceDialog = false
+                // 调用ViewModel的创建实例方法
+                onCreateInstance(accessType, regionType, queueEnabled, groupId, groupAccessType, roleIds)
+            }
+        ).Content()
+    }
+
     // 上滑渐变小
     val fl = 1 - bottomSheetState.blurProgress
     Box(
@@ -910,7 +946,7 @@ private fun RenderBottomSheetContent(
                 .padding(vertical = 16.dp)
         ) {
             Button(
-                onClick = { /* 处理创建房间逻辑 */ },
+                onClick = { showCreateInstanceDialog = true },
                 modifier = Modifier.weight(1f),
             ) {
                 Text("创建房间")
@@ -1159,10 +1195,10 @@ private fun HorizontalPagerIndicator(
     inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
     indicatorWidth: Dp = 8.dp,
     indicatorHeight: Dp = 8.dp,
-    spacing: Dp = 8.dp
+    spacing: Dp = 8.dp,
 ) {
     val pageCount = pagerState.pageCount
-    
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(spacing),
@@ -1172,7 +1208,7 @@ private fun HorizontalPagerIndicator(
             // 计算当前指示器的颜色
             val isSelected = i == pagerState.currentPage
             val color = if (isSelected) activeColor else inactiveColor
-            
+
             // 创建指示器点
             Box(
                 modifier = Modifier

@@ -256,7 +256,7 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
 
         // 弹性空间
         Spacer(Modifier.weight(1f))
-
+        println(instance.owner.collectAsState().value)
         // 所有者信息
         instance.owner.collectAsState().value?.let { owner ->
             IconLabelRow(

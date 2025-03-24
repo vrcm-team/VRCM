@@ -47,4 +47,9 @@ internal val LocaleStringsJa = LocaleStrings(
     locationDialogTags = "タグ",
     locationInvited = "誘い済み",
     locationInviteMe = "自分を誘う",
+    createInstance = "インスタンスを作成",
+    accessType = "アクセス権限",
+    regionType = "地域",
+    confirm = "確認",
+    cancel = "キャンセル",
 )

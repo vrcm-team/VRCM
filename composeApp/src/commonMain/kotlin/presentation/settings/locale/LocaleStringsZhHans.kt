@@ -47,4 +47,9 @@ internal val LocaleStringsZhHans = LocaleStrings(
     locationDialogTags = "标签",
     locationInvited= "已邀请",
     locationInviteMe= "邀请自己",
+    createInstance = "创建房间",
+    accessType = "访问权限",
+    regionType = "区域",
+    confirm = "确认",
+    cancel = "取消",
 )

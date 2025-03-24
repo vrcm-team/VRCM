@@ -52,6 +52,11 @@ data class LocaleStrings(
     val locationDialogTags: String = "Tags",
     val locationInvited: String = "Invited",
     val locationInviteMe: String = "Invite Me",
+    val createInstance: String = "Create Instance",
+    val accessType: String = "Access Type",
+    val regionType: String = "Region",
+    val confirm: String = "Confirm",
+    val cancel: String = "Cancel",
 )
 
 val strings: LocaleStrings
