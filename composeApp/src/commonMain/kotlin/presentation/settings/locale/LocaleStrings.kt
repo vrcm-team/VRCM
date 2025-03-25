@@ -53,6 +53,21 @@ data class LocaleStrings(
     val locationDialogTags: String = "Tags",
     val locationInvited: String = "Invited",
     val locationInviteMe: String = "Invite Me",
+    val createInstance: String = "Create Instance",
+    val accessType: String = "Access Type",
+    val regionType: String = "Region",
+    val confirm: String = "Confirm",
+    val cancel: String = "Cancel",
+    val favoriteWorld: String = "Favorite World",
+    val favoriteAddSuccess: String = "World has been favorited",
+    val favoriteAlreadyExists: String = "World is already in your favorites",
+    val favoriteGroupSelect: String = "Select favorite group",
+    val favoriteFailed: String = "Failed to favorite world",
+    val favoriteSelectGroup: String = "Select Group",
+    val favoriteDefaultGroup: String = "Default Group",
+    val instanceCreateSuccess: String = "Successfully created instance and sent invite",
+    val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed",
+    val instanceCreateFailed: String = "Failed to create instance"
 )
 
 val strings: LocaleStrings

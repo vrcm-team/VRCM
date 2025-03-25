@@ -28,7 +28,6 @@ data class InstanceVo(
     val hasCapacity: Boolean? = null,
     val regionType: RegionType = RegionType.Us,
     val regionName: String = "unknown",
-    val ownerId: String? = null,
     val owner: StateFlow<Owner?> = MutableStateFlow(null),
     val accessType: AccessType = AccessType.Public,
 ) : JavaSerializable {

@@ -46,6 +46,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
@@ -54,8 +55,9 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
 import presentation.screens.world.InstancesDialog
@@ -84,6 +86,7 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val isFavorited by screenModel.isFavorite.collectAsState()
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
@@ -114,18 +117,21 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-        val itemSize = DpSize(width = 80.dp, height = 68.dp) // 增加信息块大小，但保持每行四个布局
+        val screenModel = koinScreenModel<WorldProfileScreenModel>()
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
+            // 屏幕宽度减去左右中间边距
+
+            val itemSize = DpSize(width = (maxWidth - 8.dp * 5) / 4, height = 68.dp) // 增加信息块大小，但保持每行四个布局
             // ========== 尺寸计算 ==========
             val sysTopPadding = getInsetPadding(WindowInsets::getTop)
             val imageHigh = maxHeight / 5 // 图片高度为屏幕高度的1/5
             val contentPadding = 8.dp // 内容区域内边距
 
             val sizes = remember(maxHeight) {
-                WorldDetailSizes(
+                WorldDetailSizesState(
                     maxHeight = maxHeight,
                     imageHigh = imageHigh,
                     // 折叠高度：留出图片高度+顶部信息+两行信息块的空间
@@ -202,7 +208,7 @@ class WorldProfileScreen(
                         sizes = sizes
                     )
                     dragOffset = 0f
-                },
+                }
             )
         }
     }
@@ -210,42 +216,6 @@ class WorldProfileScreen(
 
 }
 
-// 定义 SheetState 枚举，与 MainScreen 中保持一致
-enum class SheetState { COLLAPSED, HALF_EXPANDED, EXPANDED }
-
-
-// ======================================
-// 数据类型
-// ======================================
-
-/**
- * 世界详情界面的尺寸计算
- */
-private data class WorldDetailSizes(
-    val maxHeight: Dp,
-    val imageHigh: Dp,
-    val collapsedHeight: Dp,
-    val halfExpandedHeight: Dp,
-    val expandedHeight: Dp,
-    val topBarHeight: Dp,
-    val sysTopPadding: Dp,
-    val itemSize: DpSize
-)
-
-/**
- * BottomSheet的状态信息
- */
-private data class BottomSheetUIState(
-    val targetHeight: Dp,
-    val currentHeight: Dp,
-    val animatedHeight: Dp,
-    val blurProgress: Float,
-    val blurRadius: Float,
-    val blurAlpha: Float,
-    val overlayAlpha: Float,
-    val collapsedProgress: Float,
-    val collapsedAlpha: Float,
-)
 
 // ======================================
 // 状态计算函数
@@ -258,7 +228,7 @@ private data class BottomSheetUIState(
 private fun calculateBottomSheetState(
     sheetState: SheetState,
     dragOffset: Float,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
 ): BottomSheetUIState {
     // 计算目标高度
     val targetHeight = when (sheetState) {
@@ -330,7 +300,7 @@ private fun determineSheetState(
     currentHeightValue: Float,
     velocity: Float,
     currentState: SheetState,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
 ): SheetState {
     // 计算各状态高度
     val collapsedHeight = sizes.collapsedHeight.value
@@ -483,7 +453,7 @@ private fun ApplyBlurEffect(
 @Composable
 private fun RenderMainContent(
     worldProfileVo: WorldProfileVo,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
     collapsedAlphaVariant: Float,
 ) {
 
@@ -491,7 +461,7 @@ private fun RenderMainContent(
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
-            MaterialTheme.colorScheme.secondary // 结束
+            MaterialTheme.colorScheme.surfaceContainerLowest// 结束
         ),
         endY = 300f,
     )
@@ -549,7 +519,7 @@ private fun RenderMainContent(
             ) {
                 Text(
                     text = worldProfileVo.authorName ?: "未知作者",
-                    color = MaterialTheme.colorScheme.onTertiary,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -557,17 +527,17 @@ private fun RenderMainContent(
             }
         }
 
-        InfoAre(worldProfileVo, collapsedAlphaVariant, itemSize)
+        InfoArea(worldProfileVo, collapsedAlphaVariant, itemSize)
 
         Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private inline fun ColumnScope.InfoAre(
+private fun ColumnScope.InfoArea(
     worldProfileVo: WorldProfileVo,
     collapsedAlphaVariant: Float,
-    itemSize: DpSize
+    itemSize: DpSize,
 ) {
     val infoCards = listOf(
         // 世界容量
@@ -622,6 +592,7 @@ private inline fun ColumnScope.InfoAre(
         ) {
             HorizontalPager(
                 state = pagerState,
+                pageSpacing = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
@@ -773,13 +744,13 @@ private fun RenderTopBar(
  * 渲染BottomSheet
  */
 @Composable
-private fun RenderBottomSheet(
+private fun Screen.RenderBottomSheet(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
-    sizes: WorldDetailSizes,
+    sizes: WorldDetailSizesState,
     onExpanded: () -> Unit,
     onDragDelta: (Float) -> Unit,
-    onDragStopped: (Float) -> Unit,
+    onDragStopped: (Float) -> Unit
 ) {
     var currentDialog by LocationDialogContent.current
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -795,7 +766,7 @@ private fun RenderBottomSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(10f)
+//            .zIndex(10f)
     ) {
         Surface(
             modifier = Modifier
@@ -825,7 +796,7 @@ private fun RenderBottomSheet(
                     worldProfileVo = worldProfileVo,
                     bottomSheetState = bottomSheetState,
                     onShrinkCardClick = onShrinkCardClick,
-                    onExpanded = onExpanded
+                    onExpanded = onExpanded,
                 )
             }
         }
@@ -837,12 +808,51 @@ private fun RenderBottomSheet(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RenderBottomSheetContent(
+private fun Screen.RenderBottomSheetContent(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     onShrinkCardClick: (InstanceVo) -> Unit,
     onExpanded: () -> Unit,
 ) {
+    val screenModel = koinScreenModel<WorldProfileScreenModel>()
+
+    // 对话框状态管理
+    var showCreateInstanceDialog by remember { mutableStateOf(false) }
+    var showFavoriteGroupBottomSheet by remember { mutableStateOf(false) }
+    val localeStrings = strings
+    // 如果显示创建实例对话框，则显示对话框内容
+    if (showCreateInstanceDialog) {
+        CreateInstanceDialog(
+            onDismiss = { showCreateInstanceDialog = false },
+            onConfirm = { accessType, regionType, queueEnabled, groupId, groupAccessType, roleIds ->
+                // 关闭对话框
+                showCreateInstanceDialog = false
+                // 调用创建实例方法
+                screenModel.createInstanceAndInviteSelf(
+                    accessType = accessType,
+                    region = regionType,
+                    queueEnabled = queueEnabled,
+                    groupId = groupId,
+                    groupAccessType = groupAccessType,
+                    roleIds = roleIds,
+                    strings = localeStrings
+                )
+            }
+        ).Content()
+    }
+    
+    // 显示收藏组选择底部表单
+    FavoriteGroupBottomSheet(
+        isVisible = showFavoriteGroupBottomSheet,
+        favoriteId = worldProfileVo.worldId,
+        favoriteType = FavoriteType.World,
+        onDismiss = { showFavoriteGroupBottomSheet = false },
+        onConfirm = { groupId->
+            screenModel.favoriteWorld(groupId, strings = localeStrings)
+            showFavoriteGroupBottomSheet = false
+        }
+    )
+    
     // 上滑渐变小
     val fl = 1 - bottomSheetState.blurProgress
     Box(
@@ -927,6 +937,7 @@ private fun RenderBottomSheetContent(
                 }
             }
         }
+        
         val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
         // 操作按钮 - 始终显示在底部
         if (buttonAlpha <= 0f) return@Box
@@ -941,21 +952,20 @@ private fun RenderBottomSheetContent(
                 .padding(vertical = 16.dp)
         ) {
             Button(
-                onClick = { /* 处理创建房间逻辑 */ },
+                onClick = { showCreateInstanceDialog = true },
                 modifier = Modifier.weight(1f),
             ) {
-                Text("创建房间")
+                Text(strings.createInstance)
             }
 
             OutlinedButton(
-                onClick = { /* 处理收藏世界逻辑 */ },
+                onClick = { showFavoriteGroupBottomSheet = true },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("收藏世界")
+                Text(strings.favoriteWorld)
             }
         }
     }
-
 }
 
 /**
@@ -1190,10 +1200,10 @@ private fun HorizontalPagerIndicator(
     inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
     indicatorWidth: Dp = 8.dp,
     indicatorHeight: Dp = 8.dp,
-    spacing: Dp = 8.dp
+    spacing: Dp = 8.dp,
 ) {
     val pageCount = pagerState.pageCount
-    
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(spacing),
@@ -1203,7 +1213,7 @@ private fun HorizontalPagerIndicator(
             // 计算当前指示器的颜色
             val isSelected = i == pagerState.currentPage
             val color = if (isSelected) activeColor else inactiveColor
-            
+
             // 创建指示器点
             Box(
                 modifier = Modifier

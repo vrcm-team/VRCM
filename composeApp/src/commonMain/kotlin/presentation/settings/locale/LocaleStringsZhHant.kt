@@ -45,7 +45,12 @@ internal val LocaleStringsZhHant = LocaleStrings(
     locationDialogOwner = "房主",
     locationDialogAuthor = "作者",
     locationDialogDescription = "描述",
-    locationDialogTags = "標簽",
+    locationDialogTags = "標籤",
     locationInvited= "己邀請",
     locationInviteMe= "邀請自己",
+    createInstance = "創建房間",
+    accessType = "訪問權限",
+    regionType = "區域",
+    confirm = "確認",
+    cancel = "取消",
 )

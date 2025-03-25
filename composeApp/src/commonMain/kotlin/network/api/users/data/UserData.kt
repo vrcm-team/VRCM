@@ -52,8 +52,6 @@ data class UserData(
                     AccessType.GroupMembers.value -> AccessType.GroupMembers
                     else -> AccessType.Group
                 }
-
-                instanceId.contains(AccessType.Private.value) -> AccessType.Private
                 instanceId.contains(AccessType.FriendPlus.value) -> AccessType.FriendPlus
                 instanceId.contains(AccessType.Friend.value) -> AccessType.Friend
                 else -> AccessType.Public
