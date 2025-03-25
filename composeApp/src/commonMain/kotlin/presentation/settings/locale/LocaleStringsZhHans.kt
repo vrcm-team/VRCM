@@ -52,4 +52,14 @@ internal val LocaleStringsZhHans = LocaleStrings(
     regionType = "区域",
     confirm = "确认",
     cancel = "取消",
+    favoriteWorld = "收藏世界",
+    favoriteAddSuccess = "世界已成功收藏",
+    favoriteAlreadyExists = "该世界已在您的收藏中",
+    favoriteGroupSelect = "选择收藏分组",
+    favoriteFailed = "收藏世界失败",
+    favoriteSelectGroup = "选择收藏组",
+    favoriteDefaultGroup = "默认收藏组",
+    instanceCreateSuccess = "成功创建房间并发送邀请",
+    instanceCreateSuccessButInviteFailed = "创建房间成功，但邀请失败",
+    instanceCreateFailed = "创建房间失败"
 )

@@ -24,7 +24,9 @@ internal const val INVITE_API_PREFIX = "invite"
 
 internal const val NOTIFICATIONS_API_PREFIX = "notifications"
 
-internal const val FAVORITE_API_PREFIX = "favorites"
+internal const val FAVORITE_API_PREFIX = "favorite"
+
+internal const val FAVORITES_API_PREFIX = "favorites"
 
 internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"
 

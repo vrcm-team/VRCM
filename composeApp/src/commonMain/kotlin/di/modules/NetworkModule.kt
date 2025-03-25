@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
@@ -18,6 +19,7 @@ import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
+import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
@@ -33,6 +35,7 @@ internal val networkModule = module(true) {
     singleOf(::NotificationApi)
     singleOf(::InviteApi)
     singleOf(::WorldsApi)
+    singleOf(::FavoriteApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
@@ -55,10 +58,10 @@ private val apiClientDefinition: Definition<HttpClient> = {
         install(ContentNegotiation) {
             json(get())
         }
-//        install(Logging) {
-//            logger = Logger.SIMPLE
-//            level = LogLevel.ALL
-//        }
+        install(Logging) {
+            logger = Logger.SIMPLE
+            level = LogLevel.ALL
+        }
         install(HttpCookies) {
             this.storage = get()
         }
