@@ -41,6 +41,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     profileUnfriended = "已刪除好友",
     profileUnfriend = "刪除好友",
     profileViewJsonData = "查看 JSON 數據",
+    profileViewGallery = "查看媒體庫",
     locationDialogOwner = "房主",
     locationDialogAuthor = "作者",
     locationDialogDescription = "描述",

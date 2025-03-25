@@ -7,6 +7,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
@@ -33,6 +34,7 @@ val presentationModule: Module = module {
     factoryOf(::AuthScreenModel)
     factoryOf(::HomeScreenModel)
     factoryOf (::UserProfileScreenModel)
+    singleOf(::GalleryScreenModel)
     singleOf (::FriendLocationPagerModel)
     singleOf (::FriendListPagerModel)
     singleOf(::SearchListPagerModel)

@@ -41,6 +41,7 @@ internal val LocaleStringsJa = LocaleStrings(
     profileUnfriended = "フレンド解除しました",
     profileUnfriend = "フレンド解除",
     profileViewJsonData = "JSONデータを表示",
+    profileViewGallery = "メディアギャラリーを表示",
     locationDialogOwner = "オーナー",
     locationDialogAuthor = "作者",
     locationDialogDescription = "説明",

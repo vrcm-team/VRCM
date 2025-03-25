@@ -44,7 +44,7 @@ class FileApi(private val client: HttpClient) {
     
     /**
      * 获取文件列表
-     * @param tag 标签类型，例如ICON、EMOJI、STICKER或GALLERY
+     * @param tag 标签，例如"icon"、"emoji"、"sticker"或"gallery"
      * @param userId 用户ID
      * @param n 每页数量，最大100
      * @param offset 偏移量
@@ -55,7 +55,7 @@ class FileApi(private val client: HttpClient) {
         n: Int = 60,
         offset: Int = 0
     ) = client.get(FILES_API_PREFIX) {
-        tag?.let { parameter("tag", it.toString()) }
+        tag?.let { parameter("tag", it.value) }
         userId?.let { parameter("userId", it) }
         parameter("n", n.coerceIn(1, 100))
         parameter("offset", offset.coerceAtLeast(0))

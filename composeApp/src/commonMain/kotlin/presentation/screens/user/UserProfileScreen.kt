@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
@@ -25,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -106,6 +109,22 @@ private fun ColumnScope.SheetItems(
     onHideCompletion: () -> Unit,
     openAlertDialog: () -> Unit,
 ) {
+    val navigator = LocalNavigator.currentOrThrow
+    
+    // 添加媒体库选项，只有当是自己的个人资料且是支持者时才显示
+    if (currentUser.isSelf && currentUser.isSupporter) {
+        val localeStrings = strings
+        val scope = rememberCoroutineScope()
+
+        SheetButtonItem(text = localeStrings.profileViewGallery, onClick = {
+            scope.launch { hideSheet() }.invokeOnCompletion {
+                onHideCompletion()
+                navigator.push(GalleryScreen)
+            }
+        })
+
+    }
+    
     FriendRequestSheetItem(
         currentUser,
         userProfileScreenModel,
