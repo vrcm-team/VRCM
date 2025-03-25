@@ -1,5 +1,9 @@
 package io.github.vrcmteam.vrcm.network.api.files
 
+import io.github.vrcmteam.vrcm.network.api.attributes.FILES_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.files.data.FileData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
 
@@ -37,5 +41,24 @@ class FileApi(private val client: HttpClient) {
             return response.headers["Location"] ?: fileUrl
         } .getOrDefault(fileUrl)
     }
+    
+    /**
+     * 获取文件列表
+     * @param tag 标签类型，例如ICON、EMOJI、STICKER或GALLERY
+     * @param userId 用户ID
+     * @param n 每页数量，最大100
+     * @param offset 偏移量
+     */
+    suspend fun getFiles(
+        tag: FileTagType? = null,
+        userId: String? = null,
+        n: Int = 60,
+        offset: Int = 0
+    ) = client.get(FILES_API_PREFIX) {
+        tag?.let { parameter("tag", it.toString()) }
+        userId?.let { parameter("userId", it) }
+        parameter("n", n.coerceIn(1, 100))
+        parameter("offset", offset.coerceAtLeast(0))
+    }.checkSuccess<List<FileData>>()
 
 }
