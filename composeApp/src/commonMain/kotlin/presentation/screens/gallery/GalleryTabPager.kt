@@ -22,6 +22,7 @@ import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import org.koin.compose.koinInject
 
 sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
     
@@ -96,13 +97,13 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
                 } else {
                     ""
                 }
-                
                 CoilImage(
                     imageModel = { imageUrl },
                     imageOptions = ImageOptions(
                         contentScale = ContentScale.Crop,
                         alignment = Alignment.Center
                     ),
+                    imageLoader = { koinInject() },
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(MaterialTheme.shapes.medium),

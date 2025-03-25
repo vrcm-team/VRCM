@@ -2,7 +2,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
@@ -17,7 +20,6 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.launch
 
@@ -54,7 +56,6 @@ object GalleryScreen : Screen {
                             )
                         }
                     },
-                    modifier = Modifier.padding(top = getInsetPadding(WindowInsets::getTop))
                 )
             },
             contentColor = MaterialTheme.colorScheme.primary
@@ -67,7 +68,7 @@ object GalleryScreen : Screen {
                 // 标签页
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
-                    divider = { Divider(thickness = 1.dp) }
+                    divider = { HorizontalDivider(thickness = 1.dp) }
                 ) {
                     tabPagers.forEachIndexed { index, pager ->
                         Tab(
