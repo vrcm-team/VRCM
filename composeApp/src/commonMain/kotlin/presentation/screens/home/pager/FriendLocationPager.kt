@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
@@ -99,8 +100,8 @@ fun Pager.FriendLocationPager(
         selectLocation = if (selectLocation == friendLocation.location) null else friendLocation.location
     }
     val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
-        val currentLocation = friendLocation.instants.value
-        if (navigator.size <= 1 && currentLocation.worldId.isNotEmpty()) {
+        if (navigator.size <= 1) {
+            val currentLocation = friendLocation.instants.value
             val instances = friendLocationMap[LocationType.Instance]
                 ?.map { it.instants.value }
                 ?.filter { it.worldId == currentLocation.worldId }
@@ -279,7 +280,9 @@ private fun LocationCard(
                             key = location.location + "WorldImage",
                         )
                         .weight(0.5f)
-                        .clickable(onClick = onClickWorldImage)
+                        .enableIf(instants.worldId.isNotEmpty()) {
+                            clickable(onClick = onClickWorldImage)
+                        }
                         .clip(
                             RoundedCornerShape(
                                 topStart = 16.dp,
