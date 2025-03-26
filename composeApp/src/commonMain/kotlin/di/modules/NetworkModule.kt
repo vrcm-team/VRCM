@@ -19,7 +19,6 @@ import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
@@ -58,10 +57,10 @@ private val apiClientDefinition: Definition<HttpClient> = {
         install(ContentNegotiation) {
             json(get())
         }
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.ALL
-        }
+//        install(Logging) {
+//            logger = Logger.SIMPLE
+//            level = LogLevel.ALL
+//        }
         install(HttpCookies) {
             this.storage = get()
         }

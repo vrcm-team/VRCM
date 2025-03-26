@@ -8,24 +8,34 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalSharedTransitionApi::class)
@@ -39,6 +49,7 @@ fun AnimatedVisibilityScope.InstanceCard(
     scaleEffect: Float = 1f - ((size - index) * 0.05f), // 新增参数，控制缩放
     alphaEffect: Float = 1f - ((size - index) * 0.6f), // 新增参数，控制透明度
     shape: Shape = RoundedCornerShape(32.dp),
+    expandProgress: Float = 1f,
     onClick: (() -> Unit)? = null,
 ) {
     val animatedScale by animateFloatAsState(
@@ -79,8 +90,14 @@ fun AnimatedVisibilityScope.InstanceCard(
         shape = MaterialTheme.shapes.medium,
         tonalElevation = 10.dp
     ) {
-        Column {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             InstanceCardContent(instance)
+            // 底部状态区域
+            BottomActionSection(instance = instance, expandProgress = expandProgress)
         }
     }
 }
@@ -91,13 +108,11 @@ fun InstanceCardContent(instance: InstanceVo) {
     val iconSize = 16.dp
     val smallIconSize = 14.dp
     val elementSpacing = 4.dp
-    val cardPadding = 12.dp
 
     // 主内容区域
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(cardPadding),
+            .fillMaxWidth(),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -117,8 +132,7 @@ fun InstanceCardContent(instance: InstanceVo) {
         )
     }
 
-    // 底部状态区域
-    StatusSection(instance = instance, cardPadding = cardPadding)
+
 }
 
 @Composable
@@ -209,56 +223,116 @@ private fun DeviceStatsRow(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
-    FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = cardPadding, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        // 状态标签
-        if (instance.isActive == true){
-            IconTextChip(
-                text = "活跃",
-                icon = AppIcons.Check,
-            )
-        }
-        if(instance.queueEnabled == true && instance.queueSize != null && instance.queueSize > 0){
-            IconTextChip(
-                text = "队列: ${instance.queueSize}",
-                icon = AppIcons.Queue,
-            )
-        }
-
-        if (instance.isFull == true){
-            IconTextChip(
-                text = "已满",
-                icon = AppIcons.Block,
-            )
-        }
-
-        if (instance.hasCapacity == true){
-            IconTextChip(
-                text = "可加入",
-                icon = AppIcons.Login,
-            )
-        }
-
-        // 弹性空间
-        Spacer(Modifier.weight(1f))
-        // 所有者信息
-        instance.owner.collectAsState().value?.let { owner ->
-            IconLabelRow(
-                icon = owner.iconVector,
-                text = owner.displayName,
-                iconSize = 14.dp,
-                spacing = 4.dp,
-                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                iconAlpha = 0.7f
-            )
+private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f) {
+    val currentNavigator = currentNavigator
+    val onClickUserIcon = { user: IUser ->
+        currentNavigator push UserProfileScreen(
+            userProfileVO = UserProfileVo(user)
+        )
+    }
+    val isExtended = expandProgress == 1f
+    val inviteApi: InviteApi = koinInject()
+    val authService: AuthService = koinInject()
+    var isInvited by remember(instance.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val localeStrings = strings
+    val onClickInvite = {
+        scope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instance.id) }.onSuccess {
+                isInvited = true
+            }
         }
     }
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Row(
+            modifier = Modifier.align(Alignment.CenterStart),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val owner = instance.owner.collectAsState().value ?: return@Row
+            Icon(
+                modifier = Modifier.size(16.dp),
+                imageVector = owner.iconVector,
+                tint = MaterialTheme.colorScheme.primary,
+                contentDescription = "OwnerIcon"
+            )
+            // TODO: Group详情页跳转
+            Text(
+                modifier = Modifier.enableIf(owner.type == BlueprintType.User && isExtended) {
+                    clickable { onClickUserIcon(UserProfileVo(owner.id)) }
+                },
+                textDecoration = if (owner.type == BlueprintType.User) TextDecoration.Underline else null,
+                text = owner.displayName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+        val enabled = !isInvited && isExtended && instance.isActive != false && instance.hasCapacity != false
+        if (expandProgress == 0f) return@Box
+        Button(
+            modifier = Modifier.align(Alignment.CenterEnd).alpha(expandProgress),
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.tertiary
+            ),
+            onClick = { onClickInvite() }
+        ) {
+            Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+        }
+    }
+
+
+//    FlowRow(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = cardPadding, vertical = 8.dp),
+//        horizontalArrangement = Arrangement.spacedBy(8.dp),
+//        verticalArrangement = Arrangement.Center
+//    ) {
+//        // 状态标签
+//        if (instance.isActive == true){
+//            IconTextChip(
+//                text = "活跃",
+//                icon = AppIcons.Check,
+//            )
+//        }
+//        if(instance.queueEnabled == true && instance.queueSize != null && instance.queueSize > 0){
+//            IconTextChip(
+//                text = "队列: ${instance.queueSize}",
+//                icon = AppIcons.Queue,
+//            )
+//        }
+//
+//        if (instance.isFull == true){
+//            IconTextChip(
+//                text = "已满",
+//                icon = AppIcons.Block,
+//            )
+//        }
+//
+//        if (instance.hasCapacity == true){
+//            IconTextChip(
+//                text = "可加入",
+//                icon = AppIcons.Login,
+//            )
+//        }
+//
+//        // 弹性空间
+//        Spacer(Modifier.weight(1f))
+//        // 所有者信息
+//        instance.owner.collectAsState().value?.let { owner ->
+//            IconLabelRow(
+//                icon = owner.iconVector,
+//                text = owner.displayName,
+//                iconSize = 14.dp,
+//                spacing = 4.dp,
+//                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+//                iconAlpha = 0.7f
+//            )
+//        }
+//    }
 }

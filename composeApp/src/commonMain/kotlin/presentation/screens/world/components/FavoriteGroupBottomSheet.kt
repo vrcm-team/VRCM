@@ -21,7 +21,6 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -53,7 +52,9 @@ fun FavoriteGroupBottomSheet(
 
     // 加载收藏数据
     LaunchedEffect(favoriteId, favoriteType) {
-        favoriteService.loadFavoriteByGroup(favoriteType)
+        authService.reTryAuth {
+            favoriteService.loadFavoriteByGroup(favoriteType)
+        }
     }
 
     // 获取收藏数据
@@ -83,8 +84,7 @@ fun FavoriteGroupBottomSheet(
                     favoriteId,
                     favoriteType
                 )
-            }
-                .map { groupName }
+            }.map { groupName }
                 .let { result ->
                     isChanging = false
                     onConfirm(result)
@@ -207,8 +207,7 @@ fun FavoriteGroupBottomSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-private suspend fun CoroutineScope.doChangeFavoriteGroup(
+private suspend fun doChangeFavoriteGroup(
     favoriteService: FavoriteService,
     groupName: String?,
     currentGroupName: String?,
@@ -216,38 +215,40 @@ private suspend fun CoroutineScope.doChangeFavoriteGroup(
     favoriteId: String,
     favoriteType: FavoriteType,
 ): Result<Unit> = runCatching {
-    val favorite = favoriteService.getFavoriteByFavoriteId(favoriteType, favoriteId)
-    // 移除旧组
-    if (favorite != null) {
-        runCatching {
-            favoriteService.removeFavorite(id = favorite.id)
-        }.onSuccess {
-            if (groupName != currentGroupName) return@onSuccess
-            val successMessage = strings.favoriteRemoveSuccess
-            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-        }.onFailure {
-            val errorMessage = "${strings.favoriteRemoveFailed}: ${it.message}"
-            SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-        }.getOrThrow()
+        val favorite = favoriteService.getFavoriteByFavoriteId(favoriteType, favoriteId)
+        // 移除旧组
+        if (favorite != null) {
+            runCatching {
+                favoriteService.removeFavorite(id = favorite.id)
+            }.onSuccess {
+                if (groupName != currentGroupName) return@onSuccess
+                val successMessage = strings.favoriteRemoveSuccess
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure {
+                val errorMessage = "${strings.favoriteRemoveFailed}: ${it.message}"
+                SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
+            }.getOrThrow()
+        }
+
+        // 添加到新组
+        if (groupName != currentGroupName && groupName != null) {
+            val isMove = favorite != null
+            runCatching {
+                favoriteService.addFavorite(
+                    favoriteId = favoriteId,
+                    favoriteType = favoriteType,
+                    groupName = groupName,
+                )
+            }.onSuccess {
+                val successMessage = if (isMove) strings.favoriteMoveSuccess else strings.favoriteAddSuccess
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure {
+                val errorMessage =
+                    "${if (isMove) strings.favoriteMoveFailed else strings.favoriteAddFailed}: ${it.message}"
+                SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
+            }.getOrThrow()
+        }
+        favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
     }
 
-    // 添加到新组
-    if (groupName != currentGroupName && groupName != null) {
-        val isMove = favorite != null
-        runCatching {
-            favoriteService.addFavorite(
-                favoriteId = favoriteId,
-                favoriteType = favoriteType,
-                groupName = groupName,
-            )
-        }.onSuccess {
-            val successMessage = if (isMove) strings.favoriteMoveSuccess else strings.favoriteAddSuccess
-            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-        }.onFailure {
-            val errorMessage = "${if (isMove) strings.favoriteMoveFailed else strings.favoriteAddFailed}: ${it.message}"
-            SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-        }.getOrThrow()
-    }
-    favoriteService.loadFavoriteByGroup(favoriteType)
-}
 

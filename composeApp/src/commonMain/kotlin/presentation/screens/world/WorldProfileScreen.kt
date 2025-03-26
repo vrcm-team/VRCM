@@ -88,7 +88,6 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
-        val isFavorited by screenModel.isFavorite.collectAsState()
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
@@ -119,7 +118,6 @@ class WorldProfileScreen(
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
-        val screenModel = koinScreenModel<WorldProfileScreenModel>()
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
@@ -768,7 +766,6 @@ private fun Screen.RenderBottomSheet(
     Box(
         modifier = Modifier
             .fillMaxSize()
-//            .zIndex(10f)
     ) {
         Surface(
             modifier = Modifier
@@ -886,7 +883,7 @@ private fun Screen.RenderBottomSheetContent(
 
                     // 描述内容
                     Text(
-                        modifier = Modifier.heightIn(max = bottomSheetState.animatedHeight / 3)
+                        modifier = Modifier.heightIn(max = (bottomSheetState.animatedHeight / 3.5f * fl))
                             .verticalScroll(rememberScrollState()),
                         text = worldProfileVo.worldDescription,
                         style = MaterialTheme.typography.bodyMedium,
@@ -1094,7 +1091,6 @@ fun AnimatedVisibilityScope.StackedCards(
                         verticalOffset = 0.dp, // 在Column中不需要手动设置偏移
                         scaleEffect = 1f,
                         alphaEffect = 1f,
-                        onClick = { onShrinkCardClick(instance) }
                     )
                 }
             }
@@ -1138,7 +1134,8 @@ fun AnimatedVisibilityScope.StackedCards(
                     index = i,
                     verticalOffset = currentOffset,
                     scaleEffect = currentScale,
-                    alphaEffect = currentAlpha
+                    alphaEffect = currentAlpha,
+                    expandProgress = expandProgress
                 )
             }
 
@@ -1151,7 +1148,8 @@ fun AnimatedVisibilityScope.StackedCards(
                     verticalOffset = 0.dp,
                     scaleEffect = 1f,
                     alphaEffect = 1f,
-                    onClick = doExpandCardClick
+                    onClick = doExpandCardClick,
+                    expandProgress = expandProgress
                 )
             }
 
@@ -1161,7 +1159,7 @@ fun AnimatedVisibilityScope.StackedCards(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(bottom = 12.dp, end = 16.dp)
-                        .alpha(1f - expandProgress) // 随着展开进度增加而变透明
+                        .alpha((1f - expandProgress * 3f).coerceIn(0f, 1f)) // 随着展开进度增加而变透明
                         .background(
                             color = MaterialTheme.colorScheme.tertiary,
                             shape = CircleShape

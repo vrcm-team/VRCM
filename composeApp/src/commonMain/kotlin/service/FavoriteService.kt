@@ -1,10 +1,12 @@
 package io.github.vrcmteam.vrcm.service
 
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +41,7 @@ class FavoriteService(
     /**
      * 加载收藏限制信息
      */
-    suspend fun loadFavoriteLimits() {
+    private suspend fun loadFavoriteLimits() {
         _favoriteLimits = favoriteApi.getFavoriteLimits()
     }
 
@@ -73,7 +75,7 @@ class FavoriteService(
         }
     }
 
-    suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) {
+    suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
         val newFavoritesByGroup: MutableMap<FavoriteGroupData, List<FavoriteData>> = mutableMapOf()
         val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
         favoriteApi.fetchFavorite(favoriteType)
@@ -88,6 +90,8 @@ class FavoriteService(
             newFavoritesByGroup[group] = newFavoritesMap[group.name] ?: listOf()
         }
         _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }.value = newFavoritesByGroup
+    }.onFailure {
+        SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
     }
 
 

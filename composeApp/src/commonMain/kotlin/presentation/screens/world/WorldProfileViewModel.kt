@@ -95,6 +95,8 @@ class WorldProfileScreenModel(
             // 获取所有实例数据
             instanceIds.asFlow().map {
                 worldsApi.getWorldInstanceById(currentProfile.worldId, it)
+            }.catch {
+                SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance data"))
             }.map { instanceData ->
                 val owner: MutableStateFlow<Owner?> = MutableStateFlow(null)
                 val instanceVo = InstanceVo(instanceData, owner)
@@ -103,7 +105,9 @@ class WorldProfileScreenModel(
                 instanceData.ownerId to owner
             }.collect { (ownerId, owner) ->
                 // 如果实例是活跃的，则获取实例的拥有者名称
-                owner.value = fetchAndSetOwner(ownerId)
+                fetchAndSetOwner(ownerId)
+                    .onSuccess { if (it != null) owner.value = it }
+                    .onFailure { SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance Owner")) }
             }
         }
     }
@@ -113,9 +117,9 @@ class WorldProfileScreenModel(
      */
     private suspend fun fetchAndSetOwner(
         ownerId: String?,
-    ): Owner? {
-        if (ownerId == null) return null
-        return when (BlueprintType.fromValue(ownerId)) {
+    ): Result<Owner?> = runCatching {
+        if (ownerId == null) return@runCatching null
+        return@runCatching when (BlueprintType.fromValue(ownerId)) {
             BlueprintType.User -> {
                 val user = usersApi.fetchUser(ownerId)
                 Owner(
