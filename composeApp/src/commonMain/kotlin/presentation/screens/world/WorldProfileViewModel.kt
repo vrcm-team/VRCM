@@ -19,7 +19,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo.Owner
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
-import io.github.vrcmteam.vrcm.service.FavoriteService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
@@ -35,7 +34,6 @@ class WorldProfileScreenModel(
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
     private val inviteApi: InviteApi,
-    private val favoriteService: FavoriteService,
 ) : ScreenModel {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)

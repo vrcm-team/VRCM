@@ -848,11 +848,7 @@ private fun Screen.RenderBottomSheetContent(
         isVisible = showFavoriteGroupBottomSheet,
         favoriteId = worldProfileVo.worldId,
         favoriteType = FavoriteType.World,
-        onDismiss = { showFavoriteGroupBottomSheet = false },
-        onConfirm = { groupIdRst ->
-            screenModel.onWorldFavorite(groupIdRst)
-            showFavoriteGroupBottomSheet = false
-        }
+        onDismiss = { showFavoriteGroupBottomSheet = false }
     )
     
     // 上滑渐变小

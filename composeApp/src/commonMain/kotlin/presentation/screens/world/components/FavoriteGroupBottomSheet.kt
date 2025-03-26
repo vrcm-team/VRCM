@@ -32,7 +32,7 @@ import org.koin.compose.koinInject
  * @param favoriteId 要收藏的目标ID
  * @param favoriteType 收藏类型
  * @param onDismiss 关闭回调
- * @param onConfirm 确认选择回调，参数为所选收藏组ID的Result
+ * @param onConfirm 确认选择回调，参数为所选收藏组name的Result
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +41,7 @@ fun FavoriteGroupBottomSheet(
     favoriteId: String,
     favoriteType: FavoriteType,
     onDismiss: () -> Unit,
-    onConfirm: (Result<String>) -> Unit,
+    onConfirm: (Result<String>) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState()
     val favoriteService: FavoriteService = koinInject()
@@ -85,11 +85,14 @@ fun FavoriteGroupBottomSheet(
             }
                 .map { groupName }
                 .let { result ->
-                    launch { sheetState.hide() }.invokeOnCompletion {
-                        isChanging = false
-                        onConfirm(result)
-                    }
+                    isChanging = false
+                    onConfirm(result)
                 }
+        }
+        scope.launch {
+            sheetState.hide()
+        }.invokeOnCompletion {
+            onDismiss()
         }
     }
 
