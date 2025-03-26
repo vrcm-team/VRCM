@@ -61,7 +61,7 @@ fun FavoriteGroupBottomSheet(
     val favoritesByGroup by favoriteService.favoritesByGroup(favoriteType).collectAsState()
 
     // 查找当前项目在哪个收藏组中
-    val existingGroup = remember(favoritesByGroup) {
+    val existingGroup = remember(favoritesByGroup, favoriteId) {
         favoritesByGroup.entries.firstOrNull { (_, favorites) ->
             favorites.any { it.favoriteId == favoriteId }
         }?.key
