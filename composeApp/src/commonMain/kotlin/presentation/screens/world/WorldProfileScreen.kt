@@ -902,15 +902,7 @@ private fun Screen.RenderBottomSheetContent(
                             modifier = Modifier.padding(bottom = 8.dp)
                         ) {
                             worldProfileVo.tags.forEach { tag ->
-                                Badge(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                ) {
-                                    Text(
-                                        text = tag,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
+                                TextChip(text = tag)
                             }
                         }
                     }

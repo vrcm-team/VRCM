@@ -9,8 +9,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
@@ -233,12 +231,10 @@ private fun AboutBlock() {
 @Composable
 private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
     val authService = koinInject<AuthService>()
-    val logoutCall = LocalNavigator.currentOrThrow.let {
-        {
+    val logoutCall = {
             onDismissRequest()
             authService.logout()
         }
-    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center

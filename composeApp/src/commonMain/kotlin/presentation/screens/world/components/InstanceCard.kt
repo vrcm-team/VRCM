@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,10 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -224,33 +221,29 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
     ) {
         // 状态标签
         if (instance.isActive == true){
-            StatusChip(
+            IconTextChip(
                 text = "活跃",
                 icon = AppIcons.Check,
-                color = MaterialTheme.colorScheme.tertiary
             )
         }
         if(instance.queueEnabled == true && instance.queueSize != null && instance.queueSize > 0){
-            StatusChip(
+            IconTextChip(
                 text = "队列: ${instance.queueSize}",
                 icon = AppIcons.Queue,
-                color = MaterialTheme.colorScheme.secondary
             )
         }
 
         if (instance.isFull == true){
-            StatusChip(
+            IconTextChip(
                 text = "已满",
                 icon = AppIcons.Block,
-                color = MaterialTheme.colorScheme.error
             )
         }
 
         if (instance.hasCapacity == true){
-            StatusChip(
+            IconTextChip(
                 text = "可加入",
                 icon = AppIcons.Login,
-                color = MaterialTheme.colorScheme.tertiary
             )
         }
 
@@ -269,35 +262,3 @@ private fun StatusSection(instance: InstanceVo, cardPadding: Dp) {
         }
     }
 }
-
-@Composable
-private fun StatusChip(
-    text: String,
-    icon: ImageVector,
-    color: Color,
-) {
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = color
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = color
-            )
-        }
-    }
-}
-
-

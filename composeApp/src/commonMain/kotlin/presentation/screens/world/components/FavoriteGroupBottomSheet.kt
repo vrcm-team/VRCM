@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,7 +45,7 @@ fun FavoriteGroupBottomSheet(
     onDismiss: () -> Unit,
     onConfirm: (Result<String>) -> Unit = {},
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val favoriteService: FavoriteService = koinInject()
     val authService: AuthService = koinInject()
     val scope = rememberCoroutineScope()
@@ -55,8 +57,7 @@ fun FavoriteGroupBottomSheet(
     }
 
     // 获取收藏数据
-    val favoritesByGroup by
-    favoriteService.favoritesByGroup(favoriteType).collectAsState()
+    val favoritesByGroup by favoriteService.favoritesByGroup(favoriteType).collectAsState()
 
     // 查找当前项目在哪个收藏组中
     val existingGroup = remember(favoritesByGroup) {
@@ -102,91 +103,104 @@ fun FavoriteGroupBottomSheet(
         onDismissRequest = onDismiss
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 标题
             Text(
                 text = if (currentGroupName != null) strings.favoriteMoveToAnotherGroup else strings.selectFavoriteGroup,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
-
-
-            // 收藏组列表
-            if (favoritesByGroup.isEmpty()) {
-                Box(
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                favoritesByGroup.entries.forEach { (group, favorites) ->
-                    val isCurrentGroup = group.name == currentGroupName
-                    val backgroundColor = if (isCurrentGroup)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.surface
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        onClick = { if (!isChanging && !isCurrentGroup) onClickGroupItem(group.name) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = backgroundColor
-                        ),
-                        elevation = CardDefaults.cardElevation(2.dp)
-                    ) {
-                        Row(
+                    // 收藏组列表
+                    if (favoritesByGroup.isEmpty()) {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = AppIcons.Check,
-                                contentDescription = "已收藏",
-                                tint = if (isCurrentGroup) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                            Text(
-                                modifier = Modifier.weight(1f),
-                                text = group.displayName,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = if (isCurrentGroup) FontWeight.Bold else FontWeight.Normal
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${favorites.size}/${favoriteService.getMaxFavoritesPerGroup(favoriteType)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        val maxFavoritesPerGroup = remember { favoriteService.getMaxFavoritesPerGroup(favoriteType) }
+                        val entries = favoritesByGroup.entries
+                        entries.forEachIndexed { index, (group, favorites) ->
+                            val isCurrentGroup = group.name == currentGroupName
+                            val backgroundColor = if (isCurrentGroup)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceContainerLowest
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(backgroundColor)
+                                    .clickable(!isChanging && !isCurrentGroup) { onClickGroupItem(group.name) },
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = AppIcons.Check,
+                                        contentDescription = "已收藏",
+                                        tint = if (isCurrentGroup) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    )
+                                    Text(
+                                        modifier = Modifier.weight(1f),
+                                        text = group.displayName,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = if (isCurrentGroup) FontWeight.Bold else FontWeight.Normal
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${favorites.size}/${maxFavoritesPerGroup}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            if (entries.size - 1 <= index) return@forEachIndexed
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
                         }
                     }
+
                 }
-                // 底部按钮
-                if (currentGroupName != null) {
-                    TextButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isChanging,
-                        onClick = { onClickGroupItem(currentGroupName) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(2.dp)
-                    ) {
-                        Text(strings.remove)
-                    }
+
+            }
+            // 底部按钮
+            if (currentGroupName != null) {
+                TextButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isChanging,
+                    onClick = { onClickGroupItem(currentGroupName) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(strings.remove)
                 }
             }
         }
