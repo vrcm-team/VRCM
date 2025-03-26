@@ -28,6 +28,8 @@ internal const val FAVORITE_API_PREFIX = "favorite"
 
 internal const val FAVORITES_API_PREFIX = "favorites"
 
+internal const val FAVORITE_LIMITS_API_SUFFIX = "favoritelimits"
+
 internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"
 
 internal const val VRC_WSS_URL = "wss://vrchat.com/?"

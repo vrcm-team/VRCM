@@ -1,12 +1,11 @@
 package io.github.vrcmteam.vrcm.network.api.favorite
 
 import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
-import io.github.vrcmteam.vrcm.network.api.attributes.FAVORITES_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.FAVORITE_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.favorite.data.AddFavoriteRequest
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -107,6 +106,24 @@ class FavoriteApi(private val client: HttpClient) {
                 }
             }.checkSuccess<List<FavoriteGroupData>>()
         }
+    }
+
+    /**
+     * 删除收藏
+     *
+     * @param favoriteId 收藏记录ID（注意：这是FavoriteData的favoriteId）
+     */
+    suspend fun deleteFavorite(favoriteId: String) {
+        client.delete("$FAVORITES_API_PREFIX/$favoriteId").checkSuccess<Unit>()
+    }
+
+    /**
+     * 获取收藏限制信息
+     * 
+     * @return 返回用户的收藏限制数据
+     */
+    suspend fun getFavoriteLimits(): FavoriteLimits {
+        return client.get("$AUTH_API_PREFIX/$USER_API_PREFIX/$FAVORITE_LIMITS_API_SUFFIX").checkSuccess()
     }
 
 }

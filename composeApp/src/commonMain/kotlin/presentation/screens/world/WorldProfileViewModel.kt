@@ -7,7 +7,6 @@ import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
-import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
@@ -21,8 +20,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 /**
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
@@ -56,11 +57,9 @@ class WorldProfileScreenModel(
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
         _isLoading.value = true
-        val favoriteDeferred = screenModelScope.async { loadFavorite() }
-        val worldInfoDeferred = screenModelScope.async { loadWorldInfo(worldId) }
-        screenModelScope.launch {
+        screenModelScope.launch(Dispatchers.IO){
             // 加载世界收藏组
-            awaitAll(favoriteDeferred, worldInfoDeferred)
+            loadWorldInfo(worldId)
             _isLoading.value = false
         }
     }
@@ -205,42 +204,12 @@ class WorldProfileScreenModel(
         }
     }
 
-    suspend fun loadFavorite(){
-        authService.reTryAuthCatching {
-            favoriteService.loadFavorites(FavoriteType.World)
-            favoriteService.loadFavoriteGroups(FavoriteType.World)
-        }
-    }
-
     /**
      * 收藏世界
      */
-    fun favoriteWorld(favoriteGroupId: String, strings: LocaleStrings) {
-        val worldId = _worldProfileState.value?.worldId ?: return
-        screenModelScope.launch(Dispatchers.IO) {
-            _isLoading.value = true
-            try {
-                favoriteService.addFavorite(
-                    favoriteId = worldId,
-                    favoriteType = FavoriteType.World,
-                    favoriteGroupId = favoriteGroupId,
-                    strings = strings
-                )
-                // 设置收藏状态为true
-                _isFavorite.value = true
-                // 增加收藏计数
-                _worldProfileState.value?.let { profile ->
-                    val updatedFavorites = profile.favorites + 1
-                    _worldProfileState.value = profile.copy(favorites = updatedFavorites)
-                }
-            } catch (e: Exception) {
-                if (e.message?.contains("already") == true) {
-                    // 如果错误是因为已经收藏了，也设置为已收藏状态
-                    _isFavorite.value = true
-                }
-            } finally {
-                _isLoading.value = false
-            }
+    fun onWorldFavorite(favoriteGroupId: Result<String>) {
+        favoriteGroupId.onSuccess {
+            _worldProfileState.value?.let(::refreshWorldData)
         }
     }
 } 

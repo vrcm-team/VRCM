@@ -54,13 +54,15 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
-import presentation.screens.world.InstancesDialog
 import kotlin.math.abs
 
 /**
@@ -847,8 +849,8 @@ private fun Screen.RenderBottomSheetContent(
         favoriteId = worldProfileVo.worldId,
         favoriteType = FavoriteType.World,
         onDismiss = { showFavoriteGroupBottomSheet = false },
-        onConfirm = { groupId->
-            screenModel.favoriteWorld(groupId, strings = localeStrings)
+        onConfirm = { groupIdRst ->
+            screenModel.onWorldFavorite(groupIdRst)
             showFavoriteGroupBottomSheet = false
         }
     )

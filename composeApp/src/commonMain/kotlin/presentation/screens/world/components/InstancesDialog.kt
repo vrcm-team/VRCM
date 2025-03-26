@@ -1,4 +1,4 @@
-package presentation.screens.world
+package io.github.vrcmteam.vrcm.presentation.screens.world.components
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
