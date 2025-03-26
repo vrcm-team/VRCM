@@ -99,8 +99,8 @@ fun Pager.FriendLocationPager(
         selectLocation = if (selectLocation == friendLocation.location) null else friendLocation.location
     }
     val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
-        if (navigator.size <= 1) {
-            val currentLocation = friendLocation.instants.value
+        val currentLocation = friendLocation.instants.value
+        if (navigator.size <= 1 && currentLocation.worldId.isNotEmpty()) {
             val instances = friendLocationMap[LocationType.Instance]
                 ?.map { it.instants.value }
                 ?.filter { it.worldId == currentLocation.worldId }
