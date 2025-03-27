@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -31,7 +30,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -461,7 +462,7 @@ private fun RenderMainContent(
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent, // 起始颜色（完全透明）
-            MaterialTheme.colorScheme.surfaceContainerLowest// 结束
+            MaterialTheme.colorScheme.surfaceContainerLow// 结束
         ),
         endY = 300f,
     )
@@ -494,15 +495,16 @@ private fun RenderMainContent(
             ) {
                 Text(
                     text = worldProfileVo.worldName,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             HorizontalDivider(thickness = 2.dp)
-            ATooltipBox(
-                modifier = Modifier.clickable {
+            Box(
+                modifier = Modifier.simpleClickable {
                     worldProfileVo.authorID?.let {
                         val userProfileScreen = UserProfileScreen(
                             userProfileVO = UserProfileVo(
@@ -511,16 +513,13 @@ private fun RenderMainContent(
                         )
                         navigator.push(userProfileScreen)
                     }
-
-                },
-                tooltip = {
-                    Text(text = worldProfileVo.authorName ?: "未知作者")
                 }
             ) {
                 Text(
                     text = worldProfileVo.authorName ?: "未知作者",
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.tertiary,
                     style = MaterialTheme.typography.labelMedium,
+                    textDecoration = TextDecoration.Underline,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
