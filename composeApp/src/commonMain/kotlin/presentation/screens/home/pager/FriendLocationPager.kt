@@ -128,8 +128,8 @@ fun Pager.FriendLocationPager(
     val onClickUserIcon = { user: IUser ->
         if (navigator.size <= 1) {
             navigator push UserProfileScreen(
-                sharedSuffixKey,
-                UserProfileVo(user)
+                UserProfileVo(user),
+                sharedSuffixKey
             )
         }
     }

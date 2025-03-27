@@ -69,5 +69,27 @@ internal val LocaleStringsZhHant = LocaleStrings(
     remove = "移除",
     instanceCreateSuccess = "成功創建房間並發送邀請",
     instanceCreateSuccessButInviteFailed = "創建房間成功，但邀請失敗",
-    instanceCreateFailed = "創建房間失敗"
+    instanceCreateFailed = "創建房間失敗",
+    
+    // 世界搜索相關
+    worldSearchAdvancedOptions = "高級搜索選項",
+    worldSearchFeaturedOnly = "僅顯示精選世界",
+    worldSearchSortBy = "排序方式",
+    worldSearchOrder = "排序順序",
+    worldSearchDescending = "降序",
+    worldSearchAscending = "升序",
+    worldSearchResultCount = "顯示數量",
+    worldSearchResultsFormat = "%d個結果",
+    
+    // 排序選項
+    worldSearchSortPopularity = "流行度",
+    worldSearchSortHeat = "熱度",
+    worldSearchSortTrust = "信任度",
+    worldSearchSortShuffle = "隨機",
+    worldSearchSortRandom = "完全隨機",
+    worldSearchSortFavorites = "收藏數",
+    worldSearchSortCreated = "創建時間",
+    worldSearchSortUpdated = "更新時間",
+    worldSearchSortRelevance = "相關度",
+    worldSearchSortName = "名稱"
 )

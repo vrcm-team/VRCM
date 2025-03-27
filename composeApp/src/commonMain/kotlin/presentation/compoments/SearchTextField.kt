@@ -12,15 +12,16 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 @Composable
 fun SearchTextField(
     modifier: Modifier = Modifier,
-    searchText: String,
+    value: String,
+    placeholder: String = strings.fiendListPagerSearch,
     onValueChange: (String) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
     ITextField(
         modifier = modifier,
         imageVector = AppIcons.Search,
-        hintText = strings.fiendListPagerSearch,
-        textValue = searchText,
+        hintText = placeholder,
+        textValue = value,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
         onValueChange = onValueChange

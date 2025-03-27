@@ -112,7 +112,7 @@ private inline fun Screen.HomeTopAppBar(
     val onClickUserIcon = { user: IUser ->
         // 防止多次点击在栈中存在相同key的屏幕报错
         if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
+            currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
         }
     }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {

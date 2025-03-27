@@ -78,7 +78,7 @@ import kotlin.math.abs
 class WorldProfileScreen(
     private val worldProfileVO: WorldProfileVo,
     private val location: String? = null,
-    private val sharedSuffixKey: String,
+    private val sharedSuffixKey: String = "",
 ) : Screen {
 
     @Composable
@@ -495,7 +495,7 @@ private fun RenderMainContent(
             ) {
                 Text(
                     text = worldProfileVo.worldName,
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -517,7 +517,7 @@ private fun RenderMainContent(
             ) {
                 Text(
                     text = worldProfileVo.authorName ?: "未知作者",
-                    color = MaterialTheme.colorScheme.tertiary,
+                    color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.labelMedium,
                     textDecoration = TextDecoration.Underline,
                     maxLines = 1,

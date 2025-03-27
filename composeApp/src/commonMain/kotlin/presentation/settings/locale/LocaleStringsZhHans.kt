@@ -17,6 +17,8 @@ internal val LocaleStringsZhHans = LocaleStrings(
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "处于房间内",
     fiendListPagerSearch = "搜索",
+    searchUsers = "用户",
+    searchWorlds = "世界",
     notificationFriendRequest = "想要成为你的好友",
     homeNotificationEmpty = "暂无新通知",
     homeStatusEdit = "编辑状态",
@@ -69,5 +71,27 @@ internal val LocaleStringsZhHans = LocaleStrings(
     remove = "移除",
     instanceCreateSuccess = "成功创建房间并发送邀请",
     instanceCreateSuccessButInviteFailed = "创建房间成功，但邀请失败",
-    instanceCreateFailed = "创建房间失败"
+    instanceCreateFailed = "创建房间失败",
+    
+    // 世界搜索相关
+    worldSearchAdvancedOptions = "高级搜索选项",
+    worldSearchFeaturedOnly = "仅显示精选世界",
+    worldSearchSortBy = "排序方式",
+    worldSearchOrder = "排序顺序",
+    worldSearchDescending = "降序",
+    worldSearchAscending = "升序",
+    worldSearchResultCount = "显示数量",
+    worldSearchResultsFormat = "%d个结果",
+    
+    // 排序选项
+    worldSearchSortPopularity = "流行度",
+    worldSearchSortHeat = "热度",
+    worldSearchSortTrust = "信任度",
+    worldSearchSortShuffle = "随机",
+    worldSearchSortRandom = "完全随机",
+    worldSearchSortFavorites = "收藏数",
+    worldSearchSortCreated = "创建时间",
+    worldSearchSortUpdated = "更新时间",
+    worldSearchSortRelevance = "相关度",
+    worldSearchSortName = "名称"
 )

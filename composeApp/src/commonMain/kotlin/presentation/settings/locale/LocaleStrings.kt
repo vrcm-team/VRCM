@@ -22,6 +22,8 @@ data class LocaleStrings(
     val fiendLocationPagerTraveling: String = "Friends is Traveling",
     val fiendLocationPagerLocation: String = "by Location",
     val fiendListPagerSearch: String = "Search",
+    val searchUsers: String = "Users",
+    val searchWorlds: String = "Worlds",
     val notificationFriendRequest: String = "wants to be your friend",
     val homeNotificationEmpty: String = "No Notification Yet",
     val homeStatusEdit: String = "Edit Status",
@@ -74,7 +76,29 @@ data class LocaleStrings(
     val remove: String = "Remove",
     val instanceCreateSuccess: String = "Successfully created instance and sent invite",
     val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed",
-    val instanceCreateFailed: String = "Failed to create instance"
+    val instanceCreateFailed: String = "Failed to create instance",
+    
+    // 世界搜索相关
+    val worldSearchAdvancedOptions: String = "Advanced Search Options",
+    val worldSearchFeaturedOnly: String = "Featured Worlds Only",
+    val worldSearchSortBy: String = "Sort By",
+    val worldSearchOrder: String = "Order",
+    val worldSearchDescending: String = "Descending",
+    val worldSearchAscending: String = "Ascending",
+    val worldSearchResultCount: String = "Results Count",
+    val worldSearchResultsFormat: String = "%d results",
+    
+    // 排序选项
+    val worldSearchSortPopularity: String = "Popularity",
+    val worldSearchSortHeat: String = "Heat",
+    val worldSearchSortTrust: String = "Trust",
+    val worldSearchSortShuffle: String = "Shuffle",
+    val worldSearchSortRandom: String = "Random",
+    val worldSearchSortFavorites: String = "Favorites",
+    val worldSearchSortCreated: String = "Created",
+    val worldSearchSortUpdated: String = "Updated",
+    val worldSearchSortRelevance: String = "Relevance",
+    val worldSearchSortName: String = "Name"
 )
 
 val strings: LocaleStrings

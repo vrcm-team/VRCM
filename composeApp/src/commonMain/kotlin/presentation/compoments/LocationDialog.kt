@@ -65,8 +65,8 @@ class LocationDialog(
         val onClickUserIcon = { user: IUser ->
             if (currentNavigator.size <= 1) {
                 currentNavigator push UserProfileScreen(
-                    sharedSuffixKey,
-                    UserProfileVo(user)
+                    UserProfileVo(user),
+                    sharedSuffixKey
                 )
             }
         }

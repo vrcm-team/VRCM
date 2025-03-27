@@ -36,8 +36,8 @@ import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import kotlinx.coroutines.launch
 
 data class UserProfileScreen(
-    private val sharedSuffixKey: String = "",
     private val userProfileVO: UserProfileVo,
+    private val sharedSuffixKey: String = "",
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @ExperimentalSharedTransitionApi

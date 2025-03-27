@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
+import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -11,7 +12,7 @@ data class WorldProfileVo(
     val worldName: String = "",
     val worldImageUrl: String? = null,
     val thumbnailImageUrl: String? = null,
-    val worldDescription: String,
+    val worldDescription: String = "",
     val authorID: String? = null,
     val authorName: String? = null,
     
@@ -35,17 +36,17 @@ data class WorldProfileVo(
     val publicationDate: String? = null,
     
     // 实例信息列表
-    val instances: List<InstanceVo>,
+    val instances: List<InstanceVo> = mutableStateListOf(),
 
     ): JavaSerializable {
     
     // 从WorldData构造，不包含实例信息
-    constructor(world: WorldData, instancesList: List<InstanceVo> = listOf()): this(
+    constructor(world: WorldData, instancesList: List<InstanceVo> = mutableStateListOf()): this(
         worldId = world.id,
         worldName = world.name,
         worldImageUrl = world.imageUrl,
         thumbnailImageUrl = world.thumbnailImageUrl,
-        worldDescription = world.description,
+        worldDescription = world.description.orEmpty(),
         authorID = world.authorId,
         authorName = world.authorName,
         capacity = world.capacity,
@@ -73,7 +74,7 @@ data class WorldProfileVo(
         worldName = instance.world.name,
         worldImageUrl = instance.world.imageUrlThumbnail,
         thumbnailImageUrl = instance.world.thumbnailImageUrl,
-        worldDescription = instance.world.description,
+        worldDescription = instance.world.description.orEmpty(),
         authorID = instance.world.authorId,
         authorName = instance.world.authorName,
         capacity = instance.world.capacity,

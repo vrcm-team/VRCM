@@ -9,7 +9,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -31,12 +30,14 @@ import kotlinx.datetime.toLocalDateTime
 fun UserSearchList(
     key: String,
     isRefreshing: Boolean? = null,
+    searchText: String,
+    updateSearchText: (String) -> Unit,
     userListInit: (String) -> List<IUser> = { emptyList() },
     doRefresh: (suspend () -> Unit)? = null,
     onUpdateSearch: suspend (searchText: String, userList: MutableList<IUser>) -> Unit,
+    headerContent: @Composable () -> Unit = {}
 ) {
     val lazyListState = rememberLazyListState()
-    var searchText by rememberSaveable(key) { mutableStateOf("") }
     val userList: MutableList<IUser> by remember { derivedStateOf { userListInit(searchText).toMutableStateList() } }
     LaunchedEffect(searchText) {
         onUpdateSearch(searchText, userList)
@@ -55,15 +56,16 @@ fun UserSearchList(
         isRefreshing,
         doRefresh
     ) {
-        SearchTextField(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            searchText = searchText,
-            onValueChange = {
-                searchText = it
-            }
-        )
+        Column {
+            SearchTextField(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                value = searchText,
+                onValueChange = updateSearchText
+            )
+            // 添加自定义头部内容
+            headerContent()
+        }
     }
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,9 +82,10 @@ fun UserList(
     val sharedSuffixKey = LocalSharedSuffixKey.current
     val toProfile = { user: IUser ->
         if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(sharedSuffixKey, UserProfileVo(user))
+            currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
         }
     }
+
     // 如果没有底部系统手势条，默认12dp
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
 

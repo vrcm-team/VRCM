@@ -69,5 +69,27 @@ internal val LocaleStringsJa = LocaleStrings(
     remove = "削除",
     instanceCreateSuccess = "インスタンスを作成し、招待を送信しました",
     instanceCreateSuccessButInviteFailed = "インスタンスは作成されましたが、招待に失敗しました",
-    instanceCreateFailed = "インスタンス作成に失敗しました"
+    instanceCreateFailed = "インスタンス作成に失敗しました",
+    
+    // 世界検索関連
+    worldSearchAdvancedOptions = "詳細検索オプション",
+    worldSearchFeaturedOnly = "注目ワールドのみ表示",
+    worldSearchSortBy = "並び順",
+    worldSearchOrder = "順序",
+    worldSearchDescending = "降順",
+    worldSearchAscending = "昇順",
+    worldSearchResultCount = "表示件数",
+    worldSearchResultsFormat = "%d件の結果",
+    
+    // 並べ替えオプション
+    worldSearchSortPopularity = "人気度",
+    worldSearchSortHeat = "熱度",
+    worldSearchSortTrust = "信頼度",
+    worldSearchSortShuffle = "シャッフル",
+    worldSearchSortRandom = "ランダム",
+    worldSearchSortFavorites = "お気に入り数",
+    worldSearchSortCreated = "作成日時",
+    worldSearchSortUpdated = "更新日時",
+    worldSearchSortRelevance = "関連度",
+    worldSearchSortName = "名前"
 )

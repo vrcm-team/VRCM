@@ -39,8 +39,8 @@ class InstancesDialog(
         val currentNavigator = currentNavigator
         val onClickUserIcon = { user: IUser ->
             currentNavigator push UserProfileScreen(
-                sharedSuffixKey,
-                UserProfileVo(user)
+                UserProfileVo(user),
+                sharedSuffixKey
             )
         }
         val inviteApi: InviteApi = koinInject()

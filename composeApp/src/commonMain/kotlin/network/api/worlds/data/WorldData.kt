@@ -12,9 +12,9 @@ data class WorldData(
     val capacity: Int,
     @SerialName("created_at")
     val createdAt: String?,
-    val description: String,
+    val description: String?,
     val favorites: Int?,
-    val featured: Boolean,
+    val featured: Boolean?,
     val heat: Int,
     val id: String,
     val imageUrl: String,
@@ -37,7 +37,7 @@ data class WorldData(
     val instances: List<List<String>>? = null,
     @SerialName("updated_at")
     val updatedAt: String?,
-    val version: Int,
+    val version: Int?,
     val visits: Int?
 ) : JavaSerializable{
     val imageUrlThumbnail:String = FileApi.convertFileUrl(imageUrl)

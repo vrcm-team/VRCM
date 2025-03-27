@@ -31,7 +31,7 @@ data class HomeInstanceVo(
         worldImageUrl = instance.world.imageUrl,
         worldAuthorName = instance.world.authorName,
         worldAuthorId = instance.world.authorId,
-        worldDescription = instance.world.description,
+        worldDescription = instance.world.description.orEmpty(),
         worldAuthorTag = instance.world.tags.filter { it.startsWith("author_tag_") }
             .map { it.substringAfter("author_tag_") },
         accessType = instance.accessType,
