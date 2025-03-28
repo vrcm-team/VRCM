@@ -47,6 +47,8 @@ class SearchListPagerModel(
 
     private var preSearchText: String = ""
 
+    private var preSearchType: Int = 0
+
     // 搜索文本 - 两个页面共享
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
@@ -66,9 +68,12 @@ class SearchListPagerModel(
      * @param type 0: 用户搜索, 1: 世界搜索
      */
     fun setSearchType(type: Int) {
-        if (type in 0..1 && type != searchType.value) {
-            _searchType.value = type
-        }
+        if (!(type in 0..1 && type != searchType.value)) return
+        _searchType.value = type
+    }
+
+    fun setSearchText(text: String) {
+        _searchText.value = text
     }
     
     /**
@@ -89,17 +94,21 @@ class SearchListPagerModel(
      * @param name 搜索文本
      * @return 是否成功获取新的搜索结果
      */
-    suspend fun refreshSearchList(name: String) = this.screenModelScope.async(Dispatchers.IO) {
-        if (name != preSearchText && name.isNotEmpty()) {
-            return@async when (searchType.value) {
-                0 -> searchUsers(name)
-                1 -> searchWorlds(name)
+    suspend fun refreshSearchList() = this.screenModelScope.async(Dispatchers.IO) {
+        val searchText = searchText.value
+        val searchType = searchType.value
+        if ((searchText != preSearchText && searchText.isNotEmpty() )|| searchType != preSearchType) {
+            return@async when (searchType) {
+                0 -> searchUsers(searchText)
+                1 -> searchWorlds(searchText)
                 else -> false
             }.also {
-                preSearchText = name
+                preSearchType = searchType
+                preSearchText = searchText
             }
         } else {
-            preSearchText = name
+            preSearchType = searchType
+            preSearchText = searchText
             return@async false
         }
     }.await()

@@ -33,16 +33,12 @@ object SearchListPager : Pager {
         val searchListPagerModel: SearchListPagerModel = koinScreenModel()
         val coroutineScope = rememberCoroutineScope()
 
-        // 创建数据提供者
-        val (userSearchProvider, worldSearchProvider) = remember(searchListPagerModel) {
-            createSearchDataProviders(searchListPagerModel, coroutineScope)
-        }
 
         // 获取当前选中的标签索引
         val selectedTabIndex by searchListPagerModel.searchType.collectAsState()
 
         // 搜索文本
-        var searchText by remember { mutableStateOf("") }
+        val searchText by searchListPagerModel.searchText.collectAsState()
 
         // 高级搜索选项状态
         var showAdvancedOptions by remember { mutableStateOf(false) }
@@ -51,20 +47,17 @@ object SearchListPager : Pager {
         val tabs = listOf(strings.searchUsers, strings.searchWorlds)
         val currentNavigator = currentNavigator
         val sharedSuffixKey = LocalSharedSuffixKey.current
-        val users by userSearchProvider.data.collectAsState()
-        val worlds by worldSearchProvider.data.collectAsState()
+        val users by searchListPagerModel.userSearchList.collectAsState()
+        val worlds by searchListPagerModel.worldSearchList.collectAsState()
         // 当搜索文本改变时执行搜索
-        LaunchedEffect(searchText, selectedTabIndex) {
-            when (selectedTabIndex) {
-                0 -> userSearchProvider.search(searchText)
-                1 -> worldSearchProvider.search(searchText)
-            }
+        LaunchedEffect(searchText,selectedTabIndex) {
+            searchListPagerModel.refreshSearchList()
         }
         GenericSearchList(
             key = "GenericSearchPager",
             searchText = searchText,
             updateSearchText = { newText ->
-                searchText = newText
+                searchListPagerModel.setSearchText(newText)
             },
             tabs = tabs,
             selectedTabIndex = selectedTabIndex,
