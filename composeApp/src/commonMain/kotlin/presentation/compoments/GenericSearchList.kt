@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
@@ -79,7 +81,15 @@ fun GenericSearchList(
                         selectedTabIndex = selectedTabIndex,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 8.dp)
+                            .padding(top = 8.dp, bottom = 8.dp),
+                        indicator = {
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier
+                                    .tabIndicatorOffset(it[selectedTabIndex])
+                                    .padding(horizontal = 24.dp)  // 使指示器两侧变短
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))  // 添加上部圆角
+                            )
+                        },
                     ) {
                         tabs.forEachIndexed { index, title ->
                             Tab(

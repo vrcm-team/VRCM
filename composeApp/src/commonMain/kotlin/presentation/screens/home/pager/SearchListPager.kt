@@ -44,7 +44,7 @@ object SearchListPager : Pager {
         var showAdvancedOptions by remember { mutableStateOf(false) }
 
         // 标签页列表
-        val tabs = listOf(strings.searchUsers, strings.searchWorlds)
+        val tabs = listOf(strings.searchUsers, strings.searchWorlds, "群组", "模型")
         val currentNavigator = currentNavigator
         val sharedSuffixKey = LocalSharedSuffixKey.current
         val users by searchListPagerModel.userSearchList.collectAsState()

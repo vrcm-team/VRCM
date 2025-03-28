@@ -25,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.VersionDialog
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
@@ -65,6 +66,7 @@ fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator
     when {
         isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<UserProfileScreen, GalleryScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
         isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
         isTransitioningFromTo<HomeScreen, AuthAnimeScreen>() -> HomeToAuthAnimeTransition
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> AuthAnimeToHomeTransition
