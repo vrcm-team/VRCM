@@ -270,8 +270,7 @@ private fun LocationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable(onClick = onClickLocationCard),
+                    .clip(MaterialTheme.shapes.medium),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AImage(
@@ -296,7 +295,16 @@ private fun LocationCard(
                 )
                 Column(
                     modifier = Modifier
-                        .weight(0.5f),
+                        .weight(0.5f)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 8.dp,
+                                topEnd = 16.dp,
+                                bottomStart = 8.dp,
+                                bottomEnd = 16.dp
+                            )
+                        )
+                        .clickable(onClick = onClickLocationCard),
                 ) {
                     Text(
                         text = instants.worldName,
