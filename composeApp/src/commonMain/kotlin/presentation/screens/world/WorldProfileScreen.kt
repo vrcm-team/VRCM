@@ -1,9 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -838,7 +841,7 @@ private fun Screen.RenderBottomSheetContent(
             }
         ).Content()
     }
-    
+
     // 显示收藏组选择底部表单
     FavoriteGroupBottomSheet(
         isVisible = showFavoriteGroupBottomSheet,
@@ -846,7 +849,7 @@ private fun Screen.RenderBottomSheetContent(
         favoriteType = FavoriteType.World,
         onDismiss = { showFavoriteGroupBottomSheet = false }
     )
-    
+
     // 上滑渐变小
     val fl = 1 - bottomSheetState.blurProgress
     Box(
@@ -859,9 +862,8 @@ private fun Screen.RenderBottomSheetContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 标签区域
-            AnimatedVisibility(
-                visible = fl > 0f,
-            ) {
+
+            if (fl > 0f) {
                 Column(
                     modifier = Modifier.alpha(fl),
                     verticalArrangement = Arrangement.spacedBy(4.dp * fl)
@@ -906,11 +908,8 @@ private fun Screen.RenderBottomSheetContent(
             }
 
             // 堆叠卡片 - 改为随着滑动过程展开
-            AnimatedVisibility(
-                visible = bottomSheetState.collapsedAlpha > 0f,
-                modifier = Modifier
-                    .fillMaxWidth()
-            ) {
+
+            if (bottomSheetState.collapsedAlpha > 0f) {
                 Box(modifier = Modifier.alpha(bottomSheetState.collapsedAlpha)) {
                     StackedCards(
                         instances = worldProfileVo.instances,
@@ -923,7 +922,7 @@ private fun Screen.RenderBottomSheetContent(
                 }
             }
         }
-        
+
         val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
         // 操作按钮 - 始终显示在底部
         if (buttonAlpha <= 0f) return@Box
@@ -1028,7 +1027,7 @@ private fun InfoItemBlock(
 
 
 @Composable
-fun AnimatedVisibilityScope.StackedCards(
+fun StackedCards(
     instances: List<InstanceVo>,
     maxVisibleCards: Int = 3,
     expandProgress: Float = 0f,  // 默认值为0，表示未展开
@@ -1147,8 +1146,8 @@ fun AnimatedVisibilityScope.StackedCards(
                     verticalOffset = 0.dp,
                     scaleEffect = 1f,
                     alphaEffect = 1f,
-                    onClick = doExpandCardClick,
-                    expandProgress = expandProgress
+                    expandProgress = expandProgress,
+                    onClick = doExpandCardClick
                 )
             }
 

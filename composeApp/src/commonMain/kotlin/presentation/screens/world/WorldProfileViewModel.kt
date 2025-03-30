@@ -72,12 +72,12 @@ class WorldProfileScreenModel(
 
             // 获取实例ID列表
             val instanceIds =
-                _worldProfileState.value?.instances?.map { it.instanceId }?.toMutableSet() ?: mutableSetOf()
-            instanceIds.addAll(worldData.instances?.mapNotNull { it.firstOrNull() }?.filter { it.isNotBlank() }
-                ?: emptySet())
+                _worldProfileState.value?.instances?.associate { it.instanceId to it.owner.value }?: emptyMap()
+            val mergeInstanceIds = instanceIds + (worldData.instances?.mapNotNull { it.firstOrNull() }?.filter { it.isNotBlank() }?.associateWith { null }
+                ?: emptyMap())
             // 如果有实例ID，则获取实例信息
-            if (instanceIds.isNotEmpty()) {
-                loadInstanceData(instanceIds)
+            if (mergeInstanceIds.isNotEmpty()) {
+                loadInstanceData(mergeInstanceIds)
             }
         }.onFailure {
             SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
@@ -87,18 +87,18 @@ class WorldProfileScreenModel(
     /**
      * 加载实例数据
      */
-    private suspend fun loadInstanceData(instanceIds: Collection<String>) {
+    private suspend fun loadInstanceData(instanceIds: Map<String, Owner?>) {
         val currentProfile = _worldProfileState.value ?: return
         val instanceVos = currentProfile.instances.toMutableStateList()
         _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos)
         authService.reTryAuthCatching {
             // 获取所有实例数据
-            instanceIds.asFlow().map {
+            instanceIds.keys.asFlow().map {
                 worldsApi.getWorldInstanceById(currentProfile.worldId, it)
             }.catch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance data"))
             }.map { instanceData ->
-                val owner: MutableStateFlow<Owner?> = MutableStateFlow(null)
+                val owner: MutableStateFlow<Owner?> = MutableStateFlow(instanceIds[instanceData.instanceId])
                 val instanceVo = InstanceVo(instanceData, owner)
                 instanceVos.removeFirst { it.id == instanceData.id }
                 instanceVos.add(instanceVo)

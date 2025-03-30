@@ -1,7 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.components
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -23,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
-import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.IconLabelRow
+import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -38,9 +37,8 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun AnimatedVisibilityScope.InstanceCard(
+fun InstanceCard(
     instance: InstanceVo,
     size: Int,
     index: Int,
@@ -62,14 +60,6 @@ fun AnimatedVisibilityScope.InstanceCard(
         label = "offset"
     )
     val modifier = Modifier.fillMaxWidth().height(120.dp)
-        .sharedBoundsBy(
-            key = "${instance.id}:StackCardsContainer",
-            sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-            animatedVisibilityScope = this,
-            clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
-                OverlayClip(DialogShapeForSharedElement)
-            }
-        )
         .enableIf(!unfold) {
             offset(y = animatedOffset)
                 .graphicsLayer(

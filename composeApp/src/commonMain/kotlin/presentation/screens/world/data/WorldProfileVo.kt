@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
-import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 
@@ -67,33 +66,7 @@ data class WorldProfileVo(
         publicationDate = world.publicationDate,
         instances = instancesList,
     )
-    
-    // 从单个InstanceData构造临时对象
-    constructor(instance: InstanceData): this(
-        worldId = instance.world.id,
-        worldName = instance.world.name,
-        worldImageUrl = instance.world.imageUrlThumbnail,
-        thumbnailImageUrl = instance.world.thumbnailImageUrl,
-        worldDescription = instance.world.description.orEmpty(),
-        authorID = instance.world.authorId,
-        authorName = instance.world.authorName,
-        capacity = instance.world.capacity,
-        recommendedCapacity = instance.world.recommendedCapacity,
-        visits = instance.world.visits?: 0,
-        favorites = instance.world.favorites?: 0,
-        heat = instance.world.heat,
-        popularity = instance.world.popularity,
-        privateOccupants = instance.world.privateOccupants?: 0,
-        publicOccupants = instance.world.publicOccupants?: 0,
-        featured = instance.world.featured,
-        tags = instance.world.tags,
-        releaseStatus = instance.world.releaseStatus,
-        version = instance.world.version,
-        createdAt = instance.world.createdAt,
-        updatedAt = instance.world.updatedAt,
-        publicationDate = instance.world.publicationDate,
-        instances = mutableListOf(InstanceVo(instance)),
-    )
+
     
     // 从InstantsVo构造临时对象
     constructor(instant: HomeInstanceVo): this(
