@@ -50,7 +50,7 @@ object SearchListPager : Pager {
         val users by searchListPagerModel.userSearchList.collectAsState()
         val worlds by searchListPagerModel.worldSearchList.collectAsState()
         // 当搜索文本改变时执行搜索
-        LaunchedEffect(searchText,selectedTabIndex) {
+        LaunchedEffect(searchText, selectedTabIndex) {
             searchListPagerModel.refreshSearchList()
         }
         GenericSearchList(

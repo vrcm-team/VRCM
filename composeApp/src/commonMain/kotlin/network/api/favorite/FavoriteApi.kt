@@ -83,7 +83,7 @@ class FavoriteApi(private val client: HttpClient) {
                 ownerId = ownerId
 
             )
-        }.toCollection(mutableListOf()).flatMap { it }
+        }.toCollection(mutableListOf()).flatten()
     }
 
     private suspend fun  FlowCollector<List<FavoriteGroupData>>.fetchFavoriteGroupList(

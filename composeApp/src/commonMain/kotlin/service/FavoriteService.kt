@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * 收藏服务类
@@ -76,7 +77,6 @@ class FavoriteService(
     }
 
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
-        val newFavoritesByGroup: MutableMap<FavoriteGroupData, List<FavoriteData>> = mutableMapOf()
         val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
         favoriteApi.fetchFavorite(favoriteType)
             .collect { favoriteDataList ->
@@ -86,10 +86,9 @@ class FavoriteService(
                 }
             }
         val groups = favoriteApi.getFavoriteGroupsByType(favoriteType)
-        groups.forEach { group ->
-            newFavoritesByGroup[group] = newFavoritesMap[group.name] ?: listOf()
+        _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }.update {
+            groups.associateWith { (newFavoritesMap[it.name] ?: listOf()) }
         }
-        _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }.value = newFavoritesByGroup
     }.onFailure {
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
     }
