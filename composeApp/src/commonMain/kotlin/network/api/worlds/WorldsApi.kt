@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.network.api.worlds
 
 import io.github.vrcmteam.vrcm.network.api.attributes.WORLDS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
@@ -61,5 +62,54 @@ class WorldsApi(private val client: HttpClient)  {
             releaseStatus?.let { parameter("releaseStatus", it) }
             tag?.let { parameter("tag", it) }
             notag?.let { parameter("notag", it) }
+        }.checkSuccess()
+        
+    /**
+     * 获取收藏的世界列表
+     * 
+     * @param featured 是否只显示精选世界
+     * @param sort 排序方式，默认为流行度
+     * @param n 返回结果数量，默认为60，最大100
+     * @param order 结果排序顺序，默认为降序
+     * @param offset 结果偏移量
+     * @param search 按世界名称搜索
+     * @param tag 包含的标签（逗号分隔）
+     * @param notag 排除的标签（逗号分隔）
+     * @param releaseStatus 根据发布状态过滤
+     * @param maxUnityVersion 资产支持的最大Unity版本
+     * @param minUnityVersion 资产支持的最小Unity版本
+     * @param platform 资产支持的平台
+     * @param userId 查看目标用户的信息（仅管理员）
+     * @return List<FavoritedWorld> 收藏的世界数据列表，包含收藏信息
+     */
+    suspend fun getFavoritedWorlds(
+        featured: Boolean? = null,
+        sort: String? = null,
+        n: Int? = null,
+        order: String? = null,
+        offset: Int? = null,
+        search: String? = null,
+        tag: String? = null,
+        notag: String? = null,
+        releaseStatus: String? = null,
+        maxUnityVersion: String? = null,
+        minUnityVersion: String? = null,
+        platform: String? = null,
+        userId: String? = null
+    ): List<FavoritedWorld> =
+        client.get("$WORLDS_API_PREFIX/favorites") {
+            featured?.let { parameter("featured", it) }
+            sort?.let { parameter("sort", it) }
+            n?.let { parameter("n", it) }
+            order?.let { parameter("order", it) }
+            offset?.let { parameter("offset", it) }
+            search?.let { parameter("search", it) }
+            tag?.let { parameter("tag", it) }
+            notag?.let { parameter("notag", it) }
+            releaseStatus?.let { parameter("releaseStatus", it) }
+            maxUnityVersion?.let { parameter("maxUnityVersion", it) }
+            minUnityVersion?.let { parameter("minUnityVersion", it) }
+            platform?.let { parameter("platform", it) }
+            userId?.let { parameter("userId", it) }
         }.checkSuccess()
 }
