@@ -200,8 +200,8 @@ class FriendListPagerModel(
     /**
      * 根据当前选中的标签页刷新对应数据
      */
-    fun refreshCurrentTabCacheData(showRefreshing: Boolean = true) {
-        when (_selectedTabIndex.value) {
+    fun refreshCurrentTabCacheData(showRefreshing: Boolean = true, tabIndex: Int = _selectedTabIndex.value) {
+        when (tabIndex) {
             0 ->
                 // 好友标签页
                 doRefreshCache(Friend, showRefreshing)

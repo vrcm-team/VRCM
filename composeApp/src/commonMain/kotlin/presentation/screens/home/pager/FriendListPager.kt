@@ -68,7 +68,8 @@ object FriendListPager : Pager {
         // 初始加载缓存数据: 只有第一次默认为ture才会刷新一次
         LaunchedEffect(Unit) {
             if (isRefreshing){
-                friendListPagerModel.refreshCurrentTabCacheData()
+                friendListPagerModel.refreshCurrentTabCacheData(tabIndex = 0)
+                friendListPagerModel.refreshCurrentTabCacheData(tabIndex = 1)
             }
         }
 
