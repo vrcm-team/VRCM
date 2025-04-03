@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.worlds
 
+import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.WORLDS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
@@ -7,6 +8,8 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 class WorldsApi(private val client: HttpClient)  {
     /**
@@ -65,6 +68,29 @@ class WorldsApi(private val client: HttpClient)  {
         }.checkSuccess()
         
     /**
+     * 获取收藏的世界列表（流式版本）
+     * 自动分页获取所有收藏世界数据
+     *
+     * @param n 每页返回结果数量，默认为50
+     * @param offset 偏移量，默认为0
+     * @param tag 过滤标签
+     * @return Flow<List<FavoritedWorld>> 收藏的世界数据列表流
+     */
+    fun favoritedWorldsFlow(
+        n: Int = 50,
+        offset: Int = 0,
+        tag: String? = null,
+    ): Flow<List<FavoritedWorld>> = flow {
+        fetchDataList(offset = offset, n = n) { currentOffset, pageSize ->
+            getFavoritedWorlds(
+                n = pageSize,
+                offset = currentOffset,
+                tag = tag,
+            )
+        }
+    }
+    
+    /**
      * 获取收藏的世界列表
      * 
      * @param featured 是否只显示精选世界
@@ -85,7 +111,7 @@ class WorldsApi(private val client: HttpClient)  {
     suspend fun getFavoritedWorlds(
         featured: Boolean? = null,
         sort: String? = null,
-        n: Int? = null,
+        n: Int = 50,
         order: String? = null,
         offset: Int? = null,
         search: String? = null,
@@ -98,9 +124,9 @@ class WorldsApi(private val client: HttpClient)  {
         userId: String? = null
     ): List<FavoritedWorld> =
         client.get("$WORLDS_API_PREFIX/favorites") {
+            parameter("n", n)
             featured?.let { parameter("featured", it) }
             sort?.let { parameter("sort", it) }
-            n?.let { parameter("n", it) }
             order?.let { parameter("order", it) }
             offset?.let { parameter("offset", it) }
             search?.let { parameter("search", it) }

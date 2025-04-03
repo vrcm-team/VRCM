@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
+import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
@@ -73,7 +74,7 @@ class FriendListPagerModel(
     val friendList: StateFlow<List<FriendData>> = _friendList.asStateFlow()
 
     // 缓存世界数据，以ID为键
-    private val worldMap: MutableMap<String, WorldData> = mutableStateMapOf()
+    private val favoritedWorldMap: MutableMap<String, FavoritedWorld> = mutableStateMapOf()
 
     private val _worldList = MutableStateFlow(emptyList<WorldData>())
 
@@ -129,7 +130,7 @@ class FriendListPagerModel(
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
                 friendMap.clear()
-                worldMap.clear()
+                favoritedWorldMap.clear()
                 _isRefreshing.value = true
             }
         }
@@ -149,8 +150,9 @@ class FriendListPagerModel(
                 }
 
                 World -> {
-                    // 需要先刷新收藏世界列表：因为数据来源收藏夹中的世界ID
+                    // 加载收藏组信息，用于分组过滤
                     favoriteService.loadFavoriteByGroup(World)
+                    // 直接从API获取收藏世界列表
                     doRefreshWorldList()
                 }
 
@@ -264,30 +266,58 @@ class FriendListPagerModel(
         // 获取选中的世界分组
         val selectedGroup = worldGroupOptions.value.selectedGroup
 
-        // 获取对应分组中的收藏世界ID
-        val favoriteWorldIds = if (selectedGroup != null) {
-            // 如果选中了特定分组，获取该分组下的收藏
-            worldFavoriteGroupsFlow.value[selectedGroup]?.map { it.favoriteId }?.toSet()
-        } else {
-            // 如果没有选中特定分组，获取所有收藏世界
-            worldFavoriteGroupsFlow.value.values.flatten().map { it.favoriteId }.toSet()
-        } ?: emptySet()
-
-        // 如果没有收藏的世界，返回空列表
-        if (favoriteWorldIds.isEmpty()) {
-            _worldList.value = emptyList()
-            return
-        }
-
         // 从缓存中获取世界数据并过滤
-        val filteredWorlds = worldMap.values
-            .filter { world ->
-                favoriteWorldIds.contains(world.id) &&
-                        (name.isEmpty() || world.name.lowercase().contains(name.lowercase()))
-            }
-            .sortedBy { it.name } // 按名称排序
-
-        _worldList.value = filteredWorlds
+        val filteredWorlds = if (selectedGroup != null) {
+            // 如果选中了特定分组，按分组名过滤
+            val groupName = selectedGroup.name
+            favoritedWorldMap.values
+                .filter { world ->
+                    world.favoriteGroup == groupName &&
+                    (name.isEmpty() || world.name.lowercase().contains(name.lowercase()))
+                }
+        } else {
+            // 如果没有选择特定分组，仅按名称过滤
+            favoritedWorldMap.values
+                .filter { world ->
+                    name.isEmpty() || world.name.lowercase().contains(name.lowercase())
+                }
+        }.sortedBy { it.name } // 按名称排序
+        
+        // 将FavoritedWorld列表转换为WorldData列表
+        _worldList.value = filteredWorlds.map { world ->
+            WorldData(
+                id = world.id,
+                name = world.name,
+                authorId = world.authorId.orEmpty(),
+                authorName = world.authorName.orEmpty(),
+                capacity = world.capacity ?: 0,
+                createdAt = world.createdAt.orEmpty(),
+                description = world.description.orEmpty(),
+                favorites = world.favorites ?: 0,
+                featured = world.featured ?: false,
+                heat = world.heat ?: 0,
+                imageUrl = world.imageUrl.orEmpty(),
+                labsPublicationDate = world.labsPublicationDate.orEmpty(),
+                organization = world.organization.orEmpty(),
+                popularity = world.popularity ?: 0,
+                publicationDate = world.publicationDate.orEmpty(),
+                recommendedCapacity = world.recommendedCapacity ?: 0,
+                releaseStatus = world.releaseStatus.orEmpty(),
+                tags = world.tags,
+                thumbnailImageUrl = world.thumbnailImageUrl.orEmpty(),
+                udonProducts = world.udonProducts,
+                unityPackages = world.unityPackages,
+                updatedAt = world.updatedAt.orEmpty(),
+                version = world.version ?: 0,
+                visits = world.visits ?: 0,
+                // 设置其他可能需要的字段
+                namespace = null,
+                privateOccupants = null,
+                publicOccupants = null,
+                instances = null,
+                previewYoutubeId = world.previewYoutubeId
+            )
+        }
     }
 
     // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
@@ -299,57 +329,38 @@ class FriendListPagerModel(
 
     /**
      * 刷新收藏的世界列表
-     * 从API获取数据并更新缓存
+     * 使用流式分页API获取全部收藏世界列表
      */
     private suspend fun doRefreshWorldList() {
-
-
-//            worldFavoriteGroupsFlow.value.values.flatten().filter { it.favoriteId == "wrld_bb1908e9-bd8e-4357-9d50-3f3506c4a3df" }
-        // 获取所有收藏的世界ID
-        val allFavoriteWorldIds = worldFavoriteGroupsFlow.value.values
-            .flatten()
-            .map { it.favoriteId }
-            .toSet()
-
-        if (allFavoriteWorldIds.isEmpty()) {
-            worldMap.clear()
-            _worldList.value = emptyList()
-            return
-        }
-
-        // 创建未缓存ID的集合
-        val uncachedWorldIds = allFavoriteWorldIds.filter { worldId ->
-            !worldMap.containsKey(worldId)
-        }
-
-        var loadedCount = 0
-        val totalToLoad = uncachedWorldIds.size
-
-        // 获取未缓存的世界数据
         screenModelScope.launch(Dispatchers.IO) {
-            // 同时获取无缓存的世界数据
-            for (worldId in uncachedWorldIds) {
-                try {
-                    val worldData = worldsApi.getWorldById(worldId)
-                    worldMap[worldId] = worldData
-                    loadedCount++
 
-                    // 每加载几个世界后更新UI，提供渐进式加载体验
-                    if (loadedCount % 3 == 0 || loadedCount == totalToLoad) {
-                        findWorldList(_searchText.value)
-                    }
-                } catch (e: Exception) {
-                    SharedFlowCentre.toastText.emit(ToastText.Error("${e.message}"))
-                }
+            // 计数器，用于跟踪是否获取了任何数据
+            var dataReceived = false
+            
+            worldsApi.favoritedWorldsFlow()
+            .retry {
+                // 如果是登录失效了就会重新登录并重试一次
+                if (it is VRCApiException) authService.doReTryAuth() else false
             }
-
-            // 移除已不在收藏列表中的缓存数据
-            worldMap.keys
-                .filter { it !in allFavoriteWorldIds }
-                .forEach { worldMap.remove(it) }
-
+            .catch { e ->
+                SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+            }
+            .onEach { favoritedWorlds ->
+                dataReceived = true
+                
+                // 更新收到每页数据后都更新一下UI，保持响应性
+                // TODO 暂时先过滤下isSecure, 不展示失效和私有的世界
+                favoritedWorldMap.putAll(favoritedWorlds.filter { it.isSecure != false } .associateBy { it.id })
+                findWorldList(_searchText.value)
+            }
+            .collect() // 收集所有页面的数据
+            
+            // 如果没有收到任何数据，清空列表
+            if (!dataReceived) {
+                favoritedWorldMap.clear()
+                _worldList.value = emptyList()
+            }
         }.join()
-
     }
 
 
@@ -365,6 +376,7 @@ class FriendListPagerModel(
                     update(friends)
                 }.count()
             if (count == 0) {
+                friendMap.clear()
                 _friendList.value = emptyList()
             }
         }.join()
