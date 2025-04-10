@@ -33,7 +33,6 @@ object SearchListPager : Pager {
         val searchListPagerModel: SearchListPagerModel = koinScreenModel()
         val coroutineScope = rememberCoroutineScope()
 
-
         // 获取当前选中的标签索引
         val selectedTabIndex by searchListPagerModel.searchType.collectAsState()
 
@@ -43,32 +42,31 @@ object SearchListPager : Pager {
         // 高级搜索选项状态
         var showAdvancedOptions by remember { mutableStateOf(false) }
 
-        // 标签页列表
-        val tabs = listOf(strings.searchUsers, strings.searchWorlds, "群组", "模型")
-        val currentNavigator = currentNavigator
-        val sharedSuffixKey = LocalSharedSuffixKey.current
         val users by searchListPagerModel.userSearchList.collectAsState()
         val worlds by searchListPagerModel.worldSearchList.collectAsState()
+        
         // 当搜索文本改变时执行搜索
         LaunchedEffect(searchText, selectedTabIndex) {
             searchListPagerModel.refreshSearchList()
         }
-        GenericSearchList(
+        
+        StandardSearchList(
             key = "GenericSearchPager",
             searchText = searchText,
             updateSearchText = { newText ->
                 searchListPagerModel.setSearchText(newText)
             },
-            tabs = tabs,
             selectedTabIndex = selectedTabIndex,
             onTabSelected = { index ->
                 coroutineScope.launch {
                     searchListPagerModel.setSearchType(index)
                 }
             },
-            advancedOptionsContent = {
+            userList = users,
+            worldList = worlds,
+            advancedOptionsContent = { tabType ->
                 // 仅在世界搜索标签下显示高级选项
-                if (selectedTabIndex == 1) {
+                if (tabType == SearchTabType.WORLD) {
                     val worldSearchOptions by searchListPagerModel.worldSearchOptions.collectAsState()
 
                     AdvancedOptionsPanel(
@@ -88,46 +86,7 @@ object SearchListPager : Pager {
                     }
                 }
             }
-        ) { tabIndex ->
-            when (tabIndex) {
-                0 -> {
-                    // 用户搜索结果
-
-                    renderUserItems(
-                        users = users,
-                        onUserClick = { user ->
-                            // 处理用户项点击
-                            val navigator = currentNavigator
-                            val sharedSuffixKey = sharedSuffixKey
-                            if (navigator.size <= 1) {
-                                navigator push UserProfileScreen(
-                                    UserProfileVo(user),
-                                    sharedSuffixKey
-                                )
-                            }
-                        }
-                    )
-                }
-
-                1 -> {
-                    // 世界搜索结果
-                    renderWorldItems(
-                        worlds = worlds,
-                        onWorldClick = { world ->
-                            // 处理世界项点击
-                            val navigator = currentNavigator
-                            if (navigator.size <= 1) {
-                                coroutineScope.launch {
-                                    navigator push WorldProfileScreen(
-                                        WorldProfileVo(world)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-        }
+        )
     }
 }
 

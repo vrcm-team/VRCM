@@ -279,9 +279,6 @@ private fun LocationCard(
                             key = location.location + "WorldImage",
                         )
                         .weight(0.5f)
-                        .enableIf(instants.worldId.isNotEmpty()) {
-                            clickable(onClick = onClickWorldImage)
-                        }
                         .clip(
                             RoundedCornerShape(
                                 topStart = 16.dp,
@@ -289,7 +286,10 @@ private fun LocationCard(
                                 bottomStart = 16.dp,
                                 bottomEnd = 8.dp
                             )
-                        ),
+                        )
+                        .enableIf(instants.worldId.isNotEmpty()) {
+                            clickable(onClick = onClickWorldImage)
+                        },
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
                 )

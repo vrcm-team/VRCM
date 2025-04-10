@@ -1,24 +1,38 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
-import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.AdvancedOptionsPanel
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
+import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
-import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import kotlinx.coroutines.launch
 
 object FriendListPager : Pager {
 
@@ -34,10 +48,7 @@ object FriendListPager : Pager {
     @Composable
     override fun Content() {
         val friendListPagerModel: FriendListPagerModel = koinScreenModel()
-        val coroutineScope = rememberCoroutineScope()
-        val currentNavigator = currentNavigator
-        val sharedSuffixKey = LocalSharedSuffixKey.current
-        
+
         // 搜索文本
         val searchText by friendListPagerModel.searchText.collectAsState()
         
@@ -53,9 +64,6 @@ object FriendListPager : Pager {
         // 获取好友组列表和世界组列表
         val friendFavoriteGroups by friendListPagerModel.friendFavoriteGroupsFlow.collectAsState()
         val worldFavoriteGroups by friendListPagerModel.worldFavoriteGroupsFlow.collectAsState()
-        
-        // 定义标签列表 - 好友和世界两个标签
-        val tabs = listOf(strings.searchUsers, strings.searchWorlds)
         
         // 获取分组选项状态
         val friendGroupOptions by friendListPagerModel.friendGroupOptions.collectAsState()
@@ -73,20 +81,20 @@ object FriendListPager : Pager {
             }
         }
 
-
-        GenericSearchList(
+        StandardSearchList(
             key = title,
             searchText = searchText,
             updateSearchText = friendListPagerModel::setSearchText,
-            tabs = tabs,
             selectedTabIndex = selectedTabIndex,
             onTabSelected = friendListPagerModel::setSelectedTabIndex,
             isRefreshing = isRefreshing,
             doRefresh = friendListPagerModel::refreshCurrentTabCacheData,
-            advancedOptionsContent = {
+            userList = filteredFriends,
+            worldList = filteredWorlds,
+            advancedOptionsContent = { tabType ->
                 // 根据当前选中的标签页显示不同的高级选项
-                when (selectedTabIndex) {
-                    0 -> { // 好友标签页
+                when (tabType) {
+                    SearchTabType.USER -> { // 好友标签页
                         AdvancedOptionsPanel(
                             title = "好友分组选项",
                             expanded = showFriendGroupOptions,
@@ -101,7 +109,7 @@ object FriendListPager : Pager {
                             )
                         }
                     }
-                    1 -> { // 世界标签页
+                    SearchTabType.WORLD -> { // 世界标签页
                         AdvancedOptionsPanel(
                             title = "世界分组选项",
                             expanded = showWorldGroupOptions,
@@ -116,43 +124,10 @@ object FriendListPager : Pager {
                             )
                         }
                     }
+                    else -> {}
                 }
             }
-        ) { tabIndex ->
-            when (tabIndex) {
-                0 -> { // 好友标签页
-                    renderUserItems(
-                        users = filteredFriends,
-                        onUserClick = { user ->
-                            // 处理用户点击，导航到用户资料页面
-                            if (currentNavigator.size <= 1) {
-                                coroutineScope.launch {
-                                    currentNavigator push UserProfileScreen(
-                                        UserProfileVo(user),
-                                        sharedSuffixKey
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-                1 -> { // 世界标签页
-                    renderWorldItems(
-                        worlds = filteredWorlds,
-                        onWorldClick = { world ->
-                            // 处理世界点击，导航到世界详情页面
-                            if (currentNavigator.size <= 1) {
-                                coroutineScope.launch {
-                                    currentNavigator push WorldProfileScreen(
-                                        WorldProfileVo(world)
-                                    )
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-        }
+        )
     }
 }
 
