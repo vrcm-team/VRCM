@@ -7,8 +7,8 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.SearchUserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
-import io.github.vrcmteam.vrcm.presentation.compoments.SortOption
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.WorldSearchOptions
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -157,19 +157,3 @@ class SearchListPagerModel(
         }.isSuccess
     }
 }
-
-/**
- * 世界搜索选项数据类
- */
-data class WorldSearchOptions(
-    val featured: Boolean? = null,
-    val sortOption: SortOption = SortOption.Popularity,
-    val user: String? = null,
-    val userId: String? = null,
-    val resultsCount: Int = 50,
-    val order: String = "descending",
-    val offset: Int = 0,
-    val releaseStatus: String? = null,
-    val tag: String? = null,
-    val notag: String? = null
-)

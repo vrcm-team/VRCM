@@ -5,11 +5,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.presentation.compoments.*
-import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
