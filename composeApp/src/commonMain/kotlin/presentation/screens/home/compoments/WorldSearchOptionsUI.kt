@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.home.pager
+package io.github.vrcmteam.vrcm.presentation.screens.home.compoments
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

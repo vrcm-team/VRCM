@@ -1,6 +1,6 @@
 package  io.github.vrcmteam.vrcm.presentation.screens.home.data
 
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SortOption
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.SortOption
 
 /**
  * 世界搜索选项数据类
