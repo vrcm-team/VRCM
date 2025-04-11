@@ -418,6 +418,9 @@ private fun RenderBackgroundImage(
     hazeState: HazeState,
     imageHeight: Dp,
 ) {
+    println(
+        "RenderBackgroundImage: ${worldId}WorldImage)"
+    )
     AImage(
         modifier = Modifier
             .height(imageHeight)

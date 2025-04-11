@@ -56,7 +56,7 @@ fun WorldSearchOptionsUI(
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             // 排序下拉菜单
             var expandSortMenu by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
@@ -66,6 +66,7 @@ fun WorldSearchOptionsUI(
                 OutlinedTextField(
                     value = options.sortOption.displayName,
                     onValueChange = {},
+                    shape = MaterialTheme.shapes.medium,
                     readOnly = true,
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandSortMenu)
@@ -73,10 +74,11 @@ fun WorldSearchOptionsUI(
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                 )
                 
                 ExposedDropdownMenu(
+                    shape = MaterialTheme.shapes.medium,
                     expanded = expandSortMenu,
                     onDismissRequest = { expandSortMenu = false }
                 ) {
@@ -165,4 +167,41 @@ fun WorldSearchOptionsUI(
             )
         }
     }
-} 
+}
+
+
+/**
+ * 排序选项枚举
+ */
+enum class SortOption(val value: String) {
+    Popularity("popularity"),
+    Heat("heat"),
+    Trust("trust"),
+    Shuffle("shuffle"),
+    Random("random"),
+    Favorites("favorites"),
+    Created("created"),
+    Updated("updated"),
+    Relevance("relevance"),
+    Name("name");
+
+    /**
+     * 获取排序选项的本地化显示名称
+     */
+    val displayName: String
+        @Composable
+        get() {
+            return when (this) {
+                Popularity -> strings.worldSearchSortPopularity
+                Heat -> strings.worldSearchSortHeat
+                Trust -> strings.worldSearchSortTrust
+                Shuffle -> strings.worldSearchSortShuffle
+                Random -> strings.worldSearchSortRandom
+                Favorites -> strings.worldSearchSortFavorites
+                Created -> strings.worldSearchSortCreated
+                Updated -> strings.worldSearchSortUpdated
+                Relevance -> strings.worldSearchSortRelevance
+                Name -> strings.worldSearchSortName
+            }
+        }
+}

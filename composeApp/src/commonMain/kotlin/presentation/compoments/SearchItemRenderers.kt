@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -8,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -40,6 +43,7 @@ fun LazyItemScope.renderUserItem(
     SearchResultItem(
         item = user,
         onClick = onUserClick,
+        modifier = Modifier.animateItem(),
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier.sharedBoundsBy("${user.id}UserIcon"),
@@ -95,13 +99,15 @@ fun LazyItemScope.renderWorldItem(
     world: WorldData,
     onWorldClick: (WorldData) -> Unit
 ) {
+    println("${world.id}WorldImage")
     SearchResultItem(
         item = world,
         onClick = onWorldClick,
+        modifier = Modifier.animateItem(),
         leadingContent = {
-            WorldThumbnail(
-                modifier = Modifier.sharedBoundsBy("${world.id}WorldThumbnail"),
-                thumbnailUrl = world.thumbnailImageUrl,
+            AImage(
+                modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp).clip(MaterialTheme.shapes.medium),
+                imageData = world.imageUrl,
             )
         },
         headlineContent = {

@@ -1,11 +1,16 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
@@ -15,8 +20,12 @@ import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
@@ -90,12 +99,24 @@ fun GenericSearchList(
                                     .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))  // 添加上部圆角
                             )
                         },
+                        divider = {}, // 移除底部分隔线
                     ) {
                         tabs.forEachIndexed { index, title ->
                             Tab(
                                 selected = index == selectedTabIndex,
                                 onClick = { onTabSelected(index) },
-                                text = { Text(title) }
+                                interactionSource = remember { MutableInteractionSource() },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                text = { 
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (index == selectedTabIndex) FontWeight.Bold
+                                                        else FontWeight.Normal
+                                        )
+                                    ) 
+                                }
                             )
                         }
                     }
@@ -132,13 +153,14 @@ fun GenericSearchList(
 fun <T> SearchResultItem(
     item: T,
     onClick: (T) -> Unit,
+    modifier: Modifier = Modifier,
     leadingContent: @Composable () -> Unit,
     headlineContent: @Composable () -> Unit,
     supportingContent: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (() -> Unit)? = null
 ) {
     ListItem(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(68.dp)
             .padding(horizontal = 6.dp)

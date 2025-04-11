@@ -14,9 +14,9 @@ import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import org.koin.compose.koinInject
 
 @Composable
-inline fun SettingsProvider(
+fun SettingsProvider(
     colorAnimationSpec: AnimationSpec<Color> = tween(600),
-    noinline content: @Composable () -> Unit
+    content: @Composable () -> Unit
 ) {
     val settingsModel: SettingsModel = koinInject()
 

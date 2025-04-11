@@ -44,8 +44,8 @@ fun StandardSearchList(
         if (currentNavigator.size <= 1) {
             coroutineScope.launch {
                 currentNavigator push UserProfileScreen(
-                    UserProfileVo(user),
-                    sharedSuffixKey
+                    userProfileVO = UserProfileVo(user),
+                    sharedSuffixKey = sharedSuffixKey
                 )
             }
         }
@@ -55,7 +55,8 @@ fun StandardSearchList(
         if (currentNavigator.size <= 1) {
             coroutineScope.launch {
                 currentNavigator push WorldProfileScreen(
-                    WorldProfileVo(world)
+                    worldProfileVO = WorldProfileVo(world),
+                    sharedSuffixKey = sharedSuffixKey
                 )
             }
         }

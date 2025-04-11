@@ -86,9 +86,9 @@ object NotificationDialog : SharedDialog {
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private inline fun LazyItemScope.NotificationItem(
+private fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
-    noinline onResponse: (String, String, NotificationItemData.ActionData) -> Unit,
+    onResponse: (String, String, NotificationItemData.ActionData) -> Unit,
 ) {
     var isExpand by remember { mutableStateOf(false) }
     var responded by remember { mutableStateOf(false) }

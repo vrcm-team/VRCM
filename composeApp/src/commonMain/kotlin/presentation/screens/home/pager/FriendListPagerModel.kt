@@ -145,8 +145,8 @@ class FriendListPagerModel(
             when (favoriteType) {
                 Friend -> {
                     // 不需要先刷新好友收藏列表
-                    doRefreshFriendList()
                     favoriteService.loadFavoriteByGroup(Friend)
+                    doRefreshFriendList()
                 }
 
                 World -> {
@@ -294,7 +294,7 @@ class FriendListPagerModel(
                 createdAt = world.createdAt.orEmpty(),
                 description = world.description.orEmpty(),
                 favorites = world.favorites ?: 0,
-                featured = world.featured ?: false,
+                featured = world.featured == true,
                 heat = world.heat ?: 0,
                 imageUrl = world.imageUrl.orEmpty(),
                 labsPublicationDate = world.labsPublicationDate.orEmpty(),

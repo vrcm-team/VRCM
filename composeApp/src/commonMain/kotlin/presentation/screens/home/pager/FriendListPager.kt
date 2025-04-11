@@ -10,6 +10,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,12 +55,6 @@ object FriendListPager : Pager {
         
         // 选中的标签页索引
         val selectedTabIndex by friendListPagerModel.selectedTabIndex.collectAsState()
-
-        // 好友组选项状态
-        var showFriendGroupOptions by remember { mutableStateOf(false) }
-        
-        // 世界组选项状态
-        var showWorldGroupOptions by remember { mutableStateOf(false) }
         
         // 获取好友组列表和世界组列表
         val friendFavoriteGroups by friendListPagerModel.friendFavoriteGroupsFlow.collectAsState()
@@ -95,34 +90,22 @@ object FriendListPager : Pager {
                 // 根据当前选中的标签页显示不同的高级选项
                 when (tabType) {
                     SearchTabType.USER -> { // 好友标签页
-                        AdvancedOptionsPanel(
-                            title = "好友分组选项",
-                            expanded = showFriendGroupOptions,
-                            onExpandToggle = { showFriendGroupOptions = !showFriendGroupOptions }
-                        ) {
-                            FriendGroupOptionsUI(
-                                options = friendGroupOptions,
-                                favoriteGroups = friendFavoriteGroups.keys.toList(),
-                                onOptionsChanged = { newOptions ->
-                                    friendListPagerModel.updateFriendGroupOptions(newOptions)
-                                }
-                            )
-                        }
+                        FriendGroupOptionsUI(
+                            options = friendGroupOptions,
+                            favoriteGroups = friendFavoriteGroups.keys.toList(),
+                            onOptionsChanged = { newOptions ->
+                                friendListPagerModel.updateFriendGroupOptions(newOptions)
+                            }
+                        )
                     }
                     SearchTabType.WORLD -> { // 世界标签页
-                        AdvancedOptionsPanel(
-                            title = "世界分组选项",
-                            expanded = showWorldGroupOptions,
-                            onExpandToggle = { showWorldGroupOptions = !showWorldGroupOptions }
-                        ) {
-                            WorldGroupOptionsUI(
-                                options = worldGroupOptions,
-                                favoriteGroups = worldFavoriteGroups.keys.toList(),
-                                onOptionsChanged = { newOptions ->
-                                    friendListPagerModel.updateWorldGroupOptions(newOptions)
-                                }
-                            )
-                        }
+                        WorldGroupOptionsUI(
+                            options = worldGroupOptions,
+                            favoriteGroups = worldFavoriteGroups.keys.toList(),
+                            onOptionsChanged = { newOptions ->
+                                friendListPagerModel.updateWorldGroupOptions(newOptions)
+                            }
+                        )
                     }
                     else -> {}
                 }
@@ -144,62 +127,52 @@ fun FriendGroupOptionsUI(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(horizontal = 16.dp)
     ) {
         // 好友分组选择
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
+        // 好友分组下拉菜单
+        var expandGroupMenu by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = expandGroupMenu,
+            onExpandedChange = { expandGroupMenu = it }
         ) {
-            Text(
-                text = "选择好友分组",
-                style = MaterialTheme.typography.bodyMedium
+            OutlinedTextField(
+                value = options.selectedGroup?.displayName ?: "全部好友",
+                onValueChange = {},
+                shape = MaterialTheme.shapes.medium,
+                readOnly = true,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
+                },
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // 好友分组下拉菜单
-            var expandGroupMenu by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
+
+            ExposedDropdownMenu(
+                shape = MaterialTheme.shapes.medium,
                 expanded = expandGroupMenu,
-                onExpandedChange = { expandGroupMenu = it }
+                onDismissRequest = { expandGroupMenu = false }
             ) {
-                OutlinedTextField(
-                    value = options.selectedGroup?.displayName ?: "全部好友",
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
-                    },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                // 添加"全部好友"选项
+                DropdownMenuItem(
+                    text = { Text("全部好友") },
+                    onClick = {
+                        onOptionsChanged(options.copy(selectedGroup = null))
+                        expandGroupMenu = false
+                    }
                 )
-                
-                ExposedDropdownMenu(
-                    expanded = expandGroupMenu,
-                    onDismissRequest = { expandGroupMenu = false }
-                ) {
-                    // 添加"全部好友"选项
+
+                // 添加所有好友分组选项
+                favoriteGroups.forEach { group ->
                     DropdownMenuItem(
-                        text = { Text("全部好友") },
+                        text = { Text(group.displayName) },
                         onClick = {
-                            onOptionsChanged(options.copy(selectedGroup = null))
+                            onOptionsChanged(options.copy(selectedGroup = group))
                             expandGroupMenu = false
                         }
                     )
-                    
-                    // 添加所有好友分组选项
-                    favoriteGroups.forEach { group ->
-                        DropdownMenuItem(
-                            text = { Text(group.displayName) },
-                            onClick = {
-                                onOptionsChanged(options.copy(selectedGroup = group))
-                                expandGroupMenu = false
-                            }
-                        )
-                    }
                 }
             }
         }
@@ -216,65 +189,55 @@ fun WorldGroupOptionsUI(
     favoriteGroups: List<FavoriteGroupData>,
     onOptionsChanged: (WorldGroupOptions) -> Unit
 ) {
+    // 世界分组选择
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        // 世界分组选择
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
+        // 世界分组下拉菜单
+        var expandGroupMenu by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(
+            expanded = expandGroupMenu,
+            onExpandedChange = { expandGroupMenu = it }
         ) {
-            Text(
-                text = "选择世界分组",
-                style = MaterialTheme.typography.bodyMedium
+            OutlinedTextField(
+                value = options.selectedGroup?.displayName ?: "全部世界",
+                onValueChange = {},
+                readOnly = true,
+                shape = MaterialTheme.shapes.medium,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
+                },
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // 世界分组下拉菜单
-            var expandGroupMenu by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
+
+            ExposedDropdownMenu(
+                shape = MaterialTheme.shapes.medium,
                 expanded = expandGroupMenu,
-                onExpandedChange = { expandGroupMenu = it }
+                onDismissRequest = { expandGroupMenu = false }
             ) {
-                OutlinedTextField(
-                    value = options.selectedGroup?.displayName ?: "全部世界",
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
-                    },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
+                // 添加"全部世界"选项
+                DropdownMenuItem(
+                    text = { Text("全部世界") },
+                    onClick = {
+                        onOptionsChanged(options.copy(selectedGroup = null))
+                        expandGroupMenu = false
+                    }
                 )
-                
-                ExposedDropdownMenu(
-                    expanded = expandGroupMenu,
-                    onDismissRequest = { expandGroupMenu = false }
-                ) {
-                    // 添加"全部世界"选项
+
+                // 添加所有世界分组选项
+                favoriteGroups.forEach { group ->
                     DropdownMenuItem(
-                        text = { Text("全部世界") },
+                        text = { Text(group.displayName) },
                         onClick = {
-                            onOptionsChanged(options.copy(selectedGroup = null))
+                            onOptionsChanged(options.copy(selectedGroup = group))
                             expandGroupMenu = false
                         }
                     )
-                    
-                    // 添加所有世界分组选项
-                    favoriteGroups.forEach { group ->
-                        DropdownMenuItem(
-                            text = { Text(group.displayName) },
-                            onClick = {
-                                onOptionsChanged(options.copy(selectedGroup = group))
-                                expandGroupMenu = false
-                            }
-                        )
-                    }
                 }
             }
         }
