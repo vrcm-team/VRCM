@@ -74,7 +74,7 @@ fun Modifier.sharedElementBy(
     with(sharedTransitionScope) {
         val suffixKey = LocalSharedSuffixKey.current
         this@sharedElementBy.sharedElement(
-            state = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
+            sharedContentState = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
             animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             placeHolderSize = placeHolderSize,
