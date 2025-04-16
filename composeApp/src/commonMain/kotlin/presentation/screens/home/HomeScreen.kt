@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
@@ -116,7 +117,7 @@ private inline fun Screen.HomeTopAppBar(
         }
     }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
-        currentDialog = UserStatusDialog(it){
+        currentDialog = UserStatusDialog(it) {
             currentDialog = null
         }
     }
@@ -154,17 +155,10 @@ private inline fun Screen.HomeTopAppBar(
             ) {
                 UserStateIcon(
                     modifier = Modifier.simpleClickable { currentUser?.let { onClickUserIcon(it) } }
-                        .enableIf(currentUser != null) {
-                            sharedBoundsBy(
-                                key = "${currentUser!!.id}UserIcon",
-                            )
-                        }
-                        .enableIf(currentUser == null) {
-                            sharedBoundsBy(
-                                key = "${homeScreenModel.userId}UserIcon",
-                                boundsTransform = IconBoundsTransform
-                            )
-                        }
+                        .sharedBoundsBy(
+                            key = "${currentUser?.id ?: homeScreenModel.userId}UserIcon",
+                            boundsTransform = if (currentUser != null) DefaultBoundsTransform else IconBoundsTransform
+                        )
                         .size(54.dp),
                     iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl
                 )
