@@ -8,6 +8,37 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 object AppIcons {
+
+    val SaveAlt: ImageVector by lazy {
+        materialIcon(name = "Filled.SaveAlt") {
+            materialPath {
+                moveTo(19.0f, 12.0f)
+                verticalLineToRelative(7.0f)
+                horizontalLineTo(5.0f)
+                verticalLineToRelative(-7.0f)
+                horizontalLineTo(3.0f)
+                verticalLineToRelative(7.0f)
+                curveToRelative(0.0f, 1.1f, 0.9f, 2.0f, 2.0f, 2.0f)
+                horizontalLineToRelative(14.0f)
+                curveToRelative(1.1f, 0.0f, 2.0f, -0.9f, 2.0f, -2.0f)
+                verticalLineToRelative(-7.0f)
+                horizontalLineToRelative(-2.0f)
+                close()
+                moveTo(13.0f, 12.67f)
+                lineToRelative(2.59f, -2.58f)
+                lineTo(17.0f, 11.5f)
+                lineToRelative(-5.0f, 5.0f)
+                lineToRelative(-5.0f, -5.0f)
+                lineToRelative(1.41f, -1.41f)
+                lineTo(11.0f, 12.67f)
+                verticalLineTo(3.0f)
+                horizontalLineToRelative(2.0f)
+                verticalLineToRelative(9.67f)
+                close()
+            }
+        }
+    }
+
     val Groups: ImageVector by lazy {
         ImageVector.Builder(
             name = "Groups",
