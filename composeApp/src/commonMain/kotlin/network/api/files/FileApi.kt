@@ -2,11 +2,13 @@ package io.github.vrcmteam.vrcm.network.api.files
 
 import io.github.vrcmteam.vrcm.network.api.attributes.FILES_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileDetailsData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
-
+import io.ktor.client.request.forms.*
+import io.ktor.http.*
 
 
 class FileApi(private val client: HttpClient) {
@@ -41,7 +43,7 @@ class FileApi(private val client: HttpClient) {
             return response.headers["Location"] ?: fileUrl
         } .getOrDefault(fileUrl)
     }
-    
+
     /**
      * 获取文件列表
      * @param tag 标签，例如"icon"、"emoji"、"sticker"或"gallery"
@@ -61,4 +63,35 @@ class FileApi(private val client: HttpClient) {
         parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccess<List<FileData>>()
 
+    /**
+     * 上传文件
+     * @param fileBytes 文件字节数组
+     * @param fileName 文件名
+     * @param mimeType 文件MIME类型
+     * @param tagType 文件标签类型
+     * @return 上传结果
+     */
+    suspend fun uploadFile(
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        tagType: FileTagType
+    ): Result<FileDetailsData> {
+        return try {
+            val response = client.submitFormWithBinaryData(
+                url = "$FILES_API_PREFIX/create",
+                formData = formData {
+                    append("file", fileBytes, Headers.build {
+                        append(HttpHeaders.ContentType, mimeType)
+                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                    })
+                    append("tag", tagType.value)
+                }
+            )
+            val result = response.checkSuccess<FileDetailsData>()
+            Result.success(result)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

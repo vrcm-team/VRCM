@@ -69,7 +69,47 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
                     message = "暂无${title}文件",
                 )
             } else {
-                GalleryGrid(files, tagType)
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // 如果是Gallery标签页，添加上传按钮
+                    if (tagType == FileTagType.Gallery) {
+                        // 上传按钮
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            val coroutineScope = rememberCoroutineScope()
+                            val platform = getAppPlatform()
+
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        // 从系统相册选择图片
+                                        val imagePath = platform.selectImageFromGallery()
+                                        if (imagePath != null) {
+                                            // 选择了图片，通知用户
+                                            SharedFlowCentre.toastText.emit(ToastText.Info("正在上传图片..."))
+                                            // 调用ScreenModel的上传方法
+                                            galleryScreenModel.uploadImage(imagePath)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(4.dp)
+                            ) {
+                                Icon(
+                                    painter = rememberVectorPainter(AppIcons.SaveAlt),
+                                    contentDescription = "上传图片",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("上传图片")
+                            }
+                        }
+                    }
+
+                    GalleryGrid(files, tagType)
+                }
             }
         }
     }
@@ -178,7 +218,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
         val coroutineScope = rememberCoroutineScope()
         val platform = getAppPlatform()
         var dialogContent by LocationDialogContent.current
-        
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -211,7 +251,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
                     minScale = 0.5f
                 )
             }
-            
+
             // 添加FloatingActionButton用于保存图片，放在右下角
             FloatingActionButton(
                 onClick = {
@@ -220,7 +260,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
                             imageUrl = imageUrl,
                             fileName = "${file.name}.jpg"
                         )
-                        
+
                         if (result) {
                             SharedFlowCentre.toastText.emit(ToastText.Success("图片已保存到相册"))
                         } else {
@@ -237,7 +277,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
                     contentDescription = "保存到相册"
                 )
             }
-            
+
             // 添加一个关闭按钮，放在左上角
             IconButton(
                 onClick = {
@@ -258,6 +298,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
     }
 }
 
+
 /**
  * 支持手势缩放和平移的图片组件
  */
@@ -271,14 +312,14 @@ fun ZoomableImage(
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) } // 0: 正常, 1: 放大, 2: 缩小
-    
+
     // 监视scale变化，当缩放回到1.0f时，重置offset到中心
     LaunchedEffect(scale) {
         if (scale <= 1.0f) {
             offset = Offset.Zero
         }
     }
-    
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -287,16 +328,16 @@ fun ZoomableImage(
                     // 处理缩放
                     val prevScale = scale
                     scale = (scale * zoom).coerceIn(minScale, maxScale)
-                    
+
                     // 处理平移 (只有在放大状态下才能平移)
                     if (scale > 1f) {
                         // 计算新的偏移量
                         val newOffset = offset + pan
-                        
+
                         // 限制平移范围，防止图片移出屏幕太多
                         val maxX = (scale - 1) * size.width / 2
                         val maxY = (scale - 1) * size.height / 2
-                        
+
                         offset = Offset(
                             newOffset.x.coerceIn(-maxX, maxX),
                             newOffset.y.coerceIn(-maxY, maxY)
@@ -315,13 +356,13 @@ fun ZoomableImage(
                             0 -> {
                                 // 正常 -> 放大
                                 scale = min(maxScale, 2.5f)
-                                
+
                                 // 可以选择让双击的位置作为放大的中心点
                                 val centerX = size.width / 2
                                 val centerY = size.height / 2
                                 val targetOffsetX = (centerX - tapOffset.x) * (scale - 1)
                                 val targetOffsetY = (centerY - tapOffset.y) * (scale - 1)
-                                
+
                                 // 限制偏移量
                                 val maxX = (scale - 1) * size.width / 2
                                 val maxY = (scale - 1) * size.height / 2
@@ -329,7 +370,7 @@ fun ZoomableImage(
                                     targetOffsetX.coerceIn(-maxX, maxX),
                                     targetOffsetY.coerceIn(-maxY, maxY)
                                 )
-                                
+
                                 doubleTapState = 1
                             }
                             1 -> {
