@@ -8,12 +8,11 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
-import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
-import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
@@ -85,15 +84,12 @@ class AuthService(
             else -> error("not supported")
         }
         return authApi.verify(verifyCode, authType)
-            .also { if (it.isSuccess) emitAuthed(password) }
+            .let { if (it.isSuccess) emitAuthed(password) else it }
     }
 
-    private suspend fun emitAuthed(password: String? = null) {
+    private suspend fun emitAuthed(password: String? = null): Result<Unit> = runCatching{
         authApi.userRes().let {
-            if (!it.status.isSuccess()) {
-                SharedFlowCentre.toastText.emit(ToastText.Error("emitAuthed: ${it.status} ${it.bodyAsText()} "))
-                return
-            }
+            val userData = it.checkSuccess<CurrentUserData>()
             var authCookie: String? = null
             var twoFactorAuthCookie: String? = null
             it.request.headers[HttpHeaders.Cookie]?.let { cookieHeader ->
@@ -105,7 +101,6 @@ class AuthService(
                         }
                     }
             }
-            val userData = it.body<CurrentUserData>()
             val accountDto = AccountDto(
                 userId = userData.id,
                 username = userData.username,
@@ -116,7 +111,6 @@ class AuthService(
             )
             SharedFlowCentre.authed.emit(accountDto)
         }
-
     }
 
     suspend fun login(username: String, password: String): AuthState {

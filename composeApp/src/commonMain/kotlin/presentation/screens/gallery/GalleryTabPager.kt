@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -32,6 +31,7 @@ import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import kotlinx.coroutines.launch
@@ -117,10 +117,10 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
     @Composable
     private fun GalleryGrid(files: List<FileData>, tagType: FileTagType) {
         LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Adaptive(120.dp),
+            columns = StaggeredGridCells.Fixed(2),
             contentPadding = PaddingValues(8.dp),
-            verticalItemSpacing = 8.dp,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalItemSpacing = 3.dp,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             items(
@@ -141,7 +141,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
 
     @Composable
     private fun GalleryItem(file: FileData, tagType: FileTagType, aspectRatio: Float = 1f) {
-        var dialogContent by LocationDialogContent.current
+        val (_, setDialogContent) = LocationDialogContent.current
 
         // 在垂直布局中，不需要随机宽度，只需要填满整行
         Card(
@@ -154,7 +154,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
                     .fillMaxSize()
                     .clickable {
                         // 点击图片时，打开全屏预览
-                        dialogContent = ImagePreviewDialog(file)
+                        setDialogContent(ImagePreviewDialog(file))
                     },
             ) {
                 // 获取最新版本的图片URL
@@ -222,13 +222,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null // 去除点击波纹效果
-                ) {
-                    // 点击背景关闭对话框
-                    dialogContent = null
-                }
+
         ) {
             // 显示原始大小的图片
             val imageUrl = FileApi.convertFileUrl(file.id, 2048)
@@ -237,11 +231,9 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // 阻止事件传递到背景，但不进行任何操作
+                    .simpleClickable {
+                        // 点击背景关闭对话框
+                        dialogContent = null
                     }
             ) {
                 ZoomableImage(
@@ -303,7 +295,7 @@ class ImagePreviewDialog(private val file: FileData) : SharedDialog {
  * 支持手势缩放和平移的图片组件
  */
 @Composable
-fun ZoomableImage(
+fun BoxScope.ZoomableImage(
     imageUrl: String,
     contentDescription: String? = null,
     maxScale: Float = 3f,
@@ -322,7 +314,7 @@ fun ZoomableImage(
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .align(Alignment.Center)
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     // 处理缩放
@@ -400,7 +392,6 @@ fun ZoomableImage(
             ),
             imageLoader = { koinInject() },
             modifier = Modifier
-                .fillMaxSize()
                 .graphicsLayer(
                     scaleX = scale,
                     scaleY = scale,

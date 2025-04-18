@@ -20,7 +20,7 @@ data class CurrentUserData(
     override val bio: String?,
     override val bioLinks: List<String>,
     val currentAvatar: String,
-    val currentAvatarAssetUrl: String,
+    val currentAvatarAssetUrl: String?,
     override val currentAvatarImageUrl: String,
     override val currentAvatarTags: List<String>,
     override val currentAvatarThumbnailImageUrl: String,
