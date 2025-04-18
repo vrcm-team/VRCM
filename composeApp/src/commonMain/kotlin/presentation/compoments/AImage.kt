@@ -77,7 +77,7 @@ fun AImage(
     color: Color = MaterialTheme.colorScheme.outlineVariant,
     contentDescription: String? = null,
     error: Painter? = remember(color) { ColorPainter(color) },
-    placeholder: Painter? = error,
+    placeholder: Painter? = remember(color) { ColorPainter(color) },
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val imageLoader: ImageLoader = koinInject()
@@ -109,7 +109,7 @@ fun AImage(
         contentDescription = contentDescription,
         imageLoader = imageLoader,
         placeholder = if (isLoading.value || imageRequest != null) null else placeholder,
-        error = if (isLoading.value || imageRequest != null) null else error,
+        error = error,
         contentScale = contentScale,
         onLoading = { isLoading.value = true },
         onSuccess = { isLoading.value = false },
