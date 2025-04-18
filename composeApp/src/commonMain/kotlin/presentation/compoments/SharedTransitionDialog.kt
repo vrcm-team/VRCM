@@ -34,9 +34,15 @@ fun SharedTransitionDialog(
         ) {
             var dialogContent by LocationDialogContent.current
             // 监听返回键
-            var onBackHook by LocalOnBackHook.current
-            onBackHook = {
-                dialogContent == null
+            val closeDialog = {
+                dialogContent?.close()
+                dialogContent = null
+            }
+            LocalOnBackHook.current.value = {
+                if (dialogContent == null) true else {
+                    closeDialog()
+                    false
+                }
             }
             content()
             AnimatedContent(
@@ -57,10 +63,7 @@ fun SharedTransitionDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .simpleClickable {
-                                dialogContent = null
-                                targetDialogContent.close()
-                            }
+                            .simpleClickable(onClick = closeDialog)
                             .background(Color.Black.copy(alpha = 0.6f))
                     )
                     targetDialogContent.Content(
