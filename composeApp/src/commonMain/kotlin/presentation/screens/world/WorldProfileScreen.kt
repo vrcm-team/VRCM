@@ -719,6 +719,7 @@ private fun RenderTopBar(
                     modifier = Modifier.widthIn(max = 200.dp),
                     text = worldName,
                     textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,

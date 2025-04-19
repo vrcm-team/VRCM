@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -291,21 +290,22 @@ private fun BottomCardTab(
     ) {
         var state by remember { mutableStateOf(0) }
         val titles = listOf("Bio", "Worlds", "Groups")
-        PrimaryTabRow(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .clip(MaterialTheme.shapes.extraLarge),
-            selectedTabIndex = state
-        ) {
-            titles.forEachIndexed { index, title ->
-                Tab(
-                    selected = state == index,
-                    enabled = index == 0,
-                    onClick = { state = index },
-                    text = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                )
-            }
-        }
+        // TODO
+//        PrimaryTabRow(
+//            modifier = Modifier
+//                .padding(horizontal = 12.dp)
+//                .clip(MaterialTheme.shapes.extraLarge),
+//            selectedTabIndex = state
+//        ) {
+//            titles.forEachIndexed { index, title ->
+//                Tab(
+//                    selected = state == index,
+//                    enabled = index == 0,
+//                    onClick = { state = index },
+//                    text = { Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+//                )
+//            }
+//        }
         AnimatedContent(targetState = state) {
             when (it) {
                 0 -> {
