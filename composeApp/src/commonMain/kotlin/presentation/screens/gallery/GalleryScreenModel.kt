@@ -1,11 +1,10 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.core.extensions.readFileBytes
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -25,37 +24,25 @@ class GalleryScreenModel(
     private val platform: AppPlatform,
 ) : ScreenModel {
 
-    // 存储不同标签类型的图片文件列表
-    private val _iconFiles = mutableStateOf<List<FileData>>(emptyList())
-    val iconFiles by _iconFiles
+    // 使用Map存储不同标签类型的图片文件列表
+    private val _filesByTag = mutableStateMapOf<FileTagType, List<FileData>>().apply {
+        FileTagType.entries.forEach { tagType ->
+            this[tagType] = emptyList()
+        }
+    }
 
-    private val _emojiFiles = mutableStateOf<List<FileData>>(emptyList())
-    val emojiFiles by _emojiFiles
-
-    private val _stickerFiles = mutableStateOf<List<FileData>>(emptyList())
-    val stickerFiles by _stickerFiles
-
-    private val _galleryFiles = mutableStateOf<List<FileData>>(emptyList())
-    val galleryFiles by _galleryFiles
-
-    // 记录各标签页是否正在刷新
-    var isIconRefreshing by mutableStateOf(false)
-        private set
-
-    var isEmojiRefreshing by mutableStateOf(false)
-        private set
-
-    var isStickerRefreshing by mutableStateOf(false)
-        private set
-
-    var isGalleryRefreshing by mutableStateOf(false)
-        private set
+    // 使用Map存储不同标签类型的刷新状态
+    private val _isRefreshingByTag = mutableStateMapOf<FileTagType, Boolean>().apply {
+        FileTagType.entries.forEach { tagType ->
+            this[tagType] = false
+        }
+    }
 
     fun init() {
         refreshAllFiles()
     }
 
-    fun refreshAllFiles() {
+    private fun refreshAllFiles() {
         refreshFiles(FileTagType.Icon)
         refreshFiles(FileTagType.Emoji)
         refreshFiles(FileTagType.Sticker)
@@ -66,31 +53,19 @@ class GalleryScreenModel(
      * 根据标签类型刷新文件列表
      */
     fun refreshFiles(tagType: FileTagType, n: Int = 60, offset: Int = 0) {
-        when (tagType) {
-            FileTagType.Icon -> isIconRefreshing = true
-            FileTagType.Emoji -> isEmojiRefreshing = true
-            FileTagType.Sticker -> isStickerRefreshing = true
-            FileTagType.Gallery -> isGalleryRefreshing = true
-        }
-        
+        // 设置刷新状态为true
+        _isRefreshingByTag[tagType] = true
+
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { fileApi.getFiles(tagType, n = n, offset = offset) }
                 .onGalleryFailure()
                 .onSuccess { files ->
-                    when (tagType) {
-                        FileTagType.Icon -> _iconFiles.value = files
-                        FileTagType.Emoji -> _emojiFiles.value = files
-                        FileTagType.Sticker -> _stickerFiles.value = files
-                        FileTagType.Gallery -> _galleryFiles.value = files
-                    }
+                    // 更新文件列表
+                    _filesByTag[tagType] = files
                 }
                 .also {
-                    when (tagType) {
-                        FileTagType.Icon -> isIconRefreshing = false
-                        FileTagType.Emoji -> isEmojiRefreshing = false
-                        FileTagType.Sticker -> isStickerRefreshing = false
-                        FileTagType.Gallery -> isGalleryRefreshing = false
-                    }
+                    // 设置刷新状态为false
+                    _isRefreshingByTag[tagType] = false
                 }
         }
     }
@@ -99,24 +74,14 @@ class GalleryScreenModel(
      * 根据标签类型获取对应的文件列表
      */
     fun getFilesByTag(tagType: FileTagType): List<FileData> {
-        return when (tagType) {
-            FileTagType.Icon -> iconFiles
-            FileTagType.Emoji -> emojiFiles
-            FileTagType.Sticker -> stickerFiles
-            FileTagType.Gallery -> galleryFiles
-        }
+        return _filesByTag[tagType] ?: emptyList()
     }
 
     /**
      * 根据标签类型获取对应的刷新状态
      */
     fun isRefreshingByTag(tagType: FileTagType): Boolean {
-        return when (tagType) {
-            FileTagType.Icon -> isIconRefreshing
-            FileTagType.Emoji -> isEmojiRefreshing
-            FileTagType.Sticker -> isStickerRefreshing
-            FileTagType.Gallery -> isGalleryRefreshing
-        }
+        return _isRefreshingByTag[tagType] ?: false
     }
 
     private inline fun <T> Result<T>.onGalleryFailure() =
@@ -131,7 +96,7 @@ class GalleryScreenModel(
      * 上传图片到服务器
      * @param imagePath 图片文件路径
      */
-    fun uploadImage(imagePath: String) {
+    fun uploadImage(imagePath: String, fileTagType: FileTagType) {
         screenModelScope.launch(Dispatchers.IO) {
             try {
                 // 通知用户正在上传
@@ -146,8 +111,8 @@ class GalleryScreenModel(
                 // 获取MIME类型
                 val mimeType = getMimeType(fileName)
 
-                // 上传文件
-                val result = fileApi.uploadFile(fileBytes, fileName, mimeType, FileTagType.Gallery)
+                // 上传图片文件
+                val result = fileApi.uploadImageFile(fileBytes, fileName, mimeType, fileTagType)
 
                 result.onSuccess {
                     // 上传成功，刷新图片列表

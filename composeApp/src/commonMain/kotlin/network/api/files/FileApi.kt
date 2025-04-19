@@ -1,10 +1,12 @@
 package io.github.vrcmteam.vrcm.network.api.files
 
 import io.github.vrcmteam.vrcm.network.api.attributes.FILES_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.FILE_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileDetailsData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
+import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -93,5 +95,30 @@ class FileApi(private val client: HttpClient) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * 上传图片文件
+     * @param fileBytes 图片文件字节数组
+     * @param fileName 文件名
+     * @param mimeType 文件MIME类型
+     * @return 上传结果
+     */
+    suspend fun uploadImageFile(
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        tagType: FileTagType
+    ): Result<FileData> {
+        return client.submitFormWithBinaryData(
+            url = "${FILE_API_PREFIX}/image",
+            formData = formData {
+                append("file", fileBytes, Headers.build {
+                    append(HttpHeaders.ContentType, mimeType)
+                    append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                })
+                append("tag", tagType.value)
+            }
+        ).checkSuccessResult<FileData>()
     }
 }

@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,7 +70,14 @@ object GalleryScreen : Screen {
                 // 标签页
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
-                    divider = { HorizontalDivider(thickness = 1.dp) }
+                    indicator = {
+                        TabRowDefaults.PrimaryIndicator(
+                            modifier = Modifier
+                                .tabIndicatorOffset(it[pagerState.currentPage])
+                                .padding(horizontal = 24.dp),  // 添加上部圆角
+                            shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                        )
+                    }
                 ) {
                     tabPagers.forEachIndexed { index, pager ->
                         Tab(
