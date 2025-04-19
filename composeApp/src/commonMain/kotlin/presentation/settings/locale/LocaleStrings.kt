@@ -48,7 +48,7 @@ data class LocaleStrings(
     val profileUnfriended: String = "Friend is Unfriended",
     val profileUnfriend: String = "Unfriend",
     val profileViewJsonData: String = "View JSON data",
-    val profileViewGallery: String = "View Media Gallery",
+    val profileViewGallery: String = "View Gallery",
     val locationDialogOwner: String = "Owner",
     val locationDialogAuthor: String = "Author",
     val locationDialogDescription: String = "Description",

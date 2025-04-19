@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,7 +34,7 @@ fun LoginCardInput(
     ) {
         ITextField(
             modifier = Modifier.padding(horizontal = 32.dp),
-            imageVector = AppIcons.AccountCircle,
+            painter = rememberVectorPainter(AppIcons.AccountCircle),
             hintText = strings.authLoginUsername,
             textValue = uiState.username,
             keyboardOptions = KeyboardOptions(

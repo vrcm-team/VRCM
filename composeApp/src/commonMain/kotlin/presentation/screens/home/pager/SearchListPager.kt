@@ -4,7 +4,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import cafe.adriel.voyager.koin.koinScreenModel
-import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.AdvancedOptionsPanel
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
+import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.WorldSearchOptionsUI
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -21,7 +23,7 @@ object SearchListPager : Pager {
 
     override val icon: Painter
         @Composable
-        get() = rememberVectorPainter(image = AppIcons.PersonSearch)
+        get() = rememberVectorPainter(AppIcons.PersonSearch)
 
     @Composable
     override fun Content() {

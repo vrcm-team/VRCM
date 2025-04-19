@@ -3,7 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -18,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -29,7 +33,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.PasswordMissEndVisualTransf
 @Composable
 fun ITextField(
     modifier: Modifier = Modifier,
-    imageVector: ImageVector,
+    painter: Painter,
     hintText: String,
     textValue: String,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -40,7 +44,7 @@ fun ITextField(
     modifier = modifier,
     leadingIcon = {
         Icon(
-            imageVector = imageVector,
+            painter = painter,
             contentDescription = "leadingIcon",
             tint = MaterialTheme.colorScheme.primary
         )
