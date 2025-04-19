@@ -863,6 +863,7 @@ private fun Screen.RenderBottomSheetContent(
                     Text(
                         text = strings.worldProfileDescription,
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(
                             alpha = 1f - (0.3f * abs(
                                 (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
@@ -883,6 +884,7 @@ private fun Screen.RenderBottomSheetContent(
                     if (worldProfileVo.tags?.isNotEmpty() == true) {
                         Text(
                             text = strings.worldProfileAuthorTags,
+                            fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         FlowRow(
