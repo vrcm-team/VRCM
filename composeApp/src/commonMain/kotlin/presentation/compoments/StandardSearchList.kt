@@ -35,7 +35,7 @@ fun StandardSearchList(
     groupContentBuilder: (LazyListScope.() -> Unit)? = null
 ) {
     // 固定的标签页列表
-    val tabs = listOf(strings.searchUsers, strings.searchWorlds, "模型", "群组")
+    val tabs = listOf(strings.users, strings.worlds)
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current

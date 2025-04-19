@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -12,12 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * 用户列表渲染
@@ -67,11 +65,10 @@ fun LazyItemScope.renderUserItem(
         trailingContent = {
             // 离线用户显示最后登录时间
             val lastLoginStr = user.lastLogin
-            if (user.status != io.github.vrcmteam.vrcm.network.api.attributes.UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@SearchResultItem
-            val lastLogin = Instant.parse(lastLoginStr).toLocalDateTime(TimeZone.currentSystemDefault())
+            if (user.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@SearchResultItem
             Text(
-                text = lastLogin.ignoredFormat, 
-                style = MaterialTheme.typography.labelSmall, 
+                text = lastLoginStr.toLocalDateTime().ignoredFormat,
+                style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )
         }
@@ -99,14 +96,14 @@ fun LazyItemScope.renderWorldItem(
     world: WorldData,
     onWorldClick: (WorldData) -> Unit
 ) {
-    println("${world.id}WorldImage")
     SearchResultItem(
         item = world,
         onClick = onWorldClick,
         modifier = Modifier.animateItem(),
         leadingContent = {
             AImage(
-                modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp).clip(MaterialTheme.shapes.medium),
+                modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                    .clip(MaterialTheme.shapes.medium),
                 imageData = world.imageUrl,
             )
         },

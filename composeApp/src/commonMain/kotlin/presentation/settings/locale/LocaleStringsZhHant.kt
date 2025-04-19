@@ -17,6 +17,8 @@ internal val LocaleStringsZhHant = LocaleStrings(
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "處於房間內",
     fiendListPagerSearch = "搜索",
+    users = "用戶",
+    worlds = "世界",
     notificationFriendRequest = "想要成為你的好友",
     homeNotificationEmpty = "暂无新訊息",
     homeStatusEdit = "編輯狀態",
@@ -70,7 +72,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     instanceCreateSuccess = "成功創建房間並發送邀請",
     instanceCreateSuccessButInviteFailed = "創建房間成功，但邀請失敗",
     instanceCreateFailed = "創建房間失敗",
-    
+
     // 世界搜索相關
     worldSearchAdvancedOptions = "高級搜索選項",
     worldSearchFeaturedOnly = "僅顯示精選世界",
@@ -80,7 +82,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     worldSearchAscending = "升序",
     worldSearchResultCount = "顯示數量",
     worldSearchResultsFormat = "%d個結果",
-    
+
     // 排序選項
     worldSearchSortPopularity = "流行度",
     worldSearchSortHeat = "熱度",
@@ -91,5 +93,36 @@ internal val LocaleStringsZhHant = LocaleStrings(
     worldSearchSortCreated = "創建時間",
     worldSearchSortUpdated = "更新時間",
     worldSearchSortRelevance = "相關度",
-    worldSearchSortName = "名稱"
+    worldSearchSortName = "名稱",
+
+    // FriendListPager
+    friendListPagerAllFriends = "全部好友",
+    friendListPagerAllWorlds = "全部世界",
+
+    // WorldProfileScreen
+    worldProfileDescription = "世界描述",
+    worldProfileAuthorTags = "作者標籤",
+    worldProfileCapacity = "容量",
+    worldProfileOnlineUsers = "地圖內總在線人數",
+    worldProfileVisits = "訪問",
+    worldProfileFavorites = "收藏",
+    worldProfileHeat = "熱度",
+    worldProfilePopularity = "知名度",
+    worldProfileVersion = "版本",
+    worldProfileUpdateDate = "更新日期",
+    worldProfileLabReleaseDate = "實驗室發布日期",
+    worldProfileUnknown = "未知",
+
+    // CreateInstanceDialog
+    createInstanceStandardAccessType = "標準訪問類型",
+    createInstanceEnableQueue = "啟用排隊功能",
+
+    // GalleryTabPager
+    galleryTabNoFiles = "暫無%s文件",
+    galleryTabUploading = "正在上傳圖片...",
+    galleryTabUploadImage = "上傳圖片",
+    galleryTabLoadFailed = "加載失敗",
+
+    // GalleryScreen
+    galleryScreenTitle = "圖庫",
 )

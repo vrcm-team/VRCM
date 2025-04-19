@@ -177,7 +177,7 @@ class WorldProfileScreenModel(
                         roleIds = roleIds
                     )
                 }.onSuccess { instanceData ->
-                    var owner =
+                    val owner =
                         if (groupId != null && groupName != null)
                             Owner(groupId, groupName, BlueprintType.Group)
                         else

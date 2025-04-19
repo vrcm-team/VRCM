@@ -7,9 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import cafe.adriel.voyager.koin.koinScreenModel
-import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
 import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 
@@ -72,7 +73,7 @@ object FriendListPager : Pager {
                         GroupOptionsUI(
                             currentOptions = friendGroupOptions,
                             favoriteGroups = friendFavoriteGroups.keys.toList(),
-                            defaultText = "全部好友",
+                            defaultText = strings.friendListPagerAllFriends,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateFriendGroupOptions(newOptions)
                             },
@@ -87,7 +88,7 @@ object FriendListPager : Pager {
                         GroupOptionsUI(
                             currentOptions = worldGroupOptions,
                             favoriteGroups = worldFavoriteGroups.keys.toList(),
-                            defaultText = "全部世界",
+                            defaultText = strings.friendListPagerAllWorlds,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateWorldGroupOptions(newOptions)
                             },
@@ -103,4 +104,3 @@ object FriendListPager : Pager {
         )
     }
 }
-

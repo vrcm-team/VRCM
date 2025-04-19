@@ -122,7 +122,6 @@ class SearchListPagerModel(
         return authService.reTryAuthCatching {
             usersApi.searchUser(name)
         }.onSuccess {
-            println(it)
             _userSearchList.value = it
         }.onApiFailure("UserSearch") {
             logger.error(it)

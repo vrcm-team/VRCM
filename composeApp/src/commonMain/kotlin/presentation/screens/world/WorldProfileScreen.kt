@@ -50,12 +50,10 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
+import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.*
-import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
-import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
@@ -418,9 +416,6 @@ private fun RenderBackgroundImage(
     hazeState: HazeState,
     imageHeight: Dp,
 ) {
-    println(
-        "RenderBackgroundImage: ${worldId}WorldImage)"
-    )
     AImage(
         modifier = Modifier
             .height(imageHeight)
@@ -546,34 +541,27 @@ private fun ColumnScope.InfoArea(
 ) {
     val infoCards = listOf(
         // 世界容量
-        Triple(AppIcons.Person, "${worldProfileVo.capacity}", "容量"),
-        // 推荐容量
+        Triple(AppIcons.Person, "${worldProfileVo.capacity}", strings.worldProfileCapacity),
+        // 在线人数
         Triple(
             AppIcons.Group,
             "${worldProfileVo.publicOccupants + worldProfileVo.privateOccupants}",
-            "地图内总在线人数"
+            strings.worldProfileOnlineUsers
         ),
         // 访问次数
-        Triple(AppIcons.Visibility, "${worldProfileVo.visits}", "访问"),
+        Triple(AppIcons.Visibility, "${worldProfileVo.visits}", strings.worldProfileVisits),
         // 收藏数
-        Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", "收藏"),
+        Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", strings.worldProfileFavorites),
         // 热度
-        Triple(AppIcons.Hot, "${worldProfileVo.heat}", "热度"),
+        Triple(AppIcons.Hot, "${worldProfileVo.heat}", strings.worldProfileHeat),
         // 热门程度
-        Triple(AppIcons.Trending, "${worldProfileVo.popularity}", "知名度"),
+        Triple(AppIcons.Trending, "${worldProfileVo.popularity}", strings.worldProfilePopularity),
         // 版本
-        Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", "版本"),
+        Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion),
         // 更新时间
-        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.substringBefore("T") ?: "未知", "更新日期"),
-        Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", "收藏"),
-        // 热度
-        Triple(AppIcons.Hot, "${worldProfileVo.heat}", "热度"),
-        // 热门程度
-        Triple(AppIcons.Trending, "${worldProfileVo.popularity}", "知名度"),
-        // 版本
-        Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", "版本"),
-        // 更新时间
-        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.substringBefore("T") ?: "未知", "更新日期")
+        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.toLocalDate()?.simpleFormat ?: strings.worldProfileUnknown, strings.worldProfileUpdateDate),
+        // 实验室发布日期
+        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.toLocalDate()?.simpleFormat ?: strings.worldProfileUnknown, strings.worldProfileLabReleaseDate),
     )
 
     // 计算每页显示的卡片数量
@@ -873,7 +861,7 @@ private fun Screen.RenderBottomSheetContent(
                 ) {
                     // 描述标题
                     Text(
-                        text = "世界描述",
+                        text = strings.worldProfileDescription,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(
                             alpha = 1f - (0.3f * abs(
@@ -894,7 +882,7 @@ private fun Screen.RenderBottomSheetContent(
                     )
                     if (worldProfileVo.tags?.isNotEmpty() == true) {
                         Text(
-                            text = "所有标签",
+                            text = strings.worldProfileAuthorTags,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         FlowRow(

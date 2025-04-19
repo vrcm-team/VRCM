@@ -17,8 +17,8 @@ internal val LocaleStringsZhHans = LocaleStrings(
     fiendLocationPagerTraveling = "正在跃迁中",
     fiendLocationPagerLocation = "处于房间内",
     fiendListPagerSearch = "搜索",
-    searchUsers = "用户",
-    searchWorlds = "世界",
+    users = "用户",
+    worlds = "世界",
     notificationFriendRequest = "想要成为你的好友",
     homeNotificationEmpty = "暂无新通知",
     homeStatusEdit = "编辑状态",
@@ -72,7 +72,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     instanceCreateSuccess = "成功创建房间并发送邀请",
     instanceCreateSuccessButInviteFailed = "创建房间成功，但邀请失败",
     instanceCreateFailed = "创建房间失败",
-    
+
     // 世界搜索相关
     worldSearchAdvancedOptions = "高级搜索选项",
     worldSearchFeaturedOnly = "仅显示精选世界",
@@ -82,7 +82,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     worldSearchAscending = "升序",
     worldSearchResultCount = "显示数量",
     worldSearchResultsFormat = "%d个结果",
-    
+
     // 排序选项
     worldSearchSortPopularity = "流行度",
     worldSearchSortHeat = "热度",
@@ -93,5 +93,36 @@ internal val LocaleStringsZhHans = LocaleStrings(
     worldSearchSortCreated = "创建时间",
     worldSearchSortUpdated = "更新时间",
     worldSearchSortRelevance = "相关度",
-    worldSearchSortName = "名称"
+    worldSearchSortName = "名称",
+
+    // FriendListPager
+    friendListPagerAllFriends = "全部好友",
+    friendListPagerAllWorlds = "全部世界",
+
+    // WorldProfileScreen
+    worldProfileDescription = "世界描述",
+    worldProfileAuthorTags = "作者标签",
+    worldProfileCapacity = "容量",
+    worldProfileOnlineUsers = "地图内总在线人数",
+    worldProfileVisits = "访问",
+    worldProfileFavorites = "收藏",
+    worldProfileHeat = "热度",
+    worldProfilePopularity = "知名度",
+    worldProfileVersion = "版本",
+    worldProfileUpdateDate = "更新日期",
+    worldProfileLabReleaseDate = "实验室发布日期",
+    worldProfileUnknown = "未知",
+
+    // CreateInstanceDialog
+    createInstanceStandardAccessType = "标准访问类型",
+    createInstanceEnableQueue = "启用排队功能",
+
+    // GalleryTabPager
+    galleryTabNoFiles = "暂无%s文件",
+    galleryTabUploading = "正在上传图片...",
+    galleryTabUploadImage = "上传图片",
+    galleryTabLoadFailed = "加载失败",
+
+    // GalleryScreen
+    galleryScreenTitle = "图库",
 )

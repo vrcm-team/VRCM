@@ -17,6 +17,8 @@ internal val LocaleStringsJa = LocaleStrings(
     fiendLocationPagerTraveling = "移動中",
     fiendLocationPagerLocation = "ルームに",
     fiendListPagerSearch = "検索",
+    users = "ユーザー",
+    worlds = "ワールド",
     notificationFriendRequest = "はあなたの友達になりたい",
     homeNotificationEmpty = "お知らせはまだありません",
     homeStatusEdit = "ステータスを編集",
@@ -70,7 +72,7 @@ internal val LocaleStringsJa = LocaleStrings(
     instanceCreateSuccess = "インスタンスを作成し、招待を送信しました",
     instanceCreateSuccessButInviteFailed = "インスタンスは作成されましたが、招待に失敗しました",
     instanceCreateFailed = "インスタンス作成に失敗しました",
-    
+
     // 世界検索関連
     worldSearchAdvancedOptions = "詳細検索オプション",
     worldSearchFeaturedOnly = "注目ワールドのみ表示",
@@ -80,7 +82,7 @@ internal val LocaleStringsJa = LocaleStrings(
     worldSearchAscending = "昇順",
     worldSearchResultCount = "表示件数",
     worldSearchResultsFormat = "%d件の結果",
-    
+
     // 並べ替えオプション
     worldSearchSortPopularity = "人気度",
     worldSearchSortHeat = "熱度",
@@ -91,5 +93,36 @@ internal val LocaleStringsJa = LocaleStrings(
     worldSearchSortCreated = "作成日時",
     worldSearchSortUpdated = "更新日時",
     worldSearchSortRelevance = "関連度",
-    worldSearchSortName = "名前"
+    worldSearchSortName = "名前",
+
+    // FriendListPager
+    friendListPagerAllFriends = "すべてのフレンド",
+    friendListPagerAllWorlds = "すべてのワールド",
+
+    // WorldProfileScreen
+    worldProfileDescription = "ワールド説明",
+    worldProfileAuthorTags = "作者タグ",
+    worldProfileCapacity = "収容人数",
+    worldProfileOnlineUsers = "ワールド内のオンラインユーザー数",
+    worldProfileVisits = "訪問数",
+    worldProfileFavorites = "お気に入り数",
+    worldProfileHeat = "熱度",
+    worldProfilePopularity = "人気度",
+    worldProfileVersion = "バージョン",
+    worldProfileUpdateDate = "更新日",
+    worldProfileLabReleaseDate = "ラボ公開日",
+    worldProfileUnknown = "不明",
+
+    // CreateInstanceDialog
+    createInstanceStandardAccessType = "標準アクセスタイプ",
+    createInstanceEnableQueue = "キュー機能を有効にする",
+
+    // GalleryTabPager
+    galleryTabNoFiles = "%sファイルがありません",
+    galleryTabUploading = "画像をアップロード中...",
+    galleryTabUploadImage = "画像をアップロード",
+    galleryTabLoadFailed = "読み込みに失敗しました",
+
+    // GalleryScreen
+    galleryScreenTitle = "ギャラリー",
 )

@@ -9,6 +9,68 @@ import androidx.compose.ui.unit.dp
 
 object AppIcons {
 
+    val FlaskConical: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "FlaskConical",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            path(
+                fill = null,
+                fillAlpha = 1.0f,
+                stroke = SolidColor(Color(0xFF000000)),
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(10f, 2f)
+                verticalLineToRelative(7.527f)
+                arcToRelative(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, -0.211f, 0.896f)
+                lineTo(4.72f, 20.55f)
+                arcToRelative(1f, 1f, 0f, isMoreThanHalf = false, isPositiveArc = false, 0.9f, 1.45f)
+                horizontalLineToRelative(12.76f)
+                arcToRelative(1f, 1f, 0f, isMoreThanHalf = false, isPositiveArc = false, 0.9f, -1.45f)
+                lineToRelative(-5.069f, -10.127f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 14f, 9.527f)
+                verticalLineTo(2f)
+            }
+            path(
+                fill = null,
+                fillAlpha = 1.0f,
+                stroke = SolidColor(Color(0xFF000000)),
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(8.5f, 2f)
+                horizontalLineToRelative(7f)
+            }
+            path(
+                fill = null,
+                fillAlpha = 1.0f,
+                stroke = SolidColor(Color(0xFF000000)),
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(7f, 16f)
+                horizontalLineToRelative(10f)
+            }
+        }.build()
+
+    }
+
     val SaveAlt: ImageVector by lazy {
         materialIcon(name = "Filled.SaveAlt") {
             materialPath {
@@ -436,8 +498,10 @@ object AppIcons {
     }
 
     val KeyboardArrowLeft: ImageVector by lazy {
-        materialIcon(name = "AutoMirrored.Outlined.KeyboardArrowLeft",
-            autoMirror = true) {
+        materialIcon(
+            name = "AutoMirrored.Outlined.KeyboardArrowLeft",
+            autoMirror = true
+        ) {
             materialPath {
                 moveTo(15.41f, 16.59f)
                 lineTo(10.83f, 12.0f)

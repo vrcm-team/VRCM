@@ -22,8 +22,8 @@ data class LocaleStrings(
     val fiendLocationPagerTraveling: String = "Friends is Traveling",
     val fiendLocationPagerLocation: String = "by Location",
     val fiendListPagerSearch: String = "Search",
-    val searchUsers: String = "Users",
-    val searchWorlds: String = "Worlds",
+    val users: String = "Users",
+    val worlds: String = "Worlds",
     val notificationFriendRequest: String = "wants to be your friend",
     val homeNotificationEmpty: String = "No Notification Yet",
     val homeStatusEdit: String = "Edit Status",
@@ -77,7 +77,7 @@ data class LocaleStrings(
     val instanceCreateSuccess: String = "Successfully created instance and sent invite",
     val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed",
     val instanceCreateFailed: String = "Failed to create instance",
-    
+
     // 世界搜索相关
     val worldSearchAdvancedOptions: String = "Advanced Search Options",
     val worldSearchFeaturedOnly: String = "Featured Worlds Only",
@@ -87,7 +87,7 @@ data class LocaleStrings(
     val worldSearchAscending: String = "Ascending",
     val worldSearchResultCount: String = "Results Count",
     val worldSearchResultsFormat: String = "%d results",
-    
+
     // 排序选项
     val worldSearchSortPopularity: String = "Popularity",
     val worldSearchSortHeat: String = "Heat",
@@ -98,7 +98,38 @@ data class LocaleStrings(
     val worldSearchSortCreated: String = "Created",
     val worldSearchSortUpdated: String = "Updated",
     val worldSearchSortRelevance: String = "Relevance",
-    val worldSearchSortName: String = "Name"
+    val worldSearchSortName: String = "Name",
+
+    // FriendListPager
+    val friendListPagerAllFriends: String = "All Friends",
+    val friendListPagerAllWorlds: String = "All Worlds",
+
+    // WorldProfileScreen
+    val worldProfileDescription: String = "World Description",
+    val worldProfileAuthorTags: String = "Author Tags",
+    val worldProfileCapacity: String = "Capacity",
+    val worldProfileOnlineUsers: String = "Total Online Users",
+    val worldProfileVisits: String = "Visits",
+    val worldProfileFavorites: String = "Favorites",
+    val worldProfileHeat: String = "Heat",
+    val worldProfilePopularity: String = "Popularity",
+    val worldProfileVersion: String = "Version",
+    val worldProfileUpdateDate: String = "Update Date",
+    val worldProfileLabReleaseDate: String = "Lab Release Date",
+    val worldProfileUnknown: String = "Unknown",
+
+    // CreateInstanceDialog
+    val createInstanceStandardAccessType: String = "Standard Access Type",
+    val createInstanceEnableQueue: String = "Enable Queue Function",
+
+    // GalleryTabPager
+    val galleryTabNoFiles: String = "No %s Files",
+    val galleryTabUploading: String = "Uploading image...",
+    val galleryTabUploadImage: String = "Upload Image",
+    val galleryTabLoadFailed: String = "Loading Failed",
+
+    // GalleryScreen
+    val galleryScreenTitle: String = "Gallery",
 )
 
 val strings: LocaleStrings
@@ -112,4 +143,3 @@ val strings: LocaleStrings
             else -> LocaleStringsEn
         }
     }
-

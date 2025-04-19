@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import kotlinx.coroutines.launch
@@ -66,7 +67,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
 
             if (files.isEmpty() && !galleryScreenModel.isRefreshingByTag(tagType)) {
                 EmptyContent(
-                    message = "暂无${title}文件",
+                    message = strings.galleryTabNoFiles.replace("%s", title),
                 )
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -108,11 +109,11 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
                             ) {
                                 Icon(
                                     painter = rememberVectorPainter(AppIcons.SaveAlt),
-                                    contentDescription = "上传图片",
+                                    contentDescription = strings.galleryTabUploadImage,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("上传图片")
+                                Text(strings.galleryTabUploadImage)
                             }
                         }
                     }
@@ -210,7 +211,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "加载失败",
+                            text = strings.galleryTabLoadFailed,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )

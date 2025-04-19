@@ -74,7 +74,6 @@ class AccountDao(
         accountSettings.keys.asSequence()
             .filter { it.contains("|${userId}") }
             .forEach {
-                println("remove $it")
                 accountSettings.remove(it)
             }
     }

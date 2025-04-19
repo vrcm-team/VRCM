@@ -37,24 +37,24 @@ class CreateInstanceDialog(
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun Content() {
-        var selectedAccessType by remember { mutableStateOf<AccessType>(AccessType.FriendPlus) }
-        var selectedRegion by remember { mutableStateOf<RegionType>(RegionType.Us) }
+        var selectedAccessType by remember { mutableStateOf(AccessType.FriendPlus) }
+        var selectedRegion by remember { mutableStateOf(RegionType.Us) }
         var queueEnabled by remember { mutableStateOf(false) }
         var groupId by remember { mutableStateOf("") }
         var groupAccessType by remember { mutableStateOf("members") }
 //        var roleId by remember { mutableStateOf("") }
         var roleIds by remember { mutableStateOf<List<String>>(emptyList()) }
         var showAdvancedOptions by remember { mutableStateOf(false) }
-        
+
         // 确定当前选择的访问类型的分类
         val isGroupType = selectedAccessType == AccessType.Group ||
                           selectedAccessType == AccessType.GroupMembers ||
                           selectedAccessType == AccessType.GroupPlus ||
                           selectedAccessType == AccessType.GroupPublic
-        
+
 //        val isPrivateType = selectedAccessType == AccessType.Invite ||
 //                            selectedAccessType == AccessType.InvitePlus
-        
+
         BasicAlertDialog(
             onDismissRequest = onDismiss,
             modifier = Modifier.fillMaxWidth(0.9f).heightIn(max = 600.dp)
@@ -89,7 +89,7 @@ class CreateInstanceDialog(
 
                     // 访问类型分组
                     Text(
-                        text = "标准访问类型",
+                        text = strings.createInstanceStandardAccessType,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primary
@@ -179,7 +179,7 @@ class CreateInstanceDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "启用排队功能",
+                            text = strings.createInstanceEnableQueue,
                             style = MaterialTheme.typography.bodyMedium
                         )
 
@@ -317,7 +317,7 @@ class CreateInstanceDialog(
             }
         }
     }
-    
+
     @Composable
     private fun AccessTypeItem(
         accessType: AccessType,
@@ -329,13 +329,13 @@ class CreateInstanceDialog(
         } else {
             MaterialTheme.colorScheme.surface
         }
-        
+
         val textColor = if (isSelected) {
             MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurface
         }
-        
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -353,7 +353,7 @@ class CreateInstanceDialog(
             )
         }
     }
-    
+
     @Composable
     private fun RegionItem(
         region: RegionType,
@@ -377,9 +377,9 @@ class CreateInstanceDialog(
                 region = region,
                 modifier = Modifier.size(36.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             Text(
                 text = region.name,
                 style = MaterialTheme.typography.labelMedium,

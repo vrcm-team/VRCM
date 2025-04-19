@@ -22,18 +22,19 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.launch
 
 object GalleryScreen : Screen {
-    
+
     private val tabPagers = listOf(
         GalleryTabPager.Companion.Icon,
         GalleryTabPager.Companion.Emoji,
         GalleryTabPager.Companion.Sticker,
         GalleryTabPager.Companion.Gallery
     )
-    
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -41,20 +42,20 @@ object GalleryScreen : Screen {
         val pagerState = rememberPagerState { tabPagers.size }
         val coroutineScope = rememberCoroutineScope()
         val navigator = LocalNavigator.currentOrThrow
-        
+
         LaunchedEffect(Unit) {
             galleryScreenModel.init()
         }
-        
+
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("媒体库") },
+                    title = { Text(strings.galleryScreenTitle) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(
                                 painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                contentDescription = "返回"
+                                contentDescription = "back"
                             )
                         }
                     },
@@ -97,7 +98,7 @@ object GalleryScreen : Screen {
                         )
                     }
                 }
-                
+
                 // 标签页内容
                 HorizontalPager(
                     state = pagerState,

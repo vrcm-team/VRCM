@@ -16,3 +16,10 @@ val LocalDateTime.ignoredFormat: String
             hour(); char(':'); minute()
         })
 
+val LocalDate.simpleFormat: String
+    get() = format(
+        LocalDate.Format {
+            year();char('-');monthNumber(); char('-'); dayOfMonth()
+        }
+    )
+
