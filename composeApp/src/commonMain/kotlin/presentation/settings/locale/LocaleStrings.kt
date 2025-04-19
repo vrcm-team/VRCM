@@ -116,7 +116,7 @@ data class LocaleStrings(
     val worldProfileVersion: String = "Version",
     val worldProfileUpdateDate: String = "Update Date",
     val worldProfileLabReleaseDate: String = "Lab Release Date",
-    val worldProfileUnknown: String = "Unknown",
+    val unknown: String = "Unknown",
 
     // CreateInstanceDialog
     val createInstanceStandardAccessType: String = "Standard Access Type",

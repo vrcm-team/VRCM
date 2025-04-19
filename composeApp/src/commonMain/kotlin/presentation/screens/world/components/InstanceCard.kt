@@ -171,7 +171,7 @@ private fun UserStatsSection(
         // 总用户数
         IconLabelRow(
             icon = AppIcons.Person,
-            text = "${instance.currentUsers ?: 0} 用户",
+            text = "${instance.currentUsers ?: 0}",
             iconSize = iconSize,
             spacing = elementSpacing,
             textStyle = MaterialTheme.typography.titleSmall
@@ -181,6 +181,7 @@ private fun UserStatsSection(
         DeviceStatsRow(
             pcUsers = instance.pcUsers,
             androidUsers = instance.androidUsers,
+            iosUsers = instance.iosUsers,
             iconSize = smallIconSize,
             spacing = elementSpacing
         )
@@ -193,23 +194,36 @@ private fun DeviceStatsRow(
     androidUsers: Int?,
     iconSize: Dp,
     spacing: Dp,
+    iosUsers: Int?,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(spacing * 2),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconLabelRow(
-            icon = AppIcons.Computer,
-            text = "${pcUsers ?: 0} PC",
-            iconSize = iconSize,
-            spacing = spacing
-        )
-        IconLabelRow(
-            icon = AppIcons.Smartphone,
-            text = "${androidUsers ?: 0} Quest",
-            iconSize = iconSize,
-            spacing = spacing
-        )
+        if (pcUsers != null && pcUsers > 0) {
+            IconLabelRow(
+                icon = AppIcons.Computer,
+                text = "$pcUsers",
+                iconSize = iconSize,
+                spacing = spacing
+            )
+        }
+        if (androidUsers != null && androidUsers > 0) {
+            IconLabelRow(
+                icon = AppIcons.Android,
+                text = "$androidUsers",
+                iconSize = iconSize,
+                spacing = spacing
+            )
+        }
+        if (iosUsers != null && iosUsers > 0) {
+            IconLabelRow(
+                icon = AppIcons.Apple,
+                text = "$iosUsers",
+                iconSize = iconSize,
+                spacing = spacing
+            )
+        }
     }
 }
 

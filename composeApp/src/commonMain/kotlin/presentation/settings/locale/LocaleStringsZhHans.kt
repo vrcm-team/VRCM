@@ -111,7 +111,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     worldProfileVersion = "版本",
     worldProfileUpdateDate = "更新日期",
     worldProfileLabReleaseDate = "实验室发布日期",
-    worldProfileUnknown = "未知",
+    unknown = "未知",
 
     // CreateInstanceDialog
     createInstanceStandardAccessType = "标准访问类型",

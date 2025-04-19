@@ -25,7 +25,7 @@ fun TopMenuBar(
     ratio: Float,
     color: Color = MaterialTheme.colorScheme.onPrimary,
     onReturn: () -> Unit,
-    onMenu: () -> Unit
+    onMenu: (() -> Unit)?
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
@@ -71,17 +71,19 @@ fun TopMenuBar(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            IconButton(
-                modifier = Modifier
-                    .padding(horizontal = 10.dp),
-                colors = iconButtonColors,
-                onClick = onMenu
-            ) {
-                Icon(
-                    imageVector = AppIcons.Menu,
-                    tint = iconColor,
-                    contentDescription = "MenuIcon"
-                )
+            onMenu?.let {
+                IconButton(
+                    modifier = Modifier
+                        .padding(horizontal = 10.dp),
+                    colors = iconButtonColors,
+                    onClick = it
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Menu,
+                        tint = iconColor,
+                        contentDescription = "MenuIcon"
+                    )
+                }
             }
         }
     }

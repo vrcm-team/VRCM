@@ -4,6 +4,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FILES_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.FILE_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileDetailsData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileResponse
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
@@ -121,4 +122,14 @@ class FileApi(private val client: HttpClient) {
             }
         ).checkSuccessResult<FileData>()
     }
+
+    /**
+     * 获取特定文件ID的文件信息
+     * @param fileId 文件ID
+     * @return 文件信息
+     */
+    suspend fun getFileInfo(fileId: String): Result<FileResponse> = runCatching {
+        client.get("$FILES_API_PREFIX/$fileId").checkSuccess<FileResponse>()
+    }
+
 }

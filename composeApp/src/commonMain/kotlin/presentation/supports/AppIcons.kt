@@ -9,6 +9,149 @@ import androidx.compose.ui.unit.dp
 
 object AppIcons {
 
+    val Android: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Android",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 960f,
+            viewportHeight = 960f
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(40f, 720f)
+                quadToRelative(9f, -107f, 65.5f, -197f)
+                reflectiveQuadTo(256f, 380f)
+                lineToRelative(-74f, -128f)
+                quadToRelative(-6f, -9f, -3f, -19f)
+                reflectiveQuadToRelative(13f, -15f)
+                quadToRelative(8f, -5f, 18f, -2f)
+                reflectiveQuadToRelative(16f, 12f)
+                lineToRelative(74f, 128f)
+                quadToRelative(86f, -36f, 180f, -36f)
+                reflectiveQuadToRelative(180f, 36f)
+                lineToRelative(74f, -128f)
+                quadToRelative(6f, -9f, 16f, -12f)
+                reflectiveQuadToRelative(18f, 2f)
+                quadToRelative(10f, 5f, 13f, 15f)
+                reflectiveQuadToRelative(-3f, 19f)
+                lineToRelative(-74f, 128f)
+                quadToRelative(94f, 53f, 150.5f, 143f)
+                reflectiveQuadTo(920f, 720f)
+                close()
+                moveToRelative(240f, -110f)
+                quadToRelative(21f, 0f, 35.5f, -14.5f)
+                reflectiveQuadTo(330f, 560f)
+                reflectiveQuadToRelative(-14.5f, -35.5f)
+                reflectiveQuadTo(280f, 510f)
+                reflectiveQuadToRelative(-35.5f, 14.5f)
+                reflectiveQuadTo(230f, 560f)
+                reflectiveQuadToRelative(14.5f, 35.5f)
+                reflectiveQuadTo(280f, 610f)
+                moveToRelative(400f, 0f)
+                quadToRelative(21f, 0f, 35.5f, -14.5f)
+                reflectiveQuadTo(730f, 560f)
+                reflectiveQuadToRelative(-14.5f, -35.5f)
+                reflectiveQuadTo(680f, 510f)
+                reflectiveQuadToRelative(-35.5f, 14.5f)
+                reflectiveQuadTo(630f, 560f)
+                reflectiveQuadToRelative(14.5f, 35.5f)
+                reflectiveQuadTo(680f, 610f)
+            }
+        }.build()
+    }
+
+    val Apple: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Apple",
+            defaultWidth = 16.dp,
+            defaultHeight = 16.dp,
+            viewportWidth = 16f,
+            viewportHeight = 16f
+        ).apply {
+            path(
+                fill = SolidColor(Color(0xFF000000)),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(11.182f, 0.008f)
+                curveTo(11.148f, -0.03f, 9.923f, 0.023f, 8.857f, 1.18f)
+                curveToRelative(-1.066f, 1.156f, -0.902f, 2.482f, -0.878f, 2.516f)
+                reflectiveCurveToRelative(1.52f, 0.087f, 2.475f, -1.258f)
+                reflectiveCurveToRelative(0.762f, -2.391f, 0.728f, -2.43f)
+                moveToRelative(3.314f, 11.733f)
+                curveToRelative(-0.048f, -0.096f, -2.325f, -1.234f, -2.113f, -3.422f)
+                reflectiveCurveToRelative(1.675f, -2.789f, 1.698f, -2.854f)
+                reflectiveCurveToRelative(-0.597f, -0.79f, -1.254f, -1.157f)
+                arcToRelative(3.7f, 3.7f, 0f, isMoreThanHalf = false, isPositiveArc = false, -1.563f, -0.434f)
+                curveToRelative(-0.108f, -0.003f, -0.483f, -0.095f, -1.254f, 0.116f)
+                curveToRelative(-0.508f, 0.139f, -1.653f, 0.589f, -1.968f, 0.607f)
+                curveToRelative(-0.316f, 0.018f, -1.256f, -0.522f, -2.267f, -0.665f)
+                curveToRelative(-0.647f, -0.125f, -1.333f, 0.131f, -1.824f, 0.328f)
+                curveToRelative(-0.49f, 0.196f, -1.422f, 0.754f, -2.074f, 2.237f)
+                curveToRelative(-0.652f, 1.482f, -0.311f, 3.83f, -0.067f, 4.56f)
+                reflectiveCurveToRelative(0.625f, 1.924f, 1.273f, 2.796f)
+                curveToRelative(0.576f, 0.984f, 1.34f, 1.667f, 1.659f, 1.899f)
+                reflectiveCurveToRelative(1.219f, 0.386f, 1.843f, 0.067f)
+                curveToRelative(0.502f, -0.308f, 1.408f, -0.485f, 1.766f, -0.472f)
+                curveToRelative(0.357f, 0.013f, 1.061f, 0.154f, 1.782f, 0.539f)
+                curveToRelative(0.571f, 0.197f, 1.111f, 0.115f, 1.652f, -0.105f)
+                curveToRelative(0.541f, -0.221f, 1.324f, -1.059f, 2.238f, -2.758f)
+                quadToRelative(0.52f, -1.185f, 0.473f, -1.282f)
+            }
+            path(
+                fill = SolidColor(Color(0xFF000000)),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(11.182f, 0.008f)
+                curveTo(11.148f, -0.03f, 9.923f, 0.023f, 8.857f, 1.18f)
+                curveToRelative(-1.066f, 1.156f, -0.902f, 2.482f, -0.878f, 2.516f)
+                reflectiveCurveToRelative(1.52f, 0.087f, 2.475f, -1.258f)
+                reflectiveCurveToRelative(0.762f, -2.391f, 0.728f, -2.43f)
+                moveToRelative(3.314f, 11.733f)
+                curveToRelative(-0.048f, -0.096f, -2.325f, -1.234f, -2.113f, -3.422f)
+                reflectiveCurveToRelative(1.675f, -2.789f, 1.698f, -2.854f)
+                reflectiveCurveToRelative(-0.597f, -0.79f, -1.254f, -1.157f)
+                arcToRelative(3.7f, 3.7f, 0f, isMoreThanHalf = false, isPositiveArc = false, -1.563f, -0.434f)
+                curveToRelative(-0.108f, -0.003f, -0.483f, -0.095f, -1.254f, 0.116f)
+                curveToRelative(-0.508f, 0.139f, -1.653f, 0.589f, -1.968f, 0.607f)
+                curveToRelative(-0.316f, 0.018f, -1.256f, -0.522f, -2.267f, -0.665f)
+                curveToRelative(-0.647f, -0.125f, -1.333f, 0.131f, -1.824f, 0.328f)
+                curveToRelative(-0.49f, 0.196f, -1.422f, 0.754f, -2.074f, 2.237f)
+                curveToRelative(-0.652f, 1.482f, -0.311f, 3.83f, -0.067f, 4.56f)
+                reflectiveCurveToRelative(0.625f, 1.924f, 1.273f, 2.796f)
+                curveToRelative(0.576f, 0.984f, 1.34f, 1.667f, 1.659f, 1.899f)
+                reflectiveCurveToRelative(1.219f, 0.386f, 1.843f, 0.067f)
+                curveToRelative(0.502f, -0.308f, 1.408f, -0.485f, 1.766f, -0.472f)
+                curveToRelative(0.357f, 0.013f, 1.061f, 0.154f, 1.782f, 0.539f)
+                curveToRelative(0.571f, 0.197f, 1.111f, 0.115f, 1.652f, -0.105f)
+                curveToRelative(0.541f, -0.221f, 1.324f, -1.059f, 2.238f, -2.758f)
+                quadToRelative(0.52f, -1.185f, 0.473f, -1.282f)
+            }
+        }.build()
+    }
     val FlaskConical: ImageVector by lazy {
         ImageVector.Builder(
             name = "FlaskConical",

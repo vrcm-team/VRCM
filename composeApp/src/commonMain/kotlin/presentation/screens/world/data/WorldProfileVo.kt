@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformFileSize
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 
@@ -14,7 +15,7 @@ data class WorldProfileVo(
     val worldDescription: String = "",
     val authorID: String? = null,
     val authorName: String? = null,
-    
+
     // 世界属性
     val capacity: Int = 0,
     val recommendedCapacity: Int = 0,
@@ -28,19 +29,26 @@ data class WorldProfileVo(
     val tags: List<String>? = null,
     val releaseStatus: String? = null,
     val version: Int? = null,
-    
+
     // 时间信息
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val publicationDate: String? = null,
-    
+
     // 实例信息列表
     val instances: List<InstanceVo> = mutableStateListOf(),
 
-    ): JavaSerializable {
-    
+    // 平台文件大小信息
+    val platformFileSizes: List<PlatformFileSize> = emptyList(),
+
+): JavaSerializable {
+
     // 从WorldData构造，不包含实例信息
-    constructor(world: WorldData, instancesList: List<InstanceVo> = mutableStateListOf()): this(
+    constructor(
+        world: WorldData, 
+        instancesList: List<InstanceVo> = mutableStateListOf(),
+        platformFileSizes: List<PlatformFileSize> = emptyList()
+    ): this(
         worldId = world.id,
         worldName = world.name,
         worldImageUrl = world.imageUrl,
@@ -65,9 +73,10 @@ data class WorldProfileVo(
         updatedAt = world.updatedAt,
         publicationDate = world.publicationDate,
         instances = instancesList,
+        platformFileSizes = platformFileSizes,
     )
 
-    
+
     // 从InstantsVo构造临时对象
     constructor(instant: HomeInstanceVo): this(
         worldId = instant.worldId,

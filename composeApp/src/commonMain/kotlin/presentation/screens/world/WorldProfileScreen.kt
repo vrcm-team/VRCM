@@ -52,6 +52,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -505,22 +506,25 @@ private fun RenderMainContent(
             }
             HorizontalDivider(thickness = 2.dp)
             Box(
-                modifier = Modifier.simpleClickable {
-                    worldProfileVo.authorID?.let {
-                        val userProfileScreen = UserProfileScreen(
-                            userProfileVO = UserProfileVo(
-                                id = it
+                modifier = Modifier.enableIf(worldProfileVo.authorName != null){
+                    simpleClickable {
+                        worldProfileVo.authorID?.let {
+                            val userProfileScreen = UserProfileScreen(
+                                userProfileVO = UserProfileVo(
+                                    id = it
+                                )
                             )
-                        )
-                        navigator.push(userProfileScreen)
+                            navigator.push(userProfileScreen)
+                        }
                     }
                 }
             ) {
                 Text(
-                    text = worldProfileVo.authorName ?: "未知作者",
+                    text = worldProfileVo.authorName ?: strings.unknown,
                     color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.labelMedium,
                     textDecoration = TextDecoration.Underline,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -539,7 +543,8 @@ private fun ColumnScope.InfoArea(
     collapsedAlphaVariant: Float,
     itemSize: DpSize,
 ) {
-    val infoCards = listOf(
+    // 基本信息卡片
+    val basicInfoCards = listOf(
         // 世界容量
         Triple(AppIcons.Person, "${worldProfileVo.capacity}", strings.worldProfileCapacity),
         // 在线人数
@@ -559,10 +564,23 @@ private fun ColumnScope.InfoArea(
         // 版本
         Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion),
         // 更新时间
-        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.toLocalDate()?.simpleFormat ?: strings.worldProfileUnknown, strings.worldProfileUpdateDate),
+        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
         // 实验室发布日期
-        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.toLocalDate()?.simpleFormat ?: strings.worldProfileUnknown, strings.worldProfileLabReleaseDate),
+        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileLabReleaseDate),
     )
+
+    // 平台文件大小卡片
+    val platformSizeCards = worldProfileVo.platformFileSizes.map { platformSize ->
+        val icon = when (platformSize.platform) {
+            Windows -> AppIcons.Computer
+            Ios -> AppIcons.Apple
+            Android -> AppIcons.Android
+        }
+        Triple(icon, platformSize.formattedSize, platformSize.displayName)
+    }
+
+    // 合并所有卡片
+    val infoCards = basicInfoCards + platformSizeCards
 
     // 计算每页显示的卡片数量
     val cardsPerRow = 4 // 每行显示4个卡片
@@ -660,7 +678,7 @@ private fun RenderTopBar(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     onReturn: () -> Unit,
-    onMenu: () -> Unit,
+    onMenu: (() -> Unit)?,
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
@@ -680,7 +698,7 @@ private fun RenderTopBar(
             ratio = topBarRatio,
             color = MaterialTheme.colorScheme.surface,
             onReturn = onReturn,
-            onMenu = onMenu
+            onMenu = null
         )
         // 标题显示
         Box(
@@ -713,20 +731,6 @@ private fun RenderTopBar(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp
                     )
-                }
-                // 刷新按钮
-                if (blurProgress > 0.5f && !isRefreshing) {
-                    IconButton(
-                        onClick = onRefresh,
-                        modifier = Modifier
-                            .padding(end = 16.dp)
-                    ) {
-                        Icon(
-                            imageVector = AppIcons.Update,
-                            contentDescription = "refresh",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
             }
         }

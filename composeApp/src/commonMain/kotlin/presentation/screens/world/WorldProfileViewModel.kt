@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo.Owner
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
@@ -34,6 +35,7 @@ class WorldProfileScreenModel(
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
     private val inviteApi: InviteApi,
+    private val worldPlatformService: WorldPlatformService,
 ) : ScreenModel {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -66,10 +68,24 @@ class WorldProfileScreenModel(
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
+
+            // TODO
+//            val platformFileSizes = mutableStateListOf<PlatformFileSize>()
             // 更新世界基本信息
             _worldProfileState.value =
-                WorldProfileVo(worldData, _worldProfileState.value?.instances ?: mutableListOf())
-
+                WorldProfileVo(
+                    world = worldData, 
+                    instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
+//                    platformFileSizes = platformFileSizes,
+                )
+//            screenModelScope.launch(Dispatchers.IO) {
+//                // 获取平台文件大小信息
+//                runCatching {
+//                    platformFileSizes.addAll(worldPlatformService.getWorldPlatformFileSizes(worldData))
+//                }.onFailure {
+//                    SharedFlowCentre.toastText.emit(ToastText.Error("Failed to load platform file sizes: ${it.message}"))
+//                }
+//            }
             // 获取实例ID列表
             val instanceIds =
                 _worldProfileState.value?.instances?.associate { it.instanceId to it.owner.value }?: emptyMap()

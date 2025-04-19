@@ -50,12 +50,12 @@ internal val LocaleStringsJa = LocaleStrings(
     locationDialogTags = "タグ",
     locationInvited = "誘い済み",
     locationInviteMe = "自分を誘う",
-    createInstance = "インスタンスを作成",
+    createInstance = "インスタンス作成",
     accessType = "アクセス権限",
     regionType = "地域",
     confirm = "確認",
     cancel = "キャンセル",
-    favoriteWorld = "ワールドをお気に入り",
+    favoriteWorld = "お気に入り追加",
     favoriteAddSuccess = "ワールドをお気に入りに追加しました",
     favoriteAlreadyExists = "このワールドは既にお気に入りです",
     favoriteGroupSelect = "お気に入りグループを選択",
@@ -111,7 +111,7 @@ internal val LocaleStringsJa = LocaleStrings(
     worldProfileVersion = "バージョン",
     worldProfileUpdateDate = "更新日",
     worldProfileLabReleaseDate = "ラボ公開日",
-    worldProfileUnknown = "不明",
+    unknown = "不明",
 
     // CreateInstanceDialog
     createInstanceStandardAccessType = "標準アクセスタイプ",
