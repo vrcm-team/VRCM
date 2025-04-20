@@ -12,8 +12,12 @@ fun CharSequence.isDigitsOnly(): Boolean = this.all{ char -> char.isDigit() }
 fun String.omission(maxLength: Int)= this.takeIf { it.length < maxLength }
     ?: "${this.substring(0,maxLength)}..."
 
-fun String.toLocalDateTime() = Instant.parse(this).toLocalDateTime(TimeZone.currentSystemDefault())
-fun String.toLocalDate() = Instant.parse(this).toLocalDateTime(TimeZone.currentSystemDefault()).date
+fun String.toLocalDateTime() =
+    runCatching {  Instant.parse(this).toLocalDateTime(TimeZone.currentSystemDefault())}
+        .getOrNull()
+fun String.toLocalDate() =
+    runCatching {  Instant.parse(this).toLocalDateTime(TimeZone.currentSystemDefault()).date }
+        .getOrNull()
 
 fun String.pretty() = this.let { string ->
     var indentLevel = 0

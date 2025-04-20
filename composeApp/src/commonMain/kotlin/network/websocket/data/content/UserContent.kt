@@ -32,5 +32,6 @@ data class UserContent(
     override val status: UserStatus,
     override val statusDescription: String,
     override val tags: List<String>,
-    override val userIcon: String
+    override val userIcon: String,
+    override val pronouns: String?
 ): IUser, JavaSerializable

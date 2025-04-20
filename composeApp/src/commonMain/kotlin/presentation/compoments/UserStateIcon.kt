@@ -144,6 +144,7 @@ fun UserInfoRow(
         } else {
             userNameText()
         }
+
         if (user?.isSupporter == true) {
             Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)) {
                 drawOval(

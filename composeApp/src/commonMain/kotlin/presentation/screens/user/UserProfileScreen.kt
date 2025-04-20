@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -263,6 +264,7 @@ private fun ProfileContent(
     }
     // TrustRank + UserName + VRC+
     UserInfoRow(user = currentUser, canCopy = true)
+    UserPronouns(pronouns = currentUser.pronouns)
     // status
     UserStatusRow(user = currentUser, canCopy = true)
     // LanguagesRow && LinksRow
@@ -272,6 +274,19 @@ private fun ProfileContent(
             .padding(top = 12.dp)
     ) {
         BottomCardTab(scrollState, currentUser)
+    }
+}
+
+@Composable
+fun UserPronouns(pronouns: String) {
+    if (pronouns.isNotEmpty()){
+        Text(
+            text = "(${pronouns})",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

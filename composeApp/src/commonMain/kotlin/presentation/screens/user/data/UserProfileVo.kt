@@ -28,6 +28,7 @@ data class UserProfileVo(
     override val lastLogin: String? = "",
     override val lastPlatform: String = "",
     override val developerType: String = "",
+    override val pronouns: String = "",
 ) : IUser, JavaSerializable {
     constructor(user: IUser): this(
         id = user.id,
@@ -50,7 +51,8 @@ data class UserProfileVo(
         profilePicOverride = user.profilePicOverride,
         lastLogin = user.lastLogin,
         lastPlatform = user.lastPlatform,
-        developerType = user.developerType
+        developerType = user.developerType,
+        pronouns = user.pronouns.orEmpty()
     )
 
     constructor(user: UserData): this(
@@ -76,7 +78,8 @@ data class UserProfileVo(
         profilePicOverride = user.profilePicOverride,
         lastLogin = user.lastLogin,
         lastPlatform = user.lastPlatform,
-        developerType = user.developerType
+        developerType = user.developerType,
+        pronouns = user.pronouns.orEmpty()
     )
 
 }

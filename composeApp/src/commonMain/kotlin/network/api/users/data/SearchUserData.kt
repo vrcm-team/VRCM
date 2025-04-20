@@ -19,7 +19,7 @@ data class SearchUserData(
     @SerialName("last_platform")
     override val lastPlatform: String,
     override val profilePicOverride: String,
-    val pronouns: String?,
+    override val pronouns: String?,
     override val status: UserStatus,
     override val statusDescription: String,
     override val tags: List<String>,

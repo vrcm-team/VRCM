@@ -29,7 +29,8 @@ data class FriendActiveContent(
             status = user.status,
             statusDescription = user.statusDescription,
             tags = user.tags,
-            userIcon = user.userIcon
+            userIcon = user.userIcon,
+            pronouns = user.pronouns,
         )
     }
 }

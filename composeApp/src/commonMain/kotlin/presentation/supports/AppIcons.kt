@@ -9,47 +9,92 @@ import androidx.compose.ui.unit.dp
 
 object AppIcons {
 
+    val Publish: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Publish",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 960f,
+            viewportHeight = 960f
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(440f, 800f)
+                verticalLineToRelative(-326f)
+                lineTo(336f, 578f)
+                lineToRelative(-56f, -58f)
+                lineToRelative(200f, -200f)
+                lineToRelative(200f, 200f)
+                lineToRelative(-56f, 58f)
+                lineToRelative(-104f, -104f)
+                verticalLineToRelative(326f)
+                close()
+                moveTo(160f, 360f)
+                verticalLineToRelative(-120f)
+                quadToRelative(0f, -33f, 23.5f, -56.5f)
+                reflectiveQuadTo(240f, 160f)
+                horizontalLineToRelative(480f)
+                quadToRelative(33f, 0f, 56.5f, 23.5f)
+                reflectiveQuadTo(800f, 240f)
+                verticalLineToRelative(120f)
+                horizontalLineToRelative(-80f)
+                verticalLineToRelative(-120f)
+                horizontalLineTo(240f)
+                verticalLineToRelative(120f)
+                close()
+            }
+        }.build()
+    }
     val Windows: ImageVector by lazy {
         ImageVector.Builder(
-                name = "Windows",
-                defaultWidth = 16.dp,
-                defaultHeight = 16.dp,
-                viewportWidth = 16f,
-                viewportHeight = 16f
-            ).apply {
-                path(
-                    fill = SolidColor(Color(0xFF000000)),
-                    fillAlpha = 1.0f,
-                    stroke = null,
-                    strokeAlpha = 1.0f,
-                    strokeLineWidth = 1.0f,
-                    strokeLineCap = StrokeCap.Butt,
-                    strokeLineJoin = StrokeJoin.Miter,
-                    strokeLineMiter = 1.0f,
-                    pathFillType = PathFillType.NonZero
-                ) {
-                    moveTo(6.555f, 1.375f)
-                    lineTo(0f, 2.237f)
-                    verticalLineToRelative(5.45f)
-                    horizontalLineToRelative(6.555f)
-                    close()
-                    moveTo(0f, 13.795f)
-                    lineToRelative(6.555f, 0.933f)
-                    verticalLineTo(8.313f)
-                    horizontalLineTo(0f)
-                    close()
-                    moveToRelative(7.278f, -5.4f)
-                    lineToRelative(0.026f, 6.378f)
-                    lineTo(16f, 16f)
-                    verticalLineTo(8.395f)
-                    close()
-                    moveTo(16f, 0f)
-                    lineTo(7.33f, 1.244f)
-                    verticalLineToRelative(6.414f)
-                    horizontalLineTo(16f)
-                    close()
-                }
-            }.build()
+            name = "Windows",
+            defaultWidth = 16.dp,
+            defaultHeight = 16.dp,
+            viewportWidth = 16f,
+            viewportHeight = 16f
+        ).apply {
+            path(
+                fill = SolidColor(Color(0xFF000000)),
+                fillAlpha = 1.0f,
+                stroke = null,
+                strokeAlpha = 1.0f,
+                strokeLineWidth = 1.0f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Miter,
+                strokeLineMiter = 1.0f,
+                pathFillType = PathFillType.NonZero
+            ) {
+                moveTo(6.555f, 1.375f)
+                lineTo(0f, 2.237f)
+                verticalLineToRelative(5.45f)
+                horizontalLineToRelative(6.555f)
+                close()
+                moveTo(0f, 13.795f)
+                lineToRelative(6.555f, 0.933f)
+                verticalLineTo(8.313f)
+                horizontalLineTo(0f)
+                close()
+                moveToRelative(7.278f, -5.4f)
+                lineToRelative(0.026f, 6.378f)
+                lineTo(16f, 16f)
+                verticalLineTo(8.395f)
+                close()
+                moveTo(16f, 0f)
+                lineTo(7.33f, 1.244f)
+                verticalLineToRelative(6.414f)
+                horizontalLineTo(16f)
+                close()
+            }
+        }.build()
     }
     val Android: ImageVector by lazy {
         ImageVector.Builder(

@@ -29,4 +29,5 @@ data class FriendData(
     override val statusDescription: String,
     override val tags: List<String> = emptyList(),
     override val userIcon: String,
+    override val pronouns: String?,
 ): IUser, JavaSerializable

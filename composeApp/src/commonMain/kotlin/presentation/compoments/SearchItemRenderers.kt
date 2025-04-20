@@ -76,7 +76,7 @@ fun LazyItemScope.renderUserItem(
             val lastLoginStr = user.lastLogin
             if (user.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@SearchResultItem
             Text(
-                text = lastLoginStr.toLocalDateTime().ignoredFormat,
+                text = lastLoginStr.toLocalDateTime()?.ignoredFormat.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )

@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.painter.Painter
 import cafe.adriel.voyager.koin.koinScreenModel
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
 import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
@@ -73,8 +74,10 @@ object FriendListPager : Pager {
 
                         GroupOptionsUI(
                             currentOptions = friendGroupOptions,
-                            favoriteGroups = friendFavoriteGroups.keys.toList(),
+                            favoriteGroups = friendFavoriteGroups,
+                            favoriteType = FavoriteType.Friend,
                             defaultText = strings.friendListPagerAllFriends,
+                            total = filteredFriends.size,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateFriendGroupOptions(newOptions)
                             },
@@ -88,7 +91,9 @@ object FriendListPager : Pager {
 
                         GroupOptionsUI(
                             currentOptions = worldGroupOptions,
-                            favoriteGroups = worldFavoriteGroups.keys.toList(),
+                            favoriteGroups = worldFavoriteGroups,
+                            favoriteType = FavoriteType.World,
+                            total = filteredWorlds.size,
                             defaultText = strings.friendListPagerAllWorlds,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateWorldGroupOptions(newOptions)

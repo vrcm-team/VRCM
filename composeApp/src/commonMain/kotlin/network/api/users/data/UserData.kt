@@ -41,6 +41,7 @@ data class UserData(
     val travelingToWorld: String?,
     override val userIcon: String,
     val worldId: String,
+    override val pronouns: String?,
 ) : IUser, JavaSerializable, IAccessType {
     override val accessType: AccessType
         get() =

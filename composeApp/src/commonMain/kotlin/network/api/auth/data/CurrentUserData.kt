@@ -74,5 +74,6 @@ data class CurrentUserData(
     val userLanguage: String?,
     val userLanguageCode: String?,
     val username: String,
-    val viveId: String
+    val viveId: String,
+    override val pronouns: String?
 ):IUser, JavaSerializable

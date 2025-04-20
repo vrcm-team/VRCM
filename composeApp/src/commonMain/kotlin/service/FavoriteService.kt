@@ -26,7 +26,8 @@ class FavoriteService(
         mutableMapOf()
 
     // 收藏限制信息缓存
-    private lateinit var _favoriteLimits: FavoriteLimits
+    private var _favoriteLimits: FavoriteLimits? = null
+
 
 
     fun favoritesByGroup(favoriteType: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
@@ -53,7 +54,7 @@ class FavoriteService(
      * @return 该类型的收藏组最大数量，如未加载限制信息则返回默认值1
      */
     fun getMaxFavoriteGroups(favoriteType: FavoriteType): Int {
-        val limits = _favoriteLimits
+        val limits = _favoriteLimits ?: return 1
         return when (favoriteType) {
             FavoriteType.World -> limits.maxFavoriteGroups.world
             FavoriteType.Avatar -> limits.maxFavoriteGroups.avatar
@@ -68,7 +69,7 @@ class FavoriteService(
      * @return 该类型每组的最大收藏数量，如未加载限制信息则返回默认值100
      */
     fun getMaxFavoritesPerGroup(favoriteType: FavoriteType): Int {
-        val limits = _favoriteLimits
+        val limits = _favoriteLimits ?: return 100
         return when (favoriteType) {
             FavoriteType.World -> limits.maxFavoritesPerGroup.world
             FavoriteType.Avatar -> limits.maxFavoritesPerGroup.avatar
