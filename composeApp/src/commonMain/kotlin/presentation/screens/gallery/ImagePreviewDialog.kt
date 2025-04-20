@@ -25,7 +25,7 @@ import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
-import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -65,10 +65,6 @@ class ImagePreviewDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .simpleClickable {
-                        // 点击背景关闭对话框
-                        setDialogContent(null)
-                    }
             ) {
                 ZoomableImage(
                     imageUrl = imageUrl,
@@ -129,7 +125,8 @@ class ImagePreviewDialog(
                     setDialogContent(null)
                 },
                 modifier = Modifier
-                    .padding(16.dp)
+                    .padding(top = getInsetPadding(WindowInsets::getTop))
+                    .padding(8.dp)
                     .align(Alignment.TopStart)
             ) {
                 Icon(
