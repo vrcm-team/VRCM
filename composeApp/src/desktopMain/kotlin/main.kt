@@ -52,7 +52,6 @@ fun main() = run {
     }
 }
 
-@org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun AppDesktopPreview() {
     ScaleOnScrollList()
