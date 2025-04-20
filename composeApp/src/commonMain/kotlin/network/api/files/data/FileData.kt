@@ -18,7 +18,10 @@ enum class FileTagType(val value: String) {
     Sticker("sticker"),
     
     @SerialName("gallery")
-    Gallery("gallery");
+    Gallery("gallery"),
+
+    @SerialName("print")
+    Print("print");
     
     override fun toString(): String = value
 }

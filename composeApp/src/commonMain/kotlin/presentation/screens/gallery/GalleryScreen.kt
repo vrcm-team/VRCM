@@ -32,10 +32,11 @@ import kotlinx.coroutines.launch
 object GalleryScreen : Screen {
 
     private val tabPagers = listOf(
+        GalleryTabPager.Companion.Gallery,
+        GalleryTabPager.Companion.Print,
         GalleryTabPager.Companion.Icon,
         GalleryTabPager.Companion.Emoji,
         GalleryTabPager.Companion.Sticker,
-        GalleryTabPager.Companion.Gallery
     )
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -83,8 +84,9 @@ object GalleryScreen : Screen {
                     .padding(paddingValues)
             ) {
                 // 标签页
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage,
+                    edgePadding = 16.dp,
                     divider = {
                         HorizontalDivider(
                             thickness = 0.5.dp,

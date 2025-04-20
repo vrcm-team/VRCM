@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType.*
 
 /**
  * 图片编辑器配置类
@@ -21,7 +22,7 @@ class ImageEditorConfig private constructor(
          */
         fun forFileTagType(fileTagType: FileTagType): ImageEditorConfig {
             return when (fileTagType) {
-                FileTagType.Icon -> {
+                Icon -> {
                     // Icon: 必须小于10MB、大于64x64像素且小于2048x2048像素
                     ImageEditorConfig(
                         aspectRatio = 1f, // 1:1 比例
@@ -33,7 +34,7 @@ class ImageEditorConfig private constructor(
                         description = "图标必须小于10MB、大于64x64像素且小于2048x2048像素"
                     )
                 }
-                FileTagType.Emoji -> {
+                Emoji -> {
                     // Emoji: 应为Sticker 1024x1024的一比一图像
                     ImageEditorConfig(
                         aspectRatio = 1f, // 1:1 比例
@@ -45,7 +46,7 @@ class ImageEditorConfig private constructor(
                         description = "表情应为1024x1024的1:1图像"
                     )
                 }
-                FileTagType.Sticker -> {
+                Sticker -> {
                     // Sticker: 使用与Emoji相同的规则
                     ImageEditorConfig(
                         aspectRatio = 1f, // 1:1 比例
@@ -57,7 +58,7 @@ class ImageEditorConfig private constructor(
                         description = "贴图应为1024x1024的1:1图像"
                     )
                 }
-                FileTagType.Gallery -> {
+                Gallery -> {
                     // Gallery: 必须小于10MB、大于64x64像素且小于2048x2048像素，比例为16:9
                     ImageEditorConfig(
                         aspectRatio = 16f / 9f, // 16:9 比例
@@ -69,6 +70,8 @@ class ImageEditorConfig private constructor(
                         description = "图片必须小于10MB、大于64x64像素且小于2048x2048像素，比例为16:9"
                     )
                 }
+
+                Print -> TODO()
             }
         }
     }

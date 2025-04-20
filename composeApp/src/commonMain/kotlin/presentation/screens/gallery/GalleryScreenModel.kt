@@ -47,6 +47,7 @@ class GalleryScreenModel(
         refreshFiles(FileTagType.Emoji)
         refreshFiles(FileTagType.Sticker)
         refreshFiles(FileTagType.Gallery)
+        refreshFiles(FileTagType.Print)
     }
 
     /**
