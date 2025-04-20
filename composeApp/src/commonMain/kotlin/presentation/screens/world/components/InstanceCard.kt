@@ -202,7 +202,7 @@ private fun DeviceStatsRow(
     ) {
         if (pcUsers != null && pcUsers > 0) {
             IconLabelRow(
-                icon = AppIcons.Computer,
+                icon = AppIcons.Windows,
                 text = "$pcUsers",
                 iconSize = iconSize,
                 spacing = spacing
