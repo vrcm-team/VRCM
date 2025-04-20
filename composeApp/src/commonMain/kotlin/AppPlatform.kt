@@ -2,8 +2,9 @@ package io.github.vrcmteam.vrcm
 
 import androidx.compose.runtime.Composable
 import org.koin.compose.getKoin
+import org.koin.core.component.KoinComponent
 
-interface AppPlatform {
+interface AppPlatform: KoinComponent {
     val name: String
     val version: String
     val type: AppPlatformType

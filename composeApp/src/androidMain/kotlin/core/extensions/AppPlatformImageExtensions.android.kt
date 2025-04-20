@@ -25,26 +25,22 @@ import kotlin.coroutines.resume
 /**
  * Android平台实现：保存图片到系统相册
  */
-actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: String): Boolean = withContext(Dispatchers.IO) {
-    try {
-        val platform = this@saveImageToGallery as AndroidAppPlatform
+actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        this@saveImageToGallery as AndroidAppPlatform
         val httpClient = HttpClient()
         val response = httpClient.get(imageUrl)
         val inputStream = response.bodyAsChannel().toInputStream()
 
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            platform.saveImageWithMediaStore(inputStream, fileName)
+            saveImageWithMediaStore(inputStream, fileName)
         } else {
-            platform.saveImageLegacy(inputStream, fileName)
+            saveImageLegacy(inputStream, fileName)
         }
 
         httpClient.close()
         result
-    } catch (e: Exception) {
-        e.printStackTrace()
-        false
     }
-}
 
 /**
  * Android平台实现：从系统相册选择图片
@@ -76,7 +72,7 @@ actual suspend fun AppPlatform.selectImageFromGallery(): String? {
             // 启动图片选择器
             getContent.launch("image/*")
 
-            // 如果协程被取消，注销ActivityResultLauncher
+            // ActivityResultLauncher
             continuation.invokeOnCancellation {
                 getContent.unregister()
             }
@@ -91,26 +87,22 @@ actual suspend fun AppPlatform.selectImageFromGallery(): String? {
  * Android平台实现：读取文件字节
  */
 actual suspend fun AppPlatform.readFileBytes(filePath: String): ByteArray = withContext(Dispatchers.IO) {
-    try {
-        val platform = this@readFileBytes as AndroidAppPlatform
-        // 如果是content://开头的URI
-        if (filePath.startsWith("content://")) {
-            val uri = Uri.parse(filePath)
-            platform.context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                return@withContext inputStream.readBytes()
-            }
-            throw IllegalArgumentException("Cannot open input stream for URI: $filePath")
-        } else {
-            // 如果是普通文件路径
-            val file = File(filePath)
-            if (!file.exists()) {
-                throw IllegalArgumentException("File not found: $filePath")
-            }
-            return@withContext file.readBytes()
+
+    val platform = this@readFileBytes as AndroidAppPlatform
+    // 如果是content://开头的URI
+    if (filePath.startsWith("content://")) {
+        val uri = Uri.parse(filePath)
+        platform.context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            return@withContext inputStream.readBytes()
         }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        throw e
+        throw IllegalArgumentException("Cannot open input stream for URI: $filePath")
+    } else {
+        // 如果是普通文件路径
+        val file = File(filePath)
+        if (!file.exists()) {
+            throw IllegalArgumentException("File not found: $filePath")
+        }
+        return@withContext file.readBytes()
     }
 }
 
@@ -174,7 +166,7 @@ private fun AndroidAppPlatform.saveImageWithMediaStore(inputStream: InputStream,
             inputStream.copyTo(outputStream)
         }
         true
-    } ?: false
+    } == true
 }
 
 private fun AndroidAppPlatform.saveImageLegacy(inputStream: InputStream, fileName: String): Boolean {

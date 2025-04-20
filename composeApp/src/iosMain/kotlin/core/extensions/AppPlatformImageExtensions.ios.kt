@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.core.extensions
 import io.github.vrcmteam.vrcm.AppPlatform
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSData
@@ -21,7 +22,7 @@ import platform.UIKit.UIImagePNGRepresentation
  */
 @OptIn(ExperimentalForeignApi::class)
 actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: String): Boolean =
-    withContext(Dispatchers.Main) {
+    withContext(Dispatchers.IO) {
 
         // 检查相册权限
         if (!requestPhotoLibraryPermission()) {
@@ -96,7 +97,7 @@ private suspend fun requestPhotoLibraryPermission(): Boolean = withContext(Dispa
 
     semaphore.acquire()
     semaphore.release()
-    return@withContext authorized
+    authorized
 }
 
 /**
