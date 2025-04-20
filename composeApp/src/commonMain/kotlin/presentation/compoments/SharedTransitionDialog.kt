@@ -10,8 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import cafe.adriel.voyager.core.annotation.InternalVoyagerApi
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
-import io.github.vrcmteam.vrcm.presentation.extensions.LocalOnBackHook
+import cafe.adriel.voyager.navigator.internal.BackHandler
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -19,7 +20,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 // 为了解决安卓序列化问题, 不能写成rememberSaveable
 private val DialogContentMap = mutableMapOf<String, MutableState<SharedDialog?>>()
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, InternalVoyagerApi::class)
 @Composable
 fun SharedTransitionDialog(
     modifier: Modifier = Modifier,
@@ -38,12 +39,12 @@ fun SharedTransitionDialog(
                 dialogContent?.close()
                 dialogContent = null
             }
-            LocalOnBackHook.current.value = {
-                if (dialogContent == null) true else {
+            BackHandler(
+                enabled = dialogContent != null,
+                onBack = {
                     closeDialog()
-                    false
                 }
-            }
+            )
             content()
             AnimatedContent(
                 modifier = Modifier.fillMaxSize(),

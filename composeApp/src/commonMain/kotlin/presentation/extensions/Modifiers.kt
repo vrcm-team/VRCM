@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -81,13 +80,11 @@ fun Modifier.slideBack(
     orientation: Orientation = Orientation.Horizontal,
 ) = this.composed {
     val navigator = LocalNavigator.currentOrThrow
-    val onBackHook = LocalOnBackHook.current.value
     // 添加一个标志变量，用于确保在一次拖动手势中只pop一次
     val hasPopped = remember { mutableStateOf(false) }
-    
     draggable(
         state = rememberDraggableState {
-            if (navigator.canPop && it > threshold && !hasPopped.value && onBackHook()) {
+            if (navigator.canPop && it > threshold && !hasPopped.value) {
                 navigator.pop()
                 hasPopped.value = true
             }
@@ -129,6 +126,3 @@ fun Modifier.simpleClickable(
     interactionSource = remember { MutableInteractionSource() },
     onClick = onClick
 )
-
-
-val LocalOnBackHook = compositionLocalOf { mutableStateOf({ true }) }
