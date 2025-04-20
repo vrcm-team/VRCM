@@ -172,7 +172,7 @@ fun BoxScope.ZoomableImage(
                         // 处理平移 (只有在放大状态下才能平移)
                         if (scale > 1f) {
                             // 计算新的偏移量
-                            val newOffset = offset + pan
+                            val newOffset = offset + (pan * scale)
 
                             // 限制平移范围，防止图片移出屏幕太多
                             val maxX = (scale - 1) * size.width / 2

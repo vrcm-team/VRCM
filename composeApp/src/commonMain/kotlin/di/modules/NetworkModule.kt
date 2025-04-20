@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.di.modules
 
-import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
@@ -14,12 +13,9 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
-import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.ktor.client.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.cookies.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import org.koin.core.definition.Definition
@@ -58,17 +54,17 @@ private val apiClientDefinition: Definition<HttpClient> = {
         install(ContentNegotiation) {
             json(get())
         }
-        install(Logging) {
-            logger = Logger.SIMPLE
-            level = LogLevel.ALL
-        }
+//        install(Logging) {
+//            logger = Logger.SIMPLE
+//            level = LogLevel.ALL
+//        }
         install(HttpCookies) {
             this.storage = get()
         }
-        install(HttpCallValidator){
-            handleResponseExceptionWithRequest{ cause, request ->
-                SharedFlowCentre.toastText.emit(ToastText.Error(cause.message?: "Unknown error occurred in ${request.url}"))
-            }
-        }
+//        install(HttpCallValidator){
+//            handleResponseExceptionWithRequest{ cause, request ->
+//                SharedFlowCentre.toastText.emit(ToastText.Error(cause.message?: "Unknown error occurred in ${request.url}"))
+//            }
+//        }
     }
 }

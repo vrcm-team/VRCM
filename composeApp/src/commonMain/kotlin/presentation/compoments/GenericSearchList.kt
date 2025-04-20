@@ -2,21 +2,15 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 /**
  * 通用搜索列表组件
@@ -70,8 +66,7 @@ fun GenericSearchList(
             item {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-
+                        .fillMaxWidth(),
                 ){
                     // 搜索框
                     SearchTextField(
@@ -87,15 +82,20 @@ fun GenericSearchList(
                     TabRow(
                         selectedTabIndex = selectedTabIndex,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 8.dp),
+                            .fillMaxWidth(),
+                        divider = {
+                            HorizontalDivider(
+                                thickness = 0.5.dp,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        },
                         indicator = {
                             TabRowDefaults.PrimaryIndicator(
                                 modifier = Modifier
-                                    .tabIndicatorOffset(it[selectedTabIndex])
-                                    .padding(horizontal = 24.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                    .tabIndicatorOffset(it[selectedTabIndex]),
+                                width = 32.dp,
+                                shape = RoundedCornerShape(4.dp)
                             )
                         },
                     ) {
@@ -103,7 +103,7 @@ fun GenericSearchList(
                             Tab(
                                 selected = index == selectedTabIndex,
                                 onClick = { onTabSelected(index) },
-                                interactionSource = remember { MutableInteractionSource() },
+                                interactionSource = null,
                                 selectedContentColor = MaterialTheme.colorScheme.primary,
                                 unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 text = { 
@@ -118,7 +118,7 @@ fun GenericSearchList(
                             )
                         }
                     }
-                    
+                    Spacer(modifier = Modifier.height(8.dp))
                     // 高级搜索选项（如果有）
                     advancedOptionsContent?.invoke()
                 }
@@ -190,7 +190,7 @@ fun AdvancedOptionsPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onExpandToggle)
+                .simpleClickable(onClick = onExpandToggle)
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -198,7 +198,7 @@ fun AdvancedOptionsPanel(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = AppIcons.Settings,
                     contentDescription = title
                 )
                 Text(
@@ -207,7 +207,7 @@ fun AdvancedOptionsPanel(
                 )
             }
             Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
                 contentDescription = if (expanded) "收起" else "展开"
             )
         }

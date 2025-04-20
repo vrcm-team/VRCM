@@ -170,7 +170,7 @@ private fun UserStatsSection(
     ) {
         // 总用户数
         IconLabelRow(
-            icon = AppIcons.Person,
+            icon = AppIcons.Group,
             text = "${instance.currentUsers ?: 0}",
             iconSize = iconSize,
             spacing = elementSpacing,

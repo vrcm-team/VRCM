@@ -1,21 +1,30 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.platformPackages
 
 /**
  * 用户列表渲染
@@ -111,6 +120,7 @@ fun LazyItemScope.renderWorldItem(
             Text(
                 text = world.name,
                 style = MaterialTheme.typography.titleMedium,
+                overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
@@ -122,12 +132,25 @@ fun LazyItemScope.renderWorldItem(
             )
         },
         trailingContent = {
-            // 显示世界访问等级
-            Text(
-                text = world.releaseStatus,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1
-            )
+            // 显示世界平台类型
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ){
+               remember { world.unityPackages.platformPackages.keys.sortedBy { it.name } } .forEach {
+                    val icon = when(it){
+                        Android -> AppIcons.Android
+                        Ios -> AppIcons.Apple
+                        Windows -> AppIcons.Windows
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "PlatformIcon",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
         }
     )
 } 

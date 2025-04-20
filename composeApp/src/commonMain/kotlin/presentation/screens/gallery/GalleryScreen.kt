@@ -85,12 +85,19 @@ object GalleryScreen : Screen {
                 // 标签页
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
+                    divider = {
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    },
                     indicator = {
                         TabRowDefaults.PrimaryIndicator(
                             modifier = Modifier
-                                .tabIndicatorOffset(it[pagerState.currentPage])
-                                .padding(horizontal = 24.dp),  // 添加上部圆角
-                            shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                .tabIndicatorOffset(it[pagerState.currentPage]),
+                            width = 32.dp,
+                            shape = RoundedCornerShape(4.dp)
                         )
                     }
                 ) {

@@ -239,7 +239,6 @@ class FriendListPagerModel(
         // 先按名称过滤
         val nameFilteredList = friendMap.values
             .filter { name.isEmpty() || it.displayName.lowercase().contains(name.lowercase()) }
-
         // 再按好友组过滤
         val result = if (friendGroupOptions.value.selectedGroup != null) {
             // 获取选中好友组的favoriteId列表

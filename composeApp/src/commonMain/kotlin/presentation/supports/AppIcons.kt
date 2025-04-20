@@ -9,6 +9,48 @@ import androidx.compose.ui.unit.dp
 
 object AppIcons {
 
+    val Windows: ImageVector by lazy {
+        ImageVector.Builder(
+                name = "Windows",
+                defaultWidth = 16.dp,
+                defaultHeight = 16.dp,
+                viewportWidth = 16f,
+                viewportHeight = 16f
+            ).apply {
+                path(
+                    fill = SolidColor(Color(0xFF000000)),
+                    fillAlpha = 1.0f,
+                    stroke = null,
+                    strokeAlpha = 1.0f,
+                    strokeLineWidth = 1.0f,
+                    strokeLineCap = StrokeCap.Butt,
+                    strokeLineJoin = StrokeJoin.Miter,
+                    strokeLineMiter = 1.0f,
+                    pathFillType = PathFillType.NonZero
+                ) {
+                    moveTo(6.555f, 1.375f)
+                    lineTo(0f, 2.237f)
+                    verticalLineToRelative(5.45f)
+                    horizontalLineToRelative(6.555f)
+                    close()
+                    moveTo(0f, 13.795f)
+                    lineToRelative(6.555f, 0.933f)
+                    verticalLineTo(8.313f)
+                    horizontalLineTo(0f)
+                    close()
+                    moveToRelative(7.278f, -5.4f)
+                    lineToRelative(0.026f, 6.378f)
+                    lineTo(16f, 16f)
+                    verticalLineTo(8.395f)
+                    close()
+                    moveTo(16f, 0f)
+                    lineTo(7.33f, 1.244f)
+                    verticalLineToRelative(6.414f)
+                    horizontalLineTo(16f)
+                    close()
+                }
+            }.build()
+    }
     val Android: ImageVector by lazy {
         ImageVector.Builder(
             name = "Android",

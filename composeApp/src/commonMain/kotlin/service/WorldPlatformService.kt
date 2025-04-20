@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi.Companion.findFileId
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformFileSize
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
+import io.github.vrcmteam.vrcm.network.api.worlds.data.UnityPackage
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import kotlinx.coroutines.async
@@ -23,11 +24,7 @@ class WorldPlatformService(private val fileApi: FileApi) {
      */
     suspend fun getWorldPlatformFileSizes(worldData: WorldData): List<PlatformFileSize> = coroutineScope {
         // 按平台对UnityPackages进行分组，并按创建日期排序（最新的在前）
-        val platformPackages = worldData.unityPackages
-            .groupBy { it.platform }
-            .mapValues { (_, packages) ->
-                packages.sortedByDescending { it.createdAt }
-            }
+        val platformPackages = worldData.unityPackages.platformPackages
 
         // 处理每个支持的平台
         val deferredResults = PlatformType.entries.mapNotNull { platform ->
@@ -71,3 +68,9 @@ class WorldPlatformService(private val fileApi: FileApi) {
             SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to get platform file size"))
         }
 }
+
+val List<UnityPackage>.platformPackages: Map<PlatformType, List<UnityPackage>>
+    get() = this.groupBy { it.platform }
+        .mapValues { (_, packages) ->
+            packages.sortedByDescending { it.createdAt }
+        }
