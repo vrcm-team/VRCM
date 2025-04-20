@@ -564,9 +564,9 @@ private fun ColumnScope.InfoArea(
         // 版本
         Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion),
         // 更新时间
-        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
+        Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
         // 实验室发布日期
-        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileLabReleaseDate),
+        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileLabReleaseDate),
     )
 
     // 平台文件大小卡片
