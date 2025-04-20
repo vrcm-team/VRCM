@@ -567,7 +567,7 @@ private fun ColumnScope.InfoArea(
         // 版本
         Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion),
         // 发布时间
-        Triple(AppIcons.Publish, worldProfileVo.publicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
+        Triple(AppIcons.Publish, worldProfileVo.publicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfilePublishDate),
         // 更新时间
         Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
         // 实验室发布日期

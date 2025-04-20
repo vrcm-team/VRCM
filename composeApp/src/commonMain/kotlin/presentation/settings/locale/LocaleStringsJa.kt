@@ -109,6 +109,7 @@ internal val LocaleStringsJa = LocaleStrings(
     worldProfileHeat = "熱度",
     worldProfilePopularity = "人気度",
     worldProfileVersion = "バージョン",
+    worldProfilePublishDate = "公開日",
     worldProfileUpdateDate = "更新日",
     worldProfileLabReleaseDate = "ラボ公開日",
     unknown = "不明",

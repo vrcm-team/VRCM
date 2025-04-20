@@ -109,6 +109,7 @@ internal val LocaleStringsZhHant = LocaleStrings(
     worldProfileHeat = "熱度",
     worldProfilePopularity = "知名度",
     worldProfileVersion = "版本",
+    worldProfilePublishDate = "發布日期",
     worldProfileUpdateDate = "更新日期",
     worldProfileLabReleaseDate = "實驗室發布日期",
     unknown = "未知",

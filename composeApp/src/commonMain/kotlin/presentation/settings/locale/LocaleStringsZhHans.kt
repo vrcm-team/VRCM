@@ -109,6 +109,7 @@ internal val LocaleStringsZhHans = LocaleStrings(
     worldProfileHeat = "热度",
     worldProfilePopularity = "知名度",
     worldProfileVersion = "版本",
+    worldProfilePublishDate = "发布日期",
     worldProfileUpdateDate = "更新日期",
     worldProfileLabReleaseDate = "实验室发布日期",
     unknown = "未知",

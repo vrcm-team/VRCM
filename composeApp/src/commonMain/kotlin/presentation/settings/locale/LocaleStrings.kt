@@ -114,6 +114,7 @@ data class LocaleStrings(
     val worldProfileHeat: String = "Heat",
     val worldProfilePopularity: String = "Popularity",
     val worldProfileVersion: String = "Version",
+    val worldProfilePublishDate: String = "Publish Date",
     val worldProfileUpdateDate: String = "Update Date",
     val worldProfileLabReleaseDate: String = "Lab Release Date",
     val unknown: String = "Unknown",
