@@ -130,6 +130,12 @@ data class LocaleStrings(
 
     // GalleryScreen
     val galleryScreenTitle: String = "Gallery",
+    
+    // ImagePreviewDialog
+    val imageSaveError: String = "Image save error: %s",
+    val imageSaveSuccess: String = "Image saved to gallery",
+    val imageSaveFailed: String = "Failed to save image",
+    val imageLoadFailed: String = "Image loading failed",
 )
 
 val strings: LocaleStrings

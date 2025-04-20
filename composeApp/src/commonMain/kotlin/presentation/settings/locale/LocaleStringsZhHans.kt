@@ -125,4 +125,10 @@ internal val LocaleStringsZhHans = LocaleStrings(
 
     // GalleryScreen
     galleryScreenTitle = "图库",
+
+    // ImagePreviewDialog
+    imageSaveError = "保存图片出错: %s",
+    imageSaveSuccess = "图片已保存到相册",
+    imageSaveFailed = "保存图片失败",
+    imageLoadFailed = "图片加载失败",
 )

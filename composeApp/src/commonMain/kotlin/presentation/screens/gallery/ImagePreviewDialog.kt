@@ -3,10 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +26,11 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
@@ -47,8 +48,11 @@ class ImagePreviewDialog(
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
         val coroutineScope = rememberCoroutineScope()
         val platform = getAppPlatform()
-        var dialogContent by LocationDialogContent.current
-
+        val (_, setDialogContent) = LocationDialogContent.current
+        // 添加保存状态跟踪
+        var isSaving by remember { mutableStateOf(false) }
+        val authService = koinInject<AuthService>()
+        val strings = strings
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -63,7 +67,7 @@ class ImagePreviewDialog(
                     .fillMaxSize()
                     .simpleClickable {
                         // 点击背景关闭对话框
-                        dialogContent = null
+                        setDialogContent(null)
                     }
             ) {
                 ZoomableImage(
@@ -77,34 +81,52 @@ class ImagePreviewDialog(
             // 添加FloatingActionButton用于保存图片，放在右下角
             FloatingActionButton(
                 onClick = {
-                    coroutineScope.launch {
-                        val result = platform.saveImageToGallery(
-                            imageUrl = imageUrl,
-                            fileName = "${fileName}${fileExtension}"
-                        )
-
-                        if (result) {
-                            SharedFlowCentre.toastText.emit(ToastText.Success("图片已保存到相册"))
-                        } else {
-                            SharedFlowCentre.toastText.emit(ToastText.Error("保存图片失败"))
+                    if (isSaving) return@FloatingActionButton
+                    // 设置保存状态为true
+                    isSaving = true
+                    coroutineScope.launch(Dispatchers.IO) {
+                        authService.reTryAuthCatching {
+                            platform.saveImageToGallery(
+                                imageUrl = imageUrl,
+                                fileName = "${fileName}${fileExtension}"
+                            )
+                        }.onFailure {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageSaveError.replace("%s",it.message.orEmpty())))
+                        }.onSuccess { isSuccess ->
+                            if (isSuccess) {
+                                SharedFlowCentre.toastText.emit(ToastText.Success(strings.imageSaveSuccess))
+                            } else {
+                                SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageSaveFailed))
+                            }
                         }
+                        isSaving = false
                     }
                 },
-                modifier = Modifier
-                    .padding(16.dp)
-                    .align(Alignment.BottomEnd)
+                modifier = Modifier.padding(16.dp)
+                    .align(Alignment.BottomEnd),
             ) {
-                Icon(
-                    painter = rememberVectorPainter(AppIcons.SaveAlt),
-                    contentDescription = "保存到相册"
-                )
+                if (isSaving) {
+                    // 保存中显示进度指示器
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    // 正常状态显示保存图标
+                    Icon(
+                        painter = rememberVectorPainter(AppIcons.SaveAlt),
+                        contentDescription = "Save Image"
+                    )
+                }
             }
+
 
             // 添加一个关闭按钮，放在左上角
             IconButton(
                 onClick = {
                     // 关闭对话框
-                    dialogContent = null
+                    setDialogContent(null)
                 },
                 modifier = Modifier
                     .padding(16.dp)
@@ -112,7 +134,7 @@ class ImagePreviewDialog(
             ) {
                 Icon(
                     painter = rememberVectorPainter(AppIcons.Close),
-                    contentDescription = "关闭",
+                    contentDescription = "Close",
                     tint = Color.White
                 )
             }
@@ -238,8 +260,9 @@ fun BoxScope.ZoomableImage(
             failure = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "图片加载失败",
-                        color = MaterialTheme.colorScheme.error
+                        text = strings.imageLoadFailed,
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
             }

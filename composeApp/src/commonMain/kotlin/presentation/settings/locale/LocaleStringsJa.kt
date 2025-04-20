@@ -119,10 +119,16 @@ internal val LocaleStringsJa = LocaleStrings(
 
     // GalleryTabPager
     galleryTabNoFiles = "%sファイルがありません",
-    galleryTabUploading = "画像をアップロード中...",
-    galleryTabUploadImage = "画像をアップロード",
+    galleryTabUploading = "イメージをアップロード中...",
+    galleryTabUploadImage = "イメージをアップロード",
     galleryTabLoadFailed = "読み込みに失敗しました",
 
     // GalleryScreen
     galleryScreenTitle = "ギャラリー",
+
+    // ImagePreviewDialog
+    imageSaveError = "イメージの保存エラー: %s",
+    imageSaveSuccess = "イメージが保存されました",
+    imageSaveFailed = "イメージの保存に失敗しました",
+    imageLoadFailed = "イメージの読み込みに失敗しました",
 )
