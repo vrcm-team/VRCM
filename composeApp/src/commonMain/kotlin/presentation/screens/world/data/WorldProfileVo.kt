@@ -34,14 +34,15 @@ data class WorldProfileVo(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val publicationDate: String? = null,
-
+    val labsPublicationDate: String? = null,
     // 实例信息列表
     val instances: List<InstanceVo> = mutableStateListOf(),
 
     // 平台文件大小信息
     val platformFileSizes: List<PlatformFileSize> = emptyList(),
 
-): JavaSerializable {
+
+    ): JavaSerializable {
 
     // 从WorldData构造，不包含实例信息
     constructor(
@@ -72,6 +73,7 @@ data class WorldProfileVo(
         createdAt = world.createdAt,
         updatedAt = world.updatedAt,
         publicationDate = world.publicationDate,
+        labsPublicationDate = world.labsPublicationDate,
         instances = instancesList,
         platformFileSizes = platformFileSizes,
     )

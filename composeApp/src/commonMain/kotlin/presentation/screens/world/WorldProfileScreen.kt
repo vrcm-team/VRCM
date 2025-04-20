@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -495,16 +496,18 @@ private fun RenderMainContent(
                     Text(text = worldProfileVo.worldName)
                 },
             ) {
-                Text(
-                    text = worldProfileVo.worldName,
-                    color = MaterialTheme.colorScheme.secondary,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                SelectionContainer {
+                    Text(
+                        text = worldProfileVo.worldName,
+                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
-            HorizontalDivider(thickness = 2.dp)
+            HorizontalDivider(thickness = 2.dp, modifier = Modifier.padding(horizontal = 8.dp))
             Box(
                 modifier = Modifier.enableIf(worldProfileVo.authorName != null){
                     simpleClickable {
@@ -563,10 +566,12 @@ private fun ColumnScope.InfoArea(
         Triple(AppIcons.Trending, "${worldProfileVo.popularity}", strings.worldProfilePopularity),
         // 版本
         Triple(AppIcons.Update, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion),
+        // 发布时间
+        Triple(AppIcons.Publish, worldProfileVo.publicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
         // 更新时间
         Triple(AppIcons.DateRange, worldProfileVo.updatedAt?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileUpdateDate),
         // 实验室发布日期
-        Triple(AppIcons.FlaskConical, worldProfileVo.publicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileLabReleaseDate),
+        Triple(AppIcons.FlaskConical, worldProfileVo.labsPublicationDate?.takeIf { it.isNotEmpty() }?.toLocalDate()?.simpleFormat ?: strings.unknown, strings.worldProfileLabReleaseDate),
     )
 
     // 平台文件大小卡片
@@ -606,7 +611,7 @@ private fun ColumnScope.InfoArea(
                 pageSpacing = 8.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
+                    .height(itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
             ) { page ->
                 // 计算当前页应显示的卡片
                 val startIndex = page * cardsPerPage
@@ -616,7 +621,7 @@ private fun ColumnScope.InfoArea(
                 // 添加页面过渡动画
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 第一行卡片
@@ -626,7 +631,7 @@ private fun ColumnScope.InfoArea(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             for ((icon, label, description) in firstRowCards) {
                                 InfoItemBlock(
@@ -644,10 +649,9 @@ private fun ColumnScope.InfoArea(
                     val secondRowEnd = minOf(secondRowStart + cardsPerRow, endIndex)
                     if (secondRowStart < secondRowEnd) {
                         val secondRowCards = pageCards.subList(firstRowEnd - startIndex, secondRowEnd - startIndex)
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             for ((icon, label, description) in secondRowCards) {
                                 InfoItemBlock(
@@ -662,8 +666,8 @@ private fun ColumnScope.InfoArea(
                 }
             }
 
-
         }
+
     }
 }
 
