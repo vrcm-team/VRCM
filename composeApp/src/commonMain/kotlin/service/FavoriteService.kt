@@ -28,6 +28,13 @@ class FavoriteService(
     // 收藏限制信息缓存
     private var _favoriteLimits: FavoriteLimits? = null
 
+    init {
+        CoroutineScope(Dispatchers.Default).launch{
+            SharedFlowCentre.authed.collect {
+                _favoritesByGroup.clear()
+            }
+        }
+    }
 
 
     fun favoritesByGroup(favoriteType: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =

@@ -45,6 +45,9 @@ object FriendListPager : Pager {
         val friendGroupOptions by friendListPagerModel.friendGroupOptions.collectAsState()
         val worldGroupOptions by friendListPagerModel.worldGroupOptions.collectAsState()
 
+        // 获取总数
+        val friendTotal by friendListPagerModel.friendTotal.collectAsState()
+        val worldTotal by friendListPagerModel.worldTotal.collectAsState()
         // 获取列表数据
         val filteredFriends by friendListPagerModel.friendList.collectAsState()
         val filteredWorlds by friendListPagerModel.worldList.collectAsState()
@@ -77,7 +80,7 @@ object FriendListPager : Pager {
                             favoriteGroups = friendFavoriteGroups,
                             favoriteType = FavoriteType.Friend,
                             defaultText = strings.friendListPagerAllFriends,
-                            total = filteredFriends.size,
+                            total = friendTotal,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateFriendGroupOptions(newOptions)
                             },
@@ -93,7 +96,7 @@ object FriendListPager : Pager {
                             currentOptions = worldGroupOptions,
                             favoriteGroups = worldFavoriteGroups,
                             favoriteType = FavoriteType.World,
-                            total = filteredWorlds.size,
+                            total = worldTotal,
                             defaultText = strings.friendListPagerAllWorlds,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateWorldGroupOptions(newOptions)
