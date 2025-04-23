@@ -104,6 +104,7 @@ class UserStatusDialog(
                 )
                 // 历史状态描述下拉菜单
                 DropdownMenu(
+                    shape = MaterialTheme.shapes.medium,
                     expanded = historyExpanded,
                     onDismissRequest = { historyExpanded = false }
                 ) {
@@ -115,6 +116,15 @@ class UserStatusDialog(
                             onClick = {
                                 setStatusDescriptionText(historyStatus)
                                 historyExpanded = false
+                            },
+                            trailingIcon = {
+                                if (historyStatus == statusDescriptionText) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "checked",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         )
                     }
@@ -183,6 +193,7 @@ fun StatusDropdownMenu(
         }
 
         DropdownMenu(
+            shape = MaterialTheme.shapes.medium,
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
@@ -209,15 +220,6 @@ fun StatusDropdownMenu(
                     onClick = {
                         onStatusSelected(status)
                         expanded = false
-                    },
-                    trailingIcon = {
-                        if (currentStatus == status) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "checked",
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
                     }
                 )
             }
