@@ -7,13 +7,13 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
-import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.FriendService
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,7 @@ import org.koin.core.logger.Logger
 class UserProfileScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
-    private val friendsApi: FriendsApi,
+    private val friendService: FriendService,
     private val notificationApi: NotificationApi,
     private val logger: Logger,
 ) : ScreenModel {
@@ -58,38 +58,38 @@ class UserProfileScreenModel(
 
     suspend fun sendFriendRequest(userId: String, message: String): Boolean =
         friendAction(message) {
-            friendsApi.sendFriendRequest(userId)
+            friendService.sendFriendRequest(userId)
         }
 
     suspend fun deleteFriendRequest(userId: String, message: String): Boolean = friendAction(message) {
-        friendsApi.deleteFriendRequest(userId)
+        friendService.deleteFriendRequest(userId)
     }
 
     suspend fun unfriend(userId: String, message: String): Boolean = friendAction(message) {
-        friendsApi.unfriend(userId)
+        friendService.unfriend(userId)
     }
 
     suspend fun acceptFriendRequest(userId: String, message: String) = friendAction(message) {
         // 看看要不要加载大于 100 条的通知
         // 先看没有hidden的, 如果没有再看hidden的 TODO:是不是要单独抽成一个独立方法
-        return@friendAction (notificationApi.fetchNotificationsV2(
-            type = NotificationType.FriendRequest.value,
-        ).firstOrNull { it.senderUserId == userId }
-            ?: notificationApi.fetchNotificationsV2(
+        return@friendAction authService.reTryAuthCatching {
+            (notificationApi.fetchNotificationsV2(
                 type = NotificationType.FriendRequest.value,
-                hidden = true
-            ).firstOrNull { it.senderUserId == userId })
-            ?.let {
-                notificationApi.acceptFriendRequest(it.id).isSuccess
-            } ?: error("Not found notification")
-
+            ).firstOrNull { it.senderUserId == userId }
+                ?: notificationApi.fetchNotificationsV2(
+                    type = NotificationType.FriendRequest.value,
+                    hidden = true
+                ).firstOrNull { it.senderUserId == userId })
+                ?.let {
+                    notificationApi.acceptFriendRequest(it.id).isSuccess
+                } ?: error("Not found notification")
+        }
     }
 
-    private suspend fun friendAction(message: String, action: suspend () -> Any): Boolean =
+    private suspend fun friendAction(message: String, action: suspend () ->  Result<*>): Boolean =
         screenModelScope.async(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                action()
-            }.onFailure {
+            action()
+                .onFailure {
                 handleError(it)
             }.onSuccess {
                 SharedFlowCentre.toastText.emit(ToastText.Success(message))

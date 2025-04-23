@@ -55,10 +55,10 @@ class FriendService(
      * 刷新好友列表
      * @return 是否成功获取到数据
      */
-    suspend fun refreshFriendList(onUpdater: () -> Unit = {}) {
+    suspend fun refreshFriendList(offline: Boolean? = null, onUpdater: (List<FriendData>) -> Unit = {}) {
 
         try {
-            val count = friendsApi.allFriendsFlow()
+            val count = (offline?.run(friendsApi::friendsFlow) ?: friendsApi.allFriendsFlow())
                 .retry(1) {
                     // 如果是登录失效了就会重新登录并重试一次
                     if (it is VRCApiException) authService.doReTryAuth() else false
@@ -68,7 +68,7 @@ class FriendService(
                 }
                 .onEach { friends ->
                     updateFriendMap(friends)
-                    onUpdater()
+                    onUpdater(friends)
                 }
                 .count()
 

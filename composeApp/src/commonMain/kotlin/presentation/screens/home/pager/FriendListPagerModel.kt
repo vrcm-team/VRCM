@@ -60,7 +60,7 @@ class FriendListPagerModel(
     private val _worldGroupOptions = MutableStateFlow(WorldGroupOptions())
     var worldGroupOptions = _worldGroupOptions.asStateFlow()
 
-    private val _friendList = MutableStateFlow(emptyList<FriendData>())
+    private val _friendList = MutableStateFlow(friendService.friendMap.values.toList().sortedUserByStatus())
     val friendList: StateFlow<List<FriendData>> = _friendList.asStateFlow()
 
     private val _friendTotal = MutableStateFlow(0)

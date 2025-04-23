@@ -6,13 +6,11 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
-import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
-import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
@@ -23,17 +21,16 @@ import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 class FriendLocationPagerModel(
-    private val friendsApi: FriendsApi,
+    private val friendService: FriendService,
     private val usersApi: UsersApi,
     private val groupsApi: GroupsApi,
     private val instancesApi: InstancesApi,
@@ -120,18 +117,12 @@ class FriendLocationPagerModel(
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
         screenModelScope.launch(Dispatchers.IO) {
-            friendsApi.friendsFlow()
-                .retry(1) {
-                    // 如果是登录失效了就会重新登录并重试一次
-                    if (it is VRCApiException) authService.doReTryAuth() else false
-                }.catch {
-                    SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
-                }.collect { friends ->
-                    update(friends)
-                    if (removeNotIncluded) {
-                        includedIdList.addAll(friends.map { it.id })
-                    }
+            friendService.refreshFriendList(offline = false) { friends ->
+                update(friends)
+                if (removeNotIncluded) {
+                    includedIdList.addAll(friends.map { it.id })
                 }
+            }
         }.join()
         if (removeNotIncluded) {
             friendMap.keys
