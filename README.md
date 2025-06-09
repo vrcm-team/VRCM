@@ -24,6 +24,10 @@
 - User Search
 - Notification actions( friend request, mark as read, hide...)
 - Settings(i8n, theme...)
+- Gallery(VRChat +)
+  
+  <img src="image/Gallery-1.png" width="201" height="437"  alt="Gallery-1"/>
+  <img src="image/Gallery-2.png" width="201" height="437"  alt="Gallery-2"/>
 <div align="center">
 
 ## Preview
