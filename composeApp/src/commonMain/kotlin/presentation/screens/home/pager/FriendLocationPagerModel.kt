@@ -9,7 +9,6 @@ import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
-import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
@@ -189,7 +188,7 @@ class FriendLocationPagerModel(
                         ).also { currentInstanceFriendLocations.add(it) }
                 }
                 // 通过location查询房间实例信息
-                fetchInstants(location) {
+                fetchInstants(location, friendLocation.instants.value) {
                     friendLocation.instants.value = it
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
@@ -199,7 +198,12 @@ class FriendLocationPagerModel(
         }
     }
 
-    private inline fun fetchInstants(location: String, crossinline updateInstants: (HomeInstanceVo) -> Unit) {
+
+    private inline fun fetchInstants(
+        location: String,
+        oldInstants: HomeInstanceVo,
+        crossinline updateInstants: (HomeInstanceVo) -> Unit
+    ) {
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)
@@ -208,7 +212,15 @@ class FriendLocationPagerModel(
             }.onSuccess { instance ->
                 val instantsVo = HomeInstanceVo(instance)
                 updateInstants(instantsVo)
-                fetchAndSetOwner(instance, instantsVo)
+                // owner不会变所以不用更新
+                if (oldInstants.owner != null){
+                    instantsVo.owner = oldInstants.owner
+                    updateInstants(instantsVo)
+                }else{
+                    // 先刷新房间实例信息，提高用户体验，再更新房间实例的拥有者信息，不然会一直空白在加载
+                    updateInstants(instantsVo)
+                    fetchAndSetOwner(instance.ownerId, instantsVo)
+                }
             }
         }
     }
@@ -220,10 +232,10 @@ class FriendLocationPagerModel(
      * @param instantsVo 房间实例的视图对象
      */
     private suspend fun fetchAndSetOwner(
-        instance: InstanceData,
+        ownerId: String?,
         instantsVo: HomeInstanceVo,
     ) {
-        val ownerId = instance.ownerId ?: return
+        val ownerId = ownerId ?: return
         val fetchOwner: suspend (String) -> HomeInstanceVo.Owner =
             when (BlueprintType.fromValue(ownerId)) {
                 BlueprintType.User -> {
