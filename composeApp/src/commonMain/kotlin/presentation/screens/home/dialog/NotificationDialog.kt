@@ -45,8 +45,10 @@ object NotificationDialog : SharedDialog {
         LaunchedEffect(Unit) {
             homeScreenModel.refreshAllNotification()
         }
-        val notifications: List<NotificationItemData>
-                by remember { derivedStateOf { homeScreenModel.friendRequestNotifications + homeScreenModel.notifications } }
+        val notifications: List<NotificationItemData> by remember { derivedStateOf {
+            (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications)
+                .sortedByDescending { it.createdAt }
+        } }
         val onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit = { id, type, response ->
             homeScreenModel.responseAllNotification(id, type, response)
         }
