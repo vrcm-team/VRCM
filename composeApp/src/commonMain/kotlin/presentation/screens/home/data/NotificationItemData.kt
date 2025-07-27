@@ -19,7 +19,7 @@ data class NotificationItemData(
 
     constructor(n: NotificationData) : this(
         id = n.id,
-        imageUrl = n.imageUrl,
+        imageUrl = n.imageUrl.orEmpty(),
         title = n.title,
         message = n.message,
         createdAt = n.createdAt,

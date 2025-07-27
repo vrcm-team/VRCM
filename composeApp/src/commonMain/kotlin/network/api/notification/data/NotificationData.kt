@@ -12,7 +12,7 @@ data class NotificationData(
     val expiryAfterSeen: Int?,
     val id: String,
     val ignoreDND: Boolean,
-    val imageUrl: String,
+    val imageUrl: String?,
     val isSystem: Boolean,
     val link: String?,
     val linkText: String?,
