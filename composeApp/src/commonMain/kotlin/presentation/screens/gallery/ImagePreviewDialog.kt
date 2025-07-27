@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -22,9 +23,7 @@ import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
-import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
-import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -39,7 +38,7 @@ import kotlin.math.min
  * 图片预览对话框
  */
 class ImagePreviewDialog(
-    private val fileId: String,
+    val fileId: String,
     private val fileName: String,
     private val fileExtension: String,
 ) : SharedDialog {
@@ -60,17 +59,18 @@ class ImagePreviewDialog(
         ) {
             // 显示原始大小的图片
             val imageUrl = FileApi.convertFileUrl(fileId, 2048)
-
             // 为了防止ZoomableImage拦截背景点击事件，单独放在一个Box中
             Box(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
                 ZoomableImage(
+                    id = fileId,
                     imageUrl = imageUrl,
                     contentDescription = fileName,
                     maxScale = 5f,
-                    minScale = 0.5f
+                    minScale = 0.5f,
+                    animatedVisibilityScope = animatedVisibilityScope
                 )
             }
 
@@ -143,12 +143,15 @@ class ImagePreviewDialog(
 /**
  * 支持手势缩放和平移的图片组件
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BoxScope.ZoomableImage(
+    id: String,
     imageUrl: String,
     contentDescription: String? = null,
     maxScale: Float = 3f,
-    minScale: Float = 0.8f
+    minScale: Float = 0.8f,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -248,7 +251,11 @@ fun BoxScope.ZoomableImage(
                             }
                         }
                     )
-                },
+                }.sharedBoundsBy(
+                id,
+                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                animatedVisibilityScope =  animatedVisibilityScope
+            ),
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()

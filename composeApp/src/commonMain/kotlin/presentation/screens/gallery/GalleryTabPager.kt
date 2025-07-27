@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -26,9 +28,7 @@ import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
-import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
-import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
-import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import org.koin.compose.koinInject
@@ -154,6 +154,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
         }
     }
 
+    @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     private fun GalleryItem(
         file: FileData,
@@ -161,7 +162,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
         aspectRatio: Float = 1f,
         shape: Shape = MaterialTheme.shapes.medium
     ) {
-        val (_, setDialogContent) = LocationDialogContent.current
+        val (dialogContent, setDialogContent) = LocationDialogContent.current
 
 
 
@@ -177,42 +178,50 @@ sealed class GalleryTabPager(private val tagType: FileTagType) : Pager {
             } else {
                 ""
             }
-            CoilImage(
-                imageModel = { imageUrl },
-                imageOptions = ImageOptions(
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center
-                ),
-                imageLoader = { koinInject() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(shape)
-                    .clickable {
-                        // 点击图片时，打开全屏预览
-                        setDialogContent(ImagePreviewDialog(file.id, file.name, file.extension))
+            AnimatedVisibility(dialogContent == null || (dialogContent as ImagePreviewDialog).fileId != file.id) {
+                CoilImage(
+                    imageModel = { imageUrl },
+                    imageOptions = ImageOptions(
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center
+                    ),
+                    imageLoader = { koinInject() },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(shape)
+                        .sharedBoundsBy(
+                            file.id,
+                            sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                            animatedVisibilityScope = this@AnimatedVisibility
+                        )
+                        .clickable {
+                            // 点击图片时，打开全屏预览
+                            setDialogContent(ImagePreviewDialog(file.id, file.name, file.extension))
+                        },
+                    loading = {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
                     },
-                loading = {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
+                    failure = {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = strings.galleryTabLoadFailed,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
-                },
-                failure = {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = strings.galleryTabLoadFailed,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            )
+                )
+            }
+
         }
 
     }
