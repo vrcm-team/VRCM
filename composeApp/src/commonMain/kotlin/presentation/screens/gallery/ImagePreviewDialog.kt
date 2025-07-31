@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -24,6 +26,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -70,7 +73,11 @@ class ImagePreviewDialog(
                     contentDescription = fileName,
                     maxScale = 5f,
                     minScale = 0.5f,
-                    animatedVisibilityScope = animatedVisibilityScope
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    onDismiss = {
+                        // 移除对话框
+                        setDialogContent(null)
+                    },
                 )
             }
 
@@ -87,7 +94,14 @@ class ImagePreviewDialog(
                                 fileName = "${fileName}${fileExtension}"
                             )
                         }.onFailure {
-                            SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageSaveError.replace("%s",it.message.orEmpty())))
+                            SharedFlowCentre.toastText.emit(
+                                ToastText.Error(
+                                    strings.imageSaveError.replace(
+                                        "%s",
+                                        it.message.orEmpty()
+                                    )
+                                )
+                            )
                         }.onSuccess { isSuccess ->
                             if (isSuccess) {
                                 SharedFlowCentre.toastText.emit(ToastText.Success(strings.imageSaveSuccess))
@@ -151,23 +165,47 @@ fun BoxScope.ZoomableImage(
     contentDescription: String? = null,
     maxScale: Float = 3f,
     minScale: Float = 0.8f,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onDismiss: () -> Unit
 ) {
-    var scale by remember { mutableStateOf(1f) }
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var doubleTapState by remember { mutableStateOf(0) } // 0: 正常, 1: 放大, 2: 缩小
+    var targetScale by remember { mutableStateOf(1f) }
+    var targetOffset by remember { mutableStateOf(Offset.Zero) }
+    var doubleTapState by remember { mutableStateOf(0) }
 
-    // 监视scale变化，当缩放回到1.0f时，重置offset到中心
-    LaunchedEffect(scale) {
-        if (scale <= 1.0f) {
-            offset = Offset.Zero
+    // 用于长按拖动的偏移量
+
+    // 设置拖动阈值 (像素)
+    val dismissThreshold = 800f
+
+    // 使用 animateFloatAsState 为 scale 添加动画
+    val animatedScale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.8f,
+            stiffness = 300f
+        ),
+        label = "scale_animation"
+    )
+
+    // 使用 animateOffsetAsState 为 offset 添加动画
+    val animatedOffset by androidx.compose.animation.core.animateOffsetAsState(
+        targetValue = targetOffset,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.8f,
+            stiffness = 300f
+        ),
+        label = "offset_animation"
+    )
+
+    // 监视animatedScale变化，当缩放回到1.0f时，重置offset到中心
+    LaunchedEffect(animatedScale) {
+        if (animatedScale <= 1.0f) {
+            targetOffset = Offset.Zero
         }
     }
 
     Box(
-        modifier = Modifier
-            .align(Alignment.Center),
-
+        modifier = Modifier.align(Alignment.Center),
         contentAlignment = Alignment.Center
     ) {
         CoilImage(
@@ -181,32 +219,56 @@ fun BoxScope.ZoomableImage(
             imageLoader = { koinInject() },
             modifier = Modifier
                 .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offset.x,
-                    translationY = offset.y
+                    scaleX = animatedScale,
+                    scaleY = animatedScale,
+                    translationX = animatedOffset.x,
+                    translationY = animatedOffset.y
                 ).pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        // 处理缩放
-                        val prevScale = scale
-                        scale = (scale * zoom).coerceIn(minScale, maxScale)
+                    detectTransformGestures(true){ _, pan, zoom, _ ->
+                        // 处理缩放 - 手势缩放时直接更新targetScale
+                        val prevScale = targetScale
+                        targetScale = (targetScale * zoom).coerceIn(minScale, maxScale)
 
                         // 处理平移 (只有在放大状态下才能平移)
-                        if (scale > 1f) {
+                        if (animatedScale > 1f) {
                             // 计算新的偏移量
-                            val newOffset = offset + (pan * scale)
+                            val newOffset = targetOffset + (pan * animatedScale)
 
                             // 限制平移范围，防止图片移出屏幕太多
-                            val maxX = (scale - 1) * size.width / 2
-                            val maxY = (scale - 1) * size.height / 2
+                            val maxX = (animatedScale - 1) * size.width / 2
+                            val maxY = (animatedScale - 1) * size.height / 2
 
-                            offset = Offset(
+                            targetOffset = Offset(
                                 newOffset.x.coerceIn(-maxX, maxX),
                                 newOffset.y.coerceIn(-maxY, maxY)
                             )
-                        } else if (prevScale > 1f && scale <= 1f) {
-                            // 如果从放大状态缩小到正常或更小，重置位置
-                            offset = Offset.Zero
+                        } else if (prevScale > 1f && targetScale <= 1f) {
+                            // 如果从放大状态缩小到正常或更小，重置位置（带动画）
+                            targetOffset = Offset.Zero
+                        }
+                    }
+                }
+                // 只有在正常大小时才启用长按拖动
+                .enableIf(doubleTapState == 0) {
+                    pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                // 拖动结束时检查是否达到阈值
+                                val distance = kotlin.math.sqrt(
+                                    targetOffset.x * targetOffset.x + targetOffset.y * targetOffset.y
+                                )
+
+                                if (distance >= dismissThreshold) {
+                                    // 达到阈值，调用onDismiss
+                                    onDismiss()
+                                } else {
+                                    // 未达到阈值，重置拖动偏移量（带动画）
+                                    targetOffset = Offset.Zero
+                                }
+                            }
+                        ) { change, dragAmount ->
+                            // 更新拖动偏移量
+                            targetOffset += dragAmount
                         }
                     }
                 }
@@ -217,18 +279,18 @@ fun BoxScope.ZoomableImage(
                             when (doubleTapState) {
                                 0 -> {
                                     // 正常 -> 放大
-                                    scale = min(maxScale, 2.5f)
+                                    targetScale = min(maxScale, 2.5f)
 
                                     // 可以选择让双击的位置作为放大的中心点
                                     val centerX = size.width / 2
                                     val centerY = size.height / 2
-                                    val targetOffsetX = (centerX - tapOffset.x) * (scale - 1)
-                                    val targetOffsetY = (centerY - tapOffset.y) * (scale - 1)
+                                    val targetOffsetX = (centerX - tapOffset.x) * (targetScale - 1)
+                                    val targetOffsetY = (centerY - tapOffset.y) * (targetScale - 1)
 
                                     // 限制偏移量
-                                    val maxX = (scale - 1) * size.width / 2
-                                    val maxY = (scale - 1) * size.height / 2
-                                    offset = Offset(
+                                    val maxX = (targetScale - 1) * size.width / 2
+                                    val maxY = (targetScale - 1) * size.height / 2
+                                    targetOffset = Offset(
                                         targetOffsetX.coerceIn(-maxX, maxX),
                                         targetOffsetY.coerceIn(-maxY, maxY)
                                     )
@@ -238,24 +300,25 @@ fun BoxScope.ZoomableImage(
 
                                 1 -> {
                                     // 放大 -> 更放大
-                                    scale = maxScale
+                                    targetScale = maxScale
                                     doubleTapState = 2
                                 }
 
                                 else -> {
                                     // 缩小回正常
-                                    scale = 1f
-                                    offset = Offset.Zero  // 确保位置回到中心
+                                    targetScale = 1f
+                                    targetOffset = Offset.Zero  // 确保位置回到中心（带动画）
                                     doubleTapState = 0
                                 }
                             }
                         }
                     )
-                }.sharedBoundsBy(
-                id,
-                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                animatedVisibilityScope =  animatedVisibilityScope
-            ),
+                }
+                .sharedBoundsBy(
+                    id,
+                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                    animatedVisibilityScope = animatedVisibilityScope
+                ),
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
