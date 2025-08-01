@@ -13,7 +13,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-blue.svg?logo=kotlin)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.8.2-blue)](https://www.jetbrains.com/lp/compose-multiplatform/)
 
-## 多平台 VRChat 好友"监控"应用
+## 多平台 VRChat 好友"视奸"应用
 
 一个功能丰富的跨平台 VRChat 好友管理应用，让您随时随地掌握好友动态。
 
