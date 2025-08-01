@@ -71,7 +71,7 @@ A feature-rich cross-platform VRChat friend management application that lets you
 </div>
 
 - ✅ **Android** - Full feature support
-- ✅ **iOS** - Full feature support (requires self-signing)
+- ✅ **iOS** - Full feature support (requires [self-signing](self-signing.md))
 
 <div align="center">
 

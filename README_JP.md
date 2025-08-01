@@ -13,7 +13,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-blue.svg?logo=kotlin)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.8.2-blue)](https://www.jetbrains.com/lp/compose-multiplatform/)
 
-## マルチプラットフォーム VRChat フレンド「監視」アプリ
+## マルチプラットフォーム VRChat フレンド「モニタリング」アプリ
 
 機能豊富なクロスプラットフォーム VRChat フレンド管理アプリケーションで、いつでもどこでもフレンドの動向を把握できます。
 
@@ -71,7 +71,7 @@
 </div>
 
 - ✅ **Android** - 完全機能対応
-- ✅ **iOS** - 完全機能対応（自己署名が必要）
+- ✅ **iOS** - 完全機能対応（[自己署名](self-signing.md)が必要）
 
 <div align="center">
 

@@ -71,7 +71,7 @@
 </div>
 
 - ✅ **Android** - 完整功能支持
-- ✅ **iOS** - 完整功能支持(需要自签)
+- ✅ **iOS** - 完整功能支持(需要[自签](self-signing.md))
 
 <div align="center">
 
