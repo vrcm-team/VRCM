@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,8 +15,10 @@ import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
 import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.extensions.ChangeStatusBarDarkTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
@@ -37,11 +40,19 @@ fun SettingsBottomSheet(
     isVisible: Boolean,
     onDismissRequest: () -> Unit,
 ) {
+    val appPlatform = getAppPlatform()
+
     ABottomSheet(
         isVisible = isVisible,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         onDismissRequest = onDismissRequest
     ) {
+
+        val currentSettings = LocalSettingsState.current.value
+        val isDark = currentSettings.isDarkTheme ?: isSystemInDarkTheme()
+
+        appPlatform.ChangeStatusBarDarkTheme(isDark)
+
         Column(
             modifier = Modifier.fillMaxWidth()
                 .align(Alignment.CenterHorizontally)
