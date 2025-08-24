@@ -9,8 +9,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import io.github.vrcmteam.vrcm.getAppPlatform
-import io.github.vrcmteam.vrcm.presentation.extensions.ChangeStatusBarDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.data.SettingsVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
@@ -22,7 +20,6 @@ fun SettingsProvider(
     content: @Composable () -> Unit
 ) {
     val settingsModel: SettingsModel = koinInject()
-    val appPlatform = getAppPlatform()
 
     CompositionLocalProvider(
         LocalSettingsState provides remember { mutableStateOf(settingsModel.settingsVo) }
@@ -33,7 +30,7 @@ fun SettingsProvider(
         }
 
         val isDark = currentSettings.isDarkTheme?:isSystemInDarkTheme()
-        appPlatform.ChangeStatusBarDarkTheme(isDark)
+        ChangeStatusBarDarkTheme(isDark)
 
         MaterialTheme(
             colorScheme = currentSettings.themeColor.asAnimateColorScheme(colorAnimationSpec),
@@ -47,6 +44,10 @@ fun SettingsProvider(
     }
 
 }
+
+// https://issuetracker.google.com/issues/362539765#comment3
+@Composable
+expect fun ChangeStatusBarDarkTheme(isDark: Boolean)
 
 val LocalSettingsState: ProvidableCompositionLocal<MutableState<SettingsVo>> =
     compositionLocalOf {
