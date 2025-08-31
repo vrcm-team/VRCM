@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -467,7 +468,7 @@ private fun RenderMainContent(
             Color.Transparent, // 起始颜色（完全透明）
             MaterialTheme.colorScheme.surfaceContainerLow// 结束
         ),
-        endY = 300f,
+        endY = with(LocalDensity.current){ 100.dp.toPx() },
     )
 
 
