@@ -21,6 +21,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -29,6 +30,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
@@ -61,6 +63,8 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
+        // Control showing favorite group management for Friend type
+        var showFriendFavoriteSheet by remember { mutableStateOf(false) }
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey){
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
@@ -88,9 +92,17 @@ data class UserProfileScreen(
                 onHideCompletion = {
                     if (!sheetState.isVisible) bottomSheetIsVisible = false
                 },
-                openAlertDialog = { openAlertDialog = true }
+                openAlertDialog = { openAlertDialog = true },
+                onManageFriendFavorite = { showFriendFavoriteSheet = true }
             )
         }
+        // Friend FavoriteType group management bottom sheet
+        FavoriteGroupBottomSheet(
+            isVisible = showFriendFavoriteSheet,
+            favoriteId = currentUser.id,
+            favoriteType = FavoriteType.Friend,
+            onDismiss = { showFriendFavoriteSheet = false }
+        )
         JsonAlertDialog(
             openAlertDialog = openAlertDialog,
             onDismissRequest = { openAlertDialog = false }
@@ -108,6 +120,7 @@ private fun ColumnScope.SheetItems(
     hideSheet: suspend () -> Unit,
     onHideCompletion: () -> Unit,
     openAlertDialog: () -> Unit,
+    onManageFriendFavorite: () -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -122,6 +135,16 @@ private fun ColumnScope.SheetItems(
             }
         })
 
+    }
+
+    // 管理好友收藏分组，仅当不是自己且是好友时显示
+    if (!currentUser.isSelf) {
+        SheetButtonItem(text = localeStrings.selectFavoriteGroup, onClick = {
+            scope.launch { hideSheet() }.invokeOnCompletion {
+                onHideCompletion()
+                onManageFriendFavorite()
+            }
+        })
     }
     
     FriendRequestSheetItem(

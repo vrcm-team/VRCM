@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 好友分组选项数据类
@@ -38,6 +40,7 @@ data class WorldGroupOptions(
 )
 
 class FriendListPagerModel(
+    private val usersApi: UsersApi,
     private val friendService: FriendService,
     private val authService: AuthService,
     private val favoriteService: FavoriteService,
@@ -79,8 +82,8 @@ class FriendListPagerModel(
     /**
      * 获取好友组数据流
      */
-    val friendFavoriteGroupsFlow: StateFlow<Map<FavoriteGroupData, List<FavoriteData>>>
-        get() = favoriteService.favoritesByGroup(Friend)
+    val friendFavoriteGroupsFlow: StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favoriteService.favoritesByGroup(Friend)
 
     /**
      * 获取世界组数据流
@@ -219,25 +222,56 @@ class FriendListPagerModel(
             // 获取选中好友组的favoriteId列表
             friendFavoriteGroupsFlow.value[friendGroupOptions.value.selectedGroup]
                 ?.map { it.favoriteId }
-                ?.toSet() ?: emptySet()
+                ?.toSet()
         } else {
-            emptySet()
+            null
         }
-
-        _friendList.value = findFriendsByName(name, favoriteIds)
+        screenModelScope.launch {
+            _friendList.value = findFriendsByName(name, favoriteIds)
+        }
     }
 
-    fun findFriendsByName(name: String, favoriteIds: Set<String>): List<FriendData> {
+    /**
+     * 基于搜索文本和当前选择的世界组过滤世界列表
+     *
+     * @param favoriteIds 为 null 时返回所有好友， 代表没有选择好友组
+     */
+    suspend fun findFriendsByName(name: String, favoriteIds: Set<String>?): List<FriendData> {
+
+        val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
+            val userData = withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
+            FriendData(
+                id = userData.id,
+                displayName = userData.displayName,
+                status = userData.status,
+                lastLogin = userData.lastLogin,
+                lastPlatform = userData.lastPlatform,
+                bio = userData.bio,
+                bioLinks = userData.bioLinks,
+                currentAvatarImageUrl = userData.currentAvatarImageUrl,
+                currentAvatarThumbnailImageUrl = userData.currentAvatarThumbnailImageUrl,
+                currentAvatarTags = userData.currentAvatarTags,
+                developerType = userData.developerType,
+                isFriend = true,
+                profilePicOverride = userData.profilePicOverride,
+                friendKey = "",
+                imageUrl = userData.profileImageUrl,
+                location = "",
+                statusDescription = userData.statusDescription,
+                userIcon = userData.userIcon,
+                pronouns = userData.pronouns,
+            )
+        } ?: emptyList()
+
         // 先按名称过滤
-        val nameFilteredList = friendService.friendMap.values.let { friends ->
+        val nameFilteredList = (friendService.friendMap.values + unFriendData).let { friends ->
             if (name.isEmpty()) friends
             else friends.filter { name.isEmpty() || it.displayName.lowercase().contains(name.lowercase()) }
         }
 
-
         // 再按好友组过滤
         val result =
-            if (favoriteIds.isNotEmpty()) nameFilteredList.filter { friend -> favoriteIds.contains(friend.id) }
+            if (favoriteIds != null) nameFilteredList.filter { friend -> favoriteIds.contains(friend.id) }
             else nameFilteredList
 
         return result.sortedUserByStatus()
@@ -324,7 +358,7 @@ class FriendListPagerModel(
             } ?: return@mapNotNull null
             val localGroup = localEntry.key
             localEntry.value.map { favoriteData ->
-                worldsApi.getWorldById(favoriteData.favoriteId)
+                withContext(Dispatchers.IO) { worldsApi.getWorldById(favoriteData.favoriteId)}
                     .toFavoritedWorldForLocal(localGroup.name, favoriteData.favoriteId)
             }
         }
