@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.update
  */
 class FavoriteService(
     private val favoriteApi: FavoriteApi,
+    private val favoriteLocalDao: FavoriteLocalDao,
 ) {
 
     // 收藏列表缓存，key为FavoriteGroupData的name
@@ -84,18 +86,66 @@ class FavoriteService(
         }
     }
 
+    private fun localGroupName(favoriteType: FavoriteType): String = "__local_${favoriteType.value}__"
+
+    private fun localGroupOf(favoriteType: FavoriteType): FavoriteGroupData = FavoriteGroupData(
+        id = "local-${favoriteType.value}",
+        ownerId = "local",
+        type = favoriteType.value,
+        visibility = "public",
+        displayName = "local",
+        name = localGroupName(favoriteType),
+        ownerDisplayName = "",
+        tags = emptyList()
+    )
+
+    private fun toLocalFavoriteId(favoriteType: FavoriteType, favoriteId: String): String =
+        "local|${favoriteType.value}|$favoriteId"
+
+    private fun parseLocalFavoriteId(id: String): Triple<Boolean, FavoriteType?, String?> {
+        if (!id.startsWith("local|")) return Triple(false, null, null)
+        val parts = id.split('|')
+        if (parts.size != 3) return Triple(false, null, null)
+        val type = when (parts[1]) {
+            FavoriteType.World.value -> FavoriteType.World
+            FavoriteType.Avatar.value -> FavoriteType.Avatar
+            FavoriteType.Friend.value -> FavoriteType.Friend
+            else -> return Triple(false, null, null)
+        }
+        return Triple(true, type, parts[2])
+    }
+
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
         val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
-        favoriteApi.fetchFavorite(favoriteType)
-            .collect { favoriteDataList ->
-                favoriteDataList.forEach { favoriteData ->
-                    val tag = favoriteData.tags.first()
-                    newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+        // 尝试加载远程收藏
+        val remoteGroups = runCatching {
+            favoriteApi.fetchFavorite(favoriteType)
+                .collect { favoriteDataList ->
+                    favoriteDataList.forEach { favoriteData ->
+                        val tag = favoriteData.tags.firstOrNull()
+                        if (tag != null) {
+                            newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+                        }
+                    }
                 }
-            }
-        val groups = favoriteApi.getFavoriteGroupsByType(favoriteType)
+            favoriteApi.getFavoriteGroupsByType(favoriteType)
+        }.getOrElse { emptyList() }
+
+        // 本地收藏
+        val localGroup = localGroupOf(favoriteType)
+        val localIds = favoriteLocalDao.load(favoriteType)
+        val localFavorites = localIds.map { fid ->
+            FavoriteData(
+                favoriteId = fid,
+                id = toLocalFavoriteId(favoriteType, fid),
+                tags = listOf(localGroup.name),
+                type = favoriteType.value
+            )
+        }
+
+        // 合并远程与本地
         _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }.update {
-            groups.associateWith { (newFavoritesMap[it.name] ?: listOf()) }
+            remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } + (localGroup to localFavorites)
         }
     }.onFailure {
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
@@ -113,11 +163,27 @@ class FavoriteService(
         favoriteId: String,
         favoriteType: FavoriteType,
         groupName: String,
-    ) = favoriteApi.addFavorite(
-        favoriteId = favoriteId,
-        favoriteType = favoriteType,
-        tag = groupName
-    )
+    ): FavoriteData {
+        val localName = localGroupName(favoriteType)
+        return if (groupName == localName) {
+            val current = favoriteLocalDao.load(favoriteType)
+            if (!current.contains(favoriteId)) {
+                favoriteLocalDao.save(favoriteType, current + favoriteId)
+            }
+            FavoriteData(
+                favoriteId = favoriteId,
+                id = toLocalFavoriteId(favoriteType, favoriteId),
+                tags = listOf(localName),
+                type = favoriteType.value
+            )
+        } else {
+            favoriteApi.addFavorite(
+                favoriteId = favoriteId,
+                favoriteType = favoriteType,
+                tag = groupName
+            )
+        }
+    }
 
 
     /**
@@ -127,7 +193,15 @@ class FavoriteService(
      */
     suspend fun removeFavorite(
         id: String,
-    ) = favoriteApi.deleteFavorite(id)
+    ) {
+        val (isLocal, type, favoriteId) = parseLocalFavoriteId(id)
+        if (isLocal && type != null && favoriteId != null) {
+            val current = favoriteLocalDao.load(type)
+            favoriteLocalDao.save(type, current.filterNot { it == favoriteId })
+        } else {
+            favoriteApi.deleteFavorite(id)
+        }
+    }
 
 
     fun getFavoriteByFavoriteId(favoriteType: FavoriteType, favoriteId: String): FavoriteData? =

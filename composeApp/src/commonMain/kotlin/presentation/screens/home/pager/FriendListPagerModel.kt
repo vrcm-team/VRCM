@@ -139,7 +139,7 @@ class FriendListPagerModel(
         }
 
     private suspend fun doRefreshFriendList() {
-        friendService.refreshFriendList{
+        friendService.refreshFriendList {
             _friendTotal.value = friendService.friendMap.size
             findFriendList(_searchText.value)
         }
@@ -248,6 +248,7 @@ class FriendListPagerModel(
         val isOffline = it.status == UserStatus.Offline
         (if (isOffline) "0" else "1") + (if (isOffline) it.lastLogin else "") + it.displayName
     }
+
     /**
      * 查找收藏的世界列表
      * 只从缓存中筛选数据，不调用API
@@ -314,36 +315,82 @@ class FriendListPagerModel(
      * 刷新收藏的世界列表
      * 使用流式分页API获取全部收藏世界列表
      */
-    private suspend fun doRefreshWorldList() {
-        screenModelScope.launch(Dispatchers.IO) {
+    private fun doRefreshWorldList() = screenModelScope.launch(Dispatchers.IO) {
 
-            // 计数器，用于跟踪是否获取了任何数据
-            var dataReceived = false
-
-            worldsApi.favoritedWorldsFlow()
-                .retry {
-                    // 如果是登录失效了就会重新登录并重试一次
-                    if (it is VRCApiException) authService.doReTryAuth() else false
-                }
-                .catch { e ->
-                    SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
-                }
-                .onEach { favoritedWorlds ->
-                    dataReceived = true
-
-                    // 更新收到每页数据后都更新一下UI，保持响应性
-                    // TODO 暂时先过滤下isSecure, 不展示失效和私有的世界
-                    favoritedWorldMap.putAll(favoritedWorlds.filter { it.isSecure != false }.associateBy { it.id })
-                    _worldTotal.value = favoritedWorldMap.size
-                    findWorldList(_searchText.value)
-                }
-                .collect() // 收集所有页面的数据
-
-            // 如果没有收到任何数据，清空列表
-            if (!dataReceived) {
-                favoritedWorldMap.clear()
-                _worldList.value = emptyList()
+        // 1) 获取本地收藏世界列表
+        val localFavoritedWorlds = worldFavoriteGroupsFlow.mapNotNull {
+            val localEntry = it.entries.firstOrNull { (group, _) ->
+                group.ownerId == "local" && group.type == World.value
+            } ?: return@mapNotNull null
+            val localGroup = localEntry.key
+            localEntry.value.map { favoriteData ->
+                worldsApi.getWorldById(favoriteData.favoriteId)
+                    .toFavoritedWorldForLocal(localGroup.name, favoriteData.favoriteId)
             }
-        }.join()
+        }
+
+        // 2) 订阅服务器端的收藏世界流
+        val remoteFavoritedWorlds = worldsApi.favoritedWorldsFlow()
+            // 如果是登录失效了就会重新登录并重试一次
+            .retry { if (it is VRCApiException) authService.doReTryAuth() else false }
+
+        // 3) 合并数据
+        var dataReceived = false
+
+        combine(localFavoritedWorlds, remoteFavoritedWorlds) { favoritedWorlds, localWorlds ->
+            localWorlds + favoritedWorlds
+        }.catch { e ->
+            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+        }.collect { favoritedWorlds ->
+            dataReceived = true
+            // 更新缓存，过滤掉不可见/非公开等情况
+            favoritedWorldMap.putAll(
+                favoritedWorlds.filter { it.isSecure != false }.associateBy { it.id }
+            )
+            _worldTotal.value = favoritedWorldMap.size
+            findWorldList(_searchText.value)
+        }
+
+        // 如果没有收到数据，清空缓存
+        if (!dataReceived) {
+            favoritedWorldMap.clear()
+        }
     }
+}
+
+
+private fun WorldData.toFavoritedWorldForLocal(localGroupName: String, wid: String): FavoritedWorld {
+    return FavoritedWorld(
+        authorId = this.authorId,
+        authorName = this.authorName,
+        id = this.id,
+        name = this.name,
+        description = this.description,
+        capacity = this.capacity,
+        recommendedCapacity = this.recommendedCapacity,
+        releaseStatus = this.releaseStatus,
+        imageUrl = this.imageUrl,
+        thumbnailImageUrl = this.thumbnailImageUrl,
+        organization = this.organization,
+        version = this.version,
+        favoriteId = "local|${World.value}|$wid",
+        favoriteGroup = localGroupName,
+        favorites = this.favorites,
+        featured = this.featured,
+        heat = this.heat,
+        popularity = this.popularity,
+        occupants = null,
+        visits = this.visits,
+        tags = this.tags,
+        isSecure = true,
+        createdAt = this.createdAt,
+        updatedAt = this.updatedAt,
+        publicationDate = this.publicationDate,
+        labsPublicationDate = this.labsPublicationDate,
+        unityPackages = this.unityPackages,
+        udonProducts = this.udonProducts,
+        urlList = null,
+        defaultContentSettings = null,
+        previewYoutubeId = this.previewYoutubeId
+    )
 }

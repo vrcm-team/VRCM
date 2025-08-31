@@ -67,4 +67,14 @@ object DaoKeys{
         const val REMEMBER_VERSION_KEY = "${PREFIX}.rememberVersion"
 
     }
+
+    /**
+     * 本地收藏分组设置
+     */
+    object FavoriteLocal {
+        const val NAME = "${PREFIX}.favorite.local"
+        const val WORLD_KEY = "${PREFIX}.favorite.local.world"
+        const val FRIEND_KEY = "${PREFIX}.favorite.local.friend"
+        const val AVATAR_KEY = "${PREFIX}.favorite.local.avatar"
+    }
 }
