@@ -6,11 +6,14 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -28,16 +31,23 @@ class UserProfileScreenModel(
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
     private val logger: Logger,
+    private val instancesApi: io.github.vrcmteam.vrcm.network.api.instances.InstancesApi,
 ) : ScreenModel {
 
     private val _userState = mutableStateOf<UserProfileVo?>(null)
     val userState by _userState
 
+    private val _friendLocation = mutableStateOf<FriendLocation?>(null)
+    val friendLocation by _friendLocation
+
     private val _userJson = mutableStateOf("")
     val userJson by _userJson
 
     fun initUserState(userProfileVO: UserProfileVo) {
-        if (_userState.value == null) _userState.value = userProfileVO
+        if (_userState.value == null) {
+            _userState.value = userProfileVO
+            computeFriendLocation(userProfileVO)
+        }
     }
 
     fun refreshUser(userId: String) =
@@ -49,7 +59,10 @@ class UserProfileScreenModel(
             }.onSuccess { response ->
                 // 防止body序列化异常
                 runCatching { UserProfileVo(response.body<UserData>()) }
-                    .onSuccess { _userState.value = it }
+                    .onSuccess {
+                        _userState.value = it
+                        computeFriendLocation(it)
+                    }
                     .onFailure { handleError(it) }
                 _userJson.value = response.bodyAsText().pretty()
             }
@@ -101,6 +114,35 @@ class UserProfileScreenModel(
     private suspend fun handleError(it: Throwable) {
         logger.error(it.message.toString())
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+    }
+
+    private fun computeFriendLocation(user: UserProfileVo) {
+        val location = user.location
+        val type = LocationType.fromValue(location)
+        if (location.isEmpty() || type != LocationType.Instance) {
+            _friendLocation.value = null
+            return
+        }
+        // Build FriendLocation with friends in the same instance
+        val friendsInSameRoom = friendService.friendMap.values
+            .filter { it.location == location }
+            .associate { it.id to mutableStateOf(it) }
+            .toMutableMap()
+        val friendLocation = FriendLocation(
+            location = location,
+            friends = friendsInSameRoom
+        )
+        _friendLocation.value = friendLocation
+        // Fetch instance details
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching {
+                instancesApi.instanceByLocation(location)
+            }.onSuccess { instance ->
+                friendLocation.instants.value = HomeInstanceVo(instance)
+            }.onFailure {
+                handleError(it)
+            }
+        }
     }
 
 }

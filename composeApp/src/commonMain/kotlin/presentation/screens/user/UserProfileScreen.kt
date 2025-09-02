@@ -29,6 +29,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -48,7 +49,7 @@ data class UserProfileScreen(
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
 
-        LaunchedEffect(Unit){
+        LaunchedEffect(Unit) {
             userProfileScreenModel.initUserState(userProfileVO)
         }
         LaunchedEffect(Unit) {
@@ -65,7 +66,7 @@ data class UserProfileScreen(
         var openAlertDialog by remember { mutableStateOf(false) }
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
-        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey){
+        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
                 profileImageUrl = currentUser?.profileImageUrl,
@@ -75,6 +76,7 @@ data class UserProfileScreen(
             ) { ratio ->
                 ProfileContent(
                     currentUser = currentUser,
+                    friendLocation = userProfileScreenModel.friendLocation,
                     ratio = ratio
                 )
             }
@@ -146,7 +148,7 @@ private fun ColumnScope.SheetItems(
             }
         })
     }
-    
+
     FriendRequestSheetItem(
         currentUser,
         userProfileScreenModel,
@@ -173,29 +175,37 @@ private fun ColumnScope.FriendRequestSheetItem(
     val action: Pair<String, suspend () -> Boolean>? = when {
         // 当前用户不是朋友且不是自己
         !currentUser.isFriend && !currentUser.isSelf -> {
-            when(currentUser.friendRequestStatus){
+            when (currentUser.friendRequestStatus) {
                 // 状态为Null,则发送好友请求
                 Null -> localeStrings.profileSendFriendRequest to {
                     userProfileScreenModel.sendFriendRequest(currentUser.id, localeStrings.profileFriendRequestSent)
                 }
                 // 状态为Outgoing,则取消发送好友请求
                 Outgoing -> localeStrings.profileDeleteFriendRequest to {
-                    userProfileScreenModel.deleteFriendRequest(currentUser.id, localeStrings.profileFriendRequestDeleted)
+                    userProfileScreenModel.deleteFriendRequest(
+                        currentUser.id,
+                        localeStrings.profileFriendRequestDeleted
+                    )
                 }
 
                 // 状态为Incoming,则接受好友请求
                 Incoming -> localeStrings.profileAcceptFriendRequest to {
-                    userProfileScreenModel.acceptFriendRequest(currentUser.id, localeStrings.profileFriendRequestAccepted)
+                    userProfileScreenModel.acceptFriendRequest(
+                        currentUser.id,
+                        localeStrings.profileFriendRequestAccepted
+                    )
                 }
+
                 else -> null
             }
         }
         // 状态为Completed,则删除好友
         // TODO: 加一个弹窗提示是否删除好友
-        currentUser.isFriend && currentUser.friendRequestStatus == Completed  ->
+        currentUser.isFriend && currentUser.friendRequestStatus == Completed ->
             localeStrings.profileUnfriend to {
-            userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
-        }
+                userProfileScreenModel.unfriend(currentUser.id, localeStrings.profileUnfriended)
+            }
+
         else -> null
     }
 
@@ -207,7 +217,7 @@ private fun ColumnScope.FriendRequestSheetItem(
         scope.launch { hideSheet() }.invokeOnCompletion {
             scope.launch {
                 enabled = false
-                when(action.second()){
+                when (action.second()) {
                     true -> hideSheet()
                     false -> enabled = true
                 }
@@ -274,6 +284,7 @@ private fun JsonAlertDialog(
 @Composable
 private fun ProfileContent(
     currentUser: UserProfileVo?,
+    friendLocation: FriendLocation?,
     ratio: Float,
 ) {
     if (currentUser == null) return
@@ -292,6 +303,34 @@ private fun ProfileContent(
     UserStatusRow(user = currentUser, canCopy = true)
     // LanguagesRow && LinksRow
     LangAndLinkRow(currentUser)
+
+    var isSelected by remember { mutableStateOf(false) }
+    // LocationCard: show the room of this user and friends in the same room
+    friendLocation?.let { loc ->
+        val navigator = currentNavigator
+        LocationCard(
+            location = loc,
+            isSelected = isSelected,
+            onClickWorldImage = {},
+            onClickLocationCard = { isSelected = !isSelected },
+        ) { friends ->
+            CompositionLocalProvider(LocalSharedSuffixKey provides "UER:${LocalSharedSuffixKey.current}"){
+                val sharedSuffixKey = LocalSharedSuffixKey.current
+                UserIconsRow(
+                    friends = friends,
+                    onClickUserIcon = { user ->
+                        println("UserProfileScreen: $user")
+                        navigator replace UserProfileScreen(
+                            UserProfileVo(user),
+                            sharedSuffixKey,
+                        )
+                    }
+                )
+            }
+
+        }
+    }
+
     Box(
         modifier = Modifier
             .padding(top = 12.dp)
@@ -302,7 +341,7 @@ private fun ProfileContent(
 
 @Composable
 fun UserPronouns(pronouns: String) {
-    if (pronouns.isNotEmpty()){
+    if (pronouns.isNotEmpty()) {
         Text(
             text = "(${pronouns})",
             style = MaterialTheme.typography.bodySmall,
@@ -423,8 +462,6 @@ private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
         LinksRow(bioLinks, width)
     }
 }
-
-
 
 
 @OptIn(ExperimentalMaterial3Api::class)
