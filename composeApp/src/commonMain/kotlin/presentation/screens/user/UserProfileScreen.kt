@@ -43,6 +43,7 @@ import org.koin.core.parameter.parametersOf
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
+    private val location: String =  userProfileVO.location,
     private val sharedSuffixKey: String = "",
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +55,9 @@ data class UserProfileScreen(
 
         LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.initUserState(userProfileVO)
+        }
+        LaunchedEffect(location){
+            userProfileScreenModel.computeFriendLocation(location)
         }
         LaunchedEffect(Unit) {
             SharedFlowCentre.logout.collect {
@@ -334,8 +338,8 @@ private fun ProfileContent(
                     friends = friends,
                     onClickUserIcon = { user ->
                         navigator replace UserProfileScreen(
-                            UserProfileVo(user),
-                            sharedSuffixKey
+                            userProfileVO = UserProfileVo(user),
+                            sharedSuffixKey = sharedSuffixKey
                         )
                     }
                 )

@@ -14,8 +14,8 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationCard
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
@@ -119,11 +119,12 @@ fun Pager.FriendLocationPager(
         }
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-    val onClickUserIcon = { user: IUser ->
+    val onClickUserIcon = { user: FriendData ->
         if (navigator.size <= 1) {
             navigator push UserProfileScreen(
-                UserProfileVo(user),
-                sharedSuffixKey
+                userProfileVO = UserProfileVo(user),
+                location = user.location,
+                sharedSuffixKey = sharedSuffixKey
             )
         }
     }
@@ -201,7 +202,7 @@ fun Pager.FriendLocationPager(
 private fun LazyListScope.SimpleCLocationCard(
     friendLocation: FriendLocation?,
     locationType: LocationType,
-    onClickUserIcon: (IUser) -> Unit,
+    onClickUserIcon: (FriendData) -> Unit,
     text: @Composable () -> String,
     ) {
     friendLocation?.friendList.let {

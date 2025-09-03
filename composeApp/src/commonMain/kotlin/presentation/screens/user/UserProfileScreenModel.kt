@@ -48,7 +48,6 @@ class UserProfileScreenModel(
     fun initUserState(userProfileVO: UserProfileVo) {
         if (userProfileVO.id != _userState.value.id){
             _userState.value = userProfileVO
-            computeFriendLocation(userProfileVO)
         }
     }
 
@@ -63,7 +62,7 @@ class UserProfileScreenModel(
                 runCatching { UserProfileVo(response.body<UserData>()) }
                     .onSuccess {
                         _userState.value = it
-                         computeFriendLocation(it)
+                         computeFriendLocation(it.location)
                     }
                     .onFailure { handleError(it) }
                 _userJson.value = response.bodyAsText().pretty()
@@ -118,8 +117,7 @@ class UserProfileScreenModel(
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
     }
 
-    private fun computeFriendLocation(user: UserProfileVo) {
-        val location = user.location
+    fun computeFriendLocation(location: String) {
         val type = LocationType.fromValue(location)
         if (location.isEmpty() || type != LocationType.Instance || _friendLocation.value != null) {
             return

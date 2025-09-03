@@ -54,7 +54,7 @@ fun UserIconsRow(
     modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    onClickUserIcon: (IUser) -> Unit,
+    onClickUserIcon: (FriendData) -> Unit,
 ) {
     if (friends.isEmpty()) return
     LazyRow(
