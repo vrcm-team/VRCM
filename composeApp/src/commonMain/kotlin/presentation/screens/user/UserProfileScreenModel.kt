@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
@@ -26,15 +27,16 @@ import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
 class UserProfileScreenModel(
+    userProfileVO: UserProfileVo,
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
     private val logger: Logger,
-    private val instancesApi: io.github.vrcmteam.vrcm.network.api.instances.InstancesApi,
+    private val instancesApi: InstancesApi,
 ) : ScreenModel {
 
-    private val _userState = mutableStateOf<UserProfileVo?>(null)
+    private val _userState = mutableStateOf(userProfileVO)
     val userState by _userState
 
     private val _friendLocation = mutableStateOf<FriendLocation?>(null)
@@ -44,7 +46,7 @@ class UserProfileScreenModel(
     val userJson by _userJson
 
     fun initUserState(userProfileVO: UserProfileVo) {
-        if (_userState.value == null) {
+        if (userProfileVO.id != _userState.value.id){
             _userState.value = userProfileVO
             computeFriendLocation(userProfileVO)
         }
@@ -61,7 +63,7 @@ class UserProfileScreenModel(
                 runCatching { UserProfileVo(response.body<UserData>()) }
                     .onSuccess {
                         _userState.value = it
-                        computeFriendLocation(it)
+                         computeFriendLocation(it)
                     }
                     .onFailure { handleError(it) }
                 _userJson.value = response.bodyAsText().pretty()
@@ -99,16 +101,16 @@ class UserProfileScreenModel(
         }
     }
 
-    private suspend fun friendAction(message: String, action: suspend () ->  Result<*>): Boolean =
+    private suspend fun friendAction(message: String, action: suspend () -> Result<*>): Boolean =
         screenModelScope.async(Dispatchers.IO) {
             action()
                 .onFailure {
-                handleError(it)
-            }.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(message))
-                runCatching { _userState.value?.id?.also { refreshUser(it) }}
-                    .onFailure { handleError(it) }
-            }.isSuccess
+                    handleError(it)
+                }.onSuccess {
+                    SharedFlowCentre.toastText.emit(ToastText.Success(message))
+                    runCatching { _userState.value.id.also { refreshUser(it) } }
+                        .onFailure { handleError(it) }
+                }.isSuccess
         }.await()
 
     private suspend fun handleError(it: Throwable) {
@@ -119,8 +121,7 @@ class UserProfileScreenModel(
     private fun computeFriendLocation(user: UserProfileVo) {
         val location = user.location
         val type = LocationType.fromValue(location)
-        if (location.isEmpty() || type != LocationType.Instance) {
-            _friendLocation.value = null
+        if (location.isEmpty() || type != LocationType.Instance || _friendLocation.value != null) {
             return
         }
         // Build FriendLocation with friends in the same instance

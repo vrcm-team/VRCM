@@ -31,12 +31,15 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import kotlinx.coroutines.launch
+import org.koin.core.parameter.parametersOf
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
@@ -47,9 +50,9 @@ data class UserProfileScreen(
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val userProfileScreenModel: UserProfileScreenModel = koinScreenModel()
+        val userProfileScreenModel: UserProfileScreenModel = koinScreenModel { parametersOf(userProfileVO) }
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.initUserState(userProfileVO)
         }
         LaunchedEffect(Unit) {
@@ -69,8 +72,8 @@ data class UserProfileScreen(
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
-                profileImageUrl = currentUser?.profileImageUrl,
-                iconUrl = currentUser?.iconUrl,
+                profileImageUrl = currentUser.profileImageUrl,
+                iconUrl = currentUser.iconUrl,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { bottomSheetIsVisible = true },
             ) { ratio ->
@@ -81,7 +84,6 @@ data class UserProfileScreen(
                 )
             }
         }
-        if (currentUser == null) return
         ABottomSheet(
             isVisible = bottomSheetIsVisible,
             sheetState = sheetState,
@@ -308,26 +310,36 @@ private fun ProfileContent(
     // LocationCard: show the room of this user and friends in the same room
     friendLocation?.let { loc ->
         val navigator = currentNavigator
-        LocationCard(
-            location = loc,
-            isSelected = isSelected,
-            onClickWorldImage = {},
-            onClickLocationCard = { isSelected = !isSelected },
-        ) { friends ->
-            CompositionLocalProvider(LocalSharedSuffixKey provides "UER:${LocalSharedSuffixKey.current}"){
-                val sharedSuffixKey = LocalSharedSuffixKey.current
+        val sharedSuffixKey = LocalSharedSuffixKey.current
+        // 创建临时的 WorldProfileVo
+        val onClickWorldImage = {
+            val currentLocation = friendLocation.instants.value
+            val tempWorldProfileVo = WorldProfileVo(currentLocation)
+            navigator push WorldProfileScreen(
+                worldProfileVO = tempWorldProfileVo,
+                location = friendLocation.location,
+                sharedSuffixKey = "UER:$sharedSuffixKey"
+            )
+        }
+
+        // 防止当前用户的共享元素冲突
+        CompositionLocalProvider(LocalSharedSuffixKey provides "UER:$sharedSuffixKey") {
+            LocationCard(
+                location = loc,
+                isSelected = isSelected,
+                onClickWorldImage = onClickWorldImage,
+                onClickLocationCard = { isSelected = !isSelected },
+            ) { friends ->
                 UserIconsRow(
                     friends = friends,
                     onClickUserIcon = { user ->
-                        println("UserProfileScreen: $user")
                         navigator replace UserProfileScreen(
                             UserProfileVo(user),
-                            sharedSuffixKey,
+                            sharedSuffixKey
                         )
                     }
                 )
             }
-
         }
     }
 
