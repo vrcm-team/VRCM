@@ -62,7 +62,9 @@ class GalleryScreenModel(
                 .onGalleryFailure()
                 .onSuccess { files ->
                     // 更新文件列表
-                    _filesByTag[tagType] = files
+                    _filesByTag[tagType] = files.sortedByDescending { file ->
+                        file.versions.maxByOrNull { it.version }?.createdAt
+                    }
                 }
                 .also {
                     // 设置刷新状态为false
