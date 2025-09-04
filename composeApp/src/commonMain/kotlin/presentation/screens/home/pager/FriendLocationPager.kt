@@ -123,7 +123,6 @@ fun Pager.FriendLocationPager(
         if (navigator.size <= 1) {
             navigator push UserProfileScreen(
                 userProfileVO = UserProfileVo(user),
-                location = user.location,
                 sharedSuffixKey = sharedSuffixKey
             )
         }
@@ -183,6 +182,7 @@ fun Pager.FriendLocationPager(
                     ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),
+                            instanceId = location.location,
                             friends = it,
                             onClickUserIcon = onClickUserIcon
                         )

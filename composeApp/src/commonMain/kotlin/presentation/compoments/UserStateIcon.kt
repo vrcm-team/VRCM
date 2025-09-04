@@ -2,18 +2,29 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,10 +38,17 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
+import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 @Composable
 fun UserStateIcon(
@@ -53,6 +71,7 @@ fun UserStateIcon(
 fun UserIconsRow(
     modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
+    instanceId: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (FriendData) -> Unit,
 ) {
@@ -62,6 +81,13 @@ fun UserIconsRow(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        instanceId?.let {
+            item {
+                InviteSelf(instanceId = instanceId)
+            }
+        }
+
         items(friends, key = { it.value.id }) {
             val friend = it.value
             LocationFriend(
@@ -71,6 +97,54 @@ fun UserIconsRow(
                 userStatus = friend.status
             ) { onClickUserIcon(friend) }
         }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun LazyItemScope.InviteSelf(
+    instanceId: String,
+) {
+    val inviteApi: InviteApi = koinInject()
+    val authService: AuthService = koinInject()
+    var isInvited by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val onClickInvite = {
+        scope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instanceId) }.onSuccess {
+                isInvited = true
+            }
+        }
+    }
+    Column(
+        modifier = Modifier.width(60.dp)
+            .clip(MaterialTheme.shapes.small)
+            .clickable(enabled = !isInvited){ onClickInvite() }
+            .animateItem(),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondary)
+        ) {
+            Icon(
+                imageVector = if (isInvited) AppIcons.Check else Icons.Rounded.Add,
+                modifier = Modifier.padding(4.dp).fillMaxSize(),
+                contentDescription = "InviteSelfIcon",
+                tint = MaterialTheme.colorScheme.onSecondary,
+            )
+        }
+        Text(
+            modifier = Modifier.fillMaxWidth(),
+            text = strings.locationInviteMe,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline
+        )
     }
 }
 
