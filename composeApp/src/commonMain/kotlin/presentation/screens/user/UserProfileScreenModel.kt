@@ -48,12 +48,6 @@ class UserProfileScreenModel(
     private val _userJson = mutableStateOf("")
     val userJson by _userJson
 
-    fun initUserState(userProfileVO: UserProfileVo) {
-        if (userProfileVO.id != _userState.value.id){
-            _userState.value = userProfileVO
-        }
-    }
-
     fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
@@ -122,6 +116,11 @@ class UserProfileScreenModel(
 
     fun computeFriendLocation(location: String) {
         val type = LocationType.fromValue(location)
+        // 防止从用户详情页跳到世界页再点进非好友主页时 friendLocation 不刷新(按理来说看不到非好友位置)
+        if (type == LocationType.Offline) {
+            _friendLocation.value = null
+            return
+        }
         if (location.isEmpty() || type != LocationType.Instance || _friendLocation.value != null) {
             return
         }

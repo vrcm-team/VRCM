@@ -43,7 +43,6 @@ import org.koin.core.parameter.parametersOf
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
-    private val location: String =  userProfileVO.location,
     private val sharedSuffixKey: String = "",
 ) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -54,19 +53,15 @@ data class UserProfileScreen(
         val userProfileScreenModel: UserProfileScreenModel = koinScreenModel { parametersOf(userProfileVO) }
 
         LaunchedEffect(userProfileVO.id) {
-            userProfileScreenModel.initUserState(userProfileVO)
+            userProfileScreenModel.refreshUser(userProfileVO.id)
         }
-        LaunchedEffect(location){
-            userProfileScreenModel.computeFriendLocation(location)
-        }
+
         LaunchedEffect(Unit) {
             SharedFlowCentre.logout.collect {
                 currentNavigator replaceAll AuthAnimeScreen(false)
             }
         }
-        LaunchedEffect(Unit) {
-            userProfileScreenModel.refreshUser(userProfileVO.id)
-        }
+
         val currentUser = userProfileScreenModel.userState
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
@@ -335,6 +330,8 @@ private fun ProfileContent(
                 onClickLocationCard = { isSelected = !isSelected },
             ) { friends ->
                 UserIconsRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    instanceId = loc.location,
                     friends = friends,
                     onClickUserIcon = { user ->
                         navigator replace UserProfileScreen(
