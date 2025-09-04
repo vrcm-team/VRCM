@@ -14,7 +14,7 @@ object LanguageIcons {
             "rus" -> Russia
             "spa" -> Spain
             "por" -> Portugal
-            "zho" -> China
+            "wuu", "cmn", "yue", "zho" -> China
             "deu" -> Germany
             "jpn" -> Japan
             "fra" -> France
