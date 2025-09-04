@@ -29,7 +29,7 @@ data class UserProfileVo(
     override val lastPlatform: String = "",
     override val developerType: String = "",
     override val pronouns: String = "",
-    val location: String = "",
+    val location: String = LocationType.Offline.value,
 ) : IUser, JavaSerializable {
     constructor(user: IUser): this(
         id = user.id,

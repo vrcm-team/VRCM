@@ -6,6 +6,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
+import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
@@ -239,28 +240,31 @@ class FriendListPagerModel(
     suspend fun findFriendsByName(name: String, favoriteIds: Set<String>?): List<FriendData> {
 
         val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
-            val userData = withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
-            FriendData(
-                id = userData.id,
-                displayName = userData.displayName,
-                status = userData.status,
-                lastLogin = userData.lastLogin,
-                lastPlatform = userData.lastPlatform,
-                bio = userData.bio,
-                bioLinks = userData.bioLinks,
-                currentAvatarImageUrl = userData.currentAvatarImageUrl,
-                currentAvatarThumbnailImageUrl = userData.currentAvatarThumbnailImageUrl,
-                currentAvatarTags = userData.currentAvatarTags,
-                developerType = userData.developerType,
-                isFriend = true,
-                profilePicOverride = userData.profilePicOverride,
-                friendKey = "",
-                imageUrl = userData.profileImageUrl,
-                location = "",
-                statusDescription = userData.statusDescription,
-                userIcon = userData.userIcon,
-                pronouns = userData.pronouns,
-            )
+            withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
+                .run {
+                    FriendData(
+                        id = id,
+                        displayName = displayName,
+                        status = status,
+                        lastLogin = lastLogin,
+                        lastPlatform = lastPlatform,
+                        bio = bio,
+                        bioLinks = bioLinks,
+                        currentAvatarImageUrl = currentAvatarImageUrl,
+                        currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+                        currentAvatarTags = currentAvatarTags,
+                        developerType = developerType,
+                        tags = tags,
+                        isFriend = false,
+                        profilePicOverride = profilePicOverride,
+                        friendKey = "",
+                        imageUrl = profileImageUrl,
+                        location = LocationType.Offline.value,
+                        statusDescription = statusDescription,
+                        userIcon = userIcon,
+                        pronouns = pronouns,
+                    )
+                }
         } ?: emptyList()
 
         // 先按名称过滤
@@ -280,7 +284,27 @@ class FriendListPagerModel(
     // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
     private fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
         val isOffline = it.status == UserStatus.Offline
-        (if (isOffline) "0" else "1") + (if (isOffline) it.lastLogin else "") + it.displayName
+        val locationType = LocationType.fromValue(it.location)
+        buildString {
+            append(if (isOffline) "0" else "1")
+            append('-')
+            append(
+                when (locationType) {
+                    LocationType.Instance -> "0"
+                    LocationType.Traveling -> "1"
+                    LocationType.Private -> "2"
+                    LocationType.Offline -> "3"
+                }
+            )
+            append('-')
+            append(it.location)
+            append('-')
+            append(if (isOffline) it.lastLogin else "")
+            append('-')
+            append(if (isOffline) "0" else "1")
+            append('-')
+            append(it.displayName)
+        }
     }
 
     /**
@@ -358,7 +382,7 @@ class FriendListPagerModel(
             } ?: return@mapNotNull null
             val localGroup = localEntry.key
             localEntry.value.map { favoriteData ->
-                withContext(Dispatchers.IO) { worldsApi.getWorldById(favoriteData.favoriteId)}
+                withContext(Dispatchers.IO) { worldsApi.getWorldById(favoriteData.favoriteId) }
                     .toFavoritedWorldForLocal(localGroup.name, favoriteData.favoriteId)
             }
         }
