@@ -317,8 +317,8 @@ private fun ProfileContent(
         val sharedSuffixKey = LocalSharedSuffixKey.current
         // 创建临时的 WorldProfileVo
         val onClickWorldImage = {
-            val currentLocation = friendLocation.instants.value
-            val tempWorldProfileVo = WorldProfileVo(currentLocation)
+            val homeInstanceVo = friendLocation.instants.value
+            val tempWorldProfileVo = WorldProfileVo(homeInstanceVo)
             navigator push WorldProfileScreen(
                 worldProfileVO = tempWorldProfileVo,
                 location = friendLocation.location,

@@ -6,8 +6,10 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
@@ -30,6 +32,7 @@ class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
     private val usersApi: UsersApi,
+    private val groupsApi: GroupsApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
     private val logger: Logger,
@@ -137,11 +140,57 @@ class UserProfileScreenModel(
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)
             }.onSuccess { instance ->
-                friendLocation.instants.value = HomeInstanceVo(instance)
+                val homeInstanceVo = HomeInstanceVo(instance)
+                friendLocation.instants.value = homeInstanceVo
+                fetchAndSetOwner(instance.ownerId, homeInstanceVo)
             }.onFailure {
                 handleError(it)
             }
         }
     }
+    /**
+     * 获取房间实例的拥有者名称
+     *
+     * @param instance 房间实例
+     * @param instantsVo 房间实例的视图对象
+     */
+    private suspend fun fetchAndSetOwner(
+        ownerId: String?,
+        instantsVo: HomeInstanceVo,
+    ) {
+        val ownerId = ownerId ?: return
+        val fetchOwner: suspend (String) -> HomeInstanceVo.Owner =
+            when (BlueprintType.fromValue(ownerId)) {
+                BlueprintType.User -> {
+                    {
+                        val user = usersApi.fetchUser(ownerId)
+                        HomeInstanceVo.Owner(
+                            id = user.id,
+                            displayName = user.displayName,
+                            type = BlueprintType.User
+                        )
+                    }
+                }
 
+                BlueprintType.Group -> {
+                    {
+                        val group = groupsApi.fetchGroup(ownerId)
+                        HomeInstanceVo.Owner(
+                            id = group.id,
+                            displayName = group.name,
+                            type = BlueprintType.Group
+                        )
+
+                    }
+                }
+                else -> return
+            }
+        authService.reTryAuthCatching {
+            fetchOwner(ownerId)
+        }.onSuccess {
+            instantsVo.owner = it
+        }.onFailure {
+            SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+        }
+    }
 }
