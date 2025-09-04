@@ -1,9 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
-import androidx.compose.material.icons.materialIcon
-import androidx.compose.material.icons.materialPath
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.vector.DefaultFillType
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
@@ -461,6 +461,32 @@ object AppIcons {
             }
         }
     }
+
+    val Add: ImageVector by lazy {
+        materialIcon(name = "Rounded.Add") {
+            materialPath {
+                moveTo(18.0f, 13.0f)
+                horizontalLineToRelative(-5.0f)
+                verticalLineToRelative(5.0f)
+                curveToRelative(0.0f, 0.55f, -0.45f, 1.0f, -1.0f, 1.0f)
+                reflectiveCurveToRelative(-1.0f, -0.45f, -1.0f, -1.0f)
+                verticalLineToRelative(-5.0f)
+                horizontalLineTo(6.0f)
+                curveToRelative(-0.55f, 0.0f, -1.0f, -0.45f, -1.0f, -1.0f)
+                reflectiveCurveToRelative(0.45f, -1.0f, 1.0f, -1.0f)
+                horizontalLineToRelative(5.0f)
+                verticalLineTo(6.0f)
+                curveToRelative(0.0f, -0.55f, 0.45f, -1.0f, 1.0f, -1.0f)
+                reflectiveCurveToRelative(1.0f, 0.45f, 1.0f, 1.0f)
+                verticalLineToRelative(5.0f)
+                horizontalLineToRelative(5.0f)
+                curveToRelative(0.55f, 0.0f, 1.0f, 0.45f, 1.0f, 1.0f)
+                reflectiveCurveToRelative(-0.45f, 1.0f, -1.0f, 1.0f)
+                close()
+            }
+        }
+    }
+
 
     val Favorite: ImageVector by lazy {
         materialIcon(name = "Filled.Favorite") {
@@ -1482,3 +1508,42 @@ object AppIcons {
     }
 }
 
+inline fun materialIcon(
+    name: String,
+    autoMirror: Boolean = false,
+    block: ImageVector.Builder.() -> ImageVector.Builder
+): ImageVector = ImageVector.Builder(
+    name = name,
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+    autoMirror = autoMirror
+).block().build()
+
+/**
+ * Adds a vector path to this icon with Material defaults.
+ *
+ * @param fillAlpha fill alpha for this path
+ * @param strokeAlpha stroke alpha for this path
+ * @param pathFillType [PathFillType] for this path
+ * @param pathBuilder builder lambda to add commands to this path
+ */
+inline fun ImageVector.Builder.materialPath(
+    fillAlpha: Float = 1f,
+    strokeAlpha: Float = 1f,
+    pathFillType: PathFillType = DefaultFillType,
+    pathBuilder: PathBuilder.() -> Unit
+) =
+    path(
+        fill = SolidColor(Color.Black),
+        fillAlpha = fillAlpha,
+        stroke = null,
+        strokeAlpha = strokeAlpha,
+        strokeLineWidth = 1f,
+        strokeLineCap = StrokeCap.Butt,
+        strokeLineJoin = StrokeJoin.Bevel,
+        strokeLineMiter = 1f,
+        pathFillType = pathFillType,
+        pathBuilder = pathBuilder
+    )
