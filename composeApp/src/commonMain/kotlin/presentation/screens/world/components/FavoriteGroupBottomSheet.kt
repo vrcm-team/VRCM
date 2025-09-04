@@ -215,8 +215,10 @@ private suspend fun doChangeFavoriteGroup(
     favoriteId: String,
     favoriteType: FavoriteType,
 ): Result<Unit> = runCatching {
-        val favorite = favoriteService.getFavoriteByFavoriteId(favoriteType, favoriteId)
-        // 移除旧组
+    val favorite = favoriteService.getFavoriteByFavoriteId(favoriteType, favoriteId)
+
+    // 移除旧组
+    suspend fun removeFavorite() {
         if (favorite != null) {
             runCatching {
                 favoriteService.removeFavorite(id = favorite.id)
@@ -229,7 +231,9 @@ private suspend fun doChangeFavoriteGroup(
                 SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
             }.getOrThrow()
         }
+    }
 
+    suspend fun addFavorite() {
         // 添加到新组
         if (groupName != currentGroupName && groupName != null) {
             val isMove = favorite != null
@@ -248,7 +252,20 @@ private suspend fun doChangeFavoriteGroup(
                 SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
             }.getOrThrow()
         }
-        favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
     }
+
+    // 如果本地的分组移动时应该尝试添加，添加成功以后再删除本地的，如果是远端的分组应该先删除再添加
+    val oldIsLocal = favorite?.id?.let(favoriteService::parseLocalFavoriteId)?.first == true
+
+    if (oldIsLocal) {
+        addFavorite()
+        removeFavorite()
+    } else {
+        removeFavorite()
+        addFavorite()
+    }
+
+    favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
+}
 
 

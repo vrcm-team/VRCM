@@ -102,7 +102,7 @@ class FavoriteService(
     private fun toLocalFavoriteId(favoriteType: FavoriteType, favoriteId: String): String =
         "local|${favoriteType.value}|$favoriteId"
 
-    private fun parseLocalFavoriteId(id: String): Triple<Boolean, FavoriteType?, String?> {
+    fun parseLocalFavoriteId(id: String): Triple<Boolean, FavoriteType?, String?> {
         if (!id.startsWith("local|")) return Triple(false, null, null)
         val parts = id.split('|')
         if (parts.size != 3) return Triple(false, null, null)
