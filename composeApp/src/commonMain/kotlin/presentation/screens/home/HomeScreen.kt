@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -116,9 +117,12 @@ private inline fun Screen.HomeTopAppBar(
             currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
         }
     }
+    var statusVisibility by remember { mutableStateOf(true) }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
+        statusVisibility = false
         currentDialog = UserStatusDialog(it) {
             currentDialog = null
+            statusVisibility = true
         }
     }
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -172,11 +176,14 @@ private inline fun Screen.HomeTopAppBar(
                         style = MaterialTheme.typography.titleMedium,
                         user = currentUser,
                     )
-                    UserStatusRow(
-                        iconSize = 8.dp,
-                        style = MaterialTheme.typography.labelMedium,
-                        user = currentUser,
-                    )
+                    AnimatedVisibility(statusVisibility){
+                        UserStatusRow(
+                            iconSize = 8.dp,
+                            style = MaterialTheme.typography.labelMedium,
+                            user = currentUser,
+                            animatedVisibilityScope = this
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.weight(1f))

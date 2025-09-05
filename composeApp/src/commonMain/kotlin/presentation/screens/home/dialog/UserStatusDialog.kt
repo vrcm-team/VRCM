@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.dialog
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,9 +19,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
-import io.github.vrcmteam.vrcm.presentation.compoments.ITextField
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
+import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.extensions.koinScreenModelByLastItem
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
@@ -58,13 +57,20 @@ class UserStatusDialog(
 
                     // 状态下拉菜单
                     StatusDropdownMenu(
+                        id = currentUser.id,
                         currentStatus = currentStatus,
+                        animatedVisibilityScope = animatedVisibilityScope,
                         onStatusSelected = setCurrentStatus,
 //                        modifier = Modifier.weight(0.1f)
                     )
 
                     // 状态描述输入框
-                    StatusInput(statusDescriptionText, setStatusDescriptionText)
+                    StatusInput(
+                        id = currentUser.id,
+                        statusDescriptionText = statusDescriptionText,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        setStatusDescriptionText = setStatusDescriptionText
+                    )
 
                 }
 
@@ -82,15 +88,23 @@ class UserStatusDialog(
         }
     }
 
+    @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     private fun RowScope.StatusInput(
+        id: String,
         statusDescriptionText: String,
+        animatedVisibilityScope: AnimatedVisibilityScope,
         setStatusDescriptionText: (String) -> Unit,
     ) {
         var historyExpanded by remember { mutableStateOf(false) }
         val focusManager = LocalFocusManager.current
         ITextField(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f)
+                .sharedBoundsBy(
+                    key = "${id}UserStatusText",
+                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                    animatedVisibilityScope = animatedVisibilityScope
+                ),
             leadingIcon = {
                 Icon(
                     imageVector = if (historyExpanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
@@ -154,11 +168,14 @@ class UserStatusDialog(
     override fun close() = onConfirmClick()
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun StatusDropdownMenu(
+    id: String,
+    modifier: Modifier = Modifier,
     currentStatus: UserStatus,
     onStatusSelected: (UserStatus) -> Unit,
-    modifier: Modifier = Modifier
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -169,6 +186,12 @@ fun StatusDropdownMenu(
             modifier = Modifier
                 .clip(MaterialTheme.shapes.medium)
                 .clickable { expanded = true }
+                .sharedBoundsBy(
+                    key = "${id}UserStatusIcon",
+                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
+
         ) {
             Row(
                 modifier = Modifier
@@ -177,7 +200,10 @@ fun StatusDropdownMenu(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 当前状态的圆形指示器
-                Canvas(modifier = Modifier.size(16.dp)) {
+                Canvas(
+                    modifier = Modifier
+                        .size(16.dp)
+                ) {
                     drawCircle(
                         color = GameColor.Status.fromValue(currentStatus),
                         style = Fill
@@ -195,7 +221,8 @@ fun StatusDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
-            val userStatuses = remember { UserStatus.entries.filter { it != UserStatus.Offline && it != currentStatus } }
+            val userStatuses =
+                remember { UserStatus.entries.filter { it != UserStatus.Offline && it != currentStatus } }
             userStatuses.forEach { status ->
                 DropdownMenuItem(
                     modifier = Modifier.clip(MaterialTheme.shapes.medium),

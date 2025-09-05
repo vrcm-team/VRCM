@@ -68,7 +68,7 @@ fun LazyItemScope.renderUserItem(
             UserStatusRow(
                 iconSize = 8.dp,
                 style = MaterialTheme.typography.bodyMedium,
-                user = user
+                user = user,
             )
         },
         trailingContent = {

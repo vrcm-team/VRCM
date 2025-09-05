@@ -301,7 +301,7 @@ private fun ProfileContent(
     UserInfoRow(user = currentUser, canCopy = true)
     UserPronouns(pronouns = currentUser.pronouns)
     // status
-    UserStatusRow(user = currentUser, canCopy = true)
+    UserStatusRow(canCopy = true, user = currentUser,)
     // LanguagesRow && LinksRow
     LangAndLinkRow(currentUser)
 

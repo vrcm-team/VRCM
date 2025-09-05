@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -234,13 +235,20 @@ fun UserStatusRow(
     iconSize: Dp = 12.dp,
     style: TextStyle = MaterialTheme.typography.labelLarge,
     user: IUser?,
+    animatedVisibilityScope: AnimatedVisibilityScope? =  null,
 ) {
     val statusText = @Composable {
         Text(
+            modifier = Modifier.enableIf(animatedVisibilityScope != null){
+                sharedBoundsBy(
+                    key = "${user?.id}UserStatusText",
+                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                    animatedVisibilityScope = animatedVisibilityScope!!
+                )
+            },
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.outline,
             maxLines = 1
         )
     }
@@ -253,6 +261,13 @@ fun UserStatusRow(
         Canvas(
             modifier = Modifier
                 .size(iconSize)
+                .enableIf(animatedVisibilityScope != null){
+                    sharedBoundsBy(
+                        key = "${user?.id}UserStatusIcon",
+                        sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                        animatedVisibilityScope = animatedVisibilityScope!!
+                    )
+                }
         ) {
             drawCircle(GameColor.Status.fromValue(user?.status))
         }
