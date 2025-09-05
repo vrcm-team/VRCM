@@ -12,11 +12,13 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -232,6 +234,31 @@ class FriendListPagerModel(
         }
     }
 
+    private fun UserData.toFriendData(): FriendData {
+        return  FriendData(
+            id = id,
+            displayName = displayName,
+            status = status,
+            lastLogin = lastLogin,
+            lastPlatform = lastPlatform,
+            bio = bio,
+            bioLinks = bioLinks,
+            currentAvatarImageUrl = currentAvatarImageUrl,
+            currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+            currentAvatarTags = currentAvatarTags,
+            developerType = developerType,
+            tags = tags,
+            isFriend = false,
+            profilePicOverride = profilePicOverride,
+            friendKey = "",
+            imageUrl = profileImageUrl,
+            location = LocationType.Offline.value,
+            statusDescription = statusDescription,
+            userIcon = userIcon,
+            pronouns = pronouns,
+        )
+    }
+
     /**
      * 基于搜索文本和当前选择的世界组过滤世界列表
      *
@@ -241,30 +268,7 @@ class FriendListPagerModel(
 
         val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
             withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
-                .run {
-                    FriendData(
-                        id = id,
-                        displayName = displayName,
-                        status = status,
-                        lastLogin = lastLogin,
-                        lastPlatform = lastPlatform,
-                        bio = bio,
-                        bioLinks = bioLinks,
-                        currentAvatarImageUrl = currentAvatarImageUrl,
-                        currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
-                        currentAvatarTags = currentAvatarTags,
-                        developerType = developerType,
-                        tags = tags,
-                        isFriend = false,
-                        profilePicOverride = profilePicOverride,
-                        friendKey = "",
-                        imageUrl = profileImageUrl,
-                        location = LocationType.Offline.value,
-                        statusDescription = statusDescription,
-                        userIcon = userIcon,
-                        pronouns = pronouns,
-                    )
-                }
+                .toFriendData()
         } ?: emptyList()
 
         // 先按名称过滤
@@ -299,9 +303,7 @@ class FriendListPagerModel(
             append('-')
             append(it.location)
             append('-')
-            append(if (isOffline) it.lastLogin else "")
-            append('-')
-            append(if (isOffline) "0" else "1")
+            append(if (isOffline) it.lastLogin else "1")
             append('-')
             append(it.displayName)
         }

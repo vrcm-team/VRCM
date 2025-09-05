@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
@@ -146,7 +147,7 @@ fun LocationCard(
 @Composable
 private inline fun MemberInfoRow(
     showUser: Boolean,
-    friendList: List<State<FriendData>>,
+    friendList: List<State<IUser>>,
     instants: HomeInstanceVo,
 ) {
     Row(

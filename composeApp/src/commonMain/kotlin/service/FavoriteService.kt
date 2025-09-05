@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.toCollection
 import kotlinx.coroutines.flow.update
 
 /**
@@ -31,7 +32,7 @@ class FavoriteService(
     private var _favoriteLimits: FavoriteLimits? = null
 
     init {
-        CoroutineScope(Dispatchers.Default).launch{
+        CoroutineScope(Dispatchers.Default).launch {
             SharedFlowCentre.authed.collect {
                 _favoritesByGroup.clear()
             }
@@ -118,17 +119,19 @@ class FavoriteService(
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
         val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
         // 尝试加载远程收藏
+        favoriteApi.fetchFavorite(favoriteType)
+            .toCollection(mutableListOf())
+            .flatten()
+            .forEach { favoriteData ->
+                val tag = favoriteData.tags.firstOrNull() ?: return@forEach
+                newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+            }
+
+
         val remoteGroups = runCatching {
-            favoriteApi.fetchFavorite(favoriteType)
-                .collect { favoriteDataList ->
-                    favoriteDataList.forEach { favoriteData ->
-                        val tag = favoriteData.tags.firstOrNull()
-                        if (tag != null) {
-                            newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
-                        }
-                    }
-                }
             favoriteApi.getFavoriteGroupsByType(favoriteType)
+        }.onFailure {
+            SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite Groups Failed"))
         }.getOrElse { emptyList() }
 
         // 本地收藏
@@ -144,7 +147,9 @@ class FavoriteService(
         }
 
         // 合并远程与本地
-        _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }.update {
+        _favoritesByGroup.getOrPut(favoriteType) {
+            MutableStateFlow(mutableMapOf())
+        }.update {
             remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } + (localGroup to localFavorites)
         }
     }.onFailure {

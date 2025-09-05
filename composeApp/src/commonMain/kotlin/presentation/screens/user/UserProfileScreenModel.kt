@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import cafe.adriel.voyager.core.model.ScreenModel
@@ -9,6 +10,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
@@ -59,7 +61,7 @@ class UserProfileScreenModel(
                 runCatching { UserProfileVo(response.body<UserData>()) }
                     .onSuccess {
                         _userState.value = it
-                         computeFriendLocation(it.location)
+                        computeFriendLocation(it.location)
                     }
                     .onFailure { handleError(it) }
                 _userJson.value = response.bodyAsText().pretty()
@@ -124,11 +126,12 @@ class UserProfileScreenModel(
         if (location.isEmpty() || type != LocationType.Instance || _friendLocation.value != null) {
             return
         }
-        // Build FriendLocation with friends in the same instance
-        val friendsInSameRoom = friendService.friendMap.values
-            .filter { it.location == location }
-            .associate { it.id to mutableStateOf(it) }
-            .toMutableMap()
+
+        val friendsInSameRoom: MutableMap<String, MutableState<FriendData>> =
+            (mapOf(userState.id to userState.toFriendData()) + friendService.friendMap).values
+                .filter { it.location == location }
+                .associate { it.id to mutableStateOf(it) }
+                .toMutableMap()
         val friendLocation = FriendLocation(
             location = location,
             friends = friendsInSameRoom
@@ -147,6 +150,7 @@ class UserProfileScreenModel(
             }
         }
     }
+
     /**
      * 获取房间实例的拥有者名称
      *
@@ -182,6 +186,7 @@ class UserProfileScreenModel(
 
                     }
                 }
+
                 else -> return
             }
         authService.reTryAuthCatching {
@@ -193,3 +198,27 @@ class UserProfileScreenModel(
         }
     }
 }
+
+private fun UserProfileVo.toFriendData() =
+    FriendData(
+        bio = bio,
+        bioLinks = bioLinks,
+        currentAvatarImageUrl = currentAvatarImageUrl,
+        currentAvatarTags = currentAvatarTags,
+        currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+        developerType = developerType,
+        displayName = displayName,
+        friendKey = "",
+        id = id,
+        imageUrl = profileImageUrl,
+        isFriend = isFriend,
+        lastLogin = lastLogin,
+        lastPlatform = lastPlatform,
+        location = location,
+        profilePicOverride = profilePicOverride,
+        status = status,
+        statusDescription = statusDescription,
+        userIcon = userIcon,
+        pronouns = pronouns,
+    )
+
