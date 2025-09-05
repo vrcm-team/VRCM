@@ -248,6 +248,7 @@ fun UserStatusRow(
             },
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             overflow = TextOverflow.Ellipsis,
             maxLines = 1
         )
