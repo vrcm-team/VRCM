@@ -26,7 +26,7 @@ data class NotificationData(
     val seen: Boolean,
     val senderUserId: String?,
     val senderUsername: String?,
-    val title: String,
+    val title: String?,
     val titleKey: String?,
     val type: String,
     val updatedAt: String,

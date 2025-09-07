@@ -5,7 +5,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 data class NotificationItemData(
     val id: String,
     val imageUrl: String,
-    val title: String,
+    val title: String?,
     val message: String,
     val createdAt: String,
     val senderUserId: String,

@@ -45,10 +45,12 @@ object NotificationDialog : SharedDialog {
         LaunchedEffect(Unit) {
             homeScreenModel.refreshAllNotification()
         }
-        val notifications: List<NotificationItemData> by remember { derivedStateOf {
-            (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications)
-                .sortedByDescending { it.createdAt }
-        } }
+        val notifications: List<NotificationItemData> by remember {
+            derivedStateOf {
+                (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications)
+                    .sortedByDescending { it.createdAt }
+            }
+        }
         val onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit = { id, type, response ->
             homeScreenModel.responseAllNotification(id, type, response)
         }
@@ -132,14 +134,14 @@ private fun LazyItemScope.NotificationItem(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         tooltip = {
                             PlainTooltip {
-                                Text(text = item.title)
+                                Text(text = item.title ?: item.message)
                             }
                         },
                         state = rememberTooltipState()
-                    ){
+                    ) {
                         Text(
                             modifier = Modifier.fillMaxWidth(),
-                            text = item.title,
+                            text = item.title ?: item.message,
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             overflow = TextOverflow.Ellipsis,
