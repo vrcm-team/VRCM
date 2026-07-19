@@ -1,0 +1,10 @@
+# Optional local settings for resign-and-install.sh.
+#
+# Copy this file to iosApp/resign.config and set only the values you need.
+# Environment variables override this file; empty values use auto-detection.
+
+# IDENTITY="Apple Development: you@mail.com (ABCDE12345)"
+# PROFILE="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/xxxx.mobileprovision"
+# BUNDLE_ID="io.github.vrcmteam.vrcm"
+# DEVICE="00008150-XXXXXXXXXXXXXXXX"
+# IPA="$SCRIPT_DIR/build/archives/release/VRCM.ipa"

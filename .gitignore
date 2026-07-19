@@ -4,6 +4,7 @@
 xcuserdata
 !src/**/build/
 local.properties
+iosApp/resign.config
 .idea
 .kotlin
 .DS_Store
