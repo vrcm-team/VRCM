@@ -114,14 +114,111 @@ auto_identity() {
   echo "$line" | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
+identity_fingerprint() {
+  local wanted="$1"
+  local wanted_upper line fingerprint label
+  wanted_upper="$(printf '%s' "$wanted" | tr '[:lower:]' '[:upper:]')"
+
+  while IFS= read -r line; do
+    fingerprint="$(printf '%s\n' "$line" \
+      | sed -nE 's/^[[:space:]]*[0-9]+\)[[:space:]]+([0-9A-Fa-f]{40})[[:space:]]+".*/\1/p')"
+    label="$(printf '%s\n' "$line" | sed -nE 's/.*"([^"]+)".*/\1/p')"
+    if [ -n "$fingerprint" ] && { [ "$label" = "$wanted" ] || [ "$fingerprint" = "$wanted_upper" ]; }; then
+      echo "$fingerprint"
+      return 0
+    fi
+  done < <(security find-identity -p codesigning -v 2>/dev/null)
+  return 1
+}
+
+profile_is_current() {
+  /usr/bin/python3 - "$1" <<'PY'
+import datetime
+import plistlib
+import sys
+
+with open(sys.argv[1], "rb") as profile_file:
+    expiration = plistlib.load(profile_file).get("ExpirationDate")
+
+if not isinstance(expiration, datetime.datetime):
+    sys.exit(1)
+
+if expiration.tzinfo is None:
+    now = datetime.datetime.utcnow()
+else:
+    now = datetime.datetime.now(datetime.timezone.utc)
+sys.exit(0 if expiration > now else 1)
+PY
+}
+
+profile_contains_certificate() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import hashlib
+import plistlib
+import sys
+
+with open(sys.argv[1], "rb") as profile_file:
+    certificates = plistlib.load(profile_file).get("DeveloperCertificates", [])
+
+wanted = sys.argv[2].upper()
+matches = any(hashlib.sha1(certificate).hexdigest().upper() == wanted for certificate in certificates)
+sys.exit(0 if matches else 1)
+PY
+}
+
+profile_allows_bundle() {
+  local profile_bundle="$1"
+  local wanted_bundle="$2"
+  local prefix suffix
+
+  [ "$profile_bundle" = "*" ] && return 0
+  [ "$profile_bundle" = "$wanted_bundle" ] && return 0
+  case "$profile_bundle" in
+    *\*)
+      prefix="${profile_bundle%\*}"
+      case "$prefix" in
+        *\*) return 1 ;;
+      esac
+      suffix="${wanted_bundle#"$prefix"}"
+      [ "$suffix" != "$wanted_bundle" ] && [ -n "$suffix" ]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+patch_entitlements() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import plistlib
+import sys
+
+path, bundle_id = sys.argv[1:]
+with open(path, "rb") as entitlements_file:
+    entitlements = plistlib.load(entitlements_file)
+
+application_id = entitlements.get("application-identifier")
+if not isinstance(application_id, str) or "." not in application_id:
+    sys.exit("Provisioning entitlements have no valid application-identifier")
+
+prefix = application_id.split(".", 1)[0]
+entitlements["application-identifier"] = f"{prefix}.{bundle_id}"
+groups = entitlements.get("keychain-access-groups")
+if isinstance(groups, list):
+    entitlements["keychain-access-groups"] = [
+        f"{prefix}.{bundle_id}" if isinstance(group, str) and group.endswith(".*") else group
+        for group in groups
+    ]
+
+with open(path, "wb") as entitlements_file:
+    plistlib.dump(entitlements, entitlements_file, fmt=plistlib.FMT_XML, sort_keys=False)
+PY
+}
+
 auto_profile() {
   local wanted_bundle="$1"
-  local wanted_team="${2:-}"
+  local identity_hash="$2"
   local dir p plist appid team profile_bundle
-  local best_both=""
-  local best_team=""
-  local best_bundle=""
-  local best_any=""
 
   shopt -s nullglob
   for dir in "${PROFILE_DIRS[@]}"; do
@@ -134,31 +231,22 @@ auto_profile() {
       }
       appid="$(plist_get "$plist" 'Entitlements:application-identifier')"
       team="$(plist_get "$plist" 'Entitlements:com.apple.developer.team-identifier')"
-      rm -f "$plist"
-      [ -z "$appid" ] && continue
-
       profile_bundle="${appid#*.}"
-      [ -z "$best_any" ] && best_any="$p"
-      if [ "$profile_bundle" = "*" ] || [ "$profile_bundle" = "$wanted_bundle" ]; then
-        [ -z "$best_bundle" ] && best_bundle="$p"
-        if [ -n "$wanted_team" ] && [ "$team" = "$wanted_team" ]; then
-          [ -z "$best_both" ] && best_both="$p"
-        fi
+      if [ -n "$appid" ] \
+        && [ -n "$team" ] \
+        && profile_allows_bundle "$profile_bundle" "$wanted_bundle" \
+        && profile_is_current "$plist" \
+        && profile_contains_certificate "$plist" "$identity_hash"; then
+        rm -f "$plist"
+        shopt -u nullglob
+        echo "$p"
+        return 0
       fi
-      if [ -n "$wanted_team" ] && [ "$team" = "$wanted_team" ]; then
-        [ -z "$best_team" ] && best_team="$p"
-      fi
+      rm -f "$plist"
     done
   done
   shopt -u nullglob
-
-  local selected="${best_both:-${best_team:-${best_bundle:-$best_any}}}"
-  [ -n "$selected" ] || return 1
-  echo "$selected"
-}
-
-identity_team() {
-  echo "$1" | sed -nE 's/.*\(([A-Z0-9]{10})\).*/\1/p'
+  return 1
 }
 
 auto_device() {
@@ -210,12 +298,15 @@ done
 command -v codesign >/dev/null || die "codesign is unavailable. Install the Xcode command-line tools."
 command -v security >/dev/null || die "security is unavailable."
 [ -x /usr/libexec/PlistBuddy ] || die "PlistBuddy is unavailable."
+[ -x /usr/bin/python3 ] || die "python3 is unavailable. Install the Xcode command-line tools."
 [ -f "$IPA" ] || die "IPA not found: $IPA (run ./gradlew :iosApp:buildReleaseIpa first)"
 
 if [ -z "$IDENTITY" ]; then
   IDENTITY="$(auto_identity || true)"
 fi
 [ -n "$IDENTITY" ] || die "No signing identity found. Set IDENTITY or run --list."
+IDENTITY_HASH="$(identity_fingerprint "$IDENTITY" || true)"
+[ -n "$IDENTITY_HASH" ] || die "Signing identity is not available in the current keychain: $IDENTITY"
 ok "Signing identity: $IDENTITY"
 
 WORK="$(mktemp -d)"
@@ -228,12 +319,12 @@ ORIGINAL_BUNDLE="$(plist_get "$APP/Info.plist" 'CFBundleIdentifier')"
 [ -n "$ORIGINAL_BUNDLE" ] || die "The app Info.plist has no CFBundleIdentifier."
 log "Original bundle identifier: $ORIGINAL_BUNDLE"
 
-IDENTITY_TEAM="$(identity_team "$IDENTITY")"
+REQUESTED_BUNDLE="${BUNDLE_ID:-$ORIGINAL_BUNDLE}"
 if [ -z "$PROFILE" ]; then
-  PROFILE="$(auto_profile "${BUNDLE_ID:-$ORIGINAL_BUNDLE}" "$IDENTITY_TEAM" || true)"
+  PROFILE="$(auto_profile "$REQUESTED_BUNDLE" "$IDENTITY_HASH" || true)"
 fi
 [ -n "$PROFILE" ] && [ -f "$PROFILE" ] \
-  || die "No provisioning profile found. Set PROFILE or run --list."
+  || die "No current provisioning profile matches bundle $REQUESTED_BUNDLE and the selected certificate. Set PROFILE or run --list."
 ok "Provisioning profile: $PROFILE"
 
 PROFILE_PLIST="$WORK/profile.plist"
@@ -244,19 +335,19 @@ ENTITLEMENTS="$WORK/entitlements.plist"
 TEAM_ID="$(plist_get "$PROFILE_PLIST" 'Entitlements:com.apple.developer.team-identifier')"
 PROFILE_APP_ID="$(plist_get "$PROFILE_PLIST" 'Entitlements:application-identifier')"
 PROFILE_BUNDLE="${PROFILE_APP_ID#*.}"
+[ -n "$TEAM_ID" ] || die "The provisioning profile has no team identifier."
+[ -n "$PROFILE_APP_ID" ] && [ "$PROFILE_APP_ID" != "$PROFILE_BUNDLE" ] \
+  || die "The provisioning profile has no valid application identifier."
+profile_is_current "$PROFILE_PLIST" || die "The provisioning profile is expired."
+profile_contains_certificate "$PROFILE_PLIST" "$IDENTITY_HASH" \
+  || die "The provisioning profile does not contain the selected signing certificate."
+profile_allows_bundle "$PROFILE_BUNDLE" "$REQUESTED_BUNDLE" \
+  || die "Provisioning profile App ID $PROFILE_APP_ID does not allow bundle $REQUESTED_BUNDLE."
 ok "Team=$TEAM_ID ProfileAppID=$PROFILE_APP_ID"
 
-if [ -n "$IDENTITY_TEAM" ] && [ -n "$TEAM_ID" ] && [ "$IDENTITY_TEAM" != "$TEAM_ID" ]; then
-  die "Signing identity team $IDENTITY_TEAM does not match profile team $TEAM_ID."
-fi
-
-if [ -z "$BUNDLE_ID" ]; then
-  if [ "$PROFILE_BUNDLE" = "*" ]; then
-    BUNDLE_ID="$ORIGINAL_BUNDLE"
-  else
-    BUNDLE_ID="$PROFILE_BUNDLE"
-  fi
-fi
+BUNDLE_ID="$REQUESTED_BUNDLE"
+patch_entitlements "$ENTITLEMENTS" "$BUNDLE_ID" \
+  || die "Failed to specialize provisioning entitlements for bundle $BUNDLE_ID."
 log "Signed bundle identifier: $BUNDLE_ID"
 
 rm -rf "$APP/_CodeSignature"
@@ -272,12 +363,14 @@ while IFS= read -r -d '' item; do
   sign_one "$item"
 done < <(find "$APP" \( -name '*.dylib' -o -name '*.framework' \) -print0)
 
+EXTENSIONS=()
 if [ -d "$APP/PlugIns" ]; then
-  while IFS= read -r -d '' extension; do
-    log "Signing extension: $(basename "$extension")"
-    sign_one --entitlements "$ENTITLEMENTS" "$extension"
-  done < <(find "$APP/PlugIns" -maxdepth 1 -name '*.appex' -print0)
+  shopt -s nullglob
+  EXTENSIONS=("$APP/PlugIns"/*.appex)
+  shopt -u nullglob
 fi
+[ "${#EXTENSIONS[@]}" -eq 0 ] \
+  || die "App extensions require separate provisioning profiles and are not supported by this script."
 
 log "Signing main app"
 sign_one --entitlements "$ENTITLEMENTS" "$APP"
@@ -292,7 +385,7 @@ OUT_IPA="$SCRIPT_DIR/build/archives/release/VRCM-signed.ipa"
 rm -f "$OUT_IPA"
 (
   cd "$WORK"
-  zip -qry "$OUT_IPA" Payload
+  zip -qr -y "$OUT_IPA" Payload
 )
 ok "Signed IPA: $OUT_IPA"
 
@@ -303,7 +396,11 @@ fi
 
 log "Installing on a connected iPhone"
 if command -v ios-deploy >/dev/null 2>&1; then
-  if ios-deploy --bundle "$APP" --no-wifi; then
+  IOS_DEPLOY_ARGS=(--bundle "$APP" --no-wifi)
+  if [ -n "$DEVICE" ]; then
+    IOS_DEPLOY_ARGS=(--id "$DEVICE" "${IOS_DEPLOY_ARGS[@]}")
+  fi
+  if ios-deploy "${IOS_DEPLOY_ARGS[@]}"; then
     ok "Installation completed with ios-deploy."
     exit 0
   fi

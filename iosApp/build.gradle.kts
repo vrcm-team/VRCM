@@ -1,10 +1,9 @@
-import org.gradle.api.GradleException
 import org.gradle.api.tasks.Exec
-import java.io.File
 
 val xcodeProject = layout.projectDirectory.file("iosApp.xcodeproj")
 val xcodeScheme = "iosApp"
 val ipaName = "VRCM"
+val packageIpaScript = layout.projectDirectory.file("package-ipa.sh")
 
 fun registerArchiveTask(
     taskName: String,
@@ -38,56 +37,23 @@ fun registerIpaTask(
     descriptionText: String,
     variant: String,
     archiveTask: TaskProvider<Exec>,
-) = tasks.register(taskName) {
+) = tasks.register<Exec>(taskName) {
     group = "build"
     description = descriptionText
 
     val archiveDir = layout.buildDirectory.dir("archives/$variant/$xcodeScheme.xcarchive")
     val outputIpa = layout.buildDirectory.file("archives/$variant/$ipaName.ipa")
     inputs.dir(archiveDir)
+    inputs.file(packageIpaScript)
     outputs.file(outputIpa)
     dependsOn(archiveTask)
-
-    doLast {
-        val applicationsDir = archiveDir.get().asFile.resolve("Products/Applications")
-        val apps = applicationsDir.listFiles { candidate ->
-            candidate.isDirectory && candidate.extension == "app"
-        }?.sortedBy(File::getName).orEmpty()
-
-        if (apps.size != 1) {
-            throw GradleException(
-                "Expected exactly one .app in ${applicationsDir.absolutePath}, found ${apps.size}",
-            )
-        }
-
-        temporaryDir.deleteRecursively()
-        val payloadDir = File(temporaryDir, "Payload").apply { mkdirs() }
-        val packagedApp = File(payloadDir, apps.single().name)
-        apps.single().copyRecursively(packagedApp, overwrite = true)
-
-        logger.lifecycle("[IPA] Applying ad-hoc signature to ${packagedApp.name}")
-        providers.exec {
-            commandLine(
-                "codesign",
-                "--force",
-                "--deep",
-                "--sign", "-",
-                "--timestamp=none",
-                packagedApp.absolutePath,
-            )
-        }.result.get().assertNormalExitValue()
-
-        val zipFile = File(temporaryDir, "$ipaName.zip")
-        providers.exec {
-            workingDir(temporaryDir)
-            commandLine("zip", "-r", "-y", zipFile.absolutePath, "Payload")
-        }.result.get().assertNormalExitValue()
-
-        val outputFile = outputIpa.get().asFile
-        outputFile.parentFile.mkdirs()
-        zipFile.copyTo(outputFile, overwrite = true)
-        logger.lifecycle("[IPA] Created ${outputFile.absolutePath}")
-    }
+    workingDir(layout.projectDirectory)
+    commandLine(
+        "bash",
+        packageIpaScript.asFile.absolutePath,
+        archiveDir.get().asFile.absolutePath,
+        outputIpa.get().asFile.absolutePath,
+    )
 }
 
 val buildDebugArchive = registerArchiveTask(
