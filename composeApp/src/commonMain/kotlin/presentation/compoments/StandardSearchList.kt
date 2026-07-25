@@ -18,6 +18,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
@@ -73,6 +74,7 @@ fun StandardSearchList(
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current
+    val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
     val onUserClick = { user: IUser ->
         // 处理用户点击，导航到用户资料页面
@@ -96,9 +98,13 @@ fun StandardSearchList(
             }
         }
     }
-    val onAvatarClick = { avatar: AvatarData ->
+    val onAvatarClick: (AvatarData) -> Unit = { avatar ->
         // 处理模型点击，导航到模型详情页面
-        if (currentNavigator.size <= 1) {
+        if (avatar.releaseStatus == "hidden") {
+            coroutineScope.launch {
+                SharedFlowCentre.toastText.emit(ToastText.Info(hiddenModelCannotViewText))
+            }
+        } else if (currentNavigator.size <= 1) {
             coroutineScope.launch {
                 currentNavigator push AvatarProfileScreen(
                     avatarProfileVo = AvatarProfileVo(avatar),

@@ -267,4 +267,6 @@ internal val LocaleStringsJa = LocaleStrings(
     avatarProfileCreated = "作成日",
     avatarProfileUpdated = "更新日",
     avatarProfilePlatforms = "対応プラットフォーム",
+    hiddenModel = "非公開モデル",
+    hiddenModelCannotView = "非公開モデルの情報は表示できません",
 )
