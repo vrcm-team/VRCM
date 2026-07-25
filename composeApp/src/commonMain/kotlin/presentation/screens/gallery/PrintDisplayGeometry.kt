@@ -199,3 +199,5 @@ internal object NoOverlayClip : SharedTransitionScope.OverlayClip {
         density: Density,
     ): Path? = null
 }
+
+internal val PrintThumbnailOverlayClip: SharedTransitionScope.OverlayClip = NoOverlayClip

@@ -330,9 +330,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                             animatedVisibilityScope = this@AnimatedVisibility,
                             boundsTransform = PrintBoundsTransform,
-                            clipInOverlayDuringTransition = PrintCropOverlayClip(
-                                placement = PrintCanvasPlacement.CropTopCenter,
-                            ),
+                            clipInOverlayDuringTransition = PrintThumbnailOverlayClip,
                         )
                         .graphicsLayer {
                             val transform = PrintDisplayGeometry.cropToFillTransform(
