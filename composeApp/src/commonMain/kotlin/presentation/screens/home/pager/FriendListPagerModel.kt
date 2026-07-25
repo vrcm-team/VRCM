@@ -436,14 +436,14 @@ class FriendListPagerModel(
             favoritedAvatarMap.values
                 .filter { avatar ->
                     favoriteIds.contains(avatar.id) &&
-                            (name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()))
+                            (name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase()))
                 }
         } else {
             favoritedAvatarMap.values
                 .filter { avatar ->
-                    name.isEmpty() || avatar.name.lowercase().contains(name.lowercase())
+                    name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase())
                 }
-        }.sortedBy { it.name }
+        }.sortedWith(compareBy<AvatarData> { it.releaseStatus == "hidden" }.thenBy { it.name })
 
         _avatarList.value = filteredAvatars
     }
@@ -469,11 +469,7 @@ class FriendListPagerModel(
             mergeFavoritedAvatars(remoteAvatars, localAvatars)
         }.onSuccess { avatars ->
             favoritedAvatarMap.clear()
-            // 过滤掉不可见/非公开的模型
-            val validAvatars = avatars.filter { avatar ->
-                avatar.releaseStatus != "hidden"
-            }
-            favoritedAvatarMap.putAll(validAvatars.associateBy { it.id })
+            favoritedAvatarMap.putAll(avatars.associateBy { it.id })
             _avatarTotal.value = favoritedAvatarMap.size
             findAvatarList(_searchText.value)
         }.onFailure {

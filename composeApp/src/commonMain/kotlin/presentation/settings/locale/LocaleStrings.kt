@@ -273,6 +273,8 @@ data class LocaleStrings(
     val avatarProfileCreated: String = "Created",
     val avatarProfileUpdated: String = "Updated",
     val avatarProfilePlatforms: String = "Platforms",
+    val hiddenModel: String = "Hidden model",
+    val hiddenModelCannotView: String = "Cannot view hidden model info",
 )
 
 val strings: LocaleStrings

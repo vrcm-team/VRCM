@@ -267,4 +267,6 @@ internal val LocaleStringsZhHans = LocaleStrings(
     avatarProfileCreated = "创建时间",
     avatarProfileUpdated = "更新时间",
     avatarProfilePlatforms = "支持平台",
+    hiddenModel = "已隐藏的模型",
+    hiddenModelCannotView = "无法查看该隐藏模型的信息",
 )
