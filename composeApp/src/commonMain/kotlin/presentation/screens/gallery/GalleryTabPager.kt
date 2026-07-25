@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,9 +31,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -60,6 +70,42 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+
+/**
+ * 在共享动画 overlay 中裁剪 Print 图片到指定区域
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+internal class PrintCropOverlayClip : SharedTransitionScope.OverlayClip {
+    override fun getClipPath(
+        sharedContentState: SharedTransitionScope.SharedContentState,
+        bounds: Rect,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Path {
+        val s = bounds.width / 2048f
+        return Path().apply {
+            addRect(
+                Rect(
+                    left = bounds.left + 72f * s,
+                    top = bounds.top + 74f * s,
+                    right = bounds.left + 1976f * s,
+                    bottom = bounds.top + 1145f * s
+                )
+            )
+        }
+    }
+}
+
+/** 非 Print 图片不裁剪 overlay */
+@OptIn(ExperimentalSharedTransitionApi::class)
+internal object NoOverlayClip : SharedTransitionScope.OverlayClip {
+    override fun getClipPath(
+        sharedContentState: SharedTransitionScope.SharedContentState,
+        bounds: Rect,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Path? = null
+}
 
 sealed class GalleryTabPager(private val tagType: FileTagType) {
 
@@ -300,6 +346,24 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         val imageUrl = print.files?.image ?: ""
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(FileTagType.Print, print.id)
+        val printCropShape = remember {
+            object : Shape {
+                override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+                    val s = size.width / 2048f
+                    val cr = CornerRadius(with(density) { 12.dp.toPx() })
+                    return Outline.Rounded(
+                        RoundRect(
+                            left = 72f * s, top = 74f * s,
+                            right = 1976f * s, bottom = 1145f * s,
+                            topLeftCornerRadius = cr,
+                            topRightCornerRadius = cr,
+                            bottomLeftCornerRadius = cr,
+                            bottomRightCornerRadius = cr,
+                        )
+                    )
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -311,17 +375,23 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     imageModel = { imageUrl },
                     imageOptions = ImageOptions(
                         contentScale = ContentScale.Crop,
-                        alignment = Alignment.Center
+                        alignment = Alignment.TopCenter
                     ),
                     imageLoader = { koinInject() },
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(MaterialTheme.shapes.medium)
                         .sharedBoundsBy(
                             print.id,
                             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                             animatedVisibilityScope = this@AnimatedVisibility,
+                            clipInOverlayDuringTransition = PrintCropOverlayClip(),
                         )
+                        .graphicsLayer {
+                            // 裁剪区域 1904×1071 比容器小，放大使裁剪后填满容器
+                            scaleX = 2048f / 1904f
+                            scaleY = 2048f / 1904f
+                        }
+                        .clip(printCropShape)
                         .combinedClickable(
                             onClick = {
                                 if (galleryScreenModel.hasSelection(FileTagType.Print)) {
@@ -363,6 +433,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.3f))
+                        .clip(MaterialTheme.shapes.medium)
                         .clickable {
                             galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                         },

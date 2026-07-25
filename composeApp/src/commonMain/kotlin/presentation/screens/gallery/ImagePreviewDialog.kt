@@ -1,8 +1,10 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -11,13 +13,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil3.CoilImage
@@ -33,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
@@ -79,6 +89,7 @@ class ImagePreviewDialog(
                         // 移除对话框
                         setDialogContent(null)
                     },
+                    cropRevealEnabled = directImageUrl != null,
                 )
             }
 
@@ -167,11 +178,49 @@ fun BoxScope.ZoomableImage(
     maxScale: Float = 3f,
     minScale: Float = 0.8f,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    cropRevealEnabled: Boolean = false,
 ) {
     var targetScale by remember { mutableStateOf(1f) }
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) }
+
+    // 裁剪揭示动画：共享动画到位后缓缓显示被裁剪区域
+    var cropRevealTarget by remember { mutableStateOf(0f) }
+    val cropRevealProgress by animateFloatAsState(
+        targetValue = cropRevealTarget,
+        animationSpec = tween(durationMillis = 500, delayMillis = 200),
+        label = "crop_reveal"
+    )
+    if (cropRevealEnabled) {
+        LaunchedEffect(Unit) {
+            snapshotFlow { animatedVisibilityScope.transition.currentState }
+                .first { it == EnterExitState.Visible }
+            cropRevealTarget = 1f
+        }
+    }
+
+    // 基于裁剪进度的动画 Shape
+    val cropShape: Shape? = if (cropRevealEnabled) {
+        object : Shape {
+            override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+                val scale = min(size.width / 2048f, size.height / 1440f)
+                val imageW = 2048f * scale
+                val imageH = 1440f * scale
+                val imageX = (size.width - imageW) / 2f
+                val imageY = (size.height - imageH) / 2f
+                val cropLeft = imageX + 72f * scale
+                val cropTop = imageY + 74f * scale
+                val cropRight = imageX + 1976f * scale
+                val cropBottom = imageY + 1145f * scale
+                val left = cropLeft * (1f - cropRevealProgress)
+                val top = cropTop * (1f - cropRevealProgress)
+                val right = cropRight + (size.width - cropRight) * cropRevealProgress
+                val bottom = cropBottom + (size.height - cropBottom) * cropRevealProgress
+                return Outline.Rectangle(Rect(left, top, right, bottom))
+            }
+        }
+    } else null
 
     // 用于长按拖动的偏移量
 
@@ -318,8 +367,10 @@ fun BoxScope.ZoomableImage(
                 .sharedBoundsBy(
                     id,
                     sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                    animatedVisibilityScope = animatedVisibilityScope
-                ),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    clipInOverlayDuringTransition = if (cropRevealEnabled) PrintCropOverlayClip() else NoOverlayClip,
+                )
+                .then(if (cropShape != null) Modifier.clip(cropShape) else Modifier),
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
