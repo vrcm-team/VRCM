@@ -3,10 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -37,8 +37,10 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
@@ -181,29 +183,31 @@ fun BoxScope.ZoomableImage(
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) }
 
-    // 进入时先完成共享边界动画再揭示全图；退出时由同一 transition 反向收拢。
-    val cropRevealProgress = if (cropRevealEnabled) {
-        val progress by animatedVisibilityScope.transition.animateFloat(
-            transitionSpec = {
-                if (EnterExitState.PreEnter isTransitioningTo EnterExitState.Visible) {
-                    keyframes {
-                        durationMillis = PrintBoundsTransitionDurationMillis +
-                            PrintRevealTransitionDurationMillis
-                        0f at 0
-                        0f at PrintBoundsTransitionDurationMillis
-                        1f at durationMillis
+    // 用独立的 Animatable 控制揭示动画，不依赖 EnterExitState transition
+    // 当 enter 动画完成后再延迟揭示，确保动画真正平滑而非瞬间完成
+    val cropRevealAnimatable = remember { Animatable(0f) }
+    val cropRevealProgress = cropRevealAnimatable.value
+
+    LaunchedEffect(animatedVisibilityScope, cropRevealEnabled) {
+        if (!cropRevealEnabled) return@LaunchedEffect
+        try {
+            snapshotFlow { animatedVisibilityScope.transition.currentState }
+                .collect { currentState ->
+                    if (currentState == EnterExitState.Visible) {
+                        // 等共享边界动画完成后再开始揭示
+                        delay(PrintBoundsTransitionDurationMillis.toLong())
+                        cropRevealAnimatable.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                        )
                     }
-                } else {
-                    tween(durationMillis = PrintRevealTransitionDurationMillis)
                 }
-            },
-            label = "print_crop_reveal",
-        ) { state ->
-            if (state == EnterExitState.Visible) 1f else 0f
+        } catch (_: CancellationException) {
+            // 退出时取消
+        } finally {
+            // 退出时立即收拢到裁剪区域
+            cropRevealAnimatable.snapTo(0f)
         }
-        progress
-    } else {
-        1f
     }
 
     val cropShape = if (cropRevealEnabled) {
