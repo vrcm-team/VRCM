@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
@@ -333,11 +335,26 @@ private fun FriendNetworkGraph(
                                 (to == highlightId && highlightIds.contains(from)))
                         // 使用社区颜色作为边的颜色
                         val communityColor = nodeColors[from]?.copy(alpha = 0.4f) ?: defaultColor
-                        drawLine(
+                        // 计算弧线的控制点：在中点垂直方向偏移
+                        val midX = (fromPos.x + toPos.x) / 2f
+                        val midY = (fromPos.y + toPos.y) / 2f
+                        val dx = toPos.x - fromPos.x
+                        val dy = toPos.y - fromPos.y
+                        val len = kotlin.math.sqrt(dx * dx + dy * dy)
+                        // 垂直方向偏移量，弧度约为线长的 15%
+                        val curvature = len * 0.15f
+                        val nx = if (len > 0f) -dy / len else 0f
+                        val ny = if (len > 0f) dx / len else 0f
+                        val ctrlX = midX + nx * curvature
+                        val ctrlY = midY + ny * curvature
+                        val path = Path().apply {
+                            moveTo(fromPos.x, fromPos.y)
+                            quadraticBezierTo(ctrlX, ctrlY, toPos.x, toPos.y)
+                        }
+                        drawPath(
+                            path = path,
                             color = if (isHighlighted) highlightColor else communityColor,
-                            start = fromPos,
-                            end = toPos,
-                            strokeWidth = if (isHighlighted) 3f else 1.5f
+                            style = Stroke(width = if (isHighlighted) 4f else 2.5f)
                         )
                     }
                 }
@@ -409,7 +426,6 @@ private fun FriendNetworkNode(
             UserStateIcon(
                 modifier = Modifier.fillMaxSize(),
                 iconUrl = node.iconUrl,
-                userStatus = node.status
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -443,23 +459,15 @@ private fun FriendNetworkSheet(
             UserStateIcon(
                 modifier = Modifier.size(48.dp),
                 iconUrl = node.iconUrl,
-                userStatus = node.status
             )
             Spacer(modifier = Modifier.width(12.dp))
             val displayName = node.displayName.ifBlank { strings.users }
-            Column {
-                Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = node.statusDescription.ifBlank { node.status.value },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
@@ -500,7 +508,6 @@ private fun FriendNetworkSheet(
                         UserStateIcon(
                             modifier = Modifier.size(32.dp),
                             iconUrl = user.iconUrl,
-                            userStatus = user.status
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
