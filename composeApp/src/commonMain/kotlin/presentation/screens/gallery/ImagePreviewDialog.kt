@@ -184,42 +184,10 @@ fun BoxScope.ZoomableImage(
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) }
 
-    // 用独立的 Animatable 控制揭示动画，不依赖 EnterExitState transition
-    // 当 enter 动画完成后再延迟揭示，确保动画真正平滑而非瞬间完成
-    val cropRevealAnimatable = remember { Animatable(0f) }
-    val cropRevealProgress = cropRevealAnimatable.value
-
-    LaunchedEffect(animatedVisibilityScope, cropRevealEnabled) {
-        if (!cropRevealEnabled) return@LaunchedEffect
-        try {
-            snapshotFlow { animatedVisibilityScope.transition.targetState }
-                .collectLatest { targetState ->
-                    when (targetState) {
-                        EnterExitState.Visible -> {
-                            // 等共享边界动画完成后再开始揭示
-                            delay(PrintBoundsTransitionDurationMillis.toLong())
-                            cropRevealAnimatable.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
-                            )
-                        }
-                        EnterExitState.PreEnter -> { /* 等待进入 */ }
-                        EnterExitState.PostExit -> {
-                            // 立即平滑反向收拢到裁剪区域
-                            cropRevealAnimatable.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
-                            )
-                        }
-                    }
-                }
-        } catch (_: CancellationException) {
-            // 退出时取消
-        } finally {
-            // 安全兜底：确保最终收拢到裁剪区域
-            cropRevealAnimatable.snapTo(0f)
-        }
-    }
+    val cropRevealProgress = rememberPrintCropRevealProgress(
+        animatedVisibilityScope = animatedVisibilityScope,
+        enabled = cropRevealEnabled,
+    )
 
     val cropShape = if (cropRevealEnabled) {
         PrintCropShape(
@@ -401,4 +369,42 @@ fun BoxScope.ZoomableImage(
             }
         )
     }
+}
+
+@Composable
+internal fun rememberPrintCropRevealProgress(
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    enabled: Boolean,
+): Float {
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(animatedVisibilityScope, enabled) {
+        if (!enabled) return@LaunchedEffect
+        try {
+            snapshotFlow { animatedVisibilityScope.transition.targetState }
+                .collectLatest { targetState ->
+                    when (targetState) {
+                        EnterExitState.Visible -> {
+                            delay(PrintBoundsTransitionDurationMillis.toLong())
+                            progress.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                            )
+                        }
+
+                        EnterExitState.PreEnter -> Unit
+                        EnterExitState.PostExit -> progress.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                        )
+                    }
+                }
+        } catch (_: CancellationException) {
+            // AnimatedContent may dispose the outgoing branch after its exit transition.
+        } finally {
+            progress.snapTo(0f)
+        }
+    }
+
+    return progress.value
 }

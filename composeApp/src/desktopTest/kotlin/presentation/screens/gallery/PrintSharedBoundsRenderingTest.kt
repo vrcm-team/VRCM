@@ -5,11 +5,15 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,6 +33,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -120,9 +125,10 @@ class PrintSharedBoundsRenderingTest {
     }
 
     @Test
-    fun thumbnailEdgesMatchAfterExitFromPreview() = runComposeUiTest {
+    fun revealProgressAndVisibleBoundsShrinkDuringExit() = runComposeUiTest {
         mainClock.autoAdvance = false
         var showPreview by mutableStateOf(false)
+        var observedProgress = Float.NaN
 
         setContent {
             Box(
@@ -132,84 +138,142 @@ class PrintSharedBoundsRenderingTest {
                     .background(Color.Black),
                 contentAlignment = Alignment.Center,
             ) {
-                SharedTransitionLayout {
-                    AnimatedContent(
-                        targetState = showPreview,
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                        transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
-                    ) { preview ->
-                        if (preview) {
-                            Box(
-                                modifier = Modifier
-                                    .size(PreviewWidth, PreviewHeight)
-                                    .sharedBoundsBy(
-                                        key = SharedKey,
-                                        useSuffixKey = false,
-                                        sharedTransitionScope = this@SharedTransitionLayout,
-                                        animatedVisibilityScope = this@AnimatedContent,
-                                        boundsTransform = PrintBoundsTransform,
-                                        clipInOverlayDuringTransition = PrintCropOverlayClip(
-                                            placement = PrintCanvasPlacement.FitCenter,
-                                        ),
-                                    )
-                                    .clip(PrintCropShape(PrintCanvasPlacement.FitCenter))
-                                    .background(PrintColor),
+                AnimatedContent(
+                    targetState = showPreview,
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                    transitionSpec = {
+                        // Retain the outgoing branch while the independently driven crop animation runs.
+                        fadeIn(tween(durationMillis = 1)) togetherWith
+                            fadeOut(
+                                animationSpec = tween(durationMillis = ExitRetentionMillis),
+                                targetAlpha = RetainedExitAlpha,
                             )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(ThumbnailWidth, ThumbnailHeight)
-                                    .sharedBoundsBy(
-                                        key = SharedKey,
-                                        useSuffixKey = false,
-                                        sharedTransitionScope = this@SharedTransitionLayout,
-                                        animatedVisibilityScope = this@AnimatedContent,
-                                        boundsTransform = PrintBoundsTransform,
-                                        clipInOverlayDuringTransition = PrintThumbnailOverlayClip,
+                    },
+                ) { preview ->
+                    if (preview) {
+                        val revealProgress = rememberPrintCropRevealProgress(
+                            animatedVisibilityScope = this@AnimatedContent,
+                            enabled = true,
+                        )
+                        SideEffect { observedProgress = revealProgress }
+                        Box(
+                            modifier = Modifier
+                                .size(PreviewWidth, PreviewHeight)
+                                .clip(
+                                    PrintCropShape(
+                                        placement = PrintCanvasPlacement.FitCenter,
+                                        revealProgress = revealProgress,
                                     )
-                                    .graphicsLayer {
-                                        val transform = PrintDisplayGeometry.cropToFillTransform(
-                                            bounds = Rect(0f, 0f, size.width, size.height),
-                                            placement = PrintCanvasPlacement.CropTopCenter,
-                                        )
-                                        scaleX = transform.scale
-                                        scaleY = transform.scale
-                                        translationX = transform.translationX
-                                        translationY = transform.translationY
-                                    }
-                                    .clip(PrintCropShape(PrintCanvasPlacement.CropTopCenter))
-                                    .background(PrintColor),
-                            )
-                        }
+                                )
+                                .background(PrintColor),
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(PreviewWidth, PreviewHeight)
+                                .clip(
+                                    PrintCropShape(
+                                        placement = PrintCanvasPlacement.FitCenter,
+                                        revealProgress = 0f,
+                                    )
+                                )
+                                .background(PrintColor),
+                        )
                     }
                 }
             }
         }
 
-        // 先捕获独立缩略图作为基准
         waitForIdle()
-        val standaloneThumbnail = onNodeWithTag(RootTag).captureToImage()
-
-        // 进入预览态
         runOnIdle { showPreview = true }
         waitForIdle()
-        mainClock.advanceTimeBy(600)
+        mainClock.advanceTimeBy(
+            PrintBoundsTransitionDurationMillis.toLong() +
+                PrintRevealTransitionDurationMillis + 100L
+        )
         waitForIdle()
 
-        // 退出预览态
+        assertEquals(1f, runOnIdle { observedProgress }, ProgressTolerance)
+        val fullImage = onNodeWithTag(RootTag).captureToImage()
+
         runOnIdle { showPreview = false }
         waitForIdle()
-        mainClock.advanceTimeBy(600)
+        mainClock.advanceTimeBy(PrintRevealTransitionDurationMillis / 2L)
         waitForIdle()
-        val afterExit = onNodeWithTag(RootTag).captureToImage()
 
-        // 退出后缩略图边缘应与独立缩略图完全一致（无跳位残留）
-        edgeProbePoints(standaloneThumbnail).forEach { (x, y) ->
-            assertPrintPixel(standaloneThumbnail, x, y, "standalone thumbnail")
-            assertPrintPixel(afterExit, x, y, "after exit thumbnail")
-        }
+        val midpointProgress = runOnIdle { observedProgress }
+        assertTrue(
+            midpointProgress > 0f && midpointProgress < 1f,
+            "exit midpoint should be partially cropped, but progress was $midpointProgress",
+        )
+        val previewBounds = Rect(0f, 0f, PreviewWidth.value, PreviewHeight.value)
+        val midpointBounds = PrintDisplayGeometry.revealedCropRect(
+            bounds = previewBounds,
+            placement = PrintCanvasPlacement.FitCenter,
+            revealProgress = midpointProgress,
+        )
+        val sourceCrop = PrintDisplayGeometry.cropRect(
+            bounds = previewBounds,
+            placement = PrintCanvasPlacement.FitCenter,
+        )
+        assertTrue(midpointBounds.left > 0f && midpointBounds.left < sourceCrop.left)
+        assertTrue(midpointBounds.top > 0f && midpointBounds.top < sourceCrop.top)
+        val midpointImage = onNodeWithTag(RootTag).captureToImage()
+
+        mainClock.advanceTimeBy(PrintRevealTransitionDurationMillis / 2L)
+        waitForIdle()
+        val collapsedProgress = runOnIdle { observedProgress }
+        assertEquals(0f, collapsedProgress, ProgressTolerance)
+        val collapsedImage = onNodeWithTag(RootTag).captureToImage()
+        assertRevealBounds(
+            full = findPrintBounds(fullImage, "fully revealed preview"),
+            midpoint = findPrintBounds(midpointImage, "exit midpoint"),
+            collapsed = findPrintBounds(collapsedImage, "collapsed exit preview"),
+            midpointProgress = midpointProgress,
+        )
     }
+
+    private fun assertRevealBounds(
+        full: PixelBounds,
+        midpoint: PixelBounds,
+        collapsed: PixelBounds,
+        midpointProgress: Float,
+    ) {
+        assertTrue(midpoint.left > full.left && midpoint.left < collapsed.left)
+        assertTrue(midpoint.top > full.top && midpoint.top < collapsed.top)
+        assertTrue(midpoint.right < full.right && midpoint.right > collapsed.right)
+        assertTrue(midpoint.bottom < full.bottom && midpoint.bottom > collapsed.bottom)
+
+        assertEquals(lerp(collapsed.left, full.left, midpointProgress), midpoint.left.toFloat(), 2f)
+        assertEquals(lerp(collapsed.top, full.top, midpointProgress), midpoint.top.toFloat(), 2f)
+        assertEquals(lerp(collapsed.right, full.right, midpointProgress), midpoint.right.toFloat(), 2f)
+        assertEquals(lerp(collapsed.bottom, full.bottom, midpointProgress), midpoint.bottom.toFloat(), 2f)
+    }
+
+    private fun findPrintBounds(image: ImageBitmap, frame: String): PixelBounds {
+        val pixels = image.toPixelMap()
+        var left = image.width
+        var top = image.height
+        var right = -1
+        var bottom = -1
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                val color = pixels[x, y]
+                if (color.red > 0.8f && color.green < 0.2f && color.blue < 0.2f) {
+                    left = minOf(left, x)
+                    top = minOf(top, y)
+                    right = maxOf(right, x)
+                    bottom = maxOf(bottom, y)
+                }
+            }
+        }
+        assertTrue(right >= left && bottom >= top, "$frame should contain visible print pixels")
+        return PixelBounds(left, top, right, bottom)
+    }
+
+    private fun lerp(start: Int, end: Int, progress: Float): Float =
+        start + (end - start) * progress
 
     private fun edgeProbePoints(image: ImageBitmap): List<Pair<Int, Int>> {
         val thumbnailWidth = image.width * 2 / 3
@@ -237,6 +301,9 @@ class PrintSharedBoundsRenderingTest {
     private companion object {
         const val RootTag = "print-transition-root"
         const val SharedKey = "print-transition-image"
+        const val ExitRetentionMillis = 600
+        const val RetainedExitAlpha = 0.99f
+        const val ProgressTolerance = 0.05f
         val RootWidth = 240.dp
         val RootHeight = 160.dp
         val ThumbnailWidth = 160.dp
@@ -245,4 +312,11 @@ class PrintSharedBoundsRenderingTest {
         val PreviewHeight = 140.dp
         val PrintColor = Color.Red
     }
+
+    private data class PixelBounds(
+        val left: Int,
+        val top: Int,
+        val right: Int,
+        val bottom: Int,
+    )
 }
