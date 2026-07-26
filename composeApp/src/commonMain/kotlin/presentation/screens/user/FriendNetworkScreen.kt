@@ -409,7 +409,6 @@ private fun FriendNetworkNode(
             UserStateIcon(
                 modifier = Modifier.fillMaxSize(),
                 iconUrl = node.iconUrl,
-                userStatus = node.status
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -443,23 +442,15 @@ private fun FriendNetworkSheet(
             UserStateIcon(
                 modifier = Modifier.size(48.dp),
                 iconUrl = node.iconUrl,
-                userStatus = node.status
             )
             Spacer(modifier = Modifier.width(12.dp))
             val displayName = node.displayName.ifBlank { strings.users }
-            Column {
-                Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = node.statusDescription.ifBlank { node.status.value },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
@@ -500,7 +491,6 @@ private fun FriendNetworkSheet(
                         UserStateIcon(
                             modifier = Modifier.size(32.dp),
                             iconUrl = user.iconUrl,
-                            userStatus = user.status
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(

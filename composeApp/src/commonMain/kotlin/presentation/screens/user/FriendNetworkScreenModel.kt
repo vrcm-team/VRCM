@@ -269,8 +269,6 @@ class FriendNetworkScreenModel(
     private fun FriendData.toMutualFriendData() = MutualFriendData(
         id = id,
         displayName = displayName,
-        status = status,
-        statusDescription = statusDescription,
         bio = bio,
         bioLinks = bioLinks,
         tags = tags,
@@ -298,8 +296,6 @@ class FriendNetworkScreenModel(
     private fun CurrentUserData.toMutualFriendData(isFriend: Boolean) = MutualFriendData(
         id = id,
         displayName = displayName,
-        status = status,
-        statusDescription = statusDescription,
         bio = bio,
         bioLinks = bioLinks,
         tags = tags,
