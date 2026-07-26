@@ -423,7 +423,10 @@ private fun RenderBackgroundImage(
         modifier = Modifier
             .height(imageHeight)
             .hazeSource(hazeState)
-            .sharedBoundsBy(worldId + "WorldImage"),
+            .sharedBoundsBy(
+                key = worldId + "WorldImage",
+                renderInOverlayDuringTransition = false
+            ),
         imageData = imageUrl,
     )
 }
