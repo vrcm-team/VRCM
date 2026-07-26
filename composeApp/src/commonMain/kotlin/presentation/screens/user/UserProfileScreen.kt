@@ -861,6 +861,7 @@ private fun DetailTopBar(
  */
 private data class CardItemVo(
     val id: String,
+    val listKey: String = id,
     val imageUrl: String?,
     val thumbnailUrl: String?,
     val title: String,
@@ -902,7 +903,7 @@ private class CardListDetailScreen(
                 )
                 CardListContent(
                     items = items,
-                    key = { it.id },
+                    key = { it.listKey },
                     imageUrl = { it.imageUrl ?: it.thumbnailUrl },
                     itemTitle = { it.title },
                     itemSubtitle = { it.subtitle },
@@ -1131,7 +1132,7 @@ private fun UserFavoritedWorldsSection(
             ) {
                 StackedLocationCardList(
                     items = worlds,
-                    key = { it.id },
+                    key = { it.favoriteId },
                     imageUrl = { it.thumbnailImageUrl ?: it.imageUrl },
                     title = { it.name },
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
@@ -1143,6 +1144,7 @@ private fun UserFavoritedWorldsSection(
                             title = groupName,
                             items = list.map { CardItemVo(
                                 id = it.id,
+                                listKey = it.favoriteId,
                                 imageUrl = it.thumbnailImageUrl ?: it.imageUrl,
                                 thumbnailUrl = it.thumbnailImageUrl,
                                 title = it.name,

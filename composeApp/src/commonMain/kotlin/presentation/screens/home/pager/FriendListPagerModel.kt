@@ -389,6 +389,7 @@ class FriendListPagerModel(
         _worldList.value = filteredWorlds.map { world ->
             WorldData(
                 id = world.id,
+                favoriteId = world.favoriteId,
                 name = world.name,
                 authorId = world.authorId.orEmpty(),
                 authorName = world.authorName.orEmpty(),
@@ -511,7 +512,7 @@ class FriendListPagerModel(
             dataReceived = true
             // 更新缓存，过滤掉不可见/非公开等情况
             favoritedWorldMap.putAll(
-                favoritedWorlds.filter { it.isSecure != false }.associateBy { it.id }
+                favoritedWorlds.filter { it.isSecure != false }.associateBy { it.favoriteId }
             )
             _worldTotal.value = favoritedWorldMap.size
             findWorldList(_searchText.value)

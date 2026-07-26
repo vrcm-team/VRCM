@@ -39,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import org.koin.core.logger.Logger
 
 class UserProfileScreenModel(
@@ -324,7 +325,9 @@ class UserProfileScreenModel(
                                     tag = group.name,
                                     n = 100
                                 )
-                            }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { group.displayName to it }
+                            }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { worlds ->
+                                group.displayName to worlds
+                            }
                         }.getOrNull()
                     }
                 }

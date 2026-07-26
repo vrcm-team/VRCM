@@ -97,7 +97,7 @@ fun LazyListScope.renderWorldItems(
     worlds: List<WorldData>,
     onWorldClick: (WorldData) -> Unit
 ) {
-    items(worlds, key = { it.id }) { world ->
+    items(worlds, key = { it.favoriteId ?: it.id }) { world ->
         renderWorldItem(world, onWorldClick)
     }
 }
