@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.network.api.users
 
 import io.github.vrcmteam.vrcm.network.api.attributes.USERS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_NOTES_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.users.data.SearchUserData
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
@@ -68,5 +69,11 @@ class UsersApi(private val client: HttpClient) {
             setBody(mapOf("targetUserId" to targetUserId, "note" to note))
             contentType(ContentType.Application.Json)
         }.checkSuccess { bodyAsText() }
+
+    suspend fun boop(userId: String): VRChatResponse =
+        client.post("$USERS_API_PREFIX/$userId/boop") {
+            contentType(ContentType.Application.Json)
+            setBody(emptyMap<String, String>())
+        }.checkSuccess()
 
 }

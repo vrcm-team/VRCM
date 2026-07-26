@@ -6,8 +6,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
 import io.github.vrcmteam.vrcm.AndroidAppPlatform
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.ktor.client.*
@@ -15,12 +13,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import kotlin.coroutines.resume
 
 /**
  * Android平台实现：保存图片到系统相册
@@ -41,47 +37,6 @@ actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
         httpClient.close()
         result
     }
-
-/**
- * Android平台实现：从系统相册选择图片
- */
-actual suspend fun AppPlatform.selectImageFromGallery(): String? {
-    val platform = this as AndroidAppPlatform
-    return suspendCancellableCoroutine { continuation ->
-        try {
-            // 确保context是Activity类型
-            if (platform.context !is ComponentActivity) {
-                continuation.resume(null)
-                return@suspendCancellableCoroutine
-            }
-
-            val activity = platform.context
-
-            // 使用ActivityResultContracts.GetContent来选择图片
-            val getContent = activity.registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-                if (uri != null) {
-                    // 获取文件的真实路径
-                    val filePath = platform.getPathFromUri(uri)
-                    continuation.resume(filePath)
-                } else {
-                    // 用户取消选择
-                    continuation.resume(null)
-                }
-            }
-
-            // 启动图片选择器
-            getContent.launch("image/*")
-
-            // ActivityResultLauncher
-            continuation.invokeOnCancellation {
-                getContent.unregister()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            continuation.resume(null)
-        }
-    }
-}
 
 /**
  * Android平台实现：读取文件字节

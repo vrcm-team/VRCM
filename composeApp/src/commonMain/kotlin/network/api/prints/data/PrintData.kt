@@ -1,12 +1,8 @@
-package io.github.vrcmteam.vrcm.network.api.files.data
+package io.github.vrcmteam.vrcm.network.api.prints.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * VRChat 拍立得(Print)数据模型
- * API: GET /prints/user/{userId}
- */
 @Serializable
 data class PrintData(
     val id: String,

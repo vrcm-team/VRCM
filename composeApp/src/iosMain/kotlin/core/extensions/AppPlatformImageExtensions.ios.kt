@@ -101,11 +101,6 @@ private suspend fun requestPhotoLibraryPermission(): Boolean = withContext(Dispa
 }
 
 /**
- * iOS平台实现：从系统相册选择图片
- */
-actual suspend fun AppPlatform.selectImageFromGallery(): String? = null
-
-/**
  * iOS平台实现：读取文件字节
  */
 actual suspend fun AppPlatform.readFileBytes(filePath: String): ByteArray = ByteArray(0)

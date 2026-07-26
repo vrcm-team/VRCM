@@ -32,7 +32,9 @@ object SearchListPager : Pager {
         val coroutineScope = rememberCoroutineScope()
 
         // 获取当前选中的标签索引
-        val selectedTabIndex by searchListPagerModel.searchType.collectAsState()
+        val searchType by searchListPagerModel.searchType.collectAsState()
+        // 将搜索类型转换为标签索引：群组搜索类型3对应标签索引2
+        val selectedTabIndex = if (searchType == 3) 2 else searchType
 
         // 搜索文本
         val searchText by searchListPagerModel.searchText.collectAsState()
@@ -42,9 +44,13 @@ object SearchListPager : Pager {
 
         val users by searchListPagerModel.userSearchList.collectAsState()
         val worlds by searchListPagerModel.worldSearchList.collectAsState()
-        
+        val groups by searchListPagerModel.groupSearchList.collectAsState()
+        val groupHasMore by searchListPagerModel.groupHasMore.collectAsState()
+        val isLoadingGroups by searchListPagerModel.isLoadingGroups.collectAsState()
+        val groupLoadMoreFailed by searchListPagerModel.groupLoadMoreFailed.collectAsState()
+
         // 当搜索文本改变时执行搜索
-        LaunchedEffect(searchText, selectedTabIndex) {
+        LaunchedEffect(searchText, searchType) {
             searchListPagerModel.refreshSearchList()
         }
         
@@ -57,11 +63,35 @@ object SearchListPager : Pager {
             selectedTabIndex = selectedTabIndex,
             onTabSelected = { index ->
                 coroutineScope.launch {
-                    searchListPagerModel.setSearchType(index)
+                    // 当 includeGroups=true 时，标签页索引 2 对应群组搜索类型 3
+                    val searchType = if (index == 2) 3 else index
+                    searchListPagerModel.setSearchType(searchType)
                 }
             },
             userList = users,
             worldList = worlds,
+            groupList = groups,
+            includeGroups = true,
+            onLoadMore = if (
+                shouldEnableGroupLoadMore(
+                    searchType = searchType,
+                    hasMore = groupHasMore,
+                    isLoading = isLoadingGroups,
+                    itemCount = groups.size,
+                )
+            ) {
+                { searchListPagerModel.loadMoreGroups() }
+            } else {
+                null
+            },
+            totalItemsCount = groups.size.takeIf { searchType == 3 } ?: 0,
+            isLoadingMore = searchType == 3 && groups.isNotEmpty() && isLoadingGroups,
+            loadMoreFailed = shouldShowGroupLoadMoreRetry(
+                searchType = searchType,
+                loadMoreFailed = groupLoadMoreFailed,
+                itemCount = groups.size,
+            ),
+            onRetryLoadMore = searchListPagerModel::retryLoadMoreGroups,
             advancedOptionsContent = { tabType ->
                 // 仅在世界搜索标签下显示高级选项
                 if (tabType == SearchTabType.WORLD) {
@@ -88,6 +118,16 @@ object SearchListPager : Pager {
     }
 }
 
+internal fun shouldEnableGroupLoadMore(
+    searchType: Int,
+    hasMore: Boolean,
+    isLoading: Boolean,
+    itemCount: Int,
+): Boolean = searchType == 3 && hasMore && !isLoading && itemCount > 0
 
-
+internal fun shouldShowGroupLoadMoreRetry(
+    searchType: Int,
+    loadMoreFailed: Boolean,
+    itemCount: Int,
+): Boolean = searchType == 3 && loadMoreFailed && itemCount > 0
 

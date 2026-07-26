@@ -2,10 +2,13 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -117,7 +121,26 @@ object GalleryScreen : Screen {
                                     )
                                 }
                             },
-                            text = { Text(pager.title) }
+                            text = {
+                                val tagType = pager.fileTagType
+                                val count = galleryScreenModel.getFileCount(tagType)
+                                val maxCount = galleryScreenModel.getMaxCount(tagType)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = pager.title,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "$count/$maxCount",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         )
                     }
                 }
@@ -132,7 +155,7 @@ object GalleryScreen : Screen {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        tabPager.Content()
+                        tabPager.Content(galleryScreenModel)
                     }
                 }
             }

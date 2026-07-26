@@ -7,6 +7,8 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -22,6 +24,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
+import io.github.vrcmteam.vrcm.presentation.navigation.BackNavigationPolicy
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.VersionDialog
@@ -35,24 +39,29 @@ import org.koin.compose.KoinContext
 
 @Composable
 fun App() {
+    val backNavigationPolicy = remember { BackNavigationPolicy() }
     KoinContext {
         SettingsProvider {
             Navigator(
                 screen = StartupAnimeScreen,
             ) {
-                SnackBarToastBox(
-                    Modifier
-                        .systemBarsPadding()
-                        .padding(vertical = 76.dp, horizontal = 12.dp)
-                ) {
-                    VersionDialog()
-                    SharedTransitionScreen(
-                        navigator = it,
-                        modifier = Modifier.slideBack(),
-                        transitionSpec = { selectTransition(it) }
-                    ) { screen ->
-                        SharedTransitionDialog(key = screen.key) {
-                            screen.Content()
+                CompositionLocalProvider(LocalBackNavigationPolicy provides backNavigationPolicy) {
+                    SnackBarToastBox(
+                        Modifier
+                            .systemBarsPadding()
+                            .padding(vertical = 76.dp, horizontal = 12.dp)
+                    ) {
+                        VersionDialog()
+                        SharedTransitionScreen(
+                            navigator = it,
+                            modifier = Modifier.slideBack(
+                                enabled = backNavigationPolicy.isSlideBackEnabled,
+                            ),
+                            transitionSpec = { selectTransition(it) }
+                        ) { screen ->
+                            SharedTransitionDialog(key = screen.key) {
+                                screen.Content()
+                            }
                         }
                     }
                 }

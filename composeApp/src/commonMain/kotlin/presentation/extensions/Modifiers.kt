@@ -86,6 +86,7 @@ inline fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifie
  * 侧滑返回
  */
 fun Modifier.slideBack(
+    enabled: Boolean = true,
     threshold: Float = 80.dp.value,
     orientation: Orientation = Orientation.Horizontal,
 ) = this.composed {
@@ -100,6 +101,7 @@ fun Modifier.slideBack(
             }
         },
         orientation = orientation,
+        enabled = enabled,
         onDragStarted = {
             // 当新的拖动手势开始时，重置标志
             hasPopped.value = false

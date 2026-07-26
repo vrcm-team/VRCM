@@ -4,6 +4,8 @@
 xcuserdata
 !src/**/build/
 local.properties
+*.jks
+*.keystore
 iosApp/resign.config
 .idea
 .kotlin
@@ -11,6 +13,7 @@ iosApp/resign.config
 captures
 .externalNativeBuild
 .cxx
+.worktrees/
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/

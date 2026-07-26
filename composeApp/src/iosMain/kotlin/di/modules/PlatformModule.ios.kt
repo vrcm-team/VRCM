@@ -5,10 +5,13 @@ import com.russhwolf.settings.NSUserDefaultsSettings
 import com.russhwolf.settings.Settings
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.IosAppPlatform
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.IosPlatformImageCodec
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import org.koin.core.logger.Logger
 import org.koin.core.logger.PrintLogger
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 
@@ -17,4 +20,5 @@ actual val platformModule: Module = module {
     singleOf<PlatformContext>(PlatformContext::INSTANCE)
     singleOf<Settings.Factory>(NSUserDefaultsSettings::Factory)
     singleOf<AppPlatform>(::IosAppPlatform)
+    singleOf(::IosPlatformImageCodec) bind PlatformImageCodec::class
 }

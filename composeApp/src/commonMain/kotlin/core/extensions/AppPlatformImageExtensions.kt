@@ -11,12 +11,6 @@ import io.github.vrcmteam.vrcm.AppPlatform
 expect suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: String): Boolean
 
 /**
- * 从系统相册选择图片
- * @return 选择的图片文件路径，如果用户取消选择则返回null
- */
-expect suspend fun AppPlatform.selectImageFromGallery(): String?
-
-/**
  * 读取文件字节
  * @param filePath 文件路径
  * @return 文件字节数组

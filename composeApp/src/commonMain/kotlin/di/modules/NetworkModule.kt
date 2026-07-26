@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.di.modules
 
-import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
+import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
@@ -37,17 +38,18 @@ internal val networkModule = module(true) {
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
-    single <HttpClient> { apiClientDefinition(it) }
-    single { Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-        explicitNulls = false
-        prettyPrint = true
-        isLenient = true
-    } }
+    singleOf(::PrintsApi)
+    single<HttpClient> { apiClientDefinition(it) }
+    single { createNetworkJson() }
 }
 
-
+internal fun createNetworkJson() = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
+    prettyPrint = true
+    isLenient = true
+}
 
 private val apiClientDefinition: Definition<HttpClient> = {
     HttpClient {
@@ -56,10 +58,6 @@ private val apiClientDefinition: Definition<HttpClient> = {
         install(ContentNegotiation) {
             json(get())
         }
-//        install(Logging) {
-//            logger = Logger.SIMPLE
-//            level = LogLevel.ALL
-//        }
         install(HttpCookies) {
             this.storage = get()
         }

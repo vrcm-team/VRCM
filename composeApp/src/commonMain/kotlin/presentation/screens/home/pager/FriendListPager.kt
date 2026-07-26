@@ -37,26 +37,31 @@ object FriendListPager : Pager {
         // 选中的标签页索引
         val selectedTabIndex by friendListPagerModel.selectedTabIndex.collectAsState()
 
-        // 获取好友组列表和世界组列表
+        // 获取好友组列表、世界组列表、模型组列表
         val friendFavoriteGroups by friendListPagerModel.friendFavoriteGroupsFlow.collectAsState()
         val worldFavoriteGroups by friendListPagerModel.worldFavoriteGroupsFlow.collectAsState()
+        val avatarFavoriteGroups by friendListPagerModel.avatarFavoriteGroupsFlow.collectAsState()
 
         // 获取分组选项状态
         val friendGroupOptions by friendListPagerModel.friendGroupOptions.collectAsState()
         val worldGroupOptions by friendListPagerModel.worldGroupOptions.collectAsState()
+        val avatarGroupOptions by friendListPagerModel.avatarGroupOptions.collectAsState()
 
         // 获取总数
         val friendTotal by friendListPagerModel.friendTotal.collectAsState()
         val worldTotal by friendListPagerModel.worldTotal.collectAsState()
+        val avatarTotal by friendListPagerModel.avatarTotal.collectAsState()
         // 获取列表数据
         val filteredFriends by friendListPagerModel.friendList.collectAsState()
         val filteredWorlds by friendListPagerModel.worldList.collectAsState()
+        val filteredAvatars by friendListPagerModel.avatarList.collectAsState()
         val isRefreshing by friendListPagerModel.isRefreshing.collectAsState()
         // 初始加载缓存数据: 只有第一次默认为ture才会刷新一次
         LaunchedEffect(Unit) {
             if (isRefreshing) {
                 friendListPagerModel.refreshCurrentTabCacheData(tabIndex = 0)
                 friendListPagerModel.refreshCurrentTabCacheData(tabIndex = 1)
+                friendListPagerModel.refreshCurrentTabCacheData(tabIndex = 2)
             }
         }
 
@@ -70,6 +75,7 @@ object FriendListPager : Pager {
             doRefresh = friendListPagerModel::refreshCurrentTabCacheData,
             userList = filteredFriends,
             worldList = filteredWorlds,
+            avatarList = filteredAvatars,
             advancedOptionsContent = { tabType ->
                 // 根据当前选中的标签页显示不同的高级选项
                 when (tabType) {
@@ -100,6 +106,23 @@ object FriendListPager : Pager {
                             defaultText = strings.friendListPagerAllWorlds,
                             onOptionsChanged = { newOptions ->
                                 friendListPagerModel.updateWorldGroupOptions(newOptions)
+                            },
+                            getSelectedGroup = { it.selectedGroup },
+                            updateOptions = { options, group -> options.copy(selectedGroup = group) }
+                        )
+
+                    }
+
+                    SearchTabType.AVATAR -> { // 模型标签页
+
+                        GroupOptionsUI(
+                            currentOptions = avatarGroupOptions,
+                            favoriteGroups = avatarFavoriteGroups,
+                            favoriteType = FavoriteType.Avatar,
+                            total = avatarTotal,
+                            defaultText = strings.friendListPagerAllAvatars,
+                            onOptionsChanged = { newOptions ->
+                                friendListPagerModel.updateAvatarGroupOptions(newOptions)
                             },
                             getSelectedGroup = { it.selectedGroup },
                             updateOptions = { options, group -> options.copy(selectedGroup = group) }

@@ -24,6 +24,15 @@ class WorldsApi(private val client: HttpClient)  {
     suspend fun getWorldById(worldId: String): WorldData =
         client.get("$WORLDS_API_PREFIX/$worldId").checkSuccess()
 
+    suspend fun getRecentWorlds(
+        n: Int = 50,
+        offset: Int = 0,
+    ): List<WorldData> =
+        client.get("$WORLDS_API_PREFIX/recent") {
+            parameter("n", n)
+            parameter("offset", offset)
+        }.checkSuccess()
+
     suspend fun getWorldInstanceById(worldId: String, instanceId: String): InstanceData =
         client.get("$WORLDS_API_PREFIX/$worldId/$instanceId").checkSuccess()
         

@@ -2,12 +2,10 @@ package io.github.vrcmteam.vrcm.network.api.files
 
 import io.github.vrcmteam.vrcm.network.api.attributes.FILES_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.FILE_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.attributes.PRINTS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileDetailsData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileResponse
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
-import io.github.vrcmteam.vrcm.network.api.files.data.PrintData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
@@ -67,22 +65,6 @@ class FileApi(private val client: HttpClient) {
         parameter("n", n.coerceIn(1, 100))
         parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccess<List<FileData>>()
-
-    /**
-     * 获取用户拍立得(Print)列表
-     * API: GET /prints/user/{userId}
-     * @param userId 用户ID
-     * @param n 每页数量
-     * @param offset 偏移量
-     */
-    suspend fun getPrints(
-        userId: String,
-        n: Int = 100,
-        offset: Int = 0
-    ) = client.get("$PRINTS_API_PREFIX/user/$userId") {
-        parameter("n", n.coerceIn(1, 100))
-        parameter("offset", offset.coerceAtLeast(0))
-    }.checkSuccess<List<PrintData>>()
 
     /**
      * 上传文件
@@ -149,5 +131,11 @@ class FileApi(private val client: HttpClient) {
     suspend fun getFileInfo(fileId: String): Result<FileResponse> = runCatching {
         client.get("$FILES_API_PREFIX/$fileId").checkSuccess<FileResponse>()
     }
-
+    /**
+     * 删除指定文件
+     * @param fileId 文件ID
+     */
+    suspend fun deleteFile(fileId: String) {
+        client.delete("$FILE_API_PREFIX/$fileId").checkSuccess<Unit>()
+    }
 }

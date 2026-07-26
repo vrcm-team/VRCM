@@ -11,6 +11,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
@@ -42,12 +44,20 @@ data class WorldGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
 
+/**
+ * 模型分组选项数据类
+ */
+data class AvatarGroupOptions(
+    val selectedGroup: FavoriteGroupData? = null
+)
+
 class FriendListPagerModel(
     private val usersApi: UsersApi,
     private val friendService: FriendService,
     private val authService: AuthService,
     private val favoriteService: FavoriteService,
-    private val worldsApi: WorldsApi
+    private val worldsApi: WorldsApi,
+    private val avatarsApi: AvatarsApi,
 ) : ScreenModel {
 
     // 当前选中的标签页索引
@@ -81,6 +91,20 @@ class FriendListPagerModel(
     private val _worldTotal = MutableStateFlow(0)
     val worldTotal: StateFlow<Int> = _worldTotal.asStateFlow()
 
+    // 缓存模型数据，以ID为键
+    private val favoritedAvatarMap: MutableMap<String, AvatarData> = mutableStateMapOf()
+
+    private val _avatarList = MutableStateFlow(emptyList<AvatarData>())
+    val avatarList: StateFlow<List<AvatarData>> = _avatarList.asStateFlow()
+
+    private val _avatarTotal = MutableStateFlow(0)
+    val avatarTotal: StateFlow<Int> = _avatarTotal.asStateFlow()
+
+    /**
+     * 模型组选项状态
+     */
+    private val _avatarGroupOptions = MutableStateFlow(AvatarGroupOptions())
+    var avatarGroupOptions = _avatarGroupOptions.asStateFlow()
 
     /**
      * 获取好友组数据流
@@ -93,6 +117,12 @@ class FriendListPagerModel(
      */
     val worldFavoriteGroupsFlow: StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
         favoriteService.favoritesByGroup(World)
+
+    /**
+     * 获取模型组数据流
+     */
+    val avatarFavoriteGroupsFlow: StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favoriteService.favoritesByGroup(Avatar)
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
@@ -109,6 +139,7 @@ class FriendListPagerModel(
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
                 favoritedWorldMap.clear()
+                favoritedAvatarMap.clear()
                 _isRefreshing.value = true
             }
         }
@@ -135,7 +166,10 @@ class FriendListPagerModel(
                         doRefreshWorldList()
                     }
 
-                    Avatar -> TODO()
+                    Avatar -> {
+                        favoriteService.loadFavoriteByGroup(Avatar)
+                        doRefreshAvatarList()
+                    }
                 }
             } catch (e: Exception) {
                 SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
@@ -182,6 +216,11 @@ class FriendListPagerModel(
                 // 世界标签页
                 findWorldList(_searchText.value)
             }
+
+            2 -> {
+                // 模型标签页
+                findAvatarList(_searchText.value)
+            }
         }
     }
 
@@ -197,6 +236,10 @@ class FriendListPagerModel(
             1 ->
                 // 世界标签页
                 doRefreshCache(World, showRefreshing)
+
+            2 ->
+                // 模型标签页
+                doRefreshCache(Avatar, showRefreshing)
         }
     }
 
@@ -213,6 +256,14 @@ class FriendListPagerModel(
      */
     fun updateWorldGroupOptions(options: WorldGroupOptions) {
         _worldGroupOptions.value = options
+        refreshCurrentTabListData()
+    }
+
+    /**
+     * 更新模型组选项
+     */
+    fun updateAvatarGroupOptions(options: AvatarGroupOptions) {
+        _avatarGroupOptions.value = options
         refreshCurrentTabListData()
     }
 
@@ -372,6 +423,61 @@ class FriendListPagerModel(
     }
 
     /**
+     * 查找收藏的模型列表
+     * 只从缓存中筛选数据，不调用API
+     */
+    private fun findAvatarList(name: String) {
+        val selectedGroup = avatarGroupOptions.value.selectedGroup
+
+        // 从缓存中获取模型数据并过滤
+        val filteredAvatars = if (selectedGroup != null) {
+            val favoriteIds = avatarFavoriteGroupsFlow.value[selectedGroup]
+                ?.map { it.favoriteId }?.toSet() ?: emptySet()
+            favoritedAvatarMap.values
+                .filter { avatar ->
+                    favoriteIds.contains(avatar.id) &&
+                            (name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase()))
+                }
+        } else {
+            favoritedAvatarMap.values
+                .filter { avatar ->
+                    name.isEmpty() || avatar.name.lowercase().contains(name.lowercase()) || avatar.id.lowercase().contains(name.lowercase())
+                }
+        }.sortedWith(compareBy<AvatarData> { it.releaseStatus == "hidden" }.thenBy { it.name })
+
+        _avatarList.value = filteredAvatars
+    }
+
+    /**
+     * 刷新收藏的模型列表
+     */
+    private suspend fun doRefreshAvatarList() {
+        authService.reTryAuthCatching {
+            // 分页获取全部收藏模型
+            val remoteAvatars = mutableListOf<AvatarData>()
+            var offset = 0
+            val pageSize = 50
+            do {
+                val page = avatarsApi.getFavoritedAvatars(n = pageSize, offset = offset)
+                remoteAvatars.addAll(page)
+                offset += pageSize
+            } while (page.size >= pageSize)
+
+            val localAvatars = localFavoritedAvatarIds(avatarFavoriteGroupsFlow.value).mapNotNull { avatarId ->
+                authService.reTryAuthCatching { avatarsApi.getAvatarById(avatarId) }.getOrNull()
+            }
+            mergeFavoritedAvatars(remoteAvatars, localAvatars)
+        }.onSuccess { avatars ->
+            favoritedAvatarMap.clear()
+            favoritedAvatarMap.putAll(avatars.associateBy { it.id })
+            _avatarTotal.value = favoritedAvatarMap.size
+            findAvatarList(_searchText.value)
+        }.onFailure {
+            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
+        }
+    }
+
+    /**
      * 刷新收藏的世界列表
      * 使用流式分页API获取全部收藏世界列表
      */
@@ -454,3 +560,16 @@ private fun WorldData.toFavoritedWorldForLocal(localGroupName: String, wid: Stri
         previewYoutubeId = this.previewYoutubeId
     )
 }
+
+internal fun mergeFavoritedAvatars(
+    remoteAvatars: List<AvatarData>,
+    localAvatars: List<AvatarData>,
+): List<AvatarData> = (remoteAvatars + localAvatars).distinctBy { it.id }
+
+internal fun localFavoritedAvatarIds(
+    groups: Map<FavoriteGroupData, List<FavoriteData>>,
+): List<String> = groups.entries
+    .firstOrNull { (group, _) -> group.ownerId == "local" && group.type == Avatar.value }
+    ?.value
+    .orEmpty()
+    .map { it.favoriteId }

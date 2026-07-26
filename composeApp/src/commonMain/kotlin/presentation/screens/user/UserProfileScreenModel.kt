@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
@@ -52,6 +53,7 @@ class UserProfileScreenModel(
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
+    private val inviteApi: InviteApi,
 ) : ScreenModel {
 
     private val _userState = mutableStateOf(userProfileVO)
@@ -65,6 +67,9 @@ class UserProfileScreenModel(
 
     private val _userGroups = mutableStateOf<List<LimitedUserGroup>>(emptyList())
     val userGroups by _userGroups
+
+    private val _mutualGroups = mutableStateOf<List<LimitedUserGroup>>(emptyList())
+    val mutualGroups by _mutualGroups
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -85,6 +90,7 @@ class UserProfileScreenModel(
 
     fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
+            _mutualGroups.value = emptyList()
             authService.reTryAuthCatching {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {
@@ -210,8 +216,9 @@ class UserProfileScreenModel(
     private suspend fun loadUserGroups(userId: String) {
         authService.reTryAuthCatching {
             usersApi.getUserGroups(userId)
-        }.onSuccess {
-            _userGroups.value = it
+        }.onSuccess { groups ->
+            _userGroups.value = visibleUserGroups(groups, userState.isSelf)
+            _mutualGroups.value = groups.filter { it.mutualGroup }
         }.onFailure {
             handleError(it)
         }
@@ -340,6 +347,38 @@ class UserProfileScreenModel(
         }
     }
 
+    fun boop(userId: String, successMessage: String) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching {
+                usersApi.boop(userId)
+            }.onSuccess {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure {
+                handleError(it)
+            }
+        }
+    }
+
+    fun inviteToMyInstance(
+        userId: String,
+        successMessage: String,
+        notInInstanceMessage: String,
+    ) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching {
+                val instanceLocation = authService.currentUser().presence.instance
+                require(instanceLocation.isNotBlank() && instanceLocation != "offline") {
+                    notInInstanceMessage
+                }
+                inviteApi.inviteUser(userId, instanceLocation)
+            }.onSuccess {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure {
+                handleError(it)
+            }
+        }
+    }
+
     fun computeFriendLocation(location: String) {
         val type = LocationType.fromValue(location)
         // 防止从用户详情页跳到世界页再点进非好友主页时 friendLocation 不刷新(按理来说看不到非好友位置)
@@ -422,6 +461,11 @@ class UserProfileScreenModel(
         }
     }
 }
+
+internal fun visibleUserGroups(
+    groups: List<LimitedUserGroup>,
+    isSelf: Boolean,
+): List<LimitedUserGroup> = if (isSelf) groups else groups.filterNot { it.mutualGroup }
 
 private fun UserProfileVo.toFriendData() =
     FriendData(

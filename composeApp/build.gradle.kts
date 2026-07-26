@@ -37,10 +37,15 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.exifinterface)
 
             implementation(libs.koin.androidx.compose)
 
             implementation(libs.ktor.client.okhttp)
+        }
+
+        androidUnitTest.dependencies {
+            implementation(libs.robolectric)
         }
 
         iosMain.dependencies {
@@ -66,6 +71,7 @@ kotlin {
             implementation(compose.ui)
 //            implementation(compose.material)
             implementation(compose.material3)
+            implementation(compose.materialIconsExtended)
 //            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
 //            implementation(compose.components.uiToolingPreview)
@@ -91,11 +97,20 @@ kotlin {
 
             implementation(libs.chrisbanes.haze)
 
+            implementation(libs.filekit.dialogs.compose)
+
 //            implementation(libs.kamel)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenModel)
             implementation(libs.voyager.transitions)
             implementation(libs.voyager.koin)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+            implementation(libs.multiplatform.settings.test)
         }
     }
 }
@@ -142,25 +157,29 @@ android {
         val properties = Properties()
         properties.load(it.inputStream())
         val storeFilePath = properties.getProperty("store_file")
-         storeFile = if (storeFilePath.isNullOrEmpty()) null else file(storeFilePath)
+         storeFile = if (storeFilePath.isNullOrEmpty()) null else rootProject.file(storeFilePath)
          storePass = properties.getProperty("store_pass")
          keyAlias = properties.getProperty("key_alias")
          keyPass = properties.getProperty("key_pass")
     }
 
-    signingConfigs {
-        create("release") {
-            this.storeFile = storeFile
-            this.storePassword = storePass
-            this.keyAlias = keyAlias
-            this.keyPassword = keyPass
+    if (storeFile != null) {
+        signingConfigs {
+            create("release") {
+                this.storeFile = storeFile
+                this.storePassword = storePass
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPass
+            }
         }
     }
 
     buildTypes {
         getByName("release") {
             this.isMinifyEnabled = false
-            this.signingConfig = signingConfigs.getByName("release")
+            if (storeFile != null) {
+                this.signingConfig = signingConfigs.getByName("release")
+            }
         }
         getByName("debug") {
             this.applicationIdSuffix = ".debug"
@@ -187,4 +206,3 @@ compose.desktop {
         }
     }
 }
-

@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -20,10 +22,13 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.platformPackages
 
@@ -154,4 +159,158 @@ fun LazyItemScope.renderWorldItem(
 
         }
     )
-} 
+}
+
+/**
+ * 模型列表渲染
+ */
+fun LazyListScope.renderAvatarItems(
+    avatars: List<AvatarData>,
+    onAvatarClick: (AvatarData) -> Unit
+) {
+    items(avatars, key = { it.id }) { avatar ->
+        renderAvatarItem(avatar, onAvatarClick)
+    }
+}
+
+/**
+ * 单个模型项渲染
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun LazyItemScope.renderAvatarItem(
+    avatar: AvatarData,
+    onAvatarClick: (AvatarData) -> Unit
+) {
+    SearchResultItem(
+        item = avatar,
+        onClick = onAvatarClick,
+        modifier = Modifier.animateItem(),
+        leadingContent = {
+            if (avatar.releaseStatus == "hidden") {
+                Box(
+                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = AppIcons.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                AImage(
+                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                    imageData = avatar.thumbnailImageUrl,
+                )
+            }
+        },
+        headlineContent = {
+            Text(
+                text = if (avatar.releaseStatus == "hidden") avatar.id else avatar.name,
+                style = MaterialTheme.typography.titleMedium,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1
+            )
+        },
+        supportingContent = {
+            Text(
+                text = if (avatar.releaseStatus == "hidden") strings.hiddenModel else avatar.authorName,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+        },
+        trailingContent = {
+            // 显示模型平台类型
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                remember(avatar.unityPackages) {
+                    avatar.unityPackages.mapNotNull { pkg ->
+                        when (pkg.platform?.lowercase()) {
+                            "android" -> Android
+                            "ios" -> Ios
+                            "standalonewindows", "windows" -> Windows
+                            else -> null
+                        }
+                    }.distinct().sortedBy { it.name }
+                }.forEach {
+                    val icon = when (it) {
+                        Android -> AppIcons.Android
+                        Ios -> AppIcons.Apple
+                        Windows -> AppIcons.Windows
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "PlatformIcon",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    )
+}
+
+/**
+ * 群组列表渲染
+ */
+fun LazyListScope.renderGroupItems(
+    groups: List<LimitedGroup>,
+    onGroupClick: (LimitedGroup) -> Unit
+) {
+    items(groups, key = { it.id }) { group ->
+        renderGroupItem(group, onGroupClick)
+    }
+}
+
+/**
+ * 单个群组项渲染
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun LazyItemScope.renderGroupItem(
+    group: LimitedGroup,
+    onGroupClick: (LimitedGroup) -> Unit
+) {
+    SearchResultItem(
+        item = group,
+        onClick = onGroupClick,
+        modifier = Modifier.animateItem(),
+        leadingContent = {
+            GroupIcon(
+                iconUrl = group.iconUrl,
+                modifier = Modifier.sharedBoundsBy("${group.id}GroupIcon"),
+                size = 48.dp
+            )
+        },
+        headlineContent = {
+            Text(
+                text = group.name,
+                style = MaterialTheme.typography.titleMedium,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1
+            )
+        },
+        supportingContent = {
+            Text(
+                text = group.description,
+                style = MaterialTheme.typography.bodyMedium,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1
+            )
+        },
+        trailingContent = {
+            // 显示成员数量
+            Text(
+                text = "${group.memberCount}",
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
+            )
+        }
+    )
+}

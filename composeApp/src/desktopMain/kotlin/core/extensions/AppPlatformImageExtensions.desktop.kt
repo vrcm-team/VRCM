@@ -11,8 +11,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
 import javax.imageio.ImageIO
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
 
 /**
  * Desktop平台实现：保存图片到系统相册
@@ -43,38 +41,6 @@ actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
     } catch (e: Exception) {
         e.printStackTrace()
         false
-    }
-}
-
-/**
- * Desktop平台实现：从系统相册选择图片
- */
-actual suspend fun AppPlatform.selectImageFromGallery(): String? = withContext(Dispatchers.IO) {
-    try {
-        val fileChooser = JFileChooser()
-        fileChooser.dialogTitle = "选择图片"
-        fileChooser.fileSelectionMode = JFileChooser.FILES_ONLY
-        fileChooser.isAcceptAllFileFilterUsed = false
-
-        // 设置文件过滤器，只显示图片文件
-        val filter = FileNameExtensionFilter(
-            "图片文件", "jpg", "jpeg", "png", "gif", "bmp"
-        )
-        fileChooser.addChoosableFileFilter(filter)
-
-        // 显示文件选择对话框
-        val result = fileChooser.showOpenDialog(null)
-
-        // 如果用户选择了文件，返回文件路径
-        if (result == JFileChooser.APPROVE_OPTION) {
-            return@withContext fileChooser.selectedFile.absolutePath
-        }
-
-        // 用户取消选择，返回null
-        null
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
     }
 }
 

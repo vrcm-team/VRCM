@@ -5,11 +5,14 @@ import com.russhwolf.settings.PropertiesSettings
 import com.russhwolf.settings.Settings
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.DesktopAppPlatform
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DesktopPlatformImageCodec
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import okio.FileSystem
 import org.koin.core.logger.Logger
 import org.koin.core.logger.PrintLogger
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import java.io.FileInputStream
 import java.io.FileWriter
@@ -34,4 +37,5 @@ actual val platformModule: Module = module {
         }
     }
     singleOf<AppPlatform>(::DesktopAppPlatform)
+    singleOf(::DesktopPlatformImageCodec) bind PlatformImageCodec::class
 }

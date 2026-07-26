@@ -11,6 +11,28 @@ import kotlinx.coroutines.flow.flow
 
 class AvatarsApi(private val client: HttpClient) {
 
+    suspend fun getAvatarById(avatarId: String): AvatarData =
+        client.get("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
+
+    suspend fun getFavoritedAvatars(
+        n: Int = 50,
+        offset: Int = 0,
+        tag: String? = null,
+        search: String? = null,
+        sort: String? = null,
+        order: String? = null,
+        featured: Boolean? = null,
+    ): List<AvatarData> =
+        client.get("$AVATARS_API_PREFIX/favorites") {
+            parameter("n", n)
+            parameter("offset", offset)
+            tag?.let { parameter("tag", it) }
+            search?.let { parameter("search", it) }
+            sort?.let { parameter("sort", it) }
+            order?.let { parameter("order", it) }
+            featured?.let { parameter("featured", it) }
+        }.checkSuccess()
+
     /**
      * 获取用户的头像列表（分页）
      *

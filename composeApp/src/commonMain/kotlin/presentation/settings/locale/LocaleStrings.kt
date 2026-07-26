@@ -156,7 +156,41 @@ data class LocaleStrings(
     val galleryTabNoFiles: String = "No %s Files",
     val galleryTabUploading: String = "Uploading image...",
     val galleryTabUploadImage: String = "Upload Image",
+    val galleryTabUploadSuccess: String = "Image uploaded successfully",
+    val galleryTabUploadFailed: String = "Image upload failed",
     val galleryTabLoadFailed: String = "Loading Failed",
+    val galleryTabVrcPlusRequired: String = "Requires VRC+",
+    val galleryTabDelete: String = "Delete",
+    val galleryTabDeleting: String = "Deleting...",
+    val galleryTabDeleteSuccess: String = "Deleted successfully",
+    val galleryTabDeleteFailed: String = "Delete failed",
+    // Print image editor
+    val printEditorTitle: String = "Edit Print",
+    val printEditorBack: String = "Back",
+    val printEditorUpload: String = "Upload",
+    val printEditorRotateLeft: String = "Rotate left",
+    val printEditorRotateRight: String = "Rotate right",
+    val printEditorFlipHorizontal: String = "Flip horizontally",
+    val printEditorFlipVertical: String = "Flip vertically",
+    val printEditorZoom: String = "Zoom",
+    val printEditorReset: String = "Reset",
+    val printEditorProcessing: String = "Preparing image...",
+    val printEditorUploading: String = "Uploading print...",
+    val printEditorUnsupportedFormat: String = "Unsupported image format. Use JPEG or PNG; HEIC/HEIF support depends on the system.",
+    val printEditorFileTooLarge: String = "The selected file exceeds 50 MiB.",
+    val printEditorImageTooLarge: String = "The selected image exceeds 100 megapixels.",
+    val printEditorDesktopRegionDecodeUnavailable: String =
+        "This image is too large for safe HEIC/HEIF processing on Desktop. Use JPEG or PNG.",
+    val printEditorReadFailed: String = "Failed to read the image: %s",
+    val printEditorDecodeFailed: String = "The image could not be decoded.",
+    val printEditorRenderFailed: String = "The image could not be prepared for upload.",
+    val printEditorUploadAuthenticationFailed: String = "Authentication expired. Sign in again and retry.",
+    val printEditorUploadPermissionFailed: String = "VRChat rejected the Print upload. Check that this account has VRC+.",
+    val printEditorUploadNetworkFailed: String = "A network error interrupted the upload. Check your connection and retry.",
+    val printEditorUploadServerFailed: String = "The VRChat Print service is unavailable. Try again later.",
+    val printEditorUploadUnknownFailed: String = "Print upload failed. Try again.",
+    val printEditorUploaded: String = "Print uploaded",
+    val printEditorSessionExpired: String = "This editing session has expired. Select the image again.",
 
     // GalleryScreen
     val galleryScreenTitle: String = "Gallery",
@@ -211,6 +245,19 @@ data class LocaleStrings(
     val userNoteEditTitle: String = "Edit Note",
     val userNoteSaved: String = "Note saved",
 
+    // Local profile actions
+    val userMutualGroups: String = "Mutual Groups",
+    val profileBoop: String = "Boop",
+    val profileBoopSuccess: String = "Boop sent",
+    val profileInviteToMyInstance: String = "Invite to My Instance",
+    val profileInviteSent: String = "Invite sent",
+    val profileInviteNotInInstance: String = "You are not in an instance",
+    val recentWorldsTitle: String = "Recent Worlds",
+    val recentWorldsEmpty: String = "No recent worlds",
+    val retry: String = "Retry",
+    val avatars: String = "Avatars",
+    val friendListPagerAllAvatars: String = "All Avatars",
+
     // User Created Worlds & Avatars
     val userCreatedWorlds: String = "Created Worlds",
     val userCreatedAvatars: String = "Created Avatars",
@@ -226,6 +273,8 @@ data class LocaleStrings(
     val avatarProfileCreated: String = "Created",
     val avatarProfileUpdated: String = "Updated",
     val avatarProfilePlatforms: String = "Platforms",
+    val hiddenModel: String = "Hidden model",
+    val hiddenModelCannotView: String = "Cannot view hidden model info",
 )
 
 val strings: LocaleStrings

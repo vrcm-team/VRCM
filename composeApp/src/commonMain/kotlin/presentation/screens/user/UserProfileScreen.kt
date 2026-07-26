@@ -2,12 +2,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,12 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -44,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
@@ -86,6 +83,7 @@ data class UserProfileScreen(
 
         val currentUser = userProfileScreenModel.userState
         val userGroups = userProfileScreenModel.userGroups
+        val mutualGroups = userProfileScreenModel.mutualGroups
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
@@ -105,6 +103,7 @@ data class UserProfileScreen(
                     currentUser = currentUser,
                     friendLocation = userProfileScreenModel.friendLocation,
                     userGroups = userGroups,
+                    mutualGroups = mutualGroups,
                     createdWorlds = userProfileScreenModel.createdWorlds,
                     createdAvatars = userProfileScreenModel.createdAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
@@ -212,6 +211,13 @@ private fun ColumnScope.SheetItems(
             }
         })
 
+        SheetButtonItem(text = localeStrings.recentWorldsTitle, onClick = {
+            scope.launch { hideSheet() }.invokeOnCompletion {
+                onHideCompletion()
+                navigator.push(RecentWorldsScreen)
+            }
+        })
+
     }
 
     // 管理好友收藏分组，仅当不是自己且是好友时显示
@@ -228,6 +234,28 @@ private fun ColumnScope.SheetItems(
                 openEditNoteDialog()
             }
         })
+
+        if (currentUser.isFriend) {
+            SheetButtonItem(text = localeStrings.profileBoop, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    userProfileScreenModel.boop(
+                        userId = currentUser.id,
+                        successMessage = localeStrings.profileBoopSuccess,
+                    )
+                }
+            })
+            SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    userProfileScreenModel.inviteToMyInstance(
+                        userId = currentUser.id,
+                        successMessage = localeStrings.profileInviteSent,
+                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
+                    )
+                }
+            })
+        }
     }
 
     SheetButtonItem(
@@ -381,6 +409,7 @@ private fun ColumnScope.ProfileContent(
     currentUser: UserProfileVo?,
     friendLocation: FriendLocation?,
     userGroups: List<LimitedUserGroup>,
+    mutualGroups: List<LimitedUserGroup>,
     createdWorlds: List<WorldData>,
     createdAvatars: List<AvatarData>,
     favoritedWorlds: List<Pair<String, List<FavoritedWorld>>>,
@@ -456,6 +485,26 @@ private fun ColumnScope.ProfileContent(
         userProfileVO = currentUser
     )
 
+    if (!currentUser.isSelf) {
+        UserGroupsSection(
+            groups = mutualGroups,
+            title = strings.userMutualGroups,
+            onGroupClick = { group ->
+                navigator push GroupProfileScreen(
+                    groupProfileVo = GroupProfileVo(
+                        groupId = group.groupId,
+                        name = group.name,
+                        shortCode = group.shortCode,
+                        iconUrl = group.iconUrl,
+                        bannerUrl = group.bannerUrl,
+                        memberCount = group.memberCount,
+                    ),
+                    sharedSuffixKey = sharedSuffixKey
+                )
+            }
+        )
+    }
+
     UserGroupsSection(
         groups = userGroups,
         onGroupClick = { group ->
@@ -509,6 +558,7 @@ private fun ColumnScope.ProfileContent(
 @Composable
 private fun UserGroupsSection(
     groups: List<LimitedUserGroup>,
+    title: String = strings.groups,
     onGroupClick: (LimitedUserGroup) -> Unit,
 ) {
     if (groups.isEmpty()) return
@@ -516,19 +566,15 @@ private fun UserGroupsSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = strings.groups,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
+        SectionHeader(title = title)
+        val shownGroups = rememberStaggeredReveal(groups)
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(groups, key = { it.groupId }) { group ->
-                val index = groups.indexOfFirst { it.groupId == group.groupId }
-                val entranceModifier = rememberCardEntranceModifier(index)
+            itemsIndexed(shownGroups, key = { _, group -> group.groupId }) { index, group ->
                 Surface(
-                    modifier = entranceModifier
+                    modifier = Modifier
+                        .animateItem(fadeInSpec = entranceFadeSpec(index))
                         .width(180.dp)
                         .height(88.dp)
                         .clip(MaterialTheme.shapes.large)
@@ -610,38 +656,6 @@ private fun SectionHeader(
 }
 
 /**
- * 卡片入场动画修饰符：淡入 + 向上滑入，根据 index 错开延迟（上限 5 项）
- */
-@Composable
-private fun rememberCardEntranceModifier(index: Int): Modifier {
-    val alpha = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(0f) }
-    val density = LocalDensity.current
-    val targetOffsetPx = with(density) { 24.dp.toPx() }
-    LaunchedEffect(Unit) {
-        offsetY.snapTo(targetOffsetPx)
-        kotlinx.coroutines.delay(minOf(index, 5) * 60L)
-        kotlinx.coroutines.coroutineScope {
-            launch {
-                alpha.animateTo(
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                )
-            }
-            launch {
-                offsetY.animateTo(
-                    targetValue = 0f,
-                    animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing)
-                )
-            }
-        }
-    }
-    return Modifier
-        .alpha(alpha.value)
-        .graphicsLayer { translationY = offsetY.value }
-}
-
-/**
  * 堆叠卡片列表：多卡片重叠效果，点击跳转新页面展开
  * @param detailTitle 新页面标题
  * @param onNavigateToDetail 点击堆叠卡片时跳转到详情页
@@ -663,12 +677,17 @@ private fun <T> StackedLocationCardList(
     if (items.isEmpty()) return
     val firstItem = items.first()
 
+    // 非 lazy 作用域无法使用 animateItem，用等效的纯淡入入场
+    val entranceAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        entranceAlpha.animateTo(1f, entranceFadeSpec())
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(128.dp)
             .clip(MaterialTheme.shapes.large)
-            .then(rememberCardEntranceModifier(0))
+            .graphicsLayer { alpha = entranceAlpha.value }
             .clickable {
                 if (items.size == 1) {
                     onClickItem?.invoke(firstItem)
@@ -930,6 +949,7 @@ private fun <T> CardListContent(
     sectionKey: String = "",
     onClickItem: ((T) -> Unit)? = null,
 ) {
+    val shownItems = rememberStaggeredReveal(items)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -938,9 +958,10 @@ private fun <T> CardListContent(
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(items, key = key) { item ->
+        itemsIndexed(shownItems, key = { _, item -> key(item) }) { index, item ->
             Surface(
                 modifier = Modifier
+                    .animateItem(fadeInSpec = entranceFadeSpec(index))
                     .fillMaxWidth()
                     .height(108.dp)
                     .clip(MaterialTheme.shapes.large)

@@ -7,6 +7,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
@@ -42,15 +46,23 @@ class AvatarProfileScreen(
     @Composable
     override fun Content() {
         val navigator = currentNavigator
+        val screenModel: AvatarProfileScreenModel = koinScreenModel()
+        val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
+
+        LaunchedEffect(avatarProfileVo.avatarId) {
+            screenModel.refreshAvatarData(avatarProfileVo)
+        }
+
+        val displayedAvatar = refreshedAvatar ?: avatarProfileVo
 
         ProfileScaffold(
-            imageModifier = Modifier.sharedBoundsBy("${avatarProfileVo.avatarId}AvatarImage"),
-            profileImageUrl = avatarProfileVo.avatarImageUrl,
+            imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
+            profileImageUrl = displayedAvatar.avatarImageUrl,
             iconUrl = null,
             onReturn = { navigator.pop() },
         ) { ratio, contentMinHeight ->
             AvatarProfileContent(
-                avatarProfileVo = avatarProfileVo,
+                avatarProfileVo = displayedAvatar,
                 contentMinHeight = contentMinHeight,
             )
         }
@@ -292,5 +304,3 @@ private fun ratingColor(rating: String?): androidx.compose.ui.graphics.Color {
         else -> MaterialTheme.colorScheme.outline
     }
 }
-
-
