@@ -6,6 +6,7 @@ xcuserdata
 local.properties
 *.jks
 *.keystore
+iosApp/resign.config
 .idea
 .kotlin
 .DS_Store

@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VRCM"
 include(":composeApp")
+include(":iosApp")
