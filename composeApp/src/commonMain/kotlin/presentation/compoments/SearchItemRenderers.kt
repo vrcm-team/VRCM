@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -185,15 +187,31 @@ fun LazyItemScope.renderAvatarItem(
         onClick = onAvatarClick,
         modifier = Modifier.animateItem(),
         leadingContent = {
-            AImage(
-                modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                imageData = avatar.thumbnailImageUrl,
-            )
+            if (avatar.releaseStatus == "hidden") {
+                Box(
+                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = AppIcons.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                AImage(
+                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                    imageData = avatar.thumbnailImageUrl,
+                )
+            }
         },
         headlineContent = {
             Text(
-                text = avatar.name,
+                text = if (avatar.releaseStatus == "hidden") avatar.id else avatar.name,
                 style = MaterialTheme.typography.titleMedium,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
@@ -201,7 +219,7 @@ fun LazyItemScope.renderAvatarItem(
         },
         supportingContent = {
             Text(
-                text = avatar.authorName,
+                text = if (avatar.releaseStatus == "hidden") strings.hiddenModel else avatar.authorName,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
             )
