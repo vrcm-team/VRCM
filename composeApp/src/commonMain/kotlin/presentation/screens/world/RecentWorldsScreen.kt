@@ -148,6 +148,8 @@ object RecentWorldsScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: RecentWorldsScreenModel = koinScreenModel()
+        val scope = rememberCoroutineScope()
+        val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
 
         LaunchedEffect(Unit) {
             model.loadRecentWorlds()
@@ -210,11 +212,17 @@ object RecentWorldsScreen : Screen {
                 ) {
                     items(model.worlds, key = { it.id }) { world ->
                         RecentWorldItem(world) {
-                            navigator.push(
-                                WorldProfileScreen(
-                                    worldProfileVO = WorldProfileVo(world),
+                            if (world.id == "???") {
+                                scope.launch {
+                                    SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+                                }
+                            } else {
+                                navigator.push(
+                                    WorldProfileScreen(
+                                        worldProfileVO = WorldProfileVo(world),
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                     if (model.isLoadingMore || model.loadMoreFailed) {
@@ -256,7 +264,7 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CoilImage(
-                imageModel = { world.thumbnailImageUrl ?: world.imageUrl },
+                imageModel = { (world.thumbnailImageUrl ?: world.imageUrl).orEmpty().ifBlank { null } },
                 imageOptions = ImageOptions(contentScale = ContentScale.Crop),
                 imageLoader = { koinInject() },
                 modifier = Modifier
@@ -265,7 +273,7 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = world.name,
+                    text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

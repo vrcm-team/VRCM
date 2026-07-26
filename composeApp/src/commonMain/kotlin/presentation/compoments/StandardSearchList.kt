@@ -87,9 +87,14 @@ fun StandardSearchList(
             }
         }
     }
-    val onWorldClick = { world: WorldData ->
-        // 处理世界点击，导航到世界详情页面
-        if (currentNavigator.size <= 1) {
+    val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
+    val onWorldClick: (WorldData) -> Unit = { world: WorldData ->
+        if (world.isHiddenWorld()) {
+            coroutineScope.launch {
+                SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+            }
+        } else if (currentNavigator.size <= 1) {
+            // 处理世界点击，导航到世界详情页面
             coroutineScope.launch {
                 currentNavigator push WorldProfileScreen(
                     worldProfileVO = WorldProfileVo(world),
