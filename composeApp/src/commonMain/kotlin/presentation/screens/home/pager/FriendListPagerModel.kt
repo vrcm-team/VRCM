@@ -375,15 +375,17 @@ class FriendListPagerModel(
             favoritedWorldMap.values
                 .filter { world ->
                     world.favoriteGroup == groupName &&
-                            (name.isEmpty() || world.name.lowercase().contains(name.lowercase()))
+                            (name.isEmpty() || world.name.lowercase().contains(name.lowercase())
+                                    || (world.id == "???" && world.favoriteId.orEmpty().lowercase().contains(name.lowercase())))
                 }
         } else {
             // 如果没有选择特定分组，仅按名称过滤
             favoritedWorldMap.values
                 .filter { world ->
                     name.isEmpty() || world.name.lowercase().contains(name.lowercase())
+                            || (world.id == "???" && world.favoriteId.orEmpty().lowercase().contains(name.lowercase()))
                 }
-        }.sortedBy { it.name } // 按名称排序
+        }.sortedWith(compareBy<FavoritedWorld> { it.id == "???" }.thenBy { it.name }) // 隐藏世界排到最后，再按名称排序
 
         // 将FavoritedWorld列表转换为WorldData列表
         _worldList.value = filteredWorlds.map { world ->
@@ -510,9 +512,9 @@ class FriendListPagerModel(
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
         }.collect { favoritedWorlds ->
             dataReceived = true
-            // 更新缓存，过滤掉不可见/非公开等情况
+            // 更新缓存
             favoritedWorldMap.putAll(
-                favoritedWorlds.filter { it.isSecure != false }.associateBy { it.favoriteId }
+                favoritedWorlds.associateBy { it.favoriteId }
             )
             _worldTotal.value = favoritedWorldMap.size
             findWorldList(_searchText.value)

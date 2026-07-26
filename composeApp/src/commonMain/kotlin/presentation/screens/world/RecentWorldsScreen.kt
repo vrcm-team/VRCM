@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -263,14 +264,31 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CoilImage(
-                imageModel = { (world.thumbnailImageUrl ?: world.imageUrl).orEmpty().ifBlank { null } },
-                imageOptions = ImageOptions(contentScale = ContentScale.Crop),
-                imageLoader = { koinInject() },
-                modifier = Modifier
-                    .size(80.dp, 45.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
+            if (world.id == "???") {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp, 45.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = AppIcons.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                CoilImage(
+                    imageModel = { (world.thumbnailImageUrl ?: world.imageUrl).orEmpty().ifBlank { null } },
+                    imageOptions = ImageOptions(contentScale = ContentScale.Crop),
+                    imageLoader = { koinInject() },
+                    modifier = Modifier
+                        .size(80.dp, 45.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
@@ -279,7 +297,7 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = world.authorName,
+                    text = if (world.id == "???") strings.hiddenWorld else world.authorName,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

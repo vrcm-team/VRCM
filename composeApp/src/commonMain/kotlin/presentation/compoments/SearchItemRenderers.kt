@@ -131,11 +131,27 @@ fun LazyItemScope.renderWorldItem(
         onClick = onWorldClick,
         modifier = Modifier.animateItem(),
         leadingContent = {
-            AImage(
-                modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                imageData = world.safeImageUrl(),
-            )
+            if (world.isHiddenWorld()) {
+                Box(
+                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = AppIcons.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                AImage(
+                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                    imageData = world.safeImageUrl(),
+                )
+            }
         },
         headlineContent = {
             Text(
@@ -147,7 +163,7 @@ fun LazyItemScope.renderWorldItem(
         },
         supportingContent = {
             Text(
-                text = world.authorName,
+                text = if (world.isHiddenWorld()) strings.hiddenWorld else world.authorName,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
             )
