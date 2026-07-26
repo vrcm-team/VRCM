@@ -119,6 +119,98 @@ class PrintSharedBoundsRenderingTest {
         }
     }
 
+    @Test
+    fun thumbnailEdgesMatchAfterExitFromPreview() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var showPreview by mutableStateOf(false)
+
+        setContent {
+            Box(
+                modifier = Modifier
+                    .size(RootWidth, RootHeight)
+                    .testTag(RootTag)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                SharedTransitionLayout {
+                    AnimatedContent(
+                        targetState = showPreview,
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                        transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
+                    ) { preview ->
+                        if (preview) {
+                            Box(
+                                modifier = Modifier
+                                    .size(PreviewWidth, PreviewHeight)
+                                    .sharedBoundsBy(
+                                        key = SharedKey,
+                                        useSuffixKey = false,
+                                        sharedTransitionScope = this@SharedTransitionLayout,
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        boundsTransform = PrintBoundsTransform,
+                                        clipInOverlayDuringTransition = PrintCropOverlayClip(
+                                            placement = PrintCanvasPlacement.FitCenter,
+                                        ),
+                                    )
+                                    .clip(PrintCropShape(PrintCanvasPlacement.FitCenter))
+                                    .background(PrintColor),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(ThumbnailWidth, ThumbnailHeight)
+                                    .sharedBoundsBy(
+                                        key = SharedKey,
+                                        useSuffixKey = false,
+                                        sharedTransitionScope = this@SharedTransitionLayout,
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        boundsTransform = PrintBoundsTransform,
+                                        clipInOverlayDuringTransition = PrintThumbnailOverlayClip,
+                                    )
+                                    .graphicsLayer {
+                                        val transform = PrintDisplayGeometry.cropToFillTransform(
+                                            bounds = Rect(0f, 0f, size.width, size.height),
+                                            placement = PrintCanvasPlacement.CropTopCenter,
+                                        )
+                                        scaleX = transform.scale
+                                        scaleY = transform.scale
+                                        translationX = transform.translationX
+                                        translationY = transform.translationY
+                                    }
+                                    .clip(PrintCropShape(PrintCanvasPlacement.CropTopCenter))
+                                    .background(PrintColor),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 先捕获独立缩略图作为基准
+        waitForIdle()
+        val standaloneThumbnail = onNodeWithTag(RootTag).captureToImage()
+
+        // 进入预览态
+        runOnIdle { showPreview = true }
+        waitForIdle()
+        mainClock.advanceTimeBy(600)
+        waitForIdle()
+
+        // 退出预览态
+        runOnIdle { showPreview = false }
+        waitForIdle()
+        mainClock.advanceTimeBy(600)
+        waitForIdle()
+        val afterExit = onNodeWithTag(RootTag).captureToImage()
+
+        // 退出后缩略图边缘应与独立缩略图完全一致（无跳位残留）
+        edgeProbePoints(standaloneThumbnail).forEach { (x, y) ->
+            assertPrintPixel(standaloneThumbnail, x, y, "standalone thumbnail")
+            assertPrintPixel(afterExit, x, y, "after exit thumbnail")
+        }
+    }
+
     private fun edgeProbePoints(image: ImageBitmap): List<Pair<Int, Int>> {
         val thumbnailWidth = image.width * 2 / 3
         val thumbnailHeight = image.height * 9 / 16

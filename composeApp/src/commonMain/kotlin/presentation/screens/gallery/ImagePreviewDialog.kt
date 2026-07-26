@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -191,21 +192,31 @@ fun BoxScope.ZoomableImage(
     LaunchedEffect(animatedVisibilityScope, cropRevealEnabled) {
         if (!cropRevealEnabled) return@LaunchedEffect
         try {
-            snapshotFlow { animatedVisibilityScope.transition.currentState }
-                .collect { currentState ->
-                    if (currentState == EnterExitState.Visible) {
-                        // 等共享边界动画完成后再开始揭示
-                        delay(PrintBoundsTransitionDurationMillis.toLong())
-                        cropRevealAnimatable.animateTo(
-                            targetValue = 1f,
-                            animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
-                        )
+            snapshotFlow { animatedVisibilityScope.transition.targetState }
+                .collectLatest { targetState ->
+                    when (targetState) {
+                        EnterExitState.Visible -> {
+                            // 等共享边界动画完成后再开始揭示
+                            delay(PrintBoundsTransitionDurationMillis.toLong())
+                            cropRevealAnimatable.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                            )
+                        }
+                        EnterExitState.PreEnter -> { /* 等待进入 */ }
+                        EnterExitState.PostExit -> {
+                            // 立即平滑反向收拢到裁剪区域
+                            cropRevealAnimatable.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                            )
+                        }
                     }
                 }
         } catch (_: CancellationException) {
             // 退出时取消
         } finally {
-            // 退出时立即收拢到裁剪区域
+            // 安全兜底：确保最终收拢到裁剪区域
             cropRevealAnimatable.snapTo(0f)
         }
     }
