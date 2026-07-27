@@ -943,6 +943,9 @@ private enum class CardScreenType : cafe.adriel.voyager.core.lifecycle.JavaSeria
     WORLD, AVATAR, FAVORITED_WORLD
 }
 
+internal fun worldImageSharedKey(sharedKeyPrefix: String, worldId: String): String? =
+    if (worldId == "???") null else "${sharedKeyPrefix}${worldId}WorldImage"
+
 /**
  * 卡片列表详情页（非泛型，仅携带可序列化数据）
  */
@@ -960,59 +963,65 @@ private class CardListDetailScreen(
         val scope = rememberCoroutineScope()
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surfaceContainerLow
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                DetailTopBar(
-                    title = title,
-                    sysTopPadding = sysTopPadding,
-                    onReturn = { navigator.pop() }
-                )
-                CardListContent(
-                    items = items,
-                    key = { it.listKey },
-                    imageUrl = { it.imageUrl ?: it.thumbnailUrl },
-                    itemTitle = { it.title },
-                    itemSubtitle = { it.subtitle },
-                    sectionKey = sectionKey,
-                    imageModifier = if (screenType == CardScreenType.WORLD || screenType == CardScreenType.FAVORITED_WORLD) {
-                        { item, modifier -> modifier.sharedBoundsBy("${sharedKeyPrefix}${item.id}WorldImage") }
-                    } else {
-                        { _, m -> m }
-                    },
-                    onClickItem = { item ->
-                        when (screenType) {
-                            CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> {
-                                if (item.id == "???") {
-                                    scope.launch {
-                                        SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
-                                    }
-                                } else {
-                                    navigator push WorldProfileScreen(
-                                        worldProfileVO = item.worldProfileVO ?: WorldProfileVo(
-                                            worldId = item.id,
-                                            worldName = item.title,
-                                            worldImageUrl = item.imageUrl,
-                                            thumbnailImageUrl = item.thumbnailUrl,
-                                            authorName = item.authorName
-                                        ),
-                                        sharedSuffixKey = sharedSuffixKey,
-                                        sharedKeyPrefix = sharedKeyPrefix
-                                    )
-                                }
+        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    DetailTopBar(
+                        title = title,
+                        sysTopPadding = sysTopPadding,
+                        onReturn = { navigator.pop() }
+                    )
+                    CardListContent(
+                        items = items,
+                        key = { it.listKey },
+                        imageUrl = { it.imageUrl ?: it.thumbnailUrl },
+                        itemTitle = { it.title },
+                        itemSubtitle = { it.subtitle },
+                        sectionKey = sectionKey,
+                        imageModifier = if (screenType == CardScreenType.WORLD || screenType == CardScreenType.FAVORITED_WORLD) {
+                            { item, modifier ->
+                                worldImageSharedKey(sharedKeyPrefix, item.id)
+                                    ?.let { modifier.sharedBoundsBy(it) }
+                                    ?: modifier
                             }
-                            CardScreenType.AVATAR -> {
-                                item.avatarData?.let { avatar ->
-                                    navigator push AvatarProfileScreen(
-                                        avatarProfileVo = AvatarProfileVo(avatar)
-                                    )
+                        } else {
+                            { _, m -> m }
+                        },
+                        onClickItem = { item ->
+                            when (screenType) {
+                                CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> {
+                                    if (item.id == "???") {
+                                        scope.launch {
+                                            SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+                                        }
+                                    } else {
+                                        navigator push WorldProfileScreen(
+                                            worldProfileVO = item.worldProfileVO ?: WorldProfileVo(
+                                                worldId = item.id,
+                                                worldName = item.title,
+                                                worldImageUrl = item.imageUrl,
+                                                thumbnailImageUrl = item.thumbnailUrl,
+                                                authorName = item.authorName
+                                            ),
+                                            sharedSuffixKey = sharedSuffixKey,
+                                            sharedKeyPrefix = sharedKeyPrefix
+                                        )
+                                    }
+                                }
+                                CardScreenType.AVATAR -> {
+                                    item.avatarData?.let { avatar ->
+                                        navigator push AvatarProfileScreen(
+                                            avatarProfileVo = AvatarProfileVo(avatar)
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -1227,7 +1236,11 @@ private fun UserFavoritedWorldsSection(
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
                     detailTitle = groupName,
                     label = groupName,
-                    imageModifier = { item, modifier -> modifier.sharedBoundsBy("Fav_${item.id}WorldImage") },
+                    imageModifier = { item, modifier ->
+                        worldImageSharedKey("Fav_", item.id)
+                            ?.let { modifier.sharedBoundsBy(it) }
+                            ?: modifier
+                    },
                     onClickItem = onWorldClick,
                     onNavigateToDetail = { list ->
                         navigator push CardListDetailScreen(
