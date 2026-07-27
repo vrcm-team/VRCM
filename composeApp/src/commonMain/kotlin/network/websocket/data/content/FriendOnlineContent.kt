@@ -12,33 +12,17 @@ data class FriendOnlineContent(
     val location: String,
     val platform: String,
     val travelingToLocation: String,
-    override val user: UserContent,
+    override val user: UserContent? = null,
     override val userId: String,
     val worldId: String
 ) : FriendEventsContent() {
-    fun toFriendData(): FriendData {
-        return FriendData(
-            bio = user.bio,
-            bioLinks = user.bioLinks,
-            currentAvatarImageUrl = user.currentAvatarImageUrl,
-            currentAvatarTags = user.currentAvatarTags,
-            currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
-            developerType = user.developerType,
-            displayName = user.displayName,
-            friendKey = user.friendKey,
-            id = userId,
-            imageUrl = user.profileImageUrl,
-            isFriend = user.isFriend,
-            lastLogin = user.lastLogin,
-            lastPlatform = user.lastPlatform,
+    fun mergeWith(existing: FriendData?) =
+        mergeFriendPresence(
+            existing = existing,
+            user = user,
+            userId = userId,
             location = location,
             travelingToLocation = travelingToLocation,
-            profilePicOverride = user.profilePicOverride,
-            status = user.status,
-            statusDescription = user.statusDescription,
-            tags = user.tags,
-            userIcon = user.userIcon,
-            pronouns = user.pronouns,
+            platform = platform,
         )
-    }
 }

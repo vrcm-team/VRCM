@@ -27,6 +27,7 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,7 +81,7 @@ class FriendListPagerModel(
     private val _friendList = MutableStateFlow(friendService.friendMap.values.toList().sortedUserByStatus())
     val friendList: StateFlow<List<FriendData>> = _friendList.asStateFlow()
 
-    private val _friendTotal = MutableStateFlow(0)
+    private val _friendTotal = MutableStateFlow(friendService.friendMap.size)
     val friendTotal: StateFlow<Int> = _friendTotal.asStateFlow()
 
     // 缓存世界数据，以ID为键
@@ -135,6 +136,8 @@ class FriendListPagerModel(
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
+    private var friendFilterJob: Job? = null
+
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
@@ -142,6 +145,12 @@ class FriendListPagerModel(
                 favoritedWorldMap.clear()
                 favoritedAvatarMap.clear()
                 _isRefreshing.value = true
+            }
+        }
+        screenModelScope.launch {
+            friendService.friendState.collect { friends ->
+                _friendTotal.value = friends.size
+                findFriendList(_searchText.value)
             }
         }
     }
@@ -180,10 +189,7 @@ class FriendListPagerModel(
         }
 
     private suspend fun doRefreshFriendList() {
-        friendService.refreshFriendList {
-            _friendTotal.value = friendService.friendMap.size
-            findFriendList(_searchText.value)
-        }
+        friendService.refreshFriendList()
     }
 
     /**
@@ -281,7 +287,8 @@ class FriendListPagerModel(
         } else {
             null
         }
-        screenModelScope.launch {
+        friendFilterJob?.cancel()
+        friendFilterJob = screenModelScope.launch {
             _friendList.value = findFriendsByName(name, favoriteIds)
         }
     }
