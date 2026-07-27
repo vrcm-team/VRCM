@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -355,10 +357,12 @@ private fun CollapsingTitleRow(
             modifier = Modifier
                 .padding(start = 16.dp)
                 .height(IntrinsicSize.Min)
-                .graphicsLayer {
-                    translationX = with(density) { xShift.toPx() }
-                    translationY = yPx
-                } ,
+                .offset {
+                    IntOffset(
+                        x = with(density) { xShift.roundToPx() },
+                        y = yPx.toInt()
+                    )
+                },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
