@@ -93,6 +93,28 @@ data class UserProfileScreen(
         var openEditNoteDialog by remember { mutableStateOf(false) }
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
+
+        // 保存/恢复滚动位置
+        val outerScrollState = rememberScrollState()
+        val innerScrollState = rememberScrollState()
+        DisposableEffect(Unit) {
+            onDispose {
+                userProfileScreenModel.savedOuterScrollPosition = outerScrollState.value
+                userProfileScreenModel.savedInnerScrollPosition = innerScrollState.value
+            }
+        }
+        // 等待内容布局完成后再恢复滚动位置，避免被 maxValue=0 钳制
+        LaunchedEffect(outerScrollState.maxValue, innerScrollState.maxValue) {
+            val savedOuter = userProfileScreenModel.savedOuterScrollPosition
+            val savedInner = userProfileScreenModel.savedInnerScrollPosition
+            if (savedOuter > 0 && outerScrollState.maxValue > 0) {
+                outerScrollState.scrollTo(savedOuter)
+            }
+            if (savedInner > 0 && innerScrollState.maxValue > 0) {
+                innerScrollState.scrollTo(savedInner)
+            }
+        }
+
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
@@ -100,6 +122,8 @@ data class UserProfileScreen(
                 iconUrl = currentUser.iconUrl,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { bottomSheetIsVisible = true },
+                outerScrollState = outerScrollState,
+                innerScrollState = innerScrollState,
             ) { ratio, contentMinHeight ->
                 ProfileContent(
                     currentUser = currentUser,

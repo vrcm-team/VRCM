@@ -89,9 +89,16 @@ class UserProfileScreenModel(
     private val _favoritedWorlds = mutableStateOf<List<Pair<String, List<FavoritedWorld>>>>(emptyList())
     val favoritedWorlds by _favoritedWorlds
 
-    fun refreshUser(userId: String) =
+    // 保存滚动位置，用于导航返回时恢复
+    var savedOuterScrollPosition: Int = 0
+    var savedInnerScrollPosition: Int = 0
+
+    // 标记用户数据是否已从API加载完成
+    private var isUserLoaded = false
+
+    fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
-            _mutualGroups.value = emptyList()
+            if (!forceRefresh && isUserLoaded) return@launch
             authService.reTryAuthCatching {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {
@@ -105,6 +112,7 @@ class UserProfileScreenModel(
                     }
                     .onFailure { handleError(it) }
                 _userJson.value = response.bodyAsText().pretty()
+                isUserLoaded = true
                 loadUserGroups(userId)
             }
         }
@@ -163,7 +171,7 @@ class UserProfileScreenModel(
             }
 
             SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            refreshUser(userState.id)
+            refreshUser(userState.id, forceRefresh = true)
         }
     }
 
@@ -204,7 +212,7 @@ class UserProfileScreenModel(
                     handleError(it)
                 }.onSuccess {
                     SharedFlowCentre.toastText.emit(ToastText.Success(message))
-                    runCatching { _userState.value.id.also { refreshUser(it) } }
+                    runCatching { _userState.value.id.also { refreshUser(it, forceRefresh = true) } }
                         .onFailure { handleError(it) }
                 }.isSuccess
         }.await()
