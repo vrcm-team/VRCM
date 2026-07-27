@@ -39,33 +39,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.core.logger.Logger
 
-private enum class UserLoadState {
-    Idle,
-    Loading,
-    Loaded,
-}
-
 internal class UserProfileLoadGate {
-    private var state = UserLoadState.Idle
+    private val mutex = Mutex()
+    private var isLoaded = false
 
-    fun tryStart(forceRefresh: Boolean = false): Boolean {
-        if (state == UserLoadState.Loading ||
-            (!forceRefresh && state == UserLoadState.Loaded)
-        ) {
-            return false
+    suspend fun runLoad(
+        forceRefresh: Boolean = false,
+        load: suspend () -> Boolean,
+    ): Boolean = mutex.withLock {
+        if (!forceRefresh && isLoaded) {
+            return@withLock false
         }
-        state = UserLoadState.Loading
-        return true
-    }
-
-    fun markLoaded() {
-        state = UserLoadState.Loaded
-    }
-
-    fun markRetryable() {
-        state = UserLoadState.Idle
+        isLoaded = false
+        isLoaded = load()
+        true
     }
 }
 
@@ -124,26 +115,25 @@ class UserProfileScreenModel(
 
     fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
-            if (!userLoadGate.tryStart(forceRefresh)) return@launch
-            authService.reTryAuthCatching {
-                usersApi.fetchUserResponse(userId)
-            }.onFailure {
-                userLoadGate.markRetryable()
-                handleError(it)
-            }.onSuccess { response ->
-                // 防止body序列化异常
-                runCatching { UserProfileVo(response.body<UserData>()) }
-                    .onSuccess {
-                        _userState.value = it
-                        computeFriendLocation(it.location)
-                        userLoadGate.markLoaded()
-                    }
-                    .onFailure {
-                        userLoadGate.markRetryable()
-                        handleError(it)
-                    }
-                _userJson.value = response.bodyAsText().pretty()
-                loadUserGroups(userId)
+            userLoadGate.runLoad(forceRefresh) {
+                var userLoaded = false
+                authService.reTryAuthCatching {
+                    usersApi.fetchUserResponse(userId)
+                }.onFailure {
+                    handleError(it)
+                }.onSuccess { response ->
+                    // 防止body序列化异常
+                    runCatching { UserProfileVo(response.body<UserData>()) }
+                        .onSuccess {
+                            _userState.value = it
+                            computeFriendLocation(it.location)
+                            userLoaded = true
+                        }
+                        .onFailure { handleError(it) }
+                    _userJson.value = response.bodyAsText().pretty()
+                    loadUserGroups(userId)
+                }
+                userLoaded
             }
         }
 
