@@ -67,7 +67,7 @@ internal class OneShotScrollRestorer(savedPosition: Int) {
 
     fun consume(maxValue: Int): Int? {
         val position = pendingPosition ?: return null
-        if (maxValue < position) return null
+        if (maxValue == Int.MAX_VALUE || maxValue < position) return null
         pendingPosition = null
         return position
     }

@@ -9,6 +9,7 @@ class UserProfileScrollRestorerTest {
     fun restoredPositionIsNotAppliedAgainWhenContentHeightChanges() {
         val restorer = OneShotScrollRestorer(savedPosition = 240)
 
+        assertNull(restorer.consume(maxValue = Int.MAX_VALUE))
         assertNull(restorer.consume(maxValue = 0))
         assertNull(restorer.consume(maxValue = 120))
         assertEquals(240, restorer.consume(maxValue = 480))
