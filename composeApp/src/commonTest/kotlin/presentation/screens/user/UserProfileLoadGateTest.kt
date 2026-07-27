@@ -108,4 +108,35 @@ class UserProfileLoadGateTest {
         assertTrue(first.await())
         assertEquals(2, attempts)
     }
+
+    @Test
+    fun groupFailureOnlyRetriesGroupsOnTheNextRegularRefresh() = runTest {
+        val coordinator = UserProfileLoadCoordinator()
+        var userAttempts = 0
+        var groupAttempts = 0
+
+        coordinator.runLoads(
+            loadUser = {
+                userAttempts++
+                true
+            },
+            loadGroups = {
+                groupAttempts++
+                false
+            },
+        )
+        coordinator.runLoads(
+            loadUser = {
+                userAttempts++
+                true
+            },
+            loadGroups = {
+                groupAttempts++
+                true
+            },
+        )
+
+        assertEquals(1, userAttempts)
+        assertEquals(2, groupAttempts)
+    }
 }

@@ -98,6 +98,20 @@ internal class UserProfileLoadGate {
     }
 }
 
+internal class UserProfileLoadCoordinator {
+    private val userGate = UserProfileLoadGate()
+    private val groupsGate = UserProfileLoadGate()
+
+    suspend fun runLoads(
+        forceRefresh: Boolean = false,
+        loadUser: suspend () -> Boolean,
+        loadGroups: suspend () -> Boolean,
+    ) {
+        userGate.runLoad(forceRefresh, loadUser)
+        groupsGate.runLoad(forceRefresh, loadGroups)
+    }
+}
+
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
@@ -149,30 +163,33 @@ class UserProfileScreenModel(
     var savedOuterScrollPosition: Int = 0
     var savedInnerScrollPosition: Int = 0
 
-    private val userLoadGate = UserProfileLoadGate()
+    private val loadCoordinator = UserProfileLoadCoordinator()
 
     fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
-            userLoadGate.runLoad(forceRefresh) {
-                var userLoaded = false
-                authService.reTryAuthCatching {
-                    usersApi.fetchUserResponse(userId)
-                }.onFailure {
-                    handleError(it)
-                }.onSuccess { response ->
-                    // 防止body序列化异常
-                    runCatching { UserProfileVo(response.body<UserData>()) }
-                        .onSuccess {
-                            _userState.value = it
-                            computeFriendLocation(it.location)
-                            userLoaded = true
-                        }
-                        .onFailure { handleError(it) }
-                    _userJson.value = response.bodyAsText().pretty()
-                    loadUserGroups(userId)
-                }
-                userLoaded
-            }
+            loadCoordinator.runLoads(
+                forceRefresh = forceRefresh,
+                loadUser = {
+                    var userLoaded = false
+                    authService.reTryAuthCatching {
+                        usersApi.fetchUserResponse(userId)
+                    }.onFailure {
+                        handleError(it)
+                    }.onSuccess { response ->
+                        // 防止body序列化异常
+                        runCatching { UserProfileVo(response.body<UserData>()) }
+                            .onSuccess {
+                                _userState.value = it
+                                computeFriendLocation(it.location)
+                                userLoaded = true
+                            }
+                            .onFailure { handleError(it) }
+                        _userJson.value = response.bodyAsText().pretty()
+                    }
+                    userLoaded
+                },
+                loadGroups = { loadUserGroups(userId) },
+            )
         }
 
     fun updateUserProfile(
@@ -280,15 +297,18 @@ class UserProfileScreenModel(
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
     }
 
-    private suspend fun loadUserGroups(userId: String) {
+    private suspend fun loadUserGroups(userId: String): Boolean {
+        var groupsLoaded = false
         authService.reTryAuthCatching {
             usersApi.getUserGroups(userId)
         }.onSuccess { groups ->
             _userGroups.value = visibleUserGroups(groups, userState.isSelf)
             _mutualGroups.value = groups.filter { it.mutualGroup }
+            groupsLoaded = true
         }.onFailure {
             handleError(it)
         }
+        return groupsLoaded
     }
 
     /**
