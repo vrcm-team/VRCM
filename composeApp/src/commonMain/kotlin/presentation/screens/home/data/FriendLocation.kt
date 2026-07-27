@@ -10,7 +10,7 @@ data class FriendLocation(
     val instants: MutableState<HomeInstanceVo> = mutableStateOf(HomeInstanceVo()),
     val friends: MutableMap<String, MutableState<FriendData>>,
     // 正在跃迁到此位置的好友 ID 集合，UI 上显示加载动画
-    val travelingIds: MutableSet<String> = mutableSetOf(),
+    val travelingIds: MutableState<Set<String>> = mutableStateOf(emptySet()),
 ) {
     companion object {
         val Offline
@@ -35,6 +35,5 @@ data class FriendLocation(
     val friendList: List<State<FriendData>>
         get() = friends.values.sortedBy { it.value.displayName }
 }
-
 
 

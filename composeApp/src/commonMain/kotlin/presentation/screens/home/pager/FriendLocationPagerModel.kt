@@ -10,24 +10,19 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
-import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
-import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.withContext
 
 class FriendLocationPagerModel(
     private val friendService: FriendService,
@@ -35,22 +30,13 @@ class FriendLocationPagerModel(
     private val groupsApi: GroupsApi,
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
-    private val json: Json,
 ) : ScreenModel {
     val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
         mutableStateMapOf()
 
-    private val friendMap: MutableMap<String, FriendData> = mutableMapOf()
-
-    // 缓存当前用户的 activeFriends，避免每次 WebSocket 事件都发起 API 请求
-    // 只在全量刷新时更新（doRefreshFriendLocation / refreshFriendLocation）
-    private var cachedActiveFriends: Set<String> = emptySet()
-
+    private val presenceStore = FriendLocationPresenceStore()
     private val updateMutex = Mutex()
-
-    // 版本计数器：每次 update/removeFriend 后自增，用于调试和潜在的 UI 刷新
-    var locationVersion by mutableLongStateOf(0L)
-        private set
+    private val refreshMutex = Mutex()
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
@@ -59,53 +45,25 @@ class FriendLocationPagerModel(
         private set
 
     init {
-        // 监听websocket事件
         screenModelScope.launch {
-            SharedFlowCentre.webSocket.collect { socketEvent ->
-                onWebSocketEvent(socketEvent)
+            friendService.friendUpdateFlow.collect { event ->
+                val refreshRequired = updateMutex.withLock { presenceStore.apply(event) }
+                if (refreshRequired) {
+                    doRefreshFriendLocation(removeNotIncluded = true)
+                } else {
+                    syncFriendLocations()
+                }
             }
         }
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
             SharedFlowCentre.authed.collect {
-                // 因为是第一个, 并且有移除不存在的元素的机制故无需clear
-                friendLocationMap.clear()
-                friendMap.clear()
+                updateMutex.withLock {
+                    friendLocationMap.clear()
+                    presenceStore.clear()
+                }
                 isRefreshing = true
             }
-        }
-    }
-
-    private fun onWebSocketEvent(socketEvent: WebSocketEvent) {
-        when (socketEvent.type) {
-            FriendEvents.FriendActive.typeName -> {
-                val friendActiveContent =
-                    json.decodeFromString<FriendActiveContent>(socketEvent.content)
-                update(listOf(friendActiveContent.toFriendData()))
-            }
-
-            // 当用户下线时根据id找到缓存的数据并根据缓存数据的location找到对应的实例房间,将此id的好友移除实例房间
-            FriendEvents.FriendOffline.typeName -> {
-                val friendOfflineContent =
-                    json.decodeFromString<FriendOfflineContent>(socketEvent.content)
-                // 直接用 userId 移除，不依赖 friendMap（friendMap 是异步更新的）
-                removeFriend(friendOfflineContent.userId)
-            }
-            // friend-online 比 friend-location 多一个 platform 字段
-            FriendEvents.FriendOnline.typeName -> {
-                val friendOnlineContent =
-                    json.decodeFromString<FriendOnlineContent>(socketEvent.content)
-                update(listOf(friendOnlineContent.toFriendData()))
-            }
-
-            // 当用户切换实例时发送此事件
-            FriendEvents.FriendLocation.typeName -> {
-                val friendLocationContent =
-                    json.decodeFromString<FriendLocationContent>(socketEvent.content)
-                update(listOf(friendLocationContent.toFriendData()))
-            }
-
-            else -> return
         }
     }
 
@@ -114,8 +72,10 @@ class FriendLocationPagerModel(
         // 只有在clear时设置true,用来触发刷新状态动画
         // 不然切换一个Page就触发动画
         isRefreshing = true
-        friendLocationMap.clear()
-        friendMap.clear()
+        updateMutex.withLock {
+            friendLocationMap.clear()
+            presenceStore.clear()
+        }
         doRefreshFriendLocation()
         // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
     }
@@ -125,121 +85,91 @@ class FriendLocationPagerModel(
      * 未clear()的刷新会因为ws接口失效导致好友下线时未同步产生数据残留, 请让removeNotIncluded = true
      * @param removeNotIncluded 是否移除不在这一次刷新好友在线列表中的好友
      */
-    suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
-        // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
-        val includedIdList: MutableList<String> = mutableListOf()
-        // 全量刷新时同步更新 cachedActiveFriends（此时可以发 API 请求）
-        runCatching {
+    suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) = refreshMutex.withLock {
+        val includedIds = mutableSetOf<String>()
+        updateMutex.withLock { presenceStore.beginRefresh() }
+        try {
             val currentUser = authService.currentUser(isRefresh = true)
-            cachedActiveFriends = currentUser.activeFriends.toSet()
+            updateMutex.withLock { presenceStore.setActiveFriends(currentUser.activeFriends) }
+        } catch (e: CancellationException) {
+            updateMutex.withLock { presenceStore.cancelRefresh() }
+            throw e
+        } catch (_: Exception) {
+            // Presence events keep this cache current if the account refresh is temporarily unavailable.
         }
-        screenModelScope.launch(Dispatchers.IO) {
-            friendService.refreshFriendList(offline = false) { friends ->
-                update(friends)
-                if (removeNotIncluded) {
-                    includedIdList.addAll(friends.map { it.id })
+        var completed = false
+        try {
+            completed = withContext(Dispatchers.IO) {
+                friendService.refreshFriendList(offline = false) { friends ->
+                    updateMutex.withLock {
+                        presenceStore.addPage(friends)
+                        includedIds.addAll(friends.map(FriendData::id))
+                    }
+                    syncFriendLocations()
                 }
             }
-        }.join()
-        if (removeNotIncluded) {
-            friendMap.keys
-                .filter { !includedIdList.contains(it) }
-                .forEach { removeFriend(it) }
+            updateMutex.withLock {
+                presenceStore.finishRefresh(includedIds, reconcile = removeNotIncluded && completed)
+            }
+        } finally {
+            if (!completed) updateMutex.withLock { presenceStore.cancelRefresh() }
+            syncFriendLocations()
+            isRefreshing = false
         }
-        isRefreshing = false
     }
 
-    private fun update(
-        friends: List<FriendData>,
-    ) = screenModelScope.launch(Dispatchers.Default) {
+    private suspend fun syncFriendLocations() = updateMutex.withLock {
         runCatching {
-            // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
-            // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent写死LocationType为Offline
-            // 使用缓存的 activeFriends 而非每次发 API 请求（VRCX 也是纯内存操作）
-            val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
-            cachedActiveFriends.forEach {
-                currentFriendMap[it]?.let { activeFriend ->
-                    if (activeFriend.location == LocationType.Private.value) {
-                        currentFriendMap[it] = activeFriend.copy(location = LocationType.Offline.value)
-                    }
-                }
-            }
-            val friendCollection = currentFriendMap.values
-            // 如果上次请求的数据中有这次的用户，则把该用户从上次的房间实例中列表中移除
-            removePre(friendCollection)
-            // 更新好友列表缓存
-            friendMap += currentFriendMap
-
-            // 清空所有已有的跃迁标记（本轮 update 会重新填充）
-            this@FriendLocationPagerModel.friendLocationMap.values.flatten().forEach {
-                it.travelingIds.clear()
-            }
-
-            val friendLocationInfoMap = friendCollection.map { mutableStateOf(it) }
-                .associateBy { it.value.id }
-                .values.groupBy { LocationType.fromValue(it.value.location) }
-
-            friendLocationInfoMap[LocationType.Offline]?.let { friends ->
-                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Offline) {
-                    mutableStateListOf(FriendLocation.Offline)
-                }.first().friends.putAll(friends.associateBy { it.value.id })
-            }
-            friendLocationInfoMap[LocationType.Private]?.let { friends ->
-                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Private) {
-                    mutableStateListOf(FriendLocation.Private)
-                }.first().friends.putAll(friends.associateBy { it.value.id })
-            }
-
-            // 跃迁中的好友合并到 Instance 分类，按目的地分组
-            val travelingFriends = friendCollection.filter {
-                LocationType.fromValue(it.location) == LocationType.Traveling && it.travelingToLocation.isNotBlank()
-            }
-            val travelingIdSet = travelingFriends.map { it.id }.toMutableSet()
-
-            val currentInstanceFriendLocations = this@FriendLocationPagerModel.friendLocationMap
-                .getOrPut(LocationType.Instance, ::mutableStateListOf)
-
-            // 处理已在房间的好友
-            val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
-            (tempInstanceFriends.map { it.value } + travelingFriends.map {
-                it.copy(location = it.travelingToLocation)
-            }).groupBy { it.location }.forEach { locationFriendEntry ->
-                val location = locationFriendEntry.key
-                val friendLocation = updateMutex.withLock(location) {
-                    currentInstanceFriendLocations.find { location == it.location }
-                        ?: FriendLocation(
-                            location = location,
-                            friends = mutableStateMapOf()
-                        ).also { currentInstanceFriendLocations.add(it) }
-                }
-                fetchInstants(location, friendLocation.instants.value) {
-                    friendLocation.instants.value = it
-                }
-                // 增量更新：已有好友复用 MutableState，新好友才创建
-                val incomingIds = locationFriendEntry.value.map { it.id }.toSet()
-                // 移除已不在该房间的好友
-                friendLocation.friends.keys.filter { it !in incomingIds }.forEach {
-                    friendLocation.friends.remove(it)
-                }
-                // 更新或新增好友
-                locationFriendEntry.value.forEach { friend ->
-                    val existing = friendLocation.friends[friend.id]
-                    if (existing != null) {
-                        existing.value = friend
-                    } else {
-                        friendLocation.friends[friend.id] = mutableStateOf(friend)
-                    }
-                }
-                // 更新跃迁标记
-                friendLocation.travelingIds.addAll(
-                    travelingIdSet.intersect(incomingIds)
-                )
-            }
-            // 强制触发 Compose 重组：内部 friends map 的变化不会被 snapshot 系统追踪
-            locationVersion++
+            val snapshot = presenceStore.snapshot()
+            syncSimpleLocation(LocationType.Offline, snapshot.offline)
+            syncSimpleLocation(LocationType.Private, snapshot.private)
+            syncInstanceLocations(snapshot.instances)
         }.onApiFailure("FriendLocation") {
             SharedFlowCentre.toastText.emit(ToastText.Error(it))
         }
+    }
+
+    private fun syncSimpleLocation(type: LocationType, friends: List<FriendData>) {
+        if (friends.isEmpty()) {
+            friendLocationMap.remove(type)
+            return
+        }
+        val location = friendLocationMap.getOrPut(type) {
+            mutableStateListOf(
+                if (type == LocationType.Offline) FriendLocation.Offline else FriendLocation.Private
+            )
+        }.first()
+        syncFriends(location, FriendLocationGroup(friends))
+    }
+
+    private fun syncInstanceLocations(groups: Map<String, FriendLocationGroup>) {
+        if (groups.isEmpty()) {
+            friendLocationMap.remove(LocationType.Instance)
+            return
+        }
+        val locations = friendLocationMap.getOrPut(LocationType.Instance, ::mutableStateListOf)
+        locations.removeAll { it.location !in groups }
+        groups.forEach { (locationId, group) ->
+            val location = locations.find { it.location == locationId } ?: FriendLocation(
+                location = locationId,
+                friends = mutableStateMapOf(),
+            ).also(locations::add)
+            syncFriends(location, group)
+            fetchInstants(locationId, location.instants.value) {
+                location.instants.value = it
+            }
+        }
+    }
+
+    private fun syncFriends(location: FriendLocation, group: FriendLocationGroup) {
+        val incoming = group.friends.associateBy(FriendData::id)
+        location.friends.keys.filter { it !in incoming }.forEach(location.friends::remove)
+        incoming.forEach { (friendId, friend) ->
+            val state = location.friends[friendId]
+            if (state == null) location.friends[friendId] = mutableStateOf(friend)
+            else state.value = friend
+        }
+        location.travelingIds.value = group.travelingIds
     }
 
 
@@ -315,31 +245,6 @@ class FriendLocationPagerModel(
         }.onFailure {
             SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
         }
-    }
-
-    /**
-     * 如果上次请求的数据中有这次的用户并且在不同的location，则把该用户从上次的房间实例中列表中移除
-     */
-    private fun removePre(friends: Collection<FriendData>) {
-        if (friendMap.isEmpty()) return
-        friends.filter { friendMap.containsKey(it.id) && friendMap[it.id]!!.location != it.location }
-            .map { it.id }
-            .forEach(::removeFriend)
-    }
-
-    private fun removeFriend(friendId: String) {
-        friendLocationMap.values.forEach { friendLocations ->
-            friendLocations.filter { it.friends.containsKey(friendId) }
-                .forEach { friendLocation ->
-                    friendLocation.friends.remove(friendId)
-                    friendMap.remove(friendId)
-                    val locationType = LocationType.fromValue(friendLocation.location)
-                    if (friendLocation.friends.isEmpty() && locationType == LocationType.Instance) {
-                        friendLocations.remove(friendLocation)
-                    }
-                }
-        }
-        locationVersion++
     }
 
 }

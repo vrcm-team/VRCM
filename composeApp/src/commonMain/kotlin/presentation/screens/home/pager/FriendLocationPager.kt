@@ -69,7 +69,6 @@ object FriendLocationPager : Pager {
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
             doRefresh = friendLocationPagerModel::refreshFriendLocation,
-            dataVersion = friendLocationPagerModel.locationVersion
         )
 
     }
@@ -85,7 +84,6 @@ fun Pager.FriendLocationPager(
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
-    dataVersion: Long = 0,
 ) {
     val navigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -153,14 +151,12 @@ fun Pager.FriendLocationPager(
                 friendLocation = offlineFriendLocation,
                 locationType = LocationType.Offline,
                 onClickUserIcon = onClickUserIcon,
-                dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerWebsite}${offlineFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = privateFriendLocation,
                 locationType = LocationType.Private,
                 onClickUserIcon = onClickUserIcon,
-                dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
@@ -176,13 +172,13 @@ fun Pager.FriendLocationPager(
                         isSelected = selectLocation == location.location,
                         onClickWorldImage = { onClickWorldImage(location) },
                         onClickLocationCard = { onClickLocationCard(location) },
-                        travelingIds = location.travelingIds,
+                        travelingIds = location.travelingIds.value,
                     ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),
                             instanceId = location.location,
                             friends = it,
-                            travelingIds = location.travelingIds,
+                            travelingIds = location.travelingIds.value,
                             onClickUserIcon = onClickUserIcon
                         )
                     }
@@ -202,27 +198,19 @@ private fun LazyListScope.SimpleCLocationCard(
     friendLocation: FriendLocation?,
     locationType: LocationType,
     onClickUserIcon: (FriendData) -> Unit,
-    dataVersion: Long = 0,
     text: @Composable () -> String,
     ) {
-    if (friendLocation == null) return
-    item(key = "${locationType}_$dataVersion") {
-        // dataVersion 变化时 item key 改变 → LazyColumn 重建此 item
-        // 同时在 composable 上下文读取 friends map 建立 snapshot 依赖
-        val friendList = friendLocation.friendList
-        if (friendList.isNotEmpty()) {
-            LocationTitle(text())
-        }
+    val friendList = friendLocation?.friendList.orEmpty()
+    if (friendList.isEmpty()) return
+    item(key = locationType) {
+        LocationTitle(text())
     }
-    item(key = "${locationType.value}_$dataVersion") {
-        val friendList = friendLocation.friendList
-        if (friendList.isNotEmpty()) {
-            UserIconsRow(
-                friends = friendList,
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                onClickUserIcon = onClickUserIcon
-            )
-        }
+    item(key = locationType.value) {
+        UserIconsRow(
+            friends = friendList,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            onClickUserIcon = onClickUserIcon
+        )
     }
 }
 
@@ -237,7 +225,6 @@ private fun LocationTitle(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
 
 
 
