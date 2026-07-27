@@ -15,16 +15,24 @@ class WebSocketRetryTest {
     @Test
     fun failedConnectionRetriesAndCancellationStopsTheLoop() = runTest {
         var attempts = 0
+        val failures = mutableListOf<Pair<Int, String?>>()
         val job = launch {
-            retryWebSocketConnection(retryDelayMillis = 100) {
-                attempts++
-                if (attempts == 1) error("network changed")
-                awaitCancellation()
-            }
+            retryWebSocketConnection(
+                retryDelayMillis = 100,
+                onFailure = { error, consecutiveFailures ->
+                    failures += consecutiveFailures to error.message
+                },
+                connect = {
+                    attempts++
+                    if (attempts == 1) error("network changed")
+                    awaitCancellation()
+                },
+            )
         }
 
         runCurrent()
         assertEquals(1, attempts)
+        assertEquals(listOf<Pair<Int, String?>>(1 to "network changed"), failures)
         advanceTimeBy(100)
         runCurrent()
         assertEquals(2, attempts)
