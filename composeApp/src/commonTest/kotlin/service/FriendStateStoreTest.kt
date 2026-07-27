@@ -53,6 +53,36 @@ class FriendStateStoreTest {
         assertFalse("usr_a" in store.snapshot)
     }
 
+    @Test
+    fun offlineEventForUnknownFriendLeavesATombstoneAgainstInFlightPage() {
+        val store = FriendStateStore()
+        val token = store.beginRefresh()
+
+        store.updateOrRemoveFromEvent("usr_a") { existing ->
+            existing?.copy(location = LocationType.Offline.value, status = UserStatus.Offline)
+        }
+        store.mergeRefresh(token, listOf(friend("usr_a", "wrld_old:1")), replaceUntouched = true)
+
+        assertFalse("usr_a" in store.snapshot)
+    }
+
+    @Test
+    fun olderRefreshCannotCommitAfterANewerRefreshStarts() {
+        val store = FriendStateStore()
+        val older = store.beginRefresh()
+        val newer = store.beginRefresh()
+
+        assertEquals(
+            true,
+            store.mergeRefresh(newer, listOf(friend("usr_a", "wrld_new:2")), replaceUntouched = true),
+        )
+        assertEquals(
+            false,
+            store.mergeRefresh(older, listOf(friend("usr_a", "wrld_old:1")), replaceUntouched = true),
+        )
+        assertEquals("wrld_new:2", store.snapshot.getValue("usr_a").location)
+    }
+
     private fun friend(id: String, location: String) = FriendData(
         bio = null,
         currentAvatarImageUrl = "",

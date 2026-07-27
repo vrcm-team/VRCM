@@ -87,7 +87,7 @@ class FriendService(
 
             FriendEvents.FriendOffline.typeName -> {
                 val content = json.decodeFromString<FriendOfflineContent>(socketEvent.content)
-                updateFriend(content.userId) { existing ->
+                updateOrRemoveFriend(content.userId) { existing ->
                     existing?.copy(
                         location = LocationType.Offline.value,
                         travelingToLocation = "",
@@ -188,6 +188,15 @@ class FriendService(
         update: (FriendData?) -> FriendData?,
     ): FriendData? = synchronized(friendMapLock) {
         val updated = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
+        publishFriendState()
+        updated
+    }
+
+    private fun updateOrRemoveFriend(
+        userId: String,
+        update: (FriendData?) -> FriendData?,
+    ): FriendData? = synchronized(friendMapLock) {
+        val updated = friendStore.updateOrRemoveFromEvent(userId, update)
         publishFriendState()
         updated
     }
