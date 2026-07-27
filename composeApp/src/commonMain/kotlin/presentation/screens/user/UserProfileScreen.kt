@@ -562,7 +562,8 @@ private fun ColumnScope.ProfileContent(
             } else {
                 navigator push WorldProfileScreen(
                     worldProfileVO = WorldProfileVo(world),
-                    sharedSuffixKey = sharedSuffixKey
+                    sharedSuffixKey = sharedSuffixKey,
+                    sharedKeyPrefix = "Created_"
                 )
             }
         }
@@ -591,9 +592,27 @@ private fun ColumnScope.ProfileContent(
                         worldName = world.name,
                         worldImageUrl = world.imageUrl?.ifBlank { null },
                         thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
-                        authorName = world.authorName
+                        worldDescription = world.description.orEmpty(),
+                        authorID = world.authorId,
+                        authorName = world.authorName,
+                        capacity = world.capacity ?: 0,
+                        recommendedCapacity = world.recommendedCapacity ?: 0,
+                        visits = world.visits ?: 0,
+                        favorites = world.favorites ?: 0,
+                        heat = world.heat ?: 0,
+                        popularity = world.popularity ?: 0,
+                        featured = world.featured,
+                        tags = world.tags.filter { it.startsWith("author_tag_") }
+                            .map { it.substringAfter("author_tag_") },
+                        releaseStatus = world.releaseStatus,
+                        version = world.version,
+                        createdAt = world.createdAt,
+                        updatedAt = world.updatedAt,
+                        publicationDate = world.publicationDate,
+                        labsPublicationDate = world.labsPublicationDate
                     ),
-                    sharedSuffixKey = sharedSuffixKey
+                    sharedSuffixKey = sharedSuffixKey,
+                    sharedKeyPrefix = "Fav_"
                 )
             }
         }
@@ -914,6 +933,7 @@ private data class CardItemVo(
     val subtitle: String,
     val authorName: String = "",
     val avatarData: AvatarData? = null,
+    val worldProfileVO: WorldProfileVo? = null,
 ) : cafe.adriel.voyager.core.lifecycle.JavaSerializable
 
 /**
@@ -932,6 +952,7 @@ private class CardListDetailScreen(
     private val sectionKey: String,
     private val screenType: CardScreenType,
     private val sharedSuffixKey: String = "",
+    private val sharedKeyPrefix: String = "",
 ) : Screen {
     @Composable
     override fun Content() {
@@ -956,6 +977,11 @@ private class CardListDetailScreen(
                     itemTitle = { it.title },
                     itemSubtitle = { it.subtitle },
                     sectionKey = sectionKey,
+                    imageModifier = if (screenType == CardScreenType.WORLD || screenType == CardScreenType.FAVORITED_WORLD) {
+                        { item, modifier -> modifier.sharedBoundsBy("${sharedKeyPrefix}${item.id}WorldImage") }
+                    } else {
+                        { _, m -> m }
+                    },
                     onClickItem = { item ->
                         when (screenType) {
                             CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> {
@@ -965,14 +991,15 @@ private class CardListDetailScreen(
                                     }
                                 } else {
                                     navigator push WorldProfileScreen(
-                                        worldProfileVO = WorldProfileVo(
+                                        worldProfileVO = item.worldProfileVO ?: WorldProfileVo(
                                             worldId = item.id,
                                             worldName = item.title,
                                             worldImageUrl = item.imageUrl,
                                             thumbnailImageUrl = item.thumbnailUrl,
                                             authorName = item.authorName
                                         ),
-                                        sharedSuffixKey = sharedSuffixKey
+                                        sharedSuffixKey = sharedSuffixKey,
+                                        sharedKeyPrefix = sharedKeyPrefix
                                     )
                                 }
                             }
@@ -1002,6 +1029,7 @@ private fun <T> CardListContent(
     itemTitle: (T) -> String,
     itemSubtitle: (T) -> String,
     sectionKey: String = "",
+    imageModifier: @Composable (T, Modifier) -> Modifier = { _, m -> m },
     onClickItem: ((T) -> Unit)? = null,
 ) {
     val shownItems = rememberStaggeredReveal(items)
@@ -1029,15 +1057,18 @@ private fun <T> CardListContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     AImage(
-                        modifier = Modifier
-                            .sharedBoundsBy("${sectionKey}_${key(item)}_StackedImage")
-                            .weight(0.4f)
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart = 16.dp, topEnd = 8.dp,
-                                    bottomStart = 16.dp, bottomEnd = 8.dp
+                        modifier = imageModifier(
+                            item,
+                            Modifier
+                                .sharedBoundsBy("${sectionKey}_${key(item)}_StackedImage")
+                                .weight(0.4f)
+                                .clip(
+                                    RoundedCornerShape(
+                                        topStart = 16.dp, topEnd = 8.dp,
+                                        bottomStart = 16.dp, bottomEnd = 8.dp
+                                    )
                                 )
-                            ),
+                        ),
                         imageData = imageUrl(item),
                         contentDescription = null
                     )
@@ -1093,22 +1124,26 @@ private fun UserCreatedWorldsSection(
             title = { it.name },
             subtitle = { it.description ?: "" },
             detailTitle = createdWorldsTitle,
-            imageModifier = { item, modifier -> modifier.sharedBoundsBy("${item.id}WorldImage") },
+            imageModifier = { item, modifier -> modifier.sharedBoundsBy("Created_${item.id}WorldImage") },
             onClickItem = onWorldClick,
             onNavigateToDetail = { list ->
                 navigator push CardListDetailScreen(
                     title = createdWorldsTitle,
-                    items = list.map { CardItemVo(
-                        id = it.id,
-                        imageUrl = it.thumbnailImageUrl ?: it.imageUrl,
-                        thumbnailUrl = it.thumbnailImageUrl,
-                        title = it.name,
-                        subtitle = it.description ?: "",
-                        authorName = it.authorName
-                    ) },
+                    items = list.map { world ->
+                        CardItemVo(
+                            id = world.id,
+                            imageUrl = world.thumbnailImageUrl ?: world.imageUrl,
+                            thumbnailUrl = world.thumbnailImageUrl,
+                            title = world.name,
+                            subtitle = world.description ?: "",
+                            authorName = world.authorName,
+                            worldProfileVO = WorldProfileVo(world)
+                        )
+                    },
                     sectionKey = createdWorldsTitle,
                     screenType = CardScreenType.WORLD,
-                    sharedSuffixKey = sharedSuffixKey
+                    sharedSuffixKey = sharedSuffixKey,
+                    sharedKeyPrefix = "Created_"
                 )
             }
         )
@@ -1192,22 +1227,50 @@ private fun UserFavoritedWorldsSection(
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
                     detailTitle = groupName,
                     label = groupName,
+                    imageModifier = { item, modifier -> modifier.sharedBoundsBy("Fav_${item.id}WorldImage") },
                     onClickItem = onWorldClick,
                     onNavigateToDetail = { list ->
                         navigator push CardListDetailScreen(
                             title = groupName,
-                            items = list.map { CardItemVo(
-                                id = it.id,
-                                listKey = it.favoriteId,
-                                imageUrl = (it.thumbnailImageUrl ?: it.imageUrl)?.ifBlank { null },
-                                thumbnailUrl = it.thumbnailImageUrl?.ifBlank { null },
-                                title = if (it.id == "???") it.favoriteId ?: it.name else it.name,
-                                subtitle = it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤",
-                                authorName = it.authorName ?: ""
-                            ) },
+                            items = list.map { world ->
+                                CardItemVo(
+                                    id = world.id,
+                                    listKey = world.favoriteId,
+                                    imageUrl = (world.thumbnailImageUrl ?: world.imageUrl)?.ifBlank { null },
+                                    thumbnailUrl = world.thumbnailImageUrl?.ifBlank { null },
+                                    title = if (world.id == "???") world.favoriteId ?: world.name else world.name,
+                                    subtitle = world.description?.takeIf { d -> d.isNotBlank() } ?: "${world.occupants ?: 0} 👤",
+                                    authorName = world.authorName ?: "",
+                                    worldProfileVO = WorldProfileVo(
+                                        worldId = world.id,
+                                        worldName = world.name,
+                                        worldImageUrl = world.imageUrl?.ifBlank { null },
+                                        thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
+                                        worldDescription = world.description.orEmpty(),
+                                        authorID = world.authorId,
+                                        authorName = world.authorName,
+                                        capacity = world.capacity ?: 0,
+                                        recommendedCapacity = world.recommendedCapacity ?: 0,
+                                        visits = world.visits ?: 0,
+                                        favorites = world.favorites ?: 0,
+                                        heat = world.heat ?: 0,
+                                        popularity = world.popularity ?: 0,
+                                        featured = world.featured,
+                                        tags = world.tags.filter { it.startsWith("author_tag_") }
+                                            .map { it.substringAfter("author_tag_") },
+                                        releaseStatus = world.releaseStatus,
+                                        version = world.version,
+                                        createdAt = world.createdAt,
+                                        updatedAt = world.updatedAt,
+                                        publicationDate = world.publicationDate,
+                                        labsPublicationDate = world.labsPublicationDate
+                                    )
+                                )
+                            },
                             sectionKey = groupName,
                             screenType = CardScreenType.FAVORITED_WORLD,
-                            sharedSuffixKey = sharedSuffixKey
+                            sharedSuffixKey = sharedSuffixKey,
+                            sharedKeyPrefix = "Fav_"
                         )
                     }
                 )
