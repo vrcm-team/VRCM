@@ -91,7 +91,6 @@ class UserProfileScreenModel(
 
     fun refreshUser(userId: String) =
         screenModelScope.launch(Dispatchers.IO) {
-            _mutualGroups.value = emptyList()
             authService.reTryAuthCatching {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {

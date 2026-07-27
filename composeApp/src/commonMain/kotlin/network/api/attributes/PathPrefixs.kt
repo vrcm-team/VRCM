@@ -38,7 +38,7 @@ internal const val FAVORITE_LIMITS_API_SUFFIX = "favoritelimits"
 
 internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"
 
-internal const val VRC_WSS_URL = "wss://vrchat.com/?"
+internal const val VRC_WSS_URL = "wss://pipeline.vrchat.cloud"
 
 internal val VRC_API_HOST = Url(VRC_API_URL).host
 

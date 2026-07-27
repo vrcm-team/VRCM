@@ -68,7 +68,8 @@ object FriendLocationPager : Pager {
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
-            doRefresh = friendLocationPagerModel::refreshFriendLocation
+            doRefresh = friendLocationPagerModel::refreshFriendLocation,
+            dataVersion = friendLocationPagerModel.locationVersion
         )
 
     }
@@ -84,6 +85,7 @@ fun Pager.FriendLocationPager(
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
+    dataVersion: Long = 0,
 ) {
     val navigator = currentNavigator
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -151,19 +153,22 @@ fun Pager.FriendLocationPager(
             SimpleCLocationCard(
                 friendLocation = offlineFriendLocation,
                 locationType = LocationType.Offline,
-                onClickUserIcon = onClickUserIcon
+                onClickUserIcon = onClickUserIcon,
+                dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerWebsite}${offlineFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = privateFriendLocation,
                 locationType = LocationType.Private,
-                onClickUserIcon = onClickUserIcon
+                onClickUserIcon = onClickUserIcon,
+                dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = travelingFriendLocation,
                 locationType = LocationType.Traveling,
-                onClickUserIcon = onClickUserIcon
+                onClickUserIcon = onClickUserIcon,
+                dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerTraveling}${travelingFriendLocation?.let { "(${it.friends.size})" }}" }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
@@ -173,7 +178,7 @@ fun Pager.FriendLocationPager(
                     )
                 }
 
-                items(instanceFriendLocations, key = { it.location }) { location ->
+                items(instanceFriendLocations, key = { "${it.location}_$dataVersion" }) { location ->
                     LocationCard(
                         location = location,
                         isSelected = selectLocation == location.location,
@@ -203,16 +208,23 @@ private fun LazyListScope.SimpleCLocationCard(
     friendLocation: FriendLocation?,
     locationType: LocationType,
     onClickUserIcon: (FriendData) -> Unit,
+    dataVersion: Long = 0,
     text: @Composable () -> String,
     ) {
-    friendLocation?.friendList.let {
-        if (it.isNullOrEmpty()) return@let
-        item(key = locationType) {
+    if (friendLocation == null) return
+    item(key = "${locationType}_$dataVersion") {
+        // dataVersion 变化时 item key 改变 → LazyColumn 重建此 item
+        // 同时在 composable 上下文读取 friends map 建立 snapshot 依赖
+        val friendList = friendLocation.friendList
+        if (friendList.isNotEmpty()) {
             LocationTitle(text())
         }
-        item(key = locationType.value) {
+    }
+    item(key = "${locationType.value}_$dataVersion") {
+        val friendList = friendLocation.friendList
+        if (friendList.isNotEmpty()) {
             UserIconsRow(
-                friends = it,
+                friends = friendList,
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 onClickUserIcon = onClickUserIcon
             )

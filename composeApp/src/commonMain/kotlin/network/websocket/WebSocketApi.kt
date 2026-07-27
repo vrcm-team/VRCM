@@ -1,20 +1,18 @@
 package io.github.vrcmteam.vrcm.network.websocket
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.network.api.attributes.CookieNames
-import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_WSS_URL
+import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.ktor.client.*
-import io.ktor.client.plugins.cookies.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
-import io.ktor.http.*
+import io.ktor.client.call.*
 import kotlinx.coroutines.*
 
 class WebSocketApi(
     private val apiClient: HttpClient,
-    private val cookiesStorage: CookiesStorage,
 ) {
 
     private var currentJob: Job? = null
@@ -35,14 +33,18 @@ class WebSocketApi(
     }
 
     suspend fun startWebSocket() {
-        val authToken = cookiesStorage
-                .get(Url(VRC_API_URL)).firstOrNull { it.name == CookieNames.AUTH }
-                ?.value ?: return
+        // 参考 VRCX：从 GET /auth 获取 WebSocket token
+        val authResponse = apiClient.get(AUTH_API_PREFIX)
+        if (authResponse.status.value != 200) return
+        val authData = authResponse.body<AuthData>()
+        if (authData.ok != true || authData.token == null) return
+        val token = authData.token
+
         try {
             apiClient.ws(
                 urlString = VRC_WSS_URL,
                 request = {
-                    parameter("authToken", authToken)
+                    parameter("auth", token)
                 }) {
                 while (true) {
                     val othersMessage = receiveDeserialized<WebSocketEvent>()
@@ -50,12 +52,8 @@ class WebSocketApi(
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-//            delay(5.seconds)
-//
-//            coroutineScope {
-//                launch { startWebSocket() }
-//            }
+            delay(5000L)
+            startWebSocket()
         }
     }
 

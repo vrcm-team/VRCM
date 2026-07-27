@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
@@ -41,7 +42,15 @@ class FriendLocationPagerModel(
 
     private val friendMap: MutableMap<String, FriendData> = mutableMapOf()
 
+    // 缓存当前用户的 activeFriends，避免每次 WebSocket 事件都发起 API 请求
+    // 只在全量刷新时更新（doRefreshFriendLocation / refreshFriendLocation）
+    private var cachedActiveFriends: Set<String> = emptySet()
+
     private val updateMutex = Mutex()
+
+    // 版本计数器：每次 update/removeFriend 后自增，用于调试和潜在的 UI 刷新
+    var locationVersion by mutableLongStateOf(0L)
+        private set
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
@@ -79,13 +88,18 @@ class FriendLocationPagerModel(
             FriendEvents.FriendOffline.typeName -> {
                 val friendOfflineContent =
                     json.decodeFromString<FriendOfflineContent>(socketEvent.content)
-                friendMap[friendOfflineContent.userId]?.let { friend ->
-                    removeFriend(friend.id)
-                }
+                // 直接用 userId 移除，不依赖 friendMap（friendMap 是异步更新的）
+                removeFriend(friendOfflineContent.userId)
             }
-            // 这两个事件接受的content都差不多，所以用一个
-            // 当用户登录游戏时会先发送Online事件这时候location是traveling
-            FriendEvents.FriendLocation.typeName, FriendEvents.FriendOnline.typeName -> {
+            // friend-online 比 friend-location 多一个 platform 字段
+            FriendEvents.FriendOnline.typeName -> {
+                val friendOnlineContent =
+                    json.decodeFromString<FriendOnlineContent>(socketEvent.content)
+                update(listOf(friendOnlineContent.toFriendData()))
+            }
+
+            // 当用户切换实例时发送此事件
+            FriendEvents.FriendLocation.typeName -> {
                 val friendLocationContent =
                     json.decodeFromString<FriendLocationContent>(socketEvent.content)
                 update(listOf(friendLocationContent.toFriendData()))
@@ -104,7 +118,6 @@ class FriendLocationPagerModel(
         friendMap.clear()
         doRefreshFriendLocation()
         // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
-
     }
 
     /**
@@ -115,6 +128,11 @@ class FriendLocationPagerModel(
     suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
         // 防止再次更新时拉取到的与上次相同的instanceId导致item的key冲突
         val includedIdList: MutableList<String> = mutableListOf()
+        // 全量刷新时同步更新 cachedActiveFriends（此时可以发 API 请求）
+        runCatching {
+            val currentUser = authService.currentUser(isRefresh = true)
+            cachedActiveFriends = currentUser.activeFriends.toSet()
+        }
         screenModelScope.launch(Dispatchers.IO) {
             friendService.refreshFriendList(offline = false) { friends ->
                 update(friends)
@@ -137,9 +155,9 @@ class FriendLocationPagerModel(
         runCatching {
             // 好友非正常退出时并挂黄灯时location会为private导致一直显示在private世界
             // 如果是WebSocketEvent更新的状态也无需担心,FriendActiveContent写死LocationType为Offline
-            val currentUser = authService.currentUser(isRefresh = true)
+            // 使用缓存的 activeFriends 而非每次发 API 请求（VRCX 也是纯内存操作）
             val currentFriendMap = friends.associateByTo(mutableMapOf()) { it.id }
-            currentUser.activeFriends.forEach {
+            cachedActiveFriends.forEach {
                 currentFriendMap[it]?.let { activeFriend ->
                     if (activeFriend.location == LocationType.Private.value) {
                         currentFriendMap[it] = activeFriend.copy(location = LocationType.Offline.value)
@@ -193,6 +211,8 @@ class FriendLocationPagerModel(
                 }
                 friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
             }
+            // 强制触发 Compose 重组：内部 friends map 的变化不会被 snapshot 系统追踪
+            locationVersion++
         }.onApiFailure("FriendLocation") {
             SharedFlowCentre.toastText.emit(ToastText.Error(it))
         }
@@ -293,6 +313,7 @@ class FriendLocationPagerModel(
                     }
                 }
         }
+        locationVersion++
     }
 
 }
