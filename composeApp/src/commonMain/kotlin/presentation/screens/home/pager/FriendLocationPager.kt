@@ -136,7 +136,6 @@ fun Pager.FriendLocationPager(
     ) {
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
-        val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]?.sortedByDescending { it.friendList.size }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
@@ -164,13 +163,6 @@ fun Pager.FriendLocationPager(
                 dataVersion = dataVersion
             ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
 
-            SimpleCLocationCard(
-                friendLocation = travelingFriendLocation,
-                locationType = LocationType.Traveling,
-                onClickUserIcon = onClickUserIcon,
-                dataVersion = dataVersion
-            ) { "${strings.fiendLocationPagerTraveling}${travelingFriendLocation?.let { "(${it.friends.size})" }}" }
-
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
                     LocationTitle(
@@ -178,17 +170,19 @@ fun Pager.FriendLocationPager(
                     )
                 }
 
-                items(instanceFriendLocations, key = { "${it.location}_$dataVersion" }) { location ->
+                items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(
                         location = location,
                         isSelected = selectLocation == location.location,
                         onClickWorldImage = { onClickWorldImage(location) },
-                        onClickLocationCard = { onClickLocationCard(location) }
+                        onClickLocationCard = { onClickLocationCard(location) },
+                        travelingIds = location.travelingIds,
                     ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),
                             instanceId = location.location,
                             friends = it,
+                            travelingIds = location.travelingIds,
                             onClickUserIcon = onClickUserIcon
                         )
                     }

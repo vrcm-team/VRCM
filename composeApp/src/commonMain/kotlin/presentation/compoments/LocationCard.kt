@@ -24,6 +24,8 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -32,6 +34,7 @@ fun LocationCard(
     isSelected: Boolean,
     onClickWorldImage: () -> Unit,
     onClickLocationCard: () -> Unit,
+    travelingIds: Set<String> = emptySet(),
     content: @Composable (List<State<FriendData>>) -> Unit,
 ) {
     val instants by location.instants
@@ -130,7 +133,7 @@ fun LocationCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
-                    MemberInfoRow(isSelected, friendList, instants)
+                    MemberInfoRow(isSelected, friendList, instants, travelingIds)
                 }
             }
             AnimatedVisibility(isSelected) {
@@ -149,6 +152,7 @@ private inline fun MemberInfoRow(
     showUser: Boolean,
     friendList: List<State<IUser>>,
     instants: HomeInstanceVo,
+    travelingIds: Set<String> = emptySet(),
 ) {
     Row(
         modifier = Modifier
@@ -170,12 +174,28 @@ private inline fun MemberInfoRow(
                         horizontalArrangement = Arrangement.spacedBy(if (friendList.size == 1) 6.dp else (-8).dp)
                     ) {
                         friendList.take(5).forEach { friendState ->
-                            UserStateIcon(
-                                modifier = Modifier
-                                    .align(Alignment.CenterVertically)
-                                    .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                                iconUrl = friendState.value.iconUrl,
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                UserStateIcon(
+                                    modifier = Modifier
+                                        .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                    iconUrl = friendState.value.iconUrl,
+                                )
+                                if (friendState.value.id in travelingIds) {
+                                    Box(
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(alpha = 0.55f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(12.dp),
+                                            strokeWidth = 2.dp,
+                                            color = Color.White,
+                                        )
+                                    }
+                                }
+                            }
                         }
                         friendList.singleOrNull()?.let { friendState ->
                             Text(

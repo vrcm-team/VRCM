@@ -28,6 +28,7 @@ data class FriendLocationContent(
             lastLogin = user.lastLogin,
             lastPlatform = user.lastPlatform,
             location = location,
+            travelingToLocation = travelingToLocation,
             profilePicOverride = user.profilePicOverride,
             status = user.status,
             statusDescription = user.statusDescription,

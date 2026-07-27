@@ -170,7 +170,13 @@ class FriendLocationPagerModel(
             // 更新好友列表缓存
             friendMap += currentFriendMap
 
-            val friendLocationInfoMap = friendCollection.associate { it.id to mutableStateOf(it) }
+            // 清空所有已有的跃迁标记（本轮 update 会重新填充）
+            this@FriendLocationPagerModel.friendLocationMap.values.flatten().forEach {
+                it.travelingIds.clear()
+            }
+
+            val friendLocationInfoMap = friendCollection.map { mutableStateOf(it) }
+                .associateBy { it.value.id }
                 .values.groupBy { LocationType.fromValue(it.value.location) }
 
             friendLocationInfoMap[LocationType.Offline]?.let { friends ->
@@ -183,20 +189,21 @@ class FriendLocationPagerModel(
                     mutableStateListOf(FriendLocation.Private)
                 }.first().friends.putAll(friends.associateBy { it.value.id })
             }
-            friendLocationInfoMap[LocationType.Traveling]?.let { friends ->
-                this@FriendLocationPagerModel.friendLocationMap.getOrPut(LocationType.Traveling) {
-                    mutableStateListOf(FriendLocation.Traveling)
-                }.first().friends.putAll(friends.associateBy { it.value.id })
+
+            // 跃迁中的好友合并到 Instance 分类，按目的地分组
+            val travelingFriends = friendCollection.filter {
+                LocationType.fromValue(it.location) == LocationType.Traveling && it.travelingToLocation.isNotBlank()
             }
+            val travelingIdSet = travelingFriends.map { it.id }.toMutableSet()
 
             val currentInstanceFriendLocations = this@FriendLocationPagerModel.friendLocationMap
                 .getOrPut(LocationType.Instance, ::mutableStateListOf)
-            val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
 
-            // 得到对应location的FriendLocation，将新的好友添加到friends
-            tempInstanceFriends.groupBy { it.value.location }.forEach { locationFriendEntry ->
-                // 通过location找到对应的FriendLocation，没有则创建一个并add到friendLocations
-                // 找到相同的location的FriendLocation
+            // 处理已在房间的好友
+            val tempInstanceFriends = friendLocationInfoMap[LocationType.Instance] ?: emptyList()
+            (tempInstanceFriends.map { it.value } + travelingFriends.map {
+                it.copy(location = it.travelingToLocation)
+            }).groupBy { it.location }.forEach { locationFriendEntry ->
                 val location = locationFriendEntry.key
                 val friendLocation = updateMutex.withLock(location) {
                     currentInstanceFriendLocations.find { location == it.location }
@@ -205,11 +212,28 @@ class FriendLocationPagerModel(
                             friends = mutableStateMapOf()
                         ).also { currentInstanceFriendLocations.add(it) }
                 }
-                // 通过location查询房间实例信息
                 fetchInstants(location, friendLocation.instants.value) {
                     friendLocation.instants.value = it
                 }
-                friendLocation.friends.putAll(locationFriendEntry.value.associateBy { it.value.id })
+                // 增量更新：已有好友复用 MutableState，新好友才创建
+                val incomingIds = locationFriendEntry.value.map { it.id }.toSet()
+                // 移除已不在该房间的好友
+                friendLocation.friends.keys.filter { it !in incomingIds }.forEach {
+                    friendLocation.friends.remove(it)
+                }
+                // 更新或新增好友
+                locationFriendEntry.value.forEach { friend ->
+                    val existing = friendLocation.friends[friend.id]
+                    if (existing != null) {
+                        existing.value = friend
+                    } else {
+                        friendLocation.friends[friend.id] = mutableStateOf(friend)
+                    }
+                }
+                // 更新跃迁标记
+                friendLocation.travelingIds.addAll(
+                    travelingIdSet.intersect(incomingIds)
+                )
             }
             // 强制触发 Compose 重组：内部 friends map 的变化不会被 snapshot 系统追踪
             locationVersion++
@@ -224,6 +248,8 @@ class FriendLocationPagerModel(
         oldInstants: HomeInstanceVo,
         crossinline updateInstants: (HomeInstanceVo) -> Unit
     ) {
+        // 已加载过实例信息则跳过网络请求
+        if (oldInstants.worldId.isNotEmpty()) return
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)

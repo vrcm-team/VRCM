@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,8 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -66,6 +70,7 @@ fun UserIconsRow(
     modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
     instanceId: String? = null,
+    travelingIds: Set<String> = emptySet(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onClickUserIcon: (FriendData) -> Unit,
 ) {
@@ -89,7 +94,8 @@ fun UserIconsRow(
                 iconUrl = friend.iconUrl,
                 name = friend.displayName,
                 userStatus = friend.status,
-                location = friend.location
+                location = friend.location,
+                isTraveling = friend.id in travelingIds,
             ) { onClickUserIcon(friend) }
         }
     }
@@ -151,6 +157,7 @@ fun LazyItemScope.LocationFriend(
     name: String,
     userStatus: UserStatus,
     location: String? = null,
+    isTraveling: Boolean = false,
     onClickUserIcon: () -> Unit,
 ) {
     Column(
@@ -159,12 +166,30 @@ fun LazyItemScope.LocationFriend(
             .clickable(onClick = onClickUserIcon).animateItem(),
         verticalArrangement = Arrangement.Center
     ) {
-        UserStateIcon(
-            modifier = Modifier.sharedBoundsBy("${id}UserIcon").fillMaxWidth(),
-            iconUrl = iconUrl,
-            userStatus = userStatus,
-            location = location
-        )
+        Box {
+            UserStateIcon(
+                modifier = Modifier.sharedBoundsBy("${id}UserIcon").fillMaxWidth(),
+                iconUrl = iconUrl,
+                userStatus = userStatus,
+                location = location
+            )
+            // 正在跃迁的好友显示旋转加载圈（全遮罩）
+            if (isTraveling) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.5.dp,
+                        color = Color.White,
+                    )
+                }
+            }
+        }
         Text(
             modifier = Modifier.sharedBoundsBy("${id}UserName").fillMaxWidth(),
             text = name,

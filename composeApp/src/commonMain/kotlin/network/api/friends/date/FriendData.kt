@@ -24,6 +24,7 @@ data class FriendData(
     @SerialName("last_platform")
     override val lastPlatform: String,
     override val location: String,
+    val travelingToLocation: String = "",
     override val profilePicOverride: String,
     override val status: UserStatus,
     override val statusDescription: String,
