@@ -1,26 +1,45 @@
 package io.github.vrcmteam.vrcm.service
 
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal data class FriendRefreshToken(
     val generation: Long,
     val eventVersion: Long,
-    val refreshVersion: Long,
 )
+
+internal class FriendRefreshCoordinator {
+    private val mutex = Mutex()
+
+    suspend fun <T> runRefresh(block: suspend () -> T): T = mutex.withLock { block() }
+}
+
+internal class FriendAccountTracker {
+    private var userId: String? = null
+
+    fun onAuthenticated(newUserId: String): Boolean {
+        val accountChanged = userId != null && userId != newUserId
+        userId = newUserId
+        return accountChanged
+    }
+
+    fun onLogout() {
+        userId = null
+    }
+}
 
 internal class FriendStateStore {
     private val friendsById = mutableMapOf<String, FriendData>()
     private val lastEventVersionById = mutableMapOf<String, Long>()
     private var generation = 0L
     private var eventVersion = 0L
-    private var latestRefreshVersion = 0L
 
     val snapshot: Map<String, FriendData>
         get() = friendsById.toMap()
 
     fun beginRefresh(): FriendRefreshToken {
-        latestRefreshVersion++
-        return FriendRefreshToken(generation, eventVersion, latestRefreshVersion)
+        return FriendRefreshToken(generation, eventVersion)
     }
 
     fun updateFromEvent(
@@ -58,7 +77,7 @@ internal class FriendStateStore {
         friends: Collection<FriendData>,
         replaceUntouched: Boolean,
     ): Boolean {
-        if (token.generation != generation || token.refreshVersion != latestRefreshVersion) return false
+        if (token.generation != generation) return false
         val incoming = friends.associateBy(FriendData::id)
         if (replaceUntouched) {
             friendsById.keys

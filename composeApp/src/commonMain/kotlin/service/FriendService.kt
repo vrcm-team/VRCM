@@ -40,6 +40,8 @@ class FriendService(
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val friendMapLock = Any()
     private val friendStore = FriendStateStore()
+    private val refreshCoordinator = FriendRefreshCoordinator()
+    private val accountTracker = FriendAccountTracker()
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
@@ -63,8 +65,22 @@ class FriendService(
             )
         }
         serviceScope.launch {
-            SharedFlowCentre.authed.collect {
-                clearFriendData()
+            SharedFlowCentre.authed.collect { account ->
+                synchronized(friendMapLock) {
+                    if (accountTracker.onAuthenticated(account.userId)) {
+                        friendStore.clear()
+                        publishFriendState()
+                    }
+                }
+            }
+        }
+        serviceScope.launch {
+            SharedFlowCentre.logout.collect {
+                synchronized(friendMapLock) {
+                    accountTracker.onLogout()
+                    friendStore.clear()
+                    publishFriendState()
+                }
             }
         }
     }
@@ -149,7 +165,7 @@ class FriendService(
     suspend fun refreshFriendList(
         offline: Boolean? = null,
         onUpdater: suspend (List<FriendData>) -> Unit = {},
-    ): Boolean {
+    ): Boolean = refreshCoordinator.runRefresh {
         val refreshToken = synchronized(friendMapLock) { friendStore.beginRefresh() }
         val collectedFriends = mutableListOf<FriendData>()
         var succeeded = true
@@ -168,18 +184,18 @@ class FriendService(
                 }
 
             if (succeeded) {
-                return commitRefresh(
+                return@runRefresh commitRefresh(
                     token = refreshToken,
                     friends = collectedFriends,
                     replaceUntouched = offline == null,
                 )
             }
-            return false
+            return@runRefresh false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             SharedFlowCentre.toastText.emit(ToastText.Error("获取好友列表失败: ${e.message}"))
-            return false
+            return@runRefresh false
         }
     }
 
