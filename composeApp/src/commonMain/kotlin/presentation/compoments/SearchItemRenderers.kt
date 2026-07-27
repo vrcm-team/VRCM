@@ -91,13 +91,28 @@ fun LazyItemScope.renderUserItem(
 }
 
 /**
+ * 判断世界是否被隐藏（API对不可见世界返回id为"???"）
+ */
+fun WorldData.isHiddenWorld(): Boolean = id == "???"
+
+/**
+ * 获取世界的安全图片URL，空字符串视为无图片
+ */
+fun WorldData.safeImageUrl(): String? = imageUrl.ifBlank { null }
+
+/**
+ * 获取隐藏世界的显示名称（使用favoriteId替代"???"）
+ */
+fun WorldData.hiddenWorldDisplayName(): String = favoriteId ?: name
+
+/**
  * 世界列表渲染
  */
 fun LazyListScope.renderWorldItems(
     worlds: List<WorldData>,
     onWorldClick: (WorldData) -> Unit
 ) {
-    items(worlds, key = { it.id }) { world ->
+    items(worlds, key = { it.favoriteId ?: it.id }) { world ->
         renderWorldItem(world, onWorldClick)
     }
 }
@@ -116,15 +131,31 @@ fun LazyItemScope.renderWorldItem(
         onClick = onWorldClick,
         modifier = Modifier.animateItem(),
         leadingContent = {
-            AImage(
-                modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                imageData = world.imageUrl,
-            )
+            if (world.isHiddenWorld()) {
+                Box(
+                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = AppIcons.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                AImage(
+                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                    imageData = world.safeImageUrl(),
+                )
+            }
         },
         headlineContent = {
             Text(
-                text = world.name,
+                text = if (world.isHiddenWorld()) world.hiddenWorldDisplayName() else world.name,
                 style = MaterialTheme.typography.titleMedium,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
@@ -132,7 +163,7 @@ fun LazyItemScope.renderWorldItem(
         },
         supportingContent = {
             Text(
-                text = world.authorName,
+                text = if (world.isHiddenWorld()) strings.hiddenWorld else world.authorName,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1
             )

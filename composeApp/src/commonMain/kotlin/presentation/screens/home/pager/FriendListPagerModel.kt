@@ -24,6 +24,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
@@ -375,20 +376,23 @@ class FriendListPagerModel(
             favoritedWorldMap.values
                 .filter { world ->
                     world.favoriteGroup == groupName &&
-                            (name.isEmpty() || world.name.lowercase().contains(name.lowercase()))
+                            (name.isEmpty() || world.name.lowercase().contains(name.lowercase())
+                                    || (world.id == "???" && world.favoriteId.orEmpty().lowercase().contains(name.lowercase())))
                 }
         } else {
             // 如果没有选择特定分组，仅按名称过滤
             favoritedWorldMap.values
                 .filter { world ->
                     name.isEmpty() || world.name.lowercase().contains(name.lowercase())
+                            || (world.id == "???" && world.favoriteId.orEmpty().lowercase().contains(name.lowercase()))
                 }
-        }.sortedBy { it.name } // 按名称排序
+        }.sortedWith(compareBy<FavoritedWorld> { it.id == "???" }.thenBy { it.name }) // 隐藏世界排到最后，再按名称排序
 
         // 将FavoritedWorld列表转换为WorldData列表
         _worldList.value = filteredWorlds.map { world ->
             WorldData(
                 id = world.id,
+                favoriteId = world.favoriteId,
                 name = world.name,
                 authorId = world.authorId.orEmpty(),
                 authorName = world.authorName.orEmpty(),
@@ -481,45 +485,34 @@ class FriendListPagerModel(
      * 刷新收藏的世界列表
      * 使用流式分页API获取全部收藏世界列表
      */
-    private fun doRefreshWorldList() = screenModelScope.launch(Dispatchers.IO) {
-
-        // 1) 获取本地收藏世界列表
-        val localFavoritedWorlds = worldFavoriteGroupsFlow.mapNotNull {
-            val localEntry = it.entries.firstOrNull { (group, _) ->
+    private suspend fun doRefreshWorldList() {
+        try {
+            val localEntry = worldFavoriteGroupsFlow.value.entries.firstOrNull { (group, _) ->
                 group.ownerId == "local" && group.type == World.value
-            } ?: return@mapNotNull null
-            val localGroup = localEntry.key
-            localEntry.value.map { favoriteData ->
-                withContext(Dispatchers.IO) { worldsApi.getWorldById(favoriteData.favoriteId) }
-                    .toFavoritedWorldForLocal(localGroup.name, favoriteData.favoriteId)
             }
-        }
+            val localFavoritedWorlds = localEntry?.let { (localGroup, favorites) ->
+                favorites.map { favoriteData ->
+                    withContext(Dispatchers.IO) { worldsApi.getWorldById(favoriteData.favoriteId) }
+                        .toFavoritedWorldForLocal(localGroup.name, favoriteData.favoriteId)
+                }
+            }.orEmpty()
 
-        // 2) 订阅服务器端的收藏世界流
-        val remoteFavoritedWorlds = worldsApi.favoritedWorldsFlow()
-            // 如果是登录失效了就会重新登录并重试一次
-            .retry { if (it is VRCApiException) authService.doReTryAuth() else false }
+            // 每页流只包含当前页；收齐后再替换缓存，避免刷新期间留下失效记录。
+            val remoteFavoritedWorlds = worldsApi.favoritedWorldsFlow()
+                .retry { if (it is VRCApiException) authService.doReTryAuth() else false }
+                .toList()
+                .flatten()
 
-        // 3) 合并数据
-        var dataReceived = false
-
-        combine(localFavoritedWorlds, remoteFavoritedWorlds) { favoritedWorlds, localWorlds ->
-            localWorlds + favoritedWorlds
-        }.catch { e ->
-            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
-        }.collect { favoritedWorlds ->
-            dataReceived = true
-            // 更新缓存，过滤掉不可见/非公开等情况
-            favoritedWorldMap.putAll(
-                favoritedWorlds.filter { it.isSecure != false }.associateBy { it.id }
+            replaceFavoritedWorldCache(
+                cache = favoritedWorldMap,
+                worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds),
             )
             _worldTotal.value = favoritedWorldMap.size
             findWorldList(_searchText.value)
-        }
-
-        // 如果没有收到数据，清空缓存
-        if (!dataReceived) {
-            favoritedWorldMap.clear()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
         }
     }
 }
@@ -565,6 +558,22 @@ internal fun mergeFavoritedAvatars(
     remoteAvatars: List<AvatarData>,
     localAvatars: List<AvatarData>,
 ): List<AvatarData> = (remoteAvatars + localAvatars).distinctBy { it.id }
+
+internal fun favoritedWorldCacheKey(world: FavoritedWorld): String =
+    if (world.id == "???") world.favoriteId else world.id
+
+internal fun mergeFavoritedWorlds(
+    remoteWorlds: List<FavoritedWorld>,
+    localWorlds: List<FavoritedWorld>,
+): List<FavoritedWorld> = (remoteWorlds + localWorlds).distinctBy(::favoritedWorldCacheKey)
+
+internal fun replaceFavoritedWorldCache(
+    cache: MutableMap<String, FavoritedWorld>,
+    worlds: List<FavoritedWorld>,
+) {
+    cache.clear()
+    cache.putAll(worlds.associateBy(::favoritedWorldCacheKey))
+}
 
 internal fun localFavoritedAvatarIds(
     groups: Map<FavoriteGroupData, List<FavoriteData>>,

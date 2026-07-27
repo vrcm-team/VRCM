@@ -31,6 +31,8 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -422,6 +424,8 @@ private fun ColumnScope.ProfileContent(
     if (currentUser == null) return
     val sharedSuffixKey = LocalSharedSuffixKey.current
     val navigator = currentNavigator
+    val scope = rememberCoroutineScope()
+    val localeStrings = strings
 
     // 加载创建的世界和模型
     LaunchedEffect(currentUser.id, currentUser.isSelf) {
@@ -527,10 +531,16 @@ private fun ColumnScope.ProfileContent(
         worlds = createdWorlds,
         sharedSuffixKey = sharedSuffixKey,
         onWorldClick = { world ->
-            navigator push WorldProfileScreen(
-                worldProfileVO = WorldProfileVo(world),
-                sharedSuffixKey = sharedSuffixKey
-            )
+            if (world.isHiddenWorld()) {
+                scope.launch {
+                    SharedFlowCentre.toastText.emit(ToastText.Info(localeStrings.hiddenWorldCannotView))
+                }
+            } else {
+                navigator push WorldProfileScreen(
+                    worldProfileVO = WorldProfileVo(world),
+                    sharedSuffixKey = sharedSuffixKey
+                )
+            }
         }
     )
 
@@ -546,10 +556,22 @@ private fun ColumnScope.ProfileContent(
         groupedWorlds = favoritedWorlds,
         sharedSuffixKey = sharedSuffixKey,
         onWorldClick = { world ->
-            navigator push WorldProfileScreen(
-                worldProfileVO = WorldProfileVo(worldId = world.id, worldName = world.name, worldImageUrl = world.imageUrl, thumbnailImageUrl = world.thumbnailImageUrl, authorName = world.authorName),
-                sharedSuffixKey = sharedSuffixKey
-            )
+            if (world.id == "???") {
+                scope.launch {
+                    SharedFlowCentre.toastText.emit(ToastText.Info(localeStrings.hiddenWorldCannotView))
+                }
+            } else {
+                navigator push WorldProfileScreen(
+                    worldProfileVO = WorldProfileVo(
+                        worldId = world.id,
+                        worldName = world.name,
+                        worldImageUrl = world.imageUrl?.ifBlank { null },
+                        thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
+                        authorName = world.authorName
+                    ),
+                    sharedSuffixKey = sharedSuffixKey
+                )
+            }
         }
     )
 }
@@ -861,6 +883,7 @@ private fun DetailTopBar(
  */
 private data class CardItemVo(
     val id: String,
+    val listKey: String = id,
     val imageUrl: String?,
     val thumbnailUrl: String?,
     val title: String,
@@ -889,6 +912,8 @@ private class CardListDetailScreen(
     @Composable
     override fun Content() {
         val navigator = currentNavigator
+        val scope = rememberCoroutineScope()
+        val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -902,7 +927,7 @@ private class CardListDetailScreen(
                 )
                 CardListContent(
                     items = items,
-                    key = { it.id },
+                    key = { it.listKey },
                     imageUrl = { it.imageUrl ?: it.thumbnailUrl },
                     itemTitle = { it.title },
                     itemSubtitle = { it.subtitle },
@@ -910,16 +935,22 @@ private class CardListDetailScreen(
                     onClickItem = { item ->
                         when (screenType) {
                             CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> {
-                                navigator push WorldProfileScreen(
-                                    worldProfileVO = WorldProfileVo(
-                                        worldId = item.id,
-                                        worldName = item.title,
-                                        worldImageUrl = item.imageUrl,
-                                        thumbnailImageUrl = item.thumbnailUrl,
-                                        authorName = item.authorName
-                                    ),
-                                    sharedSuffixKey = sharedSuffixKey
-                                )
+                                if (item.id == "???") {
+                                    scope.launch {
+                                        SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+                                    }
+                                } else {
+                                    navigator push WorldProfileScreen(
+                                        worldProfileVO = WorldProfileVo(
+                                            worldId = item.id,
+                                            worldName = item.title,
+                                            worldImageUrl = item.imageUrl,
+                                            thumbnailImageUrl = item.thumbnailUrl,
+                                            authorName = item.authorName
+                                        ),
+                                        sharedSuffixKey = sharedSuffixKey
+                                    )
+                                }
                             }
                             CardScreenType.AVATAR -> {
                                 item.avatarData?.let { avatar ->
@@ -1131,9 +1162,9 @@ private fun UserFavoritedWorldsSection(
             ) {
                 StackedLocationCardList(
                     items = worlds,
-                    key = { it.id },
-                    imageUrl = { it.thumbnailImageUrl ?: it.imageUrl },
-                    title = { it.name },
+                    key = { it.favoriteId },
+                    imageUrl = { (it.thumbnailImageUrl ?: it.imageUrl)?.ifBlank { null } },
+                    title = { if (it.id == "???") it.favoriteId ?: it.name else it.name },
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
                     detailTitle = groupName,
                     label = groupName,
@@ -1143,9 +1174,10 @@ private fun UserFavoritedWorldsSection(
                             title = groupName,
                             items = list.map { CardItemVo(
                                 id = it.id,
-                                imageUrl = it.thumbnailImageUrl ?: it.imageUrl,
-                                thumbnailUrl = it.thumbnailImageUrl,
-                                title = it.name,
+                                listKey = it.favoriteId,
+                                imageUrl = (it.thumbnailImageUrl ?: it.imageUrl)?.ifBlank { null },
+                                thumbnailUrl = it.thumbnailImageUrl?.ifBlank { null },
+                                title = if (it.id == "???") it.favoriteId ?: it.name else it.name,
                                 subtitle = it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤",
                                 authorName = it.authorName ?: ""
                             ) },

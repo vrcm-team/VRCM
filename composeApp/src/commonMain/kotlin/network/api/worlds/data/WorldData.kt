@@ -16,6 +16,7 @@ data class WorldData(
     val featured: Boolean?,
     val heat: Int,
     val id: String,
+    val favoriteId: String? = null,
     val imageUrl: String,
     val labsPublicationDate: String,
     val name: String,
