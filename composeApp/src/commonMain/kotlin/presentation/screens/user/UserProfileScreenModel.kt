@@ -35,12 +35,15 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
 
 private enum class UserLoadState {
@@ -60,9 +63,23 @@ internal class UserProfileLoadGate {
     ): Boolean {
         if (!tryStart(forceRefresh)) return false
 
-        do {
-            val succeeded = load()
-        } while (finish(succeeded))
+        var failure: Throwable? = null
+        try {
+            do {
+                val succeeded = try {
+                    load()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    failure = failure ?: error
+                    false
+                }
+            } while (finish(succeeded))
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) { abort() }
+            throw error
+        }
+        failure?.let { throw it }
         return true
     }
 
@@ -95,6 +112,11 @@ internal class UserProfileLoadGate {
             state = if (succeeded) UserLoadState.Loaded else UserLoadState.Idle
             false
         }
+    }
+
+    private suspend fun abort() = mutex.withLock {
+        state = UserLoadState.Idle
+        pendingForceRefresh = false
     }
 }
 

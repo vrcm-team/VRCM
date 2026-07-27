@@ -8,6 +8,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -138,5 +139,26 @@ class UserProfileLoadGateTest {
 
         assertEquals(1, userAttempts)
         assertEquals(2, groupAttempts)
+    }
+
+    @Test
+    fun thrownLoadFailureLeavesTheGateRetryable() = runTest {
+        val gate = UserProfileLoadGate()
+        var attempts = 0
+
+        assertFailsWith<IllegalStateException> {
+            gate.runLoad {
+                attempts++
+                error("load failed")
+            }
+        }
+
+        assertTrue(
+            gate.runLoad {
+                attempts++
+                true
+            }
+        )
+        assertEquals(2, attempts)
     }
 }
