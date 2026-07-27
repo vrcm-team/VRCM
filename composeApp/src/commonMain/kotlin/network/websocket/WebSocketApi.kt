@@ -9,6 +9,7 @@ import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.client.call.*
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.*
 
 class WebSocketApi(
@@ -21,26 +22,27 @@ class WebSocketApi(
     init {
         scope.launch {
             SharedFlowCentre.authed.collect {
-                currentJob?.cancel()
+                currentJob?.cancelAndJoin()
                 currentJob = launch { startWebSocket() }
             }
         }
         scope.launch {
             SharedFlowCentre.logout.collect {
-                currentJob?.cancel()
+                currentJob?.cancelAndJoin()
+                currentJob = null
             }
         }
     }
 
     suspend fun startWebSocket() {
-        // 参考 VRCX：从 GET /auth 获取 WebSocket token
-        val authResponse = apiClient.get(AUTH_API_PREFIX)
-        if (authResponse.status.value != 200) return
-        val authData = authResponse.body<AuthData>()
-        if (authData.ok != true || authData.token == null) return
-        val token = authData.token
-
-        try {
+        retryWebSocketConnection {
+            val authResponse = apiClient.get(AUTH_API_PREFIX)
+            check(authResponse.status == HttpStatusCode.OK) {
+                "WebSocket auth failed with HTTP ${authResponse.status.value}"
+            }
+            val authData = authResponse.body<AuthData>()
+            val token = authData.token.takeIf { authData.ok == true && !it.isNullOrBlank() }
+                ?: error("WebSocket auth response did not contain a token")
             apiClient.ws(
                 urlString = VRC_WSS_URL,
                 request = {
@@ -51,11 +53,22 @@ class WebSocketApi(
                     SharedFlowCentre.webSocket.emit(othersMessage)
                 }
             }
-        } catch (e: Exception) {
-            delay(5000L)
-            startWebSocket()
         }
     }
+}
 
-
+internal suspend fun retryWebSocketConnection(
+    retryDelayMillis: Long = 5_000L,
+    connect: suspend () -> Unit,
+) {
+    while (currentCoroutineContext().isActive) {
+        try {
+            connect()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // The next iteration obtains a fresh token before reconnecting.
+        }
+        delay(retryDelayMillis)
+    }
 }
