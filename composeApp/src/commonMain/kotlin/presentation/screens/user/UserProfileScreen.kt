@@ -62,6 +62,15 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import kotlinx.coroutines.launch
 import org.koin.core.parameter.parametersOf
 
+internal class OneShotScrollRestorer(savedPosition: Int) {
+    private var pendingPosition = savedPosition.takeIf { it > 0 }
+
+    fun consume(maxValue: Int): Int? {
+        if (maxValue <= 0) return null
+        return pendingPosition.also { pendingPosition = null }
+    }
+}
+
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
@@ -97,21 +106,26 @@ data class UserProfileScreen(
         // 保存/恢复滚动位置
         val outerScrollState = rememberScrollState()
         val innerScrollState = rememberScrollState()
+        val outerScrollRestorer = remember {
+            OneShotScrollRestorer(userProfileScreenModel.savedOuterScrollPosition)
+        }
+        val innerScrollRestorer = remember {
+            OneShotScrollRestorer(userProfileScreenModel.savedInnerScrollPosition)
+        }
         DisposableEffect(Unit) {
             onDispose {
                 userProfileScreenModel.savedOuterScrollPosition = outerScrollState.value
                 userProfileScreenModel.savedInnerScrollPosition = innerScrollState.value
             }
         }
-        // 等待内容布局完成后再恢复滚动位置，避免被 maxValue=0 钳制
-        LaunchedEffect(outerScrollState.maxValue, innerScrollState.maxValue) {
-            val savedOuter = userProfileScreenModel.savedOuterScrollPosition
-            val savedInner = userProfileScreenModel.savedInnerScrollPosition
-            if (savedOuter > 0 && outerScrollState.maxValue > 0) {
-                outerScrollState.scrollTo(savedOuter)
+        LaunchedEffect(outerScrollState.maxValue) {
+            outerScrollRestorer.consume(outerScrollState.maxValue)?.let {
+                outerScrollState.scrollTo(it)
             }
-            if (savedInner > 0 && innerScrollState.maxValue > 0) {
-                innerScrollState.scrollTo(savedInner)
+        }
+        LaunchedEffect(innerScrollState.maxValue) {
+            innerScrollRestorer.consume(innerScrollState.maxValue)?.let {
+                innerScrollState.scrollTo(it)
             }
         }
 
