@@ -43,20 +43,58 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.core.logger.Logger
 
+private enum class UserLoadState {
+    Idle,
+    Loading,
+    Loaded,
+}
+
 internal class UserProfileLoadGate {
     private val mutex = Mutex()
-    private var isLoaded = false
+    private var state = UserLoadState.Idle
+    private var pendingForceRefresh = false
 
     suspend fun runLoad(
         forceRefresh: Boolean = false,
         load: suspend () -> Boolean,
-    ): Boolean = mutex.withLock {
-        if (!forceRefresh && isLoaded) {
-            return@withLock false
+    ): Boolean {
+        if (!tryStart(forceRefresh)) return false
+
+        do {
+            val succeeded = load()
+        } while (finish(succeeded))
+        return true
+    }
+
+    private suspend fun tryStart(forceRefresh: Boolean): Boolean = mutex.withLock {
+        when (state) {
+            UserLoadState.Idle -> {
+                state = UserLoadState.Loading
+                true
+            }
+            UserLoadState.Loading -> {
+                pendingForceRefresh = pendingForceRefresh || forceRefresh
+                false
+            }
+            UserLoadState.Loaded -> {
+                if (forceRefresh) {
+                    state = UserLoadState.Loading
+                    true
+                } else {
+                    false
+                }
+            }
         }
-        isLoaded = false
-        isLoaded = load()
-        true
+    }
+
+    private suspend fun finish(succeeded: Boolean): Boolean = mutex.withLock {
+        if (pendingForceRefresh) {
+            pendingForceRefresh = false
+            true
+        } else {
+            state = if (succeeded) UserLoadState.Loaded else UserLoadState.Idle
+            false
+        }
     }
 }
 

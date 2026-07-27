@@ -1,11 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -52,34 +52,60 @@ class UserProfileLoadGateTest {
     }
 
     @Test
-    fun forcedRefreshDuringLoadRunsAfterTheCurrentRequest() = runTest {
+    fun concurrentUserLoadsAreMergedWhenTheFirstLoadFails() = runTest {
         val gate = UserProfileLoadGate()
-        val firstStarted = CompletableDeferred<Unit>()
         val releaseFirst = CompletableDeferred<Unit>()
         var attempts = 0
 
-        val first = async(Dispatchers.Default) {
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
             gate.runLoad {
                 attempts++
-                firstStarted.complete(Unit)
+                releaseFirst.await()
+                false
+            }
+        }
+        val followers = List(19) {
+            async {
+                gate.runLoad {
+                    attempts++
+                    false
+                }
+            }
+        }
+
+        assertTrue(followers.awaitAll().none { it })
+        assertEquals(1, attempts)
+        releaseFirst.complete(Unit)
+
+        assertTrue(first.await())
+        assertEquals(1, attempts)
+    }
+
+    @Test
+    fun forcedRefreshDuringLoadRunsAfterTheCurrentRequest() = runTest {
+        val gate = UserProfileLoadGate()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var attempts = 0
+
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            gate.runLoad {
+                attempts++
                 releaseFirst.await()
                 true
             }
         }
-        firstStarted.await()
-        val forced = async(Dispatchers.Default) {
+        val forced = async {
             gate.runLoad(forceRefresh = true) {
                 attempts++
                 true
             }
         }
-        yield()
 
+        assertFalse(forced.await())
         assertEquals(1, attempts)
         releaseFirst.complete(Unit)
 
         assertTrue(first.await())
-        assertTrue(forced.await())
         assertEquals(2, attempts)
     }
 }
