@@ -99,6 +99,21 @@ class FriendLocationPresenceStoreTest {
         assertEquals(listOf("usr_a"), snapshot.private.map(FriendData::id))
     }
 
+    @Test
+    fun onlineEventBeforeOldActiveSnapshotStillWins() {
+        val store = FriendLocationPresenceStore()
+        store.apply(FriendUpdateEvent.Active(friend("usr_a", LocationType.Offline.value)))
+        store.beginRefresh()
+
+        store.apply(FriendUpdateEvent.Online(friend("usr_a", LocationType.Private.value)))
+        store.setActiveFriends(listOf("usr_a"))
+        store.finishRefresh(setOf("usr_a"), reconcile = true)
+
+        val snapshot = store.snapshot()
+        assertTrue(snapshot.offline.isEmpty())
+        assertEquals(listOf("usr_a"), snapshot.private.map(FriendData::id))
+    }
+
     private fun friend(
         id: String,
         location: String,

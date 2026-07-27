@@ -19,18 +19,23 @@ internal class FriendLocationPresenceStore {
     private val friendsById = mutableMapOf<String, FriendData>()
     private val activeFriendIds = mutableSetOf<String>()
     private val refreshOverrides = mutableSetOf<String>()
+    private val activeRefreshOverrides = mutableMapOf<String, Boolean>()
     private var refreshInProgress = false
 
     fun clear() {
         friendsById.clear()
         activeFriendIds.clear()
         refreshOverrides.clear()
+        activeRefreshOverrides.clear()
         refreshInProgress = false
     }
 
     fun setActiveFriends(friendIds: Collection<String>) {
         activeFriendIds.clear()
         activeFriendIds.addAll(friendIds)
+        activeRefreshOverrides.forEach { (userId, isActive) ->
+            if (isActive) activeFriendIds += userId else activeFriendIds -= userId
+        }
     }
 
     fun addPage(friends: Collection<FriendData>) {
@@ -40,6 +45,7 @@ internal class FriendLocationPresenceStore {
 
     fun beginRefresh() {
         refreshOverrides.clear()
+        activeRefreshOverrides.clear()
         refreshInProgress = true
     }
 
@@ -55,6 +61,7 @@ internal class FriendLocationPresenceStore {
 
     fun cancelRefresh() {
         refreshOverrides.clear()
+        activeRefreshOverrides.clear()
         refreshInProgress = false
     }
 
@@ -66,25 +73,25 @@ internal class FriendLocationPresenceStore {
     fun apply(event: FriendUpdateEvent): Boolean {
         when (event) {
             is FriendUpdateEvent.Active -> {
-                markRefreshOverride(event.friend.id)
+                markRefreshOverride(event.friend.id, isActive = true)
                 activeFriendIds += event.friend.id
                 friendsById[event.friend.id] = event.friend
             }
 
             is FriendUpdateEvent.Online -> {
-                markRefreshOverride(event.friend.id)
+                markRefreshOverride(event.friend.id, isActive = false)
                 activeFriendIds -= event.friend.id
                 friendsById[event.friend.id] = event.friend
             }
 
             is FriendUpdateEvent.LocationChanged -> {
-                markRefreshOverride(event.friend.id)
+                markRefreshOverride(event.friend.id, isActive = false)
                 activeFriendIds -= event.friend.id
                 friendsById[event.friend.id] = event.friend
             }
 
             is FriendUpdateEvent.Offline -> {
-                markRefreshOverride(event.userId)
+                markRefreshOverride(event.userId, isActive = false)
                 activeFriendIds -= event.userId
                 friendsById.remove(event.userId)
             }
@@ -93,7 +100,7 @@ internal class FriendLocationPresenceStore {
                 if (event.friend.id in friendsById) friendsById[event.friend.id] = event.friend
             }
             is FriendUpdateEvent.Delete -> {
-                markRefreshOverride(event.userId)
+                markRefreshOverride(event.userId, isActive = false)
                 activeFriendIds -= event.userId
                 friendsById.remove(event.userId)
             }
@@ -103,8 +110,11 @@ internal class FriendLocationPresenceStore {
         return false
     }
 
-    private fun markRefreshOverride(userId: String) {
-        if (refreshInProgress) refreshOverrides += userId
+    private fun markRefreshOverride(userId: String, isActive: Boolean) {
+        if (refreshInProgress) {
+            refreshOverrides += userId
+            activeRefreshOverrides[userId] = isActive
+        }
     }
 
     fun snapshot(): FriendLocationSnapshot {
