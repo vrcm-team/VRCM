@@ -39,7 +39,7 @@ class FriendService(
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val friendMapLock = Any()
-    private val mutableFriendMap = mutableMapOf<String, FriendData>()
+    private val friendStore = FriendStateStore()
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
@@ -150,6 +150,7 @@ class FriendService(
         offline: Boolean? = null,
         onUpdater: suspend (List<FriendData>) -> Unit = {},
     ): Boolean {
+        val refreshToken = synchronized(friendMapLock) { friendStore.beginRefresh() }
         val collectedFriends = mutableListOf<FriendData>()
         var succeeded = true
         try {
@@ -167,10 +168,13 @@ class FriendService(
                 }
 
             if (succeeded) {
-                if (offline == null) replaceFriends(collectedFriends)
-                else putFriends(collectedFriends)
+                return commitRefresh(
+                    token = refreshToken,
+                    friends = collectedFriends,
+                    replaceUntouched = offline == null,
+                )
             }
-            return succeeded
+            return false
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -183,38 +187,42 @@ class FriendService(
         userId: String,
         update: (FriendData?) -> FriendData?,
     ): FriendData? = synchronized(friendMapLock) {
-        val updated = update(mutableFriendMap[userId]) ?: return@synchronized null
-        mutableFriendMap[userId] = updated
-        _friendState.value = mutableFriendMap.toMap()
+        val updated = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
+        publishFriendState()
         updated
     }
 
-    private fun putFriend(friend: FriendData) = mutateFriendMap {
-        mutableFriendMap[friend.id] = friend
+    private fun putFriend(friend: FriendData) = mutateFriendStore {
+        friendStore.putFromEvent(friend)
     }
 
-    private fun putFriends(friends: Collection<FriendData>) = mutateFriendMap {
-        mutableFriendMap.putAll(friends.associateBy(FriendData::id))
+    private fun removeFriend(userId: String) = mutateFriendStore {
+        friendStore.removeFromEvent(userId)
     }
 
-    private fun replaceFriends(friends: Collection<FriendData>) = mutateFriendMap {
-        mutableFriendMap.clear()
-        mutableFriendMap.putAll(friends.associateBy(FriendData::id))
+    fun clearFriendData() = mutateFriendStore {
+        friendStore.clear()
     }
 
-    private fun removeFriend(userId: String) = mutateFriendMap {
-        mutableFriendMap.remove(userId)
+    private fun commitRefresh(
+        token: FriendRefreshToken,
+        friends: Collection<FriendData>,
+        replaceUntouched: Boolean,
+    ): Boolean = synchronized(friendMapLock) {
+        val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
+        if (committed) publishFriendState()
+        committed
     }
 
-    fun clearFriendData() = mutateFriendMap {
-        mutableFriendMap.clear()
-    }
-
-    private inline fun mutateFriendMap(update: () -> Unit) {
+    private inline fun mutateFriendStore(update: () -> Unit) {
         synchronized(friendMapLock) {
             update()
-            _friendState.value = mutableFriendMap.toMap()
+            publishFriendState()
         }
+    }
+
+    private fun publishFriendState() {
+        _friendState.value = friendStore.snapshot
     }
 
     suspend fun sendFriendRequest(userId: String) =
