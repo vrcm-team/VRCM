@@ -10,8 +10,9 @@ class UserProfileScrollRestorerTest {
         val restorer = OneShotScrollRestorer(savedPosition = 240)
 
         assertNull(restorer.consume(maxValue = 0))
-        assertEquals(240, restorer.consume(maxValue = 120))
-        assertNull(restorer.consume(maxValue = 480))
+        assertNull(restorer.consume(maxValue = 120))
+        assertEquals(240, restorer.consume(maxValue = 480))
+        assertNull(restorer.consume(maxValue = 720))
     }
 
     @Test
