@@ -1,8 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -11,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -25,14 +31,17 @@ import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
+import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
@@ -79,6 +88,7 @@ class ImagePreviewDialog(
                         // 移除对话框
                         setDialogContent(null)
                     },
+                    cropRevealEnabled = directImageUrl != null,
                 )
             }
 
@@ -167,11 +177,24 @@ fun BoxScope.ZoomableImage(
     maxScale: Float = 3f,
     minScale: Float = 0.8f,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    cropRevealEnabled: Boolean = false,
 ) {
     var targetScale by remember { mutableStateOf(1f) }
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) }
+
+    val cropRevealProgress = rememberPrintCropRevealProgress(
+        animatedVisibilityScope = animatedVisibilityScope,
+        enabled = cropRevealEnabled,
+    )
+
+    val cropShape = if (cropRevealEnabled) {
+        PrintCropShape(
+            placement = PrintCanvasPlacement.FitCenter,
+            revealProgress = cropRevealProgress,
+        )
+    } else null
 
     // 用于长按拖动的偏移量
 
@@ -318,8 +341,18 @@ fun BoxScope.ZoomableImage(
                 .sharedBoundsBy(
                     id,
                     sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                    animatedVisibilityScope = animatedVisibilityScope
-                ),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = if (cropRevealEnabled) PrintBoundsTransform else DefaultBoundsTransform,
+                    clipInOverlayDuringTransition = if (cropRevealEnabled) {
+                        PrintCropOverlayClip(
+                            placement = PrintCanvasPlacement.FitCenter,
+                            revealProgress = cropRevealProgress,
+                        )
+                    } else {
+                        NoOverlayClip
+                    },
+                )
+                .then(if (cropShape != null) Modifier.clip(cropShape) else Modifier),
             loading = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -336,4 +369,42 @@ fun BoxScope.ZoomableImage(
             }
         )
     }
+}
+
+@Composable
+internal fun rememberPrintCropRevealProgress(
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    enabled: Boolean,
+): Float {
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(animatedVisibilityScope, enabled) {
+        if (!enabled) return@LaunchedEffect
+        try {
+            snapshotFlow { animatedVisibilityScope.transition.targetState }
+                .collectLatest { targetState ->
+                    when (targetState) {
+                        EnterExitState.Visible -> {
+                            delay(PrintBoundsTransitionDurationMillis.toLong())
+                            progress.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                            )
+                        }
+
+                        EnterExitState.PreEnter -> Unit
+                        EnterExitState.PostExit -> progress.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
+                        )
+                    }
+                }
+        } catch (_: CancellationException) {
+            // AnimatedContent may dispose the outgoing branch after its exit transition.
+        } finally {
+            progress.snapTo(0f)
+        }
+    }
+
+    return progress.value
 }

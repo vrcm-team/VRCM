@@ -63,6 +63,13 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
         }
 
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(compose.desktop.currentOs)
+            @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+            implementation(compose.uiTest)
+        }
+
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
 

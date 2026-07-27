@@ -30,8 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -300,6 +302,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         val imageUrl = print.files?.image ?: ""
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(FileTagType.Print, print.id)
+        val printCropShape = remember {
+            PrintCropShape(
+                placement = PrintCanvasPlacement.CropTopCenter,
+                cornerRadius = 12.dp,
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -311,7 +319,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     imageModel = { imageUrl },
                     imageOptions = ImageOptions(
                         contentScale = ContentScale.Crop,
-                        alignment = Alignment.Center
+                        alignment = Alignment.TopCenter
                     ),
                     imageLoader = { koinInject() },
                     modifier = Modifier
@@ -321,7 +329,20 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             print.id,
                             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                             animatedVisibilityScope = this@AnimatedVisibility,
+                            boundsTransform = PrintBoundsTransform,
+                            clipInOverlayDuringTransition = PrintThumbnailOverlayClip,
                         )
+                        .graphicsLayer {
+                            val transform = PrintDisplayGeometry.cropToFillTransform(
+                                bounds = Rect(0f, 0f, size.width, size.height),
+                                placement = PrintCanvasPlacement.CropTopCenter,
+                            )
+                            scaleX = transform.scale
+                            scaleY = transform.scale
+                            translationX = transform.translationX
+                            translationY = transform.translationY
+                        }
+                        .clip(printCropShape)
                         .combinedClickable(
                             onClick = {
                                 if (galleryScreenModel.hasSelection(FileTagType.Print)) {
@@ -363,6 +384,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.3f))
+                        .clip(MaterialTheme.shapes.medium)
                         .clickable {
                             galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                         },
