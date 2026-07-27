@@ -39,8 +39,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 import org.koin.core.logger.Logger
+
+private enum class UserLoadState {
+    Idle,
+    Loading,
+    Loaded,
+}
+
+internal class UserProfileLoadGate {
+    private var state = UserLoadState.Idle
+
+    fun tryStart(forceRefresh: Boolean = false): Boolean {
+        if (state == UserLoadState.Loading ||
+            (!forceRefresh && state == UserLoadState.Loaded)
+        ) {
+            return false
+        }
+        state = UserLoadState.Loading
+        return true
+    }
+
+    fun markLoaded() {
+        state = UserLoadState.Loaded
+    }
+
+    fun markRetryable() {
+        state = UserLoadState.Idle
+    }
+}
 
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
@@ -93,15 +120,15 @@ class UserProfileScreenModel(
     var savedOuterScrollPosition: Int = 0
     var savedInnerScrollPosition: Int = 0
 
-    // 标记用户数据是否已从API加载完成
-    private var isUserLoaded = false
+    private val userLoadGate = UserProfileLoadGate()
 
     fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
-            if (!forceRefresh && isUserLoaded) return@launch
+            if (!userLoadGate.tryStart(forceRefresh)) return@launch
             authService.reTryAuthCatching {
                 usersApi.fetchUserResponse(userId)
             }.onFailure {
+                userLoadGate.markRetryable()
                 handleError(it)
             }.onSuccess { response ->
                 // 防止body序列化异常
@@ -109,10 +136,13 @@ class UserProfileScreenModel(
                     .onSuccess {
                         _userState.value = it
                         computeFriendLocation(it.location)
+                        userLoadGate.markLoaded()
                     }
-                    .onFailure { handleError(it) }
+                    .onFailure {
+                        userLoadGate.markRetryable()
+                        handleError(it)
+                    }
                 _userJson.value = response.bodyAsText().pretty()
-                isUserLoaded = true
                 loadUserGroups(userId)
             }
         }
