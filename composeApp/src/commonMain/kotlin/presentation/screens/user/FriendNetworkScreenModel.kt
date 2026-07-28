@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
+import io.github.vrcmteam.vrcm.core.algorithms.computeEgoLayout
 import io.github.vrcmteam.vrcm.core.algorithms.computeForceLayout
 import io.github.vrcmteam.vrcm.core.algorithms.louvainDetect
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -34,6 +35,14 @@ data class FriendNetworkProgress(
     val current: Int,
     val total: Int,
 )
+
+enum class FriendNetworkViewMode {
+    // 社区视图：圈子分离 + 气泡，头像大小 = 圈内度数
+    Community,
+
+    // 自我中心视图：自己居中，共同好友越多离得越近，头像大小 = 共同好友数
+    Ego,
+}
 
 data class CommunitySummary(
     val id: Int,
@@ -67,7 +76,11 @@ data class FriendNetworkUiState(
     val communities: Map<String, Int> = emptyMap(),
     // 真实社区图例（按人数降序，以圈内度数最高成员命名）
     val communityLegend: List<CommunitySummary> = emptyList(),
+    val viewMode: FriendNetworkViewMode = FriendNetworkViewMode.Community,
+    // 自己的节点数据，自我中心视图的圆心
+    val selfNode: MutualFriendData? = null,
     val layout: ForceLayoutResult? = null,
+    val egoLayout: ForceLayoutResult? = null,
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
     val isLoading: Boolean = false,
@@ -252,6 +265,10 @@ class FriendNetworkScreenModel(
     var uiState by mutableStateOf(FriendNetworkUiState())
         private set
 
+    fun setViewMode(mode: FriendNetworkViewMode) {
+        uiState = uiState.copy(viewMode = mode)
+    }
+
     private fun filterSelf(
         nodes: List<MutualFriendData>,
         edges: Map<String, List<String>>,
@@ -277,6 +294,7 @@ class FriendNetworkScreenModel(
                     val communities = assignCommunities(cache.nodes, cache.edges, selfId)
                     val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                     val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
+                    val egoLayout = computeEgo(filteredNodes, filteredEdges, communities, nodeSizePx, selfId)
                     uiState = uiState.copy(
                         selfId = selfId,
                         nodes = filteredNodes,
@@ -284,7 +302,9 @@ class FriendNetworkScreenModel(
                         nodeColors = communityNodeColors(communities),
                         communities = communities,
                         communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                        selfNode = cache.nodes.firstOrNull { it.id == selfId },
                         layout = layout,
+                        egoLayout = egoLayout,
                         updatedAt = cache.updatedAt,
                         isFromCache = true,
                     )
@@ -355,6 +375,7 @@ class FriendNetworkScreenModel(
                 val communities = assignCommunities(nodes, finalEdges, selfId)
                 val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                 val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
+                val egoLayout = computeEgo(filteredNodes, filteredEdges, communities, nodeSizePx, selfId)
                 uiState = FriendNetworkUiState(
                     selfId = selfId,
                     nodes = filteredNodes,
@@ -362,7 +383,10 @@ class FriendNetworkScreenModel(
                     nodeColors = communityNodeColors(communities),
                     communities = communities,
                     communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                    viewMode = uiState.viewMode,
+                    selfNode = selfNode,
                     layout = layout,
+                    egoLayout = egoLayout,
                     updatedAt = cache.updatedAt,
                     isFromCache = false,
                     isLoading = false,
@@ -430,6 +454,22 @@ class FriendNetworkScreenModel(
         straddlers: Map<String, StraddlerInfo>,
     ): ForceLayoutResult = withContext(Dispatchers.Default) {
         computeNodePositions(nodes, edges, nodeSizePx, communities, straddlers)
+    }
+
+    private suspend fun computeEgo(
+        nodes: List<MutualFriendData>,
+        edges: Map<String, List<String>>,
+        communities: Map<String, Int>,
+        nodeSizePx: Float,
+        selfId: String,
+    ): ForceLayoutResult = withContext(Dispatchers.Default) {
+        computeEgoLayout(
+            nodeIds = nodes.map { it.id },
+            edges = edges,
+            communities = communities,
+            desiredSpacing = nodeSizePx * 1.3f,
+            selfId = selfId,
+        )
     }
 
     private fun CurrentUserData.toMutualFriendData(isFriend: Boolean) = MutualFriendData(

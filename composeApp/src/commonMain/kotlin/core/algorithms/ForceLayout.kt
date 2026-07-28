@@ -15,6 +15,13 @@ data class ForceLayoutResult(
     val positions: Map<String, Offset>,
     val layoutWidthPx: Float,
     val layoutHeightPx: Float,
+    // 自我中心视图的距离参考环（以 self 位置为圆心）
+    val guideRings: List<EgoGuideRing> = emptyList(),
+)
+
+data class EgoGuideRing(
+    val radiusPx: Float,
+    val mutualCount: Int,
 )
 
 private const val FORCE_ITERATIONS = 300
@@ -348,8 +355,9 @@ private fun placeIsolatedOnRings(
 
 /**
  * 碰撞消除：把中心距小于 minDist 的节点对沿连线推开
+ * @param pinned 该下标的节点位置固定不动（自我中心视图的中心），重叠时只推开对方
  */
-private fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float) {
+internal fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float, pinned: Int = -1) {
     val n = x.size
     if (n < 2 || minDist <= 0f) return
     val minDistSq = minDist * minDist
@@ -381,13 +389,25 @@ private fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float) {
                             dy = sin(angle)
                             dist = 1f
                         }
-                        val push = (minDist - min(dist, minDist)) / 2f
+                        val overlap = minDist - min(dist, minDist)
                         val ux = dx / dist
                         val uy = dy / dist
-                        x[i] -= ux * push
-                        y[i] -= uy * push
-                        x[j] += ux * push
-                        y[j] += uy * push
+                        when {
+                            i == pinned -> {
+                                x[j] += ux * overlap
+                                y[j] += uy * overlap
+                            }
+                            j == pinned -> {
+                                x[i] -= ux * overlap
+                                y[i] -= uy * overlap
+                            }
+                            else -> {
+                                x[i] -= ux * overlap / 2f
+                                y[i] -= uy * overlap / 2f
+                                x[j] += ux * overlap / 2f
+                                y[j] += uy * overlap / 2f
+                            }
+                        }
                         moved = true
                     }
                 }

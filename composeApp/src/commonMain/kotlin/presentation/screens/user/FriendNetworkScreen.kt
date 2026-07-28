@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -58,7 +59,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -169,10 +172,12 @@ object FriendNetworkScreen : Screen {
                     progress = state.progress,
                     isLoading = state.isLoading
                 )
-                if (state.communityLegend.isNotEmpty()) {
-                    CommunityLegendRow(
+                if (state.nodes.isNotEmpty()) {
+                    FriendNetworkControlRow(
+                        viewMode = state.viewMode,
                         legend = state.communityLegend,
                         selectedCommunity = selectedCommunityState.value,
+                        onViewModeChange = { model.setViewMode(it) },
                         onCommunityClick = { communityId ->
                             selectedCommunityState.value =
                                 if (selectedCommunityState.value == communityId) null else communityId
@@ -181,7 +186,8 @@ object FriendNetworkScreen : Screen {
                     )
                 }
                 Box(modifier = Modifier.fillMaxSize()) {
-                    val layout = state.layout
+                    val isEgoView = state.viewMode == FriendNetworkViewMode.Ego
+                    val layout = if (isEgoView) state.egoLayout else state.layout
                     if (state.nodes.isEmpty() && !state.isLoading && !state.isPreparing) {
                         Text(
                             modifier = Modifier.align(Alignment.Center),
@@ -196,6 +202,9 @@ object FriendNetworkScreen : Screen {
                             nodeColors = state.nodeColors,
                             communities = state.communities,
                             layout = layout,
+                            isEgoView = isEgoView,
+                            selfNode = state.selfNode,
+                            selfId = state.selfId,
                             highlightIdsState = highlightIdsState,
                             selectedIdState = selectedIdState,
                             highlightIdState = highlightIdState,
@@ -292,52 +301,101 @@ private fun FriendNetworkHeader(
 }
 
 @Composable
-private fun CommunityLegendRow(
+private fun FriendNetworkControlRow(
+    viewMode: FriendNetworkViewMode,
     legend: List<CommunitySummary>,
     selectedCommunity: Int?,
+    onViewModeChange: (FriendNetworkViewMode) -> Unit,
     onCommunityClick: (Int) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        legend.forEach { community ->
-            val isSelected = selectedCommunity == community.id
+        // 视图切换：社区 / 以我为中心
+        Row(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(2.dp)
+        ) {
+            ViewModeChip(
+                text = strings.friendNetworkViewCommunity,
+                isSelected = viewMode == FriendNetworkViewMode.Community,
+                onClick = { onViewModeChange(FriendNetworkViewMode.Community) }
+            )
+            ViewModeChip(
+                text = strings.friendNetworkViewEgo,
+                isSelected = viewMode == FriendNetworkViewMode.Ego,
+                onClick = { onViewModeChange(FriendNetworkViewMode.Ego) }
+            )
+        }
+        if (legend.isNotEmpty()) {
+            Spacer(modifier = Modifier.width(8.dp))
             Row(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) community.color.copy(alpha = 0.16f)
-                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) community.color else Color.Transparent,
-                        shape = CircleShape
-                    )
-                    .clickable { onCommunityClick(community.id) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(community.color, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "${community.name} · ${community.count}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
+                legend.forEach { community ->
+                    val isSelected = selectedCommunity == community.id
+                    Row(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) community.color.copy(alpha = 0.16f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) community.color else Color.Transparent,
+                                shape = CircleShape
+                            )
+                            .clickable { onCommunityClick(community.id) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(community.color, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${community.name} · ${community.count}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ViewModeChip(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+    )
 }
 
 private class EdgePathData(
@@ -361,6 +419,9 @@ private fun FriendNetworkGraph(
     nodeColors: Map<String, Color>,
     communities: Map<String, Int>,
     layout: ForceLayoutResult,
+    isEgoView: Boolean,
+    selfNode: MutualFriendData?,
+    selfId: String?,
     highlightIdsState: State<Set<String>>,
     selectedIdState: State<String?>,
     highlightIdState: State<String?>,
@@ -391,13 +452,27 @@ private fun FriendNetworkGraph(
             viewWidthPx / layoutWidthPx,
             viewHeightPx / layoutHeightPx
         ).coerceIn(0.6f, 1.25f)
-        var scale by remember(nodes.size, viewWidthPx, viewHeightPx) { mutableStateOf(initialScale) }
-        var offset by remember(nodes.size, viewWidthPx, viewHeightPx) { mutableStateOf(Offset.Zero) }
-        var hasUserInteracted by remember(nodes.size) { mutableStateOf(false) }
+        var scale by remember(nodes.size, viewWidthPx, viewHeightPx, layout) { mutableStateOf(initialScale) }
+        var offset by remember(nodes.size, viewWidthPx, viewHeightPx, layout) { mutableStateOf(Offset.Zero) }
+        var hasUserInteracted by remember(nodes.size, layout) { mutableStateOf(false) }
         val edgeList = remember(edges) { buildEdgeList(edges) }
-        // 计算每个节点的度数（连接数）
-        val nodeDegree = remember(nodes, edges) { nodes.associate { it.id to edges[it.id].orEmpty().size } }
-        val maxDegree = remember(nodeDegree) { nodeDegree.values.maxOrNull() ?: 1 }
+        // 头像大小比例：社区视图=圈内度数（圈子核心大），自我视图=共同好友数；sqrt 缓和差距
+        val nodeSizeRatio = remember(nodes, edges, communities, isEgoView) {
+            if (isEgoView) {
+                val degree = nodes.associate { it.id to edges[it.id].orEmpty().size }
+                val maxDegree = (degree.values.maxOrNull() ?: 0).coerceAtLeast(1)
+                degree.mapValues { (_, d) -> sqrt(d.toFloat() / maxDegree) }
+            } else {
+                val internalDegree = nodes.associate { node ->
+                    val community = communities[node.id]
+                    node.id to if (community != null && community >= 0) {
+                        edges[node.id].orEmpty().count { communities[it] == community }
+                    } else 0
+                }
+                val maxInternal = (internalDegree.values.maxOrNull() ?: 0).coerceAtLeast(1)
+                internalDegree.mapValues { (_, d) -> sqrt(d.toFloat() / maxInternal) }
+            }
+        }
         val positions = layout.positions
         // 预构建边的弧线 Path，避免每帧重建
         val edgePaths = remember(edgeList, layout, communities) {
@@ -425,7 +500,8 @@ private fun FriendNetworkGraph(
         // 真实社区的凸包气泡（扩张到头像外约 46dp）
         val hullPaddingPx = with(density) { 46.dp.toPx() }
         val hullStrokeWidthPx = with(density) { 24.dp.toPx() }
-        val hullPaths = remember(layout, communities) {
+        val hullPaths = remember(layout, communities, isEgoView) {
+            if (isEgoView) return@remember emptyList()
             communities.entries
                 .filter { it.value != FriendNetworkScreenModel.OTHER_COMMUNITY_ID }
                 .groupBy({ it.value }, { it.key })
@@ -458,16 +534,17 @@ private fun FriendNetworkGraph(
         val defaultColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
         val crossEdgeColor = MaterialTheme.colorScheme.outline
+        val textMeasurer = rememberTextMeasurer()
+        val ringLabelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.outline)
 
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
         val currentOnBackgroundTap by rememberUpdatedState(onBackgroundTap)
 
         // 头像半径（布局坐标系），命中测试用
-        val nodeRadius = remember(nodes, nodeDegree, maxDegree) {
+        val nodeRadius = remember(nodes, nodeSizeRatio) {
             nodes.associate { node ->
-                val degree = nodeDegree[node.id] ?: 0
-                val sizeRatio = if (maxDegree > 0) degree.toFloat() / maxDegree else 0f
+                val sizeRatio = nodeSizeRatio[node.id] ?: 0f
                 node.id to (baseNodeSizePx + maxExtraSizePx * sizeRatio) / 2f
             }
         }
@@ -497,7 +574,7 @@ private fun FriendNetworkGraph(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(nodes.size, initialScale, viewWidthPx, viewHeightPx) {
+                .pointerInput(nodes.size, initialScale, viewWidthPx, viewHeightPx, layout) {
                     detectTapGestures(
                         onTap = { pos ->
                             val nodeId = hitTest(pos)
@@ -519,7 +596,7 @@ private fun FriendNetworkGraph(
                         }
                     )
                 }
-                .pointerInput(nodes.size, initialScale, viewWidthPx, viewHeightPx) {
+                .pointerInput(nodes.size, initialScale, viewWidthPx, viewHeightPx, layout) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
                         val currentScale = if (hasUserInteracted) scale else initialScale
                         val currentOffset = if (hasUserInteracted) offset else centeredOffset
@@ -557,6 +634,32 @@ private fun FriendNetworkGraph(
                     // 当前聚焦的社区（个人高亮取其所在社区），用于气泡压暗
                     val activeCommunity = selectedCommunity ?: currentHighlightId?.let { communities[it] }
 
+                    // 0. 自我视图：距离参考环，数字 = 该环对应的共同好友数
+                    if (isEgoView && selfId != null) {
+                        val center = positions[selfId]
+                        if (center != null) {
+                            layout.guideRings.forEach { ring ->
+                                drawCircle(
+                                    color = crossEdgeColor.copy(alpha = 0.25f),
+                                    radius = ring.radiusPx,
+                                    center = center,
+                                    style = Stroke(
+                                        width = 2f,
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 14f))
+                                    )
+                                )
+                                val label = textMeasurer.measure(ring.mutualCount.toString(), ringLabelStyle)
+                                drawText(
+                                    textLayoutResult = label,
+                                    topLeft = Offset(
+                                        center.x - label.size.width / 2f,
+                                        center.y - ring.radiusPx - label.size.height - 4f
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     // 1. 社区气泡垫底
                     hullPaths.forEach { hull ->
                         val focused = activeCommunity != null && hull.communityId == activeCommunity
@@ -579,25 +682,27 @@ private fun FriendNetworkGraph(
                         )
                     }
 
-                    // 2. 普通边：圈内用社区色，跨圈用中性灰细线
-                    edgePaths.forEach { edge ->
-                        val isPersonHighlight = currentHighlightId != null &&
-                            (edge.from == currentHighlightId || edge.to == currentHighlightId)
-                        val isCommunityHighlight = selectedCommunity != null && edge.communityId == selectedCommunity
-                        if (isPersonHighlight || isCommunityHighlight) return@forEach
-                        if (edge.communityId != null) {
-                            val color = nodeColors[edge.from] ?: defaultColor
-                            drawPath(
-                                path = edge.path,
-                                color = color.copy(alpha = if (highlightActive) 0.08f else 0.55f),
-                                style = Stroke(width = 2.5f)
-                            )
-                        } else {
-                            drawPath(
-                                path = edge.path,
-                                color = crossEdgeColor.copy(alpha = if (highlightActive) 0.05f else 0.18f),
-                                style = Stroke(width = 1.5f)
-                            )
+                    // 2. 普通边：圈内用社区色，跨圈用中性灰细线（自我视图不画，避免遮住距离读数）
+                    if (!isEgoView) {
+                        edgePaths.forEach { edge ->
+                            val isPersonHighlight = currentHighlightId != null &&
+                                (edge.from == currentHighlightId || edge.to == currentHighlightId)
+                            val isCommunityHighlight = selectedCommunity != null && edge.communityId == selectedCommunity
+                            if (isPersonHighlight || isCommunityHighlight) return@forEach
+                            if (edge.communityId != null) {
+                                val color = nodeColors[edge.from] ?: defaultColor
+                                drawPath(
+                                    path = edge.path,
+                                    color = color.copy(alpha = if (highlightActive) 0.08f else 0.55f),
+                                    style = Stroke(width = 2.5f)
+                                )
+                            } else {
+                                drawPath(
+                                    path = edge.path,
+                                    color = crossEdgeColor.copy(alpha = if (highlightActive) 0.05f else 0.18f),
+                                    style = Stroke(width = 1.5f)
+                                )
+                            }
                         }
                     }
 
@@ -630,9 +735,7 @@ private fun FriendNetworkGraph(
                 nodes.forEach { node ->
                     val pos = positions[node.id] ?: return@forEach
                     key(node.id) {
-                        // 根据连接数计算头像大小
-                        val degree = nodeDegree[node.id] ?: 0
-                        val sizeRatio = if (maxDegree > 0) degree.toFloat() / maxDegree else 0f
+                        val sizeRatio = nodeSizeRatio[node.id] ?: 0f
                         val nodeSizeDp = with(density) { (baseNodeSizePx + maxExtraSizePx * sizeRatio).toDp() }
                         val nodeSizePxLocal = baseNodeSizePx + maxExtraSizePx * sizeRatio
                         val nodeOffset = IntOffset(
@@ -654,6 +757,31 @@ private fun FriendNetworkGraph(
                                 size = nodeSizeDp,
                                 selectedIdState = selectedIdState,
                                 communityColor = nodeColors[node.id],
+                            )
+                        }
+                    }
+                }
+
+                // 自我视图：自己固定在圆心
+                if (isEgoView && selfNode != null && selfId != null) {
+                    val selfPos = positions[selfId]
+                    if (selfPos != null) {
+                        val selfSizePx = baseNodeSizePx + maxExtraSizePx
+                        val selfOffset = IntOffset(
+                            x = (selfPos.x - labelWidthPx / 2).roundToInt(),
+                            y = (selfPos.y - selfSizePx / 2).roundToInt()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .offset { selfOffset }
+                                .width(labelWidth),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FriendNetworkNode(
+                                node = selfNode,
+                                size = with(density) { selfSizePx.toDp() },
+                                selectedIdState = selectedIdState,
+                                communityColor = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
