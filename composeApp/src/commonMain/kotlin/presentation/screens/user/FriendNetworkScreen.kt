@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,9 +46,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -62,6 +67,7 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
+import io.github.vrcmteam.vrcm.core.algorithms.convexHull
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -85,6 +91,8 @@ object FriendNetworkScreen : Screen {
         val state = model.uiState
         val selectedIdState = remember { mutableStateOf<String?>(null) }
         val highlightIdState = remember { mutableStateOf<String?>(null) }
+        // 图例选中的社区，与个人长按高亮互斥
+        val selectedCommunityState = remember { mutableStateOf<Int?>(null) }
         var showSheet by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
 
@@ -97,12 +105,17 @@ object FriendNetworkScreen : Screen {
         val nodeMap = remember(state.nodes) { state.nodes.associateBy { it.id } }
         val selectedNode = selectedIdState.value?.let { nodeMap[it] }
         val mutualIds = selectedIdState.value?.let { state.edges[it].orEmpty() }.orEmpty()
-        // 高亮节点及其邻居集合，draw 阶段读取，避免高亮变化触发全图重组
+        // 高亮集合（社区整团或个人+邻居），draw 阶段读取，避免高亮变化触发全图重组
         val highlightIdsState = remember(model) {
             derivedStateOf {
-                highlightIdState.value?.let { id ->
-                    setOf(id) + model.uiState.edges[id].orEmpty()
-                }.orEmpty()
+                val communityId = selectedCommunityState.value
+                if (communityId != null) {
+                    model.uiState.communities.filterValues { it == communityId }.keys
+                } else {
+                    highlightIdState.value?.let { id ->
+                        setOf(id) + model.uiState.edges[id].orEmpty()
+                    }.orEmpty()
+                }
             }
         }
 
@@ -155,6 +168,17 @@ object FriendNetworkScreen : Screen {
                     progress = state.progress,
                     isLoading = state.isLoading
                 )
+                if (state.communityLegend.isNotEmpty()) {
+                    CommunityLegendRow(
+                        legend = state.communityLegend,
+                        selectedCommunity = selectedCommunityState.value,
+                        onCommunityClick = { communityId ->
+                            selectedCommunityState.value =
+                                if (selectedCommunityState.value == communityId) null else communityId
+                            highlightIdState.value = null
+                        }
+                    )
+                }
                 Box(modifier = Modifier.fillMaxSize()) {
                     val layout = state.layout
                     if (state.nodes.isEmpty() && !state.isLoading && !state.isPreparing) {
@@ -169,22 +193,31 @@ object FriendNetworkScreen : Screen {
                             nodes = state.nodes,
                             edges = state.edges,
                             nodeColors = state.nodeColors,
+                            communities = state.communities,
                             layout = layout,
                             highlightIdsState = highlightIdsState,
                             selectedIdState = selectedIdState,
                             highlightIdState = highlightIdState,
+                            selectedCommunityState = selectedCommunityState,
                             onNodeTap = { nodeId ->
                                 val highlighted = highlightIdsState.value
                                 if (highlighted.isNotEmpty() && nodeId !in highlighted) {
                                     // 高亮模式下点击未高亮的节点：退出高亮，不打开详情
                                     highlightIdState.value = null
+                                    selectedCommunityState.value = null
                                 } else {
                                     selectedIdState.value = nodeId
                                     showSheet = true
                                 }
                             },
-                            onNodeLongPress = { highlightIdState.value = it },
-                            onBackgroundTap = { highlightIdState.value = null },
+                            onNodeLongPress = {
+                                highlightIdState.value = it
+                                selectedCommunityState.value = null
+                            },
+                            onBackgroundTap = {
+                                highlightIdState.value = null
+                                selectedCommunityState.value = null
+                            },
                         )
                     }
                     if ((state.isLoading || state.isPreparing) && state.nodes.isEmpty()) {
@@ -256,9 +289,66 @@ private fun FriendNetworkHeader(
     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 }
 
+@Composable
+private fun CommunityLegendRow(
+    legend: List<CommunitySummary>,
+    selectedCommunity: Int?,
+    onCommunityClick: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        legend.forEach { community ->
+            val isSelected = selectedCommunity == community.id
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) community.color.copy(alpha = 0.16f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) community.color else Color.Transparent,
+                        shape = CircleShape
+                    )
+                    .clickable { onCommunityClick(community.id) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(community.color, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "${community.name} · ${community.count}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSurface
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 private class EdgePathData(
     val from: String,
     val to: String,
+    // 两端同社区时为社区 ID，跨社区为 null
+    val communityId: Int?,
+    val path: Path,
+)
+
+private class HullPathData(
+    val communityId: Int,
+    val color: Color,
     val path: Path,
 )
 
@@ -267,10 +357,12 @@ private fun FriendNetworkGraph(
     nodes: List<MutualFriendData>,
     edges: Map<String, List<String>>,
     nodeColors: Map<String, Color>,
+    communities: Map<String, Int>,
     layout: ForceLayoutResult,
     highlightIdsState: State<Set<String>>,
     selectedIdState: State<String?>,
     highlightIdState: State<String?>,
+    selectedCommunityState: State<Int?>,
     onNodeTap: (String) -> Unit,
     onNodeLongPress: (String) -> Unit,
     onBackgroundTap: () -> Unit,
@@ -305,7 +397,7 @@ private fun FriendNetworkGraph(
         val maxDegree = remember(nodeDegree) { nodeDegree.values.maxOrNull() ?: 1 }
         val positions = layout.positions
         // 预构建边的弧线 Path，避免每帧重建
-        val edgePaths = remember(edgeList, layout) {
+        val edgePaths = remember(edgeList, layout, communities) {
             edgeList.mapNotNull { (from, to) ->
                 val fromPos = positions[from] ?: return@mapNotNull null
                 val toPos = positions[to] ?: return@mapNotNull null
@@ -322,14 +414,47 @@ private fun FriendNetworkGraph(
                     moveTo(fromPos.x, fromPos.y)
                     quadraticBezierTo(midX + nx * curvature, midY + ny * curvature, toPos.x, toPos.y)
                 }
-                EdgePathData(from, to, path)
+                val fromCommunity = communities[from]
+                val communityId = if (fromCommunity != null && fromCommunity == communities[to]) fromCommunity else null
+                EdgePathData(from, to, communityId, path)
             }
+        }
+        // 真实社区的凸包气泡（扩张到头像外约 46dp）
+        val hullPaddingPx = with(density) { 46.dp.toPx() }
+        val hullStrokeWidthPx = with(density) { 24.dp.toPx() }
+        val hullPaths = remember(layout, communities) {
+            communities.entries
+                .filter { it.value != FriendNetworkScreenModel.OTHER_COMMUNITY_ID }
+                .groupBy({ it.value }, { it.key })
+                .mapNotNull { (communityId, members) ->
+                    val points = members.mapNotNull { positions[it] }
+                    if (points.size < 3) return@mapNotNull null
+                    val hull = convexHull(points)
+                    if (hull.size < 2) return@mapNotNull null
+                    var centerX = 0f
+                    var centerY = 0f
+                    points.forEach { centerX += it.x; centerY += it.y }
+                    centerX /= points.size
+                    centerY /= points.size
+                    val path = Path()
+                    hull.forEachIndexed { index, p ->
+                        val dx = p.x - centerX
+                        val dy = p.y - centerY
+                        val len = sqrt(dx * dx + dy * dy)
+                        val ex = if (len > 0f) p.x + dx / len * hullPaddingPx else p.x
+                        val ey = if (len > 0f) p.y + dy / len * hullPaddingPx else p.y
+                        if (index == 0) path.moveTo(ex, ey) else path.lineTo(ex, ey)
+                    }
+                    path.close()
+                    HullPathData(communityId, FriendNetworkScreenModel.colorOfCommunity(communityId), path)
+                }
         }
         val viewCenter = Offset(viewWidthPx / 2f, viewHeightPx / 2f)
         val layoutCenter = Offset(layoutWidthPx / 2f, layoutHeightPx / 2f)
         val centeredOffset = viewCenter - (layoutCenter * initialScale)
         val defaultColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        val crossEdgeColor = MaterialTheme.colorScheme.outline
 
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
@@ -424,29 +549,75 @@ private fun FriendNetworkGraph(
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     // draw 阶段读取高亮状态：高亮变化只触发重绘
                     val currentHighlightId = highlightIdState.value
-                    edgePaths.forEach { edge ->
-                        if (currentHighlightId != null &&
-                            (edge.from == currentHighlightId || edge.to == currentHighlightId)
-                        ) {
-                            return@forEach
+                    val selectedCommunity = selectedCommunityState.value
+                    val highlightActive = currentHighlightId != null || selectedCommunity != null
+                    // 当前聚焦的社区（个人高亮取其所在社区），用于气泡压暗
+                    val activeCommunity = selectedCommunity ?: currentHighlightId?.let { communities[it] }
+
+                    // 1. 社区气泡垫底
+                    hullPaths.forEach { hull ->
+                        val focused = activeCommunity != null && hull.communityId == activeCommunity
+                        val dimmed = activeCommunity != null && hull.communityId != activeCommunity
+                        val fillAlpha = when {
+                            dimmed -> 0.03f
+                            focused -> 0.12f
+                            else -> 0.08f
                         }
-                        // 使用社区颜色作为边的颜色；高亮模式下未高亮的边压得更淡
-                        val edgeAlpha = if (currentHighlightId != null) 0.1f else 0.4f
-                        val communityColor = (nodeColors[edge.from] ?: defaultColor).copy(alpha = edgeAlpha)
+                        val strokeAlpha = when {
+                            dimmed -> 0.04f
+                            focused -> 0.14f
+                            else -> 0.10f
+                        }
+                        drawPath(hull.path, hull.color.copy(alpha = fillAlpha))
                         drawPath(
-                            path = edge.path,
-                            color = communityColor,
-                            style = Stroke(width = 2.5f)
+                            path = hull.path,
+                            color = hull.color.copy(alpha = strokeAlpha),
+                            style = Stroke(width = hullStrokeWidthPx, join = StrokeJoin.Round)
                         )
                     }
+
+                    // 2. 普通边：圈内用社区色，跨圈用中性灰细线
+                    edgePaths.forEach { edge ->
+                        val isPersonHighlight = currentHighlightId != null &&
+                            (edge.from == currentHighlightId || edge.to == currentHighlightId)
+                        val isCommunityHighlight = selectedCommunity != null && edge.communityId == selectedCommunity
+                        if (isPersonHighlight || isCommunityHighlight) return@forEach
+                        if (edge.communityId != null) {
+                            val color = nodeColors[edge.from] ?: defaultColor
+                            drawPath(
+                                path = edge.path,
+                                color = color.copy(alpha = if (highlightActive) 0.08f else 0.55f),
+                                style = Stroke(width = 2.5f)
+                            )
+                        } else {
+                            drawPath(
+                                path = edge.path,
+                                color = crossEdgeColor.copy(alpha = if (highlightActive) 0.05f else 0.18f),
+                                style = Stroke(width = 1.5f)
+                            )
+                        }
+                    }
+
+                    // 3. 高亮边最后画，盖在普通边上面
                     if (currentHighlightId != null) {
-                        // 高亮的边最后画，盖在普通边上面
                         edgePaths.forEach { edge ->
                             if (edge.from == currentHighlightId || edge.to == currentHighlightId) {
                                 drawPath(
                                     path = edge.path,
                                     color = highlightColor,
                                     style = Stroke(width = 4f)
+                                )
+                            }
+                        }
+                    }
+                    if (selectedCommunity != null) {
+                        edgePaths.forEach { edge ->
+                            if (edge.communityId == selectedCommunity) {
+                                val color = nodeColors[edge.from] ?: defaultColor
+                                drawPath(
+                                    path = edge.path,
+                                    color = color.copy(alpha = 0.9f),
+                                    style = Stroke(width = 3.5f)
                                 )
                             }
                         }

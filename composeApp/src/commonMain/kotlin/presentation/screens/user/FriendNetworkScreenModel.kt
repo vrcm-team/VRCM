@@ -35,11 +35,22 @@ data class FriendNetworkProgress(
     val total: Int,
 )
 
+data class CommunitySummary(
+    val id: Int,
+    val name: String,
+    val count: Int,
+    val color: Color,
+)
+
 data class FriendNetworkUiState(
     val selfId: String? = null,
     val nodes: List<MutualFriendData> = emptyList(),
     val edges: Map<String, List<String>> = emptyMap(),
     val nodeColors: Map<String, Color> = emptyMap(),
+    // 节点所属社区；小于 MIN_COMMUNITY_SIZE 人的社区与孤立节点归并为 OTHER_COMMUNITY_ID
+    val communities: Map<String, Int> = emptyMap(),
+    // 真实社区图例（按人数降序，以圈内度数最高成员命名）
+    val communityLegend: List<CommunitySummary> = emptyList(),
     val layout: ForceLayoutResult? = null,
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
@@ -71,55 +82,96 @@ class FriendNetworkScreenModel(
             Color(0xFFEA7CCC),
         )
 
+        // 归并后的「其他」伪社区：碎片社区与孤立节点
+        const val OTHER_COMMUNITY_ID = -1
+        private const val MIN_COMMUNITY_SIZE = 3
+        private val OTHER_COMMUNITY_COLOR = Color(0xFF8A93A0)
+
+        fun colorOfCommunity(communityId: Int): Color =
+            if (communityId == OTHER_COMMUNITY_ID) OTHER_COMMUNITY_COLOR
+            else COLORS_PALETTE[communityId % COLORS_PALETTE.size]
+
         /**
-         * 社区颜色分配
-         * 按连接密度分组，而非简单连通分量
+         * 社区划分：Louvain 检测后，不足 [MIN_COMMUNITY_SIZE] 人的碎片社区
+         * 和孤立节点归并为「其他」；真实社区按人数降序重新编号（0 起），
+         * 保证大社区优先拿到调色板前面的颜色
          */
-        fun assignCommunityColors(
+        fun assignCommunities(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
-            selfId: String? = null
-        ): Map<String, Color> {
+            selfId: String? = null,
+        ): Map<String, Int> {
             if (nodes.isEmpty()) return emptyMap()
             val adjacency = edges
                 .filterKeys { it != selfId }
                 .mapValues { (_, neighbors) -> neighbors.filter { it != selfId }.toSet() }
                 .filterValues { it.isNotEmpty() }
 
-            // Louvain 社区检测
-            val communityMap = louvainDetect(adjacency)
+            val detected = louvainDetect(adjacency)
+            val realCommunities = detected.entries
+                .groupBy({ it.value }, { it.key })
+                .values
+                .filter { it.size >= MIN_COMMUNITY_SIZE }
+                .sortedWith(compareByDescending<List<String>> { it.size }.thenBy { it.minOrNull() })
 
-            // 按社区大小降序排列，大的社区先分配颜色
-            val grouped = communityMap.entries.groupBy { it.value }
-            val sorted = grouped.entries.sortedByDescending { it.value.size }
-            val colorMap = mutableMapOf<String, Color>()
-            sorted.forEachIndexed { index, (_, members) ->
-                val color = COLORS_PALETTE[index % COLORS_PALETTE.size]
-                members.forEach { colorMap[it.key] = color }
+            val result = mutableMapOf<String, Int>()
+            realCommunities.forEachIndexed { index, members ->
+                members.forEach { result[it] = index }
             }
-            // 孤立节点（没有边的）单独分配颜色
             for (node in nodes) {
-                if (node.id != selfId && node.id !in colorMap) {
-                    colorMap[node.id] = COLORS_PALETTE[colorMap.size % COLORS_PALETTE.size]
+                if (node.id != selfId && node.id !in result) {
+                    result[node.id] = OTHER_COMMUNITY_ID
                 }
             }
-            return colorMap
+            return result
+        }
+
+        fun communityNodeColors(communities: Map<String, Int>): Map<String, Color> =
+            communities.mapValues { (_, communityId) -> colorOfCommunity(communityId) }
+
+        /**
+         * 社区图例：只含真实社区，编号顺序即人数降序，以圈内度数最高成员命名
+         */
+        fun buildCommunityLegend(
+            nodes: List<MutualFriendData>,
+            edges: Map<String, List<String>>,
+            communities: Map<String, Int>,
+        ): List<CommunitySummary> {
+            val nodeById = nodes.associateBy { it.id }
+            return communities.entries
+                .filter { it.value != OTHER_COMMUNITY_ID }
+                .groupBy({ it.value }, { it.key })
+                .entries
+                .sortedBy { it.key }
+                .map { (communityId, members) ->
+                    val topMember = members.maxByOrNull { edges[it].orEmpty().size }
+                    CommunitySummary(
+                        id = communityId,
+                        name = topMember?.let { nodeById[it]?.displayName }.orEmpty()
+                            .ifBlank { "#${communityId + 1}" },
+                        count = members.size,
+                        color = colorOfCommunity(communityId),
+                    )
+                }
         }
 
         /**
          * 力导向布局算法
          * @param nodeSizePx 节点大小（像素），由 UI 层根据 density 计算
+         * @param communities 社区划分，用于圈内聚拢、圈间分离
          */
         fun computeNodePositions(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
             nodeSizePx: Float,
+            communities: Map<String, Int> = emptyMap(),
         ): ForceLayoutResult {
             if (nodes.isEmpty()) return ForceLayoutResult(emptyMap(), 0f, 0f)
             return computeForceLayout(
                 nodeIds = nodes.map { it.id },
                 edges = edges,
                 desiredSpacing = nodeSizePx * 1.3f,
+                communities = communities,
             )
         }
     }
@@ -149,13 +201,15 @@ class FriendNetworkScreenModel(
                 if (cache != null) {
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
-                    val nodeColors = assignCommunityColors(cache.nodes, cache.edges, selfId)
-                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx)
+                    val communities = assignCommunities(cache.nodes, cache.edges, selfId)
+                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities)
                     uiState = uiState.copy(
                         selfId = selfId,
                         nodes = filteredNodes,
                         edges = filteredEdges,
-                        nodeColors = nodeColors,
+                        nodeColors = communityNodeColors(communities),
+                        communities = communities,
+                        communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
                         layout = layout,
                         updatedAt = cache.updatedAt,
                         isFromCache = true,
@@ -224,13 +278,15 @@ class FriendNetworkScreenModel(
                 cacheDao.save(cache)
                 val selfId = currentUser.id
                 val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
-                val nodeColors = assignCommunityColors(nodes, finalEdges, selfId)
-                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx)
+                val communities = assignCommunities(nodes, finalEdges, selfId)
+                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities)
                 uiState = FriendNetworkUiState(
                     selfId = selfId,
                     nodes = filteredNodes,
                     edges = filteredEdges,
-                    nodeColors = nodeColors,
+                    nodeColors = communityNodeColors(communities),
+                    communities = communities,
+                    communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
                     layout = layout,
                     updatedAt = cache.updatedAt,
                     isFromCache = false,
@@ -295,8 +351,9 @@ class FriendNetworkScreenModel(
         nodes: List<MutualFriendData>,
         edges: Map<String, List<String>>,
         nodeSizePx: Float,
+        communities: Map<String, Int>,
     ): ForceLayoutResult = withContext(Dispatchers.Default) {
-        computeNodePositions(nodes, edges, nodeSizePx)
+        computeNodePositions(nodes, edges, nodeSizePx, communities)
     }
 
     private fun CurrentUserData.toMutualFriendData(isFriend: Boolean) = MutualFriendData(
