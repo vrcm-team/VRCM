@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -61,6 +62,8 @@ private val BioMinHeightFloor = 120.dp
  * @param iconUrl 详情页头像
  * @param onReturn 返回按钮点击事件
  * @param onMenu 菜单按钮点击事件
+ * @param outerScrollState 外层滚动状态（控制头部视差），可从外部传入以保存/恢复滚动位置
+ * @param innerScrollState 内层滚动状态（控制卡片内容滚动），可从外部传入以保存/恢复滚动位置
  * @param content 详情页内容
  */
 @Composable
@@ -70,10 +73,12 @@ fun ProfileScaffold(
     iconUrl: String?,
     onReturn: () -> Unit,
     onMenu:  (() -> Unit)? = null,
+    outerScrollState: ScrollState = rememberScrollState(),
+    innerScrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
     BoxWithConstraints {
-        val scrollState = rememberScrollState()
+        val scrollState = outerScrollState
 
         val imageHeight = remember { maxHeight / 2.5f }
         // 位移的距离
@@ -130,6 +135,7 @@ fun ProfileScaffold(
                 topBarHeight,
                 sysTopPadding,
                 nestedScrollConnection,
+                innerScrollState,
                 content
             )
             // 顶部导航栏
@@ -203,10 +209,10 @@ private fun BottomCard(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     nestedScrollConnection: NestedScrollConnection,
+    scrollState: ScrollState,
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
     val inverseRatio = 1 - ratio
-    val scrollState = rememberScrollState()
     Card(
         modifier = Modifier
             .fillMaxSize()

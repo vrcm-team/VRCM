@@ -35,6 +35,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.presentation.animations.NoClip
+import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -191,7 +193,11 @@ fun LazyItemScope.LocationFriend(
             }
         }
         Text(
-            modifier = Modifier.sharedBoundsBy("${id}UserName").fillMaxWidth(),
+            modifier = Modifier.sharedBoundsBy(
+                key = "${id}UserName",
+                boundsTransform = TextBoundsTransform,
+                clipInOverlayDuringTransition = NoClip,
+            ).fillMaxWidth(),
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
@@ -213,7 +219,11 @@ fun UserInfoRow(
 ) {
     val userNameText = @Composable {
         Text(
-            modifier = Modifier.sharedBoundsBy("${user?.id}UserName"),
+            modifier = Modifier.sharedBoundsBy(
+                key = "${user?.id}UserName",
+                boundsTransform = TextBoundsTransform,
+                clipInOverlayDuringTransition = NoClip,
+            ),
             text = user?.displayName.orEmpty(),
             style = style,
             maxLines = 1,
@@ -222,7 +232,7 @@ fun UserInfoRow(
     }
 
     Row(
-        modifier = modifier.sharedBoundsBy("${user?.id}UserInfo").offset(x = (-4).dp),
+        modifier = modifier.offset(x = (-4).dp),
         horizontalArrangement = Arrangement.spacedBy(spacedBy),
         verticalAlignment = Alignment.CenterVertically
     ) {

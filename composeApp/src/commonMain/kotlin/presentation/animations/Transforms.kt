@@ -62,6 +62,19 @@ val ParentClip: OverlayClip =
         }
     }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+val NoClip: OverlayClip =
+    object : OverlayClip {
+        override fun getClipPath(
+            state: SharedContentState,
+            bounds: Rect,
+            layoutDirection: LayoutDirection,
+            density: Density,
+        ): Path? {
+            return null
+        }
+    }
+
 
 fun slideScreenTransition(
     navigator: Navigator,
