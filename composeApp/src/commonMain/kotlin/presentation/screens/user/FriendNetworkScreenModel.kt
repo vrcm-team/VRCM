@@ -123,19 +123,30 @@ class FriendNetworkScreenModel(
         // 站位引力加成封顶：至多 Top2 倾向圈
         private const val MAX_LEAN_SEGMENTS = 2
 
+        // 社区锚定：新圈成员与旧圈的交集 ≥ 30%（且 ≥2 人）才继承旧编号/颜色
+        private const val ANCHOR_MIN_OVERLAP_RATIO = 0.3f
+        private const val ANCHOR_MIN_OVERLAP_COUNT = 2
+
         fun colorOfCommunity(communityId: Int): Color =
             if (communityId == OTHER_COMMUNITY_ID) OTHER_COMMUNITY_COLOR
             else COLORS_PALETTE[communityId % COLORS_PALETTE.size]
 
         /**
          * 社区划分：Louvain 检测后，不足 [MIN_COMMUNITY_SIZE] 人的碎片社区
-         * 和孤立节点归并为「其他」；真实社区按人数降序重新编号（0 起），
-         * 保证大社区优先拿到调色板前面的颜色
+         * 和孤立节点归并为「其他」。
+         *
+         * 编号规则：
+         * - 无历史划分（[previousAssignments] 为空）：按人数降序编号（0 起），
+         *   大社区优先拿到调色板前面的颜色
+         * - 有历史划分：按成员重叠做锚定匹配——交集 ≥ max(2, 30%×新圈人数) 的
+         *   新圈继承旧编号（颜色跟人走，刷新不洗牌）；未匹配的新圈分配空闲编号，
+         *   且跳过上一轮的所有编号（刚退役的编号冷却一轮，避免颜色被立刻误复用）
          */
         fun assignCommunities(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
             selfId: String? = null,
+            previousAssignments: Map<String, Int> = emptyMap(),
         ): Map<String, Int> {
             if (nodes.isEmpty()) return emptyMap()
             val adjacency = edges
@@ -151,8 +162,56 @@ class FriendNetworkScreenModel(
                 .sortedWith(compareByDescending<List<String>> { it.size }.thenBy { it.minOrNull() })
 
             val result = mutableMapOf<String, Int>()
-            realCommunities.forEachIndexed { index, members ->
-                members.forEach { result[it] = index }
+            val previousReal = previousAssignments.filterValues { it >= 0 }
+            if (previousReal.isEmpty()) {
+                realCommunities.forEachIndexed { index, members ->
+                    members.forEach { result[it] = index }
+                }
+            } else {
+                // 候选匹配对：新圈 × 旧编号，按交集人数贪心配对
+                data class Candidate(val newIndex: Int, val prevId: Int, val overlap: Int)
+
+                val candidates = mutableListOf<Candidate>()
+                realCommunities.forEachIndexed { index, members ->
+                    val overlapByPrev = mutableMapOf<Int, Int>()
+                    members.forEach { member ->
+                        previousReal[member]?.let { prevId ->
+                            overlapByPrev[prevId] = (overlapByPrev[prevId] ?: 0) + 1
+                        }
+                    }
+                    val threshold = maxOf(
+                        ANCHOR_MIN_OVERLAP_COUNT.toFloat(),
+                        ANCHOR_MIN_OVERLAP_RATIO * members.size
+                    )
+                    overlapByPrev.forEach { (prevId, overlap) ->
+                        if (overlap >= threshold) candidates.add(Candidate(index, prevId, overlap))
+                    }
+                }
+                val inherited = mutableMapOf<Int, Int>()
+                val usedPrevIds = mutableSetOf<Int>()
+                candidates
+                    .sortedWith(
+                        compareByDescending<Candidate> { it.overlap }
+                            .thenBy { it.prevId }
+                            .thenBy { it.newIndex }
+                    )
+                    .forEach { candidate ->
+                        if (candidate.newIndex !in inherited && candidate.prevId !in usedPrevIds) {
+                            inherited[candidate.newIndex] = candidate.prevId
+                            usedPrevIds.add(candidate.prevId)
+                        }
+                    }
+                // 未匹配的新圈：分配空闲编号，上一轮所有编号（含刚退役的）冷却一轮
+                val blockedIds = previousReal.values.toMutableSet().apply { addAll(inherited.values) }
+                var nextId = 0
+                realCommunities.forEachIndexed { index, members ->
+                    val communityId = inherited[index] ?: run {
+                        while (nextId in blockedIds) nextId++
+                        blockedIds.add(nextId)
+                        nextId
+                    }
+                    members.forEach { result[it] = communityId }
+                }
             }
             for (node in nodes) {
                 if (node.id != selfId && node.id !in result) {
@@ -166,9 +225,9 @@ class FriendNetworkScreenModel(
             communities.mapValues { (_, communityId) -> colorOfCommunity(communityId) }
 
         /**
-         * 社区图例：只含真实社区，编号顺序即人数降序，以圈内度数最高成员命名。
-         * 只数本社区内部的连线：总度数高的人往往社交面广、归属最模糊，
-         * 用圈内度数才能选出真正代表这个圈子的人
+         * 社区图例：只含真实社区，按人数降序排列（锚定后编号不再代表人数排名），
+         * 以圈内度数最高成员命名。只数本社区内部的连线：总度数高的人往往
+         * 社交面广、归属最模糊，用圈内度数才能选出真正代表这个圈子的人
          */
         fun buildCommunityLegend(
             nodes: List<MutualFriendData>,
@@ -180,7 +239,10 @@ class FriendNetworkScreenModel(
                 .filter { it.value != OTHER_COMMUNITY_ID }
                 .groupBy({ it.value }, { it.key })
                 .entries
-                .sortedBy { it.key }
+                .sortedWith(
+                    compareByDescending<Map.Entry<Int, List<String>>> { it.value.size }
+                        .thenBy { it.key }
+                )
                 .map { (communityId, members) ->
                     val memberSet = members.toSet()
                     val topMember = members.maxByOrNull { member ->
@@ -291,7 +353,9 @@ class FriendNetworkScreenModel(
                 if (cache != null) {
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
-                    val communities = assignCommunities(cache.nodes, cache.edges, selfId)
+                    // 优先复用缓存里保存的划分：读缓存不重跑 Louvain，颜色与上次完全一致
+                    val communities = cache.communityAssignments.takeIf { it.isNotEmpty() }
+                        ?: assignCommunities(cache.nodes, cache.edges, selfId)
                     val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                     val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
                     val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
@@ -363,16 +427,20 @@ class FriendNetworkScreenModel(
                 }
 
                 val finalEdges = edges.mapValues { it.value.toList() }
+                val selfId = currentUser.id
+                val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
+                // 社区锚定：拿上一次的划分做匹配，颜色跟人走
+                val previousAssignments = uiState.communities.takeIf { it.isNotEmpty() }
+                    ?: cacheDao.load(selfId)?.communityAssignments.orEmpty()
+                val communities = assignCommunities(nodes, finalEdges, selfId, previousAssignments)
                 val cache = FriendNetworkCache(
                     userId = currentUser.id,
                     updatedAt = now().toEpochMilliseconds(),
                     nodes = nodes,
-                    edges = finalEdges
+                    edges = finalEdges,
+                    communityAssignments = communities,
                 )
                 cacheDao.save(cache)
-                val selfId = currentUser.id
-                val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
-                val communities = assignCommunities(nodes, finalEdges, selfId)
                 val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                 val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
                 val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
