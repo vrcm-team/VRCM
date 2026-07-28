@@ -24,6 +24,8 @@ private const val THETA_SQ = 0.64f
 private const val EXACT_REPULSION_LIMIT = 128
 private const val COLLISION_ITERATIONS = 50
 private const val MAX_DEPTH = 24
+private const val INTRA_COMMUNITY_ATTRACTION = 1.3f
+private const val CROSS_COMMUNITY_ATTRACTION = 0.25f
 
 /**
  * 力导向布局算法（简化版 ForceAtlas2）
@@ -36,20 +38,23 @@ private const val MAX_DEPTH = 24
  * @param nodeIds 节点 ID 列表
  * @param edges 邻接表，key 为节点 ID，value 为邻居节点 ID 列表
  * @param desiredSpacing 节点间期望间距（像素）
+ * @param communities 节点所属社区（可选）：同社区的边引力增强、跨社区减弱，让圈子在空间上分离
  * @return 布局结果，包含每个节点的位置和画布尺寸
  */
 fun computeForceLayout(
     nodeIds: List<String>,
     edges: Map<String, List<String>>,
     desiredSpacing: Float,
+    communities: Map<String, Int> = emptyMap(),
 ): ForceLayoutResult {
     val n = nodeIds.size
     if (n == 0) return ForceLayoutResult(emptyMap(), 0f, 0f)
 
     val idx = nodeIds.mapIndexed { i, id -> id to i }.toMap()
 
-    // 去重的无向边列表（成对存放索引）
+    // 去重的无向边列表（成对存放索引）及每条边的引力权重
     val pairList = ArrayList<Int>()
+    val weightList = ArrayList<Float>()
     val seenPairs = HashSet<Long>()
     val degree = IntArray(n)
     nodeIds.forEachIndexed { i, id ->
@@ -63,6 +68,15 @@ fun computeForceLayout(
                 pairList.add(b)
                 degree[a]++
                 degree[b]++
+                weightList.add(
+                    if (communities.isEmpty()) {
+                        1f
+                    } else {
+                        val ca = communities[nodeIds[a]]
+                        if (ca != null && ca == communities[nodeIds[b]]) INTRA_COMMUNITY_ATTRACTION
+                        else CROSS_COMMUNITY_ATTRACTION
+                    }
+                )
             }
         }
     }
@@ -93,7 +107,8 @@ fun computeForceLayout(
             edgePairs[e] = compact[pairList[e]]
             edgePairs[e + 1] = compact[pairList[e + 1]]
         }
-        runForceSimulation(sx, sy, edgePairs, desiredSpacing)
+        val edgeWeights = weightList.toFloatArray()
+        runForceSimulation(sx, sy, edgePairs, edgeWeights, desiredSpacing)
         connected.forEachIndexed { ci, oi ->
             x[oi] = sx[ci]
             y[oi] = sy[ci]
@@ -132,6 +147,7 @@ private fun runForceSimulation(
     x: FloatArray,
     y: FloatArray,
     edgePairs: IntArray,
+    edgeWeights: FloatArray,
     desiredSpacing: Float,
 ) {
     val n = x.size
@@ -169,7 +185,7 @@ private fun runForceSimulation(
             }
         }
 
-        // 引力：连接的节点之间
+        // 引力：连接的节点之间（按社区权重缩放）
         var e = 0
         while (e < edgePairs.size) {
             val i = edgePairs[e]
@@ -178,7 +194,7 @@ private fun runForceSimulation(
             val dx = x[j] - x[i]
             val dy = y[j] - y[i]
             val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-            val force = (dist * dist) / k
+            val force = (dist * dist) / k * edgeWeights[(e - 2) shr 1]
             val fxij = (dx / dist) * force
             val fyij = (dy / dist) * force
             fx[i] += fxij; fy[i] += fyij
