@@ -38,7 +38,6 @@ fun computeEgoLayout(
     }
 
     val degrees = nodeIds.associateWith { id -> edges[id].orEmpty().count { it != selfId } }
-    val maxDegree = (degrees.values.maxOrNull() ?: 0).coerceAtLeast(1)
     // 向日葵螺旋：半径 = c×√(排名 + 偏移)，偏移给圆心的自己留出空间
     val c = desiredSpacing
     val rMin = desiredSpacing * 1.6f
@@ -62,14 +61,16 @@ fun computeEgoLayout(
 
     resolveCollisions(x, y, desiredSpacing * 0.95f, pinned = 0)
 
-    // 距离参考环：半径恰好包住"共同好友数 ≥ 刻度"的人群
-    val ringDegrees = listOf(maxDegree, maxDegree / 2, maxDegree / 5)
-        .filter { it > 0 }
+    // 距离参考环：按人数四分位划分（环内 1/4、1/2、3/4 的人），
+    // 刻度 = 环内最低的共同好友数——环与色带均匀铺满整个圆盘，
+    // 不会因度数分布偏斜全挤在圆心
+    val sortedDegrees = ordered.map { degrees.getValue(it) }
+    val guideRings = listOf(n / 4, n / 2, n * 3 / 4)
+        .filter { it in 1 until n }
         .distinct()
-    val guideRings = ringDegrees.map { degree ->
-        val enclosed = degrees.values.count { it >= degree }
-        EgoGuideRing(c * sqrt(enclosed + rankOffset), degree)
-    }
+        .map { count -> EgoGuideRing(c * sqrt(count + rankOffset), sortedDegrees[count - 1]) }
+        .filter { it.mutualCount > 0 }
+        .distinctBy { it.mutualCount }
 
     var minX = 0f
     var maxX = 0f
