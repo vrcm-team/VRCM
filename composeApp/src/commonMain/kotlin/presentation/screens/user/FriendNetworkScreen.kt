@@ -173,6 +173,16 @@ object FriendNetworkScreen : Screen {
                     progress = state.progress,
                     isLoading = state.isLoading
                 )
+                // 自我中心视图：共同好友数 Top10 排行（替代社区图例的位置）
+                val mutualTopFriends = remember(state.nodes, state.edges) {
+                    state.nodes
+                        .map { node -> node to state.edges[node.id].orEmpty().size }
+                        .sortedWith(
+                            compareByDescending<Pair<MutualFriendData, Int>> { it.second }
+                                .thenBy { it.first.displayName }
+                        )
+                        .take(10)
+                }
                 if (state.nodes.isNotEmpty()) {
                     FriendNetworkControlRow(
                         viewMode = state.viewMode,
@@ -180,6 +190,9 @@ object FriendNetworkScreen : Screen {
                         legend = if (state.viewMode == FriendNetworkViewMode.Community) state.communityLegend
                         else emptyList(),
                         selectedCommunity = selectedCommunityState.value,
+                        egoTopFriends = if (state.viewMode == FriendNetworkViewMode.Ego) mutualTopFriends
+                        else emptyList(),
+                        highlightedId = highlightIdState.value,
                         onViewModeChange = { mode ->
                             model.setViewMode(mode)
                             selectedCommunityState.value = null
@@ -189,6 +202,11 @@ object FriendNetworkScreen : Screen {
                             selectedCommunityState.value =
                                 if (selectedCommunityState.value == communityId) null else communityId
                             highlightIdState.value = null
+                        },
+                        onTopFriendClick = { friendId ->
+                            highlightIdState.value =
+                                if (highlightIdState.value == friendId) null else friendId
+                            selectedCommunityState.value = null
                         }
                     )
                 }
@@ -312,8 +330,11 @@ private fun FriendNetworkControlRow(
     viewMode: FriendNetworkViewMode,
     legend: List<CommunitySummary>,
     selectedCommunity: Int?,
+    egoTopFriends: List<Pair<MutualFriendData, Int>>,
+    highlightedId: String?,
     onViewModeChange: (FriendNetworkViewMode) -> Unit,
     onCommunityClick: (Int) -> Unit,
+    onTopFriendClick: (String) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -339,7 +360,7 @@ private fun FriendNetworkControlRow(
                 onClick = { onViewModeChange(FriendNetworkViewMode.Ego) }
             )
         }
-        if (legend.isNotEmpty()) {
+        if (legend.isNotEmpty() || egoTopFriends.isNotEmpty()) {
             Spacer(modifier = Modifier.width(8.dp))
             Row(
                 modifier = Modifier
@@ -373,6 +394,42 @@ private fun FriendNetworkControlRow(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "${community.name} · ${community.count}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                }
+                // 共同好友数 Top10：点击进入该好友的高亮状态
+                egoTopFriends.forEachIndexed { index, (friend, count) ->
+                    val isSelected = highlightedId == friend.id
+                    val primary = MaterialTheme.colorScheme.primary
+                    Row(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) primary.copy(alpha = 0.14f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isSelected) primary else Color.Transparent,
+                                shape = CircleShape
+                            )
+                            .clickable { onTopFriendClick(friend.id) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) primary else MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${friend.displayName} · $count",
                             style = MaterialTheme.typography.labelMedium,
                             color = if (isSelected) MaterialTheme.colorScheme.onSurface
                             else MaterialTheme.colorScheme.onSurfaceVariant,
