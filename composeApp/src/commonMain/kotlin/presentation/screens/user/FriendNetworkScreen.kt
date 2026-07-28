@@ -49,9 +49,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -601,7 +604,21 @@ private fun FriendNetworkGraph(
         val crossEdgeColor = MaterialTheme.colorScheme.outline
         val textMeasurer = rememberTextMeasurer()
         val ringLabelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.outline)
-        val egoRingColor = MaterialTheme.colorScheme.outlineVariant
+        val primaryColor = MaterialTheme.colorScheme.primary
+
+        // 自我视图 Top10 辐射线数据：(好友 ID, 共同好友数比例)
+        val egoTopSpokes = remember(nodes, edges, isEgoView) {
+            if (!isEgoView) return@remember emptyList()
+            val ranked = nodes
+                .map { node -> node to edges[node.id].orEmpty().size }
+                .sortedWith(
+                    compareByDescending<Pair<MutualFriendData, Int>> { it.second }
+                        .thenBy { it.first.displayName }
+                )
+                .take(10)
+            val maxDegree = (ranked.firstOrNull()?.second ?: 0).coerceAtLeast(1)
+            ranked.map { (node, degree) -> node.id to degree.toFloat() / maxDegree }
+        }
 
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
@@ -700,11 +717,47 @@ private fun FriendNetworkGraph(
                     // 当前聚焦的社区（个人高亮取其所在社区），用于气泡压暗
                     val activeCommunity = selectedCommunity ?: currentHighlightId?.let { communities[it] }
 
-                    // 0. 自我视图：距离参考环，数字 = 该环对应的共同好友数
+                    // 0. 自我视图：圈层色带 + Top10 辐射线 + 距离参考环
                     if (isEgoView && selfId != null) {
                         val center = positions[selfId]
                         if (center != null) {
-                            layout.guideRings.forEach { ring ->
+                            // ① 亲密圈层色带：参考环之间交替填充极淡主题色
+                            val sortedRings = layout.guideRings.sortedBy { it.radiusPx }
+                            val boundaries = buildList {
+                                add(0f)
+                                sortedRings.forEach { add(it.radiusPx) }
+                            }
+                            val bandColor = primaryColor.copy(alpha = 0.045f)
+                            for (band in 0 until boundaries.size - 1 step 2) {
+                                val outer = boundaries[band + 1]
+                                val inner = boundaries[band]
+                                if (inner <= 0f) {
+                                    drawCircle(color = bandColor, radius = outer, center = center)
+                                } else {
+                                    val annulus = Path().apply {
+                                        fillType = PathFillType.EvenOdd
+                                        addOval(Rect(center.x - outer, center.y - outer, center.x + outer, center.y + outer))
+                                        addOval(Rect(center.x - inner, center.y - inner, center.x + inner, center.y + inner))
+                                    }
+                                    drawPath(annulus, bandColor)
+                                }
+                            }
+
+                            // ③ Top10 辐射线：粗细 ∝ 共同好友数，与排行 chips 联动加亮
+                            egoTopSpokes.forEach { (friendId, ratio) ->
+                                val target = positions[friendId] ?: return@forEach
+                                val focused = currentHighlightId == friendId
+                                drawLine(
+                                    color = primaryColor.copy(alpha = if (focused) 0.5f else 0.14f),
+                                    start = center,
+                                    end = target,
+                                    strokeWidth = (2f + 6f * ratio) * (if (focused) 1.4f else 1f),
+                                    cap = StrokeCap.Round
+                                )
+                            }
+
+                            // 距离参考环与刻度
+                            sortedRings.forEach { ring ->
                                 drawCircle(
                                     color = crossEdgeColor.copy(alpha = 0.25f),
                                     radius = ring.radiusPx,
@@ -714,7 +767,7 @@ private fun FriendNetworkGraph(
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 14f))
                                     )
                                 )
-                                val label = textMeasurer.measure(ring.mutualCount.toString(), ringLabelStyle)
+                                val label = textMeasurer.measure("≥ ${ring.mutualCount}", ringLabelStyle)
                                 drawText(
                                     textLayoutResult = label,
                                     topLeft = Offset(
@@ -822,8 +875,12 @@ private fun FriendNetworkGraph(
                                 node = node,
                                 size = nodeSizeDp,
                                 selectedIdState = selectedIdState,
-                                // 自我中心视图没有社区概念，圆环用中性色
-                                communityColor = if (isEgoView) egoRingColor else nodeColors[node.id],
+                                // ② 自我中心视图：圆环按共同好友数走主题色渐变（近浓远淡），无社区色
+                                communityColor = if (isEgoView) {
+                                    primaryColor.copy(alpha = 0.25f + 0.75f * sizeRatio)
+                                } else {
+                                    nodeColors[node.id]
+                                },
                             )
                         }
                     }
