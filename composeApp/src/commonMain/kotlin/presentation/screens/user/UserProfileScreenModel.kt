@@ -35,12 +35,104 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
+
+private enum class UserLoadState {
+    Idle,
+    Loading,
+    Loaded,
+}
+
+internal class UserProfileLoadGate {
+    private val mutex = Mutex()
+    private var state = UserLoadState.Idle
+    private var pendingForceRefresh = false
+
+    suspend fun runLoad(
+        forceRefresh: Boolean = false,
+        load: suspend () -> Boolean,
+    ): Boolean {
+        if (!tryStart(forceRefresh)) return false
+
+        var failure: Throwable? = null
+        try {
+            do {
+                val succeeded = try {
+                    load()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    failure = failure ?: error
+                    false
+                }
+            } while (finish(succeeded))
+        } catch (error: CancellationException) {
+            withContext(NonCancellable) { abort() }
+            throw error
+        }
+        failure?.let { throw it }
+        return true
+    }
+
+    private suspend fun tryStart(forceRefresh: Boolean): Boolean = mutex.withLock {
+        when (state) {
+            UserLoadState.Idle -> {
+                state = UserLoadState.Loading
+                true
+            }
+            UserLoadState.Loading -> {
+                pendingForceRefresh = pendingForceRefresh || forceRefresh
+                false
+            }
+            UserLoadState.Loaded -> {
+                if (forceRefresh) {
+                    state = UserLoadState.Loading
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    private suspend fun finish(succeeded: Boolean): Boolean = mutex.withLock {
+        if (pendingForceRefresh) {
+            pendingForceRefresh = false
+            true
+        } else {
+            state = if (succeeded) UserLoadState.Loaded else UserLoadState.Idle
+            false
+        }
+    }
+
+    private suspend fun abort() = mutex.withLock {
+        state = UserLoadState.Idle
+        pendingForceRefresh = false
+    }
+}
+
+internal class UserProfileLoadCoordinator {
+    private val userGate = UserProfileLoadGate()
+    private val groupsGate = UserProfileLoadGate()
+
+    suspend fun runLoads(
+        forceRefresh: Boolean = false,
+        loadUser: suspend () -> Boolean,
+        loadGroups: suspend () -> Boolean,
+    ) {
+        userGate.runLoad(forceRefresh, loadUser)
+        groupsGate.runLoad(forceRefresh, loadGroups)
+    }
+}
 
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
@@ -89,24 +181,37 @@ class UserProfileScreenModel(
     private val _favoritedWorlds = mutableStateOf<List<Pair<String, List<FavoritedWorld>>>>(emptyList())
     val favoritedWorlds by _favoritedWorlds
 
-    fun refreshUser(userId: String) =
+    // 保存滚动位置，用于导航返回时恢复
+    var savedOuterScrollPosition: Int = 0
+    var savedInnerScrollPosition: Int = 0
+
+    private val loadCoordinator = UserProfileLoadCoordinator()
+
+    fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
-            _mutualGroups.value = emptyList()
-            authService.reTryAuthCatching {
-                usersApi.fetchUserResponse(userId)
-            }.onFailure {
-                handleError(it)
-            }.onSuccess { response ->
-                // 防止body序列化异常
-                runCatching { UserProfileVo(response.body<UserData>()) }
-                    .onSuccess {
-                        _userState.value = it
-                        computeFriendLocation(it.location)
+            loadCoordinator.runLoads(
+                forceRefresh = forceRefresh,
+                loadUser = {
+                    var userLoaded = false
+                    authService.reTryAuthCatching {
+                        usersApi.fetchUserResponse(userId)
+                    }.onFailure {
+                        handleError(it)
+                    }.onSuccess { response ->
+                        // 防止body序列化异常
+                        runCatching { UserProfileVo(response.body<UserData>()) }
+                            .onSuccess {
+                                _userState.value = it
+                                computeFriendLocation(it.location)
+                                userLoaded = true
+                            }
+                            .onFailure { handleError(it) }
+                        _userJson.value = response.bodyAsText().pretty()
                     }
-                    .onFailure { handleError(it) }
-                _userJson.value = response.bodyAsText().pretty()
-                loadUserGroups(userId)
-            }
+                    userLoaded
+                },
+                loadGroups = { loadUserGroups(userId) },
+            )
         }
 
     fun updateUserProfile(
@@ -163,7 +268,7 @@ class UserProfileScreenModel(
             }
 
             SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            refreshUser(userState.id)
+            refreshUser(userState.id, forceRefresh = true)
         }
     }
 
@@ -204,7 +309,7 @@ class UserProfileScreenModel(
                     handleError(it)
                 }.onSuccess {
                     SharedFlowCentre.toastText.emit(ToastText.Success(message))
-                    runCatching { _userState.value.id.also { refreshUser(it) } }
+                    runCatching { _userState.value.id.also { refreshUser(it, forceRefresh = true) } }
                         .onFailure { handleError(it) }
                 }.isSuccess
         }.await()
@@ -214,15 +319,18 @@ class UserProfileScreenModel(
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
     }
 
-    private suspend fun loadUserGroups(userId: String) {
+    private suspend fun loadUserGroups(userId: String): Boolean {
+        var groupsLoaded = false
         authService.reTryAuthCatching {
             usersApi.getUserGroups(userId)
         }.onSuccess { groups ->
             _userGroups.value = visibleUserGroups(groups, userState.isSelf)
             _mutualGroups.value = groups.filter { it.mutualGroup }
+            groupsLoaded = true
         }.onFailure {
             handleError(it)
         }
+        return groupsLoaded
     }
 
     /**
