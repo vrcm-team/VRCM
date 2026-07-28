@@ -48,10 +48,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -69,7 +72,6 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
 import io.github.vrcmteam.vrcm.core.algorithms.convexHull
-import io.github.vrcmteam.vrcm.core.algorithms.filterCorePoints
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -196,6 +198,7 @@ object FriendNetworkScreen : Screen {
                             edges = state.edges,
                             nodeColors = state.nodeColors,
                             communities = state.communities,
+                            straddlers = state.straddlers,
                             layout = layout,
                             highlightIdsState = highlightIdsState,
                             selectedIdState = selectedIdState,
@@ -361,6 +364,7 @@ private fun FriendNetworkGraph(
     edges: Map<String, List<String>>,
     nodeColors: Map<String, Color>,
     communities: Map<String, Int>,
+    straddlers: Map<String, StraddlerInfo>,
     layout: ForceLayoutResult,
     highlightIdsState: State<Set<String>>,
     selectedIdState: State<String?>,
@@ -425,57 +429,33 @@ private fun FriendNetworkGraph(
         }
         // 真实社区的凸包气泡（扩张到头像外约 46dp）
         val hullPaddingPx = with(density) { 46.dp.toPx() }
-        val hullOutlineWidthPx = with(density) { 1.5.dp.toPx() }
+        val hullStrokeWidthPx = with(density) { 24.dp.toPx() }
         val hullPaths = remember(layout, communities) {
-            val raw = communities.entries
+            communities.entries
                 .filter { it.value != FriendNetworkScreenModel.OTHER_COMMUNITY_ID }
                 .groupBy({ it.value }, { it.key })
-                .entries
-                // 编号即人数降序：大社区先画、先占地盘
-                .sortedBy { it.key }
                 .mapNotNull { (communityId, members) ->
                     val points = members.mapNotNull { positions[it] }
                     if (points.size < 3) return@mapNotNull null
-                    // 骑墙者/离群成员不参与轮廓，气泡只框住空间核心
-                    val corePoints = filterCorePoints(points, minRadius = hullPaddingPx)
-                    val hull = convexHull(corePoints)
-                    if (hull.size < 3) return@mapNotNull null
+                    val hull = convexHull(points)
+                    if (hull.size < 2) return@mapNotNull null
                     var centerX = 0f
                     var centerY = 0f
-                    corePoints.forEach { centerX += it.x; centerY += it.y }
-                    centerX /= corePoints.size
-                    centerY /= corePoints.size
-                    val expanded = hull.map { p ->
+                    points.forEach { centerX += it.x; centerY += it.y }
+                    centerX /= points.size
+                    centerY /= points.size
+                    val path = Path()
+                    hull.forEachIndexed { index, p ->
                         val dx = p.x - centerX
                         val dy = p.y - centerY
                         val len = sqrt(dx * dx + dy * dy)
-                        if (len > 0f) Offset(p.x + dx / len * hullPaddingPx, p.y + dy / len * hullPaddingPx) else p
-                    }
-                    // 中点二次贝塞尔圆角，代替原来的加粗描边圆角
-                    val path = Path()
-                    val count = expanded.size
-                    path.moveTo(
-                        (expanded[0].x + expanded[1].x) / 2f,
-                        (expanded[0].y + expanded[1].y) / 2f
-                    )
-                    for (k in 1..count) {
-                        val v = expanded[k % count]
-                        val next = expanded[(k + 1) % count]
-                        path.quadraticBezierTo(v.x, v.y, (v.x + next.x) / 2f, (v.y + next.y) / 2f)
+                        val ex = if (len > 0f) p.x + dx / len * hullPaddingPx else p.x
+                        val ey = if (len > 0f) p.y + dy / len * hullPaddingPx else p.y
+                        if (index == 0) path.moveTo(ex, ey) else path.lineTo(ex, ey)
                     }
                     path.close()
                     HullPathData(communityId, FriendNetworkScreenModel.colorOfCommunity(communityId), path)
                 }
-            // 依次几何相减：后画的社区让出与先画社区的重叠区，气泡互不相交
-            val clipped = mutableListOf<HullPathData>()
-            var occupied: Path? = null
-            raw.forEach { hull ->
-                val visible = occupied?.let { Path.combine(PathOperation.Difference, hull.path, it) }
-                    ?: hull.path
-                clipped.add(HullPathData(hull.communityId, hull.color, visible))
-                occupied = occupied?.let { Path.combine(PathOperation.Union, it, hull.path) } ?: hull.path
-            }
-            clipped
         }
         val viewCenter = Offset(viewWidthPx / 2f, viewHeightPx / 2f)
         val layoutCenter = Offset(layoutWidthPx / 2f, layoutHeightPx / 2f)
@@ -487,6 +467,29 @@ private fun FriendNetworkGraph(
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
         val currentOnBackgroundTap by rememberUpdatedState(onBackgroundTap)
+
+        // 骑墙者弧环分段：本圈 + Top2 倾向 + 灰色余量，弧长按边数比例
+        val straddlerSegments = remember(straddlers, communities) {
+            straddlers.mapValues { (id, info) ->
+                val total = (info.ownEdges + info.leans.sumOf { it.edgeCount } + info.remainderEdges)
+                    .toFloat().coerceAtLeast(1f)
+                buildList {
+                    val ownCommunity = communities[id]
+                    if (ownCommunity != null && info.ownEdges > 0) {
+                        add(FriendNetworkScreenModel.colorOfCommunity(ownCommunity) to info.ownEdges / total)
+                    }
+                    info.leans.forEach { lean ->
+                        add(FriendNetworkScreenModel.colorOfCommunity(lean.communityId) to lean.edgeCount / total)
+                    }
+                    if (info.remainderEdges > 0) {
+                        add(
+                            FriendNetworkScreenModel.colorOfCommunity(FriendNetworkScreenModel.OTHER_COMMUNITY_ID)
+                                to info.remainderEdges / total
+                        )
+                    }
+                }
+            }
+        }
 
         // 头像半径（布局坐标系），命中测试用
         val nodeRadius = remember(nodes, nodeDegree, maxDegree) {
@@ -592,15 +595,15 @@ private fun FriendNetworkGraph(
                             else -> 0.08f
                         }
                         val strokeAlpha = when {
-                            dimmed -> 0.05f
-                            focused -> 0.30f
-                            else -> 0.18f
+                            dimmed -> 0.04f
+                            focused -> 0.14f
+                            else -> 0.10f
                         }
                         drawPath(hull.path, hull.color.copy(alpha = fillAlpha))
                         drawPath(
                             path = hull.path,
                             color = hull.color.copy(alpha = strokeAlpha),
-                            style = Stroke(width = hullOutlineWidthPx)
+                            style = Stroke(width = hullStrokeWidthPx, join = StrokeJoin.Round)
                         )
                     }
 
@@ -679,6 +682,7 @@ private fun FriendNetworkGraph(
                                 size = nodeSizeDp,
                                 selectedIdState = selectedIdState,
                                 communityColor = nodeColors[node.id],
+                                straddlerSegments = straddlerSegments[node.id],
                             )
                         }
                     }
@@ -694,6 +698,7 @@ private fun FriendNetworkNode(
     size: androidx.compose.ui.unit.Dp,
     selectedIdState: State<String?>,
     communityColor: Color? = null,
+    straddlerSegments: List<Pair<Color, Float>>? = null,
 ) {
     val isSelected = selectedIdState.value == node.id
     val borderColor = when {
@@ -701,11 +706,39 @@ private fun FriendNetworkNode(
         communityColor != null -> communityColor
         else -> Color.Transparent
     }
+    // 骑墙者画多段弧环（选中态仍是 primary 整环）
+    val ringModifier = if (straddlerSegments != null && straddlerSegments.size > 1 && !isSelected) {
+        Modifier.drawWithContent {
+            drawContent()
+            val strokeWidth = 3.dp.toPx()
+            val inset = strokeWidth / 2f
+            var startAngle = -90f
+            straddlerSegments.forEach { (color, fraction) ->
+                val sweep = fraction * 360f
+                drawArc(
+                    color = color,
+                    startAngle = startAngle,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = Size(this.size.width - strokeWidth, this.size.height - strokeWidth),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                )
+                startAngle += sweep
+            }
+        }
+    } else {
+        Modifier.border(
+            width = if (communityColor != null || isSelected) 3.dp else 2.dp,
+            color = borderColor,
+            shape = CircleShape
+        )
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(size)
-                .border(width = if (communityColor != null || isSelected) 3.dp else 2.dp, color = borderColor, shape = CircleShape)
+                .then(ringModifier)
                 .background(MaterialTheme.colorScheme.surface, CircleShape)
         ) {
             UserStateIcon(

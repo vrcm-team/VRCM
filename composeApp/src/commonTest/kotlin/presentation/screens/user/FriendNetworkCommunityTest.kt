@@ -94,6 +94,66 @@ class FriendNetworkCommunityTest {
     }
 
     @Test
+    fun straddlerDetectionUsesRatioThreshold() {
+        val members = listOf(node("a1"), node("a2"), node("x"), node("b1"), node("b2"), node("b3"), node("y"))
+        val communities = mapOf(
+            "a1" to 0, "a2" to 0, "x" to 0,
+            "b1" to 1, "b2" to 1, "b3" to 1, "y" to 1,
+        )
+        val graph = symmetricEdges(
+            // x：圈内 2 边，连圈 1 有 3 边 → 3 ≥ max(2, 1.5×2)=3 显著
+            "x" to "a1", "x" to "a2",
+            "x" to "b1", "x" to "b2", "x" to "b3",
+            // y：圈内 3 边，连圈 0 有 2 边 → 2 < 4.5 不显著
+            "y" to "b1", "y" to "b2", "y" to "b3",
+            "y" to "a1", "y" to "a2",
+        )
+        val straddlers = FriendNetworkScreenModel.detectStraddlers(members, graph, communities)
+
+        val x = straddlers.getValue("x")
+        assertEquals(2, x.ownEdges)
+        assertEquals(listOf(StraddlerLean(1, 3)), x.leans)
+        assertEquals(0, x.remainderEdges)
+        assertTrue("y" !in straddlers)
+    }
+
+    @Test
+    fun straddlerLeansCapAtTopTwoWithGrayRemainder() {
+        val ids = listOf("s", "a1", "a2") +
+            (1..4).map { "b$it" } + (1..4).map { "c$it" } + (1..3).map { "d$it" }
+        val members = ids.map { node(it) }
+        val communities = buildMap {
+            put("s", 0); put("a1", 0); put("a2", 0)
+            (1..4).forEach { put("b$it", 1) }
+            (1..4).forEach { put("c$it", 2) }
+            (1..3).forEach { put("d$it", 3) }
+        }
+        // s：圈内 2 边；B=4、C=4、D=3 全部过阈值(max(2, 3)=3)
+        val pairs = mutableListOf("s" to "a1", "s" to "a2")
+        (1..4).forEach { pairs.add("s" to "b$it") }
+        (1..4).forEach { pairs.add("s" to "c$it") }
+        (1..3).forEach { pairs.add("s" to "d$it") }
+        val graph = symmetricEdges(*pairs.toTypedArray())
+        val straddlers = FriendNetworkScreenModel.detectStraddlers(members, graph, communities)
+
+        val s = straddlers.getValue("s")
+        // Top2 取 B、C（同边数按社区编号升序），D 进灰色余量
+        assertEquals(listOf(StraddlerLean(1, 4), StraddlerLean(2, 4)), s.leans)
+        assertEquals(3, s.remainderEdges)
+    }
+
+    @Test
+    fun otherCommunityMembersAreNeverStraddlers() {
+        val members = listOf(node("o1"), node("b1"), node("b2"), node("b3"))
+        val communities = mapOf(
+            "o1" to FriendNetworkScreenModel.OTHER_COMMUNITY_ID,
+            "b1" to 0, "b2" to 0, "b3" to 0,
+        )
+        val graph = symmetricEdges("o1" to "b1", "o1" to "b2", "o1" to "b3")
+        assertTrue(FriendNetworkScreenModel.detectStraddlers(members, graph, communities).isEmpty())
+    }
+
+    @Test
     fun nodeColorsFollowCommunityAssignment() {
         val communities = FriendNetworkScreenModel.assignCommunities(nodes, edges)
         val colors = FriendNetworkScreenModel.communityNodeColors(communities)

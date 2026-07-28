@@ -152,6 +152,82 @@ class ForceLayoutTest {
     }
 
     @Test
+    fun centripetalForcePutsHubNearCommunityCenter() {
+        // 12 人社区：hub 连所有人（圈内度 11），外围环各连 2 邻 + hub（圈内度 3）
+        val ids = (0 until 12).map { "usr_$it" }
+        val edges = mutableMapOf<String, MutableList<String>>()
+        fun link(a: Int, b: Int) {
+            edges.getOrPut("usr_$a") { mutableListOf() }.add("usr_$b")
+            edges.getOrPut("usr_$b") { mutableListOf() }.add("usr_$a")
+        }
+        for (i in 1 until 12) link(0, i)
+        for (i in 1 until 12) link(i, if (i == 11) 1 else i + 1)
+        val communities = ids.associateWith { 0 }
+
+        val result = computeForceLayout(ids, edges, spacing, communities)
+
+        var cx = 0f
+        var cy = 0f
+        result.positions.values.forEach { cx += it.x; cy += it.y }
+        cx /= result.positions.size
+        cy /= result.positions.size
+        fun distToCenter(id: String): Float {
+            val p = result.positions.getValue(id)
+            val dx = p.x - cx
+            val dy = p.y - cy
+            return sqrt(dx * dx + dy * dy)
+        }
+        val hubDist = distToCenter("usr_0")
+        val peripheryAvg = (1 until 12).map { distToCenter("usr_$it") }.average().toFloat()
+        assertTrue(
+            hubDist < peripheryAvg * 0.6f,
+            "hub 到质心 $hubDist 应明显小于外围平均 $peripheryAvg"
+        )
+    }
+
+    @Test
+    fun leanAttractionPullsStraddlerTowardLeanCommunity() {
+        // 两个 8 人全连接团；骑墙者 s 属团 0（2 条圈内边），6 条边连团 1
+        val ids = (0 until 16).map { "usr_$it" } + "straddler"
+        val edges = mutableMapOf<String, MutableList<String>>()
+        fun link(a: String, b: String) {
+            edges.getOrPut(a) { mutableListOf() }.add(b)
+            edges.getOrPut(b) { mutableListOf() }.add(a)
+        }
+        for (g in 0..1) for (i in 0 until 8) for (j in i + 1 until 8) {
+            link("usr_${g * 8 + i}", "usr_${g * 8 + j}")
+        }
+        link("straddler", "usr_0")
+        link("straddler", "usr_1")
+        for (i in 8 until 14) link("straddler", "usr_$i")
+        val communities = buildMap {
+            (0 until 8).forEach { put("usr_$it", 0) }
+            (8 until 16).forEach { put("usr_$it", 1) }
+            put("straddler", 0)
+        }
+
+        fun centroidDist(result: ForceLayoutResult): Float {
+            var bx = 0f
+            var by = 0f
+            (8 until 16).forEach {
+                bx += result.positions.getValue("usr_$it").x
+                by += result.positions.getValue("usr_$it").y
+            }
+            bx /= 8f; by /= 8f
+            val p = result.positions.getValue("straddler")
+            val dx = p.x - bx
+            val dy = p.y - by
+            return sqrt(dx * dx + dy * dy)
+        }
+        val without = computeForceLayout(ids, edges, spacing, communities)
+        val with = computeForceLayout(ids, edges, spacing, communities, leans = mapOf("straddler" to setOf(1)))
+        assertTrue(
+            centroidDist(with) < centroidDist(without),
+            "倾向加成后骑墙者到倾向圈质心 ${centroidDist(with)} 应小于无加成 ${centroidDist(without)}"
+        )
+    }
+
+    @Test
     fun largeGraphLaysOutQuickly() {
         val (ids, edges) = randomGraph(nodeCount = 1500, edgeCount = 6000)
         val mark = TimeSource.Monotonic.markNow()

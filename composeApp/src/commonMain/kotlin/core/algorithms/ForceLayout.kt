@@ -26,6 +26,10 @@ private const val COLLISION_ITERATIONS = 50
 private const val MAX_DEPTH = 24
 private const val INTRA_COMMUNITY_ATTRACTION = 1.3f
 private const val CROSS_COMMUNITY_ATTRACTION = 0.25f
+// 骑墙者显著倾向圈的跨圈边：引力加成，把人拉到两圈走廊
+private const val LEAN_ATTRACTION = 0.5f
+// 核心向心：按圈内度数加权拉向社区质心，核心居中、边缘在外
+private const val CENTRIPETAL = 0.12f
 
 /**
  * 力导向布局算法（简化版 ForceAtlas2）
@@ -39,6 +43,7 @@ private const val CROSS_COMMUNITY_ATTRACTION = 0.25f
  * @param edges 邻接表，key 为节点 ID，value 为邻居节点 ID 列表
  * @param desiredSpacing 节点间期望间距（像素）
  * @param communities 节点所属社区（可选）：同社区的边引力增强、跨社区减弱，让圈子在空间上分离
+ * @param leans 骑墙者的显著倾向圈（节点 ID → 至多 Top2 社区）：指向这些圈的跨圈边引力加成
  * @return 布局结果，包含每个节点的位置和画布尺寸
  */
 fun computeForceLayout(
@@ -46,6 +51,7 @@ fun computeForceLayout(
     edges: Map<String, List<String>>,
     desiredSpacing: Float,
     communities: Map<String, Int> = emptyMap(),
+    leans: Map<String, Set<Int>> = emptyMap(),
 ): ForceLayoutResult {
     val n = nodeIds.size
     if (n == 0) return ForceLayoutResult(emptyMap(), 0f, 0f)
@@ -72,9 +78,17 @@ fun computeForceLayout(
                     if (communities.isEmpty()) {
                         1f
                     } else {
-                        val ca = communities[nodeIds[a]]
-                        if (ca != null && ca == communities[nodeIds[b]]) INTRA_COMMUNITY_ATTRACTION
-                        else CROSS_COMMUNITY_ATTRACTION
+                        val idA = nodeIds[a]
+                        val idB = nodeIds[b]
+                        val ca = communities[idA]
+                        val cb = communities[idB]
+                        when {
+                            ca != null && ca == cb -> INTRA_COMMUNITY_ATTRACTION
+                            // 任一端把对端社区列为显著倾向 → 加成
+                            (cb != null && leans[idA]?.contains(cb) == true) ||
+                                (ca != null && leans[idB]?.contains(ca) == true) -> LEAN_ATTRACTION
+                            else -> CROSS_COMMUNITY_ATTRACTION
+                        }
                     }
                 )
             }
@@ -108,7 +122,42 @@ fun computeForceLayout(
             edgePairs[e + 1] = compact[pairList[e + 1]]
         }
         val edgeWeights = weightList.toFloatArray()
-        runForceSimulation(sx, sy, edgePairs, edgeWeights, desiredSpacing)
+
+        // 核心向心的准备：社区稠密索引 + 按圈内度数归一化的权重
+        val commDense = mutableMapOf<Int, Int>()
+        val simComm = IntArray(m) { -1 }
+        connected.forEachIndexed { ci, oi ->
+            val comm = communities[nodeIds[oi]]
+            if (comm != null && comm >= 0) {
+                simComm[ci] = commDense.getOrPut(comm) { commDense.size }
+            }
+        }
+        val centripetalWeight = FloatArray(m)
+        if (commDense.isNotEmpty()) {
+            val internalDegree = IntArray(m)
+            var e2 = 0
+            while (e2 < edgePairs.size) {
+                val i = edgePairs[e2]
+                val j = edgePairs[e2 + 1]
+                e2 += 2
+                if (simComm[i] >= 0 && simComm[i] == simComm[j]) {
+                    internalDegree[i]++
+                    internalDegree[j]++
+                }
+            }
+            val maxDegreePerComm = IntArray(commDense.size)
+            for (i in 0 until m) {
+                val c = simComm[i]
+                if (c >= 0 && internalDegree[i] > maxDegreePerComm[c]) maxDegreePerComm[c] = internalDegree[i]
+            }
+            for (i in 0 until m) {
+                val c = simComm[i]
+                if (c >= 0 && maxDegreePerComm[c] > 0) {
+                    centripetalWeight[i] = internalDegree[i].toFloat() / maxDegreePerComm[c]
+                }
+            }
+        }
+        runForceSimulation(sx, sy, edgePairs, edgeWeights, desiredSpacing, simComm, centripetalWeight, commDense.size)
         connected.forEachIndexed { ci, oi ->
             x[oi] = sx[ci]
             y[oi] = sy[ci]
@@ -149,6 +198,9 @@ private fun runForceSimulation(
     edgePairs: IntArray,
     edgeWeights: FloatArray,
     desiredSpacing: Float,
+    simComm: IntArray = IntArray(0),
+    centripetalWeight: FloatArray = FloatArray(0),
+    commCount: Int = 0,
 ) {
     val n = x.size
     val k = desiredSpacing * 1.5f
@@ -157,6 +209,9 @@ private fun runForceSimulation(
     val fy = FloatArray(n)
     val tree = if (n > EXACT_REPULSION_LIMIT) BarnesHutTree(n) else null
     val convergenceThreshold = max(0.5f, k * 0.005f)
+    val commSumX = FloatArray(commCount)
+    val commSumY = FloatArray(commCount)
+    val commSize = IntArray(commCount)
 
     for (iter in 0 until FORCE_ITERATIONS) {
         fx.fill(0f)
@@ -205,6 +260,29 @@ private fun runForceSimulation(
         for (i in 0 until n) {
             fx[i] -= x[i] * GRAVITY
             fy[i] -= y[i] * GRAVITY
+        }
+
+        // 核心向心：按圈内度数加权拉向本社区质心，核心居中、骑墙者留在边缘
+        if (commCount > 0) {
+            commSumX.fill(0f)
+            commSumY.fill(0f)
+            commSize.fill(0)
+            for (i in 0 until n) {
+                val c = simComm[i]
+                if (c >= 0) {
+                    commSumX[c] += x[i]
+                    commSumY[c] += y[i]
+                    commSize[c]++
+                }
+            }
+            for (i in 0 until n) {
+                val c = simComm[i]
+                if (c >= 0 && commSize[c] > 0 && centripetalWeight[i] > 0f) {
+                    val pull = CENTRIPETAL * centripetalWeight[i]
+                    fx[i] += (commSumX[c] / commSize[c] - x[i]) * pull
+                    fy[i] += (commSumY[c] / commSize[c] - y[i]) * pull
+                }
+            }
         }
 
         // 更新位置（带速度限制和降温）

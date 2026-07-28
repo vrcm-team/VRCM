@@ -42,6 +42,21 @@ data class CommunitySummary(
     val color: Color,
 )
 
+data class StraddlerLean(
+    val communityId: Int,
+    val edgeCount: Int,
+)
+
+/**
+ * 骑墙者信息：某外圈边数 ≥ max(2, 1.5×圈内边数) 即为显著倾向
+ * [leans] 封顶 Top2，其余显著倾向的边数合计进 [remainderEdges]（灰色余量弧）
+ */
+data class StraddlerInfo(
+    val ownEdges: Int,
+    val leans: List<StraddlerLean>,
+    val remainderEdges: Int,
+)
+
 data class FriendNetworkUiState(
     val selfId: String? = null,
     val nodes: List<MutualFriendData> = emptyList(),
@@ -51,6 +66,8 @@ data class FriendNetworkUiState(
     val communities: Map<String, Int> = emptyMap(),
     // 真实社区图例（按人数降序，以圈内度数最高成员命名）
     val communityLegend: List<CommunitySummary> = emptyList(),
+    // 骑墙者（有显著倾向圈的人）；多段弧环与站位引力加成用
+    val straddlers: Map<String, StraddlerInfo> = emptyMap(),
     val layout: ForceLayoutResult? = null,
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
@@ -87,6 +104,12 @@ class FriendNetworkScreenModel(
         const val OTHER_COMMUNITY_ID = -1
         private const val MIN_COMMUNITY_SIZE = 3
         private val OTHER_COMMUNITY_COLOR = Color(0xFF8A93A0)
+
+        // 骑墙者判定：外圈边数 ≥ max(STRADDLER_MIN_EDGES, STRADDLER_RATIO × 圈内边数)
+        private const val STRADDLER_RATIO = 1.5f
+        private const val STRADDLER_MIN_EDGES = 2
+        // 弧环封顶：本圈 + 至多 2 个倾向圈 + 灰色余量
+        private const val MAX_LEAN_SEGMENTS = 2
 
         fun colorOfCommunity(communityId: Int): Color =
             if (communityId == OTHER_COMMUNITY_ID) OTHER_COMMUNITY_COLOR
@@ -162,15 +185,57 @@ class FriendNetworkScreenModel(
         }
 
         /**
+         * 骑墙者判定（封顶规则）：
+         * 对真实社区的成员，统计与每个外圈的连线数，
+         * 达到 max([STRADDLER_MIN_EDGES], [STRADDLER_RATIO]×圈内边数) 的记为显著倾向；
+         * 按边数降序取 Top[MAX_LEAN_SEGMENTS]，其余合计为灰色余量
+         */
+        fun detectStraddlers(
+            nodes: List<MutualFriendData>,
+            edges: Map<String, List<String>>,
+            communities: Map<String, Int>,
+        ): Map<String, StraddlerInfo> {
+            val result = mutableMapOf<String, StraddlerInfo>()
+            for (node in nodes) {
+                val own = communities[node.id] ?: continue
+                if (own == OTHER_COMMUNITY_ID) continue
+                var ownEdges = 0
+                val leanCounts = mutableMapOf<Int, Int>()
+                for (neighbor in edges[node.id].orEmpty()) {
+                    val community = communities[neighbor] ?: continue
+                    when {
+                        community == own -> ownEdges++
+                        community != OTHER_COMMUNITY_ID ->
+                            leanCounts[community] = (leanCounts[community] ?: 0) + 1
+                    }
+                }
+                val threshold = maxOf(STRADDLER_MIN_EDGES.toFloat(), STRADDLER_RATIO * ownEdges)
+                val qualifying = leanCounts.entries
+                    .filter { it.value >= threshold }
+                    .sortedWith(compareByDescending<Map.Entry<Int, Int>> { it.value }.thenBy { it.key })
+                if (qualifying.isEmpty()) continue
+                result[node.id] = StraddlerInfo(
+                    ownEdges = ownEdges,
+                    leans = qualifying.take(MAX_LEAN_SEGMENTS)
+                        .map { StraddlerLean(it.key, it.value) },
+                    remainderEdges = qualifying.drop(MAX_LEAN_SEGMENTS).sumOf { it.value },
+                )
+            }
+            return result
+        }
+
+        /**
          * 力导向布局算法
          * @param nodeSizePx 节点大小（像素），由 UI 层根据 density 计算
          * @param communities 社区划分，用于圈内聚拢、圈间分离
+         * @param straddlers 骑墙者信息：Top 倾向圈的跨圈边引力加成
          */
         fun computeNodePositions(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
             nodeSizePx: Float,
             communities: Map<String, Int> = emptyMap(),
+            straddlers: Map<String, StraddlerInfo> = emptyMap(),
         ): ForceLayoutResult {
             if (nodes.isEmpty()) return ForceLayoutResult(emptyMap(), 0f, 0f)
             return computeForceLayout(
@@ -178,6 +243,9 @@ class FriendNetworkScreenModel(
                 edges = edges,
                 desiredSpacing = nodeSizePx * 1.3f,
                 communities = communities,
+                leans = straddlers.mapValues { (_, info) ->
+                    info.leans.map { it.communityId }.toSet()
+                },
             )
         }
     }
@@ -208,7 +276,8 @@ class FriendNetworkScreenModel(
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
                     val communities = assignCommunities(cache.nodes, cache.edges, selfId)
-                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities)
+                    val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
+                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
                     uiState = uiState.copy(
                         selfId = selfId,
                         nodes = filteredNodes,
@@ -216,6 +285,7 @@ class FriendNetworkScreenModel(
                         nodeColors = communityNodeColors(communities),
                         communities = communities,
                         communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                        straddlers = straddlers,
                         layout = layout,
                         updatedAt = cache.updatedAt,
                         isFromCache = true,
@@ -285,7 +355,8 @@ class FriendNetworkScreenModel(
                 val selfId = currentUser.id
                 val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
                 val communities = assignCommunities(nodes, finalEdges, selfId)
-                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities)
+                val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
+                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
                 uiState = FriendNetworkUiState(
                     selfId = selfId,
                     nodes = filteredNodes,
@@ -293,6 +364,7 @@ class FriendNetworkScreenModel(
                     nodeColors = communityNodeColors(communities),
                     communities = communities,
                     communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                    straddlers = straddlers,
                     layout = layout,
                     updatedAt = cache.updatedAt,
                     isFromCache = false,
@@ -358,8 +430,9 @@ class FriendNetworkScreenModel(
         edges: Map<String, List<String>>,
         nodeSizePx: Float,
         communities: Map<String, Int>,
+        straddlers: Map<String, StraddlerInfo>,
     ): ForceLayoutResult = withContext(Dispatchers.Default) {
-        computeNodePositions(nodes, edges, nodeSizePx, communities)
+        computeNodePositions(nodes, edges, nodeSizePx, communities, straddlers)
     }
 
     private fun CurrentUserData.toMutualFriendData(isFriend: Boolean) = MutualFriendData(
