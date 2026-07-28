@@ -8,8 +8,7 @@ package io.github.vrcmteam.vrcm.core.algorithms
  * @return 每个节点对应的社区 ID 映射
  */
 fun louvainDetect(adjacency: Map<String, Set<String>>): Map<String, Int> {
-    // 按 ID 排序遍历：同样的数据无论插入顺序如何，结果都一致
-    val nodeIds = adjacency.keys.sorted()
+    val nodeIds = adjacency.keys.toList()
     val n = nodeIds.size
     if (n == 0) return emptyMap()
     val m = adjacency.values.sumOf { it.size } / 2
