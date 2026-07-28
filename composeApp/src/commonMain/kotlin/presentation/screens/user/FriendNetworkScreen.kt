@@ -51,7 +51,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -69,6 +69,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
 import io.github.vrcmteam.vrcm.core.algorithms.convexHull
+import io.github.vrcmteam.vrcm.core.algorithms.filterCorePoints
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -424,33 +425,57 @@ private fun FriendNetworkGraph(
         }
         // 真实社区的凸包气泡（扩张到头像外约 46dp）
         val hullPaddingPx = with(density) { 46.dp.toPx() }
-        val hullStrokeWidthPx = with(density) { 24.dp.toPx() }
+        val hullOutlineWidthPx = with(density) { 1.5.dp.toPx() }
         val hullPaths = remember(layout, communities) {
-            communities.entries
+            val raw = communities.entries
                 .filter { it.value != FriendNetworkScreenModel.OTHER_COMMUNITY_ID }
                 .groupBy({ it.value }, { it.key })
+                .entries
+                // 编号即人数降序：大社区先画、先占地盘
+                .sortedBy { it.key }
                 .mapNotNull { (communityId, members) ->
                     val points = members.mapNotNull { positions[it] }
                     if (points.size < 3) return@mapNotNull null
-                    val hull = convexHull(points)
-                    if (hull.size < 2) return@mapNotNull null
+                    // 骑墙者/离群成员不参与轮廓，气泡只框住空间核心
+                    val corePoints = filterCorePoints(points, minRadius = hullPaddingPx)
+                    val hull = convexHull(corePoints)
+                    if (hull.size < 3) return@mapNotNull null
                     var centerX = 0f
                     var centerY = 0f
-                    points.forEach { centerX += it.x; centerY += it.y }
-                    centerX /= points.size
-                    centerY /= points.size
-                    val path = Path()
-                    hull.forEachIndexed { index, p ->
+                    corePoints.forEach { centerX += it.x; centerY += it.y }
+                    centerX /= corePoints.size
+                    centerY /= corePoints.size
+                    val expanded = hull.map { p ->
                         val dx = p.x - centerX
                         val dy = p.y - centerY
                         val len = sqrt(dx * dx + dy * dy)
-                        val ex = if (len > 0f) p.x + dx / len * hullPaddingPx else p.x
-                        val ey = if (len > 0f) p.y + dy / len * hullPaddingPx else p.y
-                        if (index == 0) path.moveTo(ex, ey) else path.lineTo(ex, ey)
+                        if (len > 0f) Offset(p.x + dx / len * hullPaddingPx, p.y + dy / len * hullPaddingPx) else p
+                    }
+                    // 中点二次贝塞尔圆角，代替原来的加粗描边圆角
+                    val path = Path()
+                    val count = expanded.size
+                    path.moveTo(
+                        (expanded[0].x + expanded[1].x) / 2f,
+                        (expanded[0].y + expanded[1].y) / 2f
+                    )
+                    for (k in 1..count) {
+                        val v = expanded[k % count]
+                        val next = expanded[(k + 1) % count]
+                        path.quadraticBezierTo(v.x, v.y, (v.x + next.x) / 2f, (v.y + next.y) / 2f)
                     }
                     path.close()
                     HullPathData(communityId, FriendNetworkScreenModel.colorOfCommunity(communityId), path)
                 }
+            // 依次几何相减：后画的社区让出与先画社区的重叠区，气泡互不相交
+            val clipped = mutableListOf<HullPathData>()
+            var occupied: Path? = null
+            raw.forEach { hull ->
+                val visible = occupied?.let { Path.combine(PathOperation.Difference, hull.path, it) }
+                    ?: hull.path
+                clipped.add(HullPathData(hull.communityId, hull.color, visible))
+                occupied = occupied?.let { Path.combine(PathOperation.Union, it, hull.path) } ?: hull.path
+            }
+            clipped
         }
         val viewCenter = Offset(viewWidthPx / 2f, viewHeightPx / 2f)
         val layoutCenter = Offset(layoutWidthPx / 2f, layoutHeightPx / 2f)
@@ -567,15 +592,15 @@ private fun FriendNetworkGraph(
                             else -> 0.08f
                         }
                         val strokeAlpha = when {
-                            dimmed -> 0.04f
-                            focused -> 0.14f
-                            else -> 0.10f
+                            dimmed -> 0.05f
+                            focused -> 0.30f
+                            else -> 0.18f
                         }
                         drawPath(hull.path, hull.color.copy(alpha = fillAlpha))
                         drawPath(
                             path = hull.path,
                             color = hull.color.copy(alpha = strokeAlpha),
-                            style = Stroke(width = hullStrokeWidthPx, join = StrokeJoin.Round)
+                            style = Stroke(width = hullOutlineWidthPx)
                         )
                     }
 
