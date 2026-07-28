@@ -68,9 +68,15 @@ fun computeEgoLayout(
     val guideRings = listOf(n / 4, n / 2, n * 3 / 4)
         .filter { it in 1 until n }
         .distinct()
-        .map { count -> EgoGuideRing(c * sqrt(count + rankOffset), sortedDegrees[count - 1]) }
-        .filter { it.mutualCount > 0 }
-        .distinctBy { it.mutualCount }
+        .map { count -> sortedDegrees[count - 1] }
+        .filter { it > 0 }
+        .distinct()
+        .map { threshold ->
+            val radius = ordered.indices
+                .filter { degrees.getValue(ordered[it]) >= threshold }
+                .maxOf { i -> sqrt(x[i + 1] * x[i + 1] + y[i + 1] * y[i + 1]) }
+            EgoGuideRing(radius, threshold)
+        }
 
     var minX = 0f
     var maxX = 0f

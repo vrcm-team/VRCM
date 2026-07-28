@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.core.algorithms
 
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -83,6 +84,37 @@ class EgoLayoutTest {
             assertTrue(sorted[i - 1].radiusPx < sorted[i].radiusPx)
         }
         assertEquals(4, sorted.first().mutualCount)
+    }
+
+    @Test
+    fun equalDegreeNodesShareOneRingThatContainsEveryNode() {
+        val ids = (0 until 8).map { "usr_$it" }
+        val edges = ids.associateWith { listOf("mutual_a", "mutual_b") }
+
+        val result = computeEgoLayout(ids, edges, spacing, selfId)
+
+        assertEquals(1, result.guideRings.size)
+        val ring = result.guideRings.single()
+        assertEquals(2, ring.mutualCount)
+        val farthest = ids.maxOf { distToSelf(result, it) }
+        assertTrue(abs(ring.radiusPx - farthest) < 0.01f)
+    }
+
+    @Test
+    fun guideRingRadiusUsesFarthestNodeMeetingEachThreshold() {
+        val ids = (0 until 8).map { "usr_$it" }
+        val degrees = ids.mapIndexed { index, id -> id to (7 - index) }.toMap()
+        val edges = degrees.mapValues { (_, degree) -> (0 until degree).map { "mutual_$it" } }
+
+        val result = computeEgoLayout(ids, edges, spacing, selfId)
+
+        assertEquals(listOf(6, 4, 2), result.guideRings.map { it.mutualCount })
+        result.guideRings.forEach { ring ->
+            val farthest = ids
+                .filter { degrees.getValue(it) >= ring.mutualCount }
+                .maxOf { distToSelf(result, it) }
+            assertTrue(abs(ring.radiusPx - farthest) < 0.01f)
+        }
     }
 
     @Test
