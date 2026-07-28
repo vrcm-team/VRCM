@@ -29,7 +29,7 @@ class EgoLayoutTest {
 
     @Test
     fun emptyGraphContainsOnlySelf() {
-        val result = computeEgoLayout(emptyList(), emptyMap(), emptyMap(), spacing, selfId)
+        val result = computeEgoLayout(emptyList(), emptyMap(), spacing, selfId)
         assertEquals(setOf(selfId), result.positions.keys)
     }
 
@@ -41,7 +41,7 @@ class EgoLayoutTest {
             "hub" to "a", "hub" to "b", "hub" to "c", "hub" to "d", "hub" to "mid",
             "mid" to "leaf",
         )
-        val result = computeEgoLayout(ids, edges, emptyMap(), spacing, selfId)
+        val result = computeEgoLayout(ids, edges, spacing, selfId)
 
         assertEquals(ids.toSet() + selfId, result.positions.keys)
         val hub = distToSelf(result, "hub")
@@ -61,9 +61,8 @@ class EgoLayoutTest {
             }
         }
         val edges = symmetricEdges(*pairs.toTypedArray())
-        val communities = ids.associateWith { it.removePrefix("usr_").toInt() % 3 }
-        val first = computeEgoLayout(ids, edges, communities, spacing, selfId)
-        val second = computeEgoLayout(ids, edges, communities, spacing, selfId)
+        val first = computeEgoLayout(ids, edges, spacing, selfId)
+        val second = computeEgoLayout(ids, edges, spacing, selfId)
 
         assertEquals(first.positions, second.positions)
         first.positions.values.forEach { pos ->
@@ -75,7 +74,7 @@ class EgoLayoutTest {
     fun guideRingsDescendFromMaxMutualCount() {
         val ids = listOf("a", "b", "c", "d", "e")
         val edges = symmetricEdges("a" to "b", "a" to "c", "a" to "d", "a" to "e", "b" to "c")
-        val result = computeEgoLayout(ids, edges, emptyMap(), spacing, selfId)
+        val result = computeEgoLayout(ids, edges, spacing, selfId)
 
         assertTrue(result.guideRings.isNotEmpty())
         // 共同好友数越大的环半径越小
@@ -95,7 +94,7 @@ class EgoLayoutTest {
             for (j in 0 until 5) pairs.add("usr_$i" to "usr_$j")
         }
         val edges = symmetricEdges(*pairs.toTypedArray())
-        val result = computeEgoLayout(ids, edges, emptyMap(), spacing, selfId)
+        val result = computeEgoLayout(ids, edges, spacing, selfId)
 
         val points = result.positions.values.toList()
         var minDist = Float.MAX_VALUE

@@ -294,7 +294,7 @@ class FriendNetworkScreenModel(
                     val communities = assignCommunities(cache.nodes, cache.edges, selfId)
                     val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                     val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
-                    val egoLayout = computeEgo(filteredNodes, filteredEdges, communities, nodeSizePx, selfId)
+                    val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
                     uiState = uiState.copy(
                         selfId = selfId,
                         nodes = filteredNodes,
@@ -375,7 +375,7 @@ class FriendNetworkScreenModel(
                 val communities = assignCommunities(nodes, finalEdges, selfId)
                 val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
                 val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
-                val egoLayout = computeEgo(filteredNodes, filteredEdges, communities, nodeSizePx, selfId)
+                val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
                 uiState = FriendNetworkUiState(
                     selfId = selfId,
                     nodes = filteredNodes,
@@ -459,14 +459,12 @@ class FriendNetworkScreenModel(
     private suspend fun computeEgo(
         nodes: List<MutualFriendData>,
         edges: Map<String, List<String>>,
-        communities: Map<String, Int>,
         nodeSizePx: Float,
         selfId: String,
     ): ForceLayoutResult = withContext(Dispatchers.Default) {
         computeEgoLayout(
             nodeIds = nodes.map { it.id },
             edges = edges,
-            communities = communities,
             desiredSpacing = nodeSizePx * 1.3f,
             selfId = selfId,
         )

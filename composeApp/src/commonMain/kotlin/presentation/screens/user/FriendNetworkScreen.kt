@@ -175,9 +175,15 @@ object FriendNetworkScreen : Screen {
                 if (state.nodes.isNotEmpty()) {
                     FriendNetworkControlRow(
                         viewMode = state.viewMode,
-                        legend = state.communityLegend,
+                        // 自我中心视图里没有社区概念，不展示社区图例
+                        legend = if (state.viewMode == FriendNetworkViewMode.Community) state.communityLegend
+                        else emptyList(),
                         selectedCommunity = selectedCommunityState.value,
-                        onViewModeChange = { model.setViewMode(it) },
+                        onViewModeChange = { mode ->
+                            model.setViewMode(mode)
+                            selectedCommunityState.value = null
+                            highlightIdState.value = null
+                        },
                         onCommunityClick = { communityId ->
                             selectedCommunityState.value =
                                 if (selectedCommunityState.value == communityId) null else communityId
@@ -536,6 +542,7 @@ private fun FriendNetworkGraph(
         val crossEdgeColor = MaterialTheme.colorScheme.outline
         val textMeasurer = rememberTextMeasurer()
         val ringLabelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.outline)
+        val egoRingColor = MaterialTheme.colorScheme.outlineVariant
 
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
@@ -756,7 +763,8 @@ private fun FriendNetworkGraph(
                                 node = node,
                                 size = nodeSizeDp,
                                 selectedIdState = selectedIdState,
-                                communityColor = nodeColors[node.id],
+                                // 自我中心视图没有社区概念，圆环用中性色
+                                communityColor = if (isEgoView) egoRingColor else nodeColors[node.id],
                             )
                         }
                     }
