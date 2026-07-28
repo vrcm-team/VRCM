@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -261,28 +262,29 @@ private fun FriendNetworkHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
-        updatedAt?.let {
+        // 更新时间与缓存提示合并为一行，压缩头部高度
+        val infoLine = buildList {
+            updatedAt?.let { add(strings.friendNetworkLastUpdated.replace("%s", formatTimestamp(it))) }
+            if (isFromCache) add(strings.friendNetworkCacheHint)
+        }.joinToString(" · ")
+        if (infoLine.isNotEmpty()) {
             Text(
-                text = strings.friendNetworkLastUpdated.replace("%s", formatTimestamp(it)),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline
-            )
-        }
-        if (isFromCache) {
-            Text(
-                text = strings.friendNetworkCacheHint,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline
+                text = infoLine,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
         if (isLoading) {
             val progressText = progress?.let { "${it.current}/${it.total}" }.orEmpty()
             Text(
                 text = strings.friendNetworkBuilding.replace("%s", progressText),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
             )
         }
     }
@@ -367,7 +369,8 @@ private fun FriendNetworkGraph(
     onNodeLongPress: (String) -> Unit,
     onBackgroundTap: () -> Unit,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    // clipToBounds：画布经 graphicsLayer 平移/缩放后不得越界画到上方的图例和头部信息上
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
         val baseNodeSize = 43.dp
         val maxExtraSize = 34.dp
