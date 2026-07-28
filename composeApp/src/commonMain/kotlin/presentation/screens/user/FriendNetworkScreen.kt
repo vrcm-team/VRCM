@@ -531,14 +531,39 @@ private fun FriendNetworkGraph(
                 val maxDegree = (degree.values.maxOrNull() ?: 0).coerceAtLeast(1)
                 degree.mapValues { (_, d) -> d.toFloat() / maxDegree }
             } else {
+                // 圈内度数按「本社区最大值」归一化：每个圈子的核心都拿到本圈最大尺寸；
+                // 再按社区规模(sqrt)设上限：小圈核心醒目但不越级到全图最大
                 val internalDegree = nodes.associate { node ->
                     val community = communities[node.id]
                     node.id to if (community != null && community >= 0) {
                         edges[node.id].orEmpty().count { communities[it] == community }
                     } else 0
                 }
-                val maxInternal = (internalDegree.values.maxOrNull() ?: 0).coerceAtLeast(1)
-                internalDegree.mapValues { (_, d) -> d.toFloat() / maxInternal }
+                val communitySize = mutableMapOf<Int, Int>()
+                val maxInternalByCommunity = mutableMapOf<Int, Int>()
+                nodes.forEach { node ->
+                    val community = communities[node.id] ?: return@forEach
+                    if (community >= 0) {
+                        communitySize[community] = (communitySize[community] ?: 0) + 1
+                        val degree = internalDegree[node.id] ?: 0
+                        if (degree > (maxInternalByCommunity[community] ?: 0)) {
+                            maxInternalByCommunity[community] = degree
+                        }
+                    }
+                }
+                val maxCommunitySize = (communitySize.values.maxOrNull() ?: 1).coerceAtLeast(1)
+                nodes.associate { node ->
+                    val community = communities[node.id]
+                    val ratio = if (community != null && community >= 0) {
+                        val localMax = (maxInternalByCommunity[community] ?: 0).coerceAtLeast(1)
+                        val localRatio = (internalDegree[node.id] ?: 0).toFloat() / localMax
+                        val sizeCap = 0.6f + 0.4f * sqrt(
+                            (communitySize[community] ?: 1).toFloat() / maxCommunitySize
+                        )
+                        localRatio * sizeCap
+                    } else 0f
+                    node.id to ratio
+                }
             }
         }
         val positions = layout.positions
