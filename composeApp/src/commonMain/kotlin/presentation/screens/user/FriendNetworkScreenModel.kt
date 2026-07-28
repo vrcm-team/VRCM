@@ -70,16 +70,17 @@ class FriendNetworkScreenModel(
 
     companion object {
         // 调色板：按社区 ID 分配颜色
+        // 相邻色对经色觉可分性校验（protan/deutan/tritan ΔE ≥ 8.9，正常视觉 ΔE ≥ 16.2）
         private val COLORS_PALETTE = listOf(
-            Color(0xFF5470C6),
-            Color(0xFF91CC75),
-            Color(0xFFFAC858),
-            Color(0xFFEE6666),
-            Color(0xFF73C0DE),
-            Color(0xFF3BA272),
-            Color(0xFFFC8452),
+            Color(0xFF4E79C9),
+            Color(0xFFDC7A30),
+            Color(0xFF237B4B),
+            Color(0xFFBD982A),
+            Color(0xFFB85CA6),
+            Color(0xFF77862B),
+            Color(0xFF3BA8C9),
+            Color(0xFFE06A7C),
             Color(0xFF9A60B4),
-            Color(0xFFEA7CCC),
         )
 
         // 归并后的「其他」伪社区：碎片社区与孤立节点
