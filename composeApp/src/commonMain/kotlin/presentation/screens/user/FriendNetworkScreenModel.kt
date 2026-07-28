@@ -48,8 +48,9 @@ data class StraddlerLean(
 )
 
 /**
- * 骑墙者信息：某外圈边数 ≥ max(2, 1.5×圈内边数) 即为显著倾向
- * [leans] 封顶 Top2，其余显著倾向的边数合计进 [remainderEdges]（灰色余量弧）
+ * 骑墙者信息：某外圈边数 ≥ max(2, 1.5×圈内边数) 即为显著倾向。
+ * [leans] 封顶 Top2，用于布局时的跨圈引力加成（把骑墙者拉到圈间走廊）；
+ * 其余显著倾向的边数合计进 [remainderEdges]
  */
 data class StraddlerInfo(
     val ownEdges: Int,
@@ -66,8 +67,6 @@ data class FriendNetworkUiState(
     val communities: Map<String, Int> = emptyMap(),
     // 真实社区图例（按人数降序，以圈内度数最高成员命名）
     val communityLegend: List<CommunitySummary> = emptyList(),
-    // 骑墙者（有显著倾向圈的人）；多段弧环与站位引力加成用
-    val straddlers: Map<String, StraddlerInfo> = emptyMap(),
     val layout: ForceLayoutResult? = null,
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
@@ -108,7 +107,7 @@ class FriendNetworkScreenModel(
         // 骑墙者判定：外圈边数 ≥ max(STRADDLER_MIN_EDGES, STRADDLER_RATIO × 圈内边数)
         private const val STRADDLER_RATIO = 1.5f
         private const val STRADDLER_MIN_EDGES = 2
-        // 弧环封顶：本圈 + 至多 2 个倾向圈 + 灰色余量
+        // 站位引力加成封顶：至多 Top2 倾向圈
         private const val MAX_LEAN_SEGMENTS = 2
 
         fun colorOfCommunity(communityId: Int): Color =
@@ -285,7 +284,6 @@ class FriendNetworkScreenModel(
                         nodeColors = communityNodeColors(communities),
                         communities = communities,
                         communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
-                        straddlers = straddlers,
                         layout = layout,
                         updatedAt = cache.updatedAt,
                         isFromCache = true,
@@ -364,7 +362,6 @@ class FriendNetworkScreenModel(
                     nodeColors = communityNodeColors(communities),
                     communities = communities,
                     communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
-                    straddlers = straddlers,
                     layout = layout,
                     updatedAt = cache.updatedAt,
                     isFromCache = false,

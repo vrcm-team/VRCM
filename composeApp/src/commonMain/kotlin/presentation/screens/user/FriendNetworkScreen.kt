@@ -48,12 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -198,7 +195,6 @@ object FriendNetworkScreen : Screen {
                             edges = state.edges,
                             nodeColors = state.nodeColors,
                             communities = state.communities,
-                            straddlers = state.straddlers,
                             layout = layout,
                             highlightIdsState = highlightIdsState,
                             selectedIdState = selectedIdState,
@@ -364,7 +360,6 @@ private fun FriendNetworkGraph(
     edges: Map<String, List<String>>,
     nodeColors: Map<String, Color>,
     communities: Map<String, Int>,
-    straddlers: Map<String, StraddlerInfo>,
     layout: ForceLayoutResult,
     highlightIdsState: State<Set<String>>,
     selectedIdState: State<String?>,
@@ -467,29 +462,6 @@ private fun FriendNetworkGraph(
         val currentOnNodeTap by rememberUpdatedState(onNodeTap)
         val currentOnNodeLongPress by rememberUpdatedState(onNodeLongPress)
         val currentOnBackgroundTap by rememberUpdatedState(onBackgroundTap)
-
-        // 骑墙者弧环分段：本圈 + Top2 倾向 + 灰色余量，弧长按边数比例
-        val straddlerSegments = remember(straddlers, communities) {
-            straddlers.mapValues { (id, info) ->
-                val total = (info.ownEdges + info.leans.sumOf { it.edgeCount } + info.remainderEdges)
-                    .toFloat().coerceAtLeast(1f)
-                buildList {
-                    val ownCommunity = communities[id]
-                    if (ownCommunity != null && info.ownEdges > 0) {
-                        add(FriendNetworkScreenModel.colorOfCommunity(ownCommunity) to info.ownEdges / total)
-                    }
-                    info.leans.forEach { lean ->
-                        add(FriendNetworkScreenModel.colorOfCommunity(lean.communityId) to lean.edgeCount / total)
-                    }
-                    if (info.remainderEdges > 0) {
-                        add(
-                            FriendNetworkScreenModel.colorOfCommunity(FriendNetworkScreenModel.OTHER_COMMUNITY_ID)
-                                to info.remainderEdges / total
-                        )
-                    }
-                }
-            }
-        }
 
         // 头像半径（布局坐标系），命中测试用
         val nodeRadius = remember(nodes, nodeDegree, maxDegree) {
@@ -682,7 +654,6 @@ private fun FriendNetworkGraph(
                                 size = nodeSizeDp,
                                 selectedIdState = selectedIdState,
                                 communityColor = nodeColors[node.id],
-                                straddlerSegments = straddlerSegments[node.id],
                             )
                         }
                     }
@@ -698,7 +669,6 @@ private fun FriendNetworkNode(
     size: androidx.compose.ui.unit.Dp,
     selectedIdState: State<String?>,
     communityColor: Color? = null,
-    straddlerSegments: List<Pair<Color, Float>>? = null,
 ) {
     val isSelected = selectedIdState.value == node.id
     val borderColor = when {
@@ -706,39 +676,15 @@ private fun FriendNetworkNode(
         communityColor != null -> communityColor
         else -> Color.Transparent
     }
-    // 骑墙者画多段弧环（选中态仍是 primary 整环）
-    val ringModifier = if (straddlerSegments != null && straddlerSegments.size > 1 && !isSelected) {
-        Modifier.drawWithContent {
-            drawContent()
-            val strokeWidth = 3.dp.toPx()
-            val inset = strokeWidth / 2f
-            var startAngle = -90f
-            straddlerSegments.forEach { (color, fraction) ->
-                val sweep = fraction * 360f
-                drawArc(
-                    color = color,
-                    startAngle = startAngle,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = Size(this.size.width - strokeWidth, this.size.height - strokeWidth),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                )
-                startAngle += sweep
-            }
-        }
-    } else {
-        Modifier.border(
-            width = if (communityColor != null || isSelected) 3.dp else 2.dp,
-            color = borderColor,
-            shape = CircleShape
-        )
-    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(size)
-                .then(ringModifier)
+                .border(
+                    width = if (communityColor != null || isSelected) 3.dp else 2.dp,
+                    color = borderColor,
+                    shape = CircleShape
+                )
                 .background(MaterialTheme.colorScheme.surface, CircleShape)
         ) {
             UserStateIcon(
