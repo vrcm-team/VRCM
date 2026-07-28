@@ -29,7 +29,8 @@ private const val MIN_ITERATIONS = 30
 private const val GRAVITY = 0.06f
 private const val THETA_SQ = 0.64f
 private const val EXACT_REPULSION_LIMIT = 128
-private const val COLLISION_ITERATIONS = 50
+private const val MAX_COLLISION_ITERATIONS = 64
+private const val COLLISION_ROUNDING_MARGIN = 1.00001f
 private const val MAX_DEPTH = 24
 private const val INTRA_COMMUNITY_ATTRACTION = 1.3f
 private const val CROSS_COMMUNITY_ATTRACTION = 0.25f
@@ -360,9 +361,10 @@ private fun placeIsolatedOnRings(
 internal fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float, pinned: Int = -1) {
     val n = x.size
     if (n < 2 || minDist <= 0f) return
-    val minDistSq = minDist * minDist
-    val invCell = 1f / minDist
-    repeat(COLLISION_ITERATIONS) {
+    val targetDist = minDist * COLLISION_ROUNDING_MARGIN
+    val minDistSq = targetDist * targetDist
+    val invCell = 1f / targetDist
+    repeat(MAX_COLLISION_ITERATIONS) {
         var moved = false
         val grid = HashMap<Long, MutableList<Int>>(n * 2)
         for (i in 0 until n) {
@@ -377,21 +379,23 @@ internal fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float, pin
                     val cellNodes = grid[cellKey(gx, gy)] ?: continue
                     for (j in cellNodes) {
                         if (j <= i) continue
-                        var dx = x[j] - x[i]
-                        var dy = y[j] - y[i]
+                        val dx = x[j] - x[i]
+                        val dy = y[j] - y[i]
                         val distSq = dx * dx + dy * dy
                         if (distSq >= minDistSq) continue
-                        var dist = sqrt(distSq)
+                        val dist = sqrt(distSq)
+                        val ux: Float
+                        val uy: Float
                         if (dist < 1e-3f) {
                             // 完全重合时按索引给一个确定性方向
                             val angle = (i * 0.618034f + j * 0.381966f) * 2f * PI.toFloat()
-                            dx = cos(angle)
-                            dy = sin(angle)
-                            dist = 1f
+                            ux = cos(angle)
+                            uy = sin(angle)
+                        } else {
+                            ux = dx / dist
+                            uy = dy / dist
                         }
-                        val overlap = minDist - min(dist, minDist)
-                        val ux = dx / dist
-                        val uy = dy / dist
+                        val overlap = targetDist - min(dist, targetDist)
                         when {
                             i == pinned -> {
                                 x[j] += ux * overlap
@@ -415,15 +419,161 @@ internal fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float, pin
         }
         if (!moved) return
     }
+    if (hasCollisions(x, y, targetDist)) {
+        arrangeCollisionFallback(x, y, targetDist, pinned)
+    }
 }
 
 private fun cellKey(gx: Int, gy: Int): Long = (gx.toLong() shl 32) or (gy.toLong() and 0xffffffffL)
+
+private fun hasCollisions(x: FloatArray, y: FloatArray, minDist: Float): Boolean {
+    val minDistSq = minDist * minDist
+    val invCell = 1f / minDist
+    val grid = HashMap<Long, MutableList<Int>>(x.size * 2)
+    for (i in x.indices) {
+        val cx = floor(x[i] * invCell).toInt()
+        val cy = floor(y[i] * invCell).toInt()
+        for (gx in cx - 1..cx + 1) {
+            for (gy in cy - 1..cy + 1) {
+                for (j in grid[cellKey(gx, gy)].orEmpty()) {
+                    val dx = x[j] - x[i]
+                    val dy = y[j] - y[i]
+                    if (dx * dx + dy * dy < minDistSq) return true
+                }
+            }
+        }
+        grid.getOrPut(cellKey(cx, cy)) { mutableListOf() }.add(i)
+    }
+    return false
+}
+
+/**
+ * 极端退化输入无法在迭代上限内收敛时，保留无冲突节点原位，只把仍冲突的
+ * 节点移动到其原位附近最近的规则格点。pinned 会最先占位，因此始终保持原位。
+ */
+private fun arrangeCollisionFallback(
+    x: FloatArray,
+    y: FloatArray,
+    minDist: Float,
+    pinned: Int,
+) {
+    val step = minDist * 1.001f
+    val minDistSq = minDist * minDist
+    val invCell = 1f / minDist
+    val originalX = x.copyOf()
+    val originalY = y.copyOf()
+    val grid = HashMap<Long, MutableList<Int>>(x.size * 2)
+    val order = if (pinned in x.indices) {
+        listOf(pinned) + x.indices.filter { it != pinned }
+    } else {
+        x.indices.toList()
+    }
+
+    fun isFree(px: Float, py: Float): Boolean {
+        val cx = floor(px * invCell).toInt()
+        val cy = floor(py * invCell).toInt()
+        for (gx in cx - 1..cx + 1) {
+            for (gy in cy - 1..cy + 1) {
+                for (j in grid[cellKey(gx, gy)].orEmpty()) {
+                    val dx = x[j] - px
+                    val dy = y[j] - py
+                    if (dx * dx + dy * dy < minDistSq) return false
+                }
+            }
+        }
+        return true
+    }
+
+    fun occupy(i: Int, px: Float, py: Float) {
+        x[i] = px
+        y[i] = py
+        val cx = floor(px * invCell).toInt()
+        val cy = floor(py * invCell).toInt()
+        grid.getOrPut(cellKey(cx, cy)) { mutableListOf() }.add(i)
+    }
+
+    for (i in order) {
+        val originX = originalX[i]
+        val originY = originalY[i]
+        if (isFree(originX, originY)) {
+            occupy(i, originX, originY)
+            continue
+        }
+
+        var placed = false
+        fun tryCandidate(gx: Int, gy: Int) {
+            if (placed) return
+            val candidateX = originX + gx * step
+            val candidateY = originY + gy * step
+            if (isFree(candidateX, candidateY)) {
+                occupy(i, candidateX, candidateY)
+                placed = true
+            }
+        }
+
+        var radius = 1
+        while (!placed && radius <= x.size + 1) {
+            for (gx in -radius..radius) {
+                tryCandidate(gx, -radius)
+                tryCandidate(gx, radius)
+            }
+            for (gy in -radius + 1 until radius) {
+                tryCandidate(-radius, gy)
+                tryCandidate(radius, gy)
+            }
+            radius++
+        }
+        if (!placed) {
+            arrangeGlobalCollisionGrid(x, y, minDist, pinned)
+            return
+        }
+    }
+}
+
+private fun arrangeGlobalCollisionGrid(x: FloatArray, y: FloatArray, minDist: Float, pinned: Int) {
+    val step = minDist * 1.001f
+    if (pinned in x.indices) {
+        val centerX = x[pinned]
+        val centerY = y[pinned]
+        val movable = x.indices.filter { it != pinned }
+        var next = 0
+        var radius = 1
+        fun place(gx: Int, gy: Int) {
+            if (next >= movable.size) return
+            val i = movable[next++]
+            x[i] = centerX + gx * step
+            y[i] = centerY + gy * step
+        }
+        while (next < movable.size) {
+            for (gx in -radius..radius) {
+                place(gx, -radius)
+                place(gx, radius)
+            }
+            for (gy in -radius + 1 until radius) {
+                place(-radius, gy)
+                place(radius, gy)
+            }
+            radius++
+        }
+        return
+    }
+    val centerX = x.average().toFloat()
+    val centerY = y.average().toFloat()
+    val columns = kotlin.math.ceil(sqrt(x.size.toFloat())).toInt()
+    val rows = (x.size + columns - 1) / columns
+    val startX = centerX - (columns - 1) * step / 2f
+    val startY = centerY - (rows - 1) * step / 2f
+    for (i in x.indices) {
+        x[i] = startX + (i % columns) * step
+        y[i] = startY + (i / columns) * step
+    }
+}
 
 /**
  * Barnes-Hut 四叉树（数组实现，可跨迭代复用）
  * 远处的节点簇按质心近似计算斥力
  */
-private class BarnesHutTree(bodyCount: Int) {
+internal class BarnesHutTree(bodyCount: Int) {
     private var cap = max(64, bodyCount * 4)
     private var childBase = IntArray(cap)
     private var mass = FloatArray(cap)
@@ -435,6 +585,8 @@ private class BarnesHutTree(bodyCount: Int) {
     private var rootSize = 1f
     private val stackNode = IntArray(4 * MAX_DEPTH + 8)
     private val stackSize = FloatArray(4 * MAX_DEPTH + 8)
+    private val stackMinX = FloatArray(4 * MAX_DEPTH + 8)
+    private val stackMinY = FloatArray(4 * MAX_DEPTH + 8)
 
     var outFx = 0f
         private set
@@ -534,29 +686,44 @@ private class BarnesHutTree(bodyCount: Int) {
         var sp = 0
         stackNode[sp] = 0
         stackSize[sp] = rootSize
+        stackMinX[sp] = rootMinX
+        stackMinY[sp] = rootMinY
         sp++
         while (sp > 0) {
             sp--
             val node = stackNode[sp]
             val size = stackSize[sp]
+            val minX = stackMinX[sp]
+            val minY = stackMinY[sp]
             val m = mass[node]
             if (m == 0f) continue
-            val dx = px - comX[node]
-            val dy = py - comY[node]
-            val distSq = dx * dx + dy * dy
+            var sourceMass = m
+            var sourceX = comX[node]
+            var sourceY = comY[node]
+            val containsQuery = px >= minX && px < minX + size && py >= minY && py < minY + size
             val base = childBase[node]
-            if (base == -1 || size * size < THETA_SQ * distSq) {
-                // 自身所在叶子 dx=dy=0，天然无贡献
+            if (base == -1 && containsQuery) {
+                sourceMass -= 1f
+                if (sourceMass <= 0f) continue
+                sourceX = (sourceX * m - px) / sourceMass
+                sourceY = (sourceY * m - py) / sourceMass
+            }
+            val dx = px - sourceX
+            val dy = py - sourceY
+            val distSq = dx * dx + dy * dy
+            if (base == -1 || (!containsQuery && size * size < THETA_SQ * distSq)) {
                 if (distSq < 1e-6f) continue
                 val dist = sqrt(distSq)
-                val force = m * k2 / dist
+                val force = sourceMass * k2 / dist
                 fxAcc += (dx / dist) * force
                 fyAcc += (dy / dist) * force
             } else {
                 val half = size / 2f
-                for (c in base until base + 4) {
-                    stackNode[sp] = c
+                for (quadrant in 0 until 4) {
+                    stackNode[sp] = base + quadrant
                     stackSize[sp] = half
+                    stackMinX[sp] = minX + if (quadrant and 1 != 0) half else 0f
+                    stackMinY[sp] = minY + if (quadrant and 2 != 0) half else 0f
                     sp++
                 }
             }

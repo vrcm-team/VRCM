@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.core.algorithms
 
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.test.Test
@@ -63,9 +64,9 @@ class ForceLayoutTest {
         val (ids, edges) = randomGraph(nodeCount = 150, edgeCount = 400)
         val result = computeForceLayout(ids, edges, spacing)
 
-        // 碰撞消除保证中心距不小于 spacing * 0.95（留一点收敛容差）
+        // 碰撞消除保证中心距不小于 spacing * 0.95
         val minDist = minPairDistance(result)
-        assertTrue(minDist >= spacing * 0.9f, "最小节点间距 $minDist 小于期望 ${spacing * 0.9f}")
+        assertTrue(minDist >= spacing * 0.95f, "最小节点间距 $minDist 小于期望 ${spacing * 0.95f}")
     }
 
     @Test
@@ -80,7 +81,50 @@ class ForceLayoutTest {
 
         assertEquals(ids.toSet(), result.positions.keys)
         val minDist = minPairDistance(result)
-        assertTrue(minDist >= spacing * 0.9f, "孤立节点间距 $minDist 过小")
+        assertTrue(minDist >= spacing * 0.95f, "孤立节点间距 $minDist 过小")
+    }
+
+    @Test
+    fun collisionFallbackSeparatesManyCoincidentNodesAndKeepsPinnedNode() {
+        val x = FloatArray(500)
+        val y = FloatArray(500)
+        val minDist = spacing * 0.95f
+
+        resolveCollisions(x, y, minDist, pinned = 0)
+
+        assertEquals(0f, x[0])
+        assertEquals(0f, y[0])
+        for (i in x.indices) {
+            for (j in i + 1 until x.size) {
+                val dx = x[i] - x[j]
+                val dy = y[i] - y[j]
+                assertTrue(sqrt(dx * dx + dy * dy) >= minDist)
+            }
+        }
+    }
+
+    @Test
+    fun barnesHutExcludesCornerQueryFromContainingCell() {
+        val count = 129
+        val x = FloatArray(count) { if (it == 0) 0f else 1_000f }
+        val y = FloatArray(count) { if (it == 0) 0f else 1_000f }
+        val k2 = spacing * spacing
+        val tree = BarnesHutTree(count)
+        tree.build(x, y, count)
+
+        tree.accumulateRepulsion(x[0], y[0], k2)
+
+        var exactFx = 0f
+        var exactFy = 0f
+        for (i in 1 until count) {
+            val dx = x[0] - x[i]
+            val dy = y[0] - y[i]
+            val distSq = dx * dx + dy * dy
+            exactFx += dx * k2 / distSq
+            exactFy += dy * k2 / distSq
+        }
+        assertTrue(abs(tree.outFx - exactFx) <= abs(exactFx) * 0.001f)
+        assertTrue(abs(tree.outFy - exactFy) <= abs(exactFy) * 0.001f)
     }
 
     @Test
