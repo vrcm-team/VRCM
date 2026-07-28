@@ -110,15 +110,12 @@ class FriendNetworkCommunityTest {
         )
         val straddlers = FriendNetworkScreenModel.detectStraddlers(members, graph, communities)
 
-        val x = straddlers.getValue("x")
-        assertEquals(2, x.ownEdges)
-        assertEquals(listOf(StraddlerLean(1, 3)), x.leans)
-        assertEquals(0, x.remainderEdges)
+        assertEquals(setOf(1), straddlers.getValue("x"))
         assertTrue("y" !in straddlers)
     }
 
     @Test
-    fun straddlerLeansCapAtTopTwoWithGrayRemainder() {
+    fun straddlerLeansCapAtTopTwo() {
         val ids = listOf("s", "a1", "a2") +
             (1..4).map { "b$it" } + (1..4).map { "c$it" } + (1..3).map { "d$it" }
         val members = ids.map { node(it) }
@@ -136,10 +133,8 @@ class FriendNetworkCommunityTest {
         val graph = symmetricEdges(*pairs.toTypedArray())
         val straddlers = FriendNetworkScreenModel.detectStraddlers(members, graph, communities)
 
-        val s = straddlers.getValue("s")
-        // Top2 取 B、C（同边数按社区编号升序），D 进灰色余量
-        assertEquals(listOf(StraddlerLean(1, 4), StraddlerLean(2, 4)), s.leans)
-        assertEquals(3, s.remainderEdges)
+        // Top2 取 B、C（同边数按社区编号升序），D 不进入布局引力集合
+        assertEquals(setOf(1, 2), straddlers.getValue("s"))
     }
 
     @Test
