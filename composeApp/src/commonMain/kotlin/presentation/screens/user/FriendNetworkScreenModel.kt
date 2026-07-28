@@ -44,6 +44,8 @@ data class FriendNetworkUiState(
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
     val isLoading: Boolean = false,
+    // 正在读取缓存并计算布局（区别于 isLoading：不走网络、无进度）
+    val isPreparing: Boolean = false,
     val progress: FriendNetworkProgress? = null,
 )
 
@@ -140,9 +142,11 @@ class FriendNetworkScreenModel(
 
     fun loadCache(nodeSizePx: Float) {
         screenModelScope.launch(Dispatchers.IO) {
-            runCatching { authService.currentUser() }
-                .onSuccess { currentUser ->
-                    val cache = cacheDao.load(currentUser.id) ?: return@onSuccess
+            uiState = uiState.copy(isPreparing = true)
+            try {
+                val currentUser = authService.currentUser()
+                val cache = cacheDao.load(currentUser.id)
+                if (cache != null) {
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
                     val nodeColors = assignCommunityColors(cache.nodes, cache.edges, selfId)
@@ -157,9 +161,11 @@ class FriendNetworkScreenModel(
                         isFromCache = true,
                     )
                 }
-                .onFailure {
-                    logger.error(it.message.orEmpty())
-                }
+            } catch (e: Exception) {
+                logger.error(e.message.orEmpty())
+            } finally {
+                uiState = uiState.copy(isPreparing = false)
+            }
         }
     }
 
