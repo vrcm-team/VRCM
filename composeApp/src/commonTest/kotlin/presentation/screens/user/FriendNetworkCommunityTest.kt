@@ -65,6 +65,28 @@ class FriendNetworkCommunityTest {
     }
 
     @Test
+    fun legendNamePrefersInternalDegreeOverTotalDegree() {
+        // 5 人团（缺 a1-a5 边）：a1 圈内度 3 但总度 5（外连 b1、c1），
+        // a2/a3/a4 圈内度 4——代言人必须是圈内度最高者，而非社交面最广的 a1
+        val members = (1..5).map { node("a$it") } + (1..3).map { node("b$it") } +
+            node("c1") + node("c2")
+        val graph = symmetricEdges(
+            "a1" to "a2", "a1" to "a3", "a1" to "a4",
+            "a2" to "a3", "a2" to "a4", "a2" to "a5",
+            "a3" to "a4", "a3" to "a5", "a4" to "a5",
+            "b1" to "b2", "b2" to "b3", "b1" to "b3",
+            "c1" to "c2",
+            "a1" to "b1", "a1" to "c1",
+        )
+        val communities = FriendNetworkScreenModel.assignCommunities(members, graph)
+        val legend = FriendNetworkScreenModel.buildCommunityLegend(members, graph, communities)
+
+        val communityA = legend.first { it.count == 5 }
+        assertTrue(communityA.name != "a1", "总度数最高的 a1 不应成为代言人")
+        assertTrue(communityA.name in setOf("a2", "a3", "a4"))
+    }
+
+    @Test
     fun otherCommunityUsesGrayAndPaletteCycles() {
         val other = FriendNetworkScreenModel.colorOfCommunity(FriendNetworkScreenModel.OTHER_COMMUNITY_ID)
         assertEquals(FriendNetworkScreenModel.colorOfCommunity(0), FriendNetworkScreenModel.colorOfCommunity(9))

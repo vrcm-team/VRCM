@@ -131,7 +131,9 @@ class FriendNetworkScreenModel(
             communities.mapValues { (_, communityId) -> colorOfCommunity(communityId) }
 
         /**
-         * 社区图例：只含真实社区，编号顺序即人数降序，以圈内度数最高成员命名
+         * 社区图例：只含真实社区，编号顺序即人数降序，以圈内度数最高成员命名。
+         * 只数本社区内部的连线：总度数高的人往往社交面广、归属最模糊，
+         * 用圈内度数才能选出真正代表这个圈子的人
          */
         fun buildCommunityLegend(
             nodes: List<MutualFriendData>,
@@ -145,7 +147,10 @@ class FriendNetworkScreenModel(
                 .entries
                 .sortedBy { it.key }
                 .map { (communityId, members) ->
-                    val topMember = members.maxByOrNull { edges[it].orEmpty().size }
+                    val memberSet = members.toSet()
+                    val topMember = members.maxByOrNull { member ->
+                        edges[member].orEmpty().count { it in memberSet }
+                    }
                     CommunitySummary(
                         id = communityId,
                         name = topMember?.let { nodeById[it]?.displayName }.orEmpty()
