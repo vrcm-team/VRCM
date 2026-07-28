@@ -43,6 +43,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -519,9 +520,21 @@ private fun FriendNetworkGraph(
             viewWidthPx / layoutWidthPx,
             viewHeightPx / layoutHeightPx
         ).coerceIn(0.6f, 1.25f)
-        var scale by remember(nodes.size, viewWidthPx, viewHeightPx, layout) { mutableStateOf(initialScale) }
-        var offset by remember(nodes.size, viewWidthPx, viewHeightPx, layout) { mutableStateOf(Offset.Zero) }
-        var hasUserInteracted by remember(nodes.size, layout) { mutableStateOf(false) }
+        // rememberSaveable：切后台进程重建后还原视口；key 与视口尺寸解耦，
+        // 折叠/分屏等尺寸变化不再把状态清零（切换视图模式仍复位）
+        var scale by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(initialScale) }
+        var offsetX by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(0f) }
+        var offsetY by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(0f) }
+        var hasUserInteracted by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(false) }
+        // 视口尺寸变化（折叠态切换/分屏/重建）：平移做中心补偿，画面中心点保持不变
+        var lastViewWidth by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(viewWidthPx) }
+        var lastViewHeight by rememberSaveable(nodes.size, isEgoView) { mutableStateOf(viewHeightPx) }
+        if (lastViewWidth != viewWidthPx || lastViewHeight != viewHeightPx) {
+            offsetX += (viewWidthPx - lastViewWidth) / 2f
+            offsetY += (viewHeightPx - lastViewHeight) / 2f
+            lastViewWidth = viewWidthPx
+            lastViewHeight = viewHeightPx
+        }
         val edgeList = remember(edges) { buildEdgeList(edges) }
         // 头像大小比例：社区视图=圈内度数（圈子核心大），自我视图=共同好友数
         // 线性映射，让核心与边缘的大小差距一眼可辨
@@ -660,7 +673,7 @@ private fun FriendNetworkGraph(
         // 统一在父层做命中测试：节点自身不挂手势，避免消费事件吞掉缩放
         val hitTest by rememberUpdatedState<(Offset) -> String?> { viewPos ->
             val currentScale = if (hasUserInteracted) scale else initialScale
-            val currentOffset = if (hasUserInteracted) offset else centeredOffset
+            val currentOffset = if (hasUserInteracted) Offset(offsetX, offsetY) else centeredOffset
             val layoutPoint = (viewPos - currentOffset) / currentScale
             var best: String? = null
             var bestDist = Float.MAX_VALUE
@@ -698,7 +711,8 @@ private fun FriendNetworkGraph(
                                 currentOnNodeTap(nodeId)
                             } else {
                                 scale = initialScale
-                                offset = centeredOffset
+                                offsetX = centeredOffset.x
+                                offsetY = centeredOffset.y
                                 hasUserInteracted = false
                             }
                         }
@@ -707,14 +721,15 @@ private fun FriendNetworkGraph(
                 .pointerInput(nodes.size, initialScale, viewWidthPx, viewHeightPx, layout) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
                         val currentScale = if (hasUserInteracted) scale else initialScale
-                        val currentOffset = if (hasUserInteracted) offset else centeredOffset
+                        val currentOffset = if (hasUserInteracted) Offset(offsetX, offsetY) else centeredOffset
                         if (!hasUserInteracted && (pan != Offset.Zero || zoom != 1f)) {
                             hasUserInteracted = true
                         }
                         val newScale = (currentScale * zoom).coerceIn(minScale, maxScale)
                         val layoutPoint = (centroid - currentOffset) / currentScale
-                        val nextOffset = centroid - (layoutPoint * newScale)
-                        offset = nextOffset + pan
+                        val nextOffset = centroid - (layoutPoint * newScale) + pan
+                        offsetX = nextOffset.x
+                        offsetY = nextOffset.y
                         scale = newScale
                     }
                 }
@@ -725,7 +740,7 @@ private fun FriendNetworkGraph(
                     .graphicsLayer {
                         transformOrigin = TransformOrigin(0f, 0f)
                         val renderScale = if (hasUserInteracted) scale else initialScale
-                        val renderOffset = if (hasUserInteracted) offset else centeredOffset
+                        val renderOffset = if (hasUserInteracted) Offset(offsetX, offsetY) else centeredOffset
                         translationX = renderOffset.x
                         translationY = renderOffset.y
                         scaleX = renderScale
