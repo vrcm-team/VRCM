@@ -2,10 +2,14 @@ package io.github.vrcmteam.vrcm.core.algorithms
 
 import androidx.compose.ui.geometry.Offset
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 data class ForceLayoutResult(
     val positions: Map<String, Offset>,
@@ -13,13 +17,21 @@ data class ForceLayoutResult(
     val layoutHeightPx: Float,
 )
 
-private const val FORCE_ITERATIONS = 500
-private const val CONVERGENCE_THRESHOLD = 0.5f
+private const val FORCE_ITERATIONS = 300
 private const val MIN_ITERATIONS = 30
+private const val GRAVITY = 0.06f
+private const val THETA_SQ = 0.64f
+private const val EXACT_REPULSION_LIMIT = 128
+private const val COLLISION_ITERATIONS = 50
+private const val MAX_DEPTH = 24
 
 /**
  * 力导向布局算法（简化版 ForceAtlas2）
- * 含提前收敛退出
+ *
+ * - 斥力：节点数超过 [EXACT_REPULSION_LIMIT] 时用 Barnes-Hut 四叉树近似，复杂度 O(n log n)
+ * - 孤立节点（无边）不参与模拟，直接环形排列在主图外围
+ * - 模拟结束后做碰撞消除，保证任意两节点中心距不小于 desiredSpacing * 0.95
+ * - 画布尺寸按最终内容包围盒加边距得出
  *
  * @param nodeIds 节点 ID 列表
  * @param edges 邻接表，key 为节点 ID，value 为邻居节点 ID 列表
@@ -36,79 +48,151 @@ fun computeForceLayout(
 
     val idx = nodeIds.mapIndexed { i, id -> id to i }.toMap()
 
-    // 计算画布尺寸
-    val maxRadius = desiredSpacing * sqrt(n.coerceAtLeast(1).toFloat()) * 2f
-    val requiredDiameter = maxRadius * 2f + desiredSpacing
-    val scaleFactor = maxOf(1f, sqrt(n.toFloat().coerceAtLeast(1f)) / 10f)
-    val referenceSize = 1000f * scaleFactor
-    val layoutWidthPx = maxOf(referenceSize, requiredDiameter)
-    val layoutHeightPx = maxOf(referenceSize, requiredDiameter)
-    val center = Offset(layoutWidthPx / 2f, layoutHeightPx / 2f)
-
-    // 初始化位置：随机散布在中心附近
-    val x = FloatArray(n)
-    val y = FloatArray(n)
-    val rng = kotlin.random.Random(42)
-    for (i in 0 until n) {
-        val angle = rng.nextFloat() * 2f * PI.toFloat()
-        val r = rng.nextFloat() * desiredSpacing * 0.3f
-        x[i] = center.x + r * cos(angle)
-        y[i] = center.y + r * sin(angle)
+    // 去重的无向边列表（成对存放索引）
+    val pairList = ArrayList<Int>()
+    val seenPairs = HashSet<Long>()
+    val degree = IntArray(n)
+    nodeIds.forEachIndexed { i, id ->
+        for (other in edges[id].orEmpty()) {
+            val j = idx[other] ?: continue
+            if (i == j) continue
+            val a = min(i, j)
+            val b = max(i, j)
+            if (seenPairs.add((a.toLong() shl 32) or b.toLong())) {
+                pairList.add(a)
+                pairList.add(b)
+                degree[a]++
+                degree[b]++
+            }
+        }
     }
 
-    // 力导向迭代
+    val connected = (0 until n).filter { degree[it] > 0 }
+    val isolated = (0 until n).filter { degree[it] == 0 }
+
+    val x = FloatArray(n)
+    val y = FloatArray(n)
+    val rng = Random(42)
+
+    val m = connected.size
+    if (m > 0) {
+        // 压缩到连通子集上模拟
+        val compact = IntArray(n) { -1 }
+        connected.forEachIndexed { ci, oi -> compact[oi] = ci }
+        val sx = FloatArray(m)
+        val sy = FloatArray(m)
+        val spread = desiredSpacing * sqrt(m.toFloat()) * 0.5f
+        for (i in 0 until m) {
+            val angle = rng.nextFloat() * 2f * PI.toFloat()
+            val r = sqrt(rng.nextFloat()) * spread
+            sx[i] = r * cos(angle)
+            sy[i] = r * sin(angle)
+        }
+        val edgePairs = IntArray(pairList.size)
+        for (e in pairList.indices step 2) {
+            edgePairs[e] = compact[pairList[e]]
+            edgePairs[e + 1] = compact[pairList[e + 1]]
+        }
+        runForceSimulation(sx, sy, edgePairs, desiredSpacing)
+        connected.forEachIndexed { ci, oi ->
+            x[oi] = sx[ci]
+            y[oi] = sy[ci]
+        }
+    }
+
+    if (isolated.isNotEmpty()) {
+        placeIsolatedOnRings(x, y, connected, isolated, desiredSpacing)
+    }
+
+    resolveCollisions(x, y, desiredSpacing * 0.95f)
+
+    // 按内容包围盒平移并留出边距
+    var minX = x[0]
+    var maxX = x[0]
+    var minY = y[0]
+    var maxY = y[0]
+    for (i in 1 until n) {
+        if (x[i] < minX) minX = x[i]
+        if (x[i] > maxX) maxX = x[i]
+        if (y[i] < minY) minY = y[i]
+        if (y[i] > maxY) maxY = y[i]
+    }
+    val margin = desiredSpacing
+    val positions = nodeIds.mapIndexed { i, id ->
+        id to Offset(x[i] - minX + margin, y[i] - minY + margin)
+    }.toMap()
+    return ForceLayoutResult(
+        positions = positions,
+        layoutWidthPx = (maxX - minX) + margin * 2f,
+        layoutHeightPx = (maxY - minY) + margin * 2f,
+    )
+}
+
+private fun runForceSimulation(
+    x: FloatArray,
+    y: FloatArray,
+    edgePairs: IntArray,
+    desiredSpacing: Float,
+) {
+    val n = x.size
     val k = desiredSpacing * 1.5f
-    val gravity = 1.6f
-    val speed = 1f
+    val k2 = k * k
     val fx = FloatArray(n)
     val fy = FloatArray(n)
+    val tree = if (n > EXACT_REPULSION_LIMIT) BarnesHutTree(n) else null
+    val convergenceThreshold = max(0.5f, k * 0.005f)
 
     for (iter in 0 until FORCE_ITERATIONS) {
         fx.fill(0f)
         fy.fill(0f)
 
-        // 斥力：所有节点对之间
-        for (i in 0 until n) {
-            for (j in i + 1 until n) {
-                var dx = x[i] - x[j]
-                var dy = y[i] - y[j]
-                val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-                val force = (k * k) / dist
-                val fxij = (dx / dist) * force
-                val fyij = (dy / dist) * force
-                fx[i] += fxij; fy[i] += fyij
-                fx[j] -= fxij; fy[j] -= fyij
+        // 斥力
+        if (tree != null) {
+            tree.build(x, y, n)
+            for (i in 0 until n) {
+                tree.accumulateRepulsion(x[i], y[i], k2)
+                fx[i] += tree.outFx
+                fy[i] += tree.outFy
+            }
+        } else {
+            for (i in 0 until n) {
+                for (j in i + 1 until n) {
+                    val dx = x[i] - x[j]
+                    val dy = y[i] - y[j]
+                    val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+                    val force = k2 / dist
+                    val fxij = (dx / dist) * force
+                    val fyij = (dy / dist) * force
+                    fx[i] += fxij; fy[i] += fyij
+                    fx[j] -= fxij; fy[j] -= fyij
+                }
             }
         }
 
         // 引力：连接的节点之间
-        for (i in 0 until n) {
-            val nodeId = nodeIds[i]
-            val neighbors = edges[nodeId].orEmpty()
-            for (neighborId in neighbors) {
-                val j = idx[neighborId] ?: continue
-                if (i >= j) continue
-                var dx = x[j] - x[i]
-                var dy = y[j] - y[i]
-                val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-                val force = (dist * dist) / k
-                val fxij = (dx / dist) * force
-                val fyij = (dy / dist) * force
-                fx[i] += fxij; fy[i] += fyij
-                fx[j] -= fxij; fy[j] -= fyij
-            }
+        var e = 0
+        while (e < edgePairs.size) {
+            val i = edgePairs[e]
+            val j = edgePairs[e + 1]
+            e += 2
+            val dx = x[j] - x[i]
+            val dy = y[j] - y[i]
+            val dist = sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
+            val force = (dist * dist) / k
+            val fxij = (dx / dist) * force
+            val fyij = (dy / dist) * force
+            fx[i] += fxij; fy[i] += fyij
+            fx[j] -= fxij; fy[j] -= fyij
         }
 
-        // 重力：向中心吸引
+        // 重力：向中心（原点）轻微吸引，只为拉住游离的连通分量
         for (i in 0 until n) {
-            val dx = center.x - x[i]
-            val dy = center.y - y[i]
-            fx[i] += dx * gravity
-            fy[i] += dy * gravity
+            fx[i] -= x[i] * GRAVITY
+            fy[i] -= y[i] * GRAVITY
         }
 
-        // 更新位置（带速度限制）
-        val maxDisplacement = k * speed * (1f - iter.toFloat() / FORCE_ITERATIONS)
+        // 更新位置（带速度限制和降温）
+        val maxDisplacement = k * (1f - iter.toFloat() / FORCE_ITERATIONS)
         var maxMove = 0f
         for (i in 0 until n) {
             val fMag = sqrt(fx[i] * fx[i] + fy[i] * fy[i]).coerceAtLeast(0.01f)
@@ -122,9 +206,248 @@ fun computeForceLayout(
         }
 
         // 提前收敛检查：跳过前几轮不稳定振荡
-        if (iter >= MIN_ITERATIONS && maxMove < CONVERGENCE_THRESHOLD) break
+        if (iter >= MIN_ITERATIONS && maxMove < convergenceThreshold) break
+    }
+}
+
+/**
+ * 孤立节点按同心环排在主图外围
+ */
+private fun placeIsolatedOnRings(
+    x: FloatArray,
+    y: FloatArray,
+    connected: List<Int>,
+    isolated: List<Int>,
+    desiredSpacing: Float,
+) {
+    var maxRadius = 0f
+    for (i in connected) {
+        val r = sqrt(x[i] * x[i] + y[i] * y[i])
+        if (r > maxRadius) maxRadius = r
+    }
+    var placed = 0
+    var radius: Float
+    if (connected.isEmpty()) {
+        val first = isolated[0]
+        x[first] = 0f
+        y[first] = 0f
+        placed = 1
+        radius = desiredSpacing
+    } else {
+        radius = maxRadius + desiredSpacing * 1.5f
+    }
+    while (placed < isolated.size) {
+        val capacity = max(6, floor(2f * PI.toFloat() * radius / desiredSpacing).toInt())
+        val count = min(capacity, isolated.size - placed)
+        val step = 2f * PI.toFloat() / count
+        val phase = radius / desiredSpacing * 0.5f
+        for (j in 0 until count) {
+            val angle = phase + j * step
+            val i = isolated[placed + j]
+            x[i] = radius * cos(angle)
+            y[i] = radius * sin(angle)
+        }
+        placed += count
+        radius += desiredSpacing
+    }
+}
+
+/**
+ * 碰撞消除：把中心距小于 minDist 的节点对沿连线推开
+ */
+private fun resolveCollisions(x: FloatArray, y: FloatArray, minDist: Float) {
+    val n = x.size
+    if (n < 2 || minDist <= 0f) return
+    val minDistSq = minDist * minDist
+    val invCell = 1f / minDist
+    repeat(COLLISION_ITERATIONS) {
+        var moved = false
+        val grid = HashMap<Long, MutableList<Int>>(n * 2)
+        for (i in 0 until n) {
+            val key = cellKey(floor(x[i] * invCell).toInt(), floor(y[i] * invCell).toInt())
+            grid.getOrPut(key) { mutableListOf() }.add(i)
+        }
+        for (i in 0 until n) {
+            val cx = floor(x[i] * invCell).toInt()
+            val cy = floor(y[i] * invCell).toInt()
+            for (gx in cx - 1..cx + 1) {
+                for (gy in cy - 1..cy + 1) {
+                    val cellNodes = grid[cellKey(gx, gy)] ?: continue
+                    for (j in cellNodes) {
+                        if (j <= i) continue
+                        var dx = x[j] - x[i]
+                        var dy = y[j] - y[i]
+                        val distSq = dx * dx + dy * dy
+                        if (distSq >= minDistSq) continue
+                        var dist = sqrt(distSq)
+                        if (dist < 1e-3f) {
+                            // 完全重合时按索引给一个确定性方向
+                            val angle = (i * 0.618034f + j * 0.381966f) * 2f * PI.toFloat()
+                            dx = cos(angle)
+                            dy = sin(angle)
+                            dist = 1f
+                        }
+                        val push = (minDist - min(dist, minDist)) / 2f
+                        val ux = dx / dist
+                        val uy = dy / dist
+                        x[i] -= ux * push
+                        y[i] -= uy * push
+                        x[j] += ux * push
+                        y[j] += uy * push
+                        moved = true
+                    }
+                }
+            }
+        }
+        if (!moved) return
+    }
+}
+
+private fun cellKey(gx: Int, gy: Int): Long = (gx.toLong() shl 32) or (gy.toLong() and 0xffffffffL)
+
+/**
+ * Barnes-Hut 四叉树（数组实现，可跨迭代复用）
+ * 远处的节点簇按质心近似计算斥力
+ */
+private class BarnesHutTree(bodyCount: Int) {
+    private var cap = max(64, bodyCount * 4)
+    private var childBase = IntArray(cap)
+    private var mass = FloatArray(cap)
+    private var comX = FloatArray(cap)
+    private var comY = FloatArray(cap)
+    private var nodeCount = 0
+    private var rootMinX = 0f
+    private var rootMinY = 0f
+    private var rootSize = 1f
+    private val stackNode = IntArray(4 * MAX_DEPTH + 8)
+    private val stackSize = FloatArray(4 * MAX_DEPTH + 8)
+
+    var outFx = 0f
+        private set
+    var outFy = 0f
+        private set
+
+    fun build(x: FloatArray, y: FloatArray, n: Int) {
+        var minX = x[0]
+        var maxX = x[0]
+        var minY = y[0]
+        var maxY = y[0]
+        for (i in 1 until n) {
+            if (x[i] < minX) minX = x[i]
+            if (x[i] > maxX) maxX = x[i]
+            if (y[i] < minY) minY = y[i]
+            if (y[i] > maxY) maxY = y[i]
+        }
+        rootMinX = minX
+        rootMinY = minY
+        rootSize = max(maxX - minX, maxY - minY).coerceAtLeast(1f) * 1.0001f
+        nodeCount = 1
+        childBase[0] = -1
+        mass[0] = 0f
+        for (i in 0 until n) insert(x[i], y[i])
     }
 
-    val positions = nodeIds.mapIndexed { i, id -> id to Offset(x[i], y[i]) }.toMap()
-    return ForceLayoutResult(positions, layoutWidthPx, layoutHeightPx)
+    private fun grow(needed: Int) {
+        if (needed <= cap) return
+        var newCap = cap
+        while (newCap < needed) newCap *= 2
+        childBase = childBase.copyOf(newCap)
+        mass = mass.copyOf(newCap)
+        comX = comX.copyOf(newCap)
+        comY = comY.copyOf(newCap)
+        cap = newCap
+    }
+
+    private fun insert(px: Float, py: Float) {
+        var node = 0
+        var minX = rootMinX
+        var minY = rootMinY
+        var size = rootSize
+        var depth = 0
+        while (true) {
+            if (mass[node] == 0f) {
+                mass[node] = 1f
+                comX[node] = px
+                comY[node] = py
+                return
+            }
+            if (childBase[node] == -1) {
+                val sameSpot = abs(comX[node] - px) + abs(comY[node] - py) < 1e-3f
+                if (depth >= MAX_DEPTH || sameSpot) {
+                    // 深度到顶或同点：聚合成伪节点
+                    val total = mass[node] + 1f
+                    comX[node] += (px - comX[node]) / total
+                    comY[node] += (py - comY[node]) / total
+                    mass[node] = total
+                    return
+                }
+                // 分裂叶子：原有实体下沉到子节点
+                grow(nodeCount + 4)
+                val base = nodeCount
+                nodeCount += 4
+                for (c in base until base + 4) {
+                    childBase[c] = -1
+                    mass[c] = 0f
+                }
+                childBase[node] = base
+                val half = size / 2f
+                val q = quadrant(comX[node], comY[node], minX, minY, half)
+                val child = base + q
+                mass[child] = mass[node]
+                comX[child] = comX[node]
+                comY[child] = comY[node]
+            }
+            val total = mass[node] + 1f
+            comX[node] += (px - comX[node]) / total
+            comY[node] += (py - comY[node]) / total
+            mass[node] = total
+            val half = size / 2f
+            val q = quadrant(px, py, minX, minY, half)
+            node = childBase[node] + q
+            if (q and 1 != 0) minX += half
+            if (q and 2 != 0) minY += half
+            size = half
+            depth++
+        }
+    }
+
+    private fun quadrant(px: Float, py: Float, minX: Float, minY: Float, half: Float): Int =
+        (if (px >= minX + half) 1 else 0) or (if (py >= minY + half) 2 else 0)
+
+    fun accumulateRepulsion(px: Float, py: Float, k2: Float) {
+        var fxAcc = 0f
+        var fyAcc = 0f
+        var sp = 0
+        stackNode[sp] = 0
+        stackSize[sp] = rootSize
+        sp++
+        while (sp > 0) {
+            sp--
+            val node = stackNode[sp]
+            val size = stackSize[sp]
+            val m = mass[node]
+            if (m == 0f) continue
+            val dx = px - comX[node]
+            val dy = py - comY[node]
+            val distSq = dx * dx + dy * dy
+            val base = childBase[node]
+            if (base == -1 || size * size < THETA_SQ * distSq) {
+                // 自身所在叶子 dx=dy=0，天然无贡献
+                if (distSq < 1e-6f) continue
+                val dist = sqrt(distSq)
+                val force = m * k2 / dist
+                fxAcc += (dx / dist) * force
+                fyAcc += (dy / dist) * force
+            } else {
+                val half = size / 2f
+                for (c in base until base + 4) {
+                    stackNode[sp] = c
+                    stackSize[sp] = half
+                    sp++
+                }
+            }
+        }
+        outFx = fxAcc
+        outFy = fyAcc
+    }
 }
