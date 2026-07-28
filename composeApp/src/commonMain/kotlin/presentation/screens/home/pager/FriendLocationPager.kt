@@ -68,7 +68,7 @@ object FriendLocationPager : Pager {
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
-            doRefresh = friendLocationPagerModel::refreshFriendLocation
+            doRefresh = friendLocationPagerModel::refreshFriendLocation,
         )
 
     }
@@ -134,7 +134,6 @@ fun Pager.FriendLocationPager(
     ) {
         val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
-        val travelingFriendLocation = friendLocationMap[LocationType.Traveling]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]?.sortedByDescending { it.friendList.size }
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
@@ -151,20 +150,14 @@ fun Pager.FriendLocationPager(
             SimpleCLocationCard(
                 friendLocation = offlineFriendLocation,
                 locationType = LocationType.Offline,
-                onClickUserIcon = onClickUserIcon
+                onClickUserIcon = onClickUserIcon,
             ) { "${strings.fiendLocationPagerWebsite}${offlineFriendLocation?.let { "(${it.friends.size})" }}" }
 
             SimpleCLocationCard(
                 friendLocation = privateFriendLocation,
                 locationType = LocationType.Private,
-                onClickUserIcon = onClickUserIcon
+                onClickUserIcon = onClickUserIcon,
             ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
-
-            SimpleCLocationCard(
-                friendLocation = travelingFriendLocation,
-                locationType = LocationType.Traveling,
-                onClickUserIcon = onClickUserIcon
-            ) { "${strings.fiendLocationPagerTraveling}${travelingFriendLocation?.let { "(${it.friends.size})" }}" }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
@@ -178,12 +171,14 @@ fun Pager.FriendLocationPager(
                         location = location,
                         isSelected = selectLocation == location.location,
                         onClickWorldImage = { onClickWorldImage(location) },
-                        onClickLocationCard = { onClickLocationCard(location) }
+                        onClickLocationCard = { onClickLocationCard(location) },
+                        travelingIds = location.travelingIds.value,
                     ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),
                             instanceId = location.location,
                             friends = it,
+                            travelingIds = location.travelingIds.value,
                             onClickUserIcon = onClickUserIcon
                         )
                     }
@@ -205,18 +200,17 @@ private fun LazyListScope.SimpleCLocationCard(
     onClickUserIcon: (FriendData) -> Unit,
     text: @Composable () -> String,
     ) {
-    friendLocation?.friendList.let {
-        if (it.isNullOrEmpty()) return@let
-        item(key = locationType) {
-            LocationTitle(text())
-        }
-        item(key = locationType.value) {
-            UserIconsRow(
-                friends = it,
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                onClickUserIcon = onClickUserIcon
-            )
-        }
+    val friendList = friendLocation?.friendList.orEmpty()
+    if (friendList.isEmpty()) return
+    item(key = locationType) {
+        LocationTitle(text())
+    }
+    item(key = locationType.value) {
+        UserIconsRow(
+            friends = friendList,
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            onClickUserIcon = onClickUserIcon
+        )
     }
 }
 
@@ -231,7 +225,6 @@ private fun LocationTitle(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
 
 
 

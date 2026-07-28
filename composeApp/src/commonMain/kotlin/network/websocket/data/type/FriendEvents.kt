@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.network.websocket.data.type
 
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
 
 
 object FriendEvents {
@@ -21,14 +23,14 @@ object FriendEvents {
      * 朋友上线
      * 当用户的一位朋友在游戏中上线时，会发送此事件
      */
-    data object FriendOnline : WebSocketEventType("friend-online",Unit::class)
+    data object FriendOnline : WebSocketEventType("friend-online", FriendOnlineContent::class)
 
 
     /**
      * 朋友活跃
      * 当用户的一位朋友在网站上处于活动状态时，会发送此事件
      */
-    data object FriendActive : WebSocketEventType("friend-active",Unit::class)
+    data object FriendActive : WebSocketEventType("friend-active", FriendActiveContent::class)
 
     /**
      * 朋友离线
