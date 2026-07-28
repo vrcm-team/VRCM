@@ -27,6 +27,36 @@ class ConvexHullTest {
     }
 
     @Test
+    fun corePointsFilterDropsCorridorStraddler() {
+        val cluster = listOf(
+            Offset(0f, 0f),
+            Offset(10f, 0f),
+            Offset(0f, 10f),
+            Offset(10f, 10f),
+            Offset(5f, 5f),
+        )
+        val corridorNode = Offset(300f, 300f)
+
+        val core = filterCorePoints(cluster + corridorNode)
+
+        assertEquals(cluster.toSet(), core.toSet())
+    }
+
+    @Test
+    fun corePointsFilterKeepsTightCommunityIntact() {
+        val cluster = listOf(
+            Offset(0f, 0f),
+            Offset(10f, 0f),
+            Offset(0f, 10f),
+            Offset(10f, 10f),
+            Offset(20f, 5f),
+        )
+
+        assertEquals(cluster, filterCorePoints(cluster, minRadius = 100f))
+        assertEquals(cluster.take(3), filterCorePoints(cluster.take(3)))
+    }
+
+    @Test
     fun tinyInputsPassThrough() {
         assertEquals(0, convexHull(emptyList()).size)
         assertEquals(1, convexHull(listOf(Offset(1f, 2f))).size)
