@@ -101,7 +101,8 @@ object FriendNetworkScreen : Screen {
         val sheetState = rememberModalBottomSheetState()
 
         val density = LocalDensity.current
-        val nodeSizePx = with(density) { (43.dp + 34.dp).toPx() }
+        // 最大头像尺寸（基础 40dp + 度数加成 44dp），布局间距按此计算
+        val nodeSizePx = with(density) { (40.dp + 44.dp).toPx() }
         LaunchedEffect(Unit) {
             model.loadCache(nodeSizePx)
         }
@@ -439,8 +440,8 @@ private fun FriendNetworkGraph(
     // clipToBounds：画布经 graphicsLayer 平移/缩放后不得越界画到上方的图例和头部信息上
     BoxWithConstraints(modifier = Modifier.fillMaxSize().clipToBounds()) {
         val density = LocalDensity.current
-        val baseNodeSize = 43.dp
-        val maxExtraSize = 34.dp
+        val baseNodeSize = 40.dp
+        val maxExtraSize = 44.dp
         val baseNodeSizePx = with(density) { baseNodeSize.toPx() }
         val maxExtraSizePx = with(density) { maxExtraSize.toPx() }
         val labelWidth = 88.dp
@@ -462,12 +463,13 @@ private fun FriendNetworkGraph(
         var offset by remember(nodes.size, viewWidthPx, viewHeightPx, layout) { mutableStateOf(Offset.Zero) }
         var hasUserInteracted by remember(nodes.size, layout) { mutableStateOf(false) }
         val edgeList = remember(edges) { buildEdgeList(edges) }
-        // 头像大小比例：社区视图=圈内度数（圈子核心大），自我视图=共同好友数；sqrt 缓和差距
+        // 头像大小比例：社区视图=圈内度数（圈子核心大），自我视图=共同好友数
+        // 线性映射，让核心与边缘的大小差距一眼可辨
         val nodeSizeRatio = remember(nodes, edges, communities, isEgoView) {
             if (isEgoView) {
                 val degree = nodes.associate { it.id to edges[it.id].orEmpty().size }
                 val maxDegree = (degree.values.maxOrNull() ?: 0).coerceAtLeast(1)
-                degree.mapValues { (_, d) -> sqrt(d.toFloat() / maxDegree) }
+                degree.mapValues { (_, d) -> d.toFloat() / maxDegree }
             } else {
                 val internalDegree = nodes.associate { node ->
                     val community = communities[node.id]
@@ -476,7 +478,7 @@ private fun FriendNetworkGraph(
                     } else 0
                 }
                 val maxInternal = (internalDegree.values.maxOrNull() ?: 0).coerceAtLeast(1)
-                internalDegree.mapValues { (_, d) -> sqrt(d.toFloat() / maxInternal) }
+                internalDegree.mapValues { (_, d) -> d.toFloat() / maxInternal }
             }
         }
         val positions = layout.positions
