@@ -20,7 +20,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +46,13 @@ class FriendService(
     private val refreshCoordinator = FriendRefreshCoordinator()
     private val accountTracker = FriendAccountTracker()
     private var activeAccountUserId: String? = null
-    private var preloadJob: Job? = null
+    private val preloadTask = AccountBoundTask<String>(
+        scope = serviceScope,
+        isCurrent = { userId ->
+            synchronized(friendMapLock) { activeAccountUserId == userId }
+        },
+        runTask = { refreshFriendList() },
+    )
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
@@ -81,7 +86,7 @@ class FriendService(
                     }
                     accountTracker.onAuthenticated(account.userId)
                 }
-                preloadFriendList()
+                preloadFriendList(account.userId)
             }
         }
         serviceScope.launch {
@@ -92,6 +97,7 @@ class FriendService(
                     friendStore.clear()
                     publishFriendState()
                 }
+                preloadTask.cancelAndJoin()
             }
         }
     }
@@ -259,9 +265,10 @@ class FriendService(
 
     private fun publishFriendState() {
         val snapshot = friendStore.snapshot
-        if (_friendState.value == snapshot) return
-        _friendState.value = snapshot
-        activeAccountUserId?.takeIf { snapshot.isNotEmpty() }?.let { userId ->
+        if (_friendState.value != snapshot) {
+            _friendState.value = snapshot
+        }
+        activeAccountUserId?.let { userId ->
             friendListCacheDao.save(userId, FriendListCache(snapshot.values.toList()))
         }
     }
@@ -280,9 +287,11 @@ class FriendService(
     }
 
     fun preloadFriendList() {
-        if (preloadJob?.isActive == true) return
-        preloadJob = serviceScope.launch { refreshFriendList() }
+        val userId = synchronized(friendMapLock) { activeAccountUserId } ?: return
+        preloadFriendList(userId)
     }
+
+    private fun preloadFriendList(userId: String) = preloadTask.start(userId)
 
     suspend fun sendFriendRequest(userId: String) =
         authService.reTryAuthCatching { friendsApi.sendFriendRequest(userId) }
