@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheDao
 import io.github.vrcmteam.vrcm.storage.SettingsDao
+import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.ktor.client.plugins.cookies.*
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
@@ -20,5 +21,6 @@ internal val storageModule: Module = module {
     single { SettingsDao(get { parametersOf(DaoKeys.Settings.NAME) }) }
     single { FavoriteLocalDao(get { parametersOf(DaoKeys.FavoriteLocal.NAME) }) }
     single { FriendNetworkCacheDao(get { parametersOf(DaoKeys.FriendNetwork.NAME) }) }
+    single { UserProfileCacheDao(get { parametersOf(DaoKeys.UserProfileCache.NAME) }) }
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
 }

@@ -33,6 +33,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
+import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
@@ -147,6 +150,7 @@ class UserProfileScreenModel(
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
     private val inviteApi: InviteApi,
+    private val userProfileCacheDao: UserProfileCacheDao,
 ) : ScreenModel {
 
     private val _userState = mutableStateOf(userProfileVO)
@@ -186,6 +190,45 @@ class UserProfileScreenModel(
     var savedInnerScrollPosition: Int = 0
 
     private val loadCoordinator = UserProfileLoadCoordinator()
+    private val cacheMutex = Mutex()
+    private var cachedUserData: UserData? = null
+    private val cacheOwnerUserId = authService.accountDto().userId
+
+    init {
+        userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
+    }
+
+    private fun restoreCachedProfile(cache: UserProfileCache) {
+        cachedUserData = cache.user
+        val profile = UserProfileVo(cache.user)
+        _userState.value = profile
+        computeFriendLocation(profile.location)
+        _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
+        _mutualGroups.value = cache.groups.filter { it.mutualGroup }
+        _createdWorlds.value = cache.createdWorlds
+        _createdAvatars.value = cache.createdAvatars
+        _favoritedWorlds.value = cache.favoritedWorlds.map { it.name to it.worlds }
+    }
+
+    private suspend fun saveCache(user: UserData? = null) {
+        cacheMutex.withLock {
+            user?.let { cachedUserData = it }
+            val cachedUser = cachedUserData ?: return
+            userProfileCacheDao.save(
+                ownerUserId = cacheOwnerUserId,
+                userId = cachedUser.id,
+                cache = UserProfileCache(
+                    user = cachedUser,
+                    groups = _userGroups.value,
+                    createdWorlds = _createdWorlds.value,
+                    createdAvatars = _createdAvatars.value,
+                    favoritedWorlds = _favoritedWorlds.value.map { (name, worlds) ->
+                        FavoritedWorldGroup(name, worlds)
+                    },
+                ),
+            )
+        }
+    }
 
     fun refreshUser(userId: String, forceRefresh: Boolean = false) =
         screenModelScope.launch(Dispatchers.IO) {
@@ -199,10 +242,14 @@ class UserProfileScreenModel(
                         handleError(it)
                     }.onSuccess { response ->
                         // 防止body序列化异常
-                        runCatching { UserProfileVo(response.body<UserData>()) }
+                        runCatching { response.body<UserData>() }
                             .onSuccess {
-                                _userState.value = it
-                                computeFriendLocation(it.location)
+                                val profile = UserProfileVo(it)
+                                if (_userState.value != profile) {
+                                    _userState.value = profile
+                                    computeFriendLocation(profile.location)
+                                }
+                                saveCache(it)
                                 userLoaded = true
                             }
                             .onFailure { handleError(it) }
@@ -324,8 +371,11 @@ class UserProfileScreenModel(
         authService.reTryAuthCatching {
             usersApi.getUserGroups(userId)
         }.onSuccess { groups ->
-            _userGroups.value = visibleUserGroups(groups, userState.isSelf)
-            _mutualGroups.value = groups.filter { it.mutualGroup }
+            val visibleGroups = visibleUserGroups(groups, userState.isSelf)
+            val mutual = groups.filter { it.mutualGroup }
+            if (_userGroups.value != visibleGroups) _userGroups.value = visibleGroups
+            if (_mutualGroups.value != mutual) _mutualGroups.value = mutual
+            saveCache()
             groupsLoaded = true
         }.onFailure {
             handleError(it)
@@ -339,7 +389,6 @@ class UserProfileScreenModel(
      */
     fun loadCreatedWorlds(userId: String) {
         if (_isLoadingWorlds.value) return
-        if (_createdWorlds.value.isNotEmpty()) return
         _isLoadingWorlds.value = true
         screenModelScope.launch(Dispatchers.IO) {
             try {
@@ -356,7 +405,7 @@ class UserProfileScreenModel(
                     allWorlds.addAll(worldList)
                 }
                 // 展示列表
-                _createdWorlds.value = allWorlds
+                if (_createdWorlds.value != allWorlds) _createdWorlds.value = allWorlds
                 _isLoadingWorlds.value = false
 
                 // 逐批获取完整详情以填充description
@@ -364,10 +413,12 @@ class UserProfileScreenModel(
                 if (worldIds.isNotEmpty()) {
                     val fullWorlds = worldsApi.fetchWorldsByIds(worldIds)
                     val fullMap = fullWorlds.associateBy { it.id }
-                    _createdWorlds.value = allWorlds.map { world ->
+                    val completeWorlds = allWorlds.map { world ->
                         fullMap[world.id] ?: world
                     }
+                    if (_createdWorlds.value != completeWorlds) _createdWorlds.value = completeWorlds
                 }
+                saveCache()
             } catch (e: Exception) {
                 handleError(e)
                 _isLoadingWorlds.value = false
@@ -382,7 +433,6 @@ class UserProfileScreenModel(
     fun loadCreatedAvatars() {
         if (_isLoadingAvatars.value) return
         if (!userState.isSelf) return
-        if (_createdAvatars.value.isNotEmpty()) return
         _isLoadingAvatars.value = true
         screenModelScope.launch(Dispatchers.IO) {
             try {
@@ -395,8 +445,10 @@ class UserProfileScreenModel(
                     n = 50,
                 ).collect { avatarList ->
                     allAvatars.addAll(avatarList)
-                    _createdAvatars.value = allAvatars.toList()
+                    val avatars = allAvatars.toList()
+                    if (_createdAvatars.value != avatars) _createdAvatars.value = avatars
                 }
+                saveCache()
             } catch (e: Exception) {
                 handleError(e)
             }
@@ -439,7 +491,9 @@ class UserProfileScreenModel(
                         }.getOrNull()
                     }
                 }
-                _favoritedWorlds.value = deferreds.mapNotNull { it.await() }.toMutableList()
+                val worlds = deferreds.mapNotNull { it.await() }
+                if (_favoritedWorlds.value != worlds) _favoritedWorlds.value = worlds
+                saveCache()
             } catch (_: Exception) {}
             _isLoadingFavoritedWorlds.value = false
         }
