@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 data class UserProfileCache(
     val user: UserData,
     val groups: List<LimitedUserGroup> = emptyList(),
+    val mutualGroups: List<LimitedUserGroup> = emptyList(),
     val createdWorlds: List<WorldData> = emptyList(),
     val createdAvatars: List<AvatarData> = emptyList(),
     val favoritedWorlds: List<FavoritedWorldGroup> = emptyList(),

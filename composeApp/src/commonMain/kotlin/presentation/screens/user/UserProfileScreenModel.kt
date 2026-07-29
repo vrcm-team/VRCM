@@ -204,7 +204,7 @@ class UserProfileScreenModel(
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
-        _mutualGroups.value = cache.groups.filter { it.mutualGroup }
+        _mutualGroups.value = cache.mutualGroups
         _createdWorlds.value = cache.createdWorlds
         _createdAvatars.value = cache.createdAvatars
         _favoritedWorlds.value = cache.favoritedWorlds.map { it.name to it.worlds }
@@ -220,6 +220,7 @@ class UserProfileScreenModel(
                 cache = UserProfileCache(
                     user = cachedUser,
                     groups = _userGroups.value,
+                    mutualGroups = _mutualGroups.value,
                     createdWorlds = _createdWorlds.value,
                     createdAvatars = _createdAvatars.value,
                     favoritedWorlds = _favoritedWorlds.value.map { (name, worlds) ->
