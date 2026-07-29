@@ -87,4 +87,9 @@ object DaoKeys{
         const val NAME = "${PREFIX}.user.profile.cache"
         const val KEY_PREFIX = "${PREFIX}.user.profile.cache"
     }
+
+    object FriendListCache {
+        const val NAME = "${PREFIX}.friend.list.cache"
+        const val KEY_PREFIX = "${PREFIX}.friend.list.cache"
+    }
 }

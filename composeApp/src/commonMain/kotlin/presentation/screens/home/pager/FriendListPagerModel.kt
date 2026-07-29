@@ -300,6 +300,7 @@ class FriendListPagerModel(
             displayName = displayName,
             status = status,
             lastLogin = lastLogin,
+            lastActivity = lastActivity,
             lastPlatform = lastPlatform,
             bio = bio,
             bioLinks = bioLinks,
@@ -363,7 +364,7 @@ class FriendListPagerModel(
             append('-')
             append(it.location)
             append('-')
-            append(if (isOffline) it.lastLogin else "1")
+            append(if (isOffline) it.lastActivity else "1")
             append('-')
             append(it.displayName)
         }

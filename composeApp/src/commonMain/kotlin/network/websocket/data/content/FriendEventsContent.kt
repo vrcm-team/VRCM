@@ -49,6 +49,7 @@ internal fun UserContent.toFriendData(
     imageUrl = profileImageUrl,
     isFriend = isFriend,
     lastLogin = lastLogin,
+    lastActivity = lastActivity,
     lastPlatform = lastPlatform,
     location = location,
     travelingToLocation = travelingToLocation,

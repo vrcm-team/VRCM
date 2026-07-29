@@ -16,6 +16,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ class HomeScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val notificationApi: NotificationApi,
+    private val friendService: FriendService,
     private val logger: Logger,
 ) : ScreenModel {
 
@@ -46,6 +48,7 @@ class HomeScreenModel(
     val friendRequestNotifications by _friendRequestNotifications
 
     fun init() {
+        friendService.preloadFriendList()
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()

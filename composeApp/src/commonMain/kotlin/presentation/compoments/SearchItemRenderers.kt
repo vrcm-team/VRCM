@@ -78,11 +78,11 @@ fun LazyItemScope.renderUserItem(
             )
         },
         trailingContent = {
-            // 离线用户显示最后登录时间
-            val lastLoginStr = user.lastLogin
-            if (user.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@SearchResultItem
+            // 离线用户显示最后活动时间
+            val lastActivity = user.lastActivity
+            if (user.status != UserStatus.Offline || lastActivity.isNullOrEmpty()) return@SearchResultItem
             Text(
-                text = lastLoginStr.toLocalDateTime()?.ignoredFormat.orEmpty(),
+                text = lastActivity.toLocalDateTime()?.ignoredFormat.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )

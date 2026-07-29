@@ -22,6 +22,8 @@ interface IUser {
     val profilePicOverride: String
     @SerialName("last_login")
     val lastLogin: String?
+    @SerialName("last_activity")
+    val lastActivity: String? get() = null
     @SerialName("last_platform")
     val lastPlatform: String
     val status: UserStatus

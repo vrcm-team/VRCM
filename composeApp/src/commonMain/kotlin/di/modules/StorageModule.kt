@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
+import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheDao
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
@@ -20,6 +21,7 @@ internal val storageModule: Module = module {
     single { AccountDao(get { parametersOf(DaoKeys.Account.NAME) }) }
     single { SettingsDao(get { parametersOf(DaoKeys.Settings.NAME) }) }
     single { FavoriteLocalDao(get { parametersOf(DaoKeys.FavoriteLocal.NAME) }) }
+    single { FriendListCacheDao(get { parametersOf(DaoKeys.FriendListCache.NAME) }) }
     single { FriendNetworkCacheDao(get { parametersOf(DaoKeys.FriendNetwork.NAME) }) }
     single { UserProfileCacheDao(get { parametersOf(DaoKeys.UserProfileCache.NAME) }) }
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
