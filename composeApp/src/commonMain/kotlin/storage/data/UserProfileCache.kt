@@ -21,4 +21,5 @@ data class UserProfileCache(
 data class FavoritedWorldGroup(
     val name: String,
     val worlds: List<FavoritedWorld>,
+    val groupKey: String = name,
 )

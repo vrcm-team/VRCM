@@ -149,6 +149,29 @@ internal fun resolveFriendLocation(
     return locationsByUser[userId]?.takeIf { it.location == location }
 }
 
+internal data class FavoritedWorldGroupLoad(
+    val groupKey: String,
+    val displayName: String,
+    val result: Result<List<FavoritedWorld>>,
+)
+
+internal fun mergeFavoritedWorldGroups(
+    cachedGroups: List<FavoritedWorldGroup>,
+    loads: List<FavoritedWorldGroupLoad>,
+): List<FavoritedWorldGroup> = loads.mapNotNull { load ->
+    if (load.result.isSuccess) {
+        FavoritedWorldGroup(
+            name = load.displayName,
+            worlds = load.result.getOrThrow(),
+            groupKey = load.groupKey,
+        )
+    } else {
+        cachedGroups.firstOrNull { cached ->
+            cached.groupKey == load.groupKey || cached.name == load.displayName
+        }?.copy(name = load.displayName, groupKey = load.groupKey)
+    }
+}
+
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
@@ -197,6 +220,7 @@ class UserProfileScreenModel(
 
     private val _favoritedWorlds = mutableStateOf<List<Pair<String, List<FavoritedWorld>>>>(emptyList())
     val favoritedWorlds by _favoritedWorlds
+    private var favoritedWorldGroups = emptyList<FavoritedWorldGroup>()
 
     // 保存滚动位置，用于导航返回时恢复
     var savedOuterScrollPosition: Int = 0
@@ -232,7 +256,7 @@ class UserProfileScreenModel(
         _mutualGroups.value = cache.mutualGroups
         _createdWorlds.value = cache.createdWorlds
         _createdAvatars.value = cache.createdAvatars
-        _favoritedWorlds.value = cache.favoritedWorlds.map { it.name to it.worlds }
+        setFavoritedWorldGroups(cache.favoritedWorlds)
     }
 
     private suspend fun saveCache(user: UserData? = null) {
@@ -248,9 +272,7 @@ class UserProfileScreenModel(
                     mutualGroups = _mutualGroups.value,
                     createdWorlds = _createdWorlds.value,
                     createdAvatars = _createdAvatars.value,
-                    favoritedWorlds = _favoritedWorlds.value.map { (name, worlds) ->
-                        FavoritedWorldGroup(name, worlds)
-                    },
+                    favoritedWorlds = favoritedWorldGroups,
                 ),
             )
         }
@@ -503,26 +525,35 @@ class UserProfileScreenModel(
 
                 val deferreds = groups.map { group ->
                     async {
-                        runCatching {
-                            authService.reTryAuthCatching {
+                        FavoritedWorldGroupLoad(
+                            groupKey = group.name,
+                            displayName = group.displayName,
+                            result = authService.reTryAuthCatching {
                                 worldsApi.getFavoritedWorlds(
                                     ownerId = userId,
                                     userId = userId,
                                     tag = group.name,
                                     n = 100
                                 )
-                            }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { worlds ->
-                                group.displayName to worlds
-                            }
-                        }.getOrNull()
+                            },
+                        )
                     }
                 }
-                val worlds = deferreds.mapNotNull { it.await() }
-                if (_favoritedWorlds.value != worlds) _favoritedWorlds.value = worlds
+                val mergedGroups = mergeFavoritedWorldGroups(
+                    cachedGroups = favoritedWorldGroups,
+                    loads = deferreds.map { it.await() },
+                )
+                setFavoritedWorldGroups(mergedGroups)
                 saveCache()
             } catch (_: Exception) {}
             _isLoadingFavoritedWorlds.value = false
         }
+    }
+
+    private fun setFavoritedWorldGroups(groups: List<FavoritedWorldGroup>) {
+        favoritedWorldGroups = groups
+        val worlds = groups.map { it.name to it.worlds }
+        if (_favoritedWorlds.value != worlds) _favoritedWorlds.value = worlds
     }
 
     fun saveUserNote(note: String, successMessage: String) {
