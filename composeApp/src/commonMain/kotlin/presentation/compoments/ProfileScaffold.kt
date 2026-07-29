@@ -191,9 +191,10 @@ private fun ProfileImage(
                         bottomStart = (ContactPointShape * ratio).dp,
                         bottomEnd = (ContactPointShape * ratio).dp
                     )
-                )
+            )
                 .blur(blurDp),
             imageData = imageUrl,
+            loadOriginalSize = true,
         )
     }
 }

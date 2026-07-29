@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
@@ -409,7 +410,7 @@ class FriendListPagerModel(
                 favorites = world.favorites ?: 0,
                 featured = world.featured == true,
                 heat = world.heat ?: 0,
-                imageUrl = world.imageUrl.orEmpty(),
+                imageUrl = FileApi.convertFileUrlToOriginal(world.imageUrl.orEmpty()),
                 labsPublicationDate = world.labsPublicationDate.orEmpty(),
                 organization = world.organization.orEmpty(),
                 popularity = world.popularity ?: 0,

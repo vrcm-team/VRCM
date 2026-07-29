@@ -22,6 +22,8 @@ import coil3.PlatformContext
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.size.Precision
+import coil3.size.Size
 import org.koin.compose.koinInject
 
 /**
@@ -79,6 +81,7 @@ fun AImage(
     error: Painter? = remember(color) { ColorPainter(color) },
     placeholder: Painter? = remember(color) { ColorPainter(color) },
     contentScale: ContentScale = ContentScale.Crop,
+    loadOriginalSize: Boolean = false,
 ) {
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
@@ -88,6 +91,8 @@ fun AImage(
             is String -> remember(imageData) {
                 ImageRequest.Builder(platformContext)
                     .data(imageData)
+                    .apply { if (loadOriginalSize) size(Size.ORIGINAL) }
+                    .precision(Precision.EXACT)
                     .crossfade(600)
                     .build()
             }
