@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -347,30 +348,6 @@ class FriendListPagerModel(
     }
 
     // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
-    private fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
-        val isOffline = it.status == UserStatus.Offline
-        val locationType = LocationType.fromValue(it.location)
-        buildString {
-            append(if (isOffline) "0" else "1")
-            append('-')
-            append(
-                when (locationType) {
-                    LocationType.Instance -> "0"
-                    LocationType.Traveling -> "1"
-                    LocationType.Private -> "2"
-                    LocationType.Offline -> "3"
-                    LocationType.Web -> "3"
-                }
-            )
-            append('-')
-            append(it.location)
-            append('-')
-            append(if (isOffline) it.lastActivity else "1")
-            append('-')
-            append(it.displayName)
-        }
-    }
-
     /**
      * 查找收藏的世界列表
      * 只从缓存中筛选数据，不调用API
@@ -490,6 +467,30 @@ class FriendListPagerModel(
         } catch (e: Exception) {
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
         }
+    }
+}
+
+internal fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
+    val isOffline = it.status == UserStatus.Offline
+    val locationType = LocationType.fromValue(it.location)
+    buildString {
+        append(if (isOffline) "0" else "1")
+        append('-')
+        append(
+            when (locationType) {
+                LocationType.Instance -> "0"
+                LocationType.Traveling -> "1"
+                LocationType.Private -> "2"
+                LocationType.Offline -> "3"
+                LocationType.Web -> "3"
+            }
+        )
+        append('-')
+        append(it.location)
+        append('-')
+        append(if (isOffline) it.lastSeenAt().orEmpty() else "1")
+        append('-')
+        append(it.displayName)
     }
 }
 
