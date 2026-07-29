@@ -88,11 +88,15 @@ fun AImage(
     val isLoading = remember(imageData) { mutableStateOf(true) }
     val imageRequest: Any? =
         when (imageData) {
-            is String -> remember(imageData) {
+            is String -> remember(imageData, loadOriginalSize) {
                 ImageRequest.Builder(platformContext)
                     .data(imageData)
-                    .apply { if (loadOriginalSize) size(Size.ORIGINAL) }
-                    .precision(Precision.EXACT)
+                    .apply {
+                        if (loadOriginalSize) {
+                            size(Size.ORIGINAL)
+                            precision(Precision.EXACT)
+                        }
+                    }
                     .crossfade(600)
                     .build()
             }
@@ -121,4 +125,3 @@ fun AImage(
         onError = { isLoading.value = false }
     )
 }
-
