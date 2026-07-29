@@ -32,6 +32,9 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.platformPackages
 
+internal fun IUser.lastSeenAt(): String? =
+    lastActivity?.takeIf(String::isNotBlank) ?: lastLogin?.takeIf(String::isNotBlank)
+
 /**
  * 用户列表渲染
  */
@@ -79,10 +82,10 @@ fun LazyItemScope.renderUserItem(
         },
         trailingContent = {
             // 离线用户显示最后活动时间
-            val lastActivity = user.lastActivity
-            if (user.status != UserStatus.Offline || lastActivity.isNullOrEmpty()) return@SearchResultItem
+            val lastSeenAt = user.lastSeenAt()
+            if (user.status != UserStatus.Offline || lastSeenAt == null) return@SearchResultItem
             Text(
-                text = lastActivity.toLocalDateTime()?.ignoredFormat.orEmpty(),
+                text = lastSeenAt.toLocalDateTime()?.ignoredFormat.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )
