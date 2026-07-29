@@ -45,6 +45,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -139,6 +140,15 @@ internal class UserProfileLoadCoordinator {
     }
 }
 
+internal fun resolveFriendLocation(
+    userId: String,
+    location: String?,
+    locationsByUser: Map<String, FriendLocation>,
+): FriendLocation? {
+    if (location == null || LocationType.fromValue(location) != LocationType.Instance) return null
+    return locationsByUser[userId]?.takeIf { it.location == location }
+}
+
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
@@ -200,17 +210,16 @@ class UserProfileScreenModel(
     init {
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
         screenModelScope.launch {
-            friendService.friendState.collect { friends ->
-                val friend = friends[userProfileVO.id] ?: return@collect
-                _friendLocation.value = if (LocationType.fromValue(friend.location) == LocationType.Instance) {
-                    friendLocationPagerModel.findFriendLocation(
-                        userId = friend.id,
-                        location = friend.location,
-                    )
-                } else {
-                    null
-                }
-            }
+            combine(
+                friendService.friendState,
+                friendLocationPagerModel.friendLocationsByUser,
+            ) { friends, locationsByUser ->
+                resolveFriendLocation(
+                    userId = userProfileVO.id,
+                    location = friends[userProfileVO.id]?.location,
+                    locationsByUser = locationsByUser,
+                )
+            }.collect { _friendLocation.value = it }
         }
     }
 
@@ -576,7 +585,11 @@ class UserProfileScreenModel(
             return
         }
 
-        _friendLocation.value = friendLocationPagerModel.findFriendLocation(userState.id, location)
+        _friendLocation.value = resolveFriendLocation(
+            userId = userState.id,
+            location = location,
+            locationsByUser = friendLocationPagerModel.friendLocationsByUser.value,
+        )
     }
 
     /**
