@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.runtime.*
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -30,6 +31,20 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+internal class FriendUpdateSessionGate {
+    private var sessionToken: AccountSessionToken? = null
+
+    fun activate(token: AccountSessionToken) {
+        sessionToken = token
+    }
+
+    fun clear() {
+        sessionToken = null
+    }
+
+    fun accepts(token: AccountSessionToken): Boolean = sessionToken == token
+}
+
 class FriendLocationPagerModel(
     private val friendService: FriendService,
     private val usersApi: UsersApi,
@@ -45,6 +60,7 @@ class FriendLocationPagerModel(
         _friendLocationsByUser.asStateFlow()
 
     private val presenceStore = FriendLocationPresenceStore()
+    private val friendUpdateSessionGate = FriendUpdateSessionGate()
     private val accountTracker = AccountGenerationTracker(
         authService.accountDtoOrNull()?.userId?.takeIf(String::isNotBlank)
     )
@@ -77,8 +93,12 @@ class FriendLocationPagerModel(
             }
         }
         screenModelScope.launch {
-            friendService.friendUpdateFlow.collect { event ->
-                val refreshRequired = updateMutex.withLock { presenceStore.apply(event) }
+            friendService.friendUpdateFlow.collect { update ->
+                val refreshRequired = updateMutex.withLock {
+                    if (!acceptsFriendUpdate(update.sessionToken)) return@withLock null
+                    presenceStore.apply(update.event)
+                } ?: return@collect
+                if (!SharedFlowCentre.isCurrentSession(update.sessionToken)) return@collect
                 if (refreshRequired) {
                     doRefreshFriendLocation(removeNotIncluded = true)
                 } else {
@@ -90,11 +110,14 @@ class FriendLocationPagerModel(
             SharedFlowCentre.authed.collect { session ->
                 val account = session.account
                 val activation = accountTracker.activate(account.userId)
-                if (!activation.changed) return@collect
                 updateMutex.withLock {
-                    clearFriendLocations()
-                    hasCompletedInitialRefresh = false
+                    friendUpdateSessionGate.activate(session.token)
+                    if (activation.changed) {
+                        clearFriendLocations()
+                        hasCompletedInitialRefresh = false
+                    }
                 }
+                if (!activation.changed) return@collect
                 isRefreshing = true
                 preloadTask.cancelAndJoin()
                 preloadTask.start(activation.token)
@@ -104,6 +127,7 @@ class FriendLocationPagerModel(
             SharedFlowCentre.logout.collect {
                 accountTracker.clear()
                 updateMutex.withLock {
+                    friendUpdateSessionGate.clear()
                     clearFriendLocations()
                     hasCompletedInitialRefresh = false
                 }
@@ -112,6 +136,10 @@ class FriendLocationPagerModel(
             }
         }
     }
+
+    private fun acceptsFriendUpdate(sessionToken: AccountSessionToken): Boolean =
+        friendUpdateSessionGate.accepts(sessionToken) &&
+            SharedFlowCentre.isCurrentSession(sessionToken)
 
     fun preloadFriendLocations() {
         if (hasCompletedInitialRefresh) return

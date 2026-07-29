@@ -72,8 +72,8 @@ class FriendService(
     val friendMap: Map<String, FriendData>
         get() = friendState.value
 
-    private val _friendUpdateFlow = MutableSharedFlow<FriendUpdateEvent>()
-    val friendUpdateFlow: SharedFlow<FriendUpdateEvent> = _friendUpdateFlow.asSharedFlow()
+    private val _friendUpdateFlow = MutableSharedFlow<AccountFriendUpdateEvent>()
+    val friendUpdateFlow: SharedFlow<AccountFriendUpdateEvent> = _friendUpdateFlow.asSharedFlow()
 
     init {
         authService.accountDtoOrNull()?.userId?.takeIf(String::isNotBlank)?.let { userId ->
@@ -126,14 +126,14 @@ class FriendService(
                 val content = json.decodeFromString<FriendOnlineContent>(socketEvent.content)
                 val friend = updateFriend(sessionToken, content.userId, content::mergeWith)
                     ?: return refreshAfterIncompleteEvent(sessionToken)
-                _friendUpdateFlow.emit(FriendUpdateEvent.Online(friend))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.Online(friend))
             }
 
             FriendEvents.FriendActive.typeName -> {
                 val content = json.decodeFromString<FriendActiveContent>(socketEvent.content)
                 val friend = content.toFriendData()
                 if (!putFriend(sessionToken, friend)) return
-                _friendUpdateFlow.emit(FriendUpdateEvent.Active(friend))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.Active(friend))
             }
 
             FriendEvents.FriendOffline.typeName -> {
@@ -145,14 +145,14 @@ class FriendService(
                         status = UserStatus.Offline,
                     )
                 }) return
-                _friendUpdateFlow.emit(FriendUpdateEvent.Offline(content.userId))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.Offline(content.userId))
             }
 
             FriendEvents.FriendLocation.typeName -> {
                 val content = json.decodeFromString<FriendLocationContent>(socketEvent.content)
                 val friend = updateFriend(sessionToken, content.userId, content::mergeWith)
                     ?: return refreshAfterIncompleteEvent(sessionToken)
-                _friendUpdateFlow.emit(FriendUpdateEvent.LocationChanged(friend))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.LocationChanged(friend))
             }
 
             FriendEvents.FriendUpdate.typeName -> {
@@ -173,20 +173,20 @@ class FriendService(
                         pronouns = content.user.pronouns,
                     )
                 } ?: return refreshAfterIncompleteEvent(sessionToken)
-                _friendUpdateFlow.emit(FriendUpdateEvent.Updated(friend))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.Updated(friend))
             }
 
             FriendEvents.FriendAdd.typeName -> {
                 if (!isCurrentSession(sessionToken)) return
                 refreshFriendList()
                 if (!isCurrentSession(sessionToken)) return
-                _friendUpdateFlow.emit(FriendUpdateEvent.RefreshRequired)
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.RefreshRequired)
             }
 
             FriendEvents.FriendDelete.typeName -> {
                 val content = json.decodeFromString<FriendOfflineContent>(socketEvent.content)
                 if (!removeFriend(sessionToken, content.userId)) return
-                _friendUpdateFlow.emit(FriendUpdateEvent.Delete(content.userId))
+                emitFriendUpdate(sessionToken, FriendUpdateEvent.Delete(content.userId))
             }
         }
     }
@@ -195,7 +195,14 @@ class FriendService(
         if (!isCurrentSession(sessionToken)) return
         refreshFriendList()
         if (!isCurrentSession(sessionToken)) return
-        _friendUpdateFlow.emit(FriendUpdateEvent.RefreshRequired)
+        emitFriendUpdate(sessionToken, FriendUpdateEvent.RefreshRequired)
+    }
+
+    private suspend fun emitFriendUpdate(
+        sessionToken: AccountSessionToken,
+        event: FriendUpdateEvent,
+    ) {
+        _friendUpdateFlow.emit(AccountFriendUpdateEvent(sessionToken, event))
     }
 
     /**
@@ -364,6 +371,11 @@ sealed class FriendUpdateEvent {
     data object RefreshRequired : FriendUpdateEvent()
     data class Delete(val userId: String) : FriendUpdateEvent()
 }
+
+data class AccountFriendUpdateEvent(
+    val sessionToken: AccountSessionToken,
+    val event: FriendUpdateEvent,
+)
 
 internal suspend fun <T> collectFriendWebSocketEvents(
     events: Flow<T>,
