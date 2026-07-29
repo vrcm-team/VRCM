@@ -1,15 +1,15 @@
-package io.github.vrcmteam.vrcm.presentation.screens.user
+package io.github.vrcmteam.vrcm.network.api.files
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class UserProfileImageUrlTest {
+class ImageUrlResolverTest {
     @Test
     fun nullImageUsesAvailableThumbnail() {
         assertEquals(
             "https://example.com/thumbnail.png",
-            originalImageUrl(
+            resolveOriginalImageUrl(
                 imageUrl = null,
                 thumbnailImageUrl = "https://example.com/thumbnail.png",
             ),
@@ -20,7 +20,7 @@ class UserProfileImageUrlTest {
     fun blankImageUsesThumbnailAndRestoresItsOriginalFileUrl() {
         assertEquals(
             "https://api.vrchat.cloud/api/1/file/file_thumbnail-only/7/file",
-            originalImageUrl(
+            resolveOriginalImageUrl(
                 imageUrl = "",
                 thumbnailImageUrl =
                     "https://api.vrchat.cloud/api/1/image/file_thumbnail-only/7/256",
@@ -32,7 +32,7 @@ class UserProfileImageUrlTest {
     fun availableImageTakesPriorityOverThumbnail() {
         assertEquals(
             "https://example.com/image.png",
-            originalImageUrl(
+            resolveOriginalImageUrl(
                 imageUrl = "https://example.com/image.png",
                 thumbnailImageUrl = "https://example.com/thumbnail.png",
             ),
@@ -43,7 +43,7 @@ class UserProfileImageUrlTest {
     fun availableFileImageIsRestoredBeforeThumbnailFallback() {
         assertEquals(
             "https://api.vrchat.cloud/api/1/file/file_primary/3/file",
-            originalImageUrl(
+            resolveOriginalImageUrl(
                 imageUrl = "https://api.vrchat.cloud/api/1/image/file_primary/3/256",
                 thumbnailImageUrl = "https://example.com/thumbnail.png",
             ),
@@ -52,6 +52,6 @@ class UserProfileImageUrlTest {
 
     @Test
     fun missingImageAndThumbnailReturnNull() {
-        assertNull(originalImageUrl(imageUrl = "", thumbnailImageUrl = null))
+        assertNull(resolveOriginalImageUrl(imageUrl = "", thumbnailImageUrl = null))
     }
 }

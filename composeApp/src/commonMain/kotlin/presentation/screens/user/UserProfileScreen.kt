@@ -30,7 +30,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
-import io.github.vrcmteam.vrcm.network.api.files.FileApi
+import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -73,13 +73,6 @@ internal class OneShotScrollRestorer(savedPosition: Int) {
         return position
     }
 }
-
-internal fun originalImageUrl(imageUrl: String?, thumbnailImageUrl: String?): String? =
-    (imageUrl?.takeIf { it.isNotBlank() }
-        ?: thumbnailImageUrl?.takeIf { it.isNotBlank() })
-        ?.let { url ->
-            if (FileApi.findFileId(url).isEmpty()) url else FileApi.convertFileUrlToOriginal(url)
-        }
 
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
@@ -586,7 +579,7 @@ private fun ColumnScope.ProfileContent(
             } else {
                 navigator push WorldProfileScreen(
                     worldProfileVO = WorldProfileVo(world).copy(
-                        worldImageUrl = originalImageUrl(world.imageUrl, world.thumbnailImageUrl)
+                        worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl)
                     ),
                     sharedSuffixKey = sharedSuffixKey,
                     sharedKeyPrefix = "Created_"
@@ -617,7 +610,7 @@ private fun ColumnScope.ProfileContent(
                     worldProfileVO = WorldProfileVo(
                         worldId = world.id,
                         worldName = world.name,
-                        worldImageUrl = originalImageUrl(world.imageUrl, world.thumbnailImageUrl),
+                        worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
                         thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
                         worldDescription = world.description.orEmpty(),
                         authorID = world.authorId,
@@ -1158,7 +1151,7 @@ private fun UserCreatedWorldsSection(
         StackedLocationCardList(
             items = worlds,
             key = { it.id },
-            imageUrl = { originalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
+            imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
             title = { it.name },
             subtitle = { it.description ?: "" },
             detailTitle = createdWorldsTitle,
@@ -1170,13 +1163,13 @@ private fun UserCreatedWorldsSection(
                     items = list.map { world ->
                         CardItemVo(
                             id = world.id,
-                            imageUrl = originalImageUrl(world.imageUrl, world.thumbnailImageUrl),
+                            imageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
                             thumbnailUrl = null,
                             title = world.name,
                             subtitle = world.description ?: "",
                             authorName = world.authorName,
                             worldProfileVO = WorldProfileVo(world).copy(
-                                worldImageUrl = originalImageUrl(world.imageUrl, world.thumbnailImageUrl)
+                                worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl)
                             )
                         )
                     },
@@ -1209,7 +1202,7 @@ private fun UserCreatedAvatarsSection(
         StackedLocationCardList(
             items = avatars,
             key = { it.id },
-            imageUrl = { originalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
+            imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
             title = { it.name },
             subtitle = { it.description ?: it.authorName },
             detailTitle = createdAvatarsTitle,
@@ -1218,7 +1211,7 @@ private fun UserCreatedAvatarsSection(
                 navigator push AvatarProfileScreen(
                     avatarProfileVo = AvatarProfileVo(
                         avatar.copy(
-                            imageUrl = originalImageUrl(
+                            imageUrl = resolveOriginalImageUrl(
                                 avatar.imageUrl,
                                 avatar.thumbnailImageUrl,
                             ).orEmpty()
@@ -1232,13 +1225,13 @@ private fun UserCreatedAvatarsSection(
                     title = createdAvatarsTitle,
                     items = list.map { CardItemVo(
                         id = it.id,
-                        imageUrl = originalImageUrl(it.imageUrl, it.thumbnailImageUrl),
+                        imageUrl = resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl),
                         thumbnailUrl = null,
                         title = it.name,
                         subtitle = it.description?.takeIf { d -> d.isNotBlank() } ?: it.authorName,
                         authorName = it.authorName,
                         avatarData = it.copy(
-                            imageUrl = originalImageUrl(it.imageUrl, it.thumbnailImageUrl).orEmpty()
+                            imageUrl = resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl).orEmpty()
                         )
                     ) },
                     sectionKey = createdAvatarsTitle,
@@ -1275,7 +1268,7 @@ private fun UserFavoritedWorldsSection(
                 StackedLocationCardList(
                     items = worlds,
                     key = { it.favoriteId },
-                    imageUrl = { originalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
+                    imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
                     title = { if (it.id == "???") it.favoriteId ?: it.name else it.name },
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
                     detailTitle = groupName,
@@ -1293,7 +1286,7 @@ private fun UserFavoritedWorldsSection(
                                 CardItemVo(
                                     id = world.id,
                                     listKey = world.favoriteId,
-                                    imageUrl = originalImageUrl(world.imageUrl, world.thumbnailImageUrl),
+                                    imageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
                                     thumbnailUrl = null,
                                     title = if (world.id == "???") world.favoriteId ?: world.name else world.name,
                                     subtitle = world.description?.takeIf { d -> d.isNotBlank() } ?: "${world.occupants ?: 0} 👤",
@@ -1301,7 +1294,7 @@ private fun UserFavoritedWorldsSection(
                                     worldProfileVO = WorldProfileVo(
                                         worldId = world.id,
                                         worldName = world.name,
-                                        worldImageUrl = originalImageUrl(
+                                        worldImageUrl = resolveOriginalImageUrl(
                                             world.imageUrl,
                                             world.thumbnailImageUrl,
                                         ),

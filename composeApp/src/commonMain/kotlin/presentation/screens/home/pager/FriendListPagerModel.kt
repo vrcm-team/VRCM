@@ -13,7 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
-import io.github.vrcmteam.vrcm.network.api.files.FileApi
+import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
@@ -397,41 +397,7 @@ class FriendListPagerModel(
         }.sortedWith(compareBy<FavoritedWorld> { it.id == "???" }.thenBy { it.name }) // 隐藏世界排到最后，再按名称排序
 
         // 将FavoritedWorld列表转换为WorldData列表
-        _worldList.value = filteredWorlds.map { world ->
-            WorldData(
-                id = world.id,
-                favoriteId = world.favoriteId,
-                name = world.name,
-                authorId = world.authorId.orEmpty(),
-                authorName = world.authorName.orEmpty(),
-                capacity = world.capacity ?: 0,
-                createdAt = world.createdAt.orEmpty(),
-                description = world.description.orEmpty(),
-                favorites = world.favorites ?: 0,
-                featured = world.featured == true,
-                heat = world.heat ?: 0,
-                imageUrl = FileApi.convertFileUrlToOriginal(world.imageUrl.orEmpty()),
-                labsPublicationDate = world.labsPublicationDate.orEmpty(),
-                organization = world.organization.orEmpty(),
-                popularity = world.popularity ?: 0,
-                publicationDate = world.publicationDate.orEmpty(),
-                recommendedCapacity = world.recommendedCapacity ?: 0,
-                releaseStatus = world.releaseStatus.orEmpty(),
-                tags = world.tags,
-                thumbnailImageUrl = world.thumbnailImageUrl.orEmpty(),
-                udonProducts = world.udonProducts,
-                unityPackages = world.unityPackages,
-                updatedAt = world.updatedAt.orEmpty(),
-                version = world.version ?: 0,
-                visits = world.visits ?: 0,
-                // 设置其他可能需要的字段
-                namespace = null,
-                privateOccupants = null,
-                publicOccupants = null,
-                instances = null,
-                previewYoutubeId = world.previewYoutubeId
-            )
-        }
+        _worldList.value = filteredWorlds.map { it.toSearchWorldData() }
     }
 
     /**
@@ -524,6 +490,39 @@ class FriendListPagerModel(
         }
     }
 }
+
+internal fun FavoritedWorld.toSearchWorldData(): WorldData = WorldData(
+    id = id,
+    favoriteId = favoriteId,
+    name = name,
+    authorId = authorId.orEmpty(),
+    authorName = authorName.orEmpty(),
+    capacity = capacity ?: 0,
+    createdAt = createdAt.orEmpty(),
+    description = description.orEmpty(),
+    favorites = favorites ?: 0,
+    featured = featured == true,
+    heat = heat ?: 0,
+    imageUrl = resolveOriginalImageUrl(imageUrl, thumbnailImageUrl).orEmpty(),
+    labsPublicationDate = labsPublicationDate.orEmpty(),
+    organization = organization.orEmpty(),
+    popularity = popularity ?: 0,
+    publicationDate = publicationDate.orEmpty(),
+    recommendedCapacity = recommendedCapacity ?: 0,
+    releaseStatus = releaseStatus.orEmpty(),
+    tags = tags,
+    thumbnailImageUrl = thumbnailImageUrl.orEmpty(),
+    udonProducts = udonProducts,
+    unityPackages = unityPackages,
+    updatedAt = updatedAt.orEmpty(),
+    version = version ?: 0,
+    visits = visits ?: 0,
+    namespace = null,
+    privateOccupants = null,
+    publicOccupants = null,
+    instances = null,
+    previewYoutubeId = previewYoutubeId,
+)
 
 
 private fun WorldData.toFavoritedWorldForLocal(localGroupName: String, wid: String): FavoritedWorld {
