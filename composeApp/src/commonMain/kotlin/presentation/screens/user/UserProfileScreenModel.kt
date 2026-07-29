@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -149,6 +150,25 @@ internal fun resolveFriendLocation(
     return locationsByUser[userId]?.takeIf { it.location == location }
 }
 
+internal fun UserData.asCachedOffline(): UserData = copy(
+    state = UserState.Offline,
+    status = UserStatus.Offline,
+    location = LocationType.Offline.value,
+    instanceId = "",
+    worldId = "",
+    travelingToInstance = null,
+    travelingToLocation = null,
+    travelingToWorld = null,
+)
+
+internal fun UserProfileVo.withCurrentFriendPresence(friend: FriendData): UserProfileVo = copy(
+    status = friend.status,
+    statusDescription = friend.statusDescription,
+    location = friend.location,
+    lastLogin = friend.lastLogin,
+    lastPlatform = friend.lastPlatform,
+)
+
 internal data class FavoritedWorldGroupLoad(
     val groupKey: String,
     val displayName: String,
@@ -238,18 +258,25 @@ class UserProfileScreenModel(
                 friendService.friendState,
                 friendLocationPagerModel.friendLocationsByUser,
             ) { friends, locationsByUser ->
-                resolveFriendLocation(
+                val friend = friends[userProfileVO.id]
+                friend to resolveFriendLocation(
                     userId = userProfileVO.id,
-                    location = friends[userProfileVO.id]?.location,
+                    location = friend?.location,
                     locationsByUser = locationsByUser,
                 )
-            }.collect { _friendLocation.value = it }
+            }.collect { (friend, location) ->
+                if (friend != null) {
+                    _userState.value = _userState.value.withCurrentFriendPresence(friend)
+                }
+                _friendLocation.value = location
+            }
         }
     }
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
-        cachedUserData = cache.user
-        val profile = UserProfileVo(cache.user)
+        val cachedUser = cache.user.asCachedOffline()
+        cachedUserData = cachedUser
+        val profile = UserProfileVo(cachedUser)
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
