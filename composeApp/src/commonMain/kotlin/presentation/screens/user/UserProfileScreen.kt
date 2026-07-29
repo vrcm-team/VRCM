@@ -78,6 +78,9 @@ data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
 ) : Screen {
+    // Voyager uses a screen key to retain ScreenModels. Profiles must not share one by screen type.
+    override val key = "UserProfileScreen:${userProfileVO.id}"
+
     @OptIn(ExperimentalMaterial3Api::class)
     @ExperimentalSharedTransitionApi
     @Composable
