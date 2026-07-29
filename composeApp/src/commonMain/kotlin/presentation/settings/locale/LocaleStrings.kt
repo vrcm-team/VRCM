@@ -78,6 +78,8 @@ data class LocaleStrings(
     val friendNetworkCacheHint: String = "Cached data. Tap refresh to update.",
     val friendNetworkBuilding: String = "Building network... %s",
     val friendNetworkEmpty: String = "No network data yet",
+    val friendNetworkViewCommunity: String = "Circles",
+    val friendNetworkViewEgo: String = "Around me",
     val locationDialogOwner: String = "Owner",
     val locationDialogAuthor: String = "Author",
     val locationDialogDescription: String = "Description",

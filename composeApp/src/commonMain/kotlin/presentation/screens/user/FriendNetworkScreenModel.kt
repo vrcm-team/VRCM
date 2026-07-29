@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
+import io.github.vrcmteam.vrcm.core.algorithms.computeEgoLayout
 import io.github.vrcmteam.vrcm.core.algorithms.computeForceLayout
 import io.github.vrcmteam.vrcm.core.algorithms.louvainDetect
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -35,15 +36,40 @@ data class FriendNetworkProgress(
     val total: Int,
 )
 
+enum class FriendNetworkViewMode {
+    // 社区视图：圈子分离 + 气泡，头像大小 = 圈内度数
+    Community,
+
+    // 自我中心视图：自己居中，共同好友越多离得越近，头像大小 = 共同好友数
+    Ego,
+}
+
+data class CommunitySummary(
+    val id: Int,
+    val name: String,
+    val count: Int,
+    val color: Color,
+)
+
 data class FriendNetworkUiState(
     val selfId: String? = null,
     val nodes: List<MutualFriendData> = emptyList(),
     val edges: Map<String, List<String>> = emptyMap(),
     val nodeColors: Map<String, Color> = emptyMap(),
+    // 节点所属社区；小于 MIN_COMMUNITY_SIZE 人的社区与孤立节点归并为 OTHER_COMMUNITY_ID
+    val communities: Map<String, Int> = emptyMap(),
+    // 真实社区图例（按人数降序，以圈内度数最高成员命名）
+    val communityLegend: List<CommunitySummary> = emptyList(),
+    val viewMode: FriendNetworkViewMode = FriendNetworkViewMode.Community,
+    // 自己的节点数据，自我中心视图的圆心
+    val selfNode: MutualFriendData? = null,
     val layout: ForceLayoutResult? = null,
+    val egoLayout: ForceLayoutResult? = null,
     val updatedAt: Long? = null,
     val isFromCache: Boolean = false,
     val isLoading: Boolean = false,
+    // 正在读取缓存并计算布局（区别于 isLoading：不走网络、无进度）
+    val isPreparing: Boolean = false,
     val progress: FriendNetworkProgress? = null,
 )
 
@@ -57,73 +83,168 @@ class FriendNetworkScreenModel(
 
     companion object {
         // 调色板：按社区 ID 分配颜色
+        // 相邻色对经色觉可分性校验（protan/deutan/tritan ΔE ≥ 8.9，正常视觉 ΔE ≥ 16.2）
         private val COLORS_PALETTE = listOf(
-            Color(0xFF5470C6),
-            Color(0xFF91CC75),
-            Color(0xFFFAC858),
-            Color(0xFFEE6666),
-            Color(0xFF73C0DE),
-            Color(0xFF3BA272),
-            Color(0xFFFC8452),
+            Color(0xFF4E79C9),
+            Color(0xFFDC7A30),
+            Color(0xFF237B4B),
+            Color(0xFFBD982A),
+            Color(0xFFB85CA6),
+            Color(0xFF77862B),
+            Color(0xFF3BA8C9),
+            Color(0xFFE06A7C),
             Color(0xFF9A60B4),
-            Color(0xFFEA7CCC),
         )
 
+        // 归并后的「其他」伪社区：碎片社区与孤立节点
+        const val OTHER_COMMUNITY_ID = -1
+        private const val MIN_COMMUNITY_SIZE = 3
+        private val OTHER_COMMUNITY_COLOR = Color(0xFF8A93A0)
+
+        // 骑墙者判定：外圈边数 ≥ max(STRADDLER_MIN_EDGES, STRADDLER_RATIO × 圈内边数)
+        private const val STRADDLER_RATIO = 1.5f
+        private const val STRADDLER_MIN_EDGES = 2
+        // 站位引力加成封顶：至多 Top2 倾向圈
+        private const val MAX_LEAN_SEGMENTS = 2
+
+        fun colorOfCommunity(communityId: Int): Color =
+            if (communityId == OTHER_COMMUNITY_ID) OTHER_COMMUNITY_COLOR
+            else COLORS_PALETTE[communityId % COLORS_PALETTE.size]
+
         /**
-         * 社区颜色分配
-         * 按连接密度分组，而非简单连通分量
+         * 社区划分：Louvain 检测后，不足 [MIN_COMMUNITY_SIZE] 人的碎片社区
+         * 和孤立节点归并为「其他」；真实社区按人数降序重新编号（0 起），
+         * 保证大社区优先拿到调色板前面的颜色
          */
-        fun assignCommunityColors(
+        fun assignCommunities(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
-            selfId: String? = null
-        ): Map<String, Color> {
+            selfId: String? = null,
+        ): Map<String, Int> {
             if (nodes.isEmpty()) return emptyMap()
             val adjacency = edges
                 .filterKeys { it != selfId }
                 .mapValues { (_, neighbors) -> neighbors.filter { it != selfId }.toSet() }
                 .filterValues { it.isNotEmpty() }
 
-            // Louvain 社区检测
-            val communityMap = louvainDetect(adjacency)
+            val detected = louvainDetect(adjacency)
+            val realCommunities = detected.entries
+                .groupBy({ it.value }, { it.key })
+                .values
+                .filter { it.size >= MIN_COMMUNITY_SIZE }
+                .sortedWith(compareByDescending<List<String>> { it.size }.thenBy { it.minOrNull() })
 
-            // 按社区大小降序排列，大的社区先分配颜色
-            val grouped = communityMap.entries.groupBy { it.value }
-            val sorted = grouped.entries.sortedByDescending { it.value.size }
-            val colorMap = mutableMapOf<String, Color>()
-            sorted.forEachIndexed { index, (_, members) ->
-                val color = COLORS_PALETTE[index % COLORS_PALETTE.size]
-                members.forEach { colorMap[it.key] = color }
+            val result = mutableMapOf<String, Int>()
+            realCommunities.forEachIndexed { index, members ->
+                members.forEach { result[it] = index }
             }
-            // 孤立节点（没有边的）单独分配颜色
             for (node in nodes) {
-                if (node.id != selfId && node.id !in colorMap) {
-                    colorMap[node.id] = COLORS_PALETTE[colorMap.size % COLORS_PALETTE.size]
+                if (node.id != selfId && node.id !in result) {
+                    result[node.id] = OTHER_COMMUNITY_ID
                 }
             }
-            return colorMap
+            return result
+        }
+
+        fun communityNodeColors(communities: Map<String, Int>): Map<String, Color> =
+            communities.mapValues { (_, communityId) -> colorOfCommunity(communityId) }
+
+        /**
+         * 社区图例：只含真实社区，编号顺序即人数降序，以圈内度数最高成员命名。
+         * 只数本社区内部的连线：总度数高的人往往社交面广、归属最模糊，
+         * 用圈内度数才能选出真正代表这个圈子的人
+         */
+        fun buildCommunityLegend(
+            nodes: List<MutualFriendData>,
+            edges: Map<String, List<String>>,
+            communities: Map<String, Int>,
+        ): List<CommunitySummary> {
+            val nodeById = nodes.associateBy { it.id }
+            return communities.entries
+                .filter { it.value != OTHER_COMMUNITY_ID }
+                .groupBy({ it.value }, { it.key })
+                .entries
+                .sortedBy { it.key }
+                .map { (communityId, members) ->
+                    val memberSet = members.toSet()
+                    val topMember = members.maxByOrNull { member ->
+                        edges[member].orEmpty().count { it in memberSet }
+                    }
+                    CommunitySummary(
+                        id = communityId,
+                        name = topMember?.let { nodeById[it]?.displayName }.orEmpty()
+                            .ifBlank { "#${communityId + 1}" },
+                        count = members.size,
+                        color = colorOfCommunity(communityId),
+                    )
+                }
+        }
+
+        /**
+         * 骑墙者判定（封顶规则）：
+         * 对真实社区的成员，统计与每个外圈的连线数，
+         * 达到 max([STRADDLER_MIN_EDGES], [STRADDLER_RATIO]×圈内边数) 的记为显著倾向；
+         * 按边数降序取 Top[MAX_LEAN_SEGMENTS]，返回布局实际消费的社区 ID 集合
+         */
+        fun detectStraddlers(
+            nodes: List<MutualFriendData>,
+            edges: Map<String, List<String>>,
+            communities: Map<String, Int>,
+        ): Map<String, Set<Int>> {
+            val result = mutableMapOf<String, Set<Int>>()
+            for (node in nodes) {
+                val own = communities[node.id] ?: continue
+                if (own == OTHER_COMMUNITY_ID) continue
+                var ownEdges = 0
+                val leanCounts = mutableMapOf<Int, Int>()
+                for (neighbor in edges[node.id].orEmpty()) {
+                    val community = communities[neighbor] ?: continue
+                    when {
+                        community == own -> ownEdges++
+                        community != OTHER_COMMUNITY_ID ->
+                            leanCounts[community] = (leanCounts[community] ?: 0) + 1
+                    }
+                }
+                val threshold = maxOf(STRADDLER_MIN_EDGES.toFloat(), STRADDLER_RATIO * ownEdges)
+                val qualifying = leanCounts.entries
+                    .filter { it.value >= threshold }
+                    .sortedWith(compareByDescending<Map.Entry<Int, Int>> { it.value }.thenBy { it.key })
+                if (qualifying.isEmpty()) continue
+                result[node.id] = qualifying.take(MAX_LEAN_SEGMENTS).map { it.key }.toSet()
+            }
+            return result
         }
 
         /**
          * 力导向布局算法
          * @param nodeSizePx 节点大小（像素），由 UI 层根据 density 计算
+         * @param communities 社区划分，用于圈内聚拢、圈间分离
+         * @param straddlers 骑墙者的 Top 倾向圈，用于跨圈边引力加成
          */
         fun computeNodePositions(
             nodes: List<MutualFriendData>,
             edges: Map<String, List<String>>,
             nodeSizePx: Float,
+            communities: Map<String, Int> = emptyMap(),
+            straddlers: Map<String, Set<Int>> = emptyMap(),
         ): ForceLayoutResult {
             if (nodes.isEmpty()) return ForceLayoutResult(emptyMap(), 0f, 0f)
             return computeForceLayout(
                 nodeIds = nodes.map { it.id },
                 edges = edges,
                 desiredSpacing = nodeSizePx * 1.3f,
+                communities = communities,
+                leans = straddlers,
             )
         }
     }
 
     var uiState by mutableStateOf(FriendNetworkUiState())
         private set
+
+    fun setViewMode(mode: FriendNetworkViewMode) {
+        uiState = uiState.copy(viewMode = mode)
+    }
 
     private fun filterSelf(
         nodes: List<MutualFriendData>,
@@ -140,26 +261,36 @@ class FriendNetworkScreenModel(
 
     fun loadCache(nodeSizePx: Float) {
         screenModelScope.launch(Dispatchers.IO) {
-            runCatching { authService.currentUser() }
-                .onSuccess { currentUser ->
-                    val cache = cacheDao.load(currentUser.id) ?: return@onSuccess
+            uiState = uiState.copy(isPreparing = true)
+            try {
+                val currentUser = authService.currentUser()
+                val cache = cacheDao.load(currentUser.id)
+                if (cache != null) {
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
-                    val nodeColors = assignCommunityColors(cache.nodes, cache.edges, selfId)
-                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx)
+                    val communities = assignCommunities(cache.nodes, cache.edges, selfId)
+                    val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
+                    val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
+                    val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
                     uiState = uiState.copy(
                         selfId = selfId,
                         nodes = filteredNodes,
                         edges = filteredEdges,
-                        nodeColors = nodeColors,
+                        nodeColors = communityNodeColors(communities),
+                        communities = communities,
+                        communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                        selfNode = cache.nodes.firstOrNull { it.id == selfId },
                         layout = layout,
+                        egoLayout = egoLayout,
                         updatedAt = cache.updatedAt,
                         isFromCache = true,
                     )
                 }
-                .onFailure {
-                    logger.error(it.message.orEmpty())
-                }
+            } catch (e: Exception) {
+                logger.error(e.message.orEmpty())
+            } finally {
+                uiState = uiState.copy(isPreparing = false)
+            }
         }
     }
 
@@ -218,14 +349,21 @@ class FriendNetworkScreenModel(
                 cacheDao.save(cache)
                 val selfId = currentUser.id
                 val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
-                val nodeColors = assignCommunityColors(nodes, finalEdges, selfId)
-                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx)
+                val communities = assignCommunities(nodes, finalEdges, selfId)
+                val straddlers = detectStraddlers(filteredNodes, filteredEdges, communities)
+                val layout = computeLayout(filteredNodes, filteredEdges, nodeSizePx, communities, straddlers)
+                val egoLayout = computeEgo(filteredNodes, filteredEdges, nodeSizePx, selfId)
                 uiState = FriendNetworkUiState(
                     selfId = selfId,
                     nodes = filteredNodes,
                     edges = filteredEdges,
-                    nodeColors = nodeColors,
+                    nodeColors = communityNodeColors(communities),
+                    communities = communities,
+                    communityLegend = buildCommunityLegend(filteredNodes, filteredEdges, communities),
+                    viewMode = uiState.viewMode,
+                    selfNode = selfNode,
                     layout = layout,
+                    egoLayout = egoLayout,
                     updatedAt = cache.updatedAt,
                     isFromCache = false,
                     isLoading = false,
@@ -289,8 +427,24 @@ class FriendNetworkScreenModel(
         nodes: List<MutualFriendData>,
         edges: Map<String, List<String>>,
         nodeSizePx: Float,
+        communities: Map<String, Int>,
+        straddlers: Map<String, Set<Int>>,
     ): ForceLayoutResult = withContext(Dispatchers.Default) {
-        computeNodePositions(nodes, edges, nodeSizePx)
+        computeNodePositions(nodes, edges, nodeSizePx, communities, straddlers)
+    }
+
+    private suspend fun computeEgo(
+        nodes: List<MutualFriendData>,
+        edges: Map<String, List<String>>,
+        nodeSizePx: Float,
+        selfId: String,
+    ): ForceLayoutResult = withContext(Dispatchers.Default) {
+        computeEgoLayout(
+            nodeIds = nodes.map { it.id },
+            edges = edges,
+            desiredSpacing = nodeSizePx * 1.3f,
+            selfId = selfId,
+        )
     }
 
     private fun CurrentUserData.toMutualFriendData(isFriend: Boolean) = MutualFriendData(
