@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.core.algorithms
 
 import androidx.compose.ui.geometry.Offset
-import kotlin.math.sqrt
 
 /**
  * Andrew 单调链凸包
@@ -33,28 +32,4 @@ fun convexHull(points: List<Offset>): List<Offset> {
     lower.removeAt(lower.size - 1)
     upper.removeAt(upper.size - 1)
     return lower + upper
-}
-
-/**
- * 排除会把社区轮廓拉进圈间走廊的离群成员，只保留空间核心点。
- */
-fun filterCorePoints(points: List<Offset>, factor: Float = 1.8f, minRadius: Float = 0f): List<Offset> {
-    if (points.size < 4) return points
-    var centerX = 0f
-    var centerY = 0f
-    points.forEach {
-        centerX += it.x
-        centerY += it.y
-    }
-    centerX /= points.size
-    centerY /= points.size
-    val distances = points.map { point ->
-        val dx = point.x - centerX
-        val dy = point.y - centerY
-        sqrt(dx * dx + dy * dy)
-    }
-    val median = distances.sorted()[distances.size / 2]
-    val threshold = maxOf(median * factor, minRadius)
-    val core = points.filterIndexed { index, _ -> distances[index] <= threshold }
-    return if (core.size >= 3) core else points
 }
