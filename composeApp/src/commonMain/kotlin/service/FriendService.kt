@@ -268,7 +268,14 @@ class FriendService(
 
     private fun restoreCachedFriendList(userId: String) {
         activeAccountUserId = userId
-        friendStore.restore(friendListCacheDao.load(userId)?.friends.orEmpty())
+        val friends = friendListCacheDao.load(userId)?.friends.orEmpty().map { friend ->
+            if (friend.location == LocationType.Offline.value) {
+                friend.copy(status = UserStatus.Offline, travelingToLocation = "")
+            } else {
+                friend
+            }
+        }
+        friendStore.restore(friends)
         publishFriendState()
     }
 

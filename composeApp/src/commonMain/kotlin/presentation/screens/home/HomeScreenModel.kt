@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ class HomeScreenModel(
     private val usersApi: UsersApi,
     private val notificationApi: NotificationApi,
     private val friendService: FriendService,
+    private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
 ) : ScreenModel {
 
@@ -49,6 +51,7 @@ class HomeScreenModel(
 
     fun init() {
         friendService.preloadFriendList()
+        friendLocationPagerModel.preloadFriendLocations()
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()

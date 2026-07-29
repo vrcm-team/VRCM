@@ -652,7 +652,7 @@ private fun UserGroupsSection(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SectionHeader(title = title)
-        val shownGroups = rememberStaggeredReveal(groups)
+        val shownGroups = rememberStaggeredReveal(groups.distinctBy(LimitedUserGroup::groupId))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {

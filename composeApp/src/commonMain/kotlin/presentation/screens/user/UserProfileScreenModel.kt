@@ -30,6 +30,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -43,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -151,6 +153,7 @@ class UserProfileScreenModel(
     private val favoriteApi: FavoriteApi,
     private val inviteApi: InviteApi,
     private val userProfileCacheDao: UserProfileCacheDao,
+    private val friendLocationPagerModel: FriendLocationPagerModel,
 ) : ScreenModel {
 
     private val _userState = mutableStateOf(userProfileVO)
@@ -196,6 +199,19 @@ class UserProfileScreenModel(
 
     init {
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
+        screenModelScope.launch {
+            friendService.friendState.collect { friends ->
+                val friend = friends[userProfileVO.id] ?: return@collect
+                _friendLocation.value = if (LocationType.fromValue(friend.location) == LocationType.Instance) {
+                    friendLocationPagerModel.findFriendLocation(
+                        userId = friend.id,
+                        location = friend.location,
+                    )
+                } else {
+                    null
+                }
+            }
+        }
     }
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
@@ -552,32 +568,15 @@ class UserProfileScreenModel(
             _friendLocation.value = null
             return
         }
-        if (location.isEmpty() || type != LocationType.Instance || _friendLocation.value != null) {
+        if (location.isEmpty() || type != LocationType.Instance) {
+            _friendLocation.value = null
+            return
+        }
+        if (_friendLocation.value != null) {
             return
         }
 
-        val friendsInSameRoom: MutableMap<String, MutableState<FriendData>> =
-            (mapOf(userState.id to userState.toFriendData()) + friendService.friendMap).values
-                .filter { it.location == location }
-                .associate { it.id to mutableStateOf(it) }
-                .toMutableMap()
-        val friendLocation = FriendLocation(
-            location = location,
-            friends = friendsInSameRoom
-        )
-        _friendLocation.value = friendLocation
-        // Fetch instance details
-        screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                instancesApi.instanceByLocation(location)
-            }.onSuccess { instance ->
-                val homeInstanceVo = HomeInstanceVo(instance)
-                friendLocation.instants.value = homeInstanceVo
-                fetchAndSetOwner(instance.ownerId, homeInstanceVo)
-            }.onFailure {
-                handleError(it)
-            }
-        }
+        _friendLocation.value = friendLocationPagerModel.findFriendLocation(userState.id, location)
     }
 
     /**

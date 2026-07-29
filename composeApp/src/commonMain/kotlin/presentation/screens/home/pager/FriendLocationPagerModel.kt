@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -37,6 +38,8 @@ class FriendLocationPagerModel(
     private val presenceStore = FriendLocationPresenceStore()
     private val updateMutex = Mutex()
     private val refreshMutex = Mutex()
+    private var preloadJob: Job? = null
+    private var hasCompletedInitialRefresh = false
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
@@ -45,6 +48,13 @@ class FriendLocationPagerModel(
         private set
 
     init {
+        screenModelScope.launch {
+            friendService.friendState.collect { friends ->
+                if (!hasCompletedInitialRefresh) return@collect
+                updateMutex.withLock { presenceStore.replaceFriends(friends.values) }
+                syncFriendLocations()
+            }
+        }
         screenModelScope.launch {
             friendService.friendUpdateFlow.collect { event ->
                 val refreshRequired = updateMutex.withLock { presenceStore.apply(event) }
@@ -66,6 +76,21 @@ class FriendLocationPagerModel(
             }
         }
     }
+
+    fun preloadFriendLocations() {
+        if (preloadJob?.isActive == true) return
+        preloadJob = screenModelScope.launch {
+            doRefreshFriendLocation(removeNotIncluded = true)
+        }
+    }
+
+    fun findFriendLocation(userId: String, location: String): FriendLocation? =
+        friendLocationMap.values
+            .asSequence()
+            .flatten()
+            .firstOrNull { candidate ->
+                candidate.location == location && userId in candidate.friends
+            }
 
 
     suspend fun refreshFriendLocation() {
@@ -111,6 +136,7 @@ class FriendLocationPagerModel(
             updateMutex.withLock {
                 presenceStore.finishRefresh(includedIds, reconcile = removeNotIncluded && completed)
             }
+            if (completed) hasCompletedInitialRefresh = true
         } finally {
             if (!completed) updateMutex.withLock { presenceStore.cancelRefresh() }
             syncFriendLocations()
@@ -122,6 +148,7 @@ class FriendLocationPagerModel(
         runCatching {
             val snapshot = presenceStore.snapshot()
             syncSimpleLocation(LocationType.Offline, snapshot.offline)
+            syncSimpleLocation(LocationType.Web, snapshot.web)
             syncSimpleLocation(LocationType.Private, snapshot.private)
             syncInstanceLocations(snapshot.instances)
         }.onApiFailure("FriendLocation") {
@@ -136,7 +163,11 @@ class FriendLocationPagerModel(
         }
         val location = friendLocationMap.getOrPut(type) {
             mutableStateListOf(
-                if (type == LocationType.Offline) FriendLocation.Offline else FriendLocation.Private
+                when (type) {
+                    LocationType.Offline -> FriendLocation.Offline
+                    LocationType.Web -> FriendLocation.Web
+                    else -> FriendLocation.Private
+                }
             )
         }.first()
         syncFriends(location, FriendLocationGroup(friends))

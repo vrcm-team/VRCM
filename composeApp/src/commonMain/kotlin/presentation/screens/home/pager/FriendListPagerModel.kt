@@ -359,6 +359,7 @@ class FriendListPagerModel(
                     LocationType.Traveling -> "1"
                     LocationType.Private -> "2"
                     LocationType.Offline -> "3"
+                    LocationType.Web -> "3"
                 }
             )
             append('-')
