@@ -30,6 +30,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus.*
+import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -577,7 +578,9 @@ private fun ColumnScope.ProfileContent(
                 }
             } else {
                 navigator push WorldProfileScreen(
-                    worldProfileVO = WorldProfileVo(world),
+                    worldProfileVO = WorldProfileVo(world).copy(
+                        worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl)
+                    ),
                     sharedSuffixKey = sharedSuffixKey,
                     sharedKeyPrefix = "Created_"
                 )
@@ -589,6 +592,7 @@ private fun ColumnScope.ProfileContent(
     if (currentUser.isSelf) {
         UserCreatedAvatarsSection(
             avatars = createdAvatars,
+            sharedSuffixKey = sharedSuffixKey,
         )
     }
 
@@ -606,7 +610,7 @@ private fun ColumnScope.ProfileContent(
                     worldProfileVO = WorldProfileVo(
                         worldId = world.id,
                         worldName = world.name,
-                        worldImageUrl = world.imageUrl?.ifBlank { null },
+                        worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
                         thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
                         worldDescription = world.description.orEmpty(),
                         authorID = world.authorId,
@@ -997,14 +1001,15 @@ private class CardListDetailScreen(
                         itemTitle = { it.title },
                         itemSubtitle = { it.subtitle },
                         sectionKey = sectionKey,
-                        imageModifier = if (screenType == CardScreenType.WORLD || screenType == CardScreenType.FAVORITED_WORLD) {
-                            { item, modifier ->
+                        imageModifier = when (screenType) {
+                            CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> { item, modifier ->
                                 worldImageSharedKey(sharedKeyPrefix, item.id)
                                     ?.let { modifier.sharedBoundsBy(it) }
                                     ?: modifier
                             }
-                        } else {
-                            { _, m -> m }
+                            CardScreenType.AVATAR -> { item, modifier ->
+                                modifier.sharedBoundsBy("${item.id}AvatarImage")
+                            }
                         },
                         onClickItem = { item ->
                             when (screenType) {
@@ -1030,7 +1035,8 @@ private class CardListDetailScreen(
                                 CardScreenType.AVATAR -> {
                                     item.avatarData?.let { avatar ->
                                         navigator push AvatarProfileScreen(
-                                            avatarProfileVo = AvatarProfileVo(avatar)
+                                            avatarProfileVo = AvatarProfileVo(avatar),
+                                            sharedSuffixKey = sharedSuffixKey,
                                         )
                                     }
                                 }
@@ -1145,7 +1151,7 @@ private fun UserCreatedWorldsSection(
         StackedLocationCardList(
             items = worlds,
             key = { it.id },
-            imageUrl = { it.thumbnailImageUrl ?: it.imageUrl },
+            imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
             title = { it.name },
             subtitle = { it.description ?: "" },
             detailTitle = createdWorldsTitle,
@@ -1157,12 +1163,14 @@ private fun UserCreatedWorldsSection(
                     items = list.map { world ->
                         CardItemVo(
                             id = world.id,
-                            imageUrl = world.thumbnailImageUrl ?: world.imageUrl,
-                            thumbnailUrl = world.thumbnailImageUrl,
+                            imageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
+                            thumbnailUrl = null,
                             title = world.name,
                             subtitle = world.description ?: "",
                             authorName = world.authorName,
-                            worldProfileVO = WorldProfileVo(world)
+                            worldProfileVO = WorldProfileVo(world).copy(
+                                worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl)
+                            )
                         )
                     },
                     sectionKey = createdWorldsTitle,
@@ -1181,6 +1189,7 @@ private fun UserCreatedWorldsSection(
 @Composable
 private fun UserCreatedAvatarsSection(
     avatars: List<AvatarData>,
+    sharedSuffixKey: String = "",
 ) {
     if (avatars.isEmpty()) return
     val navigator = currentNavigator
@@ -1193,13 +1202,22 @@ private fun UserCreatedAvatarsSection(
         StackedLocationCardList(
             items = avatars,
             key = { it.id },
-            imageUrl = { it.thumbnailImageUrl ?: it.imageUrl },
+            imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
             title = { it.name },
             subtitle = { it.description ?: it.authorName },
             detailTitle = createdAvatarsTitle,
+            imageModifier = { item, modifier -> modifier.sharedBoundsBy("${item.id}AvatarImage") },
             onClickItem = { avatar ->
                 navigator push AvatarProfileScreen(
-                    avatarProfileVo = AvatarProfileVo(avatar)
+                    avatarProfileVo = AvatarProfileVo(
+                        avatar.copy(
+                            imageUrl = resolveOriginalImageUrl(
+                                avatar.imageUrl,
+                                avatar.thumbnailImageUrl,
+                            ).orEmpty()
+                        )
+                    ),
+                    sharedSuffixKey = sharedSuffixKey,
                 )
             },
             onNavigateToDetail = { list ->
@@ -1207,15 +1225,18 @@ private fun UserCreatedAvatarsSection(
                     title = createdAvatarsTitle,
                     items = list.map { CardItemVo(
                         id = it.id,
-                        imageUrl = it.thumbnailImageUrl ?: it.imageUrl,
-                        thumbnailUrl = it.thumbnailImageUrl,
+                        imageUrl = resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl),
+                        thumbnailUrl = null,
                         title = it.name,
                         subtitle = it.description?.takeIf { d -> d.isNotBlank() } ?: it.authorName,
                         authorName = it.authorName,
-                        avatarData = it
+                        avatarData = it.copy(
+                            imageUrl = resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl).orEmpty()
+                        )
                     ) },
                     sectionKey = createdAvatarsTitle,
-                    screenType = CardScreenType.AVATAR
+                    screenType = CardScreenType.AVATAR,
+                    sharedSuffixKey = sharedSuffixKey,
                 )
             }
         )
@@ -1247,7 +1268,7 @@ private fun UserFavoritedWorldsSection(
                 StackedLocationCardList(
                     items = worlds,
                     key = { it.favoriteId },
-                    imageUrl = { (it.thumbnailImageUrl ?: it.imageUrl)?.ifBlank { null } },
+                    imageUrl = { resolveOriginalImageUrl(it.imageUrl, it.thumbnailImageUrl) },
                     title = { if (it.id == "???") it.favoriteId ?: it.name else it.name },
                     subtitle = { it.description?.takeIf { d -> d.isNotBlank() } ?: "${it.occupants ?: 0} 👤" },
                     detailTitle = groupName,
@@ -1265,15 +1286,18 @@ private fun UserFavoritedWorldsSection(
                                 CardItemVo(
                                     id = world.id,
                                     listKey = world.favoriteId,
-                                    imageUrl = (world.thumbnailImageUrl ?: world.imageUrl)?.ifBlank { null },
-                                    thumbnailUrl = world.thumbnailImageUrl?.ifBlank { null },
+                                    imageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl),
+                                    thumbnailUrl = null,
                                     title = if (world.id == "???") world.favoriteId ?: world.name else world.name,
                                     subtitle = world.description?.takeIf { d -> d.isNotBlank() } ?: "${world.occupants ?: 0} 👤",
                                     authorName = world.authorName ?: "",
                                     worldProfileVO = WorldProfileVo(
                                         worldId = world.id,
                                         worldName = world.name,
-                                        worldImageUrl = world.imageUrl?.ifBlank { null },
+                                        worldImageUrl = resolveOriginalImageUrl(
+                                            world.imageUrl,
+                                            world.thumbnailImageUrl,
+                                        ),
                                         thumbnailImageUrl = world.thumbnailImageUrl?.ifBlank { null },
                                         worldDescription = world.description.orEmpty(),
                                         authorID = world.authorId,

@@ -431,8 +431,9 @@ private fun RenderBackgroundImage(
             .sharedBoundsBy(
                 key = sharedKeyPrefix + worldId + "WorldImage",
                 renderInOverlayDuringTransition = false
-            ),
+        ),
         imageData = imageUrl,
+        loadOriginalSize = true,
     )
 }
 
