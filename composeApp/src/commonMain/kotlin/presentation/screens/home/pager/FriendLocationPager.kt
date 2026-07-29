@@ -147,18 +147,6 @@ fun Pager.FriendLocationPager(
             )
         ) {
 
-            SimpleCLocationCard(
-                friendLocation = webFriendLocation,
-                locationType = LocationType.Web,
-                onClickUserIcon = onClickUserIcon,
-            ) { "${strings.fiendLocationPagerWebsite}${webFriendLocation?.let { "(${it.friends.size})" }}" }
-
-            SimpleCLocationCard(
-                friendLocation = privateFriendLocation,
-                locationType = LocationType.Private,
-                onClickUserIcon = onClickUserIcon,
-            ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
-
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
                     LocationTitle(
@@ -184,6 +172,18 @@ fun Pager.FriendLocationPager(
                     }
                 }
             }
+
+            SimpleCLocationCard(
+                friendLocation = privateFriendLocation,
+                locationType = LocationType.Private,
+                onClickUserIcon = onClickUserIcon,
+            ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
+
+            SimpleCLocationCard(
+                friendLocation = webFriendLocation,
+                locationType = LocationType.Web,
+                onClickUserIcon = onClickUserIcon,
+            ) { "${strings.fiendLocationPagerWebsite}${webFriendLocation?.let { "(${it.friends.size})" }}" }
 
         }
     }
