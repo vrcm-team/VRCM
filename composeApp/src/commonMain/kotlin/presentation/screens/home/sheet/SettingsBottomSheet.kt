@@ -25,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.VersionService
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
@@ -135,6 +136,7 @@ private inline fun ColumnScope.CustomBlock() {
 private fun AboutBlock() {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
+    val accountCacheManager = koinInject<AccountCacheManager>()
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(VersionVo()) }
     // 不能直接version.not()因为默认为false会导致一点开就显示
@@ -161,23 +163,25 @@ private fun AboutBlock() {
         }
     }
     Column {
-        imageLoader.diskCache?.let { diskCache ->
-            var size by remember { mutableStateOf(diskCache.size) }
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clickable {
-                        diskCache.clear()
-                        size = 0
-                    }
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(text = "${strings.stettingClearCache}:")
-                Spacer(modifier = Modifier.weight(1f))
-                Text(text = "${size.bytesToMb()}/${diskCache.maxSize.bytesToMb()}MB")
+        val diskCache = imageLoader.diskCache
+        var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    diskCache?.clear()
+                    accountCacheManager.clearAll()
+                    size = 0
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(text = "${strings.stettingClearCache}:")
+            Spacer(modifier = Modifier.weight(1f))
+            diskCache?.let {
+                Text(text = "${size.bytesToMb()}/${it.maxSize.bytesToMb()}MB")
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         Row(
             modifier = Modifier.fillMaxWidth()
                 .clickable { checkVersion() }

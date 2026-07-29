@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.di.modules
 import com.russhwolf.settings.Settings
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
@@ -24,5 +25,6 @@ internal val storageModule: Module = module {
     single { FriendListCacheDao(get { parametersOf(DaoKeys.FriendListCache.NAME) }) }
     single { FriendNetworkCacheDao(get { parametersOf(DaoKeys.FriendNetwork.NAME) }) }
     single { UserProfileCacheDao(get { parametersOf(DaoKeys.UserProfileCache.NAME) }) }
+    singleOf(::AccountCacheManager)
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
 }

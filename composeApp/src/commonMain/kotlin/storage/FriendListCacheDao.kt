@@ -19,4 +19,14 @@ class FriendListCacheDao(
     fun save(userId: String, cache: FriendListCache) {
         settings.putString(key(userId), json.encodeToString(FriendListCache.serializer(), cache))
     }
+
+    fun clear(userId: String) {
+        settings.remove(key(userId))
+    }
+
+    fun clearAll() {
+        settings.keys
+            .filter { it.startsWith("${DaoKeys.FriendListCache.KEY_PREFIX}.") }
+            .forEach(settings::remove)
+    }
 }

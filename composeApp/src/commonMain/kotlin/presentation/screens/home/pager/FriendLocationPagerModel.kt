@@ -87,7 +87,8 @@ class FriendLocationPagerModel(
             }
         }
         screenModelScope.launch {
-            SharedFlowCentre.authed.collect { account ->
+            SharedFlowCentre.authed.collect { session ->
+                val account = session.account
                 val activation = accountTracker.activate(account.userId)
                 if (!activation.changed) return@collect
                 updateMutex.withLock {

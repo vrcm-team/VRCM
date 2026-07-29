@@ -23,4 +23,15 @@ class UserProfileCacheDao(
             json.encodeToString(UserProfileCache.serializer(), cache),
         )
     }
+
+    fun clearOwner(ownerUserId: String) {
+        val ownerPrefix = "${DaoKeys.UserProfileCache.KEY_PREFIX}.$ownerUserId."
+        settings.keys.filter { it.startsWith(ownerPrefix) }.forEach(settings::remove)
+    }
+
+    fun clearAll() {
+        settings.keys
+            .filter { it.startsWith("${DaoKeys.UserProfileCache.KEY_PREFIX}.") }
+            .forEach(settings::remove)
+    }
 }

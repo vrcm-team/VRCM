@@ -12,6 +12,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.WorldSearchOptions
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
+import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -96,7 +99,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         fixture.model.setSearchText("account")
         assertTrue(fixture.model.refreshSearchList())
 
-        SharedFlowCentre.authed.emit(
+        SharedFlowCentre.emitAuthenticated(
             AccountDto(userId = "usr_new", username = "new-user"),
         )
 
@@ -506,6 +509,10 @@ private fun createFixture(
         authApi = AuthApi(client),
         accountDao = accountDao,
         cookiesStorage = PersistentCookiesStorage(logger),
+        accountCacheManager = AccountCacheManager(
+            friendListCacheDao = FriendListCacheDao(MapSettings()),
+            userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+        ),
     )
     return SearchModelFixture(
         model = SearchListPagerModel(
