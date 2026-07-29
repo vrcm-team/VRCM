@@ -598,6 +598,7 @@ private fun ColumnScope.ProfileContent(
     if (currentUser.isSelf) {
         UserCreatedAvatarsSection(
             avatars = createdAvatars,
+            sharedSuffixKey = sharedSuffixKey,
         )
     }
 
@@ -1040,7 +1041,8 @@ private class CardListDetailScreen(
                                 CardScreenType.AVATAR -> {
                                     item.avatarData?.let { avatar ->
                                         navigator push AvatarProfileScreen(
-                                            avatarProfileVo = AvatarProfileVo(avatar)
+                                            avatarProfileVo = AvatarProfileVo(avatar),
+                                            sharedSuffixKey = sharedSuffixKey,
                                         )
                                     }
                                 }
@@ -1193,6 +1195,7 @@ private fun UserCreatedWorldsSection(
 @Composable
 private fun UserCreatedAvatarsSection(
     avatars: List<AvatarData>,
+    sharedSuffixKey: String = "",
 ) {
     if (avatars.isEmpty()) return
     val navigator = currentNavigator
@@ -1214,7 +1217,8 @@ private fun UserCreatedAvatarsSection(
                 navigator push AvatarProfileScreen(
                     avatarProfileVo = AvatarProfileVo(
                         avatar.copy(imageUrl = originalImageUrl(avatar.imageUrl).orEmpty())
-                    )
+                    ),
+                    sharedSuffixKey = sharedSuffixKey,
                 )
             },
             onNavigateToDetail = { list ->
@@ -1230,7 +1234,8 @@ private fun UserCreatedAvatarsSection(
                         avatarData = it.copy(imageUrl = originalImageUrl(it.imageUrl).orEmpty())
                     ) },
                     sectionKey = createdAvatarsTitle,
-                    screenType = CardScreenType.AVATAR
+                    screenType = CardScreenType.AVATAR,
+                    sharedSuffixKey = sharedSuffixKey,
                 )
             }
         )

@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,6 +26,7 @@ import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -55,16 +57,18 @@ class AvatarProfileScreen(
 
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
 
-        ProfileScaffold(
-            imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
-            profileImageUrl = displayedAvatar.avatarImageUrl,
-            iconUrl = null,
-            onReturn = { navigator.pop() },
-        ) { ratio, contentMinHeight ->
-            AvatarProfileContent(
-                avatarProfileVo = displayedAvatar,
-                contentMinHeight = contentMinHeight,
-            )
+        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
+            ProfileScaffold(
+                imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
+                profileImageUrl = displayedAvatar.avatarImageUrl,
+                iconUrl = null,
+                onReturn = { navigator.pop() },
+            ) { ratio, contentMinHeight ->
+                AvatarProfileContent(
+                    avatarProfileVo = displayedAvatar,
+                    contentMinHeight = contentMinHeight,
+                )
+            }
         }
     }
 }

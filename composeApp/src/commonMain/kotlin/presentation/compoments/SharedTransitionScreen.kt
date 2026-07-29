@@ -56,6 +56,9 @@ val LocalSharedSuffixKey: ProvidableCompositionLocal<String> =
 val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope> =
     staticCompositionLocalOf { error("AnimatedVisibilityScope is not provided") }
 
+internal fun sharedContentKey(key: String, suffixKey: String, useSuffixKey: Boolean): String =
+    if (!useSuffixKey || suffixKey.isBlank()) key else "$key:$suffixKey"
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun Modifier.sharedElementBy(
@@ -71,7 +74,7 @@ fun Modifier.sharedElementBy(
     with(sharedTransitionScope) {
         val suffixKey = LocalSharedSuffixKey.current
         this@sharedElementBy.sharedElement(
-            sharedContentState = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
+            sharedContentState = rememberSharedContentState(sharedContentKey(key, suffixKey, useSuffixKey)),
             animatedVisibilityScope = animatedVisibilityScope,
             boundsTransform = boundsTransform,
             renderInOverlayDuringTransition = renderInOverlayDuringTransition,
@@ -97,7 +100,7 @@ fun Modifier.sharedBoundsBy(
     with(sharedTransitionScope) {
         val suffixKey = LocalSharedSuffixKey.current
         this@sharedBoundsBy.sharedBounds(
-            sharedContentState = rememberSharedContentState(if (!useSuffixKey || suffixKey.isBlank())key else "$key:$suffixKey"),
+            sharedContentState = rememberSharedContentState(sharedContentKey(key, suffixKey, useSuffixKey)),
             animatedVisibilityScope = animatedVisibilityScope,
             resizeMode = resizeMode,
             boundsTransform = boundsTransform,
@@ -106,5 +109,4 @@ fun Modifier.sharedBoundsBy(
             clipInOverlayDuringTransition = clipInOverlayDuringTransition
         )
     }
-
 
