@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -9,33 +8,77 @@ class CropTransformCalculatorTest {
     private val calculator = CropTransformCalculator()
 
     @Test
-    fun landscapeImageUsesMinimumCoverScale() {
+    fun landscapeImageFitsInsideViewportWithoutCropping() {
         val geometry = calculator.geometry(
             source = ImageSize(2400, 1080),
             viewport = ImageSize(1600, 900),
             transform = CropTransform(),
         )
 
-        assertEquals(2000f, geometry.imageWidth, 0.01f)
-        assertEquals(900f, geometry.imageHeight, 0.01f)
+        assertEquals(1600f, geometry.imageWidth, 0.01f)
+        assertEquals(720f, geometry.imageHeight, 0.01f)
         assertEquals(0f, geometry.translationX, 0.01f)
         assertEquals(0f, geometry.translationY, 0.01f)
     }
 
     @Test
-    fun portraitImageAlwaysCoversSixteenByNineViewport() {
+    fun portraitImageFitsInsideViewportWithoutCropping() {
         val geometry = calculator.geometry(
             source = ImageSize(1080, 1920),
             viewport = ImageSize(1600, 900),
             transform = CropTransform(),
         )
 
-        assertTrue(geometry.imageWidth >= 1600f)
-        assertTrue(geometry.imageHeight >= 900f)
+        assertEquals(506.25f, geometry.imageWidth, 0.01f)
+        assertEquals(900f, geometry.imageHeight, 0.01f)
     }
 
     @Test
-    fun panIsClampedBeforeItCanRevealEmptyPixels() {
+    fun portraitImageCanCoverViewportAndPanAtDynamicCoverZoom() {
+        val source = ImageSize(1080, 1920)
+        val viewport = ImageSize(1600, 900)
+        val limits = calculator.zoomLimits(source, viewport, quarterTurns = 0)
+
+        assertEquals(3.1604939f, limits.cover, 0.0001f)
+        assertEquals(9.481482f, limits.maximum, 0.0001f)
+
+        val covered = calculator.geometry(
+            source = source,
+            viewport = viewport,
+            transform = CropTransform(zoom = limits.cover),
+        )
+        assertEquals(viewport.width.toFloat(), covered.imageWidth, 0.01f)
+        assertTrue(covered.imageHeight >= viewport.height)
+
+        val panned = calculator.transform(
+            source = source,
+            viewport = viewport,
+            current = CropTransform(zoom = limits.cover),
+            panX = 0f,
+            panY = 10_000f,
+            zoomChange = 1f,
+        )
+        assertTrue(panned.centerOffsetY > 0f)
+        val pannedGeometry = calculator.geometry(source, viewport, panned)
+        assertEquals(
+            (pannedGeometry.imageHeight - viewport.height) / 2f,
+            pannedGeometry.translationY,
+            0.01f,
+        )
+
+        val maxZoom = calculator.transform(
+            source = source,
+            viewport = viewport,
+            current = CropTransform(),
+            panX = 0f,
+            panY = 0f,
+            zoomChange = 100f,
+        )
+        assertEquals(limits.maximum, maxZoom.zoom, 0.0001f)
+    }
+
+    @Test
+    fun panAtFitZoomCannotMoveImageAwayFromCenter() {
         val source = ImageSize(2400, 1080)
         val viewport = ImageSize(1600, 900)
         val updated = calculator.transform(
@@ -48,14 +91,14 @@ class CropTransformCalculatorTest {
         )
         val geometry = calculator.geometry(source, viewport, updated)
 
-        assertEquals(0.125f, updated.centerOffsetX, 0.0001f)
+        assertEquals(0f, updated.centerOffsetX, 0.0001f)
         assertEquals(0f, updated.centerOffsetY, 0.0001f)
-        assertTrue(abs(geometry.translationX) <= (geometry.imageWidth - viewport.width) / 2f)
-        assertTrue(abs(geometry.translationY) <= (geometry.imageHeight - viewport.height) / 2f)
+        assertEquals(0f, geometry.translationX, 0.01f)
+        assertEquals(0f, geometry.translationY, 0.01f)
     }
 
     @Test
-    fun oddQuarterTurnSwapsDimensionsAndPreservesCoverage() {
+    fun oddQuarterTurnSwapsDimensionsAndPreservesFit() {
         val source = ImageSize(2400, 1080)
         val viewport = ImageSize(1600, 900)
         val rotated = calculator.rotate(source, viewport, CropTransform(), turns = 1)
@@ -63,8 +106,8 @@ class CropTransformCalculatorTest {
 
         assertEquals(1, rotated.quarterTurns)
         assertEquals(90f, geometry.rotationDegrees)
-        assertEquals(1600f, geometry.imageWidth, 0.01f)
-        assertTrue(geometry.imageHeight >= viewport.height)
+        assertEquals(405f, geometry.imageWidth, 0.01f)
+        assertEquals(900f, geometry.imageHeight, 0.01f)
     }
 
     @Test

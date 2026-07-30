@@ -215,6 +215,29 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun disposingEditorDefersPreviewReleaseUntilExitFrameIsGone() {
+        val released = mutableListOf<ImageBitmap>()
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.jpg", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_920, 1_080)),
+            calculator = CropTransformCalculator(),
+            processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
+            uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) },
+            sessionId = "test-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+            releasePreview = released::add,
+        )
+
+        model.acquirePreviewDisplayLease()
+        model.onDispose()
+
+        assertEquals(emptyList(), released)
+        model.releasePreviewDisplayLease()
+        assertEquals(listOf<ImageBitmap>(TestImageBitmap), released)
+    }
+
+    @Test
     fun uploadPassesPreparedOriginalSizeToRenderer() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }

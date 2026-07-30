@@ -73,15 +73,19 @@ class PrintImageEditorScreenModel(
 
     private var cachedPng: ByteArray? = null
     private var cachedFileName: String? = null
-    private var previewReleased = false
+    private val previewReleaseController = PreviewBitmapReleaseController(
+        bitmap = prepared.preview,
+        releaseBitmap = releasePreview,
+    )
 
     override fun onDispose() {
         sessionStore.discard(sessionId)
-        if (!previewReleased) {
-            previewReleased = true
-            releasePreview(_state.value.prepared.preview)
-        }
+        previewReleaseController.dispose()
     }
+
+    fun acquirePreviewDisplayLease() = previewReleaseController.acquireDisplayLease()
+
+    fun releasePreviewDisplayLease() = previewReleaseController.releaseDisplayLease()
 
     fun panAndZoom(
         viewport: ImageSize,

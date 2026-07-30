@@ -496,6 +496,11 @@ private fun expectedGradientAtOutput(
     val translatedY = outputY + 0.5 - transform.translateY
     val sourceX = (transform.scaleY * translatedX - transform.skewX * translatedY) / determinant
     val sourceY = (-transform.skewY * translatedX + transform.scaleX * translatedY) / determinant
+    if (sourceX < 0.0 || sourceX >= request.originalSize.width ||
+        sourceY < 0.0 || sourceY >= request.originalSize.height
+    ) {
+        return Color.TRANSPARENT
+    }
     return gradientColor(sourceX - 0.5, sourceY - 0.5, request.originalSize)
 }
 
