@@ -1,10 +1,32 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
+import kotlin.math.max
 import kotlin.math.min
 
 class CropTransformCalculator(
-    private val maxZoom: Float = 3f,
+    private val maxCoverZoomMultiplier: Float = 3f,
 ) {
+    fun zoomLimits(
+        source: ImageSize,
+        viewport: ImageSize,
+        quarterTurns: Int,
+    ): CropZoomLimits {
+        require(source.width > 0 && source.height > 0) { "Source dimensions must be positive" }
+        require(viewport.width > 0 && viewport.height > 0) { "Viewport dimensions must be positive" }
+
+        val turns = normalizeTurns(quarterTurns)
+        val rotatedWidth = if (turns % 2 == 0) source.width.toFloat() else source.height.toFloat()
+        val rotatedHeight = if (turns % 2 == 0) source.height.toFloat() else source.width.toFloat()
+        val widthScale = viewport.width / rotatedWidth
+        val heightScale = viewport.height / rotatedHeight
+        val coverZoom = max(widthScale, heightScale) / min(widthScale, heightScale)
+        return CropZoomLimits(
+            minimum = 1f,
+            cover = coverZoom,
+            maximum = coverZoom * maxCoverZoomMultiplier,
+        )
+    }
+
     fun geometry(
         source: ImageSize,
         viewport: ImageSize,
@@ -20,7 +42,8 @@ class CropTransformCalculator(
             viewport.width / rotatedWidth,
             viewport.height / rotatedHeight,
         )
-        val zoom = transform.zoom.coerceIn(1f, maxZoom)
+        val zoomLimits = zoomLimits(source, viewport, turns)
+        val zoom = transform.zoom.coerceIn(zoomLimits.minimum, zoomLimits.maximum)
         val imageWidth = rotatedWidth * fitScale * zoom
         val imageHeight = rotatedHeight * fitScale * zoom
         val maxTranslationX = ((imageWidth - viewport.width) / 2f).coerceAtLeast(0f)
@@ -52,7 +75,7 @@ class CropTransformCalculator(
         transform = current.copy(
             centerOffsetX = current.centerOffsetX + panX / viewport.width,
             centerOffsetY = current.centerOffsetY + panY / viewport.height,
-            zoom = (current.zoom * zoomChange).coerceIn(1f, maxZoom),
+            zoom = current.zoom * zoomChange,
             quarterTurns = normalizeTurns(current.quarterTurns),
         ),
     )
@@ -82,13 +105,22 @@ class CropTransformCalculator(
         transform: CropTransform,
     ): CropTransform {
         val geometry = geometry(source, viewport, transform)
+        val zoomLimits = zoomLimits(source, viewport, transform.quarterTurns)
         return transform.copy(
             centerOffsetX = geometry.translationX / viewport.width,
             centerOffsetY = geometry.translationY / viewport.height,
-            zoom = transform.zoom.coerceIn(1f, maxZoom),
+            zoom = transform.zoom.coerceIn(zoomLimits.minimum, zoomLimits.maximum),
             quarterTurns = normalizeTurns(transform.quarterTurns),
         )
     }
 
     private fun normalizeTurns(turns: Int): Int = ((turns % 4) + 4) % 4
+}
+
+data class CropZoomLimits(
+    val minimum: Float,
+    val cover: Float,
+    val maximum: Float,
+) {
+    val valueRange: ClosedFloatingPointRange<Float> get() = minimum..maximum
 }

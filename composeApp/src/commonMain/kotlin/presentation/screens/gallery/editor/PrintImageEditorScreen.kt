@@ -277,6 +277,15 @@ private fun PrintEditorContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    val zoomRange = if (viewport.isValid()) {
+                        calculator.zoomLimits(
+                            source = state.prepared.originalSize,
+                            viewport = viewport,
+                            quarterTurns = state.transform.quarterTurns,
+                        ).valueRange
+                    } else {
+                        1f..3f
+                    }
                     Text(
                         text = locale.printEditorZoom,
                         style = MaterialTheme.typography.labelLarge,
@@ -288,7 +297,7 @@ private fun PrintEditorContent(
                         },
                         modifier = Modifier.weight(1f),
                         enabled = !state.isBusy && viewport.isValid(),
-                        valueRange = 1f..3f,
+                        valueRange = zoomRange,
                     )
                 }
 
