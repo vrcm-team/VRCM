@@ -9,9 +9,17 @@ data class NotificationItemData(
     val message: String,
     val createdAt: String,
     val senderUserId: String,
+    val link: String?,
     val type: String,
     val actions: List<ActionData>
 ) {
+    /** The VRChat user targeted by a `user:usr_...` notification link. */
+    val linkedUserId: String?
+        get() = link
+            ?.takeIf { it.startsWith("user:") }
+            ?.removePrefix("user:")
+            ?.takeIf { it.isNotBlank() }
+
     data class ActionData(
         val data: String,
         val type: String
@@ -24,6 +32,7 @@ data class NotificationItemData(
         message = n.message,
         createdAt = n.createdAt,
         senderUserId = n.senderUserId.orEmpty(),
+        link = n.link,
         type = n.type,
         actions = n.responses.map { responses ->
             ActionData(

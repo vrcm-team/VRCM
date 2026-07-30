@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
@@ -77,6 +78,7 @@ class HomeScreenModel(
                                 message = user.displayName,
                                 createdAt = data.createdAt,
                                 senderUserId = data.senderUserId,
+                                link = "user:${data.senderUserId}",
                                 type = data.type.value,
                                 actions = listOf(
                                     NotificationItemData.ActionData(
@@ -100,12 +102,38 @@ class HomeScreenModel(
                 .onHomeFailure()
                 .onSuccess {
                     _notifications.value = it.map { data ->
-                        NotificationItemData(data)
+                        val notification = NotificationItemData(data)
+                        val targetUserId = notification.linkedUserId
+                        if (data.type == "boop" && targetUserId != null) {
+                            runCatching { usersApi.fetchUser(targetUserId) }
+                                .getOrNull()
+                                ?.let { user ->
+                                    notification.copy(
+                                        imageUrl = user.profileImageUrl,
+                                        title = notification.title ?: user.displayName,
+                                    )
+                                }
+                                ?: notification
+                        } else {
+                            notification
+                        }
                     }
                 }
         }
 
-    fun responseAllNotification(id: String, type: String, action: NotificationItemData.ActionData) {
+    fun responseAllNotification(
+        item: NotificationItemData,
+        action: NotificationItemData.ActionData,
+        boopSuccessMessage: String,
+        boopAlreadySentMessage: String,
+    ) {
+        if (item.type == "boop" && action.type.equals("reply", ignoreCase = true)) {
+            item.linkedUserId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
+            return
+        }
+
+        val id = item.id
+        val type = item.type
         if (type == NotificationType.FriendRequest.value) {
             responseFriendRequest(id, action)
         } else {
@@ -123,6 +151,22 @@ class HomeScreenModel(
 
     private fun responseNotification(id: String, response: NotificationItemData.ActionData) = notificationAction {
         notificationApi.responseNotification(id, response)
+    }
+
+    private fun boopUser(userId: String, successMessage: String, alreadySentMessage: String) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching { usersApi.boop(userId) }
+                .onSuccess {
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                }
+                .onFailure { error ->
+                    if (error is VRCApiException && error.code == 429) {
+                        SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
+                    } else {
+                        Result.failure<Unit>(error).onHomeFailure()
+                    }
+                }
+        }
     }
 
 

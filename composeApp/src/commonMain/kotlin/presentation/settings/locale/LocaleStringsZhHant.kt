@@ -245,6 +245,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val userMutualGroups = "共同群組"
     override val profileBoop = "戳一下"
     override val profileBoopSuccess = "已戳一下"
+    override val profileBoopAlreadySent = "已經戳過了"
     override val profileInviteToMyInstance = "邀請來我的房間"
     override val profileInviteSent = "邀請已發送"
     override val profileInviteNotInInstance = "你當前不在任何房間中"
