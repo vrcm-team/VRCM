@@ -39,6 +39,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -104,6 +105,10 @@ class PrintImageEditorScreen(
 
         val screenModel: PrintImageEditorScreenModel = koinScreenModel {
             parametersOf(sessionId)
+        }
+        DisposableEffect(screenModel) {
+            screenModel.acquirePreviewDisplayLease()
+            onDispose(screenModel::releasePreviewDisplayLease)
         }
         val state by screenModel.state.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
@@ -221,7 +226,7 @@ private fun PrintEditorContent(
                     .width(cropWidth)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color.Black),
+                    .background(Color.White),
             ) {
                 PrintCropPreview(
                     state = state,
@@ -271,6 +276,15 @@ private fun PrintEditorContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    val zoomRange = if (viewport.isValid()) {
+                        calculator.zoomLimits(
+                            source = state.prepared.originalSize,
+                            viewport = viewport,
+                            quarterTurns = state.transform.quarterTurns,
+                        ).valueRange
+                    } else {
+                        1f..3f
+                    }
                     Text(
                         text = locale.printEditorZoom,
                         style = MaterialTheme.typography.labelLarge,
@@ -282,7 +296,7 @@ private fun PrintEditorContent(
                         },
                         modifier = Modifier.weight(1f),
                         enabled = !state.isBusy && viewport.isValid(),
-                        valueRange = 1f..3f,
+                        valueRange = zoomRange,
                     )
                 }
 

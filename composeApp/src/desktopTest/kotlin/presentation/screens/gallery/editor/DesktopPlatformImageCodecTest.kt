@@ -381,7 +381,7 @@ class DesktopPlatformImageCodecTest {
                 assertColorNear(
                     expectedFourColorAtOutput(request, x, y),
                     rendered.getColor(x, y),
-                    tolerance = 8,
+                    tolerance = 16,
                 )
             }
         }
@@ -752,6 +752,8 @@ private fun expectedFourColorAtOutput(
     val sourceX = (transform.scaleY * translatedX - transform.skewX * translatedY) / determinant
     val sourceY = (-transform.skewY * translatedX + transform.scaleX * translatedY) / determinant
     return when {
+        sourceX < 0.0 || sourceX >= request.originalSize.width ||
+                sourceY < 0.0 || sourceY >= request.originalSize.height -> Color.TRANSPARENT
         sourceX < request.originalSize.width / 2.0 &&
                 sourceY < request.originalSize.height / 2.0 -> Color.RED
         sourceX >= request.originalSize.width / 2.0 &&

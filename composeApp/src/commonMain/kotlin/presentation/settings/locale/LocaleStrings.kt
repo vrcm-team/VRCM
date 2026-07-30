@@ -257,6 +257,7 @@ sealed class LocaleStrings {
     open val userMutualGroups: String = "Mutual Groups"
     open val profileBoop: String = "Boop"
     open val profileBoopSuccess: String = "Boop sent"
+    open val profileBoopAlreadySent: String = "Already booped"
     open val profileInviteToMyInstance: String = "Invite to My Instance"
     open val profileInviteSent: String = "Invite sent"
     open val profileInviteNotInInstance: String = "You are not in an instance"

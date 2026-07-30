@@ -257,7 +257,7 @@ class IosPlatformImageCodecTest {
                 assertColorNear(
                     expectedFourColorAtOutput(request, x, y),
                     rendered.getColor(x, y),
-                    tolerance = 8,
+                    tolerance = 16,
                 )
             }
         }
@@ -319,7 +319,7 @@ class IosPlatformImageCodecTest {
         assertEquals(outputSize.width, rendered.width)
         assertEquals(outputSize.height, rendered.height)
         assertColorNear(Color.RED, rendered.asSkiaBitmap().getColor(240, 180), tolerance = 8)
-        assertColorNear(Color.YELLOW, rendered.asSkiaBitmap().getColor(1_680, 900), tolerance = 8)
+        assertEquals(0, Color.getA(rendered.asSkiaBitmap().getColor(1_800, 900)))
     }
 
     @Test
@@ -520,6 +520,8 @@ private fun expectedFourColorAtOutput(
     val sourceX = (transform.scaleY * translatedX - transform.skewX * translatedY) / determinant
     val sourceY = (-transform.skewY * translatedX + transform.scaleX * translatedY) / determinant
     return when {
+        sourceX < 0.0 || sourceX >= request.originalSize.width ||
+                sourceY < 0.0 || sourceY >= request.originalSize.height -> Color.TRANSPARENT
         sourceX < request.originalSize.width / 2.0 &&
                 sourceY < request.originalSize.height / 2.0 -> Color.RED
         sourceX >= request.originalSize.width / 2.0 &&

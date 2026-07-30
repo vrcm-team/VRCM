@@ -245,6 +245,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val userMutualGroups = "共通グループ"
     override val profileBoop = "Boop"
     override val profileBoopSuccess = "Boopを送信しました"
+    override val profileBoopAlreadySent = "すでにBoopを送信しています"
     override val profileInviteToMyInstance = "自分のインスタンスに招待"
     override val profileInviteSent = "招待を送信しました"
     override val profileInviteNotInInstance = "現在インスタンスに参加していません"

@@ -52,8 +52,15 @@ object NotificationDialog : SharedDialog {
                     .sortedByDescending { it.createdAt }
             }
         }
-        val onResponseNotification: (String, String, NotificationItemData.ActionData) -> Unit = { id, type, response ->
-            homeScreenModel.responseAllNotification(id, type, response)
+        val boopSuccessMessage = strings.profileBoopSuccess
+        val boopAlreadySentMessage = strings.profileBoopAlreadySent
+        val onResponseNotification: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, response ->
+            homeScreenModel.responseAllNotification(
+                item = item,
+                action = response,
+                boopSuccessMessage = boopSuccessMessage,
+                boopAlreadySentMessage = boopAlreadySentMessage,
+            )
         }
 
         AnimatedContent(
@@ -93,11 +100,13 @@ object NotificationDialog : SharedDialog {
 @Composable
 private fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
-    onResponse: (String, String, NotificationItemData.ActionData) -> Unit,
+    onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
 ) {
     var isExpand by remember { mutableStateOf(false) }
-    var responded by remember { mutableStateOf(false) }
+    var respondedAction by remember { mutableStateOf<NotificationItemData.ActionData?>(null) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
+    val senderId = item.senderId.orEmpty()
+    val linkedUserId = item.linkedUserId.orEmpty()
     val contentText = if (isFriendRequest) "${item.message} ${strings.notificationFriendRequest}" else item.message
     val navigator = LocalNavigator.currentOrThrow
     Box(
@@ -115,15 +124,15 @@ private fun LazyItemScope.NotificationItem(
             ) {
                 AImage(
                     modifier = Modifier
-                        .enableIf(isFriendRequest) {
+                        .enableIf(senderId.isNotEmpty()) {
                             this.clickable {
                                 navigator push UserProfileScreen(
                                     userProfileVO = UserProfileVo(
-                                        id = item.senderUserId,
+                                        id = senderId,
                                         profileImageUrl = item.imageUrl
                                     )
                                 )
-                            }.sharedBoundsBy("${item.senderUserId}UserIcon")
+                            }.sharedBoundsBy("${senderId}UserIcon")
                         }
                         .size(120.dp, 80.dp)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.medium)
@@ -173,13 +182,22 @@ private fun LazyItemScope.NotificationItem(
                 item.actions.forEach { action ->
                     FilledTonalButton(
                         modifier = Modifier.animateContentSize(),
-                        enabled = !responded,
+                        enabled = respondedAction != action,
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         ),
                         onClick = {
-                            responded = true
-                            onResponse(item.id, item.type, action)
+                            if (action.type.equals("link", ignoreCase = true) && linkedUserId.isNotEmpty()) {
+                                navigator push UserProfileScreen(
+                                    userProfileVO = UserProfileVo(
+                                        id = linkedUserId,
+                                        profileImageUrl = item.imageUrl
+                                    )
+                                )
+                            } else {
+                                respondedAction = action
+                                onResponse(item, action)
+                            }
                         }
                     ) {
                         Text(

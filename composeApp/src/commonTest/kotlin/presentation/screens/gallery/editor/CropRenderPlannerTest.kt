@@ -12,7 +12,7 @@ class CropRenderPlannerTest {
     private val planner = CropRenderPlanner(calculator)
 
     @Test
-    fun resetLandscapeCropMapsCenterAndVisibleSourceBounds() {
+    fun resetLandscapeFitMapsWholeImageIntoOutputCenter() {
         val plan = planner.plan(
             CropRenderRequest(
                 originalSize = ImageSize(2_400, 1_080),
@@ -22,13 +22,13 @@ class CropRenderPlannerTest {
         )
 
         assertPointEquals(AffinePoint(960.0, 540.0), plan.sourceToOutput.map(1_200.0, 540.0))
-        assertEquals(PixelRect(240, 0, 2_160, 1_080), plan.visibleSourceBounds)
+        assertEquals(PixelRect(0, 0, 2_400, 1_080), plan.visibleSourceBounds)
         assertEquals(ImageSize(1_920, 1_080), plan.outputSize)
     }
 
     @Test
     fun highZoomSelectsOnlySmallSourceRegion() {
-        val source = ImageSize(6_000, 12_000)
+        val source = ImageSize(6_000, 6_000)
         val bounds = planner.plan(
             CropRenderRequest(
                 originalSize = source,
@@ -37,8 +37,8 @@ class CropRenderPlannerTest {
             ),
         ).visibleSourceBounds
 
-        assertTrue(bounds.width <= 2_100)
-        assertTrue(bounds.height <= 1_200)
+        assertTrue(bounds.width <= 3_600)
+        assertTrue(bounds.height <= 2_100)
         assertInsideSource(bounds, source)
     }
 
@@ -104,7 +104,7 @@ class CropRenderPlannerTest {
             ),
             actual = plan.sourceToOutput.map(source.width / 2.0, source.height / 2.0),
         )
-        assertEquals(PixelRect(1_390, 333, 2_329, 2_000), expectedBounds)
+        assertEquals(PixelRect(555, 0, 2_778, 3_000), expectedBounds)
         assertEquals(expectedBounds, plan.visibleSourceBounds)
         assertInsideSource(plan.visibleSourceBounds, source)
     }
@@ -151,8 +151,8 @@ class CropRenderPlannerTest {
             flipVertical = true,
         )
         val geometry = calculator.geometry(source, output, transform)
-        val maxTranslationX = (geometry.imageWidth - output.width) / 2f
-        val maxTranslationY = (geometry.imageHeight - output.height) / 2f
+        val maxTranslationX = ((geometry.imageWidth - output.width) / 2f).coerceAtLeast(0f)
+        val maxTranslationY = ((geometry.imageHeight - output.height) / 2f).coerceAtLeast(0f)
 
         val plan = planner.plan(CropRenderRequest(source, transform, output))
         val expectedBounds = visibleSourceBoundsFromReturnedAffine(
@@ -170,7 +170,7 @@ class CropRenderPlannerTest {
             ),
             actual = plan.sourceToOutput.map(source.width / 2.0, source.height / 2.0),
         )
-        assertEquals(PixelRect(5_100, 0, 6_000, 1_600), expectedBounds)
+        assertEquals(PixelRect(3_599, 0, 6_000, 4_000), expectedBounds)
         assertEquals(expectedBounds, plan.visibleSourceBounds)
         assertInsideSource(plan.visibleSourceBounds, source)
         assertTrue(plan.visibleSourceBounds.width > 0)
@@ -189,13 +189,13 @@ class CropRenderPlannerTest {
             ),
         )
 
-        assertEquals(PixelRect(1_875, 0, 4_125, 4_000), plan.visibleSourceBounds)
+        assertEquals(PixelRect(0, 0, 6_000, 4_000), plan.visibleSourceBounds)
         val exclusiveRightCorner = inverseUsingDouble(
             plan.sourceToOutput,
             AffinePoint(0.0, output.height.toDouble()),
         )
-        assertEquals(4_125.0, exclusiveRightCorner.x, 0.000_001)
-        assertTrue(exclusiveRightCorner.x <= plan.visibleSourceBounds.right)
+        assertEquals(6_000.0, exclusiveRightCorner.x, 0.000_001)
+        assertTrue(exclusiveRightCorner.x <= plan.visibleSourceBounds.right + 0.000_001)
         assertOutputSamplesCoveredByBounds(plan, source, output)
     }
 
