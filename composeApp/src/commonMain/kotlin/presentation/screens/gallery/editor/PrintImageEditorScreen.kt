@@ -39,6 +39,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -104,6 +105,10 @@ class PrintImageEditorScreen(
 
         val screenModel: PrintImageEditorScreenModel = koinScreenModel {
             parametersOf(sessionId)
+        }
+        DisposableEffect(screenModel) {
+            screenModel.acquirePreviewDisplayLease()
+            onDispose(screenModel::releasePreviewDisplayLease)
         }
         val state by screenModel.state.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
@@ -222,7 +227,7 @@ private fun PrintEditorContent(
                     .width(cropWidth)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color.Black),
+                    .background(Color.White),
             ) {
                 PrintCropPreview(
                     state = state,
