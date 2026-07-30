@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -24,6 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
@@ -76,9 +78,7 @@ class FriendService(
     val friendUpdateFlow: SharedFlow<AccountFriendUpdateEvent> = _friendUpdateFlow.asSharedFlow()
 
     init {
-        authService.accountDtoOrNull()?.userId?.takeIf(String::isNotBlank)?.let { userId ->
-            synchronized(friendMapLock) { restoreCachedFriendList(userId) }
-        }
+        SharedFlowCentre.currentSession.value?.let(::activateSession)
         serviceScope.launch {
             collectFriendWebSocketEvents(
                 events = SharedFlowCentre.webSocket,
@@ -91,30 +91,34 @@ class FriendService(
             )
         }
         serviceScope.launch {
-            SharedFlowCentre.authed.collect { session ->
-                val account = session.account
-                synchronized(friendMapLock) {
-                    activeSessionToken = session.token
-                    if (activeAccountUserId != account.userId) {
-                        restoreCachedFriendList(account.userId)
+            SharedFlowCentre.currentSession.collect { session ->
+                if (session == null) {
+                    synchronized(friendMapLock) {
+                        accountTracker.onLogout()
+                        activeAccountUserId = null
+                        activeSessionToken = null
+                        friendStore.clear()
+                        publishFriendState()
                     }
-                    accountTracker.onAuthenticated(account.userId)
+                    preloadTask.cancelAndJoin()
+                } else {
+                    activateSession(session)
                 }
-                preloadFriendList(account.userId)
             }
         }
-        serviceScope.launch {
-            SharedFlowCentre.logout.collect {
-                synchronized(friendMapLock) {
-                    accountTracker.onLogout()
-                    activeAccountUserId = null
-                    activeSessionToken = null
-                    friendStore.clear()
-                    publishFriendState()
-                }
-                preloadTask.cancelAndJoin()
+    }
+
+    private fun activateSession(session: AuthenticatedAccount) {
+        val activated = synchronized(friendMapLock) {
+            if (activeSessionToken == session.token) return@synchronized false
+            activeSessionToken = session.token
+            if (activeAccountUserId != session.account.userId) {
+                restoreCachedFriendList(session.account.userId)
             }
+            accountTracker.onAuthenticated(session.account.userId)
+            true
         }
+        if (activated) preloadFriendList(session.account.userId)
     }
 
     private suspend fun handleWebSocketEvent(accountEvent: AccountWebSocketEvent) {
@@ -340,6 +344,10 @@ class FriendService(
     }
 
     private fun preloadFriendList(userId: String) = preloadTask.start(userId)
+
+    internal fun dispose() {
+        serviceScope.cancel()
+    }
 
     suspend fun sendFriendRequest(userId: String) =
         authService.reTryAuthCatching { friendsApi.sendFriendRequest(userId) }

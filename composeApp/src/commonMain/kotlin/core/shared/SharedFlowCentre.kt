@@ -4,8 +4,11 @@ import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class AccountSessionToken(
     val userId: String,
@@ -25,26 +28,27 @@ data class AccountWebSocketEvent(
 internal class AuthenticationSessionRegistry {
     private val lock = Any()
     private var generation = 0L
-    private var currentToken: AccountSessionToken? = null
+    private val _currentSession = MutableStateFlow<AuthenticatedAccount?>(null)
+    val currentSession: StateFlow<AuthenticatedAccount?> = _currentSession.asStateFlow()
 
     fun authenticate(account: AccountDto): AuthenticatedAccount = synchronized(lock) {
         val token = AccountSessionToken(account.userId, ++generation)
-        currentToken = token
-        AuthenticatedAccount(account, token)
+        AuthenticatedAccount(account, token).also { _currentSession.value = it }
     }
 
     fun invalidate() = synchronized(lock) {
         generation++
-        currentToken = null
+        _currentSession.value = null
     }
 
     fun isCurrent(token: AccountSessionToken): Boolean = synchronized(lock) {
-        currentToken == token
+        _currentSession.value?.token == token
     }
 }
 
 object SharedFlowCentre {
     private val sessionRegistry = AuthenticationSessionRegistry()
+    val currentSession: StateFlow<AuthenticatedAccount?> = sessionRegistry.currentSession
 
     private val _webSocket = MutableSharedFlow<AccountWebSocketEvent>()
     val webSocket: SharedFlow<AccountWebSocketEvent> = _webSocket.asSharedFlow()

@@ -4,9 +4,22 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AuthenticationSessionRegistryTest {
+    @Test
+    fun currentSessionIsReadableAfterAuthenticationAndClearedOnLogout() {
+        val registry = AuthenticationSessionRegistry()
+        val session = registry.authenticate(AccountDto(userId = "usr_a"))
+
+        assertEquals(session, registry.currentSession.value)
+
+        registry.invalidate()
+
+        assertNull(registry.currentSession.value)
+    }
+
     @Test
     fun oldConnectionIsRejectedAcrossAccountSwitchAndReturn() {
         val registry = AuthenticationSessionRegistry()

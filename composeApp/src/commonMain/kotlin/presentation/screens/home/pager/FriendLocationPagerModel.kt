@@ -31,8 +31,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-internal class FriendUpdateSessionGate {
-    private var sessionToken: AccountSessionToken? = null
+internal class FriendUpdateSessionGate(
+    initialSessionToken: AccountSessionToken? = null,
+) {
+    private var sessionToken: AccountSessionToken? = initialSessionToken
 
     fun activate(token: AccountSessionToken) {
         sessionToken = token
@@ -72,15 +74,14 @@ class FriendLocationPagerModel(
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
 ) : ScreenModel {
+    private val initialSession = SharedFlowCentre.currentSession.value
     private val publishedState = FriendLocationPublishedState()
     val friendLocationMap = publishedState.locationMap
     val friendLocationsByUser = publishedState.locationsByUser
 
     private val presenceStore = FriendLocationPresenceStore()
-    private val friendUpdateSessionGate = FriendUpdateSessionGate()
-    private val accountTracker = AccountGenerationTracker(
-        authService.accountDtoOrNull()?.userId?.takeIf(String::isNotBlank)
-    )
+    private val friendUpdateSessionGate = FriendUpdateSessionGate(initialSession?.token)
+    private val accountTracker = AccountGenerationTracker(initialSession?.account?.userId)
     private val updateMutex = Mutex()
     private val refreshMutex = Mutex()
     private val preloadTask = AccountBoundTask(
@@ -102,6 +103,7 @@ class FriendLocationPagerModel(
         private set
 
     init {
+        accountTracker.currentToken()?.let(preloadTask::start)
         screenModelScope.launch {
             friendService.friendState.collect { friends ->
                 if (!hasCompletedInitialRefresh) return@collect
@@ -124,32 +126,30 @@ class FriendLocationPagerModel(
             }
         }
         screenModelScope.launch {
-            SharedFlowCentre.authed.collect { session ->
-                val account = session.account
-                val activation = accountTracker.activate(account.userId)
-                updateMutex.withLock {
-                    friendUpdateSessionGate.activate(session.token)
-                    if (activation.changed) {
+            SharedFlowCentre.currentSession.collect { session ->
+                if (session == null) {
+                    accountTracker.clear()
+                    updateMutex.withLock {
+                        friendUpdateSessionGate.clear()
                         clearFriendLocations()
                         hasCompletedInitialRefresh = false
                     }
+                    isRefreshing = true
+                    preloadTask.cancelAndJoin()
+                } else {
+                    val activation = accountTracker.activate(session.account.userId)
+                    updateMutex.withLock {
+                        friendUpdateSessionGate.activate(session.token)
+                        if (activation.changed) {
+                            clearFriendLocations()
+                            hasCompletedInitialRefresh = false
+                        }
+                    }
+                    if (!activation.changed) return@collect
+                    isRefreshing = true
+                    preloadTask.cancelAndJoin()
+                    preloadTask.start(activation.token)
                 }
-                if (!activation.changed) return@collect
-                isRefreshing = true
-                preloadTask.cancelAndJoin()
-                preloadTask.start(activation.token)
-            }
-        }
-        screenModelScope.launch {
-            SharedFlowCentre.logout.collect {
-                accountTracker.clear()
-                updateMutex.withLock {
-                    friendUpdateSessionGate.clear()
-                    clearFriendLocations()
-                    hasCompletedInitialRefresh = false
-                }
-                isRefreshing = true
-                preloadTask.cancelAndJoin()
             }
         }
     }
