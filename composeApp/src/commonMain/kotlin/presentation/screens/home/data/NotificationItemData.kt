@@ -9,12 +9,25 @@ data class NotificationItemData(
     val message: String,
     val createdAt: String,
     val senderUserId: String,
+    val link: String?,
     val type: String,
     val actions: List<ActionData>
 ) {
+    /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
+    val senderId: String?
+        get() = senderUserId.trim().takeIf { it.isNotEmpty() }
+
+    /** The VRChat user targeted by a `user:usr_...` notification link. */
+    val linkedUserId: String?
+        get() = link
+            ?.takeIf { it.startsWith("user:") }
+            ?.removePrefix("user:")
+            ?.takeIf { it.isNotBlank() }
+
     data class ActionData(
         val data: String,
-        val type: String
+        val type: String,
+        val icon: String = "",
     )
 
     constructor(n: NotificationData) : this(
@@ -24,13 +37,29 @@ data class NotificationItemData(
         message = n.message,
         createdAt = n.createdAt,
         senderUserId = n.senderUserId.orEmpty(),
+        link = n.link,
         type = n.type,
         actions = n.responses.map { responses ->
             ActionData(
                 data = responses.responseData,
-                type = responses.type
+                type = responses.type,
+                icon = responses.icon,
             )
         }
     )
 
 }
+
+internal enum class NotificationResponseTarget {
+    BOOP_USER_API,
+    NOTIFICATION_API,
+}
+
+internal fun NotificationItemData.responseTarget(
+    action: NotificationItemData.ActionData,
+): NotificationResponseTarget =
+    if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
+        NotificationResponseTarget.BOOP_USER_API
+    } else {
+        NotificationResponseTarget.NOTIFICATION_API
+    }

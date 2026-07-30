@@ -12,9 +12,14 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.BoopNotificationResolver
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPresentation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -32,6 +37,8 @@ class HomeScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
 ) : ScreenModel {
+
+    private val boopNotificationResolver = BoopNotificationResolver()
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
@@ -77,6 +84,7 @@ class HomeScreenModel(
                                 message = user.displayName,
                                 createdAt = data.createdAt,
                                 senderUserId = data.senderUserId,
+                                link = "user:${data.senderUserId}",
                                 type = data.type.value,
                                 actions = listOf(
                                     NotificationItemData.ActionData(
@@ -98,14 +106,43 @@ class HomeScreenModel(
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { notificationApi.fetchNotifications() }
                 .onHomeFailure()
-                .onSuccess {
-                    _notifications.value = it.map { data ->
-                        NotificationItemData(data)
+                .onSuccess { data ->
+                    val friendPresentations = friendService.friendMap.mapValues { (_, friend) ->
+                        NotificationUserPresentation(
+                            imageUrl = friend.profileImageUrl,
+                            displayName = friend.displayName,
+                        )
+                    }
+                    _notifications.value = boopNotificationResolver.resolve(
+                        notifications = data.map(::NotificationItemData),
+                        friends = friendPresentations,
+                    ) { userId ->
+                        usersApi.fetchUser(userId).let { user ->
+                            NotificationUserPresentation(
+                                imageUrl = user.profileImageUrl,
+                                displayName = user.displayName,
+                            )
+                        }
                     }
                 }
         }
 
-    fun responseAllNotification(id: String, type: String, action: NotificationItemData.ActionData) {
+    fun responseAllNotification(
+        item: NotificationItemData,
+        action: NotificationItemData.ActionData,
+        boopSuccessMessage: String,
+        boopAlreadySentMessage: String,
+    ) {
+        when (item.responseTarget(action)) {
+            NotificationResponseTarget.BOOP_USER_API -> {
+                item.senderId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
+                return
+            }
+            NotificationResponseTarget.NOTIFICATION_API -> Unit
+        }
+
+        val id = item.id
+        val type = item.type
         if (type == NotificationType.FriendRequest.value) {
             responseFriendRequest(id, action)
         } else {
@@ -123,6 +160,22 @@ class HomeScreenModel(
 
     private fun responseNotification(id: String, response: NotificationItemData.ActionData) = notificationAction {
         notificationApi.responseNotification(id, response)
+    }
+
+    private fun boopUser(userId: String, successMessage: String, alreadySentMessage: String) {
+        screenModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching { usersApi.boop(userId) }
+                .onSuccess {
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                }
+                .onFailure { error ->
+                    if (error is VRCApiException && error.code == 429) {
+                        SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
+                    } else {
+                        Result.failure<Unit>(error).onHomeFailure()
+                    }
+                }
+        }
     }
 
 
@@ -181,8 +234,6 @@ class HomeScreenModel(
 
 
 }
-
-
 
 
 
