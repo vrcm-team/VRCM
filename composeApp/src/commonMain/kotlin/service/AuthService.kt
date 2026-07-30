@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ class AuthService(
     private val authApi: AuthApi,
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
+    private val accountCacheManager: AccountCacheManager,
 ) {
     private var scope = CoroutineScope(Job())
 
@@ -37,7 +39,8 @@ class AuthService(
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect { accountDto ->
+            SharedFlowCentre.authed.collect { session ->
+                val accountDto = session.account
                 currentAccountDto = accountDto
                 accountDao.saveAccountInfo(accountDto)
             }
@@ -109,7 +112,7 @@ class AuthService(
                 authCookie = authCookie,
                 twoFactorAuthCookie = twoFactorAuthCookie
             )
-            SharedFlowCentre.authed.emit(accountDto)
+            SharedFlowCentre.emitAuthenticated(accountDto)
         }
     }
 
@@ -156,11 +159,12 @@ class AuthService(
         cookiesStorage.removeCookie(AUTH_COOKIE)
         accountDao.logout(currentUser?.id ?: accountDto().userId)
         scope.launch {
-            SharedFlowCentre.logout.emit(Unit)
+            SharedFlowCentre.emitLogout()
         }
     }
 
     fun removeAccount(userId: String) = runCatching {
+        accountCacheManager.clearAccount(userId)
         accountDao.removeAccount(userId)
     }
 

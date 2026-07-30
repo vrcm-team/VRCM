@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.network.websocket
 
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_WSS_URL
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
@@ -24,9 +26,9 @@ class WebSocketApi(
 
     init {
         scope.launch {
-            SharedFlowCentre.authed.collect {
+            SharedFlowCentre.authed.collect { session ->
                 currentJob?.cancelAndJoin()
-                currentJob = launch { startWebSocket() }
+                currentJob = launch { startWebSocket(session.token) }
             }
         }
         scope.launch {
@@ -37,7 +39,7 @@ class WebSocketApi(
         }
     }
 
-    suspend fun startWebSocket() {
+    private suspend fun startWebSocket(sessionToken: AccountSessionToken) {
         retryWebSocketConnection(onFailure = ::reportConnectionFailure) {
             val authResponse = apiClient.get(AUTH_API_PREFIX)
             check(authResponse.status == HttpStatusCode.OK) {
@@ -53,7 +55,9 @@ class WebSocketApi(
                 }) {
                 while (true) {
                     val othersMessage = receiveDeserialized<WebSocketEvent>()
-                    SharedFlowCentre.webSocket.emit(othersMessage)
+                    SharedFlowCentre.emitWebSocket(
+                        AccountWebSocketEvent(sessionToken, othersMessage)
+                    )
                 }
             }
         }

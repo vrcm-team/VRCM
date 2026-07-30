@@ -82,7 +82,8 @@ class SearchListPagerModel(
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
         screenModelScope.launch {
-            SharedFlowCentre.authed.collect { account ->
+            SharedFlowCentre.authed.collect { session ->
+                val account = session.account
                 val accountChanged = authenticatedUserId != account.userId
                 authenticatedUserId = account.userId
                 if (accountChanged) {

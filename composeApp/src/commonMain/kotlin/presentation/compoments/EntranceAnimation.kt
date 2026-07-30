@@ -26,6 +26,9 @@ fun entranceFadeSpec(index: Int = 0): FiniteAnimationSpec<Float> = tween(
 @Composable
 fun <T> rememberStaggeredReveal(items: List<T>): List<T> {
     val shown = remember { mutableStateListOf<T>() }
-    LaunchedEffect(items) { shown.addAll(items)  }
+    LaunchedEffect(items) {
+        shown.clear()
+        shown.addAll(items)
+    }
     return shown
 }

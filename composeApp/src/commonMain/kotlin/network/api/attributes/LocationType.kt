@@ -2,6 +2,11 @@ package io.github.vrcmteam.vrcm.network.api.attributes
 
 enum class LocationType(val value: String) {
     /**
+     * Synthetic grouping key for friends active on the website.
+     */
+    Web("web"),
+
+    /**
      * Friends Active on the Website
      */
     Offline("offline"),

@@ -96,6 +96,13 @@ internal class FriendStateStore {
         lastEventVersionById.clear()
     }
 
+    fun restore(friends: Collection<FriendData>) {
+        generation++
+        friendsById.clear()
+        friendsById.putAll(friends.associateBy(FriendData::id))
+        lastEventVersionById.clear()
+    }
+
     private fun recordEvent(userId: String) {
         eventVersion++
         lastEventVersionById[userId] = eventVersion

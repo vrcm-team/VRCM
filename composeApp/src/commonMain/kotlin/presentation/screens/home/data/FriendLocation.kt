@@ -18,6 +18,11 @@ data class FriendLocation(
                 location = LocationType.Offline.value,
                 friends = mutableStateMapOf()
             )
+        val Web
+            get() = FriendLocation(
+                location = LocationType.Web.value,
+                friends = mutableStateMapOf()
+            )
         val Private
             get() = FriendLocation(
                 location = LocationType.Private.value,

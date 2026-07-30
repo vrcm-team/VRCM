@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -78,11 +79,11 @@ fun LazyItemScope.renderUserItem(
             )
         },
         trailingContent = {
-            // 离线用户显示最后登录时间
-            val lastLoginStr = user.lastLogin
-            if (user.status != UserStatus.Offline || lastLoginStr.isNullOrEmpty()) return@SearchResultItem
+            // 离线用户显示最后活动时间
+            val lastSeenAt = user.lastSeenAt()
+            if (user.status != UserStatus.Offline || lastSeenAt == null) return@SearchResultItem
             Text(
-                text = lastLoginStr.toLocalDateTime()?.ignoredFormat.orEmpty(),
+                text = lastSeenAt.toLocalDateTime()?.ignoredFormat.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1
             )

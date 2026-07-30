@@ -5,6 +5,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.FRIENDS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
+import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
@@ -55,7 +57,17 @@ class FriendsApi(private val client: HttpClient) {
                 parameter("offline", offline.toString())
                 parameter("offset", currentOffset.toString())
                 parameter("n", n.toString())
-            }.checkSuccess<List<FriendData>>()
+            }.checkSuccess<List<FriendData>>().map { friend ->
+                if (offline) {
+                    friend.copy(
+                        location = LocationType.Offline.value,
+                        status = UserStatus.Offline,
+                        travelingToLocation = "",
+                    )
+                } else {
+                    friend
+                }
+            }
         }
     }
 

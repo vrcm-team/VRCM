@@ -53,7 +53,7 @@ object FriendLocationPager : Pager {
         val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit) {
             // 未clear()的同步刷新一次
-            friendLocationPagerModel.doRefreshFriendLocation(removeNotIncluded = true)
+            friendLocationPagerModel.preloadFriendLocations()
         }
         LaunchedEffect(Unit) {
             SharedFlowCentre.toPagerTop.collect {
@@ -132,7 +132,7 @@ fun Pager.FriendLocationPager(
         isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
-        val offlineFriendLocation = friendLocationMap[LocationType.Offline]?.get(0)
+        val webFriendLocation = friendLocationMap[LocationType.Web]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
         val instanceFriendLocations = friendLocationMap[LocationType.Instance]?.sortedByDescending { it.friendList.size }
         // 如果没有底部系统手势条，默认12dp
@@ -146,18 +146,6 @@ fun Pager.FriendLocationPager(
                 bottom = bottomPadding
             )
         ) {
-
-            SimpleCLocationCard(
-                friendLocation = offlineFriendLocation,
-                locationType = LocationType.Offline,
-                onClickUserIcon = onClickUserIcon,
-            ) { "${strings.fiendLocationPagerWebsite}${offlineFriendLocation?.let { "(${it.friends.size})" }}" }
-
-            SimpleCLocationCard(
-                friendLocation = privateFriendLocation,
-                locationType = LocationType.Private,
-                onClickUserIcon = onClickUserIcon,
-            ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {
@@ -184,6 +172,18 @@ fun Pager.FriendLocationPager(
                     }
                 }
             }
+
+            SimpleCLocationCard(
+                friendLocation = privateFriendLocation,
+                locationType = LocationType.Private,
+                onClickUserIcon = onClickUserIcon,
+            ) { "${strings.fiendLocationPagerPrivate}${privateFriendLocation?.let { "(${it.friends.size})" }}" }
+
+            SimpleCLocationCard(
+                friendLocation = webFriendLocation,
+                locationType = LocationType.Web,
+                onClickUserIcon = onClickUserIcon,
+            ) { "${strings.fiendLocationPagerWebsite}${webFriendLocation?.let { "(${it.friends.size})" }}" }
 
         }
     }

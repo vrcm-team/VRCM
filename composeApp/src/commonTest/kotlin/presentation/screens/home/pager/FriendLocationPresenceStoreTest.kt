@@ -1,14 +1,64 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
+import io.github.vrcmteam.vrcm.service.AccountFriendUpdateEvent
 import io.github.vrcmteam.vrcm.service.FriendUpdateEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FriendLocationPresenceStoreTest {
+    @Test
+    fun queuedUpdateFromPreviousSessionIsRejectedAfterAccountSwitch() {
+        val store = FriendLocationPresenceStore()
+        val publishedState = FriendLocationPublishedState()
+        val gate = FriendUpdateSessionGate()
+        val firstSession = AccountSessionToken("usr_account_a", 1)
+        val secondSession = AccountSessionToken("usr_account_b", 2)
+        gate.activate(firstSession)
+        val oldFriend = friend("usr_a", "wrld_old:1")
+        publishedState.locationMap[LocationType.Instance] = mutableStateListOf(
+            FriendLocation(
+                location = oldFriend.location,
+                friends = mutableStateMapOf(oldFriend.id to mutableStateOf(oldFriend)),
+            )
+        )
+        publishedState.publishIndex()
+        val delayedUpdate = AccountFriendUpdateEvent(
+            sessionToken = firstSession,
+            event = FriendUpdateEvent.LocationChanged(oldFriend),
+        )
+
+        gate.activate(secondSession)
+        store.clear()
+        publishedState.clear()
+        if (gate.accepts(delayedUpdate.sessionToken)) {
+            store.apply(delayedUpdate.event)
+            publishedState.locationMap[LocationType.Instance] = mutableStateListOf(
+                FriendLocation(
+                    location = oldFriend.location,
+                    friends = mutableStateMapOf(oldFriend.id to mutableStateOf(oldFriend)),
+                )
+            )
+            publishedState.publishIndex()
+        }
+
+        val snapshot = store.snapshot()
+        assertTrue(snapshot.offline.isEmpty())
+        assertTrue(snapshot.web.isEmpty())
+        assertTrue(snapshot.private.isEmpty())
+        assertTrue(snapshot.instances.isEmpty())
+        assertTrue(publishedState.locationMap.isEmpty())
+        assertTrue(publishedState.locationsByUser.value.isEmpty())
+    }
+
     @Test
     fun pagesAndIncrementalUpdatesPreserveOtherFriendsInTheRoom() {
         val store = FriendLocationPresenceStore()

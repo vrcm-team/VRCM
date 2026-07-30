@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.service.FriendUpdateEvent
 
@@ -11,6 +12,7 @@ internal data class FriendLocationGroup(
 
 internal data class FriendLocationSnapshot(
     val offline: List<FriendData>,
+    val web: List<FriendData>,
     val private: List<FriendData>,
     val instances: Map<String, FriendLocationGroup>,
 )
@@ -41,6 +43,12 @@ internal class FriendLocationPresenceStore {
     fun addPage(friends: Collection<FriendData>) {
         friends.filterNot { refreshInProgress && it.id in refreshOverrides }
             .associateByTo(friendsById, FriendData::id)
+    }
+
+    fun replaceFriends(friends: Collection<FriendData>) {
+        friendsById.clear()
+        friendsById.putAll(friends.associateBy(FriendData::id))
+        activeFriendIds.retainAll(friendsById.keys)
     }
 
     fun beginRefresh() {
@@ -139,8 +147,10 @@ internal class FriendLocationPresenceStore {
                 travelingIds = friends.mapTo(mutableSetOf(), FriendData::id).intersect(travelingIds),
             )
         }
+        val offlineOrWebFriends = byType[LocationType.Offline].orEmpty()
         return FriendLocationSnapshot(
-            offline = byType[LocationType.Offline].orEmpty(),
+            offline = offlineOrWebFriends.filter { it.status == UserStatus.Offline },
+            web = offlineOrWebFriends.filter { it.status != UserStatus.Offline },
             private = byType[LocationType.Private].orEmpty(),
             instances = instances,
         )
