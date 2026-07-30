@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
@@ -23,7 +25,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
-import io.github.vrcmteam.vrcm.presentation.extensions.slideBack
 import io.github.vrcmteam.vrcm.presentation.navigation.BackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -37,6 +38,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import org.koin.compose.KoinContext
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun App() {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
@@ -44,8 +46,13 @@ fun App() {
         SettingsProvider {
             Navigator(
                 screen = StartupAnimeScreen,
-            ) {
+            ) { navigator ->
                 CompositionLocalProvider(LocalBackNavigationPolicy provides backNavigationPolicy) {
+                    BackHandler(enabled = navigator.canPop) {
+                        if (backNavigationPolicy.isBackNavigationEnabled) {
+                            navigator.pop()
+                        }
+                    }
                     SnackBarToastBox(
                         Modifier
                             .systemBarsPadding()
@@ -53,11 +60,8 @@ fun App() {
                     ) {
                         VersionDialog()
                         SharedTransitionScreen(
-                            navigator = it,
-                            modifier = Modifier.slideBack(
-                                enabled = backNavigationPolicy.isSlideBackEnabled,
-                            ),
-                            transitionSpec = { selectTransition(it) }
+                            navigator = navigator,
+                            transitionSpec = { selectTransition(navigator) }
                         ) { screen ->
                             SharedTransitionDialog(key = screen.key) {
                                 screen.Content()

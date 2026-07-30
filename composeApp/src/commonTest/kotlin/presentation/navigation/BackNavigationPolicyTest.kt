@@ -6,22 +6,22 @@ import kotlin.test.assertTrue
 
 class BackNavigationPolicyTest {
     @Test
-    fun slideBackRemainsDisabledUntilEveryBlockerIsReleased() {
+    fun backNavigationRemainsDisabledUntilEveryBlockerIsReleased() {
         val policy = BackNavigationPolicy()
         val firstBlocker = Any()
         val secondBlocker = Any()
 
-        assertTrue(policy.isSlideBackEnabled)
+        assertTrue(policy.isBackNavigationEnabled)
 
         policy.setBlocked(firstBlocker, blocked = true)
         policy.setBlocked(secondBlocker, blocked = true)
-        assertFalse(policy.isSlideBackEnabled)
+        assertFalse(policy.isBackNavigationEnabled)
 
         policy.setBlocked(firstBlocker, blocked = false)
-        assertFalse(policy.isSlideBackEnabled)
+        assertFalse(policy.isBackNavigationEnabled)
 
         policy.setBlocked(secondBlocker, blocked = false)
-        assertTrue(policy.isSlideBackEnabled)
+        assertTrue(policy.isBackNavigationEnabled)
     }
 
     @Test
@@ -33,6 +33,6 @@ class BackNavigationPolicyTest {
         policy.setBlocked(blocker, blocked = true)
         policy.setBlocked(blocker, blocked = false)
 
-        assertTrue(policy.isSlideBackEnabled)
+        assertTrue(policy.isBackNavigationEnabled)
     }
 }

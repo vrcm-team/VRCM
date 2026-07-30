@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.service
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -13,7 +15,7 @@ internal class AccountBoundTask<T>(
     private val isCurrent: (T) -> Boolean,
     private val runTask: suspend (T) -> Unit,
 ) {
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private var token: T? = null
     private var job: Job? = null
 

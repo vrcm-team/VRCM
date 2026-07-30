@@ -72,10 +72,12 @@ kotlin {
 
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.atomicfu)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)
+            implementation(libs.compose.ui.backhandler)
 //            implementation(compose.material)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)

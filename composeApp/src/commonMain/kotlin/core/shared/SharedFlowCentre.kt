@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.core.shared
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -26,7 +28,7 @@ data class AccountWebSocketEvent(
 )
 
 internal class AuthenticationSessionRegistry {
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private var generation = 0L
     private val _currentSession = MutableStateFlow<AuthenticatedAccount?>(null)
     val currentSession: StateFlow<AuthenticatedAccount?> = _currentSession.asStateFlow()

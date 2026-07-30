@@ -13,7 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 internal class BackNavigationPolicy {
     private val blockers = mutableSetOf<Any>()
 
-    var isSlideBackEnabled by mutableStateOf(true)
+    var isBackNavigationEnabled by mutableStateOf(true)
         private set
 
     fun setBlocked(blocker: Any, blocked: Boolean) {
@@ -22,7 +22,7 @@ internal class BackNavigationPolicy {
         } else {
             blockers -= blocker
         }
-        isSlideBackEnabled = blockers.isEmpty()
+        isBackNavigationEnabled = blockers.isEmpty()
     }
 }
 
@@ -31,7 +31,7 @@ internal val LocalBackNavigationPolicy = staticCompositionLocalOf<BackNavigation
 }
 
 @Composable
-internal fun BlockSlideBackNavigation(blocked: Boolean) {
+internal fun BlockBackNavigation(blocked: Boolean) {
     val policy = LocalBackNavigationPolicy.current
     val blocker = remember { Any() }
 

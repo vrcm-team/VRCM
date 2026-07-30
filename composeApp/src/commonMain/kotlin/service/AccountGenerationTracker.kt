@@ -1,5 +1,8 @@
 package io.github.vrcmteam.vrcm.service
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+
 internal data class AccountGenerationToken(
     val userId: String,
     val generation: Long,
@@ -11,7 +14,7 @@ internal data class AccountActivation(
 )
 
 internal class AccountGenerationTracker(initialUserId: String? = null) {
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private var userId = initialUserId
     private var generation = if (initialUserId == null) 0L else 1L
 

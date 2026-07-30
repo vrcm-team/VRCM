@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.service
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -8,7 +10,7 @@ internal class ConflatedAccountCacheWriter<T>(
     scope: CoroutineScope,
     private val save: suspend (accountUserId: String, value: T) -> Unit,
 ) {
-    private val lock = Any()
+    private val lock = SynchronizedObject()
     private val pendingByAccount = mutableMapOf<String, T>()
     private val signal = Channel<Unit>(Channel.CONFLATED)
 
