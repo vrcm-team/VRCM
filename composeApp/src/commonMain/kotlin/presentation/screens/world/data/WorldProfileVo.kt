@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
-import androidx.compose.runtime.mutableStateListOf
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformFileSize
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -36,7 +35,7 @@ data class WorldProfileVo(
     val publicationDate: String? = null,
     val labsPublicationDate: String? = null,
     // 实例信息列表
-    val instances: List<InstanceVo> = mutableStateListOf(),
+    val instances: List<InstanceVo> = emptyList(),
 
     // 平台文件大小信息
     val platformFileSizes: List<PlatformFileSize> = emptyList(),
@@ -47,7 +46,7 @@ data class WorldProfileVo(
     // 从WorldData构造，不包含实例信息
     constructor(
         world: WorldData, 
-        instancesList: List<InstanceVo> = mutableStateListOf(),
+        instancesList: List<InstanceVo> = emptyList(),
         platformFileSizes: List<PlatformFileSize> = emptyList()
     ): this(
         worldId = world.id,
