@@ -45,6 +45,26 @@ internal class FriendUpdateSessionGate {
     fun accepts(token: AccountSessionToken): Boolean = sessionToken == token
 }
 
+internal class FriendLocationPublishedState {
+    val locationMap: MutableMap<LocationType, MutableList<FriendLocation>> = mutableStateMapOf()
+
+    private val _locationsByUser = MutableStateFlow<Map<String, FriendLocation>>(emptyMap())
+    val locationsByUser: StateFlow<Map<String, FriendLocation>> = _locationsByUser.asStateFlow()
+
+    fun clear() {
+        locationMap.clear()
+        _locationsByUser.value = emptyMap()
+    }
+
+    fun publishIndex() {
+        val locationsByUser = mutableMapOf<String, FriendLocation>()
+        locationMap.values.flatten().forEach { location ->
+            location.friends.keys.forEach { userId -> locationsByUser[userId] = location }
+        }
+        _locationsByUser.value = locationsByUser
+    }
+}
+
 class FriendLocationPagerModel(
     private val friendService: FriendService,
     private val usersApi: UsersApi,
@@ -52,12 +72,9 @@ class FriendLocationPagerModel(
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
 ) : ScreenModel {
-    val friendLocationMap: MutableMap<LocationType, MutableList<FriendLocation>> =
-        mutableStateMapOf()
-
-    private val _friendLocationsByUser = MutableStateFlow<Map<String, FriendLocation>>(emptyMap())
-    val friendLocationsByUser: StateFlow<Map<String, FriendLocation>> =
-        _friendLocationsByUser.asStateFlow()
+    private val publishedState = FriendLocationPublishedState()
+    val friendLocationMap = publishedState.locationMap
+    val friendLocationsByUser = publishedState.locationsByUser
 
     private val presenceStore = FriendLocationPresenceStore()
     private val friendUpdateSessionGate = FriendUpdateSessionGate()
@@ -244,17 +261,12 @@ class FriendLocationPagerModel(
     }
 
     private fun clearFriendLocations() {
-        friendLocationMap.clear()
         presenceStore.clear()
-        _friendLocationsByUser.value = emptyMap()
+        publishedState.clear()
     }
 
     private fun publishFriendLocationIndex() {
-        val locationsByUser = mutableMapOf<String, FriendLocation>()
-        friendLocationMap.values.flatten().forEach { location ->
-            location.friends.keys.forEach { userId -> locationsByUser[userId] = location }
-        }
-        _friendLocationsByUser.value = locationsByUser
+        publishedState.publishIndex()
     }
 
     private fun syncSimpleLocation(type: LocationType, friends: List<FriendData>) {
