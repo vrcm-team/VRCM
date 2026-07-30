@@ -33,7 +33,7 @@ internal class BoopNotificationResolver(
         val cachedFallbacks = fallbackCacheLock.withLock { fallbackCache.toMap() }
         val missingUserIds = notifications.asSequence()
             .filter { it.type == "boop" }
-            .mapNotNull { it.linkedUserId }
+            .mapNotNull { it.senderId }
             .distinct()
             .filterNot { it in friends || it in cachedFallbacks }
             .toList()
@@ -52,7 +52,7 @@ internal class BoopNotificationResolver(
         val presentations = cachedFallbacks + fetchedFallbacks + friends
         return notifications.map { notification ->
             if (notification.type != "boop") return@map notification
-            val presentation = notification.linkedUserId?.let(presentations::get)
+            val presentation = notification.senderId?.let(presentations::get)
                 ?: return@map notification
             notification.copy(
                 imageUrl = presentation.imageUrl,

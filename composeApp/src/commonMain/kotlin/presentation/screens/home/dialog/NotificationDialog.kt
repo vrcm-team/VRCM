@@ -105,6 +105,7 @@ private fun LazyItemScope.NotificationItem(
     var isExpand by remember { mutableStateOf(false) }
     var respondedAction by remember { mutableStateOf<NotificationItemData.ActionData?>(null) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
+    val senderId = item.senderId.orEmpty()
     val linkedUserId = item.linkedUserId.orEmpty()
     val contentText = if (isFriendRequest) "${item.message} ${strings.notificationFriendRequest}" else item.message
     val navigator = LocalNavigator.currentOrThrow
@@ -123,15 +124,15 @@ private fun LazyItemScope.NotificationItem(
             ) {
                 AImage(
                     modifier = Modifier
-                        .enableIf(linkedUserId.isNotEmpty()) {
+                        .enableIf(senderId.isNotEmpty()) {
                             this.clickable {
                                 navigator push UserProfileScreen(
                                     userProfileVO = UserProfileVo(
-                                        id = linkedUserId,
+                                        id = senderId,
                                         profileImageUrl = item.imageUrl
                                     )
                                 )
-                            }.sharedBoundsBy("${linkedUserId}UserIcon")
+                            }.sharedBoundsBy("${senderId}UserIcon")
                         }
                         .size(120.dp, 80.dp)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.medium)

@@ -135,7 +135,7 @@ class HomeScreenModel(
     ) {
         when (item.responseTarget(action)) {
             NotificationResponseTarget.BOOP_USER_API -> {
-                item.linkedUserId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
+                item.senderId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
                 return
             }
             NotificationResponseTarget.NOTIFICATION_API -> Unit
@@ -234,7 +234,6 @@ class HomeScreenModel(
 
 
 }
-
 
 
 

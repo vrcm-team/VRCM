@@ -13,6 +13,7 @@ class BoopNotificationResolverTest {
     fun realBoopReplyTargetsUsersApi() {
         val item = NotificationItemData(
             notification(
+                link = null,
                 responses = listOf(
                     ResponseData(
                         responseData = "",
@@ -26,10 +27,34 @@ class BoopNotificationResolverTest {
         )
 
         assertEquals("reply", item.actions.single().icon)
+        assertEquals("usr_sender", item.senderId)
         assertEquals(
             NotificationResponseTarget.BOOP_USER_API,
             item.responseTarget(item.actions.single()),
         )
+    }
+
+    @Test
+    fun senderUserIdEnrichesBoopWithNonUserLink() = runTest {
+        val resolver = BoopNotificationResolver()
+        val item = boop(id = "generic-link", link = "world:wrld_example")
+
+        val result = resolver.resolve(
+            notifications = listOf(item),
+            friends = mapOf(
+                "usr_sender" to NotificationUserPresentation(
+                    imageUrl = "https://example.com/sender.png",
+                    displayName = "Sender",
+                )
+            ),
+        ) {
+            error("sender in friend snapshot should not use the network")
+        }
+
+        assertEquals("usr_sender", item.senderId)
+        assertEquals(null, item.linkedUserId)
+        assertEquals("https://example.com/sender.png", result.single().imageUrl)
+        assertEquals("Sender", result.single().title)
     }
 
     @Test
@@ -86,19 +111,25 @@ class BoopNotificationResolverTest {
         }
     }
 
-    private fun boop(id: String) = NotificationItemData(
+    private fun boop(
+        id: String,
+        link: String? = null,
+    ) = NotificationItemData(
         id = id,
         imageUrl = "",
         title = null,
         message = "sent you a boop",
         createdAt = "2026-07-30T00:00:00Z",
         senderUserId = "usr_sender",
-        link = "user:usr_sender",
+        link = link,
         type = "boop",
         actions = emptyList(),
     )
 
-    private fun notification(responses: List<ResponseData>) = NotificationData(
+    private fun notification(
+        link: String?,
+        responses: List<ResponseData>,
+    ) = NotificationData(
         canDelete = true,
         category = "social",
         createdAt = "2026-07-30T00:00:00Z",
@@ -109,7 +140,7 @@ class BoopNotificationResolverTest {
         ignoreDND = false,
         imageUrl = null,
         isSystem = false,
-        link = "user:usr_sender",
+        link = link,
         linkText = null,
         linkTextKey = null,
         message = "sent you a boop",

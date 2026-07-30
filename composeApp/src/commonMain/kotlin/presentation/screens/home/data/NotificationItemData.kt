@@ -13,6 +13,10 @@ data class NotificationItemData(
     val type: String,
     val actions: List<ActionData>
 ) {
+    /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
+    val senderId: String?
+        get() = senderUserId.trim().takeIf { it.isNotEmpty() }
+
     /** The VRChat user targeted by a `user:usr_...` notification link. */
     val linkedUserId: String?
         get() = link
