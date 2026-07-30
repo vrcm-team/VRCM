@@ -91,11 +91,8 @@ fun slideScreenTransition(
     val animationIntSpec = tween<IntOffset>()
     val animationFloatSpec = tween<Float>()
     return when (orientation) {
-        SlideOrientation.Horizontal -> slideInHorizontally(animationIntSpec, initialOffset) togetherWith scaleOut(
-            animationFloatSpec,
-            0.8f,
-            TransformOrigin(0.3f, 0.5f)
-        ) + fadeOut(animationFloatSpec, 0.8f)
+        SlideOrientation.Horizontal -> slideInHorizontally(animationIntSpec, initialOffset) togetherWith
+            horizontalScreenExitTransition(animationFloatSpec)
 
         SlideOrientation.Vertical ->
             slideInVertically(initialOffsetY = initialOffset) togetherWith scaleOut(
@@ -106,3 +103,11 @@ fun slideScreenTransition(
 
     }
 }
+
+internal fun horizontalScreenExitTransition(
+    animationSpec: FiniteAnimationSpec<Float>,
+): ExitTransition = scaleOut(
+    animationSpec = animationSpec,
+    targetScale = 0.8f,
+    transformOrigin = TransformOrigin(0.3f, 0.5f),
+) + fadeOut(animationSpec = animationSpec)

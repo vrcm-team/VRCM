@@ -820,18 +820,22 @@ private fun <T> StackedLocationCardList(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 AImage(
-                    modifier = imageModifier(
-                        firstItem,
-                        Modifier
-                            .sharedBoundsBy("${detailTitle}_${key(firstItem)}_StackedImage")
-                            .weight(0.5f)
-                            .clip(
-                                RoundedCornerShape(
-                                    topStart = 16.dp, topEnd = 8.dp,
-                                    bottomStart = 16.dp, bottomEnd = 8.dp
-                                )
+                    modifier = Modifier
+                        .sharedBoundsBy("${detailTitle}_${key(firstItem)}_StackedImage")
+                        .weight(0.5f)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 16.dp, topEnd = 8.dp,
+                                bottomStart = 16.dp, bottomEnd = 8.dp
                             )
-                    ),
+                        )
+                        .let { modifier ->
+                            if (shouldShareStackedCardWithItemDetail(items.size)) {
+                                imageModifier(firstItem, modifier)
+                            } else {
+                                modifier
+                            }
+                        },
                     imageData = imageUrl(firstItem),
                     contentDescription = null
                 )
@@ -968,6 +972,8 @@ private enum class CardScreenType : cafe.adriel.voyager.core.lifecycle.JavaSeria
 
 internal fun worldImageSharedKey(sharedKeyPrefix: String, worldId: String): String? =
     if (worldId == "???") null else "${sharedKeyPrefix}${worldId}WorldImage"
+
+internal fun shouldShareStackedCardWithItemDetail(itemCount: Int): Boolean = itemCount == 1
 
 /**
  * 卡片列表详情页（非泛型，仅携带可序列化数据）
