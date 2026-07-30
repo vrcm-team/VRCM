@@ -15,7 +15,11 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.BoopNotificationResolver
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPresentation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -33,6 +37,8 @@ class HomeScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
 ) : ScreenModel {
+
+    private val boopNotificationResolver = BoopNotificationResolver()
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
 
@@ -100,22 +106,22 @@ class HomeScreenModel(
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { notificationApi.fetchNotifications() }
                 .onHomeFailure()
-                .onSuccess {
-                    _notifications.value = it.map { data ->
-                        val notification = NotificationItemData(data)
-                        val targetUserId = notification.linkedUserId
-                        if (data.type == "boop" && targetUserId != null) {
-                            runCatching { usersApi.fetchUser(targetUserId) }
-                                .getOrNull()
-                                ?.let { user ->
-                                    notification.copy(
-                                        imageUrl = user.profileImageUrl,
-                                        title = notification.title ?: user.displayName,
-                                    )
-                                }
-                                ?: notification
-                        } else {
-                            notification
+                .onSuccess { data ->
+                    val friendPresentations = friendService.friendMap.mapValues { (_, friend) ->
+                        NotificationUserPresentation(
+                            imageUrl = friend.profileImageUrl,
+                            displayName = friend.displayName,
+                        )
+                    }
+                    _notifications.value = boopNotificationResolver.resolve(
+                        notifications = data.map(::NotificationItemData),
+                        friends = friendPresentations,
+                    ) { userId ->
+                        usersApi.fetchUser(userId).let { user ->
+                            NotificationUserPresentation(
+                                imageUrl = user.profileImageUrl,
+                                displayName = user.displayName,
+                            )
                         }
                     }
                 }
@@ -127,9 +133,12 @@ class HomeScreenModel(
         boopSuccessMessage: String,
         boopAlreadySentMessage: String,
     ) {
-        if (item.type == "boop" && action.type.equals("reply", ignoreCase = true)) {
-            item.linkedUserId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
-            return
+        when (item.responseTarget(action)) {
+            NotificationResponseTarget.BOOP_USER_API -> {
+                item.linkedUserId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
+                return
+            }
+            NotificationResponseTarget.NOTIFICATION_API -> Unit
         }
 
         val id = item.id
@@ -225,7 +234,6 @@ class HomeScreenModel(
 
 
 }
-
 
 
 

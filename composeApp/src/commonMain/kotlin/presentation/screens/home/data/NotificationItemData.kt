@@ -22,7 +22,8 @@ data class NotificationItemData(
 
     data class ActionData(
         val data: String,
-        val type: String
+        val type: String,
+        val icon: String = "",
     )
 
     constructor(n: NotificationData) : this(
@@ -37,9 +38,24 @@ data class NotificationItemData(
         actions = n.responses.map { responses ->
             ActionData(
                 data = responses.responseData,
-                type = responses.type
+                type = responses.type,
+                icon = responses.icon,
             )
         }
     )
 
 }
+
+internal enum class NotificationResponseTarget {
+    BOOP_USER_API,
+    NOTIFICATION_API,
+}
+
+internal fun NotificationItemData.responseTarget(
+    action: NotificationItemData.ActionData,
+): NotificationResponseTarget =
+    if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
+        NotificationResponseTarget.BOOP_USER_API
+    } else {
+        NotificationResponseTarget.NOTIFICATION_API
+    }
