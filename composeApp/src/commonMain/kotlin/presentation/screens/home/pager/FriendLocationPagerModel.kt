@@ -339,8 +339,15 @@ class FriendLocationPagerModel(
                 location = locationId,
                 friends = mutableStateMapOf(),
             ).also(locations::add)
+            val presenceChanged =
+                location.friends.keys != group.friends.mapTo(mutableSetOf(), FriendData::id) ||
+                    location.travelingIds.value != group.travelingIds
             syncFriends(location, group)
-            fetchInstants(locationId, location.instants.value) {
+            fetchInstants(
+                location = locationId,
+                oldInstants = location.instants.value,
+                forceRefresh = presenceChanged && group.friends.isNotEmpty(),
+            ) {
                 location.instants.value = it
             }
         }
@@ -361,10 +368,11 @@ class FriendLocationPagerModel(
     private inline fun fetchInstants(
         location: String,
         oldInstants: HomeInstanceVo,
+        forceRefresh: Boolean = false,
         crossinline updateInstants: (HomeInstanceVo) -> Unit
     ) {
         // 已加载过实例信息则跳过网络请求
-        if (oldInstants.worldId.isNotEmpty()) return
+        if (!forceRefresh && oldInstants.worldId.isNotEmpty()) return
         screenModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)
