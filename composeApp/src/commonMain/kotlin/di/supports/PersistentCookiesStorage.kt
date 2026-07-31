@@ -27,6 +27,8 @@ class PersistentCookiesStorage(
         value?.takeIf { it.isNotEmpty() }
             ?.let { cookieCache[key] = parseServerSetCookieHeader("$key=$it") }
 
+    fun cookieValue(key: String): String? = cookieCache[key]?.value
+
 
     override fun close() = cookieCache.clear()
 
