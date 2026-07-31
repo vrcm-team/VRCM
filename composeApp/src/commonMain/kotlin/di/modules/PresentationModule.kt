@@ -75,9 +75,9 @@ val presentationModule: Module = module {
             sessionStore = sessionStore,
         )
     }
-    singleOf (::FriendLocationPagerModel)
-    singleOf (::FriendListPagerModel)
-    singleOf(::SearchListPagerModel)
+    factoryOf(::FriendLocationPagerModel)
+    factoryOf(::FriendListPagerModel)
+    factoryOf(::SearchListPagerModel)
     singleOf(::WorldProfileScreenModel)
     singleOf(::GroupProfileScreenModel)
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
