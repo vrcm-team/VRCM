@@ -30,6 +30,7 @@ enum class LocationType(val value: String) {
         fun fromValue(value: String): LocationType =
             when (value) {
                 Offline.value -> Offline
+                Web.value -> Web
                 Private.value -> Private
                 Traveling.value -> Traveling
                 else -> Instance

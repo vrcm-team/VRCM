@@ -257,11 +257,13 @@ class UserProfileScreenModel(
             combine(
                 friendService.friendState,
                 friendLocationPagerModel.friendLocationsByUser,
-            ) { friends, locationsByUser ->
+                friendService.currentUserLocation,
+            ) { friends, locationsByUser, ownLocation ->
                 val friend = friends[userProfileVO.id]
                 friend to resolveFriendLocation(
                     userId = userProfileVO.id,
-                    location = friend?.location,
+                    location = friend?.location
+                        ?: ownLocation?.location.takeIf { userProfileVO.id == cacheOwnerUserId },
                     locationsByUser = locationsByUser,
                 )
             }.collect { (friend, location) ->

@@ -16,6 +16,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val fiendLocationPagerPrivate = "プライベートワールド中"
     override val fiendLocationPagerTraveling = "移動中"
     override val fiendLocationPagerLocation = "ルームに"
+    override val currentUserLocation = "ここにいます"
     override val fiendListPagerSearch = "検索"
     override val users = "ユーザー"
     override val worlds = "ワールド"

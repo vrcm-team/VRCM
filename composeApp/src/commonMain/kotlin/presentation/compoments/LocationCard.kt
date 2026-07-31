@@ -24,6 +24,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.graphics.Color
 
@@ -35,6 +36,7 @@ fun LocationCard(
     onClickWorldImage: () -> Unit,
     onClickLocationCard: () -> Unit,
     travelingIds: Set<String> = emptySet(),
+    isCurrentUserLocation: Boolean = false,
     content: @Composable (List<State<FriendData>>) -> Unit,
 ) {
     val instants by location.instants
@@ -46,13 +48,12 @@ fun LocationCard(
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large
     ) {
-        Column(
-            modifier = Modifier
-                .animateContentSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        Box(modifier = Modifier.animateContentSize()) {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -138,6 +139,24 @@ fun LocationCard(
             }
             AnimatedVisibility(isSelected) {
                 content(friendList)
+            }
+            }
+            if (isCurrentUserLocation) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                ) {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        text = strings.currentUserLocation,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

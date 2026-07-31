@@ -16,6 +16,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val fiendLocationPagerPrivate = "處於私人世界中"
     override val fiendLocationPagerTraveling = "正在跃迁中"
     override val fiendLocationPagerLocation = "處於房間內"
+    override val currentUserLocation = "您在這裡"
     override val fiendListPagerSearch = "搜索"
     override val users = "用戶"
     override val worlds = "世界"

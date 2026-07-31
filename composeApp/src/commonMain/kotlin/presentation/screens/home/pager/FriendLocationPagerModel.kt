@@ -20,6 +20,7 @@ import io.github.vrcmteam.vrcm.service.AccountGenerationToken
 import io.github.vrcmteam.vrcm.service.AccountGenerationTracker
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendPresence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -78,8 +79,11 @@ class FriendLocationPagerModel(
     private val publishedState = FriendLocationPublishedState()
     val friendLocationMap = publishedState.locationMap
     val friendLocationsByUser = publishedState.locationsByUser
+    val currentUserId: String
+        get() = authService.accountDto().userId
 
     private val presenceStore = FriendLocationPresenceStore()
+    private var currentUserPresence: FriendPresence? = null
     private val friendUpdateSessionGate = FriendUpdateSessionGate(initialSession?.token)
     private val accountTracker = AccountGenerationTracker(initialSession?.account?.userId)
     private val updateMutex = Mutex()
@@ -109,6 +113,16 @@ class FriendLocationPagerModel(
                 if (!hasCompletedInitialRefresh) return@collect
                 updateMutex.withLock { presenceStore.replaceFriends(friends.values) }
                 syncFriendLocations()
+            }
+        }
+        screenModelScope.launch {
+            friendService.currentUserLocation.collect { presence ->
+                var shouldSync = false
+                updateMutex.withLock {
+                    currentUserPresence = presence
+                    shouldSync = hasCompletedInitialRefresh
+                }
+                if (shouldSync) syncFriendLocations()
             }
         }
         screenModelScope.launch {
@@ -253,7 +267,34 @@ class FriendLocationPagerModel(
             syncSimpleLocation(LocationType.Offline, snapshot.offline)
             syncSimpleLocation(LocationType.Web, snapshot.web)
             syncSimpleLocation(LocationType.Private, snapshot.private)
-            syncInstanceLocations(snapshot.instances)
+            val own = currentUserPresence?.let { presence ->
+                val effectiveLocation = when {
+                    presence.location.startsWith("wrld_") -> presence.location
+                    presence.location.startsWith(LocationType.Traveling.value) &&
+                        presence.travelingToLocation.startsWith("wrld_") -> presence.travelingToLocation
+                    else -> ""
+                }
+                if (effectiveLocation.isNotEmpty()) {
+                    authService.currentUser().toFriendData(presence, effectiveLocation)
+                } else null
+            }
+            val instances = snapshot.instances.toMutableMap()
+            if (own != null) {
+                val group = instances[own.location]
+                val ownIsTraveling = currentUserPresence?.location?.startsWith(LocationType.Traveling.value) == true
+                instances[own.location] = if (group == null) {
+                    FriendLocationGroup(
+                        friends = listOf(own),
+                        travelingIds = if (ownIsTraveling) setOf(own.id) else emptySet(),
+                    )
+                } else {
+                    FriendLocationGroup(
+                        friends = group.friends.filterNot { it.id == own.id } + own,
+                        travelingIds = if (ownIsTraveling) group.travelingIds + own.id else group.travelingIds - own.id,
+                    )
+                }
+            }
+            syncInstanceLocations(instances)
             publishFriendLocationIndex()
         }.onApiFailure("FriendLocation") {
             SharedFlowCentre.toastText.emit(ToastText.Error(it))
@@ -392,3 +433,31 @@ class FriendLocationPagerModel(
     }
 
 }
+
+private fun io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData.toFriendData(
+    presence: FriendPresence,
+    effectiveLocation: String,
+) = FriendData(
+    bio = bio,
+    bioLinks = bioLinks,
+    currentAvatarImageUrl = currentAvatarImageUrl,
+    currentAvatarTags = currentAvatarTags,
+    currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+    developerType = developerType,
+    displayName = displayName,
+    friendKey = friendKey,
+    id = id,
+    imageUrl = profilePicOverride,
+    isFriend = false,
+    lastLogin = lastLogin,
+    lastActivity = lastActivity,
+    lastPlatform = lastPlatform,
+    location = effectiveLocation,
+    travelingToLocation = presence.travelingToLocation,
+    profilePicOverride = profilePicOverride,
+    status = status,
+    statusDescription = statusDescription,
+    tags = tags,
+    userIcon = userIcon,
+    pronouns = pronouns,
+)
