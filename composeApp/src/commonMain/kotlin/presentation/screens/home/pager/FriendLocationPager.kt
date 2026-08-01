@@ -66,6 +66,7 @@ object FriendLocationPager : Pager {
 
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
+            currentUserId = friendLocationPagerModel.currentUserId,
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
             doRefresh = friendLocationPagerModel::refreshFriendLocation,
@@ -81,6 +82,7 @@ object FriendLocationPager : Pager {
 @Composable
 fun Pager.FriendLocationPager(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
+    currentUserId: String,
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
@@ -134,7 +136,10 @@ fun Pager.FriendLocationPager(
     ) {
         val webFriendLocation = friendLocationMap[LocationType.Web]?.get(0)
         val privateFriendLocation = friendLocationMap[LocationType.Private]?.get(0)
-        val instanceFriendLocations = friendLocationMap[LocationType.Instance]?.sortedByDescending { it.friendList.size }
+        val instanceFriendLocations = friendLocationMap[LocationType.Instance]
+            ?.sortedWith(compareByDescending<FriendLocation> { location ->
+                location.friends.containsKey(currentUserId)
+            }.thenByDescending { it.friendList.size })
         // 如果没有底部系统手势条，默认12dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
         LazyColumn(
@@ -161,6 +166,7 @@ fun Pager.FriendLocationPager(
                         onClickWorldImage = { onClickWorldImage(location) },
                         onClickLocationCard = { onClickLocationCard(location) },
                         travelingIds = location.travelingIds.value,
+                        isCurrentUserLocation = location.friends.containsKey(currentUserId),
                     ) {
                         UserIconsRow(
                             modifier = Modifier.fillMaxWidth(),

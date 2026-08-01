@@ -253,15 +253,24 @@ class UserProfileScreenModel(
 
     init {
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
+        if (userProfileVO.id == cacheOwnerUserId) {
+            screenModelScope.launch {
+                authService.currentUserState.collect { currentUser ->
+                    currentUser?.let { _userState.value = UserProfileVo(it) }
+                }
+            }
+        }
         screenModelScope.launch {
             combine(
                 friendService.friendState,
                 friendLocationPagerModel.friendLocationsByUser,
-            ) { friends, locationsByUser ->
+                friendService.currentUserLocation,
+            ) { friends, locationsByUser, ownLocation ->
                 val friend = friends[userProfileVO.id]
                 friend to resolveFriendLocation(
                     userId = userProfileVO.id,
-                    location = friend?.location,
+                    location = friend?.location
+                        ?: ownLocation?.location.takeIf { userProfileVO.id == cacheOwnerUserId },
                     locationsByUser = locationsByUser,
                 )
             }.collect { (friend, location) ->
@@ -274,6 +283,15 @@ class UserProfileScreenModel(
     }
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
+        if (cache.user.id == cacheOwnerUserId) {
+            cachedUserData = cache.user
+            _userGroups.value = visibleUserGroups(cache.groups, true)
+            _mutualGroups.value = cache.mutualGroups
+            _createdWorlds.value = cache.createdWorlds
+            _createdAvatars.value = cache.createdAvatars
+            setFavoritedWorldGroups(cache.favoritedWorlds)
+            return
+        }
         val cachedUser = cache.user.asCachedOffline()
         cachedUserData = cachedUser
         val profile = UserProfileVo(cachedUser)
@@ -319,6 +337,9 @@ class UserProfileScreenModel(
                         // 防止body序列化异常
                         runCatching { response.body<UserData>() }
                             .onSuccess {
+                                if (it.id == cacheOwnerUserId) {
+                                    authService.applyOwnProfileRefresh(it)
+                                }
                                 val profile = UserProfileVo(it)
                                 if (_userState.value != profile) {
                                     _userState.value = profile

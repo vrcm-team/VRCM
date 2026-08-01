@@ -77,7 +77,6 @@ class AuthScreenModel(
     fun onCardStateChange(cardState: AuthCardPage) {
         _uiState.value = when (cardState) {
             AuthCardPage.Login -> {
-                authService.logout()
                 _uiState.value.copy(
                     cardState = cardState,
                     verifyCode = "",
@@ -99,17 +98,29 @@ class AuthScreenModel(
 
     fun tryAuth() {
         screenModelScope.launch {
-            val cardState = if (awaitAuth()) AuthCardPage.Authed else AuthCardPage.Login
+            val cardState = awaitAuth().toCardPage()
             onCardStateChange(cardState)
         }
     }
 
-    private suspend fun awaitAuth(): Boolean = screenModelScope.async(Dispatchers.IO) {
-        authService.reTryAuth {
-            runCatching { authService.isAuthed() }
-        }.onAuthFailure()
+    fun returnToLogin() {
+        authService.logout()
+        onCardStateChange(AuthCardPage.Login)
+    }
+
+    private suspend fun awaitAuth(): AuthState? = screenModelScope.async(Dispatchers.IO) {
+        runCatching { authService.restoreAuth() }
+            .onAuthFailure()
             .getOrNull()
-    }.await() == true
+    }.await()
+
+    private fun AuthState?.toCardPage(): AuthCardPage = when (this) {
+        AuthState.Authed -> AuthCardPage.Authed
+        AuthState.NeedEmailCode -> AuthCardPage.EmailCode
+        AuthState.NeedTFA -> AuthCardPage.TFACode
+        AuthState.NeedTTFA -> AuthCardPage.TTFACode
+        is AuthState.Unauthorized, null -> AuthCardPage.Login
+    }
 
     fun tryCheckVersion(onCheckVersion:(VersionVo) -> Unit)=
          screenModelScope.launch(Dispatchers.IO) {

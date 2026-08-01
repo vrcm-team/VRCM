@@ -10,8 +10,10 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.service.AccountFriendUpdateEvent
 import io.github.vrcmteam.vrcm.service.FriendUpdateEvent
+import io.github.vrcmteam.vrcm.service.FriendPresence
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FriendLocationPresenceStoreTest {
@@ -162,6 +164,33 @@ class FriendLocationPresenceStoreTest {
         val snapshot = store.snapshot()
         assertTrue(snapshot.offline.isEmpty())
         assertEquals(listOf("usr_a"), snapshot.private.map(FriendData::id))
+    }
+
+    @Test
+    fun privateOwnPresenceIsEligibleForPrivateCategory() {
+        assertEquals(
+            LocationType.Private.value,
+            ownEffectiveLocation(FriendPresence(LocationType.Private.value)),
+        )
+        assertEquals(null, ownEffectiveLocation(FriendPresence("", "")))
+    }
+
+    @Test
+    fun statusUpdateReusesPrivateCategoryCardAndUserState() {
+        val publishedState = FriendLocationPublishedState()
+        val active = friend("usr_self", LocationType.Private.value)
+        publishedState.syncSimpleLocation(LocationType.Private, listOf(active))
+        val card = publishedState.locationMap.getValue(LocationType.Private).first()
+        val userState = card.friends.getValue(active.id)
+
+        publishedState.syncSimpleLocation(
+            LocationType.Private,
+            listOf(active.copy(status = UserStatus.Busy)),
+        )
+
+        assertSame(card, publishedState.locationMap.getValue(LocationType.Private).first())
+        assertSame(userState, card.friends.getValue(active.id))
+        assertEquals(UserStatus.Busy, userState.value.status)
     }
 
     private fun friend(
