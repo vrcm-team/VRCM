@@ -66,8 +66,8 @@ class AccountDao(
 
     fun logout(userId: String) {
         accountSettings.keys
-            .firstOrNull { it.contains("${AUTH_KEY}|${userId}") }
-            ?.let { accountSettings.remove(it) }
+            .firstOrNull { it == "${AUTH_KEY}|${userId}" }
+            ?.let(accountSettings::remove)
     }
 
     fun removeAccount(userId: String) {
