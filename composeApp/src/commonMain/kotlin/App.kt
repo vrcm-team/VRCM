@@ -48,8 +48,10 @@ fun App() {
                 screen = StartupAnimeScreen,
             ) { navigator ->
                 CompositionLocalProvider(LocalBackNavigationPolicy provides backNavigationPolicy) {
-                    BackHandler(enabled = navigator.canPop) {
-                        if (backNavigationPolicy.isBackNavigationEnabled) {
+                    BackHandler(
+                        enabled = backNavigationPolicy.shouldHandleBack(navigator.canPop)
+                    ) {
+                        backNavigationPolicy.handleBack(navigator.canPop) {
                             navigator.pop()
                         }
                     }
