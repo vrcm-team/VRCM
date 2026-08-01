@@ -66,6 +66,23 @@ internal class FriendLocationPublishedState {
         }
         _locationsByUser.value = locationsByUser
     }
+
+    fun syncSimpleLocation(type: LocationType, friends: List<FriendData>) {
+        if (friends.isEmpty()) {
+            locationMap.remove(type)
+            return
+        }
+        val location = locationMap.getOrPut(type) {
+            mutableStateListOf(
+                when (type) {
+                    LocationType.Offline -> FriendLocation.Offline
+                    LocationType.Web -> FriendLocation.Web
+                    else -> FriendLocation.Private
+                }
+            )
+        }.first()
+        syncFriends(location, FriendLocationGroup(friends))
+    }
 }
 
 class FriendLocationPagerModel(
@@ -264,20 +281,19 @@ class FriendLocationPagerModel(
         if (token != null && !accountTracker.isCurrent(token)) return@withLock
         runCatching {
             val snapshot = presenceStore.snapshot()
-            syncSimpleLocation(LocationType.Offline, snapshot.offline)
-            syncSimpleLocation(LocationType.Web, snapshot.web)
-            syncSimpleLocation(LocationType.Private, snapshot.private)
+            publishedState.syncSimpleLocation(LocationType.Offline, snapshot.offline)
+            publishedState.syncSimpleLocation(LocationType.Web, snapshot.web)
             val own = currentUserPresence?.let { presence ->
-                val effectiveLocation = when {
-                    presence.location.startsWith("wrld_") -> presence.location
-                    presence.location.startsWith(LocationType.Traveling.value) &&
-                        presence.travelingToLocation.startsWith("wrld_") -> presence.travelingToLocation
-                    else -> ""
-                }
-                if (effectiveLocation.isNotEmpty()) {
+                ownEffectiveLocation(presence)?.let { effectiveLocation ->
                     authService.currentUser().toFriendData(presence, effectiveLocation)
-                } else null
+                }
             }
+            val privateFriends = if (own?.location == LocationType.Private.value) {
+                snapshot.private.filterNot { it.id == own.id } + own
+            } else {
+                snapshot.private
+            }
+            publishedState.syncSimpleLocation(LocationType.Private, privateFriends)
             val instances = snapshot.instances.toMutableMap()
             if (own != null) {
                 val group = instances[own.location]
@@ -310,23 +326,6 @@ class FriendLocationPagerModel(
         publishedState.publishIndex()
     }
 
-    private fun syncSimpleLocation(type: LocationType, friends: List<FriendData>) {
-        if (friends.isEmpty()) {
-            friendLocationMap.remove(type)
-            return
-        }
-        val location = friendLocationMap.getOrPut(type) {
-            mutableStateListOf(
-                when (type) {
-                    LocationType.Offline -> FriendLocation.Offline
-                    LocationType.Web -> FriendLocation.Web
-                    else -> FriendLocation.Private
-                }
-            )
-        }.first()
-        syncFriends(location, FriendLocationGroup(friends))
-    }
-
     private fun syncInstanceLocations(groups: Map<String, FriendLocationGroup>) {
         if (groups.isEmpty()) {
             friendLocationMap.remove(LocationType.Instance)
@@ -352,18 +351,6 @@ class FriendLocationPagerModel(
             }
         }
     }
-
-    private fun syncFriends(location: FriendLocation, group: FriendLocationGroup) {
-        val incoming = group.friends.associateBy(FriendData::id)
-        location.friends.keys.filter { it !in incoming }.forEach(location.friends::remove)
-        incoming.forEach { (friendId, friend) ->
-            val state = location.friends[friendId]
-            if (state == null) location.friends[friendId] = mutableStateOf(friend)
-            else state.value = friend
-        }
-        location.travelingIds.value = group.travelingIds
-    }
-
 
     private inline fun fetchInstants(
         location: String,
@@ -440,6 +427,25 @@ class FriendLocationPagerModel(
         }
     }
 
+}
+
+internal fun ownEffectiveLocation(presence: FriendPresence): String? = when {
+    presence.location.startsWith("wrld_") -> presence.location
+    presence.location.startsWith(LocationType.Traveling.value) &&
+        presence.travelingToLocation.startsWith("wrld_") -> presence.travelingToLocation
+    presence.location == LocationType.Private.value -> LocationType.Private.value
+    else -> null
+}
+
+private fun syncFriends(location: FriendLocation, group: FriendLocationGroup) {
+    val incoming = group.friends.associateBy(FriendData::id)
+    location.friends.keys.filter { it !in incoming }.forEach(location.friends::remove)
+    incoming.forEach { (friendId, friend) ->
+        val state = location.friends[friendId]
+        if (state == null) location.friends[friendId] = mutableStateOf(friend)
+        else state.value = friend
+    }
+    location.travelingIds.value = group.travelingIds
 }
 
 private fun io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData.toFriendData(
