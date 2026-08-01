@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationCont
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendUpdateContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.UserLocationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
@@ -70,6 +71,8 @@ class FriendService(
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
+    private val _currentUserLocation = MutableStateFlow<FriendPresence?>(null)
+    val currentUserLocation: StateFlow<FriendPresence?> = _currentUserLocation.asStateFlow()
 
     val friendMap: Map<String, FriendData>
         get() = friendState.value
@@ -99,6 +102,7 @@ class FriendService(
                         activeSessionToken = null
                         friendStore.clear()
                         publishFriendState()
+                        _currentUserLocation.value = null
                     }
                     preloadTask.cancelAndJoin()
                 } else {
@@ -118,7 +122,19 @@ class FriendService(
             accountTracker.onAuthenticated(session.account.userId)
             true
         }
-        if (activated) preloadFriendList(session.account.userId)
+        if (activated) {
+            preloadFriendList(session.account.userId)
+            serviceScope.launch {
+                runCatching { authService.currentUser(isRefresh = true).presence }.onSuccess { presence ->
+                    if (isCurrentSession(session.token)) {
+                        _currentUserLocation.value = FriendPresence(
+                            location = presenceLocation(presence.world, presence.instance),
+                            travelingToLocation = presenceLocation(presence.travelingToWorld, presence.travelingToInstance),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun handleWebSocketEvent(accountEvent: AccountWebSocketEvent) {
@@ -126,6 +142,20 @@ class FriendService(
         if (!isCurrentSession(sessionToken)) return
         val socketEvent = accountEvent.event
         when (socketEvent.type) {
+            "user-location" -> {
+                val content = json.decodeFromString<UserLocationContent>(socketEvent.content)
+                if (content.userId == null || content.userId == authService.accountDto().userId) {
+                    _currentUserLocation.value = FriendPresence(
+                        content.location,
+                        content.travelingToLocation,
+                    )
+                    authService.applySocketUserLocation(content.location, content.travelingToLocation)
+                }
+            }
+            "user-update" -> {
+                val content = json.decodeFromString<FriendUpdateContent>(socketEvent.content)
+                authService.applySocketUserUpdate(content.user)
+            }
             FriendEvents.FriendOnline.typeName -> {
                 val content = json.decodeFromString<FriendOnlineContent>(socketEvent.content)
                 val friend = updateFriend(sessionToken, content.userId, content::mergeWith)
@@ -357,6 +387,14 @@ class FriendService(
 
     suspend fun unfriend(userId: String) =
         authService.reTryAuthCatching { friendsApi.unfriend(userId) }
+}
+
+data class FriendPresence(val location: String, val travelingToLocation: String = "")
+
+private fun presenceLocation(world: String, instance: String): String = when {
+    instance.startsWith("wrld_") -> instance
+    world.startsWith("wrld_") && instance.isNotBlank() && instance != "offline" -> "$world:$instance"
+    else -> instance
 }
 
 private data class PendingFriendCacheSnapshot(

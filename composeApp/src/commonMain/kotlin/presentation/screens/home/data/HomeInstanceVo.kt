@@ -36,7 +36,7 @@ data class HomeInstanceVo(
             .map { it.substringAfter("author_tag_") },
         accessType = instance.accessType,
         region = instance.region,
-        userCount = "${instance.userCount}/${instance.world.capacity}",
+        userCount = "${instance.nUsers}/${instance.world.capacity}",
         name = instance.name
     )
 

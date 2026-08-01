@@ -511,6 +511,8 @@ private fun ColumnScope.ProfileContent(
                 isSelected = isSelected,
                 onClickWorldImage = onClickWorldImage,
                 onClickLocationCard = { isSelected = !isSelected },
+                travelingIds = loc.travelingIds.value,
+                isCurrentUserLocation = currentUser.isSelf,
             ) { friends ->
                 UserIconsRow(
                     modifier = Modifier.fillMaxWidth(),

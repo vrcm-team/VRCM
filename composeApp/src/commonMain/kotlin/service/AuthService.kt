@@ -8,6 +8,9 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
+import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
@@ -19,6 +22,9 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * 负责辅助登录验证的类
@@ -34,6 +40,9 @@ class AuthService(
     private var scope = CoroutineScope(Job())
 
     private var currentUser: CurrentUserData? = null
+    private var socketPresence: Presence? = null
+    private val _currentUserState = MutableStateFlow<CurrentUserData?>(null)
+    val currentUserState: StateFlow<CurrentUserData?> = _currentUserState.asStateFlow()
 
     private var currentAccountDto: AccountDto? = null
 
@@ -41,6 +50,11 @@ class AuthService(
         scope.launch {
             SharedFlowCentre.authed.collect { session ->
                 val accountDto = session.account
+                if (currentUser?.id != accountDto.userId) {
+                    currentUser = null
+                    socketPresence = null
+                    _currentUserState.value = null
+                }
                 currentAccountDto = accountDto
                 accountDao.saveAccountInfo(accountDto)
             }
@@ -89,8 +103,90 @@ class AuthService(
     suspend fun currentUser(isRefresh: Boolean = false) = if (currentUser != null && !isRefresh) {
         currentUser!!
     } else {
-        authApi.currentUser().also {
+        authApi.currentUser().let { refreshed ->
+            refreshed.copy(presence = selectCurrentPresence(refreshed.presence, socketPresence)).also {
+                currentUser = it
+                _currentUserState.value = it
+            }
+        }
+    }
+
+    fun applySocketUserUpdate(user: UserContent) {
+        val existing = currentUser ?: return
+        if (existing.id != user.id) return
+        existing.copy(
+            currentAvatarImageUrl = user.currentAvatarImageUrl,
+            currentAvatarTags = user.currentAvatarTags,
+            currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
+            displayName = user.displayName,
+            lastActivity = user.lastActivity,
+            lastLogin = user.lastLogin,
+            lastPlatform = user.lastPlatform,
+            profilePicOverride = user.profilePicOverride,
+            state = user.state,
+            status = user.status,
+            statusDescription = user.statusDescription,
+            tags = user.tags,
+            userIcon = user.userIcon,
+            pronouns = user.pronouns,
+        ).also {
             currentUser = it
+            _currentUserState.value = it
+        }
+    }
+
+    fun applySocketUserLocation(location: String, travelingToLocation: String) {
+        val existing = currentUser ?: return
+        val (world, instance) = socketLocationToPresenceParts(location)
+        val (travelingToWorld, travelingToInstance) = socketLocationToPresenceParts(travelingToLocation)
+        val updatedPresence = existing.presence.copy(
+                world = world,
+                instance = instance,
+                travelingToWorld = travelingToWorld,
+                travelingToInstance = travelingToInstance,
+            )
+        socketPresence = updatedPresence
+        existing.copy(
+            presence = updatedPresence,
+        ).also {
+            currentUser = it
+            _currentUserState.value = it
+        }
+    }
+
+    fun applyOwnProfileRefresh(user: UserData) {
+        val existing = currentUser ?: return
+        if (existing.id != user.id) return
+        val (world, instance) = socketLocationToPresenceParts(user.location)
+        val (travelingToWorld, travelingToInstance) =
+            socketLocationToPresenceParts(user.travelingToLocation.orEmpty())
+        val updatedPresence = existing.presence.copy(
+            world = world,
+            instance = instance,
+            travelingToWorld = travelingToWorld,
+            travelingToInstance = travelingToInstance,
+            platform = user.lastPlatform.ifBlank { existing.presence.platform },
+        )
+        socketPresence = updatedPresence
+        existing.copy(
+            currentAvatarImageUrl = user.currentAvatarImageUrl,
+            currentAvatarTags = user.currentAvatarTags,
+            currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
+            displayName = user.displayName,
+            lastActivity = user.lastActivity,
+            lastLogin = user.lastLogin,
+            lastPlatform = user.lastPlatform,
+            profilePicOverride = user.profilePicOverride,
+            state = user.state.value,
+            status = user.status,
+            statusDescription = user.statusDescription,
+            tags = user.tags,
+            userIcon = user.userIcon,
+            pronouns = user.pronouns,
+            presence = updatedPresence,
+        ).also {
+            currentUser = it
+            _currentUserState.value = it
         }
     }
 
@@ -124,7 +220,11 @@ class AuthService(
                 authCookie = cookiesStorage.cookieValue(AUTH_COOKIE),
                 twoFactorAuthCookie = cookiesStorage.cookieValue(TWO_FACTOR_AUTH_COOKIE),
             )
-            currentUser = userData
+            val refreshedUser = userData.copy(
+                presence = selectCurrentPresence(userData.presence, socketPresence),
+            )
+            currentUser = refreshedUser
+            _currentUserState.value = refreshedUser
             currentAccountDto = accountDto
             accountDao.saveAccountInfo(accountDto)
             SharedFlowCentre.emitAuthenticated(accountDto)
@@ -177,6 +277,8 @@ class AuthService(
             ?: accountDto().userId
         clearAuthCookie(userId)
         currentUser = null
+        socketPresence = null
+        _currentUserState.value = null
         currentAccountDto = accountDao.currentAccountDtoOrNull()
         scope.launch {
             SharedFlowCentre.emitLogout()
@@ -194,3 +296,13 @@ class AuthService(
     }
 
 }
+
+internal fun socketLocationToPresenceParts(location: String): Pair<String, String> =
+    if (location.startsWith("wrld_") && location.contains(':')) {
+        location.substringBefore(':') to location.substringAfter(':')
+    } else {
+        "" to location
+    }
+
+internal fun selectCurrentPresence(restPresence: Presence, socketPresence: Presence?): Presence =
+    socketPresence ?: restPresence

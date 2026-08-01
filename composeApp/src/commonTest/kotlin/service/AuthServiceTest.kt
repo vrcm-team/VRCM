@@ -52,6 +52,7 @@ class AuthServiceTest {
         assertEquals(1, requests.size)
         assertTrue(requests.single().first.orEmpty().contains("auth=cached-auth"))
         assertTrue(requests.single().first.orEmpty().contains("twoFactorAuth=cached-2fa"))
+        assertEquals("usr_cached", fixture.service.currentUserState.value?.id)
         fixture.client.close()
     }
 
@@ -95,6 +96,7 @@ class AuthServiceTest {
         assertNull(result)
         assertEquals(0, requestCount)
         assertNull(fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        assertNull(fixture.service.currentUserState.value)
         assertEquals(
             "cached-2fa",
             fixture.accountDao.currentAccountDtoOrNull()?.twoFactorAuthCookie,

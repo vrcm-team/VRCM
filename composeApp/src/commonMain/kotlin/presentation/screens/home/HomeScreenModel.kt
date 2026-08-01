@@ -59,6 +59,9 @@ class HomeScreenModel(
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
+        screenModelScope.launch {
+            authService.currentUserState.collect { _currentUser.value = it }
+        }
     }
 
     fun refreshAllNotification() {

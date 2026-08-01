@@ -27,6 +27,7 @@ sealed class LocaleStrings {
     open val fiendLocationPagerPrivate: String = "Friends in Private Worlds"
     open val fiendLocationPagerTraveling: String = "Friends is Traveling"
     open val fiendLocationPagerLocation: String = "by Location"
+    open val currentUserLocation: String = "You are here"
     open val fiendListPagerSearch: String = "Search"
     open val users: String = "Users"
     open val worlds: String = "Worlds"

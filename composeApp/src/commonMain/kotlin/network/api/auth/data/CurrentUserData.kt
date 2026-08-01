@@ -76,4 +76,13 @@ data class CurrentUserData(
     val username: String,
     val viveId: String,
     override val pronouns: String?
-):IUser, JavaSerializable
+): IUser, JavaSerializable {
+    override val location: String
+        get() = presenceLocation(presence.world, presence.instance)
+}
+
+internal fun presenceLocation(world: String, instance: String): String = when {
+    instance.startsWith("wrld_") -> instance
+    world.startsWith("wrld_") && instance.isNotBlank() && instance != "offline" -> "$world:$instance"
+    else -> instance
+}
