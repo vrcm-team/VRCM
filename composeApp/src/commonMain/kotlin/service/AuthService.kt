@@ -6,7 +6,6 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthType
 import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
@@ -95,8 +94,6 @@ class AuthService(
     fun applySocketUserUpdate(user: UserContent) {
         val existing = currentUser ?: return
         if (existing.id != user.id) return
-        val updatedPresence = existing.presence.withSocketUserState(user.state)
-        if (updatedPresence !== existing.presence) socketPresence = updatedPresence
         existing.copy(
             currentAvatarImageUrl = user.currentAvatarImageUrl,
             currentAvatarTags = user.currentAvatarTags,
@@ -112,7 +109,6 @@ class AuthService(
             tags = user.tags,
             userIcon = user.userIcon,
             pronouns = user.pronouns,
-            presence = updatedPresence,
         ).also {
             currentUser = it
             _currentUserState.value = it
@@ -141,12 +137,9 @@ class AuthService(
     fun applyOwnProfileRefresh(user: UserData) {
         val existing = currentUser ?: return
         if (existing.id != user.id) return
-        val location = normalizeOwnLocation(user.location, user.travelingToLocation.orEmpty())
-        val travelingToLocation = user.travelingToLocation.orEmpty()
-            .takeIf { location == io.github.vrcmteam.vrcm.network.api.attributes.LocationType.Traveling.value }
-            .orEmpty()
-        val (world, instance) = socketLocationToPresenceParts(location)
-        val (travelingToWorld, travelingToInstance) = socketLocationToPresenceParts(travelingToLocation)
+        val (world, instance) = socketLocationToPresenceParts(user.location)
+        val (travelingToWorld, travelingToInstance) =
+            socketLocationToPresenceParts(user.travelingToLocation.orEmpty())
         val updatedPresence = existing.presence.copy(
             world = world,
             instance = instance,
@@ -285,16 +278,3 @@ internal fun socketLocationToPresenceParts(location: String): Pair<String, Strin
 
 internal fun selectCurrentPresence(restPresence: Presence, socketPresence: Presence?): Presence =
     socketPresence ?: restPresence
-
-internal fun io.github.vrcmteam.vrcm.network.api.auth.data.Presence.withSocketUserState(
-    state: String,
-) = if (state == UserState.Active.value) {
-    copy(
-        world = "",
-        instance = "offline",
-        travelingToWorld = "",
-        travelingToInstance = "",
-    )
-} else {
-    this
-}

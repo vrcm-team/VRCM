@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.network.api.auth.data
 import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AgeVerificationStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -85,6 +84,5 @@ data class CurrentUserData(
 internal fun presenceLocation(world: String, instance: String): String = when {
     instance.startsWith("wrld_") -> instance
     world.startsWith("wrld_") && instance.isNotBlank() && instance != "offline" -> "$world:$instance"
-    instance.isNotBlank() -> instance
-    else -> LocationType.Offline.value
+    else -> instance
 }

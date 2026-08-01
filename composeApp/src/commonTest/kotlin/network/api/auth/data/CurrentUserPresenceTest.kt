@@ -10,8 +10,9 @@ class CurrentUserPresenceTest {
     }
 
     @Test
-    fun nonGamePresenceKeepsWebsiteOrOfflineState() {
-        assertEquals("offline", presenceLocation("", ""))
+    fun nonGamePresenceKeepsRawState() {
+        assertEquals("", presenceLocation("", ""))
         assertEquals("offline", presenceLocation("", "offline"))
+        assertEquals("traveling", presenceLocation("", "traveling"))
     }
 }
