@@ -81,7 +81,7 @@ object AuthScreen : Screen {
                             NavCard(strings.authVerifyTitle, barContent = {
                                 ReturnIcon {
                                     authScreenModel.cancelJob()
-                                    authScreenModel.onCardStateChange(AuthCardPage.Login)
+                                    authScreenModel.returnToLogin()
                                 }
                             }) {
                                 VerifyCardInput(

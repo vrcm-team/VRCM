@@ -20,7 +20,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemDa
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPresentation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +33,6 @@ class HomeScreenModel(
     private val usersApi: UsersApi,
     private val notificationApi: NotificationApi,
     private val friendService: FriendService,
-    private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
 ) : ScreenModel {
 
@@ -58,7 +56,6 @@ class HomeScreenModel(
 
     fun init() {
         friendService.preloadFriendList()
-        friendLocationPagerModel.preloadFriendLocations()
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
