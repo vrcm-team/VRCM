@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -145,7 +146,25 @@ class FriendService(
             "user-location" -> {
                 val content = json.decodeFromString<UserLocationContent>(socketEvent.content)
                 if (content.userId == null || content.userId == authService.accountDto().userId) {
-                    _currentUserLocation.value = FriendPresence(content.location, content.travelingToLocation)
+                    val normalizedLocation = normalizeOwnLocation(
+                        content.location,
+                        content.travelingToLocation,
+                    )
+                    val normalizedTravelingToLocation = content.travelingToLocation
+                        .takeIf { normalizedLocation == LocationType.Traveling.value }
+                        .orEmpty()
+                    _currentUserLocation.value = FriendPresence(
+                        normalizedLocation,
+                        normalizedTravelingToLocation,
+                    )
+                    authService.applySocketUserLocation(normalizedLocation, normalizedTravelingToLocation)
+                }
+            }
+            "user-update" -> {
+                val content = json.decodeFromString<FriendUpdateContent>(socketEvent.content)
+                authService.applySocketUserUpdate(content.user)
+                if (content.user.state == UserState.Active.value) {
+                    _currentUserLocation.value = FriendPresence(LocationType.Offline.value)
                 }
             }
             FriendEvents.FriendOnline.typeName -> {
@@ -388,6 +407,14 @@ private fun presenceLocation(world: String, instance: String): String = when {
     world.startsWith("wrld_") && instance.isNotBlank() && instance != "offline" -> "$world:$instance"
     else -> instance
 }
+
+internal fun normalizeOwnLocation(location: String, travelingToLocation: String): String =
+    when {
+        location.startsWith("wrld_") -> location
+        location == LocationType.Private.value -> location
+        location == LocationType.Traveling.value && travelingToLocation.startsWith("wrld_") -> location
+        else -> LocationType.Offline.value
+    }
 
 private data class PendingFriendCacheSnapshot(
     val token: AccountCacheWriteToken,
