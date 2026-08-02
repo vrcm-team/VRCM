@@ -31,6 +31,14 @@ internal class AccountBoundTask<T>(
         }.also { it.start() }
     }
 
+    fun cancel() {
+        synchronized(lock) {
+            token = null
+            job?.cancel()
+            job = null
+        }
+    }
+
     suspend fun cancelAndJoin() {
         val runningJob = synchronized(lock) {
             token = null

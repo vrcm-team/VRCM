@@ -83,6 +83,7 @@ kotlin {
             implementation(compose.materialIconsExtended)
 //            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
+            implementation(libs.androidx.lifecycle.runtime.compose)
 //            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.multiplatform.settings)

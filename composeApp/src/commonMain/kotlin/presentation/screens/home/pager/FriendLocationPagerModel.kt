@@ -25,13 +25,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 internal class FriendUpdateSessionGate(
     initialSessionToken: AccountSessionToken? = null,
@@ -110,6 +116,11 @@ class FriendLocationPagerModel(
     private val accountTracker = AccountGenerationTracker(initialSession?.account?.userId)
     private val updateMutex = Mutex()
     private val refreshMutex = Mutex()
+    private val instanceFetchSemaphore = Semaphore(4)
+    private val instanceJobsLock = SynchronizedObject()
+    private val instanceJobs = mutableMapOf<String, Job>()
+    private val foregroundGeneration = atomic(0L)
+    private val isForeground = atomic(true)
     private val preloadTask = AccountBoundTask(
         scope = modelScope,
         isCurrent = accountTracker::isCurrent,
@@ -200,6 +211,24 @@ class FriendLocationPagerModel(
         preloadTask.start(token)
     }
 
+    fun onBackground() {
+        isForeground.value = false
+        foregroundGeneration.incrementAndGet()
+        preloadTask.cancel()
+        synchronized(instanceJobsLock) {
+            instanceJobs.values.forEach(Job::cancel)
+            instanceJobs.clear()
+        }
+    }
+
+    fun onForeground() {
+        if (isForeground.getAndSet(true)) return
+        foregroundGeneration.incrementAndGet()
+        val token = accountTracker.currentToken() ?: return
+        isRefreshing = true
+        preloadTask.start(token)
+    }
+
     fun findFriendLocation(userId: String, location: String): FriendLocation? =
         friendLocationsByUser.value[userId]?.takeIf { it.location == location }
 
@@ -264,7 +293,7 @@ class FriendLocationPagerModel(
                             includedIds.addAll(friends.map(FriendData::id))
                         }
                     }
-                    syncFriendLocations(token)
+                    syncFriendLocations(token, fetchInstanceDetails = false)
                 }
             }
             updateMutex.withLock {
@@ -276,13 +305,16 @@ class FriendLocationPagerModel(
         } finally {
             if (accountTracker.isCurrent(token)) {
                 if (!completed) updateMutex.withLock { presenceStore.cancelRefresh() }
-                syncFriendLocations(token)
+                syncFriendLocations(token, fetchInstanceDetails = completed)
                 isRefreshing = false
             }
         }
     }
 
-    private suspend fun syncFriendLocations(token: AccountGenerationToken? = null) = updateMutex.withLock {
+    private suspend fun syncFriendLocations(
+        token: AccountGenerationToken? = null,
+        fetchInstanceDetails: Boolean = true,
+    ) = updateMutex.withLock {
         if (token != null && !accountTracker.isCurrent(token)) return@withLock
         runCatching {
             val snapshot = presenceStore.snapshot()
@@ -315,7 +347,7 @@ class FriendLocationPagerModel(
                     )
                 }
             }
-            syncInstanceLocations(instances)
+            syncInstanceLocations(instances, fetchInstanceDetails)
             publishFriendLocationIndex()
         }.onApiFailure("FriendLocation") {
             SharedFlowCentre.toastText.emit(ToastText.Error(it))
@@ -331,7 +363,10 @@ class FriendLocationPagerModel(
         publishedState.publishIndex()
     }
 
-    private fun syncInstanceLocations(groups: Map<String, FriendLocationGroup>) {
+    private fun syncInstanceLocations(
+        groups: Map<String, FriendLocationGroup>,
+        fetchInstanceDetails: Boolean,
+    ) {
         if (groups.isEmpty()) {
             friendLocationMap.remove(LocationType.Instance)
             return
@@ -347,12 +382,14 @@ class FriendLocationPagerModel(
                 location.friends.keys != group.friends.mapTo(mutableSetOf(), FriendData::id) ||
                     location.travelingIds.value != group.travelingIds
             syncFriends(location, group)
-            fetchInstants(
-                location = locationId,
-                oldInstants = location.instants.value,
-                forceRefresh = presenceChanged && group.friends.isNotEmpty(),
-            ) {
-                location.instants.value = it
+            if (fetchInstanceDetails) {
+                fetchInstants(
+                    location = locationId,
+                    oldInstants = location.instants.value,
+                    forceRefresh = presenceChanged && group.friends.isNotEmpty(),
+                ) {
+                    location.instants.value = it
+                }
             }
         }
     }
@@ -365,12 +402,17 @@ class FriendLocationPagerModel(
     ) {
         // 已加载过实例信息则跳过网络请求
         if (!forceRefresh && oldInstants.worldId.isNotEmpty()) return
-        modelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                instancesApi.instanceByLocation(location)
-            }.onFailure {
-                SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
-            }.onSuccess { instance ->
+        if (!isForeground.value) return
+        val generation = foregroundGeneration.value
+        val job = synchronized(instanceJobsLock) {
+            if (instanceJobs[location]?.isActive == true) return
+            modelScope.launch(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                try {
+                    instanceFetchSemaphore.withPermit {
+                        val instance = authService.reTryAuthCatching {
+                            instancesApi.instanceByLocation(location)
+                        }.getOrNull() ?: return@withPermit
+                        if (!isCurrentForegroundGeneration(generation)) return@withPermit
                 val instantsVo = HomeInstanceVo(instance)
                 updateInstants(instantsVo)
                 // owner不会变所以不用更新
@@ -382,9 +424,21 @@ class FriendLocationPagerModel(
                     updateInstants(instantsVo)
                     fetchAndSetOwner(instance.ownerId, instantsVo)
                 }
-            }
+                    }
+                } finally {
+                    synchronized(instanceJobsLock) {
+                        if (instanceJobs[location] == coroutineContext[Job]) {
+                            instanceJobs.remove(location)
+                        }
+                    }
+                }
+            }.also { instanceJobs[location] = it }
         }
+        job.start()
     }
+
+    private fun isCurrentForegroundGeneration(generation: Long): Boolean =
+        isForeground.value && foregroundGeneration.value == generation
 
     /**
      * 获取房间实例的拥有者名称

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
@@ -35,14 +37,27 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
+import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun App() {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     KoinContext {
+        val webSocketApi = koinInject<WebSocketApi>()
+        val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
+        LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+            friendLocationPagerModel.onBackground()
+            webSocketApi.onBackground()
+        }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            webSocketApi.onForeground()
+            friendLocationPagerModel.onForeground()
+        }
         SettingsProvider {
             Navigator(
                 screen = StartupAnimeScreen,
