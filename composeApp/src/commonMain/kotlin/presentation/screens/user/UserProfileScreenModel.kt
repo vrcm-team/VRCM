@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
@@ -261,13 +262,25 @@ class UserProfileScreenModel(
                         ?: ownLocation?.location.takeIf { userProfileVO.id == cacheOwnerUserId },
                     locationsByUser = locationsByUser,
                 )
-            }.collect { (_, location) -> _friendLocation.value = location }
+            }.collect { (friend, location) ->
+                _friendLocation.value = location
+                if (friend != null && userProfileVO.id != cacheOwnerUserId) {
+                    _userState.value = _userState.value.withCurrentFriendPresence(friend)
+                }
+            }
         }
     }
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
         cachedUserData = cache.user
-        val profile = UserProfileVo(cache.user).withSelfIdentity()
+        val cachedUser = cache.user.asCachedOffline()
+        val profile = UserProfileVo(cachedUser)
+            .withSelfIdentity()
+            .let { restored ->
+                friendService.friendState.value[cache.user.id]
+                    ?.let(restored::withCurrentFriendPresence)
+                    ?: restored
+            }
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
@@ -719,3 +732,22 @@ private fun UserProfileVo.toFriendData() =
         userIcon = userIcon,
         pronouns = pronouns,
     )
+
+internal fun UserData.asCachedOffline(): UserData = copy(
+    state = UserState.Offline,
+    status = UserStatus.Offline,
+    location = LocationType.Offline.value,
+    instanceId = "",
+    worldId = "",
+    travelingToInstance = null,
+    travelingToLocation = null,
+    travelingToWorld = null,
+)
+
+internal fun UserProfileVo.withCurrentFriendPresence(friend: FriendData): UserProfileVo = copy(
+    status = friend.status,
+    statusDescription = friend.statusDescription,
+    location = friend.location,
+    lastLogin = friend.lastLogin,
+    lastPlatform = friend.lastPlatform,
+)
