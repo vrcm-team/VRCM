@@ -87,6 +87,5 @@ data class WorldProfileVo(
         authorID = instant.worldAuthorId,
         authorName = instant.worldAuthorName,
         tags = instant.worldAuthorTag,
-        instances = mutableListOf(InstanceVo(instant)),
     )
 }

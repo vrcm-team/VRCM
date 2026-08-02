@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -97,7 +99,7 @@ class WorldProfileScreen(
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
-            screenModel.refreshWorldData(worldProfileVO)
+            screenModel.loadWorldData(worldProfileVO)
         }
 
         CompositionLocalProvider(
@@ -108,7 +110,7 @@ class WorldProfileScreen(
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
-                onRefresh = { screenModel.refreshWorldData(worldProfileVO) },
+                onRefresh = screenModel::refreshWorldData,
                 sharedKeyPrefix = sharedKeyPrefix,
             )
         }
@@ -714,6 +716,27 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null
         )
+        IconButton(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = sysTopPadding, end = 10.dp)
+                .size(topBarHeight),
+            enabled = !isRefreshing,
+            onClick = onRefresh,
+        ) {
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
         // 标题显示
         Box(
             modifier = Modifier
@@ -740,13 +763,6 @@ private fun RenderTopBar(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // 刷新状态指示
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
-                }
             }
         }
     }

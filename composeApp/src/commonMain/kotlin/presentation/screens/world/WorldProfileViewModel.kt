@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import androidx.compose.runtime.toMutableStateList
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.extensions.removeFirst
@@ -20,14 +19,20 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
+import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
  */
+@OptIn(ExperimentalTime::class)
 class WorldProfileScreenModel(
     private val worldsApi: WorldsApi,
     private val instancesApi: InstancesApi,
@@ -36,6 +41,7 @@ class WorldProfileScreenModel(
     private val authService: AuthService,
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
+    private val worldProfileCacheDao: WorldProfileCacheDao,
 ) : ScreenModel {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -52,15 +58,65 @@ class WorldProfileScreenModel(
     /**
      * 刷新世界数据
      */
-    fun refreshWorldData(worldProfileVO: WorldProfileVo) {
+    fun loadWorldData(worldProfileVO: WorldProfileVo) {
         _worldProfileState.value = worldProfileVO
+        val worldId = worldProfileVO.worldId
+        if (worldId.isBlank()) return
+
+        val cached = worldProfileCacheDao.load(worldId)
+        if (cached != null) {
+            _worldProfileState.value = WorldProfileVo(
+                world = cached.world,
+                instancesList = worldProfileVO.instances,
+                platformFileSizes = worldProfileVO.platformFileSizes,
+            )
+        }
+
+        val shouldRefreshProfile = cached == null ||
+            cached.isExpired(Clock.System.now().toEpochMilliseconds()) ||
+            cached.world.instances == null
+        if (shouldRefreshProfile) {
+            refreshWorldData()
+        } else {
+            loadCachedInstances(cached.world.instances.orEmpty())
+        }
+    }
+
+    private fun loadCachedInstances(worldInstances: List<List<String>>) {
+        val profile = _worldProfileState.value ?: return
+        val instanceIds = collectInstanceIds(profile, worldInstances)
+        if (instanceIds.isEmpty() || _isLoading.value) return
+
+        _isLoading.value = true
+        screenModelScope.launch(Dispatchers.IO) {
+            try {
+                loadInstanceData(instanceIds)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Error(error.message ?: "Failed to load instance data")
+                )
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun refreshWorldData() {
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
         _isLoading.value = true
-        screenModelScope.launch(Dispatchers.IO){
-            // 加载世界收藏组
-            loadWorldInfo(worldId)
-            _isLoading.value = false
+        screenModelScope.launch(Dispatchers.IO) {
+            try {
+                loadWorldInfo(worldId)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Error(error.message ?: "Failed to load world data")
+                )
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -68,6 +124,13 @@ class WorldProfileScreenModel(
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
+            worldProfileCacheDao.save(
+                WorldProfileCache(
+                    world = worldData,
+                    cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                )
+            )
+            if (_worldProfileState.value?.worldId != worldId) return@onSuccess
 
             // TODO
 //            val platformFileSizes = mutableStateListOf<PlatformFileSize>()
@@ -87,10 +150,10 @@ class WorldProfileScreenModel(
 //                }
 //            }
             // 获取实例ID列表
-            val instanceIds =
-                _worldProfileState.value?.instances?.associate { it.instanceId to it.owner.value }?: emptyMap()
-            val mergeInstanceIds = instanceIds + (worldData.instances?.mapNotNull { it.firstOrNull() }?.filter { it.isNotBlank() }?.associateWith { null }
-                ?: emptyMap())
+            val mergeInstanceIds = collectInstanceIds(
+                profile = _worldProfileState.value ?: return@onSuccess,
+                worldInstances = worldData.instances.orEmpty(),
+            )
             // 如果有实例ID，则获取实例信息
             if (mergeInstanceIds.isNotEmpty()) {
                 loadInstanceData(mergeInstanceIds)
@@ -100,17 +163,39 @@ class WorldProfileScreenModel(
         }
     }
 
+    private fun collectInstanceIds(
+        profile: WorldProfileVo,
+        worldInstances: List<List<String>>,
+    ): Map<String, Owner?> {
+        val currentInstanceIds = profile.instances
+            .associate { it.instanceId to it.owner.value }
+            .filterKeys { it.isNotBlank() }
+        val publicInstanceIds = worldInstances
+            .mapNotNull { it.firstOrNull() }
+            .filter { it.isNotBlank() }
+            .associateWith { null }
+        return currentInstanceIds + publicInstanceIds
+    }
+
     /**
      * 加载实例数据
      */
     private suspend fun loadInstanceData(instanceIds: Map<String, Owner?>) {
         val currentProfile = _worldProfileState.value ?: return
-        val instanceVos = currentProfile.instances.toMutableStateList()
-        _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos)
+        val instanceVos = currentProfile.instances.toMutableList()
+        _worldProfileState.value = currentProfile.copy(instances = instanceVos)
         authService.reTryAuthCatching {
             // 获取所有实例数据
-            instanceIds.keys.asFlow().map {
-                worldsApi.getWorldInstanceById(currentProfile.worldId, it)
+            instanceIds.keys.asFlow().mapNotNull { instanceId ->
+                try {
+                    worldsApi.getWorldInstanceById(currentProfile.worldId, instanceId)
+                } catch (error: Throwable) {
+                    if (error is CancellationException) throw error
+                    SharedFlowCentre.toastText.emit(
+                        ToastText.Error(error.message ?: "Failed to load instance data")
+                    )
+                    null
+                }
             }.catch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance data"))
             }.map { instanceData ->
@@ -118,6 +203,7 @@ class WorldProfileScreenModel(
                 val instanceVo = InstanceVo(instanceData, owner)
                 instanceVos.removeFirst { it.id == instanceData.id }
                 instanceVos.add(instanceVo)
+                _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos.toList())
                 instanceData.ownerId to owner
             }.collect { (ownerId, owner) ->
                 // 如果实例是活跃的，则获取实例的拥有者名称
@@ -227,7 +313,7 @@ class WorldProfileScreenModel(
      */
     fun onWorldFavorite(favoriteGroupId: Result<String>) {
         favoriteGroupId.onSuccess {
-            _worldProfileState.value?.let(::refreshWorldData)
+            refreshWorldData()
         }
     }
 } 

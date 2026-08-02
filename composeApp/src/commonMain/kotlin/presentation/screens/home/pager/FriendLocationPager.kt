@@ -27,7 +27,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -98,10 +97,6 @@ fun Pager.FriendLocationPager(
     val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
         if (navigator.size <= 1) {
             val currentLocation = friendLocation.instants.value
-            val instances = friendLocationMap[LocationType.Instance]
-                ?.map { it.instants.value }
-                ?.filter { it.worldId == currentLocation.worldId }
-                ?.map { InstanceVo(it) } ?: emptyList()
             // 创建临时的 WorldProfileVo
             val tempWorldProfileVo = WorldProfileVo(
                 worldId = currentLocation.worldId,
@@ -111,7 +106,6 @@ fun Pager.FriendLocationPager(
                 authorID = currentLocation.worldAuthorId,
                 authorName = currentLocation.worldAuthorName,
                 tags = currentLocation.worldAuthorTag,
-                instances = instances.toMutableStateList(),
             )
             navigator push WorldProfileScreen(
                 worldProfileVO = tempWorldProfileVo,

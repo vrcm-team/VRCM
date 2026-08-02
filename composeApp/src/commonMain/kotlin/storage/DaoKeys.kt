@@ -88,6 +88,16 @@ object DaoKeys{
         const val KEY_PREFIX = "${PREFIX}.user.profile.cache"
     }
 
+    object WorldProfileCache {
+        const val NAME = "${PREFIX}.world.profile.cache"
+        const val KEY_PREFIX = "${PREFIX}.world.profile.cache"
+    }
+
+    object GroupProfileCache {
+        const val NAME = "${PREFIX}.group.profile.cache"
+        const val KEY_PREFIX = "${PREFIX}.group.profile.cache"
+    }
+
     object FriendListCache {
         const val NAME = "${PREFIX}.friend.list.cache"
         const val KEY_PREFIX = "${PREFIX}.friend.list.cache"
