@@ -457,15 +457,14 @@ class FriendListPagerModel(
      */
     private suspend fun doRefreshAvatarList() {
         authService.reTryAuthCatching {
-            // 分页获取全部收藏模型
-            val remoteAvatars = mutableListOf<AvatarData>()
-            var offset = 0
-            val pageSize = 50
-            do {
-                val page = avatarsApi.getFavoritedAvatars(n = pageSize, offset = offset)
-                remoteAvatars.addAll(page)
-                offset += pageSize
-            } while (page.size >= pageSize)
+            // /avatars/favorites 默认只返回默认收藏组，必须按组 tag 分别请求。
+            val remoteTags = remoteAvatarFavoriteTags(avatarFavoriteGroupsFlow.value).let { tags ->
+                // 保留没有远程分组数据时的兼容行为（例如分组接口暂时不可用）。
+                if (tags.isEmpty()) listOf<String?>(null) else tags
+            }
+            val remoteAvatars = remoteTags.flatMap { tag ->
+                fetchFavoritedAvatars(tag)
+            }
 
             val localAvatars = localFavoritedAvatarIds(avatarFavoriteGroupsFlow.value).mapNotNull { avatarId ->
                 authService.reTryAuthCatching { avatarsApi.getAvatarById(avatarId) }.getOrNull()
@@ -479,6 +478,22 @@ class FriendListPagerModel(
         }.onFailure {
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
         }
+    }
+
+    private suspend fun fetchFavoritedAvatars(tag: String?): List<AvatarData> {
+        val avatars = mutableListOf<AvatarData>()
+        val pageSize = 50
+        var offset = 0
+        do {
+            val page = avatarsApi.getFavoritedAvatars(
+                n = pageSize,
+                offset = offset,
+                tag = tag,
+            )
+            avatars.addAll(page)
+            offset += pageSize
+        } while (page.size >= pageSize)
+        return avatars
     }
 
     /**
@@ -639,3 +654,13 @@ internal fun localFavoritedAvatarIds(
     ?.value
     .orEmpty()
     .map { it.favoriteId }
+
+internal fun remoteAvatarFavoriteTags(
+    groups: Map<FavoriteGroupData, List<FavoriteData>>,
+): List<String> = groups.keys
+    .asSequence()
+    .filter { group -> group.ownerId != "local" && group.type == Avatar.value }
+    .map { it.name }
+    .filter(String::isNotBlank)
+    .distinct()
+    .toList()

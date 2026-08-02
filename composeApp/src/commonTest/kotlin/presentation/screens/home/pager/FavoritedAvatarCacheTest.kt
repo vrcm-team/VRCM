@@ -29,6 +29,18 @@ class FavoritedAvatarCacheTest {
         assertEquals(listOf("avtr_local"), localFavoritedAvatarIds(groups))
     }
 
+    @Test
+    fun remoteAvatarFavoriteTagsExcludeLocalAndOtherFavoriteTypes() {
+        val groups = linkedMapOf(
+            group(id = "avatars1", ownerId = "usr_owner", type = "avatar") to listOf(favorite("avtr_one")),
+            group(id = "avatars2", ownerId = "usr_owner", type = "avatar") to listOf(favorite("avtr_two")),
+            group(id = "local-avatar", ownerId = "local", type = "avatar") to listOf(favorite("avtr_local")),
+            group(id = "worlds1", ownerId = "usr_owner", type = "world") to listOf(favorite("wrld_one")),
+        )
+
+        assertEquals(listOf("avatars1", "avatars2"), remoteAvatarFavoriteTags(groups))
+    }
+
     private fun avatar(id: String, name: String = id) = AvatarData(id = id, name = name)
 
     private fun group(id: String, ownerId: String, type: String) = FavoriteGroupData(
