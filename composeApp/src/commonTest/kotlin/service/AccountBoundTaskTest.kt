@@ -3,7 +3,9 @@ package io.github.vrcmteam.vrcm.service
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -41,6 +43,27 @@ class AccountBoundTaskTest {
         accountBStarted.await()
         assertFalse(tracker.isCurrent(accountA))
         assertTrue(tracker.isCurrent(accountB))
+        task.cancelAndJoin()
+    }
+
+    @Test
+    fun cancelledTaskCanRestartForTheSameAccountOnForeground() = runTest {
+        val tracker = AccountGenerationTracker("usr_a")
+        val token = tracker.currentToken()!!
+        var starts = 0
+        val task = AccountBoundTask(
+            scope = this,
+            isCurrent = tracker::isCurrent,
+            runTask = { starts++ },
+        )
+
+        task.start(token)
+        runCurrent()
+        task.cancel()
+        task.start(token)
+        runCurrent()
+
+        assertEquals(2, starts)
         task.cancelAndJoin()
     }
 }

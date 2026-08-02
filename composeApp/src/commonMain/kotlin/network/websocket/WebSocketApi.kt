@@ -14,6 +14,9 @@ import io.ktor.client.request.*
 import io.ktor.client.call.*
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.*
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import org.koin.core.logger.Logger
 
 class WebSocketApi(
@@ -22,20 +25,37 @@ class WebSocketApi(
 ) {
 
     private var currentJob: Job? = null
-    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val connectionLock = SynchronizedObject()
+    private val isForeground = atomic(true)
 
     init {
         scope.launch {
             SharedFlowCentre.authed.collect { session ->
-                currentJob?.cancelAndJoin()
-                currentJob = launch { startWebSocket(session.token) }
+                if (isForeground.value) replaceConnection(session.token)
             }
         }
         scope.launch {
             SharedFlowCentre.logout.collect {
-                currentJob?.cancelAndJoin()
-                currentJob = null
+                replaceConnection(null)
             }
+        }
+    }
+
+    fun onBackground() {
+        isForeground.value = false
+        replaceConnection(null)
+    }
+
+    fun onForeground() {
+        if (isForeground.getAndSet(true)) return
+        replaceConnection(SharedFlowCentre.currentSession.value?.token)
+    }
+
+    private fun replaceConnection(sessionToken: AccountSessionToken?) = synchronized(connectionLock) {
+        currentJob?.cancel()
+        currentJob = sessionToken?.let { token ->
+            scope.launch { startWebSocket(token) }
         }
     }
 
