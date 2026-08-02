@@ -189,7 +189,8 @@ class UserProfileScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
 ) : ScreenModel {
 
-    private val _userState = mutableStateOf(userProfileVO)
+    private val cacheOwnerUserId = authService.accountDto().userId
+    private val _userState = mutableStateOf(userProfileVO.withSelfIdentity())
     val userState by _userState
 
     private val _friendLocation = mutableStateOf<FriendLocation?>(null)
@@ -229,14 +230,21 @@ class UserProfileScreenModel(
     private val loadCoordinator = UserProfileLoadCoordinator()
     private val cacheMutex = Mutex()
     private var cachedUserData: UserData? = null
-    private val cacheOwnerUserId = authService.accountDto().userId
+
+    /**
+     * The user endpoint does not reliably include the fields used by
+     * UserProfileVo's UserData constructor to identify the current user.
+     * The account id is the authoritative source for this screen.
+     */
+    private fun UserProfileVo.withSelfIdentity(): UserProfileVo =
+        copy(isSelf = id == cacheOwnerUserId)
 
     init {
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
         if (userProfileVO.id == cacheOwnerUserId) {
             screenModelScope.launch {
                 authService.currentUserState.collect { currentUser ->
-                    currentUser?.let { _userState.value = UserProfileVo(it) }
+                    currentUser?.let { _userState.value = UserProfileVo(it).withSelfIdentity() }
                 }
             }
         }
@@ -259,7 +267,7 @@ class UserProfileScreenModel(
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
         cachedUserData = cache.user
-        val profile = UserProfileVo(cache.user)
+        val profile = UserProfileVo(cache.user).withSelfIdentity()
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
@@ -305,7 +313,7 @@ class UserProfileScreenModel(
                                 if (it.id == cacheOwnerUserId) {
                                     authService.applyOwnProfileRefresh(it)
                                 }
-                                val profile = UserProfileVo(it)
+                                val profile = UserProfileVo(it).withSelfIdentity()
                                 if (_userState.value != profile) {
                                     _userState.value = profile
                                     computeFriendLocation(profile.location)
