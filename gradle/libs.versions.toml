@@ -25,6 +25,7 @@ chrisbanes-haze = "1.3.1"
 landscapist = "2.4.7"
 robolectric = "4.16.1"
 filekit = "0.11.0"
+jna = "5.17.0"
 
 [libraries]
 # kotlinx
@@ -82,6 +83,7 @@ landscapist-coil = { module = "com.github.skydoves:landscapist-coil3", version.r
 landscapist-animation = { module = "com.github.skydoves:landscapist-animation", version.ref = "landscapist" }
 landscapist-placeholder = { module = "com.github.skydoves:landscapist-placeholder", version.ref = "landscapist" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 
 # chrisbanes-haze
 chrisbanes-haze = { module = "dev.chrisbanes.haze:haze", version.ref = "chrisbanes-haze" }

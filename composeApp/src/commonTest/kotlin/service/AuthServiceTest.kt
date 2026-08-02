@@ -9,7 +9,9 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandler
@@ -17,6 +19,7 @@ import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -34,7 +37,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class AuthServiceTest {
+class AuthServiceTest : MainDispatcherTest() {
     @AfterTest
     fun clearSession() = runTest { SharedFlowCentre.emitLogout() }
 
@@ -114,10 +117,11 @@ class AuthServiceTest {
         val cookies = PersistentCookiesStorage(EmptyLogger())
         val client = HttpClient(MockEngine) {
             engine { addHandler(handler) }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             install(HttpCookies) { storage = cookies }
         }
-        val accountDao = AccountDao(MapSettings()).also { it.saveAccountInfo(cachedAccount()) }
+        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { it.saveAccountInfo(cachedAccount()) }
         val service = AuthService(
             authApi = AuthApi(client),
             accountDao = accountDao,

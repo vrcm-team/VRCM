@@ -61,6 +61,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
 
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.jna.platform)
         }
 
         val desktopTest by getting
