@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.*
 import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
@@ -22,8 +21,10 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendPresence
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,6 +93,10 @@ class FriendLocationPagerModel(
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
 ) : ScreenModel {
+    // This model is a Koin singleton because its location index is shared by
+    // the home pager and profile screens. Keep its workers alive across the
+    // logout/login navigation cycle so a new session can restart preloading.
+    private val modelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val initialSession = SharedFlowCentre.currentSession.value
     private val publishedState = FriendLocationPublishedState()
     val friendLocationMap = publishedState.locationMap
@@ -106,7 +111,7 @@ class FriendLocationPagerModel(
     private val updateMutex = Mutex()
     private val refreshMutex = Mutex()
     private val preloadTask = AccountBoundTask(
-        scope = screenModelScope,
+        scope = modelScope,
         isCurrent = accountTracker::isCurrent,
         runTask = { token ->
             doRefreshFriendLocationForAccount(
@@ -125,14 +130,14 @@ class FriendLocationPagerModel(
 
     init {
         accountTracker.currentToken()?.let(preloadTask::start)
-        screenModelScope.launch {
+        modelScope.launch {
             friendService.friendState.collect { friends ->
                 if (!hasCompletedInitialRefresh) return@collect
                 updateMutex.withLock { presenceStore.replaceFriends(friends.values) }
                 syncFriendLocations()
             }
         }
-        screenModelScope.launch {
+        modelScope.launch {
             friendService.currentUserLocation.collect { presence ->
                 var shouldSync = false
                 updateMutex.withLock {
@@ -142,7 +147,7 @@ class FriendLocationPagerModel(
                 if (shouldSync) syncFriendLocations()
             }
         }
-        screenModelScope.launch {
+        modelScope.launch {
             friendService.friendUpdateFlow.collect { update ->
                 val refreshRequired = updateMutex.withLock {
                     if (!acceptsFriendUpdate(update.sessionToken)) return@withLock null
@@ -156,7 +161,7 @@ class FriendLocationPagerModel(
                 }
             }
         }
-        screenModelScope.launch {
+        modelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 if (session == null) {
                     accountTracker.clear()
@@ -360,7 +365,7 @@ class FriendLocationPagerModel(
     ) {
         // 已加载过实例信息则跳过网络请求
         if (!forceRefresh && oldInstants.worldId.isNotEmpty()) return
-        screenModelScope.launch(Dispatchers.IO) {
+        modelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 instancesApi.instanceByLocation(location)
             }.onFailure {

@@ -10,7 +10,6 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
-import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -150,25 +149,6 @@ internal fun resolveFriendLocation(
     return locationsByUser[userId]?.takeIf { it.location == location }
 }
 
-internal fun UserData.asCachedOffline(): UserData = copy(
-    state = UserState.Offline,
-    status = UserStatus.Offline,
-    location = LocationType.Offline.value,
-    instanceId = "",
-    worldId = "",
-    travelingToInstance = null,
-    travelingToLocation = null,
-    travelingToWorld = null,
-)
-
-internal fun UserProfileVo.withCurrentFriendPresence(friend: FriendData): UserProfileVo = copy(
-    status = friend.status,
-    statusDescription = friend.statusDescription,
-    location = friend.location,
-    lastLogin = friend.lastLogin,
-    lastPlatform = friend.lastPlatform,
-)
-
 internal data class FavoritedWorldGroupLoad(
     val groupKey: String,
     val displayName: String,
@@ -273,28 +253,13 @@ class UserProfileScreenModel(
                         ?: ownLocation?.location.takeIf { userProfileVO.id == cacheOwnerUserId },
                     locationsByUser = locationsByUser,
                 )
-            }.collect { (friend, location) ->
-                if (friend != null) {
-                    _userState.value = _userState.value.withCurrentFriendPresence(friend)
-                }
-                _friendLocation.value = location
-            }
+            }.collect { (_, location) -> _friendLocation.value = location }
         }
     }
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
-        if (cache.user.id == cacheOwnerUserId) {
-            cachedUserData = cache.user
-            _userGroups.value = visibleUserGroups(cache.groups, true)
-            _mutualGroups.value = cache.mutualGroups
-            _createdWorlds.value = cache.createdWorlds
-            _createdAvatars.value = cache.createdAvatars
-            setFavoritedWorldGroups(cache.favoritedWorlds)
-            return
-        }
-        val cachedUser = cache.user.asCachedOffline()
-        cachedUserData = cachedUser
-        val profile = UserProfileVo(cachedUser)
+        cachedUserData = cache.user
+        val profile = UserProfileVo(cache.user)
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
