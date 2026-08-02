@@ -20,6 +20,7 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
@@ -56,7 +57,7 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
 
         val json = Json { ignoreUnknownKeys = true }
         val client = testClient(json)
-        val accountDao = AccountDao(MapSettings()).also { it.saveAccountInfo(account) }
+        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { it.saveAccountInfo(account) }
         val friendListCacheDao = FriendListCacheDao(MapSettings())
         val cacheManager = AccountCacheManager(
             friendListCacheDao = friendListCacheDao,

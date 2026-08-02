@@ -7,6 +7,9 @@ import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.DesktopAppPlatform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DesktopPlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
+import io.github.vrcmteam.vrcm.storage.DaoKeys
+import io.github.vrcmteam.vrcm.storage.DesktopSecureStorage
+import io.github.vrcmteam.vrcm.storage.SecureStorage
 import okio.FileSystem
 import org.koin.core.logger.Logger
 import org.koin.core.logger.PrintLogger
@@ -22,6 +25,28 @@ import java.nio.file.StandardCopyOption
 import java.util.*
 
 internal const val MAX_SETTINGS_FILE_SIZE = 64L * 1024L * 1024L
+
+internal fun desktopSettingsDirectory(
+    environment: Map<String, String> = System.getenv(),
+    osName: String = System.getProperty("os.name"),
+    userHome: String = System.getProperty("user.home"),
+): File = when {
+    osName.startsWith("Windows", ignoreCase = true) ->
+        File(environment["APPDATA"] ?: File(userHome, "AppData/Roaming").path, "VRCM")
+    osName.startsWith("Mac", ignoreCase = true) ->
+        File(userHome, "Library/Application Support/VRCM")
+    else -> File(environment["XDG_CONFIG_HOME"] ?: File(userHome, ".config").path, "vrcm")
+}
+
+internal fun migrateLegacySettingsFile(legacyFile: File, targetFile: File) {
+    if (targetFile.exists() || !legacyFile.isFile) return
+    targetFile.parentFile.mkdirs()
+    try {
+        Files.move(legacyFile.toPath(), targetFile.toPath(), StandardCopyOption.ATOMIC_MOVE)
+    } catch (_: AtomicMoveNotSupportedException) {
+        Files.move(legacyFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+}
 
 internal fun loadSettingsProperties(file: File): Properties {
     if (file.exists() && file.length() > MAX_SETTINGS_FILE_SIZE) {
@@ -59,8 +84,10 @@ actual val platformModule: Module = module {
     single<Settings.Factory> {
         object : Settings.Factory {
             override fun create(name: String?): Settings {
-                // TODO：保存到非临时文件夹避免误删
-                val file = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("$name-settings.properties").toFile()
+                val directory = desktopSettingsDirectory().apply { mkdirs() }
+                val file = directory.resolve("$name-settings.properties")
+                val legacyFile = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("$name-settings.properties").toFile()
+                migrateLegacySettingsFile(legacyFile, file)
                 if (!file.exists()) {
                     file.createNewFile()
                 }
@@ -73,4 +100,5 @@ actual val platformModule: Module = module {
     }
     singleOf<AppPlatform>(::DesktopAppPlatform)
     singleOf(::DesktopPlatformImageCodec) bind PlatformImageCodec::class
+    single<SecureStorage> { DesktopSecureStorage(desktopSettingsDirectory(), DaoKeys.Account.NAME) }
 }

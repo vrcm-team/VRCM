@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheDao
 import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.SettingsDao
+import io.github.vrcmteam.vrcm.storage.SecureStorage
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
 import io.ktor.client.plugins.cookies.*
@@ -21,7 +22,7 @@ import org.koin.dsl.module
 
 internal val storageModule: Module = module {
     factory<Settings> { (name: String) -> get<Settings.Factory>().create(name) }
-    single { AccountDao(get { parametersOf(DaoKeys.Account.NAME) }) }
+    single { AccountDao(get { parametersOf(DaoKeys.Account.NAME) }, get<SecureStorage>()) }
     single { SettingsDao(get { parametersOf(DaoKeys.Settings.NAME) }) }
     single { FavoriteLocalDao(get { parametersOf(DaoKeys.FavoriteLocal.NAME) }) }
     single { FriendListCacheDao(get { parametersOf(DaoKeys.FriendListCache.NAME) }) }

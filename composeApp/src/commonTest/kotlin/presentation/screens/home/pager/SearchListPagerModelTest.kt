@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.WorldSearchOptions
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
+import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
@@ -502,7 +503,7 @@ private fun createFixture(
             json(Json { ignoreUnknownKeys = true })
         }
     }
-    val accountDao = AccountDao(MapSettings()).also { dao ->
+    val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { dao ->
         account?.let(dao::saveAccountInfo)
     }
     val authService = AuthService(

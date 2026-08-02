@@ -14,6 +14,7 @@ import okio.ByteString.Companion.decodeBase64
 
 class AccountDao(
     private val accountSettings: Settings,
+    private val secureStorage: SecureStorage,
 ) {
 
     fun saveAccountInfo(accountDto: AccountDto) {
@@ -21,11 +22,20 @@ class AccountDao(
             .filter { it.startsWith(CURRENT_KEY) }
             .forEach { accountSettings[it] = false }
         accountSettings["${USERNAME_KEY}|${accountDto.userId}"] = accountDto.username
-        accountDto.password?.let { accountSettings["${PASSWORD_KEY}|${accountDto.userId}"] = it.encodeBase64() }
+        accountDto.password?.let {
+            secureStorage.put(secretKey(PASSWORD_KEY, accountDto.userId), it)
+            accountSettings.remove("${PASSWORD_KEY}|${accountDto.userId}")
+        }
         accountDto.iconUrl?.let { accountSettings["${ICON_URL_KEY}|${accountDto.userId}"] = it }
         accountSettings["${CURRENT_KEY}|${accountDto.userId}"] = true
-        accountDto.authCookie?.let { accountSettings["${AUTH_KEY}|${accountDto.userId}"] = it }
-        accountDto.twoFactorAuthCookie?.let { accountSettings["${TWO_FACTOR_AUTH_KEY}|${accountDto.userId}"] = it }
+        accountDto.authCookie?.let {
+            secureStorage.put(secretKey(AUTH_KEY, accountDto.userId), it)
+            accountSettings.remove("${AUTH_KEY}|${accountDto.userId}")
+        }
+        accountDto.twoFactorAuthCookie?.let {
+            secureStorage.put(secretKey(TWO_FACTOR_AUTH_KEY, accountDto.userId), it)
+            accountSettings.remove("${TWO_FACTOR_AUTH_KEY}|${accountDto.userId}")
+        }
     }
 
     fun accountDtoList(): List<AccountDto> =
@@ -39,11 +49,17 @@ class AccountDao(
                 AccountDto(
                     userId = userId,
                     username = accountSettings.getStringOrNull("${USERNAME_KEY}|${userId}").orEmpty(),
-                    password = accountSettings.getStringOrNull("${PASSWORD_KEY}|${userId}")?.decodeBase64()?.utf8(),
+                    password = readSecret(PASSWORD_KEY, userId) {
+                        accountSettings.getStringOrNull("${PASSWORD_KEY}|${userId}")?.decodeBase64()?.utf8()
+                    },
                     iconUrl = accountSettings.getStringOrNull("${ICON_URL_KEY}|${userId}"),
                     current = accountSettings.getBoolean("${CURRENT_KEY}|${userId}", false),
-                    authCookie = accountSettings.getStringOrNull("${AUTH_KEY}|${userId}"),
-                    twoFactorAuthCookie = accountSettings.getStringOrNull("${TWO_FACTOR_AUTH_KEY}|${userId}")
+                    authCookie = readSecret(AUTH_KEY, userId) {
+                        accountSettings.getStringOrNull("${AUTH_KEY}|${userId}")
+                    },
+                    twoFactorAuthCookie = readSecret(TWO_FACTOR_AUTH_KEY, userId) {
+                        accountSettings.getStringOrNull("${TWO_FACTOR_AUTH_KEY}|${userId}")
+                    }
                 )
             }
 
@@ -62,12 +78,14 @@ class AccountDao(
 
     fun clearAccount() {
         accountSettings.clear()
+        secureStorage.clear()
     }
 
     fun logout(userId: String) {
         accountSettings.keys
             .firstOrNull { it == "${AUTH_KEY}|${userId}" }
             ?.let(accountSettings::remove)
+        secureStorage.remove(secretKey(AUTH_KEY, userId))
     }
 
     fun removeAccount(userId: String) {
@@ -76,6 +94,19 @@ class AccountDao(
             .forEach {
                 accountSettings.remove(it)
             }
+        listOf(PASSWORD_KEY, AUTH_KEY, TWO_FACTOR_AUTH_KEY).forEach { type ->
+            secureStorage.remove(secretKey(type, userId))
+        }
+    }
+
+    private fun secretKey(type: String, userId: String) = "$userId|${type.substringAfterLast('.')}"
+
+    private fun readSecret(type: String, userId: String, legacy: () -> String?): String? {
+        secureStorage.get(secretKey(type, userId))?.let { return it }
+        val oldValue = legacy() ?: return null
+        secureStorage.put(secretKey(type, userId), oldValue)
+        accountSettings.remove("$type|$userId")
+        return oldValue
     }
 
 }
