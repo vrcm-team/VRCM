@@ -84,7 +84,10 @@ actual val platformModule: Module = module {
     single<Settings.Factory> {
         object : Settings.Factory {
             override fun create(name: String?): Settings {
-                val file = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("$name-settings.properties").toFile()
+                val directory = desktopSettingsDirectory().apply { mkdirs() }
+                val file = directory.resolve("$name-settings.properties")
+                val legacyFile = FileSystem.SYSTEM_TEMPORARY_DIRECTORY.resolve("$name-settings.properties").toFile()
+                migrateLegacySettingsFile(legacyFile, file)
                 if (!file.exists()) {
                     file.createNewFile()
                 }
