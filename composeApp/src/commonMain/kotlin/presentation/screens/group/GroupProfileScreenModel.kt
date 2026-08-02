@@ -13,6 +13,8 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
@@ -23,12 +25,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import org.koin.core.logger.Logger
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class GroupProfileScreenModel(
     private val groupsApi: GroupsApi,
     private val usersApi: UsersApi,
     private val authService: AuthService,
     private val logger: Logger,
+    private val groupProfileCacheDao: GroupProfileCacheDao,
 ) : ScreenModel {
 
     private val _groupProfileState = MutableStateFlow<GroupProfileVo?>(null)
@@ -52,6 +58,14 @@ class GroupProfileScreenModel(
     private val _postsLoading = MutableStateFlow(false)
     val postsLoading: StateFlow<Boolean> = _postsLoading.asStateFlow()
 
+    private val _postsLoadingMore = MutableStateFlow(false)
+    val postsLoadingMore: StateFlow<Boolean> = _postsLoadingMore.asStateFlow()
+
+    private val _postsEndReached = MutableStateFlow(false)
+    val postsEndReached: StateFlow<Boolean> = _postsEndReached.asStateFlow()
+
+    private var postsNextOffset = 0
+
     private val _membersLoading = MutableStateFlow(false)
     val membersLoading: StateFlow<Boolean> = _membersLoading.asStateFlow()
 
@@ -64,17 +78,44 @@ class GroupProfileScreenModel(
     private val _isActionLoading = MutableStateFlow(false)
     val isActionLoading: StateFlow<Boolean> = _isActionLoading.asStateFlow()
 
-    fun refreshGroupData(groupProfileVo: GroupProfileVo) {
+    fun loadGroupData(groupProfileVo: GroupProfileVo) {
         _groupProfileState.value = groupProfileVo
+        val groupId = groupProfileVo.groupId
+        if (groupId.isBlank()) return
+
+        val cached = groupProfileCacheDao.load(groupId)
+        if (cached != null) {
+            _groupProfileState.value = GroupProfileVo(cached.group)
+        }
+        refreshGroupData(refreshProfile = cached == null || cached.isExpired(nowMilliseconds()))
+    }
+
+    fun refreshGroupData() {
+        refreshGroupData(refreshProfile = true)
+    }
+
+    fun loadMorePosts() {
+        val groupId = _groupProfileState.value?.groupId ?: return
+        if (_postsLoading.value || _postsLoadingMore.value || _postsEndReached.value) return
+        _postsLoadingMore.value = true
+        screenModelScope.launch(Dispatchers.IO) {
+            loadPosts(groupId, reset = false)
+        }
+    }
+
+    private fun refreshGroupData(refreshProfile: Boolean) {
         _members.value = emptyList()
         _owner.value = null
         _galleryImages.value = emptyMap()
         _posts.value = emptyList()
         _postAuthors.value = emptyMap()
+        _postsLoadingMore.value = false
+        _postsEndReached.value = false
+        postsNextOffset = 0
         _postsLoading.value = true
         _membersLoading.value = true
         _groupInstances.value = emptyList()
-        val groupId = groupProfileVo.groupId
+        val groupId = _groupProfileState.value?.groupId.orEmpty()
         if (_isLoading.value || groupId.isBlank()) {
             _postsLoading.value = false
             _membersLoading.value = false
@@ -82,33 +123,48 @@ class GroupProfileScreenModel(
         }
         _isLoading.value = true
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                groupsApi.fetchGroup(groupId, includeRoles = true)
-            }.onSuccess {
-                _groupProfileState.value = GroupProfileVo(it)
-            }.onFailure {
-                handleError("GroupProfile", it)
-            }
-            val group = _groupProfileState.value
-            if (group?.ownerId != null) {
-                loadOwner(group.ownerId)
-            }
-            if (group != null) {
-                coroutineScope {
-                    listOf(
-                        async { loadMembers(groupId) },
-                        async { loadPosts(groupId) },
-                        async { loadGroupInstances(groupId) },
-                        async { loadGalleryImages(groupId, group.galleries) }
-                    ).awaitAll()
+            try {
+                if (refreshProfile) {
+                    authService.reTryAuthCatching {
+                        groupsApi.fetchGroup(groupId, includeRoles = true)
+                    }.onSuccess { groupData ->
+                        groupProfileCacheDao.save(
+                            GroupProfileCache(
+                                group = groupData,
+                                cachedAtEpochMilliseconds = nowMilliseconds(),
+                            )
+                        )
+                        if (_groupProfileState.value?.groupId == groupId) {
+                            _groupProfileState.value = GroupProfileVo(groupData)
+                        }
+                    }.onFailure {
+                        handleError("GroupProfile", it)
+                    }
                 }
-            } else {
-                _postsLoading.value = false
-                _membersLoading.value = false
+                val group = _groupProfileState.value
+                if (group?.ownerId != null) {
+                    loadOwner(group.ownerId)
+                }
+                if (group != null) {
+                    coroutineScope {
+                        listOf(
+                            async { loadMembers(groupId) },
+                        async { loadPosts(groupId, reset = true) },
+                            async { loadGroupInstances(groupId) },
+                            async { loadGalleryImages(groupId, group.galleries) }
+                        ).awaitAll()
+                    }
+                } else {
+                    _postsLoading.value = false
+                    _membersLoading.value = false
+                }
+            } finally {
+                _isLoading.value = false
             }
-            _isLoading.value = false
         }
     }
+
+    private fun nowMilliseconds(): Long = Clock.System.now().toEpochMilliseconds()
 
     fun joinGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
@@ -120,7 +176,7 @@ class GroupProfileScreenModel(
             }.onFailure {
                 handleError("GroupJoin", it)
             }.onSuccess {
-                _groupProfileState.value?.let { refreshGroupData(it) }
+                refreshGroupData()
             }
             _isActionLoading.value = false
         }
@@ -136,7 +192,7 @@ class GroupProfileScreenModel(
             }.onFailure {
                 handleError("GroupLeave", it)
             }.onSuccess {
-                _groupProfileState.value?.let { refreshGroupData(it) }
+                refreshGroupData()
             }
             _isActionLoading.value = false
         }
@@ -164,15 +220,31 @@ class GroupProfileScreenModel(
         }
     }
 
-    private suspend fun loadPosts(groupId: String) {
-        _postsLoading.value = true
+    private suspend fun loadPosts(groupId: String, reset: Boolean) {
+        if (reset) {
+            _postsLoading.value = true
+            postsNextOffset = 0
+            _postsEndReached.value = false
+        } else {
+            if (_postsLoading.value || _postsEndReached.value) {
+                _postsLoadingMore.value = false
+                return
+            }
+            _postsLoadingMore.value = true
+        }
+        val offset = postsNextOffset
         authService.reTryAuthCatching {
-            groupsApi.getGroupPosts(groupId = groupId, n = 20, offset = 0)
+            groupsApi.getGroupPosts(groupId = groupId, n = POSTS_PAGE_SIZE, offset = offset)
         }.onSuccess { postData ->
-            _posts.value = postData.posts
-            val authorMap = mutableMapOf<String, String>()
+            _posts.value = (_posts.value + postData.posts).distinctBy(GroupPost::id)
+            postsNextOffset = offset + postData.posts.size
+            _postsEndReached.value = postData.posts.isEmpty() ||
+                postData.posts.size < POSTS_PAGE_SIZE ||
+                (postData.total > 0 && postsNextOffset >= postData.total)
+            val authorMap = _postAuthors.value.toMutableMap()
             val authorIds = postData.posts
                 .mapNotNull { it.authorId.takeIf { id -> id.isNotBlank() } }
+                .filterNot { authorMap.containsKey(it) }
                 .distinct()
             // 用有限并发请求获取作者名（避免 429）
             coroutineScope {
@@ -194,6 +266,7 @@ class GroupProfileScreenModel(
             logger.error(it.message.orEmpty())
         }
         _postsLoading.value = false
+        _postsLoadingMore.value = false
     }
 
     private suspend fun loadGroupInstances(groupId: String) {
@@ -226,5 +299,9 @@ class GroupProfileScreenModel(
     private suspend fun handleError(tag: String, error: Throwable) {
         logger.error("$tag: ${error.message}")
         SharedFlowCentre.toastText.emit(ToastText.Error(error.message ?: "Unknown error"))
+    }
+
+    private companion object {
+        const val POSTS_PAGE_SIZE = 20
     }
 }

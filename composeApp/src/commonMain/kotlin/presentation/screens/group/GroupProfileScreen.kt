@@ -34,10 +34,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -53,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,17 +126,28 @@ class GroupProfileScreen(
         val posts by screenModel.posts.collectAsState()
         val postAuthors by screenModel.postAuthors.collectAsState()
         val postsLoading by screenModel.postsLoading.collectAsState()
+        val postsLoadingMore by screenModel.postsLoadingMore.collectAsState()
+        val postsEndReached by screenModel.postsEndReached.collectAsState()
         val membersLoading by screenModel.membersLoading.collectAsState()
         val groupInstances by screenModel.groupInstances.collectAsState()
+        val isLoading by screenModel.isLoading.collectAsState()
         val isActionLoading by screenModel.isActionLoading.collectAsState()
 
         LaunchedEffect(groupProfileVo.groupId) {
-            screenModel.refreshGroupData(groupProfileVo)
+            screenModel.loadGroupData(groupProfileVo)
         }
 
         val group = groupState ?: groupProfileVo
         val scrollState = rememberScrollState()
         var selectedTabIndex by remember { mutableStateOf(0) }
+
+        LaunchedEffect(scrollState, selectedTabIndex) {
+            snapshotFlow { scrollState.value to scrollState.maxValue }.collect { (value, maxValue) ->
+                if (selectedTabIndex == 1 && (maxValue == 0 || maxValue - value <= 600)) {
+                    screenModel.loadMorePosts()
+                }
+            }
+        }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             BoxWithConstraints(
@@ -188,7 +203,14 @@ class GroupProfileScreen(
                         }
                         when (selectedTabIndex) {
                             0 -> DetailsContent(group = group, owner = owner, instances = groupInstances)
-                            1 -> PostsContent(posts = posts, roles = group.roles, postAuthors = postAuthors, isLoading = postsLoading)
+                            1 -> PostsContent(
+                                posts = posts,
+                                roles = group.roles,
+                                postAuthors = postAuthors,
+                                isLoading = postsLoading,
+                                isLoadingMore = postsLoadingMore,
+                                endReached = postsEndReached,
+                            )
                             2 -> MembersContent(members = members, isLoading = membersLoading)
                             else -> GalleriesContent(group = group, galleryImages = galleryImages)
                         }
@@ -202,6 +224,27 @@ class GroupProfileScreen(
                         onReturn = { currentNavigator.pop() },
                         onMenu = null
                     )
+                    IconButton(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = sysTopPadding, end = 10.dp)
+                            .size(topBarHeight),
+                        enabled = !isLoading,
+                        onClick = screenModel::refreshGroupData,
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                     CollapsingTitleRow(
                         group = group,
                         membershipStatus = group.membershipStatus,
@@ -619,7 +662,9 @@ private fun PostsContent(
     posts: List<GroupPost>,
     roles: List<Role>,
     postAuthors: Map<String, String>,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    isLoadingMore: Boolean = false,
+    endReached: Boolean = false,
 ) {
     if (isLoading) {
         Box(
@@ -646,6 +691,14 @@ private fun PostsContent(
     ) {
         posts.forEach { post ->
             PostCard(post = post, roles = roles, authorName = postAuthors[post.authorId])
+        }
+        if (isLoadingMore && !endReached) {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+            }
         }
     }
 }

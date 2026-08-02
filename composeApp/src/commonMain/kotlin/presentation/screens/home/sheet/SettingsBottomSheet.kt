@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.VersionService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
+import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
 import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
@@ -138,6 +139,7 @@ private fun AboutBlock() {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
     val accountCacheManager = koinInject<AccountCacheManager>()
+    val groupProfileCacheDao = koinInject<GroupProfileCacheDao>()
     val worldProfileCacheDao = koinInject<WorldProfileCacheDao>()
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(VersionVo()) }
@@ -172,6 +174,7 @@ private fun AboutBlock() {
                 .clickable {
                     diskCache?.clear()
                     accountCacheManager.clearAll()
+                    groupProfileCacheDao.clearAll()
                     worldProfileCacheDao.clearAll()
                     size = 0
                 }
