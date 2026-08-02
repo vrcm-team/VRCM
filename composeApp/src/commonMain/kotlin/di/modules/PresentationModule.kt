@@ -78,7 +78,7 @@ val presentationModule: Module = module {
     singleOf (::FriendLocationPagerModel)
     singleOf (::FriendListPagerModel)
     singleOf(::SearchListPagerModel)
-    singleOf(::WorldProfileScreenModel)
+    factoryOf(::WorldProfileScreenModel)
     singleOf(::GroupProfileScreenModel)
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     factory { AvatarProfileScreenModel(get()) }

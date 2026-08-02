@@ -20,14 +20,19 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
+import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
  */
+@OptIn(ExperimentalTime::class)
 class WorldProfileScreenModel(
     private val worldsApi: WorldsApi,
     private val instancesApi: InstancesApi,
@@ -36,6 +41,7 @@ class WorldProfileScreenModel(
     private val authService: AuthService,
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
+    private val worldProfileCacheDao: WorldProfileCacheDao,
 ) : ScreenModel {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -52,15 +58,35 @@ class WorldProfileScreenModel(
     /**
      * 刷新世界数据
      */
-    fun refreshWorldData(worldProfileVO: WorldProfileVo) {
+    fun loadWorldData(worldProfileVO: WorldProfileVo) {
         _worldProfileState.value = worldProfileVO
+        val worldId = worldProfileVO.worldId
+        if (worldId.isBlank()) return
+
+        val cached = worldProfileCacheDao.load(worldId)
+        if (cached != null) {
+            _worldProfileState.value = WorldProfileVo(
+                world = cached.world,
+                instancesList = worldProfileVO.instances,
+                platformFileSizes = worldProfileVO.platformFileSizes,
+            )
+        }
+
+        if (cached == null || cached.isExpired(Clock.System.now().toEpochMilliseconds())) {
+            refreshWorldData()
+        }
+    }
+
+    fun refreshWorldData() {
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
         _isLoading.value = true
-        screenModelScope.launch(Dispatchers.IO){
-            // 加载世界收藏组
-            loadWorldInfo(worldId)
-            _isLoading.value = false
+        screenModelScope.launch(Dispatchers.IO) {
+            try {
+                loadWorldInfo(worldId)
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -68,6 +94,13 @@ class WorldProfileScreenModel(
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
+            worldProfileCacheDao.save(
+                WorldProfileCache(
+                    world = worldData,
+                    cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                )
+            )
+            if (_worldProfileState.value?.worldId != worldId) return@onSuccess
 
             // TODO
 //            val platformFileSizes = mutableStateListOf<PlatformFileSize>()
@@ -227,7 +260,7 @@ class WorldProfileScreenModel(
      */
     fun onWorldFavorite(favoriteGroupId: Result<String>) {
         favoriteGroupId.onSuccess {
-            _worldProfileState.value?.let(::refreshWorldData)
+            refreshWorldData()
         }
     }
 } 
