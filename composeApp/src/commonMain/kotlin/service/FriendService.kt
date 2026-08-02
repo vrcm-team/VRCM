@@ -21,6 +21,8 @@ import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +50,7 @@ class FriendService(
     private val accountCacheManager: AccountCacheManager,
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val friendMapLock = Any()
+    private val friendMapLock = SynchronizedObject()
     private val friendStore = FriendStateStore()
     private val refreshCoordinator = FriendRefreshCoordinator()
     private val accountTracker = FriendAccountTracker()

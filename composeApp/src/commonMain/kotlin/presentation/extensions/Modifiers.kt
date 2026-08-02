@@ -7,7 +7,6 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,8 +20,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.plus
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import kotlin.math.roundToInt
 
 
@@ -81,37 +78,6 @@ fun Modifier.drawSateCircle(
 @Composable
 inline fun Modifier.enableIf(enable: Boolean = true, effect: @Composable Modifier.() -> Modifier) =
     if (enable) effect() else this
-
-/**
- * 侧滑返回
- */
-fun Modifier.slideBack(
-    enabled: Boolean = true,
-    threshold: Float = 80.dp.value,
-    orientation: Orientation = Orientation.Horizontal,
-) = this.composed {
-    val navigator = LocalNavigator.currentOrThrow
-    // 添加一个标志变量，用于确保在一次拖动手势中只pop一次
-    val hasPopped = remember { mutableStateOf(false) }
-    draggable(
-        state = rememberDraggableState {
-            if (navigator.canPop && it > threshold && !hasPopped.value) {
-                navigator.pop()
-                hasPopped.value = true
-            }
-        },
-        orientation = orientation,
-        enabled = enabled,
-        onDragStarted = {
-            // 当新的拖动手势开始时，重置标志
-            hasPopped.value = false
-        },
-        onDragStopped = {
-            // 当拖动手势结束时，重置标志（可选，取决于需求）
-            hasPopped.value = false
-        }
-    )
-}
 
 /**
  * 下滑返回

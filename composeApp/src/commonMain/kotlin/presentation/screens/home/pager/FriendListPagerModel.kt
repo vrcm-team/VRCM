@@ -30,6 +30,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -139,6 +142,7 @@ class FriendListPagerModel(
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
     private var friendFilterJob: Job? = null
+    private val offlineStatusDescriptions = mutableMapOf<String, String>()
 
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
@@ -146,6 +150,7 @@ class FriendListPagerModel(
             SharedFlowCentre.authed.collect {
                 favoritedWorldMap.clear()
                 favoritedAvatarMap.clear()
+                offlineStatusDescriptions.clear()
                 _isRefreshing.value = true
             }
         }
@@ -344,7 +349,49 @@ class FriendListPagerModel(
             if (favoriteIds != null) nameFilteredList.filter { friend -> favoriteIds.contains(friend.id) }
             else nameFilteredList
 
-        return result.sortedUserByStatus()
+        return enrichOfflineStatusDescriptions(result).sortedUserByStatus()
+    }
+
+    /**
+     * The offline friends endpoint can omit the custom status description.
+     * Fetch it from the user profile only for those rows, and cache the result
+     * so presence updates do not turn the favorites page into a request storm.
+     */
+    private suspend fun enrichOfflineStatusDescriptions(friends: List<FriendData>): List<FriendData> {
+        val candidates = friends.filter {
+            it.status == UserStatus.Offline && it.statusDescription.isBlank()
+        }
+        if (candidates.isEmpty()) return friends
+
+        val missing = candidates.filterNot { offlineStatusDescriptions.containsKey(it.id) }
+        missing.chunked(8).forEach { batch ->
+            val fetched = coroutineScope {
+                batch.map { friend ->
+                    async {
+                        friend.id to runCatching {
+                            withContext(Dispatchers.IO) {
+                                usersApi.fetchUser(friend.id).statusDescription.trim()
+                            }
+                        }.getOrDefault("")
+                    }
+                }.awaitAll()
+            }
+            fetched.forEach { (id, description) ->
+                offlineStatusDescriptions[id] = description
+            }
+        }
+
+        return friends.map { friend ->
+            val description = offlineStatusDescriptions[friend.id].orEmpty()
+            if (friend.status == UserStatus.Offline &&
+                friend.statusDescription.isBlank() &&
+                description.isNotBlank()
+            ) {
+                friend.copy(statusDescription = description)
+            } else {
+                friend
+            }
+        }
     }
 
     // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
