@@ -66,6 +66,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val editProfileUpdateSuccess = "資料已更新"
     override val mutualFriendsTitle = "共同好友"
     override val mutualFriendsEmpty = "與%s暫無共同好友"
+    override val mutualFriendsLoadFailed = "共同好友載入失敗"
     override val mutualFriendsCount = "共同好友：%total%"
     override val mutualFriendsCountWithHidden = "共同好友：%total%（隱藏 %hidden%）"
     override val mutualFriendsHiddenUser = "隱藏的共同好友"

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -65,7 +67,7 @@ data class MutualFriendsScreen(
                 }
             }
         }
-        val isLoading = model.isLoading && mutualFriends.isNotEmpty()
+        val isLoading = model.isLoading
         val displayName = userName.ifBlank { strings.users }
 
         LaunchedEffect(userId) {
@@ -103,23 +105,43 @@ data class MutualFriendsScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                if (totalCount == 0 && !isLoading) {
-                    Text(
-                        modifier = Modifier.align(Alignment.Center),
-                        text = strings.mutualFriendsEmpty.replace("%s", displayName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        renderUserItems(visibleMutualFriends) {
-                            navigator push UserProfileScreen(UserProfileVo(it))
+                when {
+                    isLoading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+
+                    model.errorMessage != null -> {
+                        Column(modifier = Modifier.align(Alignment.Center)) {
+                            Text(
+                                text = strings.mutualFriendsLoadFailed,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            TextButton(
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                                onClick = { model.load(userId) }
+                            ) {
+                                Text(strings.retry)
+                            }
                         }
                     }
-                }
 
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    totalCount == 0 -> {
+                        Text(
+                            modifier = Modifier.align(Alignment.Center),
+                            text = strings.mutualFriendsEmpty.replace("%s", displayName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+
+                    else -> {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            renderUserItems(visibleMutualFriends) {
+                                navigator push UserProfileScreen(UserProfileVo(it))
+                            }
+                        }
+                    }
                 }
             }
         }
