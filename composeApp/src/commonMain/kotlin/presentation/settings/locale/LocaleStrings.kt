@@ -77,6 +77,7 @@ sealed class LocaleStrings {
     open val editProfileUpdateSuccess: String = "Profile updated"
     open val mutualFriendsTitle: String = "Mutual Friends"
     open val mutualFriendsEmpty: String = "No mutual friends with %s"
+    open val mutualFriendsLoadFailed: String = "Failed to load mutual friends"
     open val mutualFriendsCount: String = "Mutual Friends: %total%"
     open val mutualFriendsCountWithHidden: String = "Mutual Friends: %total% (Hidden %hidden%)"
     open val mutualFriendsHiddenUser: String = "Hidden Mutual"

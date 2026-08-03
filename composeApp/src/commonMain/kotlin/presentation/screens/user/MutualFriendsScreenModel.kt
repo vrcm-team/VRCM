@@ -21,27 +21,42 @@ class MutualFriendsScreenModel(
     private val logger: Logger,
 ) : ScreenModel {
 
+    private var loadInProgress = false
+
     var mutualFriends by mutableStateOf<List<MutualFriendData>>(emptyList())
         private set
 
-    var isLoading by mutableStateOf(false)
+    // The screen starts in a loading state so its first frame cannot show the empty state before
+    // LaunchedEffect has had a chance to start the request.
+    var isLoading by mutableStateOf(true)
         private set
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
     fun load(userId: String) {
-        if (isLoading) return
+        if (loadInProgress) return
+        loadInProgress = true
         screenModelScope.launch(Dispatchers.IO) {
             isLoading = true
             errorMessage = null
-            val result = fetchAllMutualFriends(userId)
-            mutualFriends = result
-            isLoading = false
+            try {
+                fetchAllMutualFriends(userId)
+                    .onSuccess { mutualFriends = it }
+                    .onFailure { error ->
+                        val message = error.message.orEmpty()
+                        logger.error(message)
+                        SharedFlowCentre.toastText.emit(ToastText.Error(message))
+                        errorMessage = message
+                    }
+            } finally {
+                isLoading = false
+                loadInProgress = false
+            }
         }
     }
 
-    private suspend fun fetchAllMutualFriends(userId: String): List<MutualFriendData> {
+    private suspend fun fetchAllMutualFriends(userId: String): Result<List<MutualFriendData>> {
         val all = mutableListOf<MutualFriendData>()
         var offset = 0
         val limit = 100
@@ -50,17 +65,16 @@ class MutualFriendsScreenModel(
                 usersApi.getMutualFriends(userId, n = limit, offset = offset)
             }
             if (pageResult.isFailure) {
-                val message = pageResult.exceptionOrNull()?.message.orEmpty()
-                logger.error(message)
-                SharedFlowCentre.toastText.emit(ToastText.Error(message))
-                errorMessage = message
-                break
+                return Result.failure(
+                    pageResult.exceptionOrNull()
+                        ?: IllegalStateException("Failed to load mutual friends")
+                )
             }
             val page = pageResult.getOrDefault(emptyList())
             all.addAll(page)
             if (page.size < limit) break
             offset += limit
         }
-        return all
+        return Result.success(all)
     }
 }

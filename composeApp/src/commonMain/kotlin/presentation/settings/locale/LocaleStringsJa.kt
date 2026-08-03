@@ -66,6 +66,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val editProfileUpdateSuccess = "プロフィールを更新しました"
     override val mutualFriendsTitle = "共通の友達"
     override val mutualFriendsEmpty = "%sとの共通の友達はいません"
+    override val mutualFriendsLoadFailed = "共通の友達を読み込めませんでした"
     override val mutualFriendsCount = "共通の友達：%total%"
     override val mutualFriendsCountWithHidden = "共通の友達：%total%（非公開 %hidden%）"
     override val mutualFriendsHiddenUser = "非公開の共通友達"
