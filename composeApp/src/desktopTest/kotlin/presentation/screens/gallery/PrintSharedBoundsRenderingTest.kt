@@ -125,7 +125,7 @@ class PrintSharedBoundsRenderingTest {
     }
 
     @Test
-    fun revealProgressAndVisibleBoundsShrinkDuringExit() = runComposeUiTest {
+    fun revealProgressAndVisibleBoundsChangeContinuouslyInBothDirections() = runComposeUiTest {
         mainClock.autoAdvance = false
         var showPreview by mutableStateOf(false)
         var observedProgress = Float.NaN
@@ -186,16 +186,36 @@ class PrintSharedBoundsRenderingTest {
         }
 
         waitForIdle()
+        val collapsedBeforeEnter = onNodeWithTag(RootTag).captureToImage()
         runOnIdle { showPreview = true }
         waitForIdle()
-        mainClock.advanceTimeBy(
-            PrintBoundsTransitionDurationMillis.toLong() +
-                PrintRevealTransitionDurationMillis + 100L
+        mainClock.advanceTimeBy(PrintRevealTransitionDurationMillis / 2L)
+        waitForIdle()
+
+        val enteringMidpointProgress = runOnIdle { observedProgress }
+        assertTrue(
+            enteringMidpointProgress > 0f && enteringMidpointProgress < 1f,
+            "enter midpoint should be partially revealed, but progress was $enteringMidpointProgress",
         )
+        val enteringMidpointImage = onNodeWithTag(RootTag).captureToImage()
+
+        mainClock.advanceTimeBy(PrintRevealTransitionDurationMillis / 2L)
         waitForIdle()
 
         assertEquals(1f, runOnIdle { observedProgress }, ProgressTolerance)
         val fullImage = onNodeWithTag(RootTag).captureToImage()
+
+        val previewBounds = Rect(0f, 0f, PreviewWidth.value, PreviewHeight.value)
+        val sourceCrop = PrintDisplayGeometry.cropRect(
+            bounds = previewBounds,
+            placement = PrintCanvasPlacement.FitCenter,
+        )
+        assertRevealBounds(
+            full = findPrintBounds(fullImage, "fully revealed preview"),
+            midpoint = findPrintBounds(enteringMidpointImage, "enter midpoint"),
+            collapsed = findPrintBounds(collapsedBeforeEnter, "collapsed preview before enter"),
+            midpointProgress = enteringMidpointProgress,
+        )
 
         runOnIdle { showPreview = false }
         waitForIdle()
@@ -207,15 +227,10 @@ class PrintSharedBoundsRenderingTest {
             midpointProgress > 0f && midpointProgress < 1f,
             "exit midpoint should be partially cropped, but progress was $midpointProgress",
         )
-        val previewBounds = Rect(0f, 0f, PreviewWidth.value, PreviewHeight.value)
         val midpointBounds = PrintDisplayGeometry.revealedCropRect(
             bounds = previewBounds,
             placement = PrintCanvasPlacement.FitCenter,
             revealProgress = midpointProgress,
-        )
-        val sourceCrop = PrintDisplayGeometry.cropRect(
-            bounds = previewBounds,
-            placement = PrintCanvasPlacement.FitCenter,
         )
         assertTrue(midpointBounds.left > 0f && midpointBounds.left < sourceCrop.left)
         assertTrue(midpointBounds.top > 0f && midpointBounds.top < sourceCrop.top)

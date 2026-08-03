@@ -41,7 +41,6 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
@@ -385,7 +384,6 @@ internal fun rememberPrintCropRevealProgress(
                 .collectLatest { targetState ->
                     when (targetState) {
                         EnterExitState.Visible -> {
-                            delay(PrintBoundsTransitionDurationMillis.toLong())
                             progress.animateTo(
                                 targetValue = 1f,
                                 animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),

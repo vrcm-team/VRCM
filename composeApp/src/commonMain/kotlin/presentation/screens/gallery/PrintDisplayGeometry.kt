@@ -20,7 +20,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 internal const val PrintBoundsTransitionDurationMillis = 500
-internal const val PrintRevealTransitionDurationMillis = 500
+internal const val PrintRevealTransitionDurationMillis = PrintBoundsTransitionDurationMillis
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 internal val PrintBoundsTransform = BoundsTransform { _, _ ->
