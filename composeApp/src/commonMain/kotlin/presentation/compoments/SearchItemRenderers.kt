@@ -322,6 +322,10 @@ fun LazyItemScope.renderGroupItem(
         },
         headlineContent = {
             Text(
+                modifier = Modifier.sharedBoundsBy(
+                    key = groupNameSharedKey(group.id),
+                    resizeMode = SharedTextBoundsResizeMode,
+                ),
                 text = group.name,
                 style = MaterialTheme.typography.titleMedium,
                 overflow = TextOverflow.Ellipsis,

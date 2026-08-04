@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope.ResizeMode
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -26,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,13 +47,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-internal val UserNameBoundsResizeMode: ResizeMode =
-    ResizeMode.scaleToBounds(
-        contentScale = ContentScale.FillWidth,
-        alignment = Alignment.Center,
-    )
 
 @Composable
 fun UserStateIcon(
@@ -204,7 +195,7 @@ fun LazyItemScope.LocationFriend(
         Text(
             modifier = Modifier.sharedBoundsBy(
                 key = "${id}UserName",
-                resizeMode = UserNameBoundsResizeMode,
+                resizeMode = SharedTextBoundsResizeMode,
                 boundsTransform = TextBoundsTransform,
                 clipInOverlayDuringTransition = NoClip,
             ).fillMaxWidth(),
@@ -231,7 +222,7 @@ fun UserInfoRow(
         Text(
             modifier = Modifier.sharedBoundsBy(
                 key = "${user?.id}UserName",
-                resizeMode = UserNameBoundsResizeMode,
+                resizeMode = SharedTextBoundsResizeMode,
                 boundsTransform = TextBoundsTransform,
                 clipInOverlayDuringTransition = NoClip,
             ),

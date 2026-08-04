@@ -56,8 +56,17 @@ val LocalSharedSuffixKey: ProvidableCompositionLocal<String> =
 val LocalAnimatedVisibilityScope: ProvidableCompositionLocal<AnimatedVisibilityScope> =
     staticCompositionLocalOf { error("AnimatedVisibilityScope is not provided") }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+internal val SharedTextBoundsResizeMode: ResizeMode =
+    ResizeMode.scaleToBounds(
+        contentScale = ContentScale.FillWidth,
+        alignment = Center,
+    )
+
 internal fun sharedContentKey(key: String, suffixKey: String, useSuffixKey: Boolean): String =
     if (!useSuffixKey || suffixKey.isBlank()) key else "$key:$suffixKey"
+
+internal fun groupNameSharedKey(groupId: String): String = "${groupId}GroupName"
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -109,4 +118,3 @@ fun Modifier.sharedBoundsBy(
             clipInOverlayDuringTransition = clipInOverlayDuringTransition
         )
     }
-
