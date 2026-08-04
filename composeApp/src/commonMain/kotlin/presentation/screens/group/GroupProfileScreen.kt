@@ -792,7 +792,7 @@ private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = fals
             users = users,
             onUserClick = { user ->
                 currentNavigator push UserProfileScreen(
-                    userProfileVO = UserProfileVo(id = user.id, displayName = user.displayName)
+                    userProfileVO = UserProfileVo(user)
                 )
             }
         )
@@ -912,7 +912,7 @@ private fun OwnerCard(
             modifier = Modifier.enableIf(ownerUserId.isNotBlank()) {
                 clickable {
                     currentNavigator push UserProfileScreen(
-                        userProfileVO = UserProfileVo(id = ownerUserId, displayName = owner.displayName)
+                        userProfileVO = UserProfileVo(owner)
                     )
                 }
             }
@@ -955,7 +955,8 @@ private fun MemberCard(member: GroupMember) {
             .enableIf(userId.isNotBlank()) {
                 clickable {
                     currentNavigator push UserProfileScreen(
-                        userProfileVO = UserProfileVo(id = userId, displayName = displayName)
+                        userProfileVO = member.user?.let(::UserProfileVo)
+                            ?: UserProfileVo(id = userId, displayName = displayName)
                     )
                 }
             },

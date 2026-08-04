@@ -104,7 +104,10 @@ private fun AvatarProfileContent(
             modifier = Modifier.simpleClickable {
                 navigator.push(
                     UserProfileScreen(
-                        userProfileVO = UserProfileVo(id = avatarProfileVo.authorId)
+                        userProfileVO = UserProfileVo(
+                            id = avatarProfileVo.authorId,
+                            displayName = avatarProfileVo.authorName,
+                        )
                     )
                 )
             }

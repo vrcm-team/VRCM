@@ -161,7 +161,9 @@ class LocationDialog(
                                     modifier = if (owner.type == BlueprintType.User || owner.type == BlueprintType.Group)
                                         Modifier.clickable {
                                             if (owner.type == BlueprintType.User) {
-                                                onClickUserIcon(UserProfileVo(owner.id))
+                                                onClickUserIcon(
+                                                    UserProfileVo(id = owner.id, displayName = owner.displayName)
+                                                )
                                             } else {
                                                 currentNavigator push GroupProfileScreen(
                                                     groupProfileVo = GroupProfileVo(groupId = owner.id, name = owner.displayName),

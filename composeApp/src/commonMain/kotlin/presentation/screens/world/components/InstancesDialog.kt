@@ -101,7 +101,11 @@ class InstancesDialog(
                                 // TODO: Group详情页跳转
                                 Text(
                                     modifier = if (owner.type == BlueprintType.User)
-                                        Modifier.clickable { onClickUserIcon(UserProfileVo(owner.id)) }
+                                        Modifier.clickable {
+                                            onClickUserIcon(
+                                                UserProfileVo(id = owner.id, displayName = owner.displayName)
+                                            )
+                                        }
                                     else Modifier,
                                     textDecoration = if (owner.type == BlueprintType.User) TextDecoration.Underline else null,
                                     text = owner.displayName,

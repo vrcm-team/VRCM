@@ -541,14 +541,7 @@ private fun ColumnScope.ProfileContent(
             title = strings.userMutualGroups,
             onGroupClick = { group ->
                 navigator push GroupProfileScreen(
-                    groupProfileVo = GroupProfileVo(
-                        groupId = group.groupId,
-                        name = group.name,
-                        shortCode = group.shortCode,
-                        iconUrl = group.iconUrl,
-                        bannerUrl = group.bannerUrl,
-                        memberCount = group.memberCount,
-                    ),
+                    groupProfileVo = GroupProfileVo(group),
                     sharedSuffixKey = sharedSuffixKey
                 )
             }
@@ -559,14 +552,7 @@ private fun ColumnScope.ProfileContent(
         groups = userGroups,
         onGroupClick = { group ->
             navigator push GroupProfileScreen(
-                groupProfileVo = GroupProfileVo(
-                    groupId = group.groupId,
-                    name = group.name,
-                    shortCode = group.shortCode,
-                    iconUrl = group.iconUrl,
-                    bannerUrl = group.bannerUrl,
-                    memberCount = group.memberCount,
-                ),
+                groupProfileVo = GroupProfileVo(group),
                 sharedSuffixKey = sharedSuffixKey
             )
         }
