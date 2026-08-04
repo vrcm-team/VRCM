@@ -62,6 +62,7 @@ kotlin {
 
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna.platform)
+            implementation(libs.okio)
         }
 
         val desktopTest by getting
@@ -69,6 +70,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
             @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
             implementation(compose.uiTest)
+            implementation(libs.okio.fakefilesystem)
         }
 
         commonMain.dependencies {
