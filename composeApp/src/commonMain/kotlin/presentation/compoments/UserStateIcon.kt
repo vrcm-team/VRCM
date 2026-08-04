@@ -299,7 +299,10 @@ fun UserStatusRow(
     }
 
     Row(
-        modifier = modifier.sharedBoundsBy("${user?.id}UserStatusRow"),
+        modifier = modifier.sharedBoundsBy(
+            key = "${user?.id}UserStatusRow",
+            resizeMode = SharedTextBoundsResizeMode,
+        ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {
