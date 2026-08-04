@@ -1,26 +1,34 @@
 package io.github.vrcmteam.vrcm.storage
 
 import com.sun.jna.platform.win32.Crypt32Util
+import okio.FileSystem
+import okio.Path
+import okio.Path.Companion.toOkioPath
 import java.io.File
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.Properties
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class DesktopSecureStorage(directory: File, name: String) : SecureStorage {
-    private val secretsFile = directory.resolve("$name-secrets.properties")
-    private val keyFile = directory.resolve("$name-secrets.key")
-    private val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+class DesktopSecureStorage(
+    private val fileSystem: FileSystem,
+    directory: Path,
+    name: String,
+    private val isWindows: Boolean = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
+) : SecureStorage {
+    constructor(directory: File, name: String) : this(FileSystem.SYSTEM, directory.toOkioPath(), name)
+
+    private val secretsFile = directory / "$name-secrets.properties"
+    private val keyFile = directory / "$name-secrets.key"
     private val lock = Any()
 
-    init { directory.mkdirs() }
+    init { fileSystem.createDirectories(directory) }
 
     override fun get(key: String): String? = synchronized(lock) {
         load()[key]?.toString()?.let(::decrypt)
@@ -36,7 +44,7 @@ class DesktopSecureStorage(directory: File, name: String) : SecureStorage {
     }
 
     override fun clear() = synchronized(lock) {
-        if (secretsFile.exists()) secretsFile.delete()
+        fileSystem.delete(secretsFile, mustExist = false)
     }
 
     private fun encrypt(value: String): String = if (isWindows) {
@@ -62,33 +70,46 @@ class DesktopSecureStorage(directory: File, name: String) : SecureStorage {
     }.getOrNull()
 
     private fun secretKey(): SecretKey {
-        if (!keyFile.exists()) {
+        if (!fileSystem.exists(keyFile)) {
             val key = KeyGenerator.getInstance("AES").apply { init(256, SecureRandom()) }.generateKey().encoded
-            Files.write(keyFile.toPath(), key)
-            keyFile.setReadable(false, false)
-            keyFile.setWritable(false, false)
-            keyFile.setReadable(true, true)
-            keyFile.setWritable(true, true)
+            fileSystem.write(keyFile, mustCreate = true) { write(key) }
+            if (fileSystem === FileSystem.SYSTEM) restrictKeyFilePermissions(keyFile.toFile())
         }
-        return SecretKeySpec(Files.readAllBytes(keyFile.toPath()), "AES")
+        return SecretKeySpec(fileSystem.read(keyFile) { readByteArray() }, "AES")
     }
 
     private fun load() = Properties().apply {
-        if (secretsFile.isFile) Files.newBufferedReader(secretsFile.toPath(), StandardCharsets.UTF_8).use(::load)
+        if (fileSystem.metadataOrNull(secretsFile)?.isRegularFile == true) {
+            fileSystem.read(secretsFile) { load(inputStream().reader(StandardCharsets.UTF_8)) }
+        }
     }
 
     private fun store(properties: Properties) {
-        val temporary = Files.createTempFile(secretsFile.parentFile.toPath(), secretsFile.name, ".tmp")
+        val temporary = requireNotNull(secretsFile.parent) / "${secretsFile.name}.${UUID.randomUUID()}.tmp"
         try {
-            Files.newBufferedWriter(temporary, StandardCharsets.UTF_8).use { properties.store(it, null) }
-            Files.move(temporary, secretsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            fileSystem.write(temporary, mustCreate = true) {
+                outputStream().writer(StandardCharsets.UTF_8).also { writer ->
+                    properties.store(writer, null)
+                    writer.flush()
+                }
+            }
+            fileSystem.moveReplacing(temporary, secretsFile)
         } finally {
-            Files.deleteIfExists(temporary)
+            fileSystem.delete(temporary, mustExist = false)
         }
     }
 
     private fun encode(bytes: ByteArray) = Base64.getEncoder().encodeToString(bytes)
     private fun decode(value: String) = Base64.getDecoder().decode(value)
 
-    private companion object { const val TRANSFORMATION = "AES/GCM/NoPadding" }
+    private companion object {
+        const val TRANSFORMATION = "AES/GCM/NoPadding"
+
+        fun restrictKeyFilePermissions(file: File) {
+            file.setReadable(false, false)
+            file.setWritable(false, false)
+            file.setReadable(true, true)
+            file.setWritable(true, true)
+        }
+    }
 }
