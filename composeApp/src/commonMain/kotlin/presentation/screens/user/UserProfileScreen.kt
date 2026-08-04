@@ -675,7 +675,10 @@ private fun UserGroupsSection(
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
-                                    modifier = Modifier.sharedBoundsBy("${group.groupId}GroupName"),
+                                    modifier = Modifier.sharedBoundsBy(
+                                        key = groupNameSharedKey(group.groupId),
+                                        resizeMode = SharedTextBoundsResizeMode,
+                                    ),
                                     text = group.name,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,

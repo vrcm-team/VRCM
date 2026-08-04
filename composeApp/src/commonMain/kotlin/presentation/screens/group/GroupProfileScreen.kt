@@ -89,8 +89,10 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.TextChip
 import io.github.vrcmteam.vrcm.presentation.compoments.TextLabel
+import io.github.vrcmteam.vrcm.presentation.compoments.groupNameSharedKey
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.renderUserItems
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -422,7 +424,10 @@ private fun CollapsingTitleRow(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    modifier = Modifier.sharedBoundsBy("${group.groupId}GroupName"),
+                    modifier = Modifier.sharedBoundsBy(
+                        key = groupNameSharedKey(group.groupId),
+                        resizeMode = SharedTextBoundsResizeMode,
+                    ),
                     text = group.name.ifBlank { strings.unknown },
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
