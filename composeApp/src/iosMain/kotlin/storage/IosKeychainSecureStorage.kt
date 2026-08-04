@@ -5,13 +5,26 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import kotlinx.cinterop.COpaquePointer
+import platform.CoreFoundation.CFDataCreate
+import platform.CoreFoundation.CFDataGetBytePtr
+import platform.CoreFoundation.CFDataGetLength
+import platform.CoreFoundation.CFDataGetTypeID
+import platform.CoreFoundation.CFDataRef
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFDictionarySetValue
 import platform.CoreFoundation.CFDictionaryRef
+import platform.CoreFoundation.CFGetTypeID
+import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.CFStringCreateWithCString
 import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
-import platform.Foundation.NSData
-import platform.Foundation.dataWithBytes
+import platform.CoreFoundation.kCFStringEncodingUTF8
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
@@ -34,61 +47,122 @@ class IosKeychainSecureStorage(
 ) : SecureStorage {
     override fun get(key: String): String? = memScoped {
         val result = alloc<CFTypeRefVar>()
-        val status = SecItemCopyMatching(
-            query(key).plus(
-                mapOf(
-                    kSecReturnData to kCFBooleanTrue,
-                    kSecMatchLimit to kSecMatchLimitOne,
-                )
-            ).asDictionary(),
-            result.ptr,
-        )
+        val status = withQueryDictionary(
+            key,
+            kSecReturnData to kCFBooleanTrue,
+            kSecMatchLimit to kSecMatchLimitOne,
+        ) { query -> SecItemCopyMatching(query, result.ptr) }
         if (status != errSecSuccess) return@memScoped null
-        (result.value as? NSData)?.toByteArray()?.decodeToString()
+        val data = result.value ?: return@memScoped null
+        try {
+            data.toDataByteArray()?.decodeToString()
+        } finally {
+            CFRelease(data)
+        }
     }
 
     override fun put(key: String, value: String) {
-        val data = value.encodeToByteArray().toNSData()
-        val attributes = mapOf(kSecValueData to data).asDictionary()
-        val updateStatus = SecItemUpdate(query(key).asDictionary(), attributes)
-        val finalStatus = if (updateStatus == errSecItemNotFound) {
-            SecItemAdd(query(key).plus(mapOf<Any?, Any?>(kSecValueData to data)).asDictionary(), null)
-        } else updateStatus
-        check(finalStatus == errSecSuccess) { "Failed to persist credential in Keychain ($finalStatus)" }
+        val data = value.encodeToByteArray().toCFData()
+        try {
+            val updateStatus = withQueryDictionary(key) { query ->
+                withDictionary(kSecValueData to data) { attributes ->
+                    SecItemUpdate(query, attributes)
+                }
+            }
+            val finalStatus = if (updateStatus == errSecItemNotFound) {
+                withQueryDictionary(key, kSecValueData to data) { attributes ->
+                    SecItemAdd(attributes, null)
+                }
+            } else updateStatus
+            check(finalStatus == errSecSuccess) { "Failed to persist credential in Keychain ($finalStatus)" }
+        } finally {
+            CFRelease(data)
+        }
     }
 
     override fun remove(key: String) {
-        SecItemDelete(query(key).asDictionary())
+        withQueryDictionary(key) { query -> SecItemDelete(query) }
     }
 
     override fun clear() {
-        SecItemDelete(
-            mapOf(
+        val serviceValue = service.toCFString()
+        try {
+            withDictionary(
                 kSecClass to kSecClassGenericPassword,
-                kSecAttrService to service,
-            ).asDictionary()
-        )
+                kSecAttrService to serviceValue,
+            ) { query -> SecItemDelete(query) }
+        } finally {
+            CFRelease(serviceValue)
+        }
     }
 
-    private fun query(key: String): Map<Any?, Any?> = mapOf(
-        kSecClass to kSecClassGenericPassword,
-        kSecAttrService to service,
-        kSecAttrAccount to key,
-    )
+    private fun <T> withQueryDictionary(
+        key: String,
+        vararg extraEntries: Pair<COpaquePointer?, COpaquePointer?>,
+        block: (CFDictionaryRef) -> T,
+    ): T {
+        val serviceValue = service.toCFString()
+        return try {
+            val accountValue = key.toCFString()
+            try {
+                withDictionary(
+                    kSecClass to kSecClassGenericPassword,
+                    kSecAttrService to serviceValue,
+                    kSecAttrAccount to accountValue,
+                    *extraEntries,
+                    block = block,
+                )
+            } finally {
+                CFRelease(accountValue)
+            }
+        } finally {
+            CFRelease(serviceValue)
+        }
+    }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-@Suppress("UNCHECKED_CAST")
-private fun Map<*, *>.asDictionary(): CFDictionaryRef = this as CFDictionaryRef
+private fun <T> withDictionary(
+    vararg entries: Pair<COpaquePointer?, COpaquePointer?>,
+    block: (CFDictionaryRef) -> T,
+): T {
+    val dictionary = CFDictionaryCreateMutable(
+        allocator = null,
+        capacity = entries.size.toLong(),
+        keyCallBacks = kCFTypeDictionaryKeyCallBacks.ptr,
+        valueCallBacks = kCFTypeDictionaryValueCallBacks.ptr,
+    ) ?: error("Unable to create Keychain query")
+    return try {
+        entries.forEach { (key, value) -> CFDictionarySetValue(dictionary, key, value) }
+        block(dictionary)
+    } finally {
+        CFRelease(dictionary)
+    }
+}
 
 @OptIn(ExperimentalForeignApi::class)
-private fun ByteArray.toNSData(): NSData = if (isEmpty()) {
-    NSData.dataWithBytes(bytes = null, length = 0u)
+private fun String.toCFString(): platform.CoreFoundation.CFStringRef {
+    require('\u0000' !in this) { "Keychain identifiers cannot contain NUL" }
+    return CFStringCreateWithCString(null, this, kCFStringEncodingUTF8)
+        ?: error("Unable to encode Keychain value")
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun kotlinx.cinterop.CPointer<out kotlinx.cinterop.CPointed>.toDataByteArray(): ByteArray? {
+    if (CFGetTypeID(this) != CFDataGetTypeID()) return null
+    val data: CFDataRef = reinterpret()
+    val length = CFDataGetLength(data)
+    return ByteArray(length.toInt()).also { output ->
+        if (output.isNotEmpty()) {
+            val bytes = checkNotNull(CFDataGetBytePtr(data))
+            output.usePinned { pinned -> memcpy(pinned.addressOf(0), bytes, length.toULong()) }
+        }
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun ByteArray.toCFData(): CFDataRef = (if (isEmpty()) {
+    CFDataCreate(null, null, 0)
 } else usePinned { pinned ->
-    NSData.dataWithBytes(bytes = pinned.addressOf(0), length = size.toULong())
-}
-
-@OptIn(ExperimentalForeignApi::class)
-private fun NSData.toByteArray(): ByteArray = ByteArray(length.toInt()).also { output ->
-    output.usePinned { pinned -> memcpy(pinned.addressOf(0), bytes, length) }
-}
+    CFDataCreate(null, pinned.addressOf(0).reinterpret(), size.toLong())
+}) ?: error("Unable to encode Keychain value")
