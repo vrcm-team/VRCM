@@ -526,7 +526,8 @@ private fun RenderMainContent(
                         worldProfileVo.authorID?.let {
                             val userProfileScreen = UserProfileScreen(
                                 userProfileVO = UserProfileVo(
-                                    id = it
+                                    id = it,
+                                    displayName = worldProfileVo.authorName.orEmpty(),
                                 )
                             )
                             navigator.push(userProfileScreen)

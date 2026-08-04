@@ -123,7 +123,7 @@ fun StandardSearchList(
         if (currentNavigator.size <= 1) {
             coroutineScope.launch {
                 currentNavigator push GroupProfileScreen(
-                    groupProfileVo = GroupProfileVo(group.id),
+                    groupProfileVo = GroupProfileVo(group),
                     sharedSuffixKey = sharedSuffixKey
                 )
             }

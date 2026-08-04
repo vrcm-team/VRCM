@@ -277,7 +277,9 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
                 modifier = Modifier.enableIf(isExtended) {
                     clickable {
                         if (owner.type == BlueprintType.User) {
-                            onClickUserIcon(UserProfileVo(owner.id))
+                            onClickUserIcon(
+                                UserProfileVo(id = owner.id, displayName = owner.displayName)
+                            )
                         } else if (owner.type == BlueprintType.Group) {
                             onClickGroup(owner.id, owner.displayName)
                         }

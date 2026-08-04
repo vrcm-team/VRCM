@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.GroupData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.groups.data.MyMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.Role
+import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 
 data class GroupProfileVo(
     val groupId: String,
@@ -98,5 +99,15 @@ data class GroupProfileVo(
         galleries = group.galleries,
         ownerId = group.ownerId,
         createdAt = group.createdAt,
+    )
+
+    constructor(group: LimitedUserGroup) : this(
+        groupId = group.groupId,
+        name = group.name,
+        shortCode = group.shortCode,
+        description = group.description,
+        iconUrl = group.iconUrl,
+        bannerUrl = group.bannerUrl,
+        memberCount = group.memberCount,
     )
 }
