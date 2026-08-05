@@ -36,6 +36,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.thresholdNestedScrollConnection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import presentation.compoments.TopMenuBar
@@ -55,6 +57,43 @@ private val BioReservedHeight = 200.dp
  * 简介区域最小高度下限
  */
 private val BioMinHeightFloor = 120.dp
+
+internal suspend fun scrollProfileToTopSequentially(
+    innerScrollState: ScrollState,
+    outerScrollState: ScrollState,
+    animateToTop: suspend (ScrollState) -> Unit,
+) {
+    animateToTop(innerScrollState)
+    animateToTop(outerScrollState)
+}
+
+internal class ProfileScrollToTopController(
+    private val scope: CoroutineScope,
+    private val animateToTop: suspend (ScrollState) -> Unit = { scrollState ->
+        scrollState.animateScrollTo(
+            value = 0,
+            animationSpec = spring(
+                stiffness = Spring.StiffnessLow,
+                visibilityThreshold = 1f,
+            ),
+        )
+    },
+) {
+    private var activeJob: Job? = null
+
+    fun scrollToTop(innerScrollState: ScrollState, outerScrollState: ScrollState): Job {
+        val previousJob = activeJob
+        previousJob?.cancel()
+        return scope.launch {
+            previousJob?.join()
+            scrollProfileToTopSequentially(
+                innerScrollState = innerScrollState,
+                outerScrollState = outerScrollState,
+                animateToTop = animateToTop,
+            )
+        }.also { activeJob = it }
+    }
+}
 
 /**
  * 详情页面脚手架
@@ -104,6 +143,7 @@ fun ProfileScaffold(
             }
         val lastIconPadding = imageHeight - (topBarHeight * ratio)
         val scope = rememberCoroutineScope()
+        val scrollToTopController = remember(scope) { ProfileScrollToTopController(scope) }
         val isHidden = topBarHeight + sysTopPadding < remainingDistance
         // 嵌套滑动,当父组件没有滑到maxValue时，父组件将消费滚动偏移量
         val nestedScrollConnection =
@@ -157,9 +197,10 @@ fun ProfileScaffold(
                 topIconRatio,
                 iconUrl,
             ) {
-                scope.launch {
-                    scrollState.animateScrollTo(0, spring(stiffness = Spring.StiffnessLow))
-                }
+                scrollToTopController.scrollToTop(
+                    innerScrollState = innerScrollState,
+                    outerScrollState = scrollState,
+                )
             }
         }
     }
