@@ -13,7 +13,8 @@ import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
-import io.github.vrcmteam.vrcm.network.supports.ApiClientDefaultBuilder
+import io.github.vrcmteam.vrcm.network.supports.ApiNoticeCenter
+import io.github.vrcmteam.vrcm.network.supports.configureApiClient
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -39,6 +40,7 @@ internal val networkModule = module(true) {
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
     singleOf(::PrintsApi)
+    singleOf(::ApiNoticeCenter)
     single<HttpClient> { apiClientDefinition(it) }
     single { createNetworkJson() }
 }
@@ -53,7 +55,7 @@ internal fun createNetworkJson() = Json {
 
 private val apiClientDefinition: Definition<HttpClient> = {
     HttpClient {
-        ApiClientDefaultBuilder()
+        configureApiClient(get())
         // api的json序列化器
         install(ContentNegotiation) {
             json(get())

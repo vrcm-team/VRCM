@@ -8,6 +8,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.supports.ApiNotice
+import io.github.vrcmteam.vrcm.network.supports.ApiNoticeCenter
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import org.koin.compose.koinInject
+
+internal fun ApiNotice.localizedMessage(locale: LocaleStrings): String = when (this) {
+    ApiNotice.RateLimited -> locale.apiRequestRateLimited
+}
+
+internal fun shouldAcceptRegularToast(activeNotice: ApiNotice?): Boolean =
+    activeNotice == null
 
 /**
  * toast弹窗
@@ -60,6 +72,9 @@ fun SnackBarToastBox(
     },
     content: @Composable () -> Unit
 ) {
+    val apiNoticeCenter: ApiNoticeCenter = koinInject()
+    val activeNotice by apiNoticeCenter.activeNotice.collectAsState()
+    val locale = strings
 
     Box {
         CompositionLocalProvider(
@@ -67,12 +82,18 @@ fun SnackBarToastBox(
         ) {
             content()
             var sackBarToastText by LocalSnackBarToastText.current
-            LaunchedEffect(Unit){
-                SharedFlowCentre.toastText.collect {
-                    sackBarToastText = it
+            LaunchedEffect(apiNoticeCenter){
+                SharedFlowCentre.toastText.collect { toast ->
+                    if (shouldAcceptRegularToast(apiNoticeCenter.activeNotice.value)) {
+                        sackBarToastText = toast
+                    }
                 }
             }
-            val theme = when (sackBarToastText) {
+            val apiToast = activeNotice?.let {
+                ToastText.Info(it.localizedMessage(locale))
+            }
+            val displayedToast = apiToast ?: sackBarToastText
+            val theme = when (displayedToast) {
                 is ToastText.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
                 is ToastText.Success ,
                 is ToastText.Info ,
@@ -80,8 +101,11 @@ fun SnackBarToastBox(
             }
             SnackBarToast(
                 modifier = modifier.align(alignment),
-                text = sackBarToastText.text,
-                onEffect = { sackBarToastText = ToastText.Normal },
+                text = displayedToast.text,
+                onEffect = {
+                    activeNotice?.let(apiNoticeCenter::consume)
+                    sackBarToastText = ToastText.Normal
+                },
                 containerColor = theme.first,
                 contentColor = theme.second,
                 content = toastContent

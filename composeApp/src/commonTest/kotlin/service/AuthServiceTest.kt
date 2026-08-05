@@ -4,7 +4,9 @@ import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
+import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
@@ -30,9 +32,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
+import org.koin.core.logger.Level
+import org.koin.core.logger.Logger
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -107,6 +115,79 @@ class AuthServiceTest : MainDispatcherTest() {
         fixture.client.close()
     }
 
+    @Test
+    fun networkAvatarSelectionResponseUpdatesCurrentUserState() = runTest {
+        var requestCount = 0
+        val fixture = fixture {
+            requestCount++
+            if (requestCount == 1) {
+                jsonResponse(currentUserJson(cachedAccount()))
+            } else {
+                jsonResponse("""{"currentAvatar":"avtr_selected"}""")
+            }
+        }
+        fixture.service.restoreAuth()
+        val result = NetworkAvatarSelector(
+            avatarsApi = AvatarsApi(fixture.client),
+            authService = fixture.service,
+            logger = EmptyLogger(),
+        ).select("avtr_selected")
+
+        assertTrue(result.isSuccess)
+        assertEquals(2, requestCount)
+        assertEquals(
+            "avtr_selected",
+            fixture.service.currentUserState.value?.currentAvatar,
+        )
+        fixture.client.close()
+    }
+
+    @Test
+    fun networkAvatarSelectionFailureLogsResponseDetailsWithoutCredentials() = runTest {
+        var requestCount = 0
+        val responseBody = """{"error":{"message":"Avatar not available","status_code":403}}"""
+        val fixture = fixture {
+            requestCount++
+            if (requestCount == 1) {
+                jsonResponse(currentUserJson(cachedAccount()))
+            } else {
+                respond(
+                    content = responseBody,
+                    status = HttpStatusCode.Forbidden,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+        fixture.service.restoreAuth()
+        val logger = CapturingLogger()
+        val application = koinApplication {
+            modules(
+                module {
+                    single { AvatarsApi(fixture.client) }
+                    single { fixture.service }
+                    single<Logger> { logger }
+                    singleOf(::NetworkAvatarSelector)
+                }
+            )
+        }
+
+        val result = application.koin.get<NetworkAvatarSelector>().select("avtr_blocked")
+
+        assertTrue(result.isFailure)
+        val (level, message) = logger.entries.single()
+        assertEquals(Level.ERROR, level)
+        assertTrue(message.contains("method=PUT"))
+        assertTrue(message.contains("path=/avatars/avtr_blocked/select"))
+        assertTrue(message.contains("status=403"))
+        assertTrue(message.contains("description=Forbidden"))
+        assertTrue(message.contains("body=$responseBody"))
+        assertFalse(message.contains("cached-auth"))
+        assertFalse(message.contains(HttpHeaders.Authorization))
+        assertFalse(message.contains(HttpHeaders.Cookie))
+        application.close()
+        fixture.client.close()
+    }
+
     private data class Fixture(
         val service: AuthService,
         val accountDao: AccountDao,
@@ -149,14 +230,17 @@ class AuthServiceTest : MainDispatcherTest() {
         headers = headersOf(HttpHeaders.ContentType, "application/json"),
     )
 
-    private fun currentUserJson(account: AccountDto): String = """
+    private fun currentUserJson(
+        account: AccountDto,
+        currentAvatar: String = "",
+    ): String = """
         {
           "requiresTwoFactorAuth":null,
           "ageVerificationStatus":"verified","ageVerified":true,
           "acceptedPrivacyVersion":0,"acceptedTOSVersion":0,
           "accountDeletionDate":null,"accountDeletionLog":null,"activeFriends":[],
           "allowAvatarCopying":true,"bio":null,"bioLinks":[],
-          "currentAvatar":"","currentAvatarAssetUrl":null,"currentAvatarImageUrl":"",
+          "currentAvatar":"$currentAvatar","currentAvatarAssetUrl":null,"currentAvatarImageUrl":"",
           "currentAvatarTags":[],"currentAvatarThumbnailImageUrl":"","date_joined":"",
           "developerType":"none","displayName":"${account.username}","emailVerified":true,
           "fallbackAvatar":"","friendGroupNames":[],"friendKey":"","friends":[],
@@ -181,4 +265,12 @@ class AuthServiceTest : MainDispatcherTest() {
           "username":"${account.username}","viveId":"","pronouns":null
         }
     """.trimIndent()
+}
+
+private class CapturingLogger : Logger(Level.DEBUG) {
+    val entries = mutableListOf<Pair<Level, String>>()
+
+    override fun display(level: Level, msg: String) {
+        entries += level to msg
+    }
 }

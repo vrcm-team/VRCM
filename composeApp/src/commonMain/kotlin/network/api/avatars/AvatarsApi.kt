@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.network.api.avatars
 import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AVATARS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -13,6 +14,9 @@ class AvatarsApi(private val client: HttpClient) {
 
     suspend fun getAvatarById(avatarId: String): AvatarData =
         client.get("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
+
+    suspend fun selectAvatar(avatarId: String): AvatarSelectionData =
+        client.put("$AVATARS_API_PREFIX/$avatarId/select").checkSuccess()
 
     suspend fun getFavoritedAvatars(
         n: Int = 50,

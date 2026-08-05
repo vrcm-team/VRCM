@@ -8,7 +8,9 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
@@ -81,7 +83,8 @@ val presentationModule: Module = module {
     factoryOf(::WorldProfileScreenModel)
     factoryOf(::GroupProfileScreenModel)
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
-    factory { AvatarProfileScreenModel(get()) }
+    singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
+    factory { AvatarProfileScreenModel(get(), get()) }
     factoryOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()

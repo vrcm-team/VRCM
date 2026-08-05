@@ -111,6 +111,14 @@ class AuthService(
         }
     }
 
+    internal fun applyCurrentAvatarUpdate(avatarId: String) {
+        val existing = currentUser ?: return
+        existing.copy(currentAvatar = avatarId).also {
+            currentUser = it
+            _currentUserState.value = it
+        }
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         val existing = currentUser ?: return
         if (existing.id != user.id) return

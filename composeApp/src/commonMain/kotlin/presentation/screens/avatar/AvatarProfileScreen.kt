@@ -25,9 +25,11 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -36,8 +38,28 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarPlatformIn
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+
+internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastText = when (this) {
+    AvatarProfileNotice.Banned -> ToastText.Error(locale.avatarProfileBanned)
+    AvatarProfileNotice.Switched -> ToastText.Success(locale.avatarProfileSwitched)
+    AvatarProfileNotice.Copied -> ToastText.Success(locale.avatarProfileCopied)
+    is AvatarProfileNotice.SelectionFailed -> ToastText.Error(
+        message ?: locale.avatarProfileSelectFailed
+    )
+}
+
+internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
+    AvatarActionAvailability.Checking -> locale.avatarProfileActionChecking
+    AvatarActionAvailability.Current -> locale.avatarProfileActionCurrent
+    AvatarActionAvailability.Banned -> locale.avatarProfileBanned
+    AvatarActionAvailability.Own -> locale.avatarProfileActionSwitch
+    AvatarActionAvailability.Copyable -> locale.avatarProfileActionSwitch
+    AvatarActionAvailability.NotCopyable -> locale.avatarProfileActionNotCopyable
+    AvatarActionAvailability.CheckFailed -> locale.avatarProfileActionCheckFailed
+}
 
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
@@ -50,6 +72,14 @@ class AvatarProfileScreen(
         val navigator = currentNavigator
         val screenModel: AvatarProfileScreenModel = koinScreenModel()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
+        val actionState by screenModel.actionState.collectAsState()
+        val locale = strings
+
+        LaunchedEffect(screenModel, locale) {
+            screenModel.notices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+            }
+        }
 
         LaunchedEffect(avatarProfileVo.avatarId) {
             screenModel.refreshAvatarData(avatarProfileVo)
@@ -61,12 +91,14 @@ class AvatarProfileScreen(
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
                 profileImageUrl = displayedAvatar.avatarImageUrl,
-                iconUrl = null,
+                iconUrl = displayedAvatar.avatarImageUrl,
                 onReturn = { navigator.pop() },
             ) { ratio, contentMinHeight ->
                 AvatarProfileContent(
                     avatarProfileVo = displayedAvatar,
                     contentMinHeight = contentMinHeight,
+                    actionState = actionState,
+                    onSelectAvatar = screenModel::selectAvatar,
                 )
             }
         }
@@ -78,6 +110,8 @@ class AvatarProfileScreen(
 private fun AvatarProfileContent(
     avatarProfileVo: AvatarProfileVo,
     contentMinHeight: Dp,
+    actionState: AvatarActionState,
+    onSelectAvatar: () -> Unit,
 ) {
     val navigator = currentNavigator
 
@@ -114,6 +148,11 @@ private fun AvatarProfileContent(
         )
     }
 
+    AvatarActionButton(
+        state = actionState,
+        onClick = onSelectAvatar,
+    )
+
     // 描述
     if (avatarProfileVo.avatarDescription.isNotBlank()) {
         Surface(
@@ -144,6 +183,55 @@ private fun AvatarProfileContent(
     }
     if (knownPlatforms.isNotEmpty()) {
         AvatarPlatformSection(knownPlatforms)
+    }
+}
+
+@Composable
+private fun AvatarActionButton(
+    state: AvatarActionState,
+    onClick: () -> Unit,
+) {
+    val availability = state.availability
+    val enabled = !state.isSelecting && (
+        availability == AvatarActionAvailability.Own ||
+            availability == AvatarActionAvailability.Copyable
+        )
+    val showProgress = state.isSelecting || availability == AvatarActionAvailability.Checking
+    val icon = when (availability) {
+        AvatarActionAvailability.Current -> AppIcons.CheckCircle
+        AvatarActionAvailability.Own -> AppIcons.Update
+        AvatarActionAvailability.Copyable -> AppIcons.Queue
+        AvatarActionAvailability.Banned,
+        AvatarActionAvailability.NotCopyable -> AppIcons.Block
+        AvatarActionAvailability.Checking,
+        AvatarActionAvailability.CheckFailed -> AppIcons.QuestionMark
+    }
+
+    Button(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        enabled = enabled,
+        onClick = onClick,
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = availability.localizedButtonText(strings),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

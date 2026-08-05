@@ -17,7 +17,10 @@ private const val RATE_LIMIT_MAX_DELAY_MILLIS = 60_000L
 /**
  * 默认的http client配置
  */
-val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
+internal fun HttpClientConfig<*>.configureApiClient(
+    apiNoticeCenter: ApiNoticeCenter,
+    retryDelay: (suspend (Long) -> Unit)? = null,
+) {
     defaultRequest { url.takeFrom(VRC_API_URL) }
     // retry five times with exponential backoff.
     // Retrying mutations automatically could repeat a user action after an uncertain response.
@@ -36,6 +39,14 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
 
             retryAfterMillis ?: (RATE_LIMIT_BASE_DELAY_MILLIS shl (retryCount - 1))
                 .coerceAtMost(RATE_LIMIT_MAX_DELAY_MILLIS)
+        }
+        retryDelay?.let { delay(it) }
+    }
+    HttpResponseValidator {
+        validateResponse { response ->
+            if (response.status == HttpStatusCode.TooManyRequests) {
+                apiNoticeCenter.publish(ApiNotice.RateLimited)
+            }
         }
     }
     // http timeout超时时间
@@ -56,5 +67,4 @@ val ApiClientDefaultBuilder: HttpClientConfig<*>.() -> Unit = {
     // user agent用户代理信息 (就是添加一个header)
     install(UserAgent)
 }
-
 
