@@ -40,6 +40,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -96,6 +99,11 @@ fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator
         isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningOn<HomeScreen, GroupProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<HomeScreen, AvatarProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<MutualFriendsScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(navigator)
+        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(navigator)
         isTransitioningOn<UserProfileScreen, GalleryScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
         isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
         isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
