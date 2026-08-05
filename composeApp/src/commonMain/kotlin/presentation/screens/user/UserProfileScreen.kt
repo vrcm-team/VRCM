@@ -74,6 +74,12 @@ internal class OneShotScrollRestorer(savedPosition: Int) {
     }
 }
 
+internal class OneShotEntranceAnimationGate : cafe.adriel.voyager.core.lifecycle.JavaSerializable {
+    private var pending = true
+
+    fun consume(): Boolean = pending.also { pending = false }
+}
+
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
@@ -977,10 +983,13 @@ private class CardListDetailScreen(
     private val sharedSuffixKey: String = "",
     private val sharedKeyPrefix: String = "",
 ) : Screen {
+    private val entranceAnimationGate = OneShotEntranceAnimationGate()
+
     @Composable
     override fun Content() {
         val navigator = currentNavigator
         val scope = rememberCoroutineScope()
+        val animateListEntrance = remember { entranceAnimationGate.consume() }
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -1001,6 +1010,7 @@ private class CardListDetailScreen(
                         itemTitle = { it.title },
                         itemSubtitle = { it.subtitle },
                         sectionKey = sectionKey,
+                        animateEntrance = animateListEntrance,
                         imageModifier = when (screenType) {
                             CardScreenType.WORLD, CardScreenType.FAVORITED_WORLD -> { item, modifier ->
                                 worldImageSharedKey(sharedKeyPrefix, item.id)
@@ -1060,10 +1070,11 @@ private fun <T> CardListContent(
     itemTitle: (T) -> String,
     itemSubtitle: (T) -> String,
     sectionKey: String = "",
+    animateEntrance: Boolean = true,
     imageModifier: @Composable (T, Modifier) -> Modifier = { _, m -> m },
     onClickItem: ((T) -> Unit)? = null,
 ) {
-    val shownItems = rememberStaggeredReveal(items)
+    val shownItems = rememberStaggeredReveal(items, animateEntrance)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(

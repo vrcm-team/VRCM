@@ -21,10 +21,15 @@ fun entranceFadeSpec(index: Int = 0): FiniteAnimationSpec<Float> = tween(
 /**
  * animateItem 的出现动画只对初次组合后新插入的项生效，
  * 因此先以空列表组合，下一帧再填入数据，让所有项走插入动画；
- * 后续列表更新直接透传，已有项不会重放入场动画。
+ * [animateEntrance] 为 false 时直接透传列表，用于返回页面时避免重放入场动画。
  */
 @Composable
-fun <T> rememberStaggeredReveal(items: List<T>): List<T> {
+fun <T> rememberStaggeredReveal(
+    items: List<T>,
+    animateEntrance: Boolean = true,
+): List<T> {
+    if (!animateEntrance) return items
+
     val shown = remember { mutableStateListOf<T>() }
     LaunchedEffect(items) {
         shown.clear()
