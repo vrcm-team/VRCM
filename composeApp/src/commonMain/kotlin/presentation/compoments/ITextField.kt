@@ -127,16 +127,17 @@ fun ITextField(
                 it()
             }
         }
-        if (textValue.isEmpty()) return
-        Icon(
-            modifier = Modifier
-                .padding(end = 12.dp)
-                .clip(CircleShape)
-                .clickable { onValueChange("") },
-            imageVector = AppIcons.Clear,
-            contentDescription = "ClearIcon",
-            tint = MaterialTheme.colorScheme.outlineVariant
-        )
+        if (textValue.isNotEmpty()) {
+            Icon(
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .clip(CircleShape)
+                    .clickable { onValueChange("") },
+                imageVector = AppIcons.Clear,
+                contentDescription = "ClearIcon",
+                tint = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
 
     }
 }
@@ -211,8 +212,7 @@ fun IPasswordField(
             textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface)
         )
-        if (textValue.isEmpty()) return
-        if (keyboardOptions.keyboardType == KeyboardType.Password){
+        if (textValue.isNotEmpty() && keyboardOptions.keyboardType == KeyboardType.Password) {
             Icon(
                 modifier = Modifier
                     .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
@@ -224,16 +224,17 @@ fun IPasswordField(
                 tint = MaterialTheme.colorScheme.outlineVariant
             )
         }
-        Icon(
-            modifier = Modifier
-                .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
-                .clip(CircleShape)
-                .clickable { onValueChange("") },
-            imageVector = AppIcons.Clear,
-            contentDescription = "ClearIcon",
-            tint = MaterialTheme.colorScheme.outlineVariant
-        )
+        if (textValue.isNotEmpty()) {
+            Icon(
+                modifier = Modifier
+                    .padding(end = 12.dp, top = 12.dp, bottom = 12.dp)
+                    .clip(CircleShape)
+                    .clickable { onValueChange("") },
+                imageVector = AppIcons.Clear,
+                contentDescription = "ClearIcon",
+                tint = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
 
     }
 }
-
