@@ -146,6 +146,8 @@ sealed class LocaleStrings {
     // WorldProfileScreen
     open val worldProfileDescription: String = "World Description"
     open val worldProfileAuthorTags: String = "Author Tags"
+    open val worldProfileCreateFirstInstance: String = "Create the first instance"
+    open val worldProfileCreateFirstInstanceHint: String = "Select this stand to get started"
     open val worldProfileCapacity: String = "Capacity"
     open val worldProfileOnlineUsers: String = "Total Online Users"
     open val worldProfileVisits: String = "Visits"

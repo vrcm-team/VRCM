@@ -26,6 +26,9 @@ class MutualFriendsScreenModel(
     var mutualFriends by mutableStateOf<List<MutualFriendData>>(emptyList())
         private set
 
+    var hasLoadedSuccessfully by mutableStateOf(false)
+        private set
+
     // The screen starts in a loading state so its first frame cannot show the empty state before
     // LaunchedEffect has had a chance to start the request.
     var isLoading by mutableStateOf(true)
@@ -42,7 +45,10 @@ class MutualFriendsScreenModel(
             errorMessage = null
             try {
                 fetchAllMutualFriends(userId)
-                    .onSuccess { mutualFriends = it }
+                    .onSuccess {
+                        mutualFriends = it
+                        hasLoadedSuccessfully = true
+                    }
                     .onFailure { error ->
                         val message = error.message.orEmpty()
                         logger.error(message)

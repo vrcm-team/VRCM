@@ -135,6 +135,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     // WorldProfileScreen
     override val worldProfileDescription = "ワールド説明"
     override val worldProfileAuthorTags = "作者タグ"
+    override val worldProfileCreateFirstInstance = "最初のインスタンスを作成"
+    override val worldProfileCreateFirstInstanceHint = "ここを選択して作成を開始"
     override val worldProfileCapacity = "収容人数"
     override val worldProfileOnlineUsers = "ワールド内のオンラインユーザー数"
     override val worldProfileVisits = "訪問数"

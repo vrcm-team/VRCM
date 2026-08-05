@@ -17,6 +17,24 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
+internal data class TopMenuActionColors(
+    val container: Color,
+    val content: Color,
+)
+
+internal fun topMenuActionColors(
+    ratio: Float,
+    onPrimary: Color,
+    primary: Color,
+    primaryContainer: Color,
+): TopMenuActionColors {
+    val clampedRatio = ratio.coerceIn(0f, 1f)
+    return TopMenuActionColors(
+        container = primaryContainer.copy(alpha = 0.6f * clampedRatio),
+        content = lerp(onPrimary, primary, 1f - clampedRatio),
+    )
+}
+
 @Composable
 fun TopMenuBar(
     topBarHeight: Dp = 64.dp,
@@ -46,15 +64,15 @@ fun TopMenuBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val iconColor = lerp(
-                MaterialTheme.colorScheme.onPrimary,
-                MaterialTheme.colorScheme.primary,
-                inverseRatio
+            val actionColors = topMenuActionColors(
+                ratio = ratio,
+                onPrimary = MaterialTheme.colorScheme.onPrimary,
+                primary = MaterialTheme.colorScheme.primary,
+                primaryContainer = MaterialTheme.colorScheme.primaryContainer,
             )
-            val actionColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f * ratio)
             val iconButtonColors = IconButtonColors(
-                containerColor = actionColor,
-                contentColor = iconColor,
+                containerColor = actionColors.container,
+                contentColor = actionColors.content,
                 disabledContainerColor = Color.Unspecified,
                 disabledContentColor = Color.Unspecified,
             )
@@ -66,7 +84,7 @@ fun TopMenuBar(
             ) {
                 Icon(
                     imageVector = AppIcons.ArrowBackIosNew,
-                    tint = iconColor,
+                    tint = actionColors.content,
                     contentDescription = "ReturnIcon"
                 )
             }
@@ -77,12 +95,12 @@ fun TopMenuBar(
                         .padding(horizontal = 10.dp),
                     colors = iconButtonColors,
                     onClick = it
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Menu,
-                        tint = iconColor,
-                        contentDescription = "MenuIcon"
-                    )
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Menu,
+                            tint = actionColors.content,
+                            contentDescription = "MenuIcon"
+                        )
                 }
             }
         }

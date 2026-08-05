@@ -84,6 +84,8 @@ data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
 ) : Screen {
+    private val groupEntranceAnimationGate = OneShotEntranceAnimationGate()
+
     // Voyager uses a screen key to retain ScreenModels. Profiles must not share one by screen type.
     override val key = "UserProfileScreen:${userProfileVO.id}"
 
@@ -93,6 +95,7 @@ data class UserProfileScreen(
     override fun Content() {
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinScreenModel { parametersOf(userProfileVO) }
+        val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
 
         LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.refreshUser(userProfileVO.id)
@@ -160,6 +163,7 @@ data class UserProfileScreen(
                     createdAvatars = userProfileScreenModel.createdAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     contentMinHeight = contentMinHeight,
+                    animateGroupEntrance = animateGroupEntrance,
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
                     onLoadAvatars = { userProfileScreenModel.loadCreatedAvatars() },
                     onLoadFavoritedWorlds = { userProfileScreenModel.loadFavoritedWorlds(userProfileVO.id) },
@@ -466,6 +470,7 @@ private fun ColumnScope.ProfileContent(
     createdAvatars: List<AvatarData>,
     favoritedWorlds: List<Pair<String, List<FavoritedWorld>>>,
     contentMinHeight: Dp,
+    animateGroupEntrance: Boolean,
     onLoadWorlds: () -> Unit,
     onLoadAvatars: () -> Unit,
     onLoadFavoritedWorlds: () -> Unit,
@@ -545,6 +550,7 @@ private fun ColumnScope.ProfileContent(
         UserGroupsSection(
             groups = mutualGroups,
             title = strings.userMutualGroups,
+            animateEntrance = animateGroupEntrance,
             onGroupClick = { group ->
                 navigator push GroupProfileScreen(
                     groupProfileVo = GroupProfileVo(group),
@@ -556,6 +562,7 @@ private fun ColumnScope.ProfileContent(
 
     UserGroupsSection(
         groups = userGroups,
+        animateEntrance = animateGroupEntrance,
         onGroupClick = { group ->
             navigator push GroupProfileScreen(
                 groupProfileVo = GroupProfileVo(group),
@@ -641,6 +648,7 @@ private fun ColumnScope.ProfileContent(
 private fun UserGroupsSection(
     groups: List<LimitedUserGroup>,
     title: String = strings.groups,
+    animateEntrance: Boolean = true,
     onGroupClick: (LimitedUserGroup) -> Unit,
 ) {
     if (groups.isEmpty()) return
@@ -649,7 +657,10 @@ private fun UserGroupsSection(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SectionHeader(title = title)
-        val shownGroups = rememberStaggeredReveal(groups.distinctBy(LimitedUserGroup::groupId))
+        val shownGroups = rememberStaggeredReveal(
+            items = groups.distinctBy(LimitedUserGroup::groupId),
+            animateEntrance = animateEntrance,
+        )
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -948,7 +959,7 @@ private fun DetailTopBar(
 /**
  * 卡片列表项数据（可序列化，用于详情页）
  */
-private data class CardItemVo(
+data class CardItemVo(
     val id: String,
     val listKey: String = id,
     val imageUrl: String?,
@@ -963,7 +974,7 @@ private data class CardItemVo(
 /**
  * 卡片导航类型
  */
-private enum class CardScreenType : cafe.adriel.voyager.core.lifecycle.JavaSerializable {
+enum class CardScreenType : cafe.adriel.voyager.core.lifecycle.JavaSerializable {
     WORLD, AVATAR, FAVORITED_WORLD
 }
 
@@ -975,7 +986,7 @@ internal fun shouldShareStackedCardWithItemDetail(itemCount: Int): Boolean = ite
 /**
  * 卡片列表详情页（非泛型，仅携带可序列化数据）
  */
-private class CardListDetailScreen(
+class CardListDetailScreen(
     private val title: String,
     private val items: List<CardItemVo>,
     private val sectionKey: String,

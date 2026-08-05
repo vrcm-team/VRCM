@@ -41,6 +41,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -110,6 +111,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
+import presentation.compoments.topMenuActionColors
 
 class GroupProfileScreen(
     private val groupProfileVo: GroupProfileVo,
@@ -163,6 +165,18 @@ class GroupProfileScreen(
                 }
                 val topBarHeight = 64.dp
                 val sysTopPadding = getInsetPadding(WindowInsets::getTop)
+                val refreshActionColors = topMenuActionColors(
+                    ratio = ratio,
+                    onPrimary = MaterialTheme.colorScheme.onPrimary,
+                    primary = MaterialTheme.colorScheme.primary,
+                    primaryContainer = MaterialTheme.colorScheme.primaryContainer,
+                )
+                val refreshButtonColors = IconButtonColors(
+                    containerColor = refreshActionColors.container,
+                    contentColor = refreshActionColors.content,
+                    disabledContainerColor = refreshActionColors.container,
+                    disabledContentColor = refreshActionColors.content,
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -226,25 +240,31 @@ class GroupProfileScreen(
                         onReturn = { currentNavigator.pop() },
                         onMenu = null
                     )
-                    IconButton(
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = sysTopPadding, end = 10.dp)
-                            .size(topBarHeight),
-                        enabled = !isLoading,
-                        onClick = screenModel::refreshGroupData,
+                            .fillMaxWidth()
+                            .height(topBarHeight + sysTopPadding)
+                            .padding(top = sysTopPadding, end = 10.dp),
+                        contentAlignment = Alignment.CenterEnd,
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                        IconButton(
+                            enabled = !isLoading,
+                            colors = refreshButtonColors,
+                            onClick = screenModel::refreshGroupData,
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = refreshActionColors.content,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh",
+                                    tint = refreshActionColors.content,
+                                )
+                            }
                         }
                     }
                     CollapsingTitleRow(

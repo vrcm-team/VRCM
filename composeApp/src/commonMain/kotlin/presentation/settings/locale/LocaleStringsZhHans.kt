@@ -135,6 +135,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     // WorldProfileScreen
     override val worldProfileDescription = "世界描述"
     override val worldProfileAuthorTags = "作者标签"
+    override val worldProfileCreateFirstInstance = "创建第一个房间"
+    override val worldProfileCreateFirstInstanceHint = "点击此展位开始创建"
     override val worldProfileCapacity = "容量"
     override val worldProfileOnlineUsers = "地图内总在线人数"
     override val worldProfileVisits = "访问"

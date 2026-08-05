@@ -67,7 +67,12 @@ data class MutualFriendsScreen(
                 }
             }
         }
-        val isLoading = model.isLoading
+        val contentState = resolveMutualFriendsContentState(
+            hasLoadedSuccessfully = model.hasLoadedSuccessfully,
+            isLoading = model.isLoading,
+            hasError = model.errorMessage != null,
+            totalCount = totalCount,
+        )
         val displayName = userName.ifBlank { strings.users }
 
         LaunchedEffect(userId) {
@@ -105,12 +110,12 @@ data class MutualFriendsScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                when {
-                    isLoading -> {
+                when (contentState) {
+                    MutualFriendsContentState.Loading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
 
-                    model.errorMessage != null -> {
+                    MutualFriendsContentState.Error -> {
                         Column(modifier = Modifier.align(Alignment.Center)) {
                             Text(
                                 text = strings.mutualFriendsLoadFailed,
@@ -126,7 +131,7 @@ data class MutualFriendsScreen(
                         }
                     }
 
-                    totalCount == 0 -> {
+                    MutualFriendsContentState.Empty -> {
                         Text(
                             modifier = Modifier.align(Alignment.Center),
                             text = strings.mutualFriendsEmpty.replace("%s", displayName),
@@ -135,7 +140,7 @@ data class MutualFriendsScreen(
                         )
                     }
 
-                    else -> {
+                    MutualFriendsContentState.Content -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
                             renderUserItems(visibleMutualFriends) {
                                 navigator push UserProfileScreen(UserProfileVo(it))
@@ -146,6 +151,25 @@ data class MutualFriendsScreen(
             }
         }
     }
+}
+
+internal enum class MutualFriendsContentState {
+    Loading,
+    Error,
+    Empty,
+    Content,
+}
+
+internal fun resolveMutualFriendsContentState(
+    hasLoadedSuccessfully: Boolean,
+    isLoading: Boolean,
+    hasError: Boolean,
+    totalCount: Int,
+): MutualFriendsContentState = when {
+    !hasLoadedSuccessfully && isLoading -> MutualFriendsContentState.Loading
+    !hasLoadedSuccessfully && hasError -> MutualFriendsContentState.Error
+    totalCount == 0 -> MutualFriendsContentState.Empty
+    else -> MutualFriendsContentState.Content
 }
 
 private const val HIDDEN_MUTUAL_USER_ID = "usr_00000000-0000-0000-0000-000000000000"

@@ -62,6 +62,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.EmptyInstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
@@ -70,6 +71,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
+import presentation.compoments.topMenuActionColors
 import kotlin.math.abs
 
 /**
@@ -706,6 +708,18 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
+        val refreshActionColors = topMenuActionColors(
+            ratio = topBarRatio,
+            onPrimary = MaterialTheme.colorScheme.onPrimary,
+            primary = MaterialTheme.colorScheme.primary,
+            primaryContainer = MaterialTheme.colorScheme.primaryContainer,
+        )
+        val refreshButtonColors = IconButtonColors(
+            containerColor = refreshActionColors.container,
+            contentColor = refreshActionColors.content,
+            disabledContainerColor = refreshActionColors.container,
+            disabledContentColor = refreshActionColors.content,
+        )
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -717,25 +731,31 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null
         )
-        IconButton(
+        Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = sysTopPadding, end = 10.dp)
-                .size(topBarHeight),
-            enabled = !isRefreshing,
-            onClick = onRefresh,
+                .fillMaxWidth()
+                .height(topBarHeight + sysTopPadding)
+                .padding(top = sysTopPadding, end = 10.dp),
+            contentAlignment = Alignment.CenterEnd,
         ) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+            IconButton(
+                enabled = !isRefreshing,
+                colors = refreshButtonColors,
+                onClick = onRefresh,
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        color = refreshActionColors.content,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = refreshActionColors.content,
+                    )
+                }
             }
         }
         // 标题显示
@@ -879,6 +899,7 @@ private fun Screen.RenderBottomSheetContent(
 
     // 上滑渐变小
     val fl = 1 - bottomSheetState.blurProgress
+    val hasNoInstances = worldProfileVo.instances.isEmpty()
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -938,7 +959,15 @@ private fun Screen.RenderBottomSheetContent(
 
             // 堆叠卡片 - 改为随着滑动过程展开
 
-            if (bottomSheetState.collapsedAlpha > 0f) {
+            if (hasNoInstances && bottomSheetState.blurProgress > 0f) {
+                EmptyInstanceCard(
+                    onCreateInstance = { showCreateInstanceDialog = true },
+                    enabled = bottomSheetState.blurProgress >= 1f,
+                    modifier = Modifier.alpha(bottomSheetState.blurProgress),
+                )
+            }
+
+            if (!hasNoInstances && bottomSheetState.collapsedAlpha > 0f) {
                 Box(modifier = Modifier.alpha(bottomSheetState.collapsedAlpha)) {
                     StackedCards(
                         instances = worldProfileVo.instances,
@@ -1065,7 +1094,7 @@ fun StackedCards(
 ) {
 
     val size = instances.size
-    // 如果没有实例，直接返回
+    // 空状态由调用方优先渲染，保留防御性返回。
     if (size == 0) return
     val isFullyExpanded = expandProgress >= 1f
 
