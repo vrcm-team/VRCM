@@ -1,13 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -17,16 +13,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil3.CoilImage
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
@@ -38,13 +41,12 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 图片预览对话框
@@ -55,6 +57,12 @@ class ImagePreviewDialog(
     private val fileExtension: String,
     private val directImageUrl: String? = null,
 ) : SharedDialog {
+
+    override val transitionDurationMillis: Int =
+        if (directImageUrl != null) PrintTotalTransitionDurationMillis else 0
+
+    override val sharedTransitionKey: String?
+        get() = if (directImageUrl != null) fileId else null
 
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
@@ -88,7 +96,7 @@ class ImagePreviewDialog(
                         // 移除对话框
                         setDialogContent(null)
                     },
-                    cropRevealEnabled = directImageUrl != null,
+                    printLayoutEnabled = directImageUrl != null,
                 )
             }
 
@@ -178,23 +186,11 @@ fun BoxScope.ZoomableImage(
     minScale: Float = 0.8f,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onDismiss: () -> Unit,
-    cropRevealEnabled: Boolean = false,
+    printLayoutEnabled: Boolean = false,
 ) {
     var targetScale by remember { mutableStateOf(1f) }
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
     var doubleTapState by remember { mutableStateOf(0) }
-
-    val cropRevealProgress = rememberPrintCropRevealProgress(
-        animatedVisibilityScope = animatedVisibilityScope,
-        enabled = cropRevealEnabled,
-    )
-
-    val cropShape = if (cropRevealEnabled) {
-        PrintCropShape(
-            placement = PrintCanvasPlacement.FitCenter,
-            revealProgress = cropRevealProgress,
-        )
-    } else null
 
     // 用于长按拖动的偏移量
 
@@ -228,137 +224,225 @@ fun BoxScope.ZoomableImage(
         }
     }
 
-    Box(
-        modifier = Modifier.align(Alignment.Center),
-        contentAlignment = Alignment.Center
-    ) {
-        CoilImage(
-            imageModel = { imageUrl },
-            imageOptions = ImageOptions(
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.Center,
-                requestSize = IntSize(2048, 2048),
-                contentDescription = contentDescription
-            ),
-            imageLoader = { koinInject() },
-            modifier = Modifier
-                .graphicsLayer(
-                    scaleX = animatedScale,
-                    scaleY = animatedScale,
-                    translationX = animatedOffset.x,
-                    translationY = animatedOffset.y
-                ).pointerInput(Unit) {
-                    detectTransformGestures(true){ _, pan, zoom, _ ->
-                        // 处理缩放 - 手势缩放时直接更新targetScale
-                        val prevScale = targetScale
-                        targetScale = (targetScale * zoom).coerceIn(minScale, maxScale)
+    val gestureModifier = Modifier
+        .offset {
+            IntOffset(
+                x = animatedOffset.x.roundToInt(),
+                y = animatedOffset.y.roundToInt(),
+            )
+        }
+        .graphicsLayer(
+            scaleX = animatedScale,
+            scaleY = animatedScale,
+        ).pointerInput(Unit) {
+            detectTransformGestures(true){ _, pan, zoom, _ ->
+                // 处理缩放 - 手势缩放时直接更新targetScale
+                val prevScale = targetScale
+                targetScale = (targetScale * zoom).coerceIn(minScale, maxScale)
 
-                        // 处理平移 (只有在放大状态下才能平移)
-                        if (animatedScale > 1f) {
-                            // 计算新的偏移量
-                            val newOffset = targetOffset + (pan * animatedScale)
+                // 处理平移 (只有在放大状态下才能平移)
+                if (animatedScale > 1f) {
+                    // 计算新的偏移量
+                    val newOffset = targetOffset + (pan * animatedScale)
 
-                            // 限制平移范围，防止图片移出屏幕太多
-                            val maxX = (animatedScale - 1) * size.width / 2
-                            val maxY = (animatedScale - 1) * size.height / 2
+                    // 限制平移范围，防止图片移出屏幕太多
+                    val maxX = (animatedScale - 1) * size.width / 2
+                    val maxY = (animatedScale - 1) * size.height / 2
 
-                            targetOffset = Offset(
-                                newOffset.x.coerceIn(-maxX, maxX),
-                                newOffset.y.coerceIn(-maxY, maxY)
-                            )
-                        } else if (prevScale > 1f && targetScale <= 1f) {
-                            // 如果从放大状态缩小到正常或更小，重置位置（带动画）
+                    targetOffset = Offset(
+                        newOffset.x.coerceIn(-maxX, maxX),
+                        newOffset.y.coerceIn(-maxY, maxY)
+                    )
+                } else if (prevScale > 1f && targetScale <= 1f) {
+                    // 如果从放大状态缩小到正常或更小，重置位置（带动画）
+                    targetOffset = Offset.Zero
+                }
+            }
+        }
+        // 只有在正常大小时才启用长按拖动
+        .enableIf(doubleTapState == 0) {
+            pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        // 拖动结束时检查是否达到阈值
+                        val distance = kotlin.math.sqrt(
+                            targetOffset.x * targetOffset.x + targetOffset.y * targetOffset.y
+                        )
+
+                        if (distance >= dismissThreshold) {
+                            // 达到阈值，调用onDismiss
+                            onDismiss()
+                        } else {
+                            // 未达到阈值，重置拖动偏移量（带动画）
                             targetOffset = Offset.Zero
                         }
                     }
+                ) { _, dragAmount ->
+                    // 更新拖动偏移量
+                    targetOffset += dragAmount
                 }
-                // 只有在正常大小时才启用长按拖动
-                .enableIf(doubleTapState == 0) {
-                    pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragEnd = {
-                                // 拖动结束时检查是否达到阈值
-                                val distance = kotlin.math.sqrt(
-                                    targetOffset.x * targetOffset.x + targetOffset.y * targetOffset.y
-                                )
+            }
+        }
+        // 支持双击放大/缩小
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onDoubleTap = { tapOffset ->
+                    when (doubleTapState) {
+                        0 -> {
+                            // 正常 -> 放大
+                            targetScale = min(maxScale, 2.5f)
 
-                                if (distance >= dismissThreshold) {
-                                    // 达到阈值，调用onDismiss
-                                    onDismiss()
-                                } else {
-                                    // 未达到阈值，重置拖动偏移量（带动画）
-                                    targetOffset = Offset.Zero
-                                }
-                            }
-                        ) { change, dragAmount ->
-                            // 更新拖动偏移量
-                            targetOffset += dragAmount
+                            // 可以选择让双击的位置作为放大的中心点
+                            val centerX = size.width / 2
+                            val centerY = size.height / 2
+                            val targetOffsetX = (centerX - tapOffset.x) * (targetScale - 1)
+                            val targetOffsetY = (centerY - tapOffset.y) * (targetScale - 1)
+
+                            // 限制偏移量
+                            val maxX = (targetScale - 1) * size.width / 2
+                            val maxY = (targetScale - 1) * size.height / 2
+                            targetOffset = Offset(
+                                targetOffsetX.coerceIn(-maxX, maxX),
+                                targetOffsetY.coerceIn(-maxY, maxY)
+                            )
+
+                            doubleTapState = 1
+                        }
+
+                        1 -> {
+                            // 放大 -> 更放大
+                            targetScale = maxScale
+                            doubleTapState = 2
+                        }
+
+                        else -> {
+                            // 缩小回正常
+                            targetScale = 1f
+                            targetOffset = Offset.Zero  // 确保位置回到中心（带动画）
+                            doubleTapState = 0
                         }
                     }
                 }
-                // 支持双击放大/缩小
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { tapOffset ->
-                            when (doubleTapState) {
-                                0 -> {
-                                    // 正常 -> 放大
-                                    targetScale = min(maxScale, 2.5f)
+            )
+        }
 
-                                    // 可以选择让双击的位置作为放大的中心点
-                                    val centerX = size.width / 2
-                                    val centerY = size.height / 2
-                                    val targetOffsetX = (centerX - tapOffset.x) * (targetScale - 1)
-                                    val targetOffsetY = (centerY - tapOffset.y) * (targetScale - 1)
-
-                                    // 限制偏移量
-                                    val maxX = (targetScale - 1) * size.width / 2
-                                    val maxY = (targetScale - 1) * size.height / 2
-                                    targetOffset = Offset(
-                                        targetOffsetX.coerceIn(-maxX, maxX),
-                                        targetOffsetY.coerceIn(-maxY, maxY)
-                                    )
-
-                                    doubleTapState = 1
-                                }
-
-                                1 -> {
-                                    // 放大 -> 更放大
-                                    targetScale = maxScale
-                                    doubleTapState = 2
-                                }
-
-                                else -> {
-                                    // 缩小回正常
-                                    targetScale = 1f
-                                    targetOffset = Offset.Zero  // 确保位置回到中心（带动画）
-                                    doubleTapState = 0
-                                }
-                            }
-                        }
+    if (printLayoutEnabled) {
+        val revealProgress = LocalSharedDialogTransitionProgress.current
+        PrintTargetCanvasLayout(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(gestureModifier),
+                contentAlignment = Alignment.Center,
+            ) {
+                PrintCanvasBackground(
+                    progress = revealProgress,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    PrintPreviewCanvasImage(
+                        imageUrl = imageUrl,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
-                .sharedBoundsBy(
+                PrintTargetPhotoLayout(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds(),
+                    ) {
+                        PrintSharedPhoto(
+                            key = id,
+                            progress = revealProgress,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            PrintPhotoImage(
+                                imageUrl = imageUrl,
+                                contentDescription = id,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .printSafePhotoToBounds(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier.align(Alignment.Center),
+            contentAlignment = Alignment.Center,
+        ) {
+            PreviewImage(
+                imageUrl = imageUrl,
+                contentDescription = contentDescription,
+                modifier = gestureModifier.sharedBoundsBy(
                     id,
                     sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                     animatedVisibilityScope = animatedVisibilityScope,
-                    boundsTransform = if (cropRevealEnabled) PrintBoundsTransform else DefaultBoundsTransform,
-                    clipInOverlayDuringTransition = if (cropRevealEnabled) {
-                        PrintCropOverlayClip(
-                            placement = PrintCanvasPlacement.FitCenter,
-                            revealProgress = cropRevealProgress,
-                        )
-                    } else {
-                        NoOverlayClip
-                    },
-                )
-                .then(if (cropShape != null) Modifier.clip(cropShape) else Modifier),
-            loading = {
+                    boundsTransform = DefaultBoundsTransform,
+                    renderInOverlayDuringTransition = true,
+                    clipInOverlayDuringTransition = NoOverlayClip,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun PrintPhotoImage(
+    imageUrl: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    PrintPhotoImage(
+        painter = rememberPrintPhotoPainter(imageUrl),
+        contentDescription = contentDescription,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun rememberPrintPhotoPainter(imageUrl: String): AsyncImagePainter {
+    val imageLoader = koinInject<ImageLoader>()
+    val platformContext = koinInject<PlatformContext>()
+    val request = remember(imageUrl, platformContext) {
+        ImageRequest.Builder(platformContext)
+            .data(imageUrl)
+            .size(PrintSharedPhotoRequestSize.width, PrintSharedPhotoRequestSize.height)
+            .build()
+    }
+    return rememberAsyncImagePainter(
+        model = request,
+        imageLoader = imageLoader,
+        contentScale = ContentScale.Fit,
+    )
+}
+
+@Composable
+internal fun PrintPhotoImage(
+    painter: AsyncImagePainter,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val painterState by painter.state.collectAsState()
+    Box(modifier = modifier) {
+        Image(
+            painter = painter,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize(),
+            alignment = Alignment.Center,
+            contentScale = ContentScale.Fit,
+        )
+        when (painterState) {
+            AsyncImagePainter.State.Empty,
+            is AsyncImagePainter.State.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            },
-            failure = {
+            }
+
+            is AsyncImagePainter.State.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = strings.imageLoadFailed,
@@ -367,44 +451,64 @@ fun BoxScope.ZoomableImage(
                     )
                 }
             }
-        )
+
+            is AsyncImagePainter.State.Success -> Unit
+        }
     }
 }
 
 @Composable
-internal fun rememberPrintCropRevealProgress(
-    animatedVisibilityScope: AnimatedVisibilityScope,
-    enabled: Boolean,
-): Float {
-    val progress = remember { Animatable(0f) }
-
-    LaunchedEffect(animatedVisibilityScope, enabled) {
-        if (!enabled) return@LaunchedEffect
-        try {
-            snapshotFlow { animatedVisibilityScope.transition.targetState }
-                .collectLatest { targetState ->
-                    when (targetState) {
-                        EnterExitState.Visible -> {
-                            delay(PrintBoundsTransitionDurationMillis.toLong())
-                            progress.animateTo(
-                                targetValue = 1f,
-                                animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
-                            )
-                        }
-
-                        EnterExitState.PreEnter -> Unit
-                        EnterExitState.PostExit -> progress.animateTo(
-                            targetValue = 0f,
-                            animationSpec = tween(durationMillis = PrintRevealTransitionDurationMillis),
-                        )
-                    }
-                }
-        } catch (_: CancellationException) {
-            // AnimatedContent may dispose the outgoing branch after its exit transition.
-        } finally {
-            progress.snapTo(0f)
-        }
-    }
-
-    return progress.value
+private fun PrintPreviewCanvasImage(
+    imageUrl: String,
+    modifier: Modifier,
+) {
+    CoilImage(
+        imageModel = { imageUrl },
+        imageOptions = ImageOptions(
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center,
+            requestSize = PrintPreviewPhotoRequestSize,
+            contentDescription = null,
+        ),
+        imageLoader = { koinInject() },
+        modifier = modifier,
+        loading = {},
+        failure = {},
+    )
 }
+
+@Composable
+private fun PreviewImage(
+    imageUrl: String,
+    contentDescription: String?,
+    modifier: Modifier,
+) {
+    CoilImage(
+        imageModel = { imageUrl },
+        imageOptions = ImageOptions(
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center,
+            requestSize = IntSize(2048, 2048),
+            contentDescription = contentDescription
+        ),
+        imageLoader = { koinInject() },
+        modifier = modifier,
+        loading = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        },
+        failure = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = strings.imageLoadFailed,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
+    )
+}
+
+internal val PrintSharedPhotoRequestSize = IntSize(1_024, 720)
+internal val PrintPreviewPhotoRequestSize = IntSize(2_048, 1_440)

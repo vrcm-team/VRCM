@@ -30,10 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -302,11 +300,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         val imageUrl = print.files?.image ?: ""
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(FileTagType.Print, print.id)
-        val printCropShape = remember {
-            PrintCropShape(
-                placement = PrintCanvasPlacement.CropTopCenter,
-                cornerRadius = 12.dp,
-            )
+        val photoPainter = rememberPrintPhotoPainter(imageUrl)
+        val transitionKey = LocalSharedDialogTransitionKey.current
+        val printTransitionProgress = if (transitionKey == print.id) {
+            LocalSharedDialogTransitionProgress.current
+        } else {
+            0f
         }
 
         Box(
@@ -315,34 +314,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 .aspectRatio(16f / 9f),
         ) {
             AnimatedVisibility(dialogContent == null || (dialogContent as? ImagePreviewDialog)?.fileId != print.id) {
-                CoilImage(
-                    imageModel = { imageUrl },
-                    imageOptions = ImageOptions(
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.TopCenter
-                    ),
-                    imageLoader = { koinInject() },
+                PrintSharedPhoto(
+                    key = print.id,
+                    progress = printTransitionProgress,
+                    animatedVisibilityScope = this@AnimatedVisibility,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(MaterialTheme.shapes.medium)
-                        .sharedBoundsBy(
-                            print.id,
-                            sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                            animatedVisibilityScope = this@AnimatedVisibility,
-                            boundsTransform = PrintBoundsTransform,
-                            clipInOverlayDuringTransition = PrintThumbnailOverlayClip,
-                        )
-                        .graphicsLayer {
-                            val transform = PrintDisplayGeometry.cropToFillTransform(
-                                bounds = Rect(0f, 0f, size.width, size.height),
-                                placement = PrintCanvasPlacement.CropTopCenter,
-                            )
-                            scaleX = transform.scale
-                            scaleY = transform.scale
-                            translationX = transform.translationX
-                            translationY = transform.translationY
-                        }
-                        .clip(printCropShape)
                         .combinedClickable(
                             onClick = {
                                 if (galleryScreenModel.hasSelection(FileTagType.Print)) {
@@ -355,28 +332,15 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                                 galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                             },
                         ),
-                    loading = {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        }
-                    },
-                    failure = {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = strings.galleryTabLoadFailed,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                )
+                ) {
+                    PrintPhotoImage(
+                        painter = photoPainter,
+                        contentDescription = print.id,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .printSafePhotoToBounds(),
+                    )
+                }
             }
             // 选中状态覆盖层
             if (selected) {
@@ -478,7 +442,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         .sharedBoundsBy(
                             file.id,
                             sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                            animatedVisibilityScope = this@AnimatedVisibility
+                            animatedVisibilityScope = this@AnimatedVisibility,
+                            renderInOverlayDuringTransition = true,
                         )
                         .combinedClickable(
                             onClick = {

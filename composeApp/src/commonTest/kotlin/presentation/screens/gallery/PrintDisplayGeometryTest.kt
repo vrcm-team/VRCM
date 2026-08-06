@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 import androidx.compose.ui.geometry.Rect
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PrintDisplayGeometryTest {
     @Test
@@ -17,7 +18,6 @@ class PrintDisplayGeometryTest {
     fun fitCropUsesCenteredCanvasInPortraitBounds() {
         val crop = PrintDisplayGeometry.cropRect(
             bounds = Rect(0f, 0f, 1_080f, 1_440f),
-            placement = PrintCanvasPlacement.FitCenter,
         )
 
         assertRectEquals(
@@ -30,7 +30,6 @@ class PrintDisplayGeometryTest {
     fun fitCropUsesCenteredCanvasInWideBounds() {
         val crop = PrintDisplayGeometry.cropRect(
             bounds = Rect(0f, 0f, 2_560f, 1_080f),
-            placement = PrintCanvasPlacement.FitCenter,
         )
 
         assertRectEquals(
@@ -43,7 +42,6 @@ class PrintDisplayGeometryTest {
     fun fitCropUsesCenteredCanvasInSixteenByNineBounds() {
         val crop = PrintDisplayGeometry.cropRect(
             bounds = Rect(0f, 0f, 2_048f, 1_152f),
-            placement = PrintCanvasPlacement.FitCenter,
         )
 
         assertRectEquals(
@@ -53,33 +51,27 @@ class PrintDisplayGeometryTest {
     }
 
     @Test
-    fun thumbnailTransformMapsAllCropEdgesToContainerEdges() {
-        val bounds = Rect(0f, 0f, 2_048f, 1_152f)
-        val crop = PrintDisplayGeometry.cropRect(
-            bounds = bounds,
-            placement = PrintCanvasPlacement.CropTopCenter,
-        )
-        val transform = PrintDisplayGeometry.cropToFillTransform(
-            bounds = bounds,
-            placement = PrintCanvasPlacement.CropTopCenter,
-        )
+    fun targetPhotoRectIsSixteenByNineSafeRegionInsideFittedCanvas() {
+        val bounds = Rect(0f, 0f, 240f, 160f)
+        val canvas = PrintDisplayGeometry.canvasRect(bounds)
 
-        assertRectEquals(bounds, transform.map(crop, bounds))
+        val photo = PrintDisplayGeometry.targetPhotoRect(bounds)
+
+        assertEquals(16f / 9f, photo.width / photo.height, 0.01f)
+        assertTrue(photo.left >= canvas.left)
+        assertTrue(photo.top >= canvas.top)
+        assertTrue(photo.right <= canvas.right)
+        assertTrue(photo.bottom <= canvas.bottom)
     }
 
     @Test
-    fun revealProgressUsesSameCropAndFullBoundsInBothDirections() {
-        val bounds = Rect(0f, 0f, 1_080f, 1_440f)
-        val crop = PrintDisplayGeometry.cropRect(bounds, PrintCanvasPlacement.FitCenter)
+    fun safePhotoTransformMapsFittedRawPngCropToSharedBounds() {
+        val bounds = Rect(0f, 0f, 160f, 90f)
+        val fittedSafePhoto = PrintDisplayGeometry.targetPhotoRect(bounds)
 
-        assertRectEquals(
-            crop,
-            PrintDisplayGeometry.revealedCropRect(bounds, PrintCanvasPlacement.FitCenter, 0f),
-        )
-        assertRectEquals(
-            bounds,
-            PrintDisplayGeometry.revealedCropRect(bounds, PrintCanvasPlacement.FitCenter, 1f),
-        )
+        val transform = PrintDisplayGeometry.safePhotoToBoundsTransform(bounds)
+
+        assertRectEquals(bounds, transform.map(fittedSafePhoto, bounds))
     }
 
     private fun assertRectEquals(expected: Rect, actual: Rect) {
