@@ -28,6 +28,8 @@ sealed class LocaleStrings {
     open val desktopWindowMaximize: String = "Maximize"
     open val desktopWindowRestore: String = "Restore"
     open val desktopWindowClose: String = "Close"
+    open val widePaneEmptyTitle: String = "There's not even a mirror here yet"
+    open val widePaneEmptyHint: String = "Pick a friend, world, or group on the left to take a look"
     open val fiendLocationPagerWebsite: String = "Active on the Website"
     open val fiendLocationPagerPrivate: String = "Friends in Private Worlds"
     open val fiendLocationPagerTraveling: String = "Friends is Traveling"

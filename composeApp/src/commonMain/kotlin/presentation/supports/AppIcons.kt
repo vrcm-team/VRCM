@@ -17,6 +17,39 @@ object AppIcons {
     val WindowMaximize: ImageVector by lazy { Icons.Outlined.CropSquare }
     val WindowRestore: ImageVector by lazy { Icons.Outlined.FilterNone }
 
+    val Mirror: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Mirror",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(
+                fill = null,
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 2f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(11f, 6f)
+                lineTo(8f, 9f)
+                moveTo(16f, 7f)
+                lineTo(8f, 15f)
+                moveTo(6f, 2f)
+                horizontalLineTo(18f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 20f, 4f)
+                verticalLineTo(20f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 18f, 22f)
+                horizontalLineTo(6f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 4f, 20f)
+                verticalLineTo(4f)
+                arcTo(2f, 2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 6f, 2f)
+                close()
+            }
+        }.build()
+    }
+
     val Publish: ImageVector by lazy {
         ImageVector.Builder(
             name = "Publish",

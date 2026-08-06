@@ -17,6 +17,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val desktopWindowMaximize = "最大化"
     override val desktopWindowRestore = "還原"
     override val desktopWindowClose = "關閉"
+    override val widePaneEmptyTitle = "這裡甚至還沒有一面鏡子"
+    override val widePaneEmptyHint = "先從左邊選個好友、世界或群組看看"
     override val fiendLocationPagerWebsite = "活躍在網頁上"
     override val fiendLocationPagerPrivate = "處於私人世界中"
     override val fiendLocationPagerTraveling = "正在跃迁中"

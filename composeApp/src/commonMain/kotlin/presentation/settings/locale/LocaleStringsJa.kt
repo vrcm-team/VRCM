@@ -17,6 +17,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val desktopWindowMaximize = "最大化"
     override val desktopWindowRestore = "元に戻す"
     override val desktopWindowClose = "閉じる"
+    override val widePaneEmptyTitle = "ここにはまだ鏡すらありません"
+    override val widePaneEmptyHint = "左からフレンド、ワールド、またはグループを選んでみよう"
     override val fiendLocationPagerWebsite = "ウェブサイトで"
     override val fiendLocationPagerPrivate = "プライベートワールド中"
     override val fiendLocationPagerTraveling = "移動中"

@@ -2,14 +2,19 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.*
 import androidx.compose.animation.SharedTransitionScope.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
@@ -18,10 +23,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment.Companion.Center
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -40,6 +47,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.navigation.adaptivePaneMetadata
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppListDetailSceneStrategy
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 private const val AppRouteMetadataKey = "vrcm:app-route"
@@ -139,15 +147,33 @@ fun SharedTransitionScreen(
 
 @Composable
 private fun EmptyDetailPane() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Center,
+    val locale = strings
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
         Icon(
-            imageVector = AppIcons.PersonSearch,
+            imageVector = AppIcons.Mirror,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.24f),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f),
+        )
+        Text(
+            text = locale.widePaneEmptyTitle,
+            modifier = Modifier.widthIn(max = 360.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = locale.widePaneEmptyHint,
+            modifier = Modifier.widthIn(max = 360.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
         )
     }
 }
