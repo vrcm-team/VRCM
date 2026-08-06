@@ -39,7 +39,6 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vinceglb.filekit.name
-import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
@@ -93,7 +92,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
 
         // 非 Print 类型的图片选择器（直接上传）
         val simpleImagePicker = rememberFilePickerLauncher(
-            type = FileKitType.File(*GalleryUploadImageFormat.allowedExtensions.toTypedArray()),
+            type = galleryImagePickerType(GalleryUploadImageFormat.allowedExtensions),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
@@ -128,7 +127,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
 
         // Print 类型的图片选择器（经过编辑器）
         val printImagePicker = rememberFilePickerLauncher(
-            type = FileKitType.File("jpg", "jpeg", "png", "heic", "heif"),
+            type = galleryImagePickerType(listOf("jpg", "jpeg", "png", "heic", "heif")),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
