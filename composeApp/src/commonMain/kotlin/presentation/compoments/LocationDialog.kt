@@ -55,22 +55,18 @@ class LocationDialog(
         val owner = remember { currentInstants.owner }
         val currentNavigator = currentNavigator
         val onClickWorldImage = {
-            if (currentNavigator.size <= 1) {
-                // 创建临时的 WorldProfileVo
-                val tempWorldProfileVo = WorldProfileVo(currentInstants)
-                currentNavigator push WorldProfileScreen(
-                    tempWorldProfileVo,
-                    sharedSuffixKey = sharedSuffixKey
-                )
-            }
+            // 创建临时的 WorldProfileVo
+            val tempWorldProfileVo = WorldProfileVo(currentInstants)
+            currentNavigator push WorldProfileScreen(
+                tempWorldProfileVo,
+                sharedSuffixKey = sharedSuffixKey
+            )
         }
         val onClickUserIcon = { user: IUser ->
-            if (currentNavigator.size <= 1) {
-                currentNavigator push UserProfileScreen(
-                    userProfileVO = UserProfileVo(user),
-                    sharedSuffixKey = sharedSuffixKey
-                )
-            }
+            currentNavigator push UserProfileScreen(
+                userProfileVO = UserProfileVo(user),
+                sharedSuffixKey = sharedSuffixKey
+            )
         }
         val inviteApi: InviteApi = koinInject()
         val authService: AuthService = koinInject()

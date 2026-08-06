@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.worlds.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -16,4 +15,4 @@ data class UnityPackage(
     val pluginUrl: String?,
     val unitySortNumber: Long? = null,
     val unityVersion: String
-) : JavaSerializable
+)

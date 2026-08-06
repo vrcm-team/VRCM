@@ -5,6 +5,8 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,14 +15,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.transitions.SlideOrientation
+import androidx.navigation3.scene.Scene
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
+import io.github.vrcmteam.vrcm.presentation.animations.SlideOrientation
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
@@ -28,7 +28,13 @@ import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.navigation.BackNavigationPolicy
+import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppNavigator
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.appWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.VersionDialog
@@ -50,29 +56,26 @@ import org.koin.compose.koinInject
 @Composable
 fun App() {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
-    KoinContext {
-        val webSocketApi = koinInject<WebSocketApi>()
-        val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
-        LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-            friendLocationPagerModel.onBackground()
-            webSocketApi.onBackground()
-        }
-        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-            webSocketApi.onForeground()
-            friendLocationPagerModel.onForeground()
-        }
-        SettingsProvider {
-            Navigator(
-                screen = StartupAnimeScreen,
-            ) { navigator ->
-                CompositionLocalProvider(LocalBackNavigationPolicy provides backNavigationPolicy) {
-                    BackHandler(
-                        enabled = backNavigationPolicy.shouldHandleBack(navigator.canPop)
-                    ) {
-                        backNavigationPolicy.handleBack(navigator.canPop) {
-                            navigator.pop()
-                        }
-                    }
+    val navigator = rememberAppNavigator(StartupAnimeScreen)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val windowWidthClass = appWindowWidthClass(maxWidth)
+        KoinContext {
+            val webSocketApi = koinInject<WebSocketApi>()
+            val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
+            LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+                friendLocationPagerModel.onBackground()
+                webSocketApi.onBackground()
+            }
+            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                webSocketApi.onForeground()
+                friendLocationPagerModel.onForeground()
+            }
+            SettingsProvider {
+                CompositionLocalProvider(
+                    LocalBackNavigationPolicy provides backNavigationPolicy,
+                    LocalNavigator provides navigator,
+                    LocalAppWindowWidthClass provides windowWidthClass,
+                ) {
                     SnackBarToastBox(
                         Modifier
                             .systemBarsPadding()
@@ -81,7 +84,8 @@ fun App() {
                         VersionDialog()
                         SharedTransitionScreen(
                             navigator = navigator,
-                            transitionSpec = { selectTransition(navigator) }
+                            transitionSpec = { selectTransition(isPop = false) },
+                            popTransitionSpec = { selectTransition(isPop = true) },
                         ) { screen ->
                             SharedTransitionDialog(key = screen.key) {
                                 screen.Content()
@@ -94,23 +98,23 @@ fun App() {
     }
 }
 
-fun AnimatedContentTransitionScope<Screen>.selectTransition(navigator: Navigator): ContentTransform =
+fun AnimatedContentTransitionScope<Scene<AppRoute>>.selectTransition(isPop: Boolean): ContentTransform =
     when {
-        isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<HomeScreen, GroupProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<HomeScreen, AvatarProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<MutualFriendsScreen, UserProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(navigator)
-        isTransitioningOn<UserProfileScreen, GalleryScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
-        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
-        isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
-        isTransitioningOn<WorldProfileScreen, GroupProfileScreen>() -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
+        isTransitioningOn<HomeScreen, UserProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<HomeScreen, GroupProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<HomeScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<MutualFriendsScreen, UserProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<UserProfileScreen, GalleryScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
+        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
+        isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
+        isTransitioningOn<WorldProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
         isTransitioningFromTo<HomeScreen, AuthAnimeScreen>() -> HomeToAuthAnimeTransition
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> AuthAnimeToHomeTransition
         isTransitioning<StartupAnimeScreen>() -> ContentTransform(EnterTransition.None, ExitTransition.None)
         isTransitioning<AuthAnimeScreen>() -> ContentTransform(EnterTransition.None, ExitTransition.None)
-        else -> slideScreenTransition(navigator, SlideOrientation.Horizontal)
+        else -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
     }

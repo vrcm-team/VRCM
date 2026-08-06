@@ -127,7 +127,7 @@
 
 ### 架构组件
 - **[Koin](https://github.com/InsertKoinIO/koin)** - 依赖注入框架
-- **[Voyager](https://github.com/adrielcafe/voyager)** - 导航和状态管理
+- **[Navigation 3](https://developer.android.com/guide/navigation/navigation-3)** - 自适应导航和状态恢复
 - **[Multiplatform-Settings](https://github.com/russhwolf/multiplatform-settings)** - 跨平台配置存储
 - **[Coil](https://github.com/coil-kt/coil)** - 高性能图片加载
 
@@ -174,5 +174,4 @@
 [下载最新版本](https://github.com/vrcm-team/VRCM/releases/latest) • [反馈问题](https://github.com/vrcm-team/VRCM/issues) • [功能建议](https://github.com/vrcm-team/VRCM/discussions)
 
 </div>
-
 

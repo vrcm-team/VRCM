@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.avatars.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -52,11 +51,11 @@ data class AvatarData(
     val featured: Boolean = false,
     @Serializable(with = AvatarUnityPackagesSerializer::class)
     val unityPackages: List<AvatarUnityPackage> = emptyList(),
-) : JavaSerializable
+)
 
 @Serializable
 data class AvatarUnityPackage(
     val platform: String? = null,
     val unityVersion: String? = null,
     val performanceRating: String? = null,
-) : JavaSerializable
+)

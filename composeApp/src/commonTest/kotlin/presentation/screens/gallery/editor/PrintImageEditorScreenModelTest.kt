@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -207,8 +209,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
 
         store.complete(sessionId)
         assertEquals(emptyList(), released)
-        model.onDispose()
-        model.onDispose()
+        clearViewModel(model)
 
         assertNull(store.get(sessionId))
         assertEquals(listOf<ImageBitmap>(TestImageBitmap), released)
@@ -230,7 +231,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         )
 
         model.acquirePreviewDisplayLease()
-        model.onDispose()
+        clearViewModel(model)
 
         assertEquals(emptyList(), released)
         model.releasePreviewDisplayLease()
@@ -272,6 +273,14 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     private companion object {
         val VIEWPORT = ImageSize(1_600, 900)
         val PNG_BYTES = byteArrayOf(1, 2, 3)
+    }
+}
+
+private fun clearViewModel(viewModel: ViewModel) {
+    ViewModelStore().apply {
+        put("test", viewModel)
+        clear()
+        clear()
     }
 }
 

@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import cafe.adriel.voyager.core.annotation.InternalVoyagerApi
-import cafe.adriel.voyager.core.model.ScreenModelStore
+import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
@@ -33,13 +32,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-@OptIn(InternalVoyagerApi::class)
 class RecentWorldsScreenModelTest : MainDispatcherTest() {
-    private val holderKey = "RecentWorldsScreenModelTest:${hashCode()}"
+    private val models = mutableListOf<RecentWorldsScreenModel>()
 
     @AfterTest
     fun disposeModel() {
-        ScreenModelStore.onDisposeNavigator(holderKey)
+        models.forEach { model ->
+            ViewModelStore().apply {
+                put("test", model)
+                clear()
+            }
+        }
     }
 
     @Test
@@ -96,12 +99,11 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
                 userProfileCacheDao = UserProfileCacheDao(MapSettings()),
             ),
         )
-        return ScreenModelStore.getOrPut<RecentWorldsScreenModel>(holderKey, tag = null) {
-            RecentWorldsScreenModel(
-                authService = authService,
-                worldsApi = WorldsApi(client),
-            )
-        }
+        return RecentWorldsScreenModel(
+            authService = authService,
+            worldsApi = WorldsApi(client),
+        )
+            .also(models::add)
     }
 }
 

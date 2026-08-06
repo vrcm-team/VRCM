@@ -1,11 +1,14 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
+import kotlinx.serialization.Serializable
+
 /**
  * Trust rank of a user.
  * @param value The value of the trust rank.
  * @param displayName The display name of the trust rank.
  * @see <a href="https://vrchatapi.github.io/tutorials/tags/">VRChatApi Tutorials Tags</a>
  */
+@Serializable
 enum class TrustRank(val value: String, val displayName: String) {
 
     TrustedUser("system_trust_veteran","Trusted"),

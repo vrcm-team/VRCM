@@ -10,7 +10,7 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 - Compose Multiplatform：1.10.3
 - 包名：`io.github.vrcmteam.vrcm`
 - Android：minSdk 24、targetSdk 35、compileSdk 36
-- 主要技术：Voyager、Koin、Ktor、Multiplatform Settings、Coil、Kotlin Coroutines
+- 主要技术：Navigation 3、Lifecycle ViewModel、Material 3 Adaptive、Koin、Ktor、Multiplatform Settings、Coil、Kotlin Coroutines
 
 具体版本以 `gradle/libs.versions.toml` 为准。
 
@@ -29,7 +29,7 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 
 `commonMain/kotlin` 内的核心边界：
 
-- `presentation/`：Voyager Screen/ScreenModel、Compose UI、动画、导航、主题与设置
+- `presentation/`：Navigation 3 路由、Lifecycle ViewModel、Compose UI、动画、导航、主题与设置
 - `network/`：Ktor API、WebSocket、网络模型与协议支持
 - `service/`：认证、好友、收藏、版本、上传等业务编排
 - `storage/`：账户、缓存、设置与持久化
@@ -51,10 +51,10 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 
 ## 架构与状态
 
-- 导航与页面生命周期遵循现有 Voyager `Screen`、`ScreenModel` 和 Navigator 模式。
+- 导航与页面生命周期遵循现有 Navigation 3 `AppRoute`、`AppNavigator`、`NavDisplay` 和 Lifecycle `ViewModel` 模式。
 - 依赖通过 Koin 注入，不在 Composable 中直接构造网络、存储或服务对象。
 - 状态保持单一数据源，优先使用现有 `StateFlow`、`SharedFlow` 或 Compose state 模式。
-- 可复用业务流程放在既有 ScreenModel、Service、Storage 或 Network 边界中，不在 UI 中复制。
+- 可复用业务流程放在既有 ViewModel、Service、Storage 或 Network 边界中，不在 UI 中复制。
 - 网络调用使用现有 Ktor client、API 和认证重试封装。
 - 协程必须绑定明确生命周期与 Dispatcher，不得在测试或页面退出后遗留任务或全局 Dispatcher 状态。
 

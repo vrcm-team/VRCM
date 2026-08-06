@@ -1,13 +1,12 @@
 package io.github.vrcmteam.vrcm.network.websocket.data.content
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import kotlinx.serialization.Serializable
 
 @Serializable
-abstract class FriendEventsContent: JavaSerializable{
+abstract class FriendEventsContent{
     abstract val user: UserContent?
     abstract val userId: String
 }

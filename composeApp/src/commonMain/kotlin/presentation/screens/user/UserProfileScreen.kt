@@ -22,10 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -61,6 +62,8 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.koin.core.parameter.parametersOf
 
 internal class OneShotScrollRestorer(savedPosition: Int) {
@@ -74,19 +77,21 @@ internal class OneShotScrollRestorer(savedPosition: Int) {
     }
 }
 
-internal class OneShotEntranceAnimationGate : cafe.adriel.voyager.core.lifecycle.JavaSerializable {
+internal class OneShotEntranceAnimationGate {
     private var pending = true
 
     fun consume(): Boolean = pending.also { pending = false }
 }
 
+@Serializable
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
-) : Screen {
+) : AppDetailRoute {
+    @Transient
     private val groupEntranceAnimationGate = OneShotEntranceAnimationGate()
 
-    // Voyager uses a screen key to retain ScreenModels. Profiles must not share one by screen type.
+    // Keep dialog/shared-element state distinct for profiles with different IDs.
     override val key = "UserProfileScreen:${userProfileVO.id}"
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +99,7 @@ data class UserProfileScreen(
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val userProfileScreenModel: UserProfileScreenModel = koinScreenModel { parametersOf(userProfileVO) }
+        val userProfileScreenModel: UserProfileScreenModel = koinViewModel { parametersOf(userProfileVO) }
         val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
 
         LaunchedEffect(userProfileVO.id) {
@@ -959,6 +964,7 @@ private fun DetailTopBar(
 /**
  * 卡片列表项数据（可序列化，用于详情页）
  */
+@Serializable
 data class CardItemVo(
     val id: String,
     val listKey: String = id,
@@ -969,12 +975,13 @@ data class CardItemVo(
     val authorName: String = "",
     val avatarData: AvatarData? = null,
     val worldProfileVO: WorldProfileVo? = null,
-) : cafe.adriel.voyager.core.lifecycle.JavaSerializable
+)
 
 /**
  * 卡片导航类型
  */
-enum class CardScreenType : cafe.adriel.voyager.core.lifecycle.JavaSerializable {
+@Serializable
+enum class CardScreenType {
     WORLD, AVATAR, FAVORITED_WORLD
 }
 
@@ -986,6 +993,7 @@ internal fun shouldShareStackedCardWithItemDetail(itemCount: Int): Boolean = ite
 /**
  * 卡片列表详情页（非泛型，仅携带可序列化数据）
  */
+@Serializable
 class CardListDetailScreen(
     private val title: String,
     private val items: List<CardItemVo>,
@@ -993,7 +1001,8 @@ class CardListDetailScreen(
     private val screenType: CardScreenType,
     private val sharedSuffixKey: String = "",
     private val sharedKeyPrefix: String = "",
-) : Screen {
+) : AppDetailRoute {
+    @Transient
     private val entranceAnimationGate = OneShotEntranceAnimationGate()
 
     @Composable

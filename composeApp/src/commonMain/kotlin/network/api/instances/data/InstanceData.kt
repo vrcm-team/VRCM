@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.instances.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.IAccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
@@ -43,7 +42,7 @@ data class InstanceData(
     val userCount: Int,
     val world: WorldData,
     val worldId: String
-) : IAccessType, JavaSerializable {
+) : IAccessType {
     override val accessType: AccessType
             get() = when (type) {
                 AccessType.Group.value -> {

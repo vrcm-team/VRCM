@@ -2,8 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
@@ -20,7 +20,7 @@ class GalleryScreenModel internal constructor(
     private val dataSource: GalleryDataSource,
     private val logger: Logger,
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : ScreenModel {
+) : ViewModel() {
 
     companion object {
         /** Gallery/Icon/Print 的上限 */
@@ -95,7 +95,7 @@ class GalleryScreenModel internal constructor(
     fun init() {
         clearSelection()
         refreshAllFiles()
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             runGalleryCatching {
                 _isVrcPlus.value = dataSource.isCurrentUserSupporter()
             }.onFailure {
@@ -119,7 +119,7 @@ class GalleryScreenModel internal constructor(
         // 设置刷新状态为true
         _isRefreshingByTag[tagType] = true
 
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             runGalleryCatching { dataSource.getFiles(tagType, n, offset) }
                 .onGalleryFailure()
                 .onSuccess { files ->
@@ -142,7 +142,7 @@ class GalleryScreenModel internal constructor(
      */
     fun refreshPrints(n: Int = 100, offset: Int = 0) {
         _isRefreshingPrints.value = true
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             runGalleryCatching { dataSource.getPrints(n, offset) }
                 .onGalleryFailure()
                 .onSuccess { prints ->
@@ -194,7 +194,7 @@ class GalleryScreenModel internal constructor(
     private inline fun <T> Result<T>.onGalleryFailure() =
         onApiFailure("Gallery") {
             logger.error(it)
-            screenModelScope.launch {
+            viewModelScope.launch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
         }
@@ -216,7 +216,7 @@ class GalleryScreenModel internal constructor(
         successMessage: String,
         failedMessagePrefix: String,
     ) {
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             SharedFlowCentre.toastText.emit(ToastText.Info(uploadingMessage))
             val format = GalleryUploadImageFormat.fromFileName(fileName)
             if (format == null) {
@@ -255,7 +255,7 @@ class GalleryScreenModel internal constructor(
         val ids = selectedIds(tagType).intersect(loadedIds).toList()
         clearSelection(tagType)
         if (ids.isEmpty()) return
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             SharedFlowCentre.toastText.emit(ToastText.Info(deletingMessage))
             var failed = 0
             for (id in ids) {
@@ -288,7 +288,7 @@ class GalleryScreenModel internal constructor(
         val ids = selectedIds(FileTagType.Print).intersect(loadedIds).toList()
         clearSelection(FileTagType.Print)
         if (ids.isEmpty()) return
-        screenModelScope.launch(workerDispatcher) {
+        viewModelScope.launch(workerDispatcher) {
             SharedFlowCentre.toastText.emit(ToastText.Info(deletingMessage))
             var failed = 0
             for (id in ids) {

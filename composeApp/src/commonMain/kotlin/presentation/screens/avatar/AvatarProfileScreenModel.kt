@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -123,7 +123,7 @@ class AvatarProfileScreenModel internal constructor(
     private val avatarProfileLoader: AvatarProfileLoader,
     private val avatarSelector: AvatarSelector,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) : ScreenModel {
+) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
     val avatarProfileState: StateFlow<AvatarProfileVo?> = _avatarProfileState.asStateFlow()
@@ -147,7 +147,7 @@ class AvatarProfileScreenModel internal constructor(
             isSelecting = selecting,
         )
     }.stateIn(
-        scope = screenModelScope,
+        scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = AvatarActionState(),
     )
@@ -165,8 +165,7 @@ class AvatarProfileScreenModel internal constructor(
             return
         }
         _isLoading.value = true
-
-        screenModelScope.launch(requestDispatcher) {
+        viewModelScope.launch(requestDispatcher) {
             avatarProfileLoader.load(avatarId)
                 .onSuccess { avatarData ->
                     if (requestToken == latestRequestToken.value) {
@@ -202,7 +201,7 @@ class AvatarProfileScreenModel internal constructor(
         }
         if (!isSelecting.compareAndSet(expect = false, update = true)) return
 
-        screenModelScope.launch(requestDispatcher) {
+        viewModelScope.launch(requestDispatcher) {
             avatarSelector.select(avatarId)
                 .onSuccess {
                     _notices.emit(

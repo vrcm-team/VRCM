@@ -127,7 +127,7 @@
 
 ### アーキテクチャコンポーネント
 - **[Koin](https://github.com/InsertKoinIO/koin)** - 依存性注入フレームワーク
-- **[Voyager](https://github.com/adrielcafe/voyager)** - ナビゲーションと状態管理
+- **[Navigation 3](https://developer.android.com/guide/navigation/navigation-3)** - アダプティブナビゲーションと状態復元
 - **[Multiplatform-Settings](https://github.com/russhwolf/multiplatform-settings)** - クロスプラットフォーム設定ストレージ
 - **[Coil](https://github.com/coil-kt/coil)** - 高性能画像読み込み
 

@@ -6,11 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 
-val currentNavigator: Navigator
+val currentNavigator: AppNavigator
     @Composable
     get() = LocalNavigator.currentOrThrow
 
@@ -27,4 +27,3 @@ inline fun getInsetPadding(default: Int, direction: (WindowInsets, Density) -> I
 @Composable
 inline fun getInsetPadding(direction: (WindowInsets, Density) -> Int) =
     getInsetPadding(0, direction)
-

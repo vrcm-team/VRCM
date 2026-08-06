@@ -19,8 +19,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
+import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import org.koin.compose.viewmodel.koinViewModel
 import dev.chrisbanes.haze.HazeDefaults.style
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -44,10 +46,13 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
 
-object HomeScreen : Screen {
+@Serializable
+object HomeScreen : AppListRoute {
 
     private val pagerList = listOf(
         FriendLocationPager,
@@ -59,7 +64,7 @@ object HomeScreen : Screen {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val homeScreenModel: HomeScreenModel = koinScreenModel()
+        val homeScreenModel: HomeScreenModel = koinViewModel()
 
         LaunchedEffect(Unit) {
             homeScreenModel.init()
@@ -73,12 +78,27 @@ object HomeScreen : Screen {
         // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
-        val pagerState = rememberPagerState { pagerList.size }
+        val windowWidthClass = LocalAppWindowWidthClass.current
+        val pagerState = rememberPagerState(
+            initialPage = homeScreenModel.selectedPagerIndex,
+        ) { pagerList.size }
+        val useNavigationRail = windowWidthClass != AppWindowWidthClass.Compact
+
+        LaunchedEffect(pagerState, windowWidthClass) {
+            pagerState.scrollToPage(homeScreenModel.selectedPagerIndex)
+            snapshotFlow { pagerState.settledPage }.collect { page ->
+                homeScreenModel.onPagerSettled(page)
+            }
+        }
 
         Scaffold(
             contentColor = MaterialTheme.colorScheme.primary,
             topBar = { HomeTopAppBar(hazeState) },
-            bottomBar = { HomeBottomBar(pagerList, pagerState, hazeState) },
+            bottomBar = {
+                if (!useNavigationRail) {
+                    HomeBottomBar(pagerList, pagerState, hazeState)
+                }
+            },
         ) {
             Surface(
                 modifier = Modifier
@@ -86,10 +106,18 @@ object HomeScreen : Screen {
                     .enableIf(supportBlur) { hazeSource(state = hazeState!!) },
                 tonalElevation = 2.dp
             ) {
-                HorizontalPager(pagerState) {
-                    val pager = pagerList[it]
-                    CompositionLocalProvider(LocalSharedSuffixKey provides pager.title) {
-                        pager.Content()
+                Row {
+                    if (useNavigationRail) {
+                        HomeNavigationRail(pagerList, pagerState)
+                    }
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        val pager = pagerList[it]
+                        CompositionLocalProvider(LocalSharedSuffixKey provides pager.title) {
+                            pager.Content()
+                        }
                     }
                 }
             }
@@ -101,10 +129,10 @@ object HomeScreen : Screen {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private inline fun Screen.HomeTopAppBar(
+private inline fun AppListRoute.HomeTopAppBar(
     hazeState: HazeState?,
 ) {
-    val homeScreenModel: HomeScreenModel = koinScreenModel()
+    val homeScreenModel: HomeScreenModel = koinViewModel()
     val currentUser = homeScreenModel.currentUser
     val hasNotifications by remember { derivedStateOf { (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications).isNotEmpty() } }
     // to ProfileScreen
@@ -112,10 +140,7 @@ private inline fun Screen.HomeTopAppBar(
     val sharedSuffixKey = LocalSharedSuffixKey.current
     var currentDialog by LocationDialogContent.current
     val onClickUserIcon = { user: IUser ->
-        // 防止多次点击在栈中存在相同key的屏幕报错
-        if (currentNavigator.size <= 1) {
-            currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
-        }
+        currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
     }
     var statusVisibility by remember { mutableStateOf(true) }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
@@ -197,6 +222,35 @@ private inline fun Screen.HomeTopAppBar(
 
 }
 
+@Composable
+private fun HomeNavigationRail(
+    pagerList: List<Pager>,
+    pagerState: PagerState,
+) {
+    val scope = rememberCoroutineScope()
+    NavigationRail(
+        modifier = Modifier.fillMaxHeight(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ) {
+        Spacer(Modifier.weight(1f))
+        pagerList.forEach { pager ->
+            val selected = pagerState.currentPage == pager.index
+            NavigationRailItem(
+                selected = selected,
+                onClick = { scope.selectPager(pager, pagerState, selected) },
+                icon = {
+                    Icon(
+                        modifier = Modifier.size(24.dp),
+                        painter = pager.icon!!,
+                        contentDescription = pager.title,
+                    )
+                },
+            )
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
 
 @Composable
 private inline fun HomeBottomBar(
@@ -211,23 +265,11 @@ private inline fun HomeBottomBar(
 
     val pagerNavigationItems: @Composable RowScope.() -> Unit = {
         pagerList.forEach { pager ->
-            val index = pager.index
-            val selected = pagerState.currentPage == index
+            val selected = pagerState.currentPage == pager.index
             PagerNavigationItem(
                 provider = pager,
                 selected = selected,
-                onClick = {
-                    scope.launch {
-                        if (selected) {
-                            SharedFlowCentre.toPagerTop.emit(Unit)
-                        } else {
-                            pagerState.animateScrollToPage(
-                                page = index,
-                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                            )
-                        }
-                    }
-                }
+                onClick = { scope.selectPager(pager, pagerState, selected) }
             )
         }
     }
@@ -268,6 +310,23 @@ private inline fun HomeBottomBar(
         }
     }
 
+}
+
+private fun CoroutineScope.selectPager(
+    pager: Pager,
+    pagerState: PagerState,
+    selected: Boolean,
+) {
+    launch {
+        if (selected) {
+            SharedFlowCentre.toPagerTop.emit(Unit)
+        } else {
+            pagerState.animateScrollToPage(
+                page = pager.index,
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
 }
 
 @Composable
@@ -316,9 +375,9 @@ fun SettingsActionButton(
 }
 
 @Composable
-inline fun NotificationActionButton(
+fun NotificationActionButton(
     hasNotifications: Boolean,
-    crossinline refreshNotification: () -> Unit,
+    refreshNotification: () -> Unit,
 ) {
     val (_, onClickNotification) = LocationDialogContent.current
     LaunchedEffect(Unit) {
@@ -347,4 +406,3 @@ inline fun NotificationActionButton(
         }
     }
 }
-

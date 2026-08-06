@@ -43,6 +43,8 @@ import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.module.dsl.viewModel
+import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -50,18 +52,18 @@ import org.koin.dsl.module
 val presentationModule: Module = module {
     factoryOf (::SettingsModel)
     factory{ SettingsModel(get(),getAll()) }
-    factoryOf(::AuthScreenModel)
-    factoryOf(::HomeScreenModel)
-    factoryOf (::UserProfileScreenModel)
-    factoryOf(::MutualFriendsScreenModel)
-    factoryOf(::FriendNetworkScreenModel)
+    viewModelOf(::AuthScreenModel)
+    viewModelOf(::HomeScreenModel)
+    viewModelOf(::UserProfileScreenModel)
+    viewModelOf(::MutualFriendsScreenModel)
+    viewModelOf(::FriendNetworkScreenModel)
     singleOf(::NetworkGalleryDataSource) bind GalleryDataSource::class
-    factory { GalleryScreenModel(get(), get()) }
+    viewModel { GalleryScreenModel(get(), get()) }
     single { CropTransformCalculator() }
     singleOf(::PrintImageEditorSessionStore)
     single<PrintImageProcessor> { DefaultPrintImageProcessor(get()) }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    factory { parameters ->
+    viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
         val session = requireNotNull(sessionStore.get(sessionId)) {
@@ -78,14 +80,14 @@ val presentationModule: Module = module {
         )
     }
     singleOf (::FriendLocationPagerModel)
-    singleOf (::FriendListPagerModel)
-    singleOf(::SearchListPagerModel)
-    factoryOf(::WorldProfileScreenModel)
-    factoryOf(::GroupProfileScreenModel)
+    viewModelOf(::FriendListPagerModel)
+    viewModelOf(::SearchListPagerModel)
+    viewModelOf(::WorldProfileScreenModel)
+    viewModelOf(::GroupProfileScreenModel)
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
-    factory { AvatarProfileScreenModel(get(), get()) }
-    factoryOf(::RecentWorldsScreenModel)
+    viewModel { AvatarProfileScreenModel(get(), get()) }
+    viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }

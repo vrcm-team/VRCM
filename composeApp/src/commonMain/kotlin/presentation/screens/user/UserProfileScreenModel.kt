@@ -3,8 +3,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
@@ -188,7 +188,7 @@ class UserProfileScreenModel(
     private val inviteApi: InviteApi,
     private val userProfileCacheDao: UserProfileCacheDao,
     private val friendLocationPagerModel: FriendLocationPagerModel,
-) : ScreenModel {
+) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
     private val _userState = mutableStateOf(userProfileVO.withSelfIdentity())
@@ -243,13 +243,13 @@ class UserProfileScreenModel(
     init {
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
         if (userProfileVO.id == cacheOwnerUserId) {
-            screenModelScope.launch {
+            viewModelScope.launch {
                 authService.currentUserState.collect { currentUser ->
                     currentUser?.let { _userState.value = UserProfileVo(it).withSelfIdentity() }
                 }
             }
         }
-        screenModelScope.launch {
+        viewModelScope.launch {
             combine(
                 friendService.friendState,
                 friendLocationPagerModel.friendLocationsByUser,
@@ -310,7 +310,7 @@ class UserProfileScreenModel(
     }
 
     fun refreshUser(userId: String, forceRefresh: Boolean = false) =
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             loadCoordinator.runLoads(
                 forceRefresh = forceRefresh,
                 loadUser = {
@@ -352,7 +352,7 @@ class UserProfileScreenModel(
         languages: List<String>? = null,
         successMessage: String = "Profile updated",
     ) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             // 更新基本信息
             authService.reTryAuthCatching {
                 usersApi.updateUserInfo(
@@ -432,7 +432,7 @@ class UserProfileScreenModel(
     }
 
     private suspend fun friendAction(message: String, action: suspend () -> Result<*>): Boolean =
-        screenModelScope.async(Dispatchers.IO) {
+        viewModelScope.async(Dispatchers.IO) {
             action()
                 .onFailure {
                     handleError(it)
@@ -472,7 +472,7 @@ class UserProfileScreenModel(
     fun loadCreatedWorlds(userId: String) {
         if (_isLoadingWorlds.value) return
         _isLoadingWorlds.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val isSelf = userState.isSelf
                 val allWorlds = mutableListOf<WorldData>()
@@ -516,7 +516,7 @@ class UserProfileScreenModel(
         if (_isLoadingAvatars.value) return
         if (!userState.isSelf) return
         _isLoadingAvatars.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val allAvatars = mutableListOf<AvatarData>()
                 avatarsApi.avatarsFlow(
@@ -544,7 +544,7 @@ class UserProfileScreenModel(
     fun loadFavoritedWorlds(userId: String) {
         if (_isLoadingFavoritedWorlds.value) return
         _isLoadingFavoritedWorlds.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val groups = authService.reTryAuthCatching {
                     favoriteApi.getFavoriteGroupsByType(
@@ -591,7 +591,7 @@ class UserProfileScreenModel(
     }
 
     fun saveUserNote(note: String, successMessage: String) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 usersApi.saveUserNote(userState.id, note)
             }.onFailure {
@@ -604,7 +604,7 @@ class UserProfileScreenModel(
     }
 
     fun boop(userId: String, successMessage: String) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 usersApi.boop(userId)
             }.onSuccess {
@@ -620,7 +620,7 @@ class UserProfileScreenModel(
         successMessage: String,
         notInInstanceMessage: String,
     ) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 val instanceLocation = authService.currentUser().presence.instance
                 require(instanceLocation.isNotBlank() && instanceLocation != "offline") {

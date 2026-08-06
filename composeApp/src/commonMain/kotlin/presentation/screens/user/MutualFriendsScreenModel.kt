@@ -3,8 +3,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
@@ -19,7 +19,7 @@ class MutualFriendsScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val logger: Logger,
-) : ScreenModel {
+) : ViewModel() {
 
     private var loadInProgress = false
 
@@ -40,7 +40,7 @@ class MutualFriendsScreenModel(
     fun load(userId: String) {
         if (loadInProgress) return
         loadInProgress = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             isLoading = true
             errorMessage = null
             try {

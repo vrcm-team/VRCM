@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.koin.koinScreenModel
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -31,6 +30,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import org.koin.compose.koinInject
 
 
 object FriendLocationPager : Pager {
@@ -47,7 +47,7 @@ object FriendLocationPager : Pager {
     @ExperimentalSharedTransitionApi
     @Composable
     override fun Content() {
-        val friendLocationPagerModel: FriendLocationPagerModel = koinScreenModel()
+        val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
         // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit) {
@@ -95,33 +95,29 @@ fun Pager.FriendLocationPager(
         selectLocation = if (selectLocation == friendLocation.location) null else friendLocation.location
     }
     val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
-        if (navigator.size <= 1) {
-            val currentLocation = friendLocation.instants.value
-            // 创建临时的 WorldProfileVo
-            val tempWorldProfileVo = WorldProfileVo(
-                worldId = currentLocation.worldId,
-                worldName = currentLocation.worldName,
-                worldImageUrl = currentLocation.worldImageUrl,
-                worldDescription = currentLocation.worldDescription,
-                authorID = currentLocation.worldAuthorId,
-                authorName = currentLocation.worldAuthorName,
-                tags = currentLocation.worldAuthorTag,
-            )
-            navigator push WorldProfileScreen(
-                worldProfileVO = tempWorldProfileVo,
-                location = friendLocation.location,
-                sharedSuffixKey = sharedSuffixKey
-            )
-        }
+        val currentLocation = friendLocation.instants.value
+        // 创建临时的 WorldProfileVo
+        val tempWorldProfileVo = WorldProfileVo(
+            worldId = currentLocation.worldId,
+            worldName = currentLocation.worldName,
+            worldImageUrl = currentLocation.worldImageUrl,
+            worldDescription = currentLocation.worldDescription,
+            authorID = currentLocation.worldAuthorId,
+            authorName = currentLocation.worldAuthorName,
+            tags = currentLocation.worldAuthorTag,
+        )
+        navigator push WorldProfileScreen(
+            worldProfileVO = tempWorldProfileVo,
+            location = friendLocation.location,
+            sharedSuffixKey = sharedSuffixKey
+        )
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
     val onClickUserIcon = { user: FriendData ->
-        if (navigator.size <= 1) {
-            navigator push UserProfileScreen(
-                userProfileVO = UserProfileVo(user),
-                sharedSuffixKey = sharedSuffixKey
-            )
-        }
+        navigator push UserProfileScreen(
+            userProfileVO = UserProfileVo(user),
+            sharedSuffixKey = sharedSuffixKey
+        )
     }
     RefreshBox(
         refreshContainerOffsetY = topPadding,
@@ -225,7 +221,5 @@ private fun LocationTitle(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
-
 
 

@@ -71,8 +71,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.network.api.groups.data.Gallery
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
@@ -112,17 +112,19 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
 import presentation.compoments.topMenuActionColors
+import kotlinx.serialization.Serializable
 
+@Serializable
 class GroupProfileScreen(
     private val groupProfileVo: GroupProfileVo,
     private val sharedSuffixKey: String = "",
-) : Screen {
+) : AppDetailRoute {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val screenModel: GroupProfileScreenModel = koinScreenModel()
+        val screenModel: GroupProfileScreenModel = koinViewModel()
         val groupState by screenModel.groupProfileState.collectAsState()
         val members by screenModel.members.collectAsState()
         val owner by screenModel.owner.collectAsState()

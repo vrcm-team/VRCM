@@ -2,8 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -11,18 +11,15 @@ import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.service.AuthService
-import io.github.vrcmteam.vrcm.service.VersionService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.*
 import org.koin.core.logger.Logger
-import presentation.screens.auth.data.VersionVo
 
 
 class AuthScreenModel(
     private val authService: AuthService,
-    private val versionService: VersionService,
     private val logger: Logger,
-) : ScreenModel {
+) : ViewModel() {
 
     private val _uiState = mutableStateOf(authService.accountDto().run {
         AuthUIState(
@@ -69,7 +66,7 @@ class AuthScreenModel(
             _uiState.value = _uiState.value.copy(btnIsLoading = false)
         }
         logger.error(errorMsg)
-        screenModelScope.launch {
+        viewModelScope.launch {
             SharedFlowCentre.toastText.emit(ToastText.Error(errorMsg))
         }
     }
@@ -97,7 +94,7 @@ class AuthScreenModel(
     }
 
     fun tryAuth() {
-        screenModelScope.launch {
+        viewModelScope.launch {
             val cardState = awaitAuth().toCardPage()
             onCardStateChange(cardState)
         }
@@ -108,7 +105,7 @@ class AuthScreenModel(
         onCardStateChange(AuthCardPage.Login)
     }
 
-    private suspend fun awaitAuth(): AuthState? = screenModelScope.async(Dispatchers.IO) {
+    private suspend fun awaitAuth(): AuthState? = viewModelScope.async(Dispatchers.IO) {
         runCatching { authService.restoreAuth() }
             .onAuthFailure()
             .getOrNull()
@@ -122,20 +119,6 @@ class AuthScreenModel(
         is AuthState.Unauthorized, null -> AuthCardPage.Login
     }
 
-    fun tryCheckVersion(onCheckVersion:(VersionVo) -> Unit)=
-         screenModelScope.launch(Dispatchers.IO) {
-            versionService.checkVersion(true)
-                .onAuthFailure()
-                .map { VersionVo(it.tagName, it.htmlUrl, it.body, it.hasNewVersion) }
-                .getOrElse { VersionVo() }
-                .also(onCheckVersion)
-        }
-
-
-    fun rememberVersion(version: String?) = screenModelScope.launch(Dispatchers.IO) {
-        versionService.rememberVersion(version)
-    }
-
     fun login() {
         if (_uiState.value.btnIsLoading) return
         val username = _uiState.value.username.trim()
@@ -144,7 +127,7 @@ class AuthScreenModel(
             onErrorMessageChange("Username or Password is empty")
         } else {
             onLoadingChange(true)
-            screenModelScope.launch(context = Dispatchers.Default) {
+            viewModelScope.launch(context = Dispatchers.Default) {
                 doLogin(username, password)
             }
         }
@@ -156,7 +139,7 @@ class AuthScreenModel(
         val password = _uiState.value.password.trim()
         if (verifyCode.isEmpty() || verifyCode.length != 6 || _uiState.value.btnIsLoading) return
         onLoadingChange(true)
-        _currentVerifyJob = screenModelScope.launch(context = Dispatchers.Default) {
+        _currentVerifyJob = viewModelScope.launch(context = Dispatchers.Default) {
             async(context = Dispatchers.IO) {
                 authService.verify( password, verifyCode, _uiState.value.cardState)
             }.await()

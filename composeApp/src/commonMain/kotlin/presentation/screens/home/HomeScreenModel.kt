@@ -1,10 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -36,11 +37,14 @@ class HomeScreenModel(
     private val friendService: FriendService,
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
-) : ScreenModel {
+) : ViewModel() {
 
     private val boopNotificationResolver = BoopNotificationResolver()
 
     private val _currentUser = mutableStateOf<CurrentUserData?>(null)
+
+    var selectedPagerIndex by mutableIntStateOf(0)
+        private set
 
     val userId: String
         get() = authService.accountDto().userId
@@ -49,6 +53,10 @@ class HomeScreenModel(
         get() = authService.accountDto().iconUrl.orEmpty()
 
     var currentUser by _currentUser
+
+    fun onPagerSettled(index: Int) {
+        selectedPagerIndex = index
+    }
 
     private val _notifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val notifications by _notifications
@@ -62,7 +70,7 @@ class HomeScreenModel(
         refreshCurrentUser()
         refreshFriendRequestNotification()
         refreshNotifications()
-        screenModelScope.launch {
+        viewModelScope.launch {
             authService.currentUserState.collect { _currentUser.value = it }
         }
     }
@@ -73,7 +81,7 @@ class HomeScreenModel(
     }
 
     private fun refreshFriendRequestNotification() =
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value) }
                 .onHomeFailure()
                 .onSuccess {
@@ -106,7 +114,7 @@ class HomeScreenModel(
         }
 
     private fun refreshNotifications() =
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { notificationApi.fetchNotifications() }
                 .onHomeFailure()
                 .onSuccess { data ->
@@ -166,7 +174,7 @@ class HomeScreenModel(
     }
 
     private fun boopUser(userId: String, successMessage: String, alreadySentMessage: String) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { usersApi.boop(userId) }
                 .onSuccess {
                     SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
@@ -191,7 +199,7 @@ class HomeScreenModel(
     }
 
     private fun notificationAction(action: suspend () -> Unit) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { action() }
                 .onHomeFailure()
                 .onSuccess {
@@ -202,7 +210,7 @@ class HomeScreenModel(
     }
 
     private fun refreshCurrentUser() =
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching { authService.currentUser(isRefresh = true) }
                 .onHomeFailure()
                 .onSuccess {
@@ -214,12 +222,12 @@ class HomeScreenModel(
     private inline fun <T> Result<T>.onHomeFailure() =
         onApiFailure("Home") {
             logger.error(it)
-            screenModelScope.launch {
+            viewModelScope.launch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
         }
     fun updateUserStatus(userStatus: UserStatus, statusDescription: String) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 usersApi.updateUserInfo(
                     userId = userId,
@@ -237,7 +245,6 @@ class HomeScreenModel(
 
 
 }
-
 
 
 

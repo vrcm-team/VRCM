@@ -1,13 +1,14 @@
 package io.github.vrcmteam.vrcm.presentation.screens.group.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.groups.data.Gallery
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.groups.data.MyMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.Role
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class GroupProfileVo(
     val groupId: String,
     val name: String = "",
@@ -43,7 +44,7 @@ data class GroupProfileVo(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val lastPostCreatedAt: String? = null,
-) : JavaSerializable {
+) {
 
     constructor(group: GroupData) : this(
         groupId = group.id,

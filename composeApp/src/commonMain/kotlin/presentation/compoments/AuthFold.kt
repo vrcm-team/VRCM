@@ -59,7 +59,19 @@ fun AuthFold(
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             shape = RoundedCornerShape(topStart = shapeDp, topEnd = shapeDp),
         ) {
-            cardContext()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = 560.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight(),
+                ) {
+                    cardContext()
+                }
+            }
         }
         AImage(
             modifier = Modifier

@@ -6,24 +6,28 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
+import io.github.vrcmteam.vrcm.service.VersionService
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import org.koin.core.logger.Logger
 import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
-object StartupAnimeScreen : Screen {
+@Serializable
+object StartupAnimeScreen : AppRoute {
     @Composable
     override fun Content() {
         val durationMillis = 1000
         val current = LocalNavigator.currentOrThrow
         var isStartUp by remember { mutableStateOf(false) }
         val startUpAnime = { isStartUp = true }
-        val authScreenModel = koinScreenModel<AuthScreenModel>()
+        val authScreenModel = koinViewModel<AuthScreenModel>()
 
         LaunchedEffect(Unit) {
             delay(500)
@@ -64,22 +68,29 @@ object StartupAnimeScreen : Screen {
 
 @Composable
 fun VersionDialog() {
-    val authScreenModel: AuthScreenModel  = koinInject()
+    val versionService: VersionService = koinInject()
+    val logger: Logger = koinInject()
     var version by remember { mutableStateOf(VersionVo()) }
-    val onCheckVersion: (VersionVo) -> Unit = {
-        if (it.hasNewVersion) {
-            version = it
-        }
-    }
-    LaunchedEffect(Unit) {
-        authScreenModel.tryCheckVersion(onCheckVersion)
+    LaunchedEffect(versionService) {
+        versionService.checkVersion(checkRemember = true)
+            .onFailure { logger.error("Failed to check version: ${it.message.orEmpty()}") }
+            .onSuccess {
+                if (it.hasNewVersion) {
+                    version = VersionVo(
+                        tagName = it.tagName,
+                        htmlUrl = it.htmlUrl,
+                        body = it.body,
+                        hasNewVersion = true,
+                        downloadUrl = it.downloadUrl,
+                    )
+                }
+            }
     }
     UpdateDialog(
         version = version,
         onDismissRequest = {
             version = VersionVo()
         },
-        onRememberVersion = authScreenModel::rememberVersion
+        onRememberVersion = versionService::rememberVersion
     )
 }
-

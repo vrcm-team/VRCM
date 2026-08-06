@@ -5,8 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
 import io.github.vrcmteam.vrcm.core.algorithms.computeEgoLayout
 import io.github.vrcmteam.vrcm.core.algorithms.computeForceLayout
@@ -79,7 +79,7 @@ class FriendNetworkScreenModel(
     private val friendService: FriendService,
     private val cacheDao: FriendNetworkCacheDao,
     private val logger: Logger,
-) : ScreenModel {
+) : ViewModel() {
 
     companion object {
         // 调色板：按社区 ID 分配颜色
@@ -260,7 +260,7 @@ class FriendNetworkScreenModel(
     }
 
     fun loadCache(nodeSizePx: Float) {
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             uiState = uiState.copy(isPreparing = true)
             try {
                 val currentUser = authService.currentUser()
@@ -297,7 +297,7 @@ class FriendNetworkScreenModel(
     @OptIn(ExperimentalTime::class)
     fun refresh(nodeSizePx: Float) {
         if (uiState.isLoading) return
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             uiState = uiState.copy(isLoading = true, progress = FriendNetworkProgress(0, 0))
             try {
                 val currentUser = authService.currentUser()

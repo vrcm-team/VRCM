@@ -25,15 +25,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.serialization.Serializable
 import kotlinx.coroutines.launch
 
-object GalleryScreen : Screen {
+@Serializable
+object GalleryScreen : AppRoute {
 
     private val tabPagers = listOf(
         GalleryTabPager.Companion.Gallery,
@@ -46,7 +48,7 @@ object GalleryScreen : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val galleryScreenModel: GalleryScreenModel = koinScreenModel()
+        val galleryScreenModel: GalleryScreenModel = koinViewModel()
         val pagerState = rememberPagerState { tabPagers.size }
         val coroutineScope = rememberCoroutineScope()
         val navigator = LocalNavigator.currentOrThrow

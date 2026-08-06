@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.users.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AgeVerificationStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -75,4 +74,4 @@ data class CurrentUpdateUserData(
     val username: String,
     val viveId: String,
     override val pronouns: String?
-):IUser, JavaSerializable
+):IUser

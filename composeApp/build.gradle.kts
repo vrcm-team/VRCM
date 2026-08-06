@@ -23,7 +23,6 @@ kotlin {
     }
 
     listOf(
-        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach { iosTarget ->
@@ -80,19 +79,24 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)
-            implementation(libs.compose.ui.backhandler)
+            implementation(libs.navigation3.ui)
+            implementation(libs.navigationevent.compose)
+            implementation(libs.material3.adaptive.navigation3)
 //            implementation(compose.material)
             implementation(compose.material3)
             implementation(compose.materialIconsExtended)
 //            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.androidx.lifecycle.viewmodel)
+            implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 //            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
 
             implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
 
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.websockets)
@@ -113,10 +117,6 @@ kotlin {
             implementation(libs.filekit.dialogs.compose)
 
 //            implementation(libs.kamel)
-            implementation(libs.voyager.navigator)
-            implementation(libs.voyager.screenModel)
-            implementation(libs.voyager.transitions)
-            implementation(libs.voyager.koin)
         }
 
         commonTest.dependencies {

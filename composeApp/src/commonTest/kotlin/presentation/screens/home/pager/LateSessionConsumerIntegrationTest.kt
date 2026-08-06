@@ -103,7 +103,7 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
                 locationModel.friendLocationsByUser.value.getValue(friendId).location,
             )
         } finally {
-            locationModel.onDispose()
+            locationModel.close()
             friendService.dispose()
             SharedFlowCentre.emitLogout()
             client.close()

@@ -21,8 +21,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
-import io.github.vrcmteam.vrcm.presentation.extensions.koinScreenModelByLastItem
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -34,7 +34,7 @@ class UserStatusDialog(
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
 
-        val homeScreenModel: HomeScreenModel = koinScreenModelByLastItem()
+        val homeScreenModel: HomeScreenModel = koinViewModel()
         SharedDialogContainer(
             key = "UserStatus",
             animatedVisibilityScope = animatedVisibilityScope,

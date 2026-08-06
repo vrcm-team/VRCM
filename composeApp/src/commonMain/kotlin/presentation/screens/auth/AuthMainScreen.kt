@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
@@ -28,12 +28,14 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 
-object AuthScreen : Screen {
+@Serializable
+object AuthScreen : AppRoute {
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
-        val authScreenModel: AuthScreenModel = koinScreenModel()
+        val authScreenModel: AuthScreenModel = koinViewModel()
         var showAccountMenu by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
             authScreenModel.tryAuth()

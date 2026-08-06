@@ -70,10 +70,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
 import io.github.vrcmteam.vrcm.core.algorithms.convexHull
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
@@ -85,17 +85,19 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.time.ExperimentalTime
 
-object FriendNetworkScreen : Screen {
+@Serializable
+object FriendNetworkScreen : AppRoute {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
-        val model: FriendNetworkScreenModel = koinScreenModel()
+        val model: FriendNetworkScreenModel = koinViewModel()
         val state = model.uiState
         val selectedIdState = remember { mutableStateOf<String?>(null) }
         val highlightIdState = remember { mutableStateOf<String?>(null) }

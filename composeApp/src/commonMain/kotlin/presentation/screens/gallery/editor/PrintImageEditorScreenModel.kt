@@ -1,8 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
 import androidx.compose.ui.graphics.ImageBitmap
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
 import io.github.vrcmteam.vrcm.service.toPrintUploadFailure
@@ -64,7 +64,7 @@ class PrintImageEditorScreenModel(
     private val workerExceptionHandler: CoroutineExceptionHandler? = null,
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val releasePreview: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
-) : ScreenModel {
+) : ViewModel() {
     private val _state = MutableStateFlow(PrintImageEditorState(prepared = prepared))
     val state: StateFlow<PrintImageEditorState> = _state.asStateFlow()
 
@@ -78,7 +78,7 @@ class PrintImageEditorScreenModel(
         releaseBitmap = releasePreview,
     )
 
-    override fun onDispose() {
+    override fun onCleared() {
         sessionStore.discard(sessionId)
         previewReleaseController.dispose()
     }
@@ -150,7 +150,7 @@ class PrintImageEditorScreenModel(
             phase = if (existingPng == null) EditorPhase.Processing else EditorPhase.Uploading,
             error = null,
         )
-        screenModelScope.launch(workerContext()) {
+        viewModelScope.launch(workerContext()) {
             var stage = if (existingPng == null) UploadStage.Processing else UploadStage.Uploading
             try {
                 val png = existingPng ?: processor.render(

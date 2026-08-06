@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
-import cafe.adriel.voyager.core.annotation.InternalVoyagerApi
-import cafe.adriel.voyager.core.model.ScreenModelStore
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -24,14 +24,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-@OptIn(InternalVoyagerApi::class)
 class AvatarProfileRequestTest : MainDispatcherTest() {
-    private val modelHolderKeys = mutableListOf<String>()
-    private var nextModelIndex = 0
+    private val models = mutableListOf<AvatarProfileScreenModel>()
 
     @AfterTest
     fun disposeModels() {
-        modelHolderKeys.forEach(ScreenModelStore::onDisposeNavigator)
+        models.forEach(::clearViewModel)
     }
 
     @Test
@@ -326,12 +324,15 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     private fun avatarModel(
         loader: AvatarProfileLoader,
         selector: AvatarSelector = FakeAvatarSelector(),
-    ): AvatarProfileScreenModel {
-        val holderKey = "AvatarProfileRequestTest:${hashCode()}:${nextModelIndex++}"
-        modelHolderKeys += holderKey
-        return ScreenModelStore.getOrPut<AvatarProfileScreenModel>(holderKey, tag = null) {
-            AvatarProfileScreenModel(loader, selector, Dispatchers.Unconfined)
-        }
+    ): AvatarProfileScreenModel =
+        AvatarProfileScreenModel(loader, selector, Dispatchers.Unconfined)
+            .also(models::add)
+}
+
+private fun clearViewModel(viewModel: ViewModel) {
+    ViewModelStore().apply {
+        put("test", viewModel)
+        clear()
     }
 }
 

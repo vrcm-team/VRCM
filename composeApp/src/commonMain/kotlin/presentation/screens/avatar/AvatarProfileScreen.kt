@@ -21,9 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
@@ -41,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.serialization.Serializable
 
 internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastText = when (this) {
     AvatarProfileNotice.Banned -> ToastText.Error(locale.avatarProfileBanned)
@@ -61,16 +62,17 @@ internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings)
     AvatarActionAvailability.CheckFailed -> locale.avatarProfileActionCheckFailed
 }
 
+@Serializable
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
     private val sharedSuffixKey: String = "",
-) : Screen {
+) : AppDetailRoute {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content() {
         val navigator = currentNavigator
-        val screenModel: AvatarProfileScreenModel = koinScreenModel()
+        val screenModel: AvatarProfileScreenModel = koinViewModel()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val locale = strings

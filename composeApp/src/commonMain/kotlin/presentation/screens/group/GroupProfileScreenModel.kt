@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.group
 
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
@@ -35,7 +35,7 @@ class GroupProfileScreenModel(
     private val authService: AuthService,
     private val logger: Logger,
     private val groupProfileCacheDao: GroupProfileCacheDao,
-) : ScreenModel {
+) : ViewModel() {
 
     private val _groupProfileState = MutableStateFlow<GroupProfileVo?>(null)
     val groupProfileState: StateFlow<GroupProfileVo?> = _groupProfileState.asStateFlow()
@@ -98,7 +98,7 @@ class GroupProfileScreenModel(
         val groupId = _groupProfileState.value?.groupId ?: return
         if (_postsLoading.value || _postsLoadingMore.value || _postsEndReached.value) return
         _postsLoadingMore.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             loadPosts(groupId, reset = false)
         }
     }
@@ -122,7 +122,7 @@ class GroupProfileScreenModel(
             return
         }
         _isLoading.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (refreshProfile) {
                     authService.reTryAuthCatching {
@@ -170,7 +170,7 @@ class GroupProfileScreenModel(
         val groupId = _groupProfileState.value?.groupId ?: return
         if (_isActionLoading.value) return
         _isActionLoading.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 groupsApi.joinGroup(groupId)
             }.onFailure {
@@ -186,7 +186,7 @@ class GroupProfileScreenModel(
         val groupId = _groupProfileState.value?.groupId ?: return
         if (_isActionLoading.value) return
         _isActionLoading.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 groupsApi.leaveGroup(groupId)
             }.onFailure {

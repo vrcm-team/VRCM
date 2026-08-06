@@ -127,7 +127,7 @@ A feature-rich cross-platform VRChat friend management application that lets you
 
 ### Architecture Components
 - **[Koin](https://github.com/InsertKoinIO/koin)** - Dependency injection framework
-- **[Voyager](https://github.com/adrielcafe/voyager)** - Navigation and state management
+- **[Navigation 3](https://developer.android.com/guide/navigation/navigation-3)** - Adaptive navigation and state restoration
 - **[Multiplatform-Settings](https://github.com/russhwolf/multiplatform-settings)** - Cross-platform configuration storage
 - **[Coil](https://github.com/coil-kt/coil)** - High-performance image loading
 

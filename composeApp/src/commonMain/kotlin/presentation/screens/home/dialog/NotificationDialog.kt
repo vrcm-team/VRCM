@@ -15,8 +15,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
@@ -25,8 +25,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
-import io.github.vrcmteam.vrcm.presentation.extensions.koinScreenModelByLastItem
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -41,7 +41,7 @@ object NotificationDialog : SharedDialog {
 
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
-        val homeScreenModel: HomeScreenModel = koinScreenModelByLastItem()
+        val homeScreenModel: HomeScreenModel = koinViewModel()
         // 每打开一次刷新一次
         LaunchedEffect(Unit) {
             homeScreenModel.refreshAllNotification()

@@ -3,7 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import cafe.adriel.voyager.koin.koinScreenModel
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.compoments.AdvancedOptionsPanel
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
 import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
@@ -28,7 +28,7 @@ object SearchListPager : Pager {
     @Composable
     override fun Content() {
         // 获取ViewModel
-        val searchListPagerModel: SearchListPagerModel = koinScreenModel()
+        val searchListPagerModel: SearchListPagerModel = koinViewModel()
         val coroutineScope = rememberCoroutineScope()
 
         // 获取当前选中的标签索引

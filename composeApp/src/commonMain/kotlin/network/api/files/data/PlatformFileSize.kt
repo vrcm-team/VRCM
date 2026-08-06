@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.files.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import kotlinx.serialization.Serializable
 
 /**
@@ -11,7 +10,7 @@ data class PlatformFileSize(
     val platform: PlatformType,
     val sizeInBytes: Long,
     val displayName: String
-) : JavaSerializable {
+) {
 
     val formattedSize: String
         get() = when {

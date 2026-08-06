@@ -34,8 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vinceglb.filekit.name
@@ -275,7 +275,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         galleryScreenModel: GalleryScreenModel,
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Adaptive(minSize = 160.dp),
             contentPadding = PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -368,11 +368,10 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         tagType: FileTagType,
         galleryScreenModel: GalleryScreenModel,
     ) {
-        // 根据文件类型设置不同的列数
-        val count = when (tagType) {
-            FileTagType.Gallery, FileTagType.Print -> 2
-            FileTagType.Emoji, FileTagType.Sticker -> 3
-            FileTagType.Icon -> 4
+        val minimumCellSize = when (tagType) {
+            FileTagType.Gallery, FileTagType.Print -> 160.dp
+            FileTagType.Emoji, FileTagType.Sticker -> 104.dp
+            FileTagType.Icon -> 80.dp
         }
         // 根据文件类型设置不同的宽高比
         val aspectRatio = when (tagType) {
@@ -386,7 +385,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             else -> MaterialTheme.shapes.medium  // 其他类型使用默认的medium形状
         }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(count),
+            columns = GridCells.Adaptive(minSize = minimumCellSize),
             contentPadding = PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),

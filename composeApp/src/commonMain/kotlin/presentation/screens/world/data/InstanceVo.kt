@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import androidx.compose.ui.graphics.vector.ImageVector
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
@@ -31,7 +30,7 @@ data class InstanceVo(
     val regionName: String = "unknown",
     val owner: StateFlow<Owner?> = MutableStateFlow(null),
     val accessType: AccessType = AccessType.Public,
-) : JavaSerializable {
+) {
     constructor(instance: InstanceData, owner: StateFlow<Owner?> = MutableStateFlow(null)) : this(
         id = instance.id,
         instanceId = instance.instanceId,

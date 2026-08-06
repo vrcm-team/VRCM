@@ -11,9 +11,10 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
-import cafe.adriel.voyager.core.stack.StackEvent
-import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.transitions.SlideOrientation
+enum class SlideOrientation {
+    Horizontal,
+    Vertical,
+}
 
 
 val HomeToAuthAnimeTransition =
@@ -77,17 +78,11 @@ val NoClip: OverlayClip =
 
 
 fun slideScreenTransition(
-    navigator: Navigator,
+    isPop: Boolean,
     orientation: SlideOrientation = SlideOrientation.Vertical,
 ): ContentTransform {
-    val initialOffset = when (navigator.lastEvent) {
-        StackEvent.Pop -> { size: Int -> -size }
-        else -> { size: Int -> size }
-    }
-    val targetOffset = when (navigator.lastEvent) {
-        StackEvent.Pop -> { size: Int -> size }
-        else -> { size: Int -> -size }
-    }
+    val initialOffset = if (isPop) ({ size: Int -> -size }) else ({ size: Int -> size })
+    val targetOffset = if (isPop) ({ size: Int -> size }) else ({ size: Int -> -size })
     val animationIntSpec = tween<IntOffset>()
     val animationFloatSpec = tween<Float>()
     return when (orientation) {

@@ -5,7 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.painter.Painter
-import cafe.adriel.voyager.koin.koinScreenModel
+import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTabType
 import io.github.vrcmteam.vrcm.presentation.compoments.StandardSearchList
@@ -29,7 +29,7 @@ object FriendListPager : Pager {
 
     @Composable
     override fun Content() {
-        val friendListPagerModel: FriendListPagerModel = koinScreenModel()
+        val friendListPagerModel: FriendListPagerModel = koinViewModel()
 
         // 搜索文本
         val searchText by friendListPagerModel.searchText.collectAsState()

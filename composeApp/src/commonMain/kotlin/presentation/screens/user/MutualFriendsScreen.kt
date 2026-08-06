@@ -26,26 +26,28 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.renderUserItem
 import io.github.vrcmteam.vrcm.presentation.compoments.renderUserItems
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class MutualFriendsScreen(
     private val userId: String,
     private val userName: String,
-) : Screen {
+) : AppDetailRoute {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
-        val model: MutualFriendsScreenModel = koinScreenModel()
+        val model: MutualFriendsScreenModel = koinViewModel()
         val mutualFriends by remember { derivedStateOf { model.mutualFriends.sortedBy { it.displayName } } }
         val totalCount by remember { derivedStateOf { model.mutualFriends.size } }
         val visibleMutualFriends by remember {

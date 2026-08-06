@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.*
-import cafe.adriel.voyager.core.model.ScreenModel
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
@@ -26,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,7 +98,7 @@ class FriendLocationPagerModel(
     private val groupsApi: GroupsApi,
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
-) : ScreenModel {
+) {
     // This model is a Koin singleton because its location index is shared by
     // the home pager and profile screens. Keep its workers alive across the
     // logout/login navigation cycle so a new session can restart preloading.
@@ -132,6 +132,10 @@ class FriendLocationPagerModel(
         },
     )
     private var hasCompletedInitialRefresh = false
+
+    fun close() {
+        modelScope.cancel()
+    }
 
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次

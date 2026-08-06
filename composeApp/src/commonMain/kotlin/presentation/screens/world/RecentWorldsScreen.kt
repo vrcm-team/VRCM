@@ -16,12 +16,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -38,12 +38,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
 class RecentWorldsScreenModel(
     private val authService: AuthService,
     private val worldsApi: WorldsApi,
-) : ScreenModel {
+) : ViewModel() {
 
     private val _worlds = mutableStateOf<List<WorldData>>(emptyList())
     val worlds by _worlds
@@ -96,7 +97,7 @@ class RecentWorldsScreenModel(
         }
 
         val pageOffset = if (reset) 0 else pagingState.nextOffset
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 authService.reTryAuthCatching {
                     worldsApi.getRecentWorlds(n = RECENT_WORLDS_PAGE_SIZE, offset = pageOffset)
@@ -157,13 +158,14 @@ internal fun <T> prepareRecentWorldPageRetry(
 internal fun <T> RecentWorldPagingState<T>.canAutoLoadNextPage(): Boolean =
     failedOffset != nextOffset
 
-object RecentWorldsScreen : Screen {
+@Serializable
+object RecentWorldsScreen : AppDetailRoute {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
-        val model: RecentWorldsScreenModel = koinScreenModel()
+        val model: RecentWorldsScreenModel = koinViewModel()
         val scope = rememberCoroutineScope()
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
 

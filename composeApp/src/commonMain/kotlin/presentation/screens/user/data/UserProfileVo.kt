@@ -1,9 +1,10 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.*
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class UserProfileVo(
     override val id: String,
     override val displayName: String = "",
@@ -31,7 +32,7 @@ data class UserProfileVo(
     override val pronouns: String = "",
     override val location: String = LocationType.Offline.value,
     val note: String = "",
-) : IUser, JavaSerializable {
+) : IUser {
     constructor(user: IUser): this(
         id = user.id,
         displayName = user.displayName,

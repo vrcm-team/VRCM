@@ -2,44 +2,154 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.*
 import androidx.compose.animation.SharedTransitionScope.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment.Companion.Center
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.transitions.ScreenTransition
-import cafe.adriel.voyager.transitions.ScreenTransitionContent
+import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import androidx.navigation3.ui.NavDisplay
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.ParentClip
+import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
+import io.github.vrcmteam.vrcm.presentation.navigation.adaptivePaneMetadata
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppListDetailSceneStrategy
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+private const val AppRouteMetadataKey = "vrcm:app-route"
+
+internal val Scene<AppRoute>.route: AppRoute
+    get() = entries.last().metadata.getValue(AppRouteMetadataKey) as AppRoute
+
+internal fun createAppNavEntry(
+    route: AppRoute,
+    metadata: Map<String, Any>,
+    content: @Composable (AppRoute) -> Unit,
+): NavEntry<AppRoute> = NavEntry(
+    key = route,
+    contentKey = route.key,
+    metadata = metadata,
+    content = content,
+)
+
+@OptIn(
+    ExperimentalSharedTransitionApi::class,
+    ExperimentalComposeUiApi::class,
+    ExperimentalMaterial3AdaptiveApi::class,
+)
 @Composable
 fun SharedTransitionScreen(
-    navigator: Navigator,
+    navigator: AppNavigator,
     modifier: Modifier = Modifier,
-    transitionSpec: AnimatedContentTransitionScope<Screen>.() -> ContentTransform = { DefaultScreenTransition },
-    content: ScreenTransitionContent = { it.Content() }
+    transitionSpec: AnimatedContentTransitionScope<Scene<AppRoute>>.() -> ContentTransform = {
+        DefaultScreenTransition
+    },
+    popTransitionSpec: AnimatedContentTransitionScope<Scene<AppRoute>>.() -> ContentTransform = {
+        DefaultScreenTransition
+    },
+    content: @Composable (AppRoute) -> Unit = { it.Content() },
 ) {
-    SharedTransitionLayout(modifier) {
-        ScreenTransition(
-            navigator = navigator,
-            modifier = modifier,
-            transition = transitionSpec,
-        ) { screen ->
-            CompositionLocalProvider(
-                LocalSharedTransitionScreenScope provides this@SharedTransitionLayout,
-                LocalAnimatedVisibilityScope provides this
+    val backNavigationPolicy = LocalBackNavigationPolicy.current
+    val saveableStateDecorator = rememberSaveableStateHolderNavEntryDecorator<AppRoute>()
+    val viewModelStoreDecorator = rememberViewModelStoreNavEntryDecorator<AppRoute>()
+    val paneDragInteractionSource = remember { MutableInteractionSource() }
+    val interceptionState = rememberNavigationEventState(NavigationEventInfo.None)
+    val listDetailStrategy = rememberAppListDetailSceneStrategy<AppRoute>(
+        backNavigationBehavior = BackNavigationBehavior.PopLatest,
+        paneExpansionDragHandle = { state ->
+            Box(
+                modifier = Modifier
+                    .width(24.dp)
+                    .fillMaxHeight()
+                    .paneExpansionDraggable(
+                        state = state,
+                        minTouchTargetSize = 48.dp,
+                        interactionSource = paneDragInteractionSource,
+                    ),
+                contentAlignment = Center,
             ) {
-                content(screen)
+                VerticalDivider(
+                    modifier = Modifier.fillMaxHeight(),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
             }
-        }
-    }
+        },
+    )
 
+    SharedTransitionLayout(modifier) {
+        NavDisplay(
+            backStack = navigator.backStack,
+            modifier = modifier,
+            onBack = { navigator.pop() },
+            entryDecorators = listOf(saveableStateDecorator, viewModelStoreDecorator),
+            sceneStrategy = listDetailStrategy,
+            sharedTransitionScope = this@SharedTransitionLayout,
+            transitionSpec = transitionSpec,
+            popTransitionSpec = popTransitionSpec,
+            entryProvider = { route ->
+                createAppNavEntry(
+                    route = route,
+                    metadata = mapOf(AppRouteMetadataKey to route) +
+                        route.adaptivePaneMetadata { EmptyDetailPane() },
+                ) { screen ->
+                    CompositionLocalProvider(
+                        LocalSharedTransitionScreenScope provides this@SharedTransitionLayout,
+                        LocalAnimatedVisibilityScope provides LocalNavAnimatedContentScope.current,
+                    ) {
+                        content(screen)
+                    }
+                }
+            },
+        )
+        NavigationBackHandler(
+            state = interceptionState,
+            isBackEnabled = backNavigationPolicy.shouldInterceptBack(),
+            onBackCompleted = {
+                backNavigationPolicy.handleBack(canNavigateBack = false) {}
+            },
+        )
+    }
+}
+
+@Composable
+private fun EmptyDetailPane() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Center,
+    ) {
+        Icon(
+            imageVector = AppIcons.PersonSearch,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.24f),
+        )
+    }
 }
 
 

@@ -1,8 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.mutableStateMapOf
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
@@ -65,7 +65,7 @@ class FriendListPagerModel(
     private val favoriteService: FavoriteService,
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
-) : ScreenModel {
+) : ViewModel() {
 
     // 当前选中的标签页索引
     private val _selectedTabIndex = MutableStateFlow(0)
@@ -146,7 +146,7 @@ class FriendListPagerModel(
 
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
-        screenModelScope.launch {
+        viewModelScope.launch {
             SharedFlowCentre.authed.collect {
                 favoritedWorldMap.clear()
                 favoritedAvatarMap.clear()
@@ -154,7 +154,7 @@ class FriendListPagerModel(
                 _isRefreshing.value = true
             }
         }
-        screenModelScope.launch {
+        viewModelScope.launch {
             friendService.friendState.collect { friends ->
                 _friendTotal.value = friends.size
                 findFriendList(_searchText.value)
@@ -166,7 +166,7 @@ class FriendListPagerModel(
      * 加载收藏组信息
      */
     private fun doRefreshCache(favoriteType: FavoriteType, showRefreshing: Boolean = true) =
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (showRefreshing) _isRefreshing.value = true
                 when (favoriteType) {
@@ -295,7 +295,7 @@ class FriendListPagerModel(
             null
         }
         friendFilterJob?.cancel()
-        friendFilterJob = screenModelScope.launch {
+        friendFilterJob = viewModelScope.launch {
             _friendList.value = findFriendsByName(name, favoriteIds)
         }
     }

@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -136,7 +135,7 @@ val LocalSharedDialogTransitionProgress: ProvidableCompositionLocal<Float> =
 val LocalSharedDialogTransitionKey: ProvidableCompositionLocal<String?> =
     compositionLocalOf { null }
 
-interface SharedDialog : JavaSerializable {
+interface SharedDialog {
 
     val transitionDurationMillis: Int
         get() = 0

@@ -13,16 +13,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class AuthAnimeScreen(
     private val isAuthed: Boolean,
-) : Screen {
+) : AppRoute {
     @Composable
     override fun Content() {
         val currentNavigator = LocalNavigator.currentOrThrow
@@ -34,7 +36,7 @@ data class AuthAnimeScreen(
             }
             currentNavigator replace screen
         }
-        val authScreenModel = koinScreenModel<AuthScreenModel>()
+        val authScreenModel = koinViewModel<AuthScreenModel>()
         BoxWithConstraints {
             var isAuthedState by remember { mutableStateOf(isAuthed) }
             val cardUpAnimationSpec = tween<Dp>(1200)

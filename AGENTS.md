@@ -10,7 +10,7 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 - Compose Multiplatform：1.10.3
 - Android：minSdk 24、targetSdk 35、compileSdk 36
 - 包名：`io.github.vrcmteam.vrcm`
-- 主要框架：Voyager、Koin、Ktor、Multiplatform Settings、Coil
+- 主要框架：Navigation 3、Lifecycle ViewModel、Material 3 Adaptive、Koin、Ktor、Multiplatform Settings、Coil
 
 版本信息以 `gradle/libs.versions.toml` 为准，不要依赖文档中的旧版本号。
 
@@ -44,7 +44,7 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 
 `commonMain/kotlin/` 的主要目录：
 
-- `presentation/`：Compose UI、Voyager Screen/ScreenModel、动画、主题、导航与设置
+- `presentation/`：Compose UI、Navigation 3 路由、Lifecycle ViewModel、动画、主题、导航与设置
 - `network/`：VRChat/GitHub API、Ktor 支持、WebSocket 与网络数据模型
 - `service/`：认证、好友、收藏、版本、上传等跨 API 业务编排
 - `storage/`：账户、缓存、设置与本地持久化
@@ -55,10 +55,10 @@ VRCM 是面向 VRChat 的跨平台好友与内容管理应用，使用 Kotlin Mu
 
 ## 三、架构与状态管理
 
-- 页面导航遵循现有 Voyager `Screen`、`ScreenModel` 和 Navigator 模式。
+- 页面导航遵循现有 Navigation 3 `AppRoute`、`AppNavigator`、`NavDisplay` 和 Lifecycle `ViewModel` 模式。
 - 依赖通过现有 Koin 模块注入，不要在 UI 中自行构造网络、存储或服务对象。
 - 状态应保持单一数据源。优先使用 `StateFlow`、`SharedFlow` 或现有 Compose state 模式，不要创建彼此可能失同步的重复状态。
-- 页面只负责展示和交互编排；可复用或跨页面的业务流程优先放入 ScreenModel、Service、Storage 或 Network 层的既有边界。
+- 页面只负责展示和交互编排；可复用或跨页面的业务流程优先放入 ViewModel、Service、Storage 或 Network 层的既有边界。
 - 网络请求使用现有 Ktor client、API 类型和认证重试封装，不要另建平行客户端。
 - 平台差异优先使用现有源集和 `expect`/`actual` 模式，不要把平台判断散落在 `commonMain`。
 - 协程必须绑定明确生命周期和 Dispatcher。测试或页面退出后不得遗留后台协程、全局状态或未恢复的 Main Dispatcher。

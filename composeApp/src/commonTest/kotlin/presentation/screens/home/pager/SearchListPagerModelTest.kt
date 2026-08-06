@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
@@ -487,8 +489,15 @@ private class SearchModelFixture(
     private val client: HttpClient,
 ) {
     fun close() {
-        model.onDispose()
+        clearViewModel(model)
         client.close()
+    }
+}
+
+private fun clearViewModel(viewModel: ViewModel) {
+    ViewModelStore().apply {
+        put("test", viewModel)
+        clear()
     }
 }
 

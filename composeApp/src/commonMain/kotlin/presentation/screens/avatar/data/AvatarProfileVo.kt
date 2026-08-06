@@ -1,8 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class AvatarProfileVo(
     val avatarId: String,
     val avatarName: String = "",
@@ -17,7 +18,7 @@ data class AvatarProfileVo(
     val updatedAt: String? = null,
     val version: Int? = null,
     val platformInfos: List<AvatarPlatformInfo> = emptyList(),
-) : JavaSerializable {
+) {
     constructor(avatar: AvatarData) : this(
         avatarId = avatar.id,
         avatarName = avatar.name,
@@ -41,11 +42,12 @@ data class AvatarProfileVo(
     )
 }
 
+@Serializable
 data class AvatarPlatformInfo(
     val platform: String,
     val unityVersion: String? = null,
     val performanceRating: String? = null,
-) : JavaSerializable {
+) {
     val displayName: String
         get() = buildString {
             append(platform.replaceFirstChar { it.uppercase() })

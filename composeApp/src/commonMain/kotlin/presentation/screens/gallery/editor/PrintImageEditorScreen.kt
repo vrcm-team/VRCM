@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,10 +66,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -77,13 +81,15 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 import kotlin.math.roundToInt
 
+@Serializable
 class PrintImageEditorScreen(
     private val sessionId: String,
-) : Screen {
+) : AppRoute {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -103,7 +109,7 @@ class PrintImageEditorScreen(
             return
         }
 
-        val screenModel: PrintImageEditorScreenModel = koinScreenModel {
+        val screenModel: PrintImageEditorScreenModel = koinViewModel {
             parametersOf(sessionId)
         }
         DisposableEffect(screenModel) {
@@ -204,150 +210,217 @@ private fun PrintEditorContent(
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
+    val expanded = LocalAppWindowWidthClass.current == AppWindowWidthClass.Expanded
 
-    Column(modifier = modifier) {
-        BoxWithConstraints(
+    val preview: @Composable (Modifier) -> Unit = { previewModifier ->
+        PrintEditorPreview(
+            state = state,
+            calculator = calculator,
+            viewport = viewport,
+            onViewportChanged = { viewport = it },
+            onPanAndZoom = onPanAndZoom,
+            locale = locale,
+            modifier = previewModifier,
+        )
+    }
+    val controls: @Composable (Modifier, Boolean) -> Unit = { controlsModifier, sidePanel ->
+        PrintEditorControls(
+            state = state,
+            calculator = calculator,
+            viewport = viewport,
+            onSetZoom = onSetZoom,
+            onRotateLeft = onRotateLeft,
+            onRotateRight = onRotateRight,
+            onFlipHorizontal = onFlipHorizontal,
+            onFlipVertical = onFlipVertical,
+            onReset = onReset,
+            locale = locale,
+            sidePanel = sidePanel,
+            modifier = controlsModifier,
+        )
+    }
+
+    if (expanded) {
+        Row(modifier = modifier) {
+            preview(Modifier.weight(1f).fillMaxHeight())
+            VerticalDivider(Modifier.fillMaxHeight())
+            controls(Modifier.width(360.dp).fillMaxHeight(), true)
+        }
+    } else {
+        Column(modifier = modifier) {
+            preview(Modifier.fillMaxWidth().weight(1f))
+            controls(Modifier.fillMaxWidth(), false)
+        }
+    }
+}
+
+@Composable
+private fun PrintEditorPreview(
+    state: PrintImageEditorState,
+    calculator: CropTransformCalculator,
+    viewport: ImageSize,
+    onViewportChanged: (ImageSize) -> Unit,
+    onPanAndZoom: (ImageSize, Float, Float, Float) -> Unit,
+    locale: LocaleStrings,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(
+        modifier = modifier.background(Color(0xFF18191B)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val availableWidth = (maxWidth - 24.dp).coerceAtLeast(1.dp)
+        val availableHeight = (maxHeight - 24.dp).coerceAtLeast(1.dp)
+        val cropWidth = if (availableWidth * 9f / 16f <= availableHeight) {
+            availableWidth
+        } else {
+            availableHeight * 16f / 9f
+        }
+
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .background(Color(0xFF18191B)),
-            contentAlignment = Alignment.Center,
+                .width(cropWidth)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.White),
         ) {
-            val availableWidth = (maxWidth - 24.dp).coerceAtLeast(1.dp)
-            val availableHeight = (maxHeight - 24.dp).coerceAtLeast(1.dp)
-            val cropWidth = if (availableWidth * 9f / 16f <= availableHeight) {
-                availableWidth
-            } else {
-                availableHeight * 16f / 9f
-            }
+            PrintCropPreview(
+                state = state,
+                calculator = calculator,
+                viewport = viewport,
+                onViewportChanged = onViewportChanged,
+                onPanAndZoom = onPanAndZoom,
+                modifier = Modifier.fillMaxSize(),
+            )
 
-            Box(
-                modifier = Modifier
-                    .width(cropWidth)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White),
-            ) {
-                PrintCropPreview(
-                    state = state,
-                    calculator = calculator,
-                    viewport = viewport,
-                    onViewportChanged = { viewport = it },
-                    onPanAndZoom = onPanAndZoom,
-                    modifier = Modifier.fillMaxSize(),
-                )
-
-                if (state.isBusy) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.58f)),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        CircularProgressIndicator(color = Color.White)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (state.phase == EditorPhase.Processing) {
-                                locale.printEditorProcessing
-                            } else {
-                                locale.printEditorUploading
-                            },
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+            if (state.isBusy) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.58f)),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (state.phase == EditorPhase.Processing) {
+                            locale.printEditorProcessing
+                        } else {
+                            locale.printEditorUploading
+                        },
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }
+    }
+}
 
-        Surface(tonalElevation = 2.dp) {
-            Column(
+@Composable
+private fun PrintEditorControls(
+    state: PrintImageEditorState,
+    calculator: CropTransformCalculator,
+    viewport: ImageSize,
+    onSetZoom: (ImageSize, Float) -> Unit,
+    onRotateLeft: (ImageSize) -> Unit,
+    onRotateRight: (ImageSize) -> Unit,
+    onFlipHorizontal: () -> Unit,
+    onFlipVertical: () -> Unit,
+    onReset: () -> Unit,
+    locale: LocaleStrings,
+    sidePanel: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier = modifier, tonalElevation = 2.dp) {
+        Column(
+            modifier = (if (sidePanel) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if (sidePanel) {
+                Arrangement.spacedBy(18.dp, Alignment.CenterVertically)
+            } else {
+                Arrangement.spacedBy(10.dp)
+            },
+        ) {
+            Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
-                    modifier = Modifier
-                        .widthIn(max = 720.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                val zoomRange = if (viewport.isValid()) {
+                    calculator.zoomLimits(
+                        source = state.prepared.originalSize,
+                        viewport = viewport,
+                        quarterTurns = state.transform.quarterTurns,
+                    ).valueRange
+                } else {
+                    1f..3f
+                }
+                Text(
+                    text = locale.printEditorZoom,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Slider(
+                    value = state.transform.zoom,
+                    onValueChange = {
+                        if (viewport.isValid()) onSetZoom(viewport, it)
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !state.isBusy && viewport.isValid(),
+                    valueRange = zoomRange,
+                )
+            }
+
+            FlowRow(
+                modifier = Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                EditorToolButton(
+                    label = locale.printEditorRotateLeft,
+                    enabled = !state.isBusy && viewport.isValid(),
+                    onClick = { onRotateLeft(viewport) },
                 ) {
-                    val zoomRange = if (viewport.isValid()) {
-                        calculator.zoomLimits(
-                            source = state.prepared.originalSize,
-                            viewport = viewport,
-                            quarterTurns = state.transform.quarterTurns,
-                        ).valueRange
-                    } else {
-                        1f..3f
-                    }
-                    Text(
-                        text = locale.printEditorZoom,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Slider(
-                        value = state.transform.zoom,
-                        onValueChange = {
-                            if (viewport.isValid()) onSetZoom(viewport, it)
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.isBusy && viewport.isValid(),
-                        valueRange = zoomRange,
+                    Icon(Icons.AutoMirrored.Filled.RotateLeft, contentDescription = locale.printEditorRotateLeft)
+                }
+                EditorToolButton(
+                    label = locale.printEditorRotateRight,
+                    enabled = !state.isBusy && viewport.isValid(),
+                    onClick = { onRotateRight(viewport) },
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = locale.printEditorRotateRight)
+                }
+                EditorToggleButton(
+                    label = locale.printEditorFlipHorizontal,
+                    checked = state.transform.flipHorizontal,
+                    enabled = !state.isBusy,
+                    onClick = onFlipHorizontal,
+                ) {
+                    Icon(Icons.Default.Flip, contentDescription = locale.printEditorFlipHorizontal)
+                }
+                EditorToggleButton(
+                    label = locale.printEditorFlipVertical,
+                    checked = state.transform.flipVertical,
+                    enabled = !state.isBusy,
+                    onClick = onFlipVertical,
+                ) {
+                    Icon(
+                        Icons.Default.Flip,
+                        contentDescription = locale.printEditorFlipVertical,
+                        modifier = Modifier.rotate(90f),
                     )
                 }
-
-                FlowRow(
-                    modifier = Modifier
-                        .widthIn(max = 720.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                EditorToolButton(
+                    label = locale.printEditorReset,
+                    enabled = !state.isBusy,
+                    onClick = onReset,
                 ) {
-                    EditorToolButton(
-                        label = locale.printEditorRotateLeft,
-                        enabled = !state.isBusy && viewport.isValid(),
-                        onClick = { onRotateLeft(viewport) },
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.RotateLeft, contentDescription = locale.printEditorRotateLeft)
-                    }
-                    EditorToolButton(
-                        label = locale.printEditorRotateRight,
-                        enabled = !state.isBusy && viewport.isValid(),
-                        onClick = { onRotateRight(viewport) },
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = locale.printEditorRotateRight)
-                    }
-                    EditorToggleButton(
-                        label = locale.printEditorFlipHorizontal,
-                        checked = state.transform.flipHorizontal,
-                        enabled = !state.isBusy,
-                        onClick = onFlipHorizontal,
-                    ) {
-                        Icon(Icons.Default.Flip, contentDescription = locale.printEditorFlipHorizontal)
-                    }
-                    EditorToggleButton(
-                        label = locale.printEditorFlipVertical,
-                        checked = state.transform.flipVertical,
-                        enabled = !state.isBusy,
-                        onClick = onFlipVertical,
-                    ) {
-                        Icon(
-                            Icons.Default.Flip,
-                            contentDescription = locale.printEditorFlipVertical,
-                            modifier = Modifier.rotate(90f),
-                        )
-                    }
-                    EditorToolButton(
-                        label = locale.printEditorReset,
-                        enabled = !state.isBusy,
-                        onClick = onReset,
-                    ) {
-                        Icon(Icons.Default.RestartAlt, contentDescription = locale.printEditorReset)
-                    }
+                    Icon(Icons.Default.RestartAlt, contentDescription = locale.printEditorReset)
                 }
             }
         }

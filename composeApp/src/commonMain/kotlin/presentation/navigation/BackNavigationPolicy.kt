@@ -42,6 +42,9 @@ internal class BackNavigationPolicy {
     fun shouldHandleBack(canNavigateBack: Boolean): Boolean =
         hasBackHandler || !isBackNavigationEnabled || canNavigateBack
 
+    fun shouldInterceptBack(): Boolean =
+        hasBackHandler || !isBackNavigationEnabled
+
     fun handleBack(canNavigateBack: Boolean, navigateBack: () -> Unit): Boolean {
         handlers.values.lastOrNull()?.let { handler ->
             handler()

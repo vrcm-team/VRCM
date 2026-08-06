@@ -68,4 +68,20 @@ class BackNavigationPolicyTest {
         assertTrue(policy.handleBack(canNavigateBack = true) { navigationCount += 1 })
         assertEquals(0, navigationCount)
     }
+
+    @Test
+    fun pageBackIsDelegatedToNavigationDisplayWithoutAnOverride() {
+        val policy = BackNavigationPolicy()
+
+        assertFalse(policy.shouldInterceptBack())
+
+        val dialog = Any()
+        policy.setBackHandler(dialog) {}
+        assertTrue(policy.shouldInterceptBack())
+
+        policy.setBackHandler(dialog, handler = null)
+        val blocker = Any()
+        policy.setBlocked(blocker, blocked = true)
+        assertTrue(policy.shouldInterceptBack())
+    }
 }

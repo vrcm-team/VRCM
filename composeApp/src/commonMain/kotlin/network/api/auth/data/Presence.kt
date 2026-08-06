@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.auth.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,4 +17,4 @@ data class Presence(
     val travelingToInstance: String,
     val travelingToWorld: String,
     val world: String
-) : JavaSerializable
+)

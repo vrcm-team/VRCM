@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
@@ -42,7 +42,7 @@ class WorldProfileScreenModel(
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
     private val worldProfileCacheDao: WorldProfileCacheDao,
-) : ScreenModel {
+) : ViewModel() {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
     val worldProfileState: StateFlow<WorldProfileVo?> = _worldProfileState.asStateFlow()
@@ -88,7 +88,7 @@ class WorldProfileScreenModel(
         if (instanceIds.isEmpty() || _isLoading.value) return
 
         _isLoading.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 loadInstanceData(instanceIds)
             } catch (error: Throwable) {
@@ -106,7 +106,7 @@ class WorldProfileScreenModel(
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
         _isLoading.value = true
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 loadWorldInfo(worldId)
             } catch (error: Throwable) {
@@ -141,7 +141,7 @@ class WorldProfileScreenModel(
                     instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
 //                    platformFileSizes = platformFileSizes,
                 )
-//            screenModelScope.launch(Dispatchers.IO) {
+//            viewModelScope.launch(Dispatchers.IO) {
 //                // 获取平台文件大小信息
 //                runCatching {
 //                    platformFileSizes.addAll(worldPlatformService.getWorldPlatformFileSizes(worldData))
@@ -260,7 +260,7 @@ class WorldProfileScreenModel(
         strings: LocaleStrings,
     ) {
         val worldId = _worldProfileState.value?.worldId ?: return
-        screenModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
                 // 获取当前用户ID

@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
-import cafe.adriel.voyager.core.model.ScreenModel
-import cafe.adriel.voyager.core.model.screenModelScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
@@ -36,7 +36,7 @@ class SearchListPagerModel(
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
     private val logger: Logger
-) : ScreenModel {
+) : ViewModel() {
 
     // 用户搜索列表
     private val _userSearchList =  MutableStateFlow(emptyList<SearchUserData>())
@@ -56,7 +56,7 @@ class SearchListPagerModel(
     private val groupLoadingGate = GroupLoadingGate()
     val isLoadingGroups: StateFlow<Boolean> = groupLoadingGate.owner
         .map { it != null }
-        .stateIn(screenModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _groupLoadMoreFailed = MutableStateFlow(false)
     val groupLoadMoreFailed: StateFlow<Boolean> = _groupLoadMoreFailed.asStateFlow()
@@ -81,7 +81,7 @@ class SearchListPagerModel(
 
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
-        screenModelScope.launch {
+        viewModelScope.launch {
             SharedFlowCentre.authed.collect { session ->
                 val account = session.account
                 val accountChanged = authenticatedUserId != account.userId
@@ -194,7 +194,7 @@ class SearchListPagerModel(
         if (retryFailed) _groupLoadMoreFailed.value = false
 
         val offset = pagingState.nextOffset
-        return screenModelScope.launch(Dispatchers.IO) {
+        return viewModelScope.launch(Dispatchers.IO) {
             searchGroups(
                 requestKey = requestKey,
                 generation = generation,

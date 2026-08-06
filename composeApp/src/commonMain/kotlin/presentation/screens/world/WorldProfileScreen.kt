@@ -46,10 +46,12 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.koin.koinScreenModel
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import org.koin.compose.viewmodel.koinViewModel
+import kotlinx.serialization.Serializable
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
@@ -83,17 +85,18 @@ import kotlin.math.abs
  * @since 2024/3/23 19:44
  * @version: 1.0
  */
+@Serializable
 class WorldProfileScreen(
     private val worldProfileVO: WorldProfileVo,
     private val location: String? = null,
     private val sharedSuffixKey: String = "",
     private val sharedKeyPrefix: String = "",
-) : Screen {
+) : AppDetailRoute {
 
     @Composable
     override fun Content() {
         // 创建ViewModel
-        val screenModel: WorldProfileScreenModel = koinScreenModel()
+        val screenModel: WorldProfileScreenModel = koinViewModel()
 
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
@@ -793,7 +796,7 @@ private fun RenderTopBar(
  * 渲染BottomSheet
  */
 @Composable
-private fun Screen.RenderBottomSheet(
+private fun AppRoute.RenderBottomSheet(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     sizes: WorldDetailSizesState,
@@ -856,13 +859,13 @@ private fun Screen.RenderBottomSheet(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Screen.RenderBottomSheetContent(
+private fun AppRoute.RenderBottomSheetContent(
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     onShrinkCardClick: (InstanceVo) -> Unit,
     onExpanded: () -> Unit,
 ) {
-    val screenModel = koinScreenModel<WorldProfileScreenModel>()
+    val screenModel = koinViewModel<WorldProfileScreenModel>()
 
     // 对话框状态管理
     var showCreateInstanceDialog by remember { mutableStateOf(false) }

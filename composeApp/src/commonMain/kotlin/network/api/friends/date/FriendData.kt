@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.friends.date
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import kotlinx.serialization.SerialName
@@ -33,4 +32,4 @@ data class FriendData(
     override val tags: List<String> = emptyList(),
     override val userIcon: String,
     override val pronouns: String?,
-): IUser, JavaSerializable
+): IUser

@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.users.data
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import io.github.vrcmteam.vrcm.network.api.attributes.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -42,7 +41,7 @@ data class UserData(
     override val userIcon: String,
     val worldId: String,
     override val pronouns: String?,
-) : IUser, JavaSerializable, IAccessType {
+) : IUser, IAccessType {
     override val accessType: AccessType
         get() =
             when {

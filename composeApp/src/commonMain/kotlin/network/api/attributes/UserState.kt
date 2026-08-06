@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.network.api.attributes
 
-import cafe.adriel.voyager.core.lifecycle.JavaSerializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -8,7 +7,7 @@ import kotlinx.serialization.Serializable
  * 用户状态
  */
 @Serializable
-enum class UserState(val value: String) : JavaSerializable {
+enum class UserState(val value: String) {
 
     /**
      * 离线

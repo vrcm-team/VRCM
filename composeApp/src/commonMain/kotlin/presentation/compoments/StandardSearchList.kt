@@ -76,15 +76,13 @@ fun StandardSearchList(
     val sharedSuffixKey = LocalSharedSuffixKey.current
     val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
-    val onUserClick = { user: IUser ->
+    val onUserClick: (IUser) -> Unit = { user ->
         // 处理用户点击，导航到用户资料页面
-        if (currentNavigator.size <= 1) {
-            coroutineScope.launch {
-                currentNavigator push UserProfileScreen(
-                    userProfileVO = UserProfileVo(user),
-                    sharedSuffixKey = sharedSuffixKey
-                )
-            }
+        coroutineScope.launch {
+            currentNavigator push UserProfileScreen(
+                userProfileVO = UserProfileVo(user),
+                sharedSuffixKey = sharedSuffixKey
+            )
         }
     }
     val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
@@ -93,7 +91,7 @@ fun StandardSearchList(
             coroutineScope.launch {
                 SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
             }
-        } else if (currentNavigator.size <= 1) {
+        } else {
             // 处理世界点击，导航到世界详情页面
             coroutineScope.launch {
                 currentNavigator push WorldProfileScreen(
@@ -109,7 +107,7 @@ fun StandardSearchList(
             coroutineScope.launch {
                 SharedFlowCentre.toastText.emit(ToastText.Info(hiddenModelCannotViewText))
             }
-        } else if (currentNavigator.size <= 1) {
+        } else {
             coroutineScope.launch {
                 currentNavigator push AvatarProfileScreen(
                     avatarProfileVo = AvatarProfileVo(avatar),
@@ -118,15 +116,13 @@ fun StandardSearchList(
             }
         }
     }
-    val onGroupClick = { group: LimitedGroup ->
+    val onGroupClick: (LimitedGroup) -> Unit = { group ->
         // 处理群组点击，导航到群组详情页面
-        if (currentNavigator.size <= 1) {
-            coroutineScope.launch {
-                currentNavigator push GroupProfileScreen(
-                    groupProfileVo = GroupProfileVo(group),
-                    sharedSuffixKey = sharedSuffixKey
-                )
-            }
+        coroutineScope.launch {
+            currentNavigator push GroupProfileScreen(
+                groupProfileVo = GroupProfileVo(group),
+                sharedSuffixKey = sharedSuffixKey
+            )
         }
     }
 
