@@ -75,6 +75,9 @@ class FriendService(
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
     private val _currentUserLocation = MutableStateFlow<FriendPresence?>(null)
     val currentUserLocation: StateFlow<FriendPresence?> = _currentUserLocation.asStateFlow()
+    private val _friendActivitySource = MutableStateFlow<FriendActivitySourceSnapshot?>(null)
+    internal val friendActivitySource: StateFlow<FriendActivitySourceSnapshot?> =
+        _friendActivitySource.asStateFlow()
 
     val friendMap: Map<String, FriendData>
         get() = friendState.value
@@ -105,6 +108,7 @@ class FriendService(
                         friendStore.clear()
                         publishFriendState()
                         _currentUserLocation.value = null
+                        _friendActivitySource.value = null
                     }
                     preloadTask.cancelAndJoin()
                 } else {
@@ -119,9 +123,11 @@ class FriendService(
             if (activeSessionToken == session.token) return@synchronized false
             activeSessionToken = session.token
             if (activeAccountUserId != session.account.userId) {
+                _currentUserLocation.value = null
                 restoreCachedFriendList(session.account.userId)
             }
             accountTracker.onAuthenticated(session.account.userId)
+            publishFriendActivitySource()
             true
         }
         if (activated) {
@@ -129,9 +135,12 @@ class FriendService(
             serviceScope.launch {
                 runCatching { authService.currentUser(isRefresh = true).presence }.onSuccess { presence ->
                     if (isCurrentSession(session.token)) {
-                        _currentUserLocation.value = FriendPresence(
+                        updateCurrentUserLocation(
+                            sessionToken = session.token,
+                            presence = FriendPresence(
                             location = presenceLocation(presence.world, presence.instance),
                             travelingToLocation = presenceLocation(presence.travelingToWorld, presence.travelingToInstance),
+                            ),
                         )
                     }
                 }
@@ -147,9 +156,12 @@ class FriendService(
             "user-location" -> {
                 val content = json.decodeFromString<UserLocationContent>(socketEvent.content)
                 if (content.userId == null || content.userId == authService.accountDto().userId) {
-                    _currentUserLocation.value = FriendPresence(
-                        content.location,
-                        content.travelingToLocation,
+                    updateCurrentUserLocation(
+                        sessionToken = sessionToken,
+                        presence = FriendPresence(
+                            content.location,
+                            content.travelingToLocation,
+                        ),
                     )
                     authService.applySocketUserLocation(content.location, content.travelingToLocation)
                 }
@@ -345,6 +357,7 @@ class FriendService(
         if (_friendState.value != snapshot) {
             _friendState.value = snapshot
         }
+        publishFriendActivitySource()
         activeAccountUserId?.let { userId ->
             cacheWriter.submit(
                 accountUserId = userId,
@@ -354,6 +367,24 @@ class FriendService(
                 ),
             )
         }
+    }
+
+    private fun updateCurrentUserLocation(
+        sessionToken: AccountSessionToken,
+        presence: FriendPresence,
+    ) = synchronized(friendMapLock) {
+        if (!isCurrentSessionLocked(sessionToken)) return@synchronized
+        _currentUserLocation.value = presence
+        publishFriendActivitySource()
+    }
+
+    private fun publishFriendActivitySource() {
+        val token = activeSessionToken ?: return
+        _friendActivitySource.value = FriendActivitySourceSnapshot(
+            token = token,
+            friends = friendStore.snapshot.values.toList(),
+            selfLocation = _currentUserLocation.value?.location,
+        )
     }
 
     private fun restoreCachedFriendList(userId: String) {

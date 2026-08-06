@@ -1,6 +1,11 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import org.koin.compose.viewmodel.koinViewModel
@@ -11,7 +16,12 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.WorldSearchO
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.service.FriendActivityService
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 object SearchListPager : Pager {
     override val index: Int
@@ -25,11 +35,18 @@ object SearchListPager : Pager {
         @Composable
         get() = rememberVectorPainter(AppIcons.PersonSearch)
 
+    @OptIn(ExperimentalTime::class)
     @Composable
     override fun Content() {
         // 获取ViewModel
         val searchListPagerModel: SearchListPagerModel = koinViewModel()
         val coroutineScope = rememberCoroutineScope()
+        val friendActivityService = koinInject<FriendActivityService>()
+        val recentCutoffMillis = remember {
+            Clock.System.now().toEpochMilliseconds() - 24L * 60L * 60L * 1_000L
+        }
+        val recentTogether by friendActivityService.observeRecentTogether(recentCutoffMillis)
+            .collectAsState(initial = emptyList())
 
         // 获取当前选中的标签索引
         val searchType by searchListPagerModel.searchType.collectAsState()
@@ -68,10 +85,32 @@ object SearchListPager : Pager {
                     searchListPagerModel.setSearchType(searchType)
                 }
             },
-            userList = users,
+            userList = if (searchText.isEmpty() && searchType == 0) {
+                recentTogether.map { summary ->
+                    UserProfileVo(
+                        id = summary.friendUserId,
+                        displayName = summary.displayName,
+                        profileImageUrl = summary.profileImageUrl,
+                        iconUrl = summary.profileImageUrl,
+                        currentAvatarImageUrl = summary.profileImageUrl,
+                        isFriend = true,
+                    )
+                }
+            } else {
+                users
+            },
             worldList = worlds,
             groupList = groups,
             includeGroups = true,
+            headerContent = {
+                if (searchText.isEmpty() && searchType == 0 && recentTogether.isNotEmpty()) {
+                    Text(
+                        text = strings.friendActivityRecentTogether,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            },
             onLoadMore = if (
                 shouldEnableGroupLoadMore(
                     searchType = searchType,
@@ -130,4 +169,3 @@ internal fun shouldShowGroupLoadMoreRetry(
     loadMoreFailed: Boolean,
     itemCount: Int,
 ): Boolean = searchType == 3 && loadMoreFailed && itemCount > 0
-

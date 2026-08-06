@@ -13,6 +13,7 @@ internal data class AccountCacheWriteToken(
 class AccountCacheManager(
     private val friendListCacheDao: FriendListCacheDao,
     private val userProfileCacheDao: UserProfileCacheDao,
+    private val friendActivityStore: FriendActivityCacheStore,
 ) {
     private val lock = SynchronizedObject()
     private var globalGeneration = 0L
@@ -39,16 +40,22 @@ class AccountCacheManager(
         true
     }
 
-    fun clearAccount(userId: String) = synchronized(lock) {
-        accountGenerations[userId] = (accountGenerations[userId] ?: 0L) + 1L
-        friendListCacheDao.clear(userId)
-        userProfileCacheDao.clearOwner(userId)
+    suspend fun clearAccount(userId: String) {
+        synchronized(lock) {
+            accountGenerations[userId] = (accountGenerations[userId] ?: 0L) + 1L
+            friendListCacheDao.clear(userId)
+            userProfileCacheDao.clearOwner(userId)
+        }
+        friendActivityStore.clearAccount(userId)
     }
 
-    fun clearAll() = synchronized(lock) {
-        globalGeneration++
-        accountGenerations.clear()
-        friendListCacheDao.clearAll()
-        userProfileCacheDao.clearAll()
+    suspend fun clearAll() {
+        synchronized(lock) {
+            globalGeneration++
+            accountGenerations.clear()
+            friendListCacheDao.clearAll()
+            userProfileCacheDao.clearAll()
+        }
+        friendActivityStore.clearAll()
     }
 }

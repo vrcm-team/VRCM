@@ -169,14 +169,22 @@ private fun AboutBlock() {
     Column {
         val diskCache = imageLoader.diskCache
         var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
+        var isClearingCache by remember { mutableStateOf(false) }
         Row(
             modifier = Modifier.fillMaxWidth()
-                .clickable {
-                    diskCache?.clear()
-                    accountCacheManager.clearAll()
-                    groupProfileCacheDao.clearAll()
-                    worldProfileCacheDao.clearAll()
-                    size = 0
+                .clickable(enabled = !isClearingCache) {
+                    scope.launch {
+                        isClearingCache = true
+                        try {
+                            diskCache?.clear()
+                            accountCacheManager.clearAll()
+                            groupProfileCacheDao.clearAll()
+                            worldProfileCacheDao.clearAll()
+                            size = 0
+                        } finally {
+                            isClearingCache = false
+                        }
+                    }
                 }
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)

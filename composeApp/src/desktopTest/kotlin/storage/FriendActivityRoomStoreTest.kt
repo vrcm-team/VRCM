@@ -1,0 +1,381 @@
+package io.github.vrcmteam.vrcm.storage
+
+import androidx.room.Room
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
+import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
+import io.github.vrcmteam.vrcm.service.FriendActivityBatch
+import io.github.vrcmteam.vrcm.service.FriendActivityEventType
+import io.github.vrcmteam.vrcm.service.FriendActivityInputSnapshot
+import io.github.vrcmteam.vrcm.service.FriendActivityObservation
+import io.github.vrcmteam.vrcm.service.FriendMeetingChange
+import io.github.vrcmteam.vrcm.service.data.AccountDto
+import io.github.vrcmteam.vrcm.service.trackFriendActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+
+class FriendActivityRoomStoreTest {
+    @Test
+    fun restoreDropsIncompleteSessionWithoutAddingDuration() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val observation = observation()
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Started(
+                            userId = observation.userId,
+                            occurredAtMillis = 1_000L,
+                            worldId = "wrld_world",
+                            accessType = FriendActivityAccessType.Invite,
+                            announce = false,
+                        )
+                    )
+                ),
+                nowMillis = 1_000L,
+            )
+
+            store.discardIncompleteSessions("usr_owner")
+
+            assertEquals(emptyList(), store.sessions("usr_owner", observation.userId))
+            val summary = store.summary("usr_owner", observation.userId)
+            assertEquals(0, summary?.meetingCount)
+            assertEquals(0L, summary?.togetherDurationMillis)
+        }
+    }
+
+    @Test
+    fun completedSessionUpdatesSummaryAndTimeline() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val observation = observation()
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Started(
+                            userId = observation.userId,
+                            occurredAtMillis = 1_000L,
+                            worldId = "wrld_world",
+                            accessType = FriendActivityAccessType.Invite,
+                            announce = true,
+                        )
+                    )
+                ),
+                nowMillis = 1_000L,
+            )
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Ended(
+                            userId = observation.userId,
+                            occurredAtMillis = 61_000L,
+                            durationMillis = 60_000L,
+                        )
+                    )
+                ),
+                nowMillis = 61_000L,
+            )
+
+            val summary = store.summary("usr_owner", observation.userId)
+            assertEquals(1, summary?.meetingCount)
+            assertEquals(60_000L, summary?.togetherDurationMillis)
+            assertEquals(61_000L, summary?.lastSeenTogetherAtMillis)
+
+            val session = store.sessions("usr_owner", observation.userId).single()
+            assertEquals(61_000L, session.endedAtMillis)
+            assertEquals(60_000L, session.durationMillis)
+
+            val events = store.observeEvents("usr_owner", observation.userId).first()
+            assertEquals(
+                listOf(FriendActivityEventType.Left.name, FriendActivityEventType.Met.name),
+                events.map { it.type },
+            )
+            assertEquals(listOf("wrld_world", "wrld_world"), events.map { it.worldId })
+            assertEquals(
+                listOf(FriendActivityAccessType.Invite.name, FriendActivityAccessType.Invite.name),
+                events.map { it.accessType },
+            )
+        }
+    }
+
+    @Test
+    fun worldNameBackfillUpdatesEventsAndSessionsForOneAccount() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val observation = observation()
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Started(
+                            userId = observation.userId,
+                            occurredAtMillis = 1_000L,
+                            worldId = "wrld_world",
+                            accessType = FriendActivityAccessType.Invite,
+                            announce = true,
+                        )
+                    )
+                ),
+                nowMillis = 1_000L,
+            )
+
+            store.cacheWorldName("usr_owner", "wrld_world", "The Black Cat")
+
+            assertEquals(
+                "The Black Cat",
+                store.observeEvents("usr_owner", observation.userId).first().single().worldName,
+            )
+            assertEquals(
+                "The Black Cat",
+                store.sessions("usr_owner", observation.userId).single().worldName,
+            )
+            assertEquals("The Black Cat", store.cachedWorldName("usr_owner", "wrld_world"))
+            assertNull(store.cachedWorldName("usr_other", "wrld_world"))
+        }
+    }
+
+    @Test
+    fun recentTogetherOnlyReturnsFriendsInsideWindowInLatestOrder() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val older = observation().copy(userId = "usr_older", displayName = "Older")
+            val newer = observation().copy(userId = "usr_newer", displayName = "Newer")
+            store.record(
+                token = token,
+                observations = listOf(older),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Started(
+                            userId = older.userId,
+                            occurredAtMillis = 1_000L,
+                            worldId = "wrld_old",
+                            accessType = FriendActivityAccessType.Public,
+                            announce = false,
+                        )
+                    )
+                ),
+                nowMillis = 1_000L,
+            )
+            store.record(
+                token = token,
+                observations = listOf(newer),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Started(
+                            userId = newer.userId,
+                            occurredAtMillis = 3_000L,
+                            worldId = "wrld_new",
+                            accessType = FriendActivityAccessType.Friends,
+                            announce = false,
+                        )
+                    )
+                ),
+                nowMillis = 3_000L,
+            )
+
+            val recent = store.observeRecentTogether(
+                ownerUserId = "usr_owner",
+                sinceMillis = 2_000L,
+                limit = 20,
+            ).first()
+
+            assertEquals(listOf("usr_newer"), recent.map { it.friendUserId })
+        }
+    }
+
+    @Test
+    fun activityCollectorIgnoresSnapshotsFromAnotherSession() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 2L),
+            )
+            val otherSessionToken = AccountSessionToken(userId = "usr_other", generation = 1L)
+            val friend = observation().copy(location = "wrld_world:instance_b")
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flowOf(
+                    FriendActivityInputSnapshot(
+                        token = otherSessionToken,
+                        friends = listOf(friend.copy(userId = "usr_wrong")),
+                        selfLocation = "wrld_world:instance_b",
+                        observedAtMillis = 500L,
+                    ),
+                    FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = listOf(friend),
+                        selfLocation = "wrld_world:instance_a",
+                        observedAtMillis = 1_000L,
+                    ),
+                    FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = listOf(friend.copy(location = "wrld_world:instance_a")),
+                        selfLocation = "wrld_world:instance_a",
+                        observedAtMillis = 2_000L,
+                    ),
+                ),
+                store = store,
+            )
+
+            assertNull(store.summary("usr_owner", "usr_wrong"))
+            assertEquals(
+                2_000L,
+                store.summary("usr_owner", friend.userId)?.lastSeenTogetherAtMillis,
+            )
+        }
+    }
+
+    @Test
+    fun accountCacheClearAlsoRemovesRoomActivity() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            store.record(
+                token = token,
+                observations = listOf(observation()),
+                batch = FriendActivityBatch(),
+                nowMillis = 1_000L,
+            )
+            val manager = AccountCacheManager(
+                friendListCacheDao = FriendListCacheDao(MapSettings()),
+                userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+                friendActivityStore = store,
+            )
+
+            manager.clearAccount("usr_owner")
+
+            assertNull(store.summary("usr_owner", "usr_friend"))
+        }
+    }
+
+    @Test
+    fun clearAccountRejectsWritesCapturedByOlderGeneration() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val observation = observation()
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(),
+                nowMillis = 1_000L,
+            )
+            store.clearAccount("usr_owner")
+
+            store.record(
+                token = token,
+                observations = listOf(observation.copy(displayName = "Stale")),
+                batch = FriendActivityBatch(),
+                nowMillis = 2_000L,
+            )
+
+            assertNull(store.summary("usr_owner", observation.userId))
+        }
+    }
+
+    @Test
+    fun clearAllRejectsWritesFromEveryPreviouslyActiveAccount() = runTest {
+        withStore { store ->
+            val tokenA = store.activateAccount("usr_owner_a")
+            val tokenB = store.activateAccount("usr_owner_b")
+            val observation = observation()
+            store.record(tokenA, listOf(observation), FriendActivityBatch(), 1_000L)
+            store.record(tokenB, listOf(observation), FriendActivityBatch(), 1_000L)
+
+            store.clearAll()
+            store.record(tokenA, listOf(observation), FriendActivityBatch(), 2_000L)
+            store.record(tokenB, listOf(observation), FriendActivityBatch(), 2_000L)
+
+            assertNull(store.summary("usr_owner_a", observation.userId))
+            assertNull(store.summary("usr_owner_b", observation.userId))
+        }
+    }
+
+    @Test
+    fun activityCollectorRebuildsItsBaselineAfterCacheClear() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val baseline = observation().copy(location = "wrld_world:instance_a")
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flow {
+                    emit(
+                        FriendActivityInputSnapshot(
+                            token = session.token,
+                            friends = listOf(baseline),
+                            selfLocation = null,
+                            observedAtMillis = 1_000L,
+                        )
+                    )
+                    store.clearAll()
+                    emit(
+                        FriendActivityInputSnapshot(
+                            token = session.token,
+                            friends = listOf(baseline.copy(statusDescription = "After clear")),
+                            selfLocation = null,
+                            observedAtMillis = 2_000L,
+                        )
+                    )
+                    emit(
+                        FriendActivityInputSnapshot(
+                            token = session.token,
+                            friends = listOf(baseline.copy(
+                                statusDescription = "After clear",
+                                bio = "Changed after baseline",
+                            )),
+                            selfLocation = null,
+                            observedAtMillis = 3_000L,
+                        )
+                    )
+                },
+                store = store,
+            )
+
+            assertEquals(
+                listOf(FriendActivityEventType.BioChanged.name),
+                store.observeEvents("usr_owner", baseline.userId).first().map { it.type },
+            )
+        }
+    }
+
+    private suspend fun withStore(block: suspend (RoomFriendActivityStore) -> Unit) {
+        val database = Room.inMemoryDatabaseBuilder<VrcmDatabase>()
+            .setDriver(BundledSQLiteDriver())
+            .setQueryCoroutineContext(Dispatchers.IO)
+            .build()
+        try {
+            block(RoomFriendActivityStore(database.friendActivityDao()))
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun observation() = FriendActivityObservation(
+        userId = "usr_friend",
+        displayName = "Friend",
+        profileImageUrl = "https://example.com/friend.png",
+        location = "wrld_world:private_instance~private(usr_owner)",
+        status = "active",
+        statusDescription = "",
+        bio = "",
+        lastActivityAtMillis = 900L,
+    )
+}

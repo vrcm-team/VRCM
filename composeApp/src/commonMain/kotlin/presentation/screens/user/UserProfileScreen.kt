@@ -167,6 +167,8 @@ data class UserProfileScreen(
                     createdWorlds = userProfileScreenModel.createdWorlds,
                     createdAvatars = userProfileScreenModel.createdAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
+                    friendActivitySummary = userProfileScreenModel.friendActivitySummary,
+                    friendActivityEvents = userProfileScreenModel.friendActivityEvents,
                     contentMinHeight = contentMinHeight,
                     animateGroupEntrance = animateGroupEntrance,
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
@@ -474,6 +476,8 @@ private fun ColumnScope.ProfileContent(
     createdWorlds: List<WorldData>,
     createdAvatars: List<AvatarData>,
     favoritedWorlds: List<Pair<String, List<FavoritedWorld>>>,
+    friendActivitySummary: io.github.vrcmteam.vrcm.service.FriendActivitySummary?,
+    friendActivityEvents: List<io.github.vrcmteam.vrcm.service.FriendActivityEvent>,
     contentMinHeight: Dp,
     animateGroupEntrance: Boolean,
     onLoadWorlds: () -> Unit,
@@ -545,6 +549,13 @@ private fun ColumnScope.ProfileContent(
         bioMinHeight = contentMinHeight,
         userProfileVO = currentUser
     )
+
+    if (!currentUser.isSelf && friendActivitySummary != null) {
+        FriendActivitySection(
+            summary = friendActivitySummary,
+            events = friendActivityEvents,
+        )
+    }
 
     if (!currentUser.isSelf) {
         UserGroupsSection(

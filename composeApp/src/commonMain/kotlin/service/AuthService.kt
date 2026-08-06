@@ -298,7 +298,7 @@ class AuthService(
         if (userId.isNotEmpty()) accountDao.logout(userId)
     }
 
-    fun removeAccount(userId: String) = runCatching {
+    suspend fun removeAccount(userId: String) = runCatching {
         accountCacheManager.clearAccount(userId)
         accountDao.removeAccount(userId)
     }

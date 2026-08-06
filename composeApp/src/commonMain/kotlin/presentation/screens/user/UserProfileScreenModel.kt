@@ -35,6 +35,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPag
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendActivityEvent
+import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
@@ -188,6 +191,7 @@ class UserProfileScreenModel(
     private val inviteApi: InviteApi,
     private val userProfileCacheDao: UserProfileCacheDao,
     private val friendLocationPagerModel: FriendLocationPagerModel,
+    friendActivityService: FriendActivityService,
 ) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
@@ -205,6 +209,12 @@ class UserProfileScreenModel(
 
     private val _mutualGroups = mutableStateOf<List<LimitedUserGroup>>(emptyList())
     val mutualGroups by _mutualGroups
+
+    private val _friendActivitySummary = mutableStateOf<FriendActivitySummary?>(null)
+    val friendActivitySummary by _friendActivitySummary
+
+    private val _friendActivityEvents = mutableStateOf<List<FriendActivityEvent>>(emptyList())
+    val friendActivityEvents by _friendActivityEvents
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -241,6 +251,16 @@ class UserProfileScreenModel(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            friendActivityService.observeSummary(userProfileVO.id).collect {
+                _friendActivitySummary.value = it
+            }
+        }
+        viewModelScope.launch {
+            friendActivityService.observeEvents(userProfileVO.id).collect {
+                _friendActivityEvents.value = it
+            }
+        }
         userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
         if (userProfileVO.id == cacheOwnerUserId) {
             viewModelScope.launch {

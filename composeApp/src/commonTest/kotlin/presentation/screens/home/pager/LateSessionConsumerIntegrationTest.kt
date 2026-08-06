@@ -62,6 +62,7 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
         val cacheManager = AccountCacheManager(
             friendListCacheDao = friendListCacheDao,
             userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+            friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
         )
         val authService = AuthService(
             authApi = AuthApi(client),

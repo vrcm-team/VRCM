@@ -7,12 +7,16 @@ import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.FriendActivityCacheStore
 import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheDao
+import io.github.vrcmteam.vrcm.storage.RoomFriendActivityStore
 import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.SecureStorage
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.buildVrcmDatabase
+import io.github.vrcmteam.vrcm.storage.platformVrcmDatabaseBuilder
 import io.ktor.client.plugins.cookies.*
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
@@ -30,6 +34,9 @@ internal val storageModule: Module = module {
     single { GroupProfileCacheDao(get { parametersOf(DaoKeys.GroupProfileCache.NAME) }) }
     single { UserProfileCacheDao(get { parametersOf(DaoKeys.UserProfileCache.NAME) }) }
     single { WorldProfileCacheDao(get { parametersOf(DaoKeys.WorldProfileCache.NAME) }) }
+    single { buildVrcmDatabase(platformVrcmDatabaseBuilder(get())) }
+    single { get<io.github.vrcmteam.vrcm.storage.VrcmDatabase>().friendActivityDao() }
+    singleOf(::RoomFriendActivityStore) bind FriendActivityCacheStore::class
     singleOf(::AccountCacheManager)
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
 }

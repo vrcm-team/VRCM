@@ -51,6 +51,7 @@ import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
+import io.github.vrcmteam.vrcm.service.FriendActivityService
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -62,6 +63,7 @@ fun App(windowChrome: @Composable () -> Unit = {}) {
     KoinContext {
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
+        koinInject<FriendActivityService>()
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
             friendLocationPagerModel.onBackground()
             webSocketApi.onBackground()

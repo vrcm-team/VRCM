@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.storage
 
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -9,12 +10,12 @@ import kotlin.test.assertTrue
 
 class AccountCacheManagerTest {
     @Test
-    fun clearingOneAccountDoesNotRemoveAnotherAccountsCaches() {
+    fun clearingOneAccountDoesNotRemoveAnotherAccountsCaches() = runTest {
         val friendSettings = MapSettings()
         val profileSettings = MapSettings()
         val friendDao = FriendListCacheDao(friendSettings)
         val profileDao = UserProfileCacheDao(profileSettings)
-        val manager = AccountCacheManager(friendDao, profileDao)
+        val manager = accountCacheManager(friendDao, profileDao)
         friendDao.save("usr_a", FriendListCache(emptyList()))
         friendDao.save("usr_b", FriendListCache(emptyList()))
         profileSettings.putString(profileKey("usr_a", "usr_profile"), "cached-a")
@@ -29,12 +30,12 @@ class AccountCacheManagerTest {
     }
 
     @Test
-    fun clearingAllRemovesBothCacheTypesForEveryAccount() {
+    fun clearingAllRemovesBothCacheTypesForEveryAccount() = runTest {
         val friendSettings = MapSettings()
         val profileSettings = MapSettings()
         val friendDao = FriendListCacheDao(friendSettings)
         val profileDao = UserProfileCacheDao(profileSettings)
-        val manager = AccountCacheManager(friendDao, profileDao)
+        val manager = accountCacheManager(friendDao, profileDao)
         friendDao.save("usr_a", FriendListCache(emptyList()))
         friendDao.save("usr_b", FriendListCache(emptyList()))
         profileSettings.putString(profileKey("usr_a", "usr_profile"), "cached-a")
@@ -47,9 +48,9 @@ class AccountCacheManagerTest {
     }
 
     @Test
-    fun queuedWriteCapturedBeforeAccountClearCannotRestoreDeletedCache() {
+    fun queuedWriteCapturedBeforeAccountClearCannotRestoreDeletedCache() = runTest {
         val friendDao = FriendListCacheDao(MapSettings())
-        val manager = AccountCacheManager(friendDao, UserProfileCacheDao(MapSettings()))
+        val manager = accountCacheManager(friendDao, UserProfileCacheDao(MapSettings()))
         val staleToken = manager.captureWriteToken("usr_a")
 
         manager.clearAccount("usr_a")
@@ -61,4 +62,13 @@ class AccountCacheManagerTest {
 
     private fun profileKey(ownerUserId: String, userId: String) =
         "${DaoKeys.UserProfileCache.KEY_PREFIX}.$ownerUserId.$userId"
+
+    private fun accountCacheManager(
+        friendDao: FriendListCacheDao,
+        profileDao: UserProfileCacheDao,
+    ) = AccountCacheManager(
+        friendListCacheDao = friendDao,
+        userProfileCacheDao = profileDao,
+        friendActivityStore = NoOpFriendActivityCacheStore,
+    )
 }

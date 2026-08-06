@@ -522,6 +522,7 @@ private fun createFixture(
         accountCacheManager = AccountCacheManager(
             friendListCacheDao = FriendListCacheDao(MapSettings()),
             userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+            friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
         ),
     )
     return SearchModelFixture(

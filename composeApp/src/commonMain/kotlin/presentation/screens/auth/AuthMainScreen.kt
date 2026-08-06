@@ -122,7 +122,7 @@ private fun AccountBottomSheet(
     onDismissRequest: () -> Unit,
     findAccountList: ()-> List<AccountDto>,
     onAccountChange: (AccountDto) -> Unit,
-    removeAccount: (String) -> Result<Unit>,
+    removeAccount: suspend (String) -> Result<Unit>,
     authUIState: AuthUIState,
 ) {
     val scope = rememberCoroutineScope()
@@ -177,8 +177,10 @@ private fun AccountBottomSheet(
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .clickable {
-                                            removeAccount(accountDto.userId)
-                                                .onSuccess { accountList.remove(accountDto) }
+                                            scope.launch {
+                                                removeAccount(accountDto.userId)
+                                                    .onSuccess { accountList.remove(accountDto) }
+                                            }
                                         },
                                     imageVector = AppIcons.Clear,
                                     contentDescription = "ClearIcon",

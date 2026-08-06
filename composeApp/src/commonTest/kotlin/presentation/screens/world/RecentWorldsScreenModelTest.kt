@@ -97,6 +97,7 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
             accountCacheManager = AccountCacheManager(
                 friendListCacheDao = FriendListCacheDao(MapSettings()),
                 userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+                friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
             ),
         )
         return RecentWorldsScreenModel(
