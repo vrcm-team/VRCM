@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -27,6 +28,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -41,7 +44,9 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -112,6 +117,226 @@ class AuthServiceTest : MainDispatcherTest() {
             "cached-2fa",
             fixture.accountDao.currentAccountDtoOrNull()?.twoFactorAuthCookie,
         )
+        fixture.client.close()
+    }
+
+    @Test
+    fun accountLoginWaitsForSessionBoundRequest() = runTest {
+        val secondAccount = AccountDto(
+            userId = "usr_second",
+            username = "second-user",
+            password = "second-password",
+            authCookie = "second-auth",
+            twoFactorAuthCookie = "second-2fa",
+        )
+        var requestCount = 0
+        val loginStarted = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            requestCount++
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginStarted.complete(Unit)
+                jsonResponse(currentUserJson(secondAccount))
+            } else if (requestCount == 1) {
+                jsonResponse(currentUserJson(cachedAccount()))
+            } else {
+                jsonResponse(currentUserJson(secondAccount))
+            }
+        }
+        fixture.accountDao.saveAccountInfo(secondAccount)
+        fixture.accountDao.saveAccountInfo(cachedAccount())
+        fixture.service.restoreAuth()
+        val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val requestStarted = CompletableDeferred<Unit>()
+        val finishRequest = CompletableDeferred<Unit>()
+
+        val request = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.runSessionBoundCatching(firstSession.token) {
+                requestStarted.complete(Unit)
+                finishRequest.await()
+                "sent"
+            }
+        }
+        requestStarted.await()
+        val login = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.login(secondAccount.username, secondAccount.password.orEmpty())
+        }
+
+        assertFalse(loginStarted.isCompleted)
+        finishRequest.complete(Unit)
+        val response = assertNotNull(request.await())
+        assertEquals("sent", response.result.getOrThrow())
+        assertEquals(firstSession.token, response.sessionToken)
+        assertIs<AuthState.Authed>(login.await())
+        assertTrue(loginStarted.isCompleted)
+        assertEquals("usr_second", SharedFlowCentre.currentSession.value?.account?.userId)
+        fixture.client.close()
+    }
+
+    @Test
+    fun accountLoginReplacesPreviousCookieContext() = runTest {
+        val secondAccount = AccountDto(
+            userId = "usr_second",
+            username = "second-user",
+            password = "second-password",
+            authCookie = "second-auth",
+            twoFactorAuthCookie = null,
+        )
+        var requestCount = 0
+        var loginCookie: String? = null
+        val fixture = fixture { request ->
+            requestCount++
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginCookie = request.headers[HttpHeaders.Cookie]
+                jsonResponse(currentUserJson(secondAccount))
+            } else if (requestCount == 1) {
+                jsonResponse(currentUserJson(cachedAccount()))
+            } else {
+                jsonResponse(currentUserJson(secondAccount))
+            }
+        }
+        fixture.accountDao.saveAccountInfo(secondAccount)
+        fixture.accountDao.saveAccountInfo(cachedAccount())
+        fixture.service.restoreAuth()
+
+        assertIs<AuthState.Authed>(
+            fixture.service.login(secondAccount.username, secondAccount.password.orEmpty())
+        )
+
+        assertTrue(loginCookie.orEmpty().contains("auth=second-auth"))
+        assertFalse(loginCookie.orEmpty().contains("cached-auth"))
+        assertFalse(loginCookie.orEmpty().contains("cached-2fa"))
+        fixture.client.close()
+    }
+
+    @Test
+    fun incompleteAccountLoginInvalidatesPreviousSession() = runTest {
+        val secondAccount = AccountDto(
+            userId = "usr_second",
+            username = "second-user",
+            password = "second-password",
+            authCookie = "second-auth",
+        )
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                jsonResponse("""{"requiresTwoFactorAuth":["totp"]}""")
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.accountDao.saveAccountInfo(secondAccount)
+        fixture.accountDao.saveAccountInfo(cachedAccount())
+        fixture.service.restoreAuth()
+        val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertIs<AuthState.NeedTTFA>(
+            fixture.service.login(secondAccount.username, secondAccount.password.orEmpty())
+        )
+
+        assertNull(SharedFlowCentre.currentSession.value)
+        var requestExecuted = false
+        val response = fixture.service.runSessionBoundCatching(firstSession.token) {
+            requestExecuted = true
+        }
+        assertNull(response)
+        assertFalse(requestExecuted)
+        fixture.client.close()
+    }
+
+    @Test
+    fun sessionBoundRequestPreservesCancellation() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertFailsWith<CancellationException> {
+            fixture.service.runSessionBoundCatching(session.token) {
+                throw CancellationException("cancel request")
+            }
+        }
+        fixture.client.close()
+    }
+
+    @Test
+    fun sessionBoundRequestReturnsRetryAuthenticationFailure() = runTest {
+        val retryError = IllegalStateException("reauth unavailable")
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                throw retryError
+            }
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        var attempts = 0
+
+        val response = assertNotNull(
+            fixture.service.runSessionBoundCatching(session.token) {
+                attempts++
+                if (attempts == 1) {
+                    throw VRCApiException("Unauthorized", 401, "expired")
+                }
+                "sent"
+            }
+        )
+
+        assertEquals("reauth unavailable", response.result.exceptionOrNull()?.message)
+        assertEquals(session.token, response.sessionToken)
+        assertTrue(SharedFlowCentre.isCurrentSession(session.token))
+        fixture.client.close()
+    }
+
+    @Test
+    fun sessionBoundRequestReturnsRefreshedSessionAfterSuccessfulRetry() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        var attempts = 0
+
+        val response = assertNotNull(
+            fixture.service.runSessionBoundCatching(firstSession.token) {
+                attempts++
+                if (attempts == 1) {
+                    throw VRCApiException("Unauthorized", 401, "expired")
+                }
+                "sent"
+            }
+        )
+
+        assertEquals(2, attempts)
+        assertEquals("sent", response.result.getOrThrow())
+        assertEquals(firstSession.account.userId, response.sessionToken.userId)
+        assertFalse(response.sessionToken == firstSession.token)
+        assertTrue(SharedFlowCentre.isCurrentSession(response.sessionToken))
+        fixture.client.close()
+    }
+
+    @Test
+    fun failedAccountSwitchInvalidatesPreviousSession() = runTest {
+        val secondAccount = AccountDto(
+            userId = "usr_second",
+            username = "second-user",
+            password = "second-password",
+            authCookie = "second-auth",
+        )
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                throw IllegalStateException("login unavailable")
+            }
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.accountDao.saveAccountInfo(secondAccount)
+        fixture.accountDao.saveAccountInfo(cachedAccount())
+        fixture.service.restoreAuth()
+
+        assertFailsWith<IllegalStateException> {
+            fixture.service.login(secondAccount.username, secondAccount.password.orEmpty())
+        }
+
+        assertNull(SharedFlowCentre.currentSession.value)
         fixture.client.close()
     }
 

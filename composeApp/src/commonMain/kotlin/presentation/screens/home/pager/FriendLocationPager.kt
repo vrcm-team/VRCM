@@ -87,14 +87,13 @@ fun Pager.FriendLocationPager(
     doRefresh: suspend () -> Unit,
 ) {
     val navigator = currentNavigator
-    val sharedSuffixKey = LocalSharedSuffixKey.current
     // 只会有一个实例被打开
     var selectLocation by rememberSaveable { mutableStateOf<String?>(null) }
     val onClickLocationCard: (FriendLocation) -> Unit = { friendLocation ->
         // 如果当前位置实例和点击的位置实例相同，则收起卡片，否则展开选中的，收起之前的
         selectLocation = if (selectLocation == friendLocation.location) null else friendLocation.location
     }
-    val onClickWorldImage: (FriendLocation) -> Unit = { friendLocation ->
+    val onClickWorldImage: (FriendLocation, String) -> Unit = { friendLocation, sharedSuffixKey ->
         val currentLocation = friendLocation.instants.value
         // 创建临时的 WorldProfileVo
         val tempWorldProfileVo = WorldProfileVo(
@@ -113,7 +112,7 @@ fun Pager.FriendLocationPager(
         )
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-    val onClickUserIcon = { user: FriendData ->
+    val onClickUserIcon = { user: FriendData, sharedSuffixKey: String ->
         navigator push UserProfileScreen(
             userProfileVO = UserProfileVo(user),
             sharedSuffixKey = sharedSuffixKey
@@ -154,7 +153,9 @@ fun Pager.FriendLocationPager(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         location = location,
                         isSelected = selectLocation == location.location,
-                        onClickWorldImage = { onClickWorldImage(location) },
+                        onClickWorldImage = { sharedSuffixKey ->
+                            onClickWorldImage(location, sharedSuffixKey)
+                        },
                         onClickLocationCard = { onClickLocationCard(location) },
                         travelingIds = location.travelingIds.value,
                         isCurrentUserLocation = location.friends.containsKey(currentUserId),
@@ -194,7 +195,7 @@ fun Pager.FriendLocationPager(
 private fun LazyListScope.SimpleCLocationCard(
     friendLocation: FriendLocation?,
     locationType: LocationType,
-    onClickUserIcon: (FriendData) -> Unit,
+    onClickUserIcon: (FriendData, String) -> Unit,
     text: @Composable () -> String,
     ) {
     val friendList = friendLocation?.friendList.orEmpty()
@@ -222,5 +223,3 @@ private fun LocationTitle(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
-

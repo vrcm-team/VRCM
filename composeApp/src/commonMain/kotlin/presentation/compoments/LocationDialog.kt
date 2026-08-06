@@ -222,8 +222,11 @@ class LocationDialog(
                                 }
                             }
                             Spacer(modifier = Modifier.height(2.dp))
-                            UserIconsRow(friends = friendLocation.friendList) {
-                                onClickUserIcon(it)
+                            UserIconsRow(friends = friendLocation.friendList) { user, transitionSuffixKey ->
+                                currentNavigator push UserProfileScreen(
+                                    userProfileVO = UserProfileVo(user),
+                                    sharedSuffixKey = transitionSuffixKey,
+                                )
                             }
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),

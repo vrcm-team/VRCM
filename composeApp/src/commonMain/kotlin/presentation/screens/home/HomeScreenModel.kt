@@ -13,7 +13,6 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
-import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.BoopNotificationResolver
@@ -24,6 +23,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.BoopService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -37,6 +38,7 @@ class HomeScreenModel(
     private val friendService: FriendService,
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
+    private val boopService: BoopService,
 ) : ViewModel() {
 
     private val boopNotificationResolver = BoopNotificationResolver()
@@ -64,7 +66,7 @@ class HomeScreenModel(
     private val _friendRequestNotifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val friendRequestNotifications by _friendRequestNotifications
 
-    fun init() {
+    init {
         friendService.preloadFriendList()
         friendLocationPagerModel.preloadFriendLocations()
         refreshCurrentUser()
@@ -146,7 +148,9 @@ class HomeScreenModel(
     ) {
         when (item.responseTarget(action)) {
             NotificationResponseTarget.BOOP_USER_API -> {
-                item.senderId?.let { boopUser(it, boopSuccessMessage, boopAlreadySentMessage) }
+                item.senderId?.let {
+                    boopUser(item.id, it, boopSuccessMessage, boopAlreadySentMessage)
+                }
                 return
             }
             NotificationResponseTarget.NOTIFICATION_API -> Unit
@@ -173,19 +177,26 @@ class HomeScreenModel(
         notificationApi.responseNotification(id, response)
     }
 
-    private fun boopUser(userId: String, successMessage: String, alreadySentMessage: String) {
+    private fun boopUser(
+        notificationId: String,
+        userId: String,
+        successMessage: String,
+        alreadySentMessage: String,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching { usersApi.boop(userId) }
-                .onSuccess {
+            when (val result = boopService.send(userId)) {
+                BoopResult.Sent -> {
+                    _notifications.value = _notifications.value.filterNot { it.id == notificationId }
+                    authService.reTryAuthCatching { notificationApi.deleteNotification(notificationId) }
+                        .onFailure { error -> Result.failure<Unit>(error).onHomeFailure() }
                     SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
                 }
-                .onFailure { error ->
-                    if (error is VRCApiException && error.code == 429) {
-                        SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
-                    } else {
-                        Result.failure<Unit>(error).onHomeFailure()
-                    }
+                BoopResult.Cooldown -> {
+                    SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
                 }
+                is BoopResult.Failed -> Result.failure<Unit>(result.error).onHomeFailure()
+                BoopResult.InFlight, BoopResult.SessionChanged -> Unit
+            }
         }
     }
 
@@ -245,6 +256,3 @@ class HomeScreenModel(
 
 
 }
-
-
-

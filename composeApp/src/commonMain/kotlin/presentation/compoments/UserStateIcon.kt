@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -42,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -77,7 +76,7 @@ fun UserIconsRow(
     instanceId: String? = null,
     travelingIds: Set<String> = emptySet(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    onClickUserIcon: (FriendData) -> Unit,
+    onClickUserIcon: (FriendData, String) -> Unit,
 ) {
     if (friends.isEmpty()) return
     LazyRow(
@@ -101,7 +100,7 @@ fun UserIconsRow(
                 userStatus = friend.status,
                 location = friend.location,
                 isTraveling = friend.id in travelingIds,
-            ) { onClickUserIcon(friend) }
+            ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
         }
     }
 }
@@ -163,17 +162,22 @@ fun LazyItemScope.LocationFriend(
     userStatus: UserStatus,
     location: String? = null,
     isTraveling: Boolean = false,
-    onClickUserIcon: () -> Unit,
+    onClickUserIcon: (String) -> Unit,
 ) {
+    val sharedSuffixKey = rememberContainerTransformToken("location-user:$id")
+        ?: LocalSharedSuffixKey.current
     Column(
         modifier = Modifier.width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable(onClick = onClickUserIcon).animateItem(),
+            .clickable { onClickUserIcon(sharedSuffixKey) }.animateItem(),
         verticalArrangement = Arrangement.Center
     ) {
         Box {
             UserStateIcon(
-                modifier = Modifier.sharedBoundsBy("${id}UserIcon").fillMaxWidth(),
+                modifier = Modifier.sharedBoundsBy(
+                    key = "${id}UserIcon",
+                    suffixKey = sharedSuffixKey,
+                ).fillMaxWidth(),
                 iconUrl = iconUrl,
                 userStatus = userStatus,
                 location = location
@@ -198,6 +202,7 @@ fun LazyItemScope.LocationFriend(
         Text(
             modifier = Modifier.sharedBoundsBy(
                 key = "${id}UserName",
+                suffixKey = sharedSuffixKey,
                 resizeMode = SharedTextBoundsResizeMode,
                 boundsTransform = TextBoundsTransform,
                 clipInOverlayDuringTransition = NoClip,
@@ -220,12 +225,15 @@ fun UserInfoRow(
     iconSize: Dp = 24.dp,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
     user: IUser?,
+    sharedUserId: String? = user?.id,
+    sharedSuffixKey: String? = null,
     pronouns: String? = null,
 ) {
     val userNameText = @Composable {
         Text(
             modifier = Modifier.sharedBoundsBy(
-                key = "${user?.id}UserName",
+                key = "${sharedUserId}UserName",
+                suffixKey = sharedSuffixKey,
                 resizeMode = SharedTextBoundsResizeMode,
                 boundsTransform = TextBoundsTransform,
                 clipInOverlayDuringTransition = NoClip,
@@ -358,12 +366,14 @@ fun UserStatusRow(
     style: TextStyle = MaterialTheme.typography.labelLarge,
     user: IUser?,
     animatedVisibilityScope: AnimatedVisibilityScope? =  null,
+    sharedUserId: String? = user?.id,
+    sharedSuffixKey: String? = null,
 ) {
     val statusText = @Composable {
         Text(
             modifier = Modifier.enableIf(animatedVisibilityScope != null){
                 sharedBoundsBy(
-                    key = "${user?.id}UserStatusText",
+                    key = "${sharedUserId}UserStatusText",
                     sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                     animatedVisibilityScope = animatedVisibilityScope!!
                 )
@@ -378,8 +388,11 @@ fun UserStatusRow(
 
     Row(
         modifier = modifier.sharedBoundsBy(
-            key = "${user?.id}UserStatusRow",
+            key = "${sharedUserId}UserStatusRow",
+            suffixKey = sharedSuffixKey,
             resizeMode = SharedTextBoundsResizeMode,
+            boundsTransform = TextBoundsTransform,
+            clipInOverlayDuringTransition = NoClip,
         ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
@@ -391,7 +404,7 @@ fun UserStatusRow(
                 .size(iconSize)
                 .enableIf(animatedVisibilityScope != null){
                     sharedBoundsBy(
-                        key = "${user?.id}UserStatusIcon",
+                        key = "${sharedUserId}UserStatusIcon",
                         sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                         animatedVisibilityScope = animatedVisibilityScope!!
                     )

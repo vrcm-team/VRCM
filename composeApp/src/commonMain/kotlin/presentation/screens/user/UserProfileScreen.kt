@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
-import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -45,8 +44,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreen
-import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
-import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
@@ -61,6 +58,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.service.BoopResult
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -120,6 +118,9 @@ data class UserProfileScreen(
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
+        var openBoopDialog by remember { mutableStateOf(false) }
+        var boopSending by remember { mutableStateOf(false) }
+        val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
 
@@ -158,9 +159,10 @@ data class UserProfileScreen(
                 onMenu = { bottomSheetIsVisible = true },
                 outerScrollState = outerScrollState,
                 innerScrollState = innerScrollState,
-            ) { ratio, contentMinHeight ->
+            ) { _, contentMinHeight ->
                 ProfileContent(
                     currentUser = currentUser,
+                    sharedUserId = userProfileVO.id,
                     friendLocation = userProfileScreenModel.friendLocation,
                     userGroups = userGroups,
                     mutualGroups = mutualGroups,
@@ -174,7 +176,6 @@ data class UserProfileScreen(
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
                     onLoadAvatars = { userProfileScreenModel.loadCreatedAvatars() },
                     onLoadFavoritedWorlds = { userProfileScreenModel.loadFavoritedWorlds(userProfileVO.id) },
-                    ratio = ratio,
                 )
             }
         }
@@ -193,7 +194,9 @@ data class UserProfileScreen(
                 openAlertDialog = { openAlertDialog = true },
                 openEditProfileDialog = { openEditProfileDialog = true },
                 onManageFriendFavorite = { showFriendFavoriteSheet = true },
-                openEditNoteDialog = { openEditNoteDialog = true }
+                openEditNoteDialog = { openEditNoteDialog = true },
+                boopEnabled = userProfileScreenModel.isBoopAllowed,
+                openBoopDialog = { openBoopDialog = true },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -239,6 +242,29 @@ data class UserProfileScreen(
                 openEditNoteDialog = false
             }
         )
+        val boopSuccessMessage = strings.profileBoopSuccess
+        val boopCooldownMessage = strings.profileBoopAlreadySent
+        BoopSelectorDialog(
+            visible = openBoopDialog,
+            targetName = currentUser.displayName,
+            sending = boopSending,
+            onDismiss = { openBoopDialog = false },
+            onSend = { emojiId ->
+                if (!boopSending) {
+                    actionScope.launch {
+                        boopSending = true
+                        val result = userProfileScreenModel.boop(
+                            userId = currentUser.id,
+                            emojiId = emojiId,
+                            successMessage = boopSuccessMessage,
+                            cooldownMessage = boopCooldownMessage,
+                        )
+                        boopSending = false
+                        if (result == BoopResult.Sent) openBoopDialog = false
+                    }
+                }
+            },
+        )
     }
 
 }
@@ -253,6 +279,8 @@ private fun ColumnScope.SheetItems(
     openEditProfileDialog: () -> Unit,
     onManageFriendFavorite: () -> Unit,
     openEditNoteDialog: () -> Unit,
+    boopEnabled: Boolean,
+    openBoopDialog: () -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -299,13 +327,10 @@ private fun ColumnScope.SheetItems(
         })
 
         if (currentUser.isFriend) {
-            SheetButtonItem(text = localeStrings.profileBoop, onClick = {
+            SheetButtonItem(text = localeStrings.profileBoop, enabled = boopEnabled, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.boop(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileBoopSuccess,
-                    )
+                    openBoopDialog()
                 }
             })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
@@ -470,6 +495,7 @@ private fun JsonAlertDialog(
 @Composable
 private fun ColumnScope.ProfileContent(
     currentUser: UserProfileVo?,
+    sharedUserId: String,
     friendLocation: FriendLocation?,
     userGroups: List<LimitedUserGroup>,
     mutualGroups: List<LimitedUserGroup>,
@@ -483,7 +509,6 @@ private fun ColumnScope.ProfileContent(
     onLoadWorlds: () -> Unit,
     onLoadAvatars: () -> Unit,
     onLoadFavoritedWorlds: () -> Unit,
-    ratio: Float,
 ) {
     if (currentUser == null) return
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -500,7 +525,10 @@ private fun ColumnScope.ProfileContent(
         }
     }
 
-    UserProfileIdentity(userProfileVO = currentUser)
+    UserProfileIdentity(
+        userProfileVO = currentUser,
+        sharedUserId = sharedUserId,
+    )
 
     var isSelected by remember { mutableStateOf(false) }
     // LocationCard: show the room of this user and friends in the same room
@@ -508,13 +536,13 @@ private fun ColumnScope.ProfileContent(
         val navigator = currentNavigator
         val locationSharedSuffixKey = "UER:$sharedSuffixKey"
         // 创建临时的 WorldProfileVo
-        val onClickWorldImage = {
+        val onClickWorldImage = { transitionSuffixKey: String ->
             val homeInstanceVo = friendLocation.instants.value
             val tempWorldProfileVo = WorldProfileVo(homeInstanceVo)
             navigator push WorldProfileScreen(
                 worldProfileVO = tempWorldProfileVo,
                 location = friendLocation.location,
-                sharedSuffixKey = locationSharedSuffixKey
+                sharedSuffixKey = transitionSuffixKey
             )
         }
 
@@ -533,10 +561,10 @@ private fun ColumnScope.ProfileContent(
                     modifier = Modifier.fillMaxWidth(),
                     instanceId = loc.location,
                     friends = friends,
-                    onClickUserIcon = { user ->
+                    onClickUserIcon = { user, transitionSuffixKey ->
                         navigator replace UserProfileScreen(
                             userProfileVO = UserProfileVo(user),
-                            sharedSuffixKey = sharedSuffixKey
+                            sharedSuffixKey = transitionSuffixKey,
                         )
                     }
                 )
@@ -1369,8 +1397,12 @@ private fun UserFavoritedWorldsSection(
     }
 }
 
+
 @Composable
-private fun UserProfileIdentity(userProfileVO: UserProfileVo) {
+private fun UserProfileIdentity(
+    userProfileVO: UserProfileVo,
+    sharedUserId: String,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1379,11 +1411,13 @@ private fun UserProfileIdentity(userProfileVO: UserProfileVo) {
         UserInfoRow(
             user = userProfileVO,
             canCopy = true,
+            sharedUserId = sharedUserId,
             pronouns = userProfileVO.pronouns,
         )
         UserStatusRow(
             canCopy = true,
             user = userProfileVO,
+            sharedUserId = sharedUserId,
         )
         LangAndLinkRow(userProfileVO)
     }

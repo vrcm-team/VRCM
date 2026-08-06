@@ -21,6 +21,7 @@ import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -45,6 +46,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.ParentClip
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalPaneSharedTransitionsEnabled
 import io.github.vrcmteam.vrcm.presentation.navigation.adaptivePaneMetadata
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppListDetailSceneStrategy
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -126,8 +128,11 @@ fun SharedTransitionScreen(
                     metadata = mapOf(AppRouteMetadataKey to route) +
                         route.adaptivePaneMetadata { EmptyDetailPane() },
                 ) { screen ->
+                    val sharedTransitionScope = this@SharedTransitionLayout.takeIf {
+                        LocalPaneSharedTransitionsEnabled.current
+                    }
                     CompositionLocalProvider(
-                        LocalSharedTransitionScreenScope provides this@SharedTransitionLayout,
+                        LocalSharedTransitionScreenScope provides sharedTransitionScope,
                         LocalAnimatedVisibilityScope provides LocalNavAnimatedContentScope.current,
                     ) {
                         content(screen)
@@ -180,8 +185,8 @@ private fun EmptyDetailPane() {
 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
-val LocalSharedTransitionScreenScope: ProvidableCompositionLocal<SharedTransitionScope> =
-    staticCompositionLocalOf { error("SharedTransitionScope is not provided") }
+val LocalSharedTransitionScreenScope: ProvidableCompositionLocal<SharedTransitionScope?> =
+    compositionLocalOf { null }
 
 /**
  * 用于区分多个同级页面共享元素错位问题:比如两个Page中key相同的元素会在滑动时错位
@@ -204,29 +209,132 @@ internal fun sharedContentKey(key: String, suffixKey: String, useSuffixKey: Bool
 
 internal fun groupNameSharedKey(groupId: String): String = "${groupId}GroupName"
 
+/** 标记可用于 Compose 共享元素配对的类型化 key。 */
+interface SharedElementKey
+
+private data class StringSharedElementKey(val value: String) : SharedElementKey
+
+/** 使用导航时生成的唯一 [token] 配对容器变换的源与目标。 */
+data class ContainerTransformKey(val token: String) : SharedElementKey
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedBoundsReveal(
+    sharedElementKey: SharedElementKey,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current
+        ?: error("SharedTransitionScope is not provided"),
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    boundsTransform: BoundsTransform = DefaultBoundsTransform,
+    resizeMode: ResizeMode = ResizeMode.RemeasureToBounds,
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
+    renderInOverlayDuringTransition: Boolean = true,
+    zIndexInOverlay: Float = 0f,
+): Modifier = sharedBoundsWithDefaults(
+    sharedElementKey = sharedElementKey,
+    sharedTransitionScope = sharedTransitionScope,
+    animatedVisibilityScope = animatedVisibilityScope,
+    boundsTransform = boundsTransform,
+    resizeMode = resizeMode,
+    clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+    renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+    zIndexInOverlay = zIndexInOverlay,
+)
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedBoundsWithDefaults(
+    sharedElementKey: SharedElementKey,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current
+        ?: error("SharedTransitionScope is not provided"),
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    boundsTransform: BoundsTransform = DefaultBoundsTransform,
+    resizeMode: ResizeMode = ResizeMode.RemeasureToBounds,
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
+    renderInOverlayDuringTransition: Boolean = true,
+    zIndexInOverlay: Float = 0f,
+): Modifier = with(sharedTransitionScope) {
+    this@sharedBoundsWithDefaults.sharedBounds(
+        sharedContentState = rememberSharedContentState(sharedElementKey),
+        animatedVisibilityScope = animatedVisibilityScope,
+        boundsTransform = boundsTransform,
+        resizeMode = resizeMode,
+        clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+        renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+        zIndexInOverlay = zIndexInOverlay,
+    )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedElementReveal(
+    sharedElementKey: SharedElementKey,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current
+        ?: error("SharedTransitionScope is not provided"),
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    boundsTransform: BoundsTransform = DefaultBoundsTransform,
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
+    renderInOverlayDuringTransition: Boolean = true,
+    zIndexInOverlay: Float = 0f,
+): Modifier = sharedElementWithDefaults(
+    sharedElementKey = sharedElementKey,
+    sharedTransitionScope = sharedTransitionScope,
+    animatedVisibilityScope = animatedVisibilityScope,
+    boundsTransform = boundsTransform,
+    clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+    renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+    zIndexInOverlay = zIndexInOverlay,
+)
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedElementWithDefaults(
+    sharedElementKey: SharedElementKey,
+    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current
+        ?: error("SharedTransitionScope is not provided"),
+    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    boundsTransform: BoundsTransform = DefaultBoundsTransform,
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
+    renderInOverlayDuringTransition: Boolean = true,
+    zIndexInOverlay: Float = 0f,
+): Modifier = with(sharedTransitionScope) {
+    this@sharedElementWithDefaults.sharedElement(
+        sharedContentState = rememberSharedContentState(sharedElementKey),
+        animatedVisibilityScope = animatedVisibilityScope,
+        boundsTransform = boundsTransform,
+        clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+        renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+        zIndexInOverlay = zIndexInOverlay,
+    )
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun Modifier.sharedElementBy(
     key: String,
     useSuffixKey: Boolean = true,
-    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current,
-    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    suffixKey: String? = null,
+    sharedTransitionScope: SharedTransitionScope? = LocalSharedTransitionScreenScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
-): Modifier =
-    with(sharedTransitionScope) {
-        val suffixKey = LocalSharedSuffixKey.current
-        this@sharedElementBy.sharedElement(
-            sharedContentState = rememberSharedContentState(sharedContentKey(key, suffixKey, useSuffixKey)),
-            animatedVisibilityScope = animatedVisibilityScope,
-            boundsTransform = boundsTransform,
-            renderInOverlayDuringTransition = renderInOverlayDuringTransition,
-            zIndexInOverlay = zIndexInOverlay,
-            clipInOverlayDuringTransition = clipInOverlayDuringTransition
-        )
-    }
+): Modifier {
+    val transitionScope = sharedTransitionScope ?: return this
+    val resolvedSuffixKey = suffixKey ?: LocalSharedSuffixKey.current
+    val visibilityScope = animatedVisibilityScope ?: LocalAnimatedVisibilityScope.current
+    return sharedElementWithDefaults(
+        sharedElementKey = StringSharedElementKey(
+            sharedContentKey(key, resolvedSuffixKey, useSuffixKey),
+        ),
+        sharedTransitionScope = transitionScope,
+        animatedVisibilityScope = visibilityScope,
+        boundsTransform = boundsTransform,
+        renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+        zIndexInOverlay = zIndexInOverlay,
+        clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+    )
+}
 
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -234,23 +342,55 @@ fun Modifier.sharedElementBy(
 fun Modifier.sharedBoundsBy(
     key: String,
     useSuffixKey: Boolean = true,
-    sharedTransitionScope: SharedTransitionScope = LocalSharedTransitionScreenScope.current,
-    animatedVisibilityScope: AnimatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+    suffixKey: String? = null,
+    sharedTransitionScope: SharedTransitionScope? = LocalSharedTransitionScreenScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     resizeMode: ResizeMode = ResizeMode.RemeasureToBounds,
     boundsTransform: BoundsTransform = DefaultBoundsTransform,
     renderInOverlayDuringTransition: Boolean = true,
     zIndexInOverlay: Float = 0f,
     clipInOverlayDuringTransition: OverlayClip = ParentClip,
-): Modifier =
-    with(sharedTransitionScope) {
-        val suffixKey = LocalSharedSuffixKey.current
-        this@sharedBoundsBy.sharedBounds(
-            sharedContentState = rememberSharedContentState(sharedContentKey(key, suffixKey, useSuffixKey)),
-            animatedVisibilityScope = animatedVisibilityScope,
-            resizeMode = resizeMode,
-            boundsTransform = boundsTransform,
-            renderInOverlayDuringTransition = renderInOverlayDuringTransition,
-            zIndexInOverlay = zIndexInOverlay,
-            clipInOverlayDuringTransition = clipInOverlayDuringTransition
-        )
-    }
+): Modifier {
+    val transitionScope = sharedTransitionScope ?: return this
+    val resolvedSuffixKey = suffixKey ?: LocalSharedSuffixKey.current
+    val visibilityScope = animatedVisibilityScope ?: LocalAnimatedVisibilityScope.current
+    return sharedBoundsWithDefaults(
+        sharedElementKey = StringSharedElementKey(
+            sharedContentKey(key, resolvedSuffixKey, useSuffixKey),
+        ),
+        sharedTransitionScope = transitionScope,
+        animatedVisibilityScope = visibilityScope,
+        resizeMode = resizeMode,
+        boundsTransform = boundsTransform,
+        renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+        zIndexInOverlay = zIndexInOverlay,
+        clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+    )
+}
+
+/**
+ * 将当前容器登记为 [token] 对应的共享边界；没有共享过渡作用域时保持原 Modifier 不变。
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedContainerTransform(
+    token: String,
+    sharedTransitionScope: SharedTransitionScope? = LocalSharedTransitionScreenScope.current,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    boundsTransform: BoundsTransform = DefaultBoundsTransform,
+    resizeMode: ResizeMode = ResizeMode.RemeasureToBounds,
+    clipInOverlayDuringTransition: OverlayClip = ParentClip,
+    renderInOverlayDuringTransition: Boolean = true,
+): Modifier {
+    val transitionScope = sharedTransitionScope ?: return this
+    val visibilityScope = animatedVisibilityScope ?: LocalAnimatedVisibilityScope.current
+    return sharedBoundsReveal(
+        sharedElementKey = ContainerTransformKey(token),
+        sharedTransitionScope = transitionScope,
+        animatedVisibilityScope = visibilityScope,
+        boundsTransform = boundsTransform,
+        resizeMode = resizeMode,
+        clipInOverlayDuringTransition = clipInOverlayDuringTransition,
+        renderInOverlayDuringTransition = renderInOverlayDuringTransition,
+    )
+}

@@ -25,6 +25,8 @@ import org.jetbrains.compose.resources.vectorResource
 import vrcm.composeapp.generated.resources.Res
 import vrcm.composeapp.generated.resources.logo
 
+internal const val AuthHomeSharedSuffixKey = "auth-home"
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AuthFold(
@@ -81,6 +83,7 @@ fun AuthFold(
                 .enableIf(enabledIconAnime) {
                     sharedBoundsBy(
                         key = "${authUIState.userId}UserIcon",
+                        suffixKey = AuthHomeSharedSuffixKey,
                         boundsTransform = IconBoundsTransform
                     )
                 }

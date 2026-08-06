@@ -17,9 +17,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
@@ -86,7 +88,7 @@ object NotificationDialog : SharedDialog {
                         modifier = Modifier.fillMaxWidth().padding(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        items(notificationItemDataList) { item ->
+                        items(notificationItemDataList, key = { it.id }) { item ->
                             NotificationItem(item, onResponseNotification)
                         }
                     }
@@ -107,6 +109,9 @@ private fun LazyItemScope.NotificationItem(
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
     val senderId = item.senderId.orEmpty()
     val linkedUserId = item.linkedUserId.orEmpty()
+    val sharedSuffixKey = rememberContainerTransformToken(
+        "notification:${item.id}:user:$senderId",
+    ) ?: LocalSharedSuffixKey.current
     val contentText = if (isFriendRequest) "${item.message} ${strings.notificationFriendRequest}" else item.message
     val navigator = LocalNavigator.currentOrThrow
     Box(
@@ -130,9 +135,13 @@ private fun LazyItemScope.NotificationItem(
                                     userProfileVO = UserProfileVo(
                                         id = senderId,
                                         profileImageUrl = item.imageUrl
-                                    )
+                                    ),
+                                    sharedSuffixKey = sharedSuffixKey,
                                 )
-                            }.sharedBoundsBy("${senderId}UserIcon")
+                            }.sharedBoundsBy(
+                                key = "${senderId}UserIcon",
+                                suffixKey = sharedSuffixKey,
+                            )
                         }
                         .size(120.dp, 80.dp)
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.medium)
@@ -192,7 +201,8 @@ private fun LazyItemScope.NotificationItem(
                                     userProfileVO = UserProfileVo(
                                         id = linkedUserId,
                                         profileImageUrl = item.imageUrl
-                                    )
+                                    ),
+                                    sharedSuffixKey = sharedSuffixKey,
                                 )
                             } else {
                                 respondedAction = action

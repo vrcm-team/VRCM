@@ -144,8 +144,11 @@ data class MutualFriendsScreen(
 
                     MutualFriendsContentState.Content -> {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            renderUserItems(visibleMutualFriends) {
-                                navigator push UserProfileScreen(UserProfileVo(it))
+                            renderUserItems(visibleMutualFriends) { user, sharedSuffixKey ->
+                                navigator push UserProfileScreen(
+                                    userProfileVO = UserProfileVo(user),
+                                    sharedSuffixKey = sharedSuffixKey,
+                                )
                             }
                         }
                     }

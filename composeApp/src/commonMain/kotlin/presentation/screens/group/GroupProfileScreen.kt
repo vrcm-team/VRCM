@@ -56,6 +56,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -145,7 +146,7 @@ class GroupProfileScreen(
 
         val group = groupState ?: groupProfileVo
         val scrollState = rememberScrollState()
-        var selectedTabIndex by remember { mutableStateOf(0) }
+        var selectedTabIndex by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(0) }
 
         LaunchedEffect(scrollState, selectedTabIndex) {
             snapshotFlow { scrollState.value to scrollState.maxValue }.collect { (value, maxValue) ->
@@ -817,9 +818,10 @@ private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = fals
     ) {
         renderUserItems(
             users = users,
-            onUserClick = { user ->
+            onUserClick = { user, sharedSuffixKey ->
                 currentNavigator push UserProfileScreen(
-                    userProfileVO = UserProfileVo(user)
+                    userProfileVO = UserProfileVo(user),
+                    sharedSuffixKey = sharedSuffixKey,
                 )
             }
         )

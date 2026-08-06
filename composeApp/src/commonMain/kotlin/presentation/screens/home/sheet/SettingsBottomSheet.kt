@@ -251,9 +251,12 @@ private fun AboutBlock() {
 @Composable
 private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
     val authService = koinInject<AuthService>()
-    val logoutCall = {
-            onDismissRequest()
-            authService.logout()
+    val scope = rememberCoroutineScope()
+    val logoutCall: () -> Unit = {
+            scope.launch {
+                authService.logout()
+                onDismissRequest()
+            }
         }
     Row(
         modifier = Modifier.fillMaxWidth(),

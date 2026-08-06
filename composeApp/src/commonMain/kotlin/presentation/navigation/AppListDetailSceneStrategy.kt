@@ -37,8 +37,10 @@ import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.calculateThreePaneScaffoldValue
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntRect
 import androidx.navigation3.runtime.NavEntry
@@ -54,6 +56,8 @@ import io.github.vrcmteam.vrcm.presentation.animations.defaultSpring
 private val PaneBoundsAnimationSpec = defaultSpring(
     visibilityThreshold = IntRect(1, 1, 1, 1),
 )
+
+internal val LocalPaneSharedTransitionsEnabled = staticCompositionLocalOf { true }
 
 @ExperimentalMaterial3AdaptiveApi
 @Composable
@@ -331,7 +335,11 @@ private class AppListDetailScene<T : Any>(
                         modifier = Modifier.preferredWidth(0.4f),
                         boundsAnimationSpec = PaneBoundsAnimationSpec,
                     ) {
-                        entry.Content()
+                        CompositionLocalProvider(
+                            LocalPaneSharedTransitionsEnabled provides false,
+                        ) {
+                            entry.Content()
+                        }
                     }
                 }
             } ?: {},
@@ -339,10 +347,14 @@ private class AppListDetailScene<T : Any>(
                 AnimatedPane(
                     boundsAnimationSpec = PaneBoundsAnimationSpec,
                 ) {
-                    if (lastDetail != null) {
-                        lastDetail.Content()
-                    } else {
-                        detailPlaceholder()
+                    CompositionLocalProvider(
+                        LocalPaneSharedTransitionsEnabled provides false,
+                    ) {
+                        if (lastDetail != null) {
+                            lastDetail.Content()
+                        } else {
+                            detailPlaceholder()
+                        }
                     }
                 }
             },

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import org.koin.compose.viewmodel.koinViewModel
@@ -67,7 +68,6 @@ object HomeScreen : AppListRoute {
         val homeScreenModel: HomeScreenModel = koinViewModel()
 
         LaunchedEffect(Unit) {
-            homeScreenModel.init()
             // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
                 // 为了切换头像的共享元素动画
@@ -137,7 +137,10 @@ private inline fun AppListRoute.HomeTopAppBar(
     val hasNotifications by remember { derivedStateOf { (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications).isNotEmpty() } }
     // to ProfileScreen
     val currentNavigator = currentNavigator
-    val sharedSuffixKey = LocalSharedSuffixKey.current
+    val homeUserId = homeScreenModel.userId
+    val sharedSuffixKey = rememberContainerTransformToken(
+        "home-user:$homeUserId",
+    ) ?: LocalSharedSuffixKey.current
     var currentDialog by LocationDialogContent.current
     val onClickUserIcon = { user: IUser ->
         currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
@@ -151,11 +154,6 @@ private inline fun AppListRoute.HomeTopAppBar(
         }
     }
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    // 初始化刷新一次
-    LaunchedEffect(Unit) {
-        homeScreenModel.refreshAllNotification()
-    }
-
     val modifier = if (hazeState != null) {
         Modifier.hazeEffect(
             state = hazeState,
@@ -182,15 +180,31 @@ private inline fun AppListRoute.HomeTopAppBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                UserStateIcon(
-                    modifier = Modifier.simpleClickable { currentUser?.let { onClickUserIcon(it) } }
+                Box(
+                    modifier = Modifier
+                        .simpleClickable { currentUser?.let { onClickUserIcon(it) } }
                         .sharedBoundsBy(
-                            key = "${currentUser?.id ?: homeScreenModel.userId}UserIcon",
-                            boundsTransform = if (currentUser != null) DefaultBoundsTransform else IconBoundsTransform
+                            key = "${homeUserId}UserIcon",
+                            suffixKey = AuthHomeSharedSuffixKey,
+                            boundsTransform = IconBoundsTransform,
                         )
                         .size(54.dp),
-                    iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl
-                )
+                ) {
+                    UserStateIcon(
+                        modifier = Modifier
+                            .sharedBoundsBy(
+                                key = "${homeUserId}UserIcon",
+                                suffixKey = sharedSuffixKey,
+                                boundsTransform = if (currentUser != null) {
+                                    DefaultBoundsTransform
+                                } else {
+                                    IconBoundsTransform
+                                },
+                            )
+                            .fillMaxSize(),
+                        iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl,
+                    )
+                }
                 Column(
                     modifier = Modifier.widthIn(max = 220.dp)
                         .simpleClickable { currentUser?.let { onClickShowStatusDialog(currentUser) } },
@@ -200,22 +214,24 @@ private inline fun AppListRoute.HomeTopAppBar(
                         iconSize = 16.dp,
                         style = MaterialTheme.typography.titleMedium,
                         user = currentUser,
+                        sharedUserId = homeUserId,
+                        sharedSuffixKey = sharedSuffixKey,
+                        pronouns = currentUser?.pronouns
                     )
                     AnimatedVisibility(statusVisibility){
                         UserStatusRow(
                             iconSize = 8.dp,
                             style = MaterialTheme.typography.labelMedium,
                             user = currentUser,
-                            animatedVisibilityScope = this
+                            animatedVisibilityScope = this,
+                            sharedUserId = homeUserId,
+                            sharedSuffixKey = sharedSuffixKey,
                         )
                     }
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            NotificationActionButton(
-                hasNotifications,
-                homeScreenModel::refreshAllNotification
-            )
+            NotificationActionButton(hasNotifications)
             SettingsActionButton()
         }
     }
@@ -377,12 +393,8 @@ fun SettingsActionButton(
 @Composable
 fun NotificationActionButton(
     hasNotifications: Boolean,
-    refreshNotification: () -> Unit,
 ) {
     val (_, onClickNotification) = LocationDialogContent.current
-    LaunchedEffect(Unit) {
-        refreshNotification()
-    }
     IconButton(
         onClick = { onClickNotification(NotificationDialog) },
         colors = IconButtonDefaults.iconButtonColors(

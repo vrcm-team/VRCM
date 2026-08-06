@@ -54,9 +54,6 @@ fun StandardSearchList(
     worldList: List<WorldData> = emptyList(),
     avatarList: List<AvatarData> = emptyList(),
     groupList: List<LimitedGroup> = emptyList(),
-    // 目前群组功能可能还没实现，所以这里暂时留空
-    modelContentBuilder: (LazyListScope.() -> Unit)? = null,
-    groupContentBuilder: (LazyListScope.() -> Unit)? = null,
     // 是否显示群组标签（替换模型标签）
     includeGroups: Boolean = false,
     onLoadMore: (() -> Unit)? = null,
@@ -73,10 +70,9 @@ fun StandardSearchList(
     }
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
-    val sharedSuffixKey = LocalSharedSuffixKey.current
     val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
-    val onUserClick: (IUser) -> Unit = { user ->
+    val onUserClick: (IUser, String) -> Unit = { user, sharedSuffixKey ->
         // 处理用户点击，导航到用户资料页面
         coroutineScope.launch {
             currentNavigator push UserProfileScreen(
@@ -86,7 +82,7 @@ fun StandardSearchList(
         }
     }
     val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
-    val onWorldClick: (WorldData) -> Unit = { world: WorldData ->
+    val onWorldClick: (WorldData, String) -> Unit = { world, sharedSuffixKey ->
         if (world.isHiddenWorld()) {
             coroutineScope.launch {
                 SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
@@ -101,7 +97,7 @@ fun StandardSearchList(
             }
         }
     }
-    val onAvatarClick: (AvatarData) -> Unit = { avatar ->
+    val onAvatarClick: (AvatarData, String) -> Unit = { avatar, sharedSuffixKey ->
         // 处理模型点击，导航到模型详情页面
         if (avatar.releaseStatus == "hidden") {
             coroutineScope.launch {
@@ -116,7 +112,7 @@ fun StandardSearchList(
             }
         }
     }
-    val onGroupClick: (LimitedGroup) -> Unit = { group ->
+    val onGroupClick: (LimitedGroup, String) -> Unit = { group, sharedSuffixKey ->
         // 处理群组点击，导航到群组详情页面
         coroutineScope.launch {
             currentNavigator push GroupProfileScreen(

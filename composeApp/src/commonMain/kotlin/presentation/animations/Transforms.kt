@@ -26,15 +26,14 @@ val DefaultScreenTransition = (fadeIn(animationSpec = tween(220, delayMillis = 9
         scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
     .togetherWith(fadeOut(animationSpec = tween(90)))
 
-private const val BoundsAnimationDurationMillis = 500
+private const val BoundsAnimationDurationMillis = 300
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalAnimationSpecApi::class)
-val TextBoundsTransform = BoundsTransform { initialBounds, targetBounds ->
-    keyframes {
-        durationMillis = BoundsAnimationDurationMillis
-        initialBounds at 0 using ArcMode.ArcBelow using FastOutSlowInEasing
-        targetBounds at BoundsAnimationDurationMillis
-    }
+@OptIn(ExperimentalSharedTransitionApi::class)
+val TextBoundsTransform = BoundsTransform { _, _ ->
+    tween(
+        durationMillis = BoundsAnimationDurationMillis,
+        easing = FastOutSlowInEasing,
+    )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

@@ -38,6 +38,8 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
+import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.BoopService
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
@@ -192,6 +194,7 @@ class UserProfileScreenModel(
     private val userProfileCacheDao: UserProfileCacheDao,
     private val friendLocationPagerModel: FriendLocationPagerModel,
     friendActivityService: FriendActivityService,
+    private val boopService: BoopService,
 ) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
@@ -215,6 +218,9 @@ class UserProfileScreenModel(
 
     private val _friendActivityEvents = mutableStateOf<List<FriendActivityEvent>>(emptyList())
     val friendActivityEvents by _friendActivityEvents
+
+    private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
+    val isBoopAllowed by _isBoopAllowed
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -251,6 +257,11 @@ class UserProfileScreenModel(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            authService.currentUserState.collect { currentUser ->
+                _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
+            }
+        }
         viewModelScope.launch {
             friendActivityService.observeSummary(userProfileVO.id).collect {
                 _friendActivitySummary.value = it
@@ -623,16 +634,20 @@ class UserProfileScreenModel(
         }
     }
 
-    fun boop(userId: String, successMessage: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                usersApi.boop(userId)
-            }.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure {
-                handleError(it)
-            }
+    suspend fun boop(
+        userId: String,
+        emojiId: String?,
+        successMessage: String,
+        cooldownMessage: String,
+    ): BoopResult = when (val result = boopService.send(userId, emojiId)) {
+        BoopResult.Sent -> result.also {
+            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
         }
+        BoopResult.Cooldown -> result.also {
+            SharedFlowCentre.toastText.emit(ToastText.Info(cooldownMessage))
+        }
+        is BoopResult.Failed -> result.also { handleError(it.error) }
+        BoopResult.InFlight, BoopResult.SessionChanged -> result
     }
 
     fun inviteToMyInstance(

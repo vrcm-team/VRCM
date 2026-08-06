@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -34,7 +35,7 @@ fun LocationCard(
     modifier: Modifier = Modifier,
     location: FriendLocation,
     isSelected: Boolean,
-    onClickWorldImage: () -> Unit,
+    onClickWorldImage: (String) -> Unit,
     onClickLocationCard: () -> Unit,
     travelingIds: Set<String> = emptySet(),
     isCurrentUserLocation: Boolean = false,
@@ -42,6 +43,9 @@ fun LocationCard(
 ) {
     val instants by location.instants
     val friendList = location.friendList
+    val sharedSuffixKey = rememberContainerTransformToken(
+        "location:${location.location}:${instants.worldId}",
+    ) ?: LocalSharedSuffixKey.current
     Surface(
         modifier = modifier
             .fillMaxWidth(),
@@ -65,6 +69,7 @@ fun LocationCard(
                     modifier = Modifier
                         .sharedElementBy(
                             key = location.location + "WorldImage",
+                            suffixKey = sharedSuffixKey,
                         )
                         .weight(0.5f)
                         .clip(
@@ -76,7 +81,7 @@ fun LocationCard(
                             )
                         )
                         .enableIf(instants.worldId.isNotEmpty()) {
-                            clickable(onClick = onClickWorldImage)
+                            clickable { onClickWorldImage(sharedSuffixKey) }
                         },
                     imageData = instants.worldImageUrl,
                     contentDescription = "WorldImage"
@@ -265,4 +270,3 @@ private inline fun MemberInfoRow(
         )
     }
 }
-

@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.service
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
@@ -9,22 +10,30 @@ import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
-import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
+import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
-import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
+import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal data class SessionBoundResponse<T>(
+    val result: Result<T>,
+    val sessionToken: AccountSessionToken,
+)
 
 /**
  * 负责辅助登录验证的类
@@ -38,6 +47,7 @@ class AuthService(
     private val accountCacheManager: AccountCacheManager,
 ) {
     private var scope = CoroutineScope(Job())
+    private val authMutex = Mutex()
 
     private var currentUser: CurrentUserData? = null
     private var socketPresence: Presence? = null
@@ -67,7 +77,11 @@ class AuthService(
 
     fun accountDtoOrNull(): AccountDto? = accountDao.currentAccountDtoOrNull()
 
-    suspend fun restoreAuth(): AuthState? {
+    suspend fun restoreAuth(): AuthState? = authMutex.withLock {
+        restoreAuthLocked()
+    }
+
+    private suspend fun restoreAuthLocked(): AuthState? {
         val account = accountDao.currentAccountDtoOrNull() ?: return null
         // No auth cookie means the user explicitly logged out (or has never logged in).
         // In that state we must not silently recreate a session from the saved password.
@@ -85,7 +99,7 @@ class AuthService(
                 clearAuthCookie(account.userId)
                 val password = account.password
                     ?: return AuthState.Unauthorized(response.bodyAsText())
-                login(account.username, password)
+                loginLocked(account.username, password)
             }
 
             else -> response.checkSuccess<CurrentUserData>().let { error("Unexpected response: $it") }
@@ -93,6 +107,8 @@ class AuthService(
     }
 
     private fun applyAuthCookie(username: String) {
+        cookiesStorage.removeCookie(AUTH_COOKIE)
+        cookiesStorage.removeCookie(TWO_FACTOR_AUTH_COOKIE)
         accountDao.accountDtoByUserName(username)
             ?.let {
                 cookiesStorage.addCookie(AUTH_COOKIE, it.authCookie)
@@ -203,7 +219,7 @@ class AuthService(
         password: String,
         verifyCode: String,
         authCardPage: AuthCardPage,
-    ): Result<Unit> {
+    ): Result<Unit> = authMutex.withLock {
         val authType = when (authCardPage) {
             AuthCardPage.EmailCode -> AuthType.Email
             AuthCardPage.TFACode -> AuthType.TFA
@@ -239,11 +255,36 @@ class AuthService(
         }
     }
 
-    suspend fun login(username: String, password: String): AuthState {
+    suspend fun login(username: String, password: String): AuthState = authMutex.withLock {
+        loginLocked(username, password)
+    }
+
+    private suspend fun loginLocked(username: String, password: String): AuthState {
+        val activeUserId = SharedFlowCentre.currentSession.value?.account?.userId
+        val targetUserId = accountDao.accountDtoByUserName(username)?.userId
+        val isAccountSwitch = activeUserId != null && activeUserId != targetUserId
         applyAuthCookie(username)
-        return authApi.login(username, password).also {
-            if (it is AuthState.Authed) emitAuthed(password)
+        return try {
+            authApi.login(username, password).also {
+                if (it is AuthState.Authed) {
+                    emitAuthed(password).getOrThrow()
+                } else {
+                    invalidateCurrentSessionLocked()
+                }
+            }
+        } catch (error: Throwable) {
+            if (isAccountSwitch) invalidateCurrentSessionLocked()
+            throw error
         }
+    }
+
+    private suspend fun invalidateCurrentSessionLocked() {
+        if (SharedFlowCentre.currentSession.value == null) return
+        currentUser = null
+        socketPresence = null
+        _currentUserState.value = null
+        currentAccountDto = accountDao.currentAccountDtoOrNull()
+        SharedFlowCentre.emitLogout()
     }
 
 
@@ -262,10 +303,58 @@ class AuthService(
         }
     }
 
-    suspend fun doReTryAuth(): Boolean {
+    suspend fun doReTryAuth(): Boolean = authMutex.withLock {
+        doReTryAuthLocked()
+    }
+
+    private suspend fun doReTryAuthLocked(expectedUserId: String? = null): Boolean {
         val accountInfo = accountDao.currentAccountDtoOrNull() ?: return false
+        if (expectedUserId != null && accountInfo.userId != expectedUserId) return false
         val password = accountInfo.password ?: return false
-        return login(accountInfo.username, password) is AuthState.Authed
+        return loginLocked(accountInfo.username, password) is AuthState.Authed
+    }
+
+    internal suspend fun <T> runSessionBoundCatching(
+        sessionToken: AccountSessionToken,
+        callback: suspend () -> T,
+    ): SessionBoundResponse<T>? = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
+
+        val first = runRequestCatching(callback)
+        val firstError = first.exceptionOrNull()
+        if (firstError !is VRCApiException ||
+            firstError.code != HttpStatusCode.Unauthorized.value
+        ) {
+            return@withLock SessionBoundResponse(first, sessionToken)
+        }
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
+        val reauthenticated = runRequestCatching {
+            doReTryAuthLocked(sessionToken.userId)
+        }
+        reauthenticated.exceptionOrNull()?.let { error ->
+            return@withLock SessionBoundResponse(Result.failure(error), sessionToken)
+        }
+        if (!reauthenticated.getOrThrow()) {
+            return@withLock SessionBoundResponse(first, sessionToken)
+        }
+
+        val refreshedSession = SharedFlowCentre.currentSession.value
+        if (refreshedSession?.account?.userId != sessionToken.userId ||
+            !SharedFlowCentre.isCurrentSession(refreshedSession.token)
+        ) {
+            return@withLock null
+        }
+        val retried = runRequestCatching(callback)
+        if (!SharedFlowCentre.isCurrentSession(refreshedSession.token)) return@withLock null
+        SessionBoundResponse(retried, refreshedSession.token)
+    }
+
+    private suspend fun <T> runRequestCatching(callback: suspend () -> T): Result<T> = try {
+        Result.success(callback())
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        Result.failure(error)
     }
 
     /**
@@ -279,7 +368,7 @@ class AuthService(
             runCatching { callback() }
         }
 
-    fun logout() {
+    suspend fun logout() = authMutex.withLock {
         val userId = SharedFlowCentre.currentSession.value?.account?.userId
             ?: currentUser?.id
             ?: accountDto().userId
@@ -288,13 +377,12 @@ class AuthService(
         socketPresence = null
         _currentUserState.value = null
         currentAccountDto = accountDao.currentAccountDtoOrNull()
-        scope.launch {
-            SharedFlowCentre.emitLogout()
-        }
+        SharedFlowCentre.emitLogout()
     }
 
     private fun clearAuthCookie(userId: String) {
         cookiesStorage.removeCookie(AUTH_COOKIE)
+        cookiesStorage.removeCookie(TWO_FACTOR_AUTH_COOKIE)
         if (userId.isNotEmpty()) accountDao.logout(userId)
     }
 

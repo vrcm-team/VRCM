@@ -25,10 +25,10 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
-import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
+import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.platformPackages
@@ -38,7 +38,7 @@ import io.github.vrcmteam.vrcm.service.platformPackages
  */
 fun LazyListScope.renderUserItems(
     users: List<IUser>,
-    onUserClick: (IUser) -> Unit
+    onUserClick: (IUser, String) -> Unit
 ) {
     items(users, key = { it.id }) { user ->
         renderUserItem(user, onUserClick)
@@ -52,15 +52,20 @@ fun LazyListScope.renderUserItems(
 @Composable
 fun LazyItemScope.renderUserItem(
     user: IUser,
-    onUserClick: (IUser) -> Unit
+    onUserClick: (IUser, String) -> Unit
 ) {
+    val sharedSuffixKey = rememberContainerTransformToken("user:${user.id}")
+        ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = user,
-        onClick = onUserClick,
+        onClick = { onUserClick(it, sharedSuffixKey) },
         modifier = Modifier.animateItem(),
         leadingContent = {
             UserStateIcon(
-                modifier = Modifier.sharedBoundsBy("${user.id}UserIcon"),
+                modifier = Modifier.sharedBoundsBy(
+                    key = "${user.id}UserIcon",
+                    suffixKey = sharedSuffixKey,
+                ),
                 iconUrl = user.iconUrl,
             )
         },
@@ -68,7 +73,9 @@ fun LazyItemScope.renderUserItem(
             UserInfoRow(
                 iconSize = 16.dp,
                 style = MaterialTheme.typography.titleMedium,
-                user = user
+                user = user,
+                sharedSuffixKey = sharedSuffixKey,
+                pronouns = user.pronouns,
             )
         },
         supportingContent = {
@@ -76,6 +83,7 @@ fun LazyItemScope.renderUserItem(
                 iconSize = 8.dp,
                 style = MaterialTheme.typography.bodyMedium,
                 user = user,
+                sharedSuffixKey = sharedSuffixKey,
             )
         },
         trailingContent = {
@@ -111,7 +119,7 @@ fun WorldData.hiddenWorldDisplayName(): String = favoriteId ?: name
  */
 fun LazyListScope.renderWorldItems(
     worlds: List<WorldData>,
-    onWorldClick: (WorldData) -> Unit
+    onWorldClick: (WorldData, String) -> Unit
 ) {
     items(worlds, key = { it.favoriteId ?: it.id }) { world ->
         renderWorldItem(world, onWorldClick)
@@ -125,16 +133,21 @@ fun LazyListScope.renderWorldItems(
 @Composable
 fun LazyItemScope.renderWorldItem(
     world: WorldData,
-    onWorldClick: (WorldData) -> Unit
+    onWorldClick: (WorldData, String) -> Unit
 ) {
+    val sharedSuffixKey = rememberContainerTransformToken("world:${world.favoriteId ?: world.id}")
+        ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = world,
-        onClick = onWorldClick,
+        onClick = { onWorldClick(it, sharedSuffixKey) },
         modifier = Modifier.animateItem(),
         leadingContent = {
             if (world.isHiddenWorld()) {
                 Box(
-                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                    modifier = Modifier.sharedBoundsBy(
+                        key = "${world.id}WorldImage",
+                        suffixKey = sharedSuffixKey,
+                    ).size(48.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -148,7 +161,10 @@ fun LazyItemScope.renderWorldItem(
                 }
             } else {
                 AImage(
-                    modifier = Modifier.sharedBoundsBy("${world.id}WorldImage").size(48.dp)
+                    modifier = Modifier.sharedBoundsBy(
+                        key = "${world.id}WorldImage",
+                        suffixKey = sharedSuffixKey,
+                    ).size(48.dp)
                         .clip(MaterialTheme.shapes.medium),
                     imageData = world.safeImageUrl(),
                 )
@@ -198,7 +214,7 @@ fun LazyItemScope.renderWorldItem(
  */
 fun LazyListScope.renderAvatarItems(
     avatars: List<AvatarData>,
-    onAvatarClick: (AvatarData) -> Unit
+    onAvatarClick: (AvatarData, String) -> Unit
 ) {
     items(avatars, key = { it.id }) { avatar ->
         renderAvatarItem(avatar, onAvatarClick)
@@ -212,16 +228,21 @@ fun LazyListScope.renderAvatarItems(
 @Composable
 fun LazyItemScope.renderAvatarItem(
     avatar: AvatarData,
-    onAvatarClick: (AvatarData) -> Unit
+    onAvatarClick: (AvatarData, String) -> Unit
 ) {
+    val sharedSuffixKey = rememberContainerTransformToken("avatar:${avatar.id}")
+        ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = avatar,
-        onClick = onAvatarClick,
+        onClick = { onAvatarClick(it, sharedSuffixKey) },
         modifier = Modifier.animateItem(),
         leadingContent = {
             if (avatar.releaseStatus == "hidden") {
                 Box(
-                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                    modifier = Modifier.sharedBoundsBy(
+                        key = "${avatar.id}AvatarImage",
+                        suffixKey = sharedSuffixKey,
+                    ).size(48.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
@@ -235,7 +256,10 @@ fun LazyItemScope.renderAvatarItem(
                 }
             } else {
                 AImage(
-                    modifier = Modifier.sharedBoundsBy("${avatar.id}AvatarImage").size(48.dp)
+                    modifier = Modifier.sharedBoundsBy(
+                        key = "${avatar.id}AvatarImage",
+                        suffixKey = sharedSuffixKey,
+                    ).size(48.dp)
                         .clip(MaterialTheme.shapes.medium),
                     imageData = avatar.thumbnailImageUrl,
                 )
@@ -293,7 +317,7 @@ fun LazyItemScope.renderAvatarItem(
  */
 fun LazyListScope.renderGroupItems(
     groups: List<LimitedGroup>,
-    onGroupClick: (LimitedGroup) -> Unit
+    onGroupClick: (LimitedGroup, String) -> Unit
 ) {
     items(groups, key = { it.id }) { group ->
         renderGroupItem(group, onGroupClick)
@@ -307,16 +331,21 @@ fun LazyListScope.renderGroupItems(
 @Composable
 fun LazyItemScope.renderGroupItem(
     group: LimitedGroup,
-    onGroupClick: (LimitedGroup) -> Unit
+    onGroupClick: (LimitedGroup, String) -> Unit
 ) {
+    val sharedSuffixKey = rememberContainerTransformToken("group:${group.id}")
+        ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = group,
-        onClick = onGroupClick,
+        onClick = { onGroupClick(it, sharedSuffixKey) },
         modifier = Modifier.animateItem(),
         leadingContent = {
             GroupIcon(
                 iconUrl = group.iconUrl,
-                modifier = Modifier.sharedBoundsBy("${group.id}GroupIcon"),
+                modifier = Modifier.sharedBoundsBy(
+                    key = "${group.id}GroupIcon",
+                    suffixKey = sharedSuffixKey,
+                ),
                 size = 48.dp
             )
         },
@@ -324,6 +353,7 @@ fun LazyItemScope.renderGroupItem(
             Text(
                 modifier = Modifier.sharedBoundsBy(
                     key = groupNameSharedKey(group.id),
+                    suffixKey = sharedSuffixKey,
                     resizeMode = SharedTextBoundsResizeMode,
                 ),
                 text = group.name,

@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.di.modules
 import io.github.vrcmteam.vrcm.service.*
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val serviceModule: Module = module {
@@ -11,5 +12,7 @@ val serviceModule: Module = module {
     singleOf(::FavoriteService)
     singleOf(::FriendService)
     singleOf(::FriendActivityService)
+    singleOf(::NetworkBoopRequest) bind BoopRequest::class
+    singleOf(::BoopService)
     singleOf(::WorldPlatformService)
 }

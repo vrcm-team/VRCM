@@ -101,8 +101,10 @@ class AuthScreenModel(
     }
 
     fun returnToLogin() {
-        authService.logout()
-        onCardStateChange(AuthCardPage.Login)
+        viewModelScope.launch {
+            authService.logout()
+            onCardStateChange(AuthCardPage.Login)
+        }
     }
 
     private suspend fun awaitAuth(): AuthState? = viewModelScope.async(Dispatchers.IO) {
