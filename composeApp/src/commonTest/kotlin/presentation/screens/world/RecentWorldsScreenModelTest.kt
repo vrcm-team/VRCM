@@ -15,12 +15,14 @@ import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -41,17 +43,19 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun repeatedInitialLoadKeepsExistingStateWithoutAnotherRequest() = runBlocking {
+    fun repeatedInitialLoadSilentlyRefreshesWhileKeepingCurrentContent() = runBlocking {
         var requestCount = 0
+        val releaseRefresh = CompletableDeferred<Unit>()
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler {
                     requestCount++
-                    respond(
-                        content = "[]",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
-                    )
+                    if (requestCount == 1) {
+                        worldResponse("wrld_old")
+                    } else {
+                        releaseRefresh.await()
+                        worldResponse("wrld_new")
+                    }
                 }
             }
             install(ContentNegotiation) {
@@ -62,13 +66,20 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
 
         try {
             model.loadRecentWorlds()
-            awaitUntil { !model.isLoading }
+            awaitUntil { !model.isLoading && model.worlds.singleOrNull()?.id == "wrld_old" }
             assertEquals(1, requestCount)
 
             model.loadRecentWorlds()
+            awaitUntil { requestCount == 2 }
 
             assertFalse(model.isLoading)
-            assertEquals(1, requestCount)
+            assertEquals("wrld_old", model.worlds.single().id)
+
+            releaseRefresh.complete(Unit)
+            awaitUntil { model.worlds.singleOrNull()?.id == "wrld_new" }
+
+            assertFalse(model.isLoading)
+            assertEquals(2, requestCount)
         } finally {
             client.close()
         }
@@ -93,6 +104,21 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
         }
     }
 }
+
+private fun MockRequestHandleScope.worldResponse(id: String) = respond(
+    content = """
+        [{
+          "authorId":"usr_author","authorName":"Author","capacity":16,"created_at":null,
+          "description":null,"favorites":0,"featured":false,"heat":0,"id":"$id",
+          "imageUrl":"","labsPublicationDate":"","name":"$id","namespace":null,
+          "organization":"","popularity":0,"publicationDate":"","recommendedCapacity":16,
+          "releaseStatus":"public","tags":[],"thumbnailImageUrl":null,"udonProducts":[],
+          "unityPackages":[],"updated_at":null,"version":1,"visits":0
+        }]
+    """.trimIndent(),
+    status = HttpStatusCode.OK,
+    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+)
 
 private suspend fun awaitUntil(predicate: () -> Boolean) {
     withTimeout(1_000) {

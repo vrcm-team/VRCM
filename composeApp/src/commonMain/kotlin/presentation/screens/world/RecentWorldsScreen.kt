@@ -59,12 +59,13 @@ class RecentWorldsScreenModel(
 
     private var pagingState = RecentWorldPagingState<WorldData>()
     private var initialLoadStarted = false
+    private var refreshInProgress = false
     val loadMoreFailed: Boolean get() = pagingState.failedOffset != null
 
     fun loadRecentWorlds() {
-        if (initialLoadStarted) return
+        val showLoading = !initialLoadStarted
         initialLoadStarted = true
-        loadPage(reset = true)
+        loadPage(reset = true, showLoading = showLoading)
     }
 
     fun loadMoreRecentWorlds() {
@@ -78,38 +79,47 @@ class RecentWorldsScreenModel(
         loadPage(reset = false)
     }
 
-    private fun loadPage(reset: Boolean) {
-        if (_isLoadingMore.value || (!reset && (_isLoading.value || _endReached.value))) return
+    private fun loadPage(reset: Boolean, showLoading: Boolean = false) {
+        if (refreshInProgress || _isLoadingMore.value ||
+            (!reset && (_isLoading.value || _endReached.value))
+        ) return
 
         if (reset) {
-            pagingState = RecentWorldPagingState()
-            _worlds.value = emptyList()
-            _endReached.value = false
-            _isLoading.value = true
+            refreshInProgress = true
+            if (showLoading) {
+                _worlds.value = emptyList()
+                _endReached.value = false
+                _isLoading.value = true
+            }
         } else {
             _isLoadingMore.value = true
         }
 
+        val pageOffset = if (reset) 0 else pagingState.nextOffset
         screenModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                worldsApi.getRecentWorlds(n = RECENT_WORLDS_PAGE_SIZE, offset = pagingState.nextOffset)
-            }.onSuccess { page ->
-                pagingState = appendRecentWorldPage(
-                    current = pagingState,
-                    page = page,
-                    pageSize = RECENT_WORLDS_PAGE_SIZE,
-                    keySelector = { it.id },
-                )
-                _worlds.value = pagingState.items
-                _endReached.value = pagingState.endReached
-            }.onFailure {
-                if (!reset) {
-                    pagingState = markRecentWorldPageFailed(pagingState)
+            try {
+                authService.reTryAuthCatching {
+                    worldsApi.getRecentWorlds(n = RECENT_WORLDS_PAGE_SIZE, offset = pageOffset)
+                }.onSuccess { page ->
+                    pagingState = appendRecentWorldPage(
+                        current = if (reset) RecentWorldPagingState() else pagingState,
+                        page = page,
+                        pageSize = RECENT_WORLDS_PAGE_SIZE,
+                        keySelector = { it.id },
+                    )
+                    _worlds.value = pagingState.items
+                    _endReached.value = pagingState.endReached
+                }.onFailure {
+                    if (!reset) {
+                        pagingState = markRecentWorldPageFailed(pagingState)
+                    }
+                    SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
                 }
-                SharedFlowCentre.toastText.emit(ToastText.Error(it.message.toString()))
+            } finally {
+                if (reset) refreshInProgress = false
+                _isLoading.value = false
+                _isLoadingMore.value = false
             }
-            _isLoading.value = false
-            _isLoadingMore.value = false
         }
     }
 
