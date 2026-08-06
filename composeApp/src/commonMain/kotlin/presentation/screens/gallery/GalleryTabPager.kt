@@ -335,9 +335,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     PrintPhotoImage(
                         painter = photoPainter,
                         contentDescription = print.id,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .printSafePhotoToBounds(),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }

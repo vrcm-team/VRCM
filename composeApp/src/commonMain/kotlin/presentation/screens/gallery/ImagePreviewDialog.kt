@@ -359,9 +359,7 @@ fun BoxScope.ZoomableImage(
                             PrintPhotoImage(
                                 imageUrl = imageUrl,
                                 contentDescription = id,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .printSafePhotoToBounds(),
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
@@ -430,7 +428,9 @@ internal fun PrintPhotoImage(
         Image(
             painter = painter,
             contentDescription = contentDescription,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .printSafePhotoToBounds(),
             alignment = Alignment.Center,
             contentScale = ContentScale.Fit,
         )
@@ -438,7 +438,10 @@ internal fun PrintPhotoImage(
             AsyncImagePainter.State.Empty,
             is AsyncImagePainter.State.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                    )
                 }
             }
 
