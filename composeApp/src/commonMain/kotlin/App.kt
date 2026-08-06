@@ -57,20 +57,28 @@ import org.koin.compose.koinInject
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun App(windowChrome: @Composable () -> Unit = {}) {
+fun App(
+    isConfigurationChange: () -> Boolean = { false },
+    windowChrome: @Composable () -> Unit = {},
+) {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
+    val lifecycleEventGate = remember { AppLifecycleEventGate() }
     KoinContext {
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
         koinInject<FriendActivityService>()
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-            friendLocationPagerModel.onBackground()
-            webSocketApi.onBackground()
+            if (lifecycleEventGate.onStop(isConfigurationChange())) {
+                friendLocationPagerModel.onBackground()
+                webSocketApi.onBackground()
+            }
         }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-            webSocketApi.onForeground()
-            friendLocationPagerModel.onForeground()
+            if (lifecycleEventGate.onResume()) {
+                webSocketApi.onForeground()
+                friendLocationPagerModel.onForeground()
+            }
         }
         SettingsProvider {
             Column(Modifier.fillMaxSize()) {
