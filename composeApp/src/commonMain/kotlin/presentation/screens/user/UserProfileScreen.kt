@@ -1370,19 +1370,6 @@ private fun UserFavoritedWorldsSection(
 }
 
 @Composable
-fun UserPronouns(pronouns: String) {
-    if (pronouns.isNotEmpty()) {
-        Text(
-            text = pronouns,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
 private fun UserProfileIdentity(userProfileVO: UserProfileVo) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1392,12 +1379,12 @@ private fun UserProfileIdentity(userProfileVO: UserProfileVo) {
         UserInfoRow(
             user = userProfileVO,
             canCopy = true,
+            pronouns = userProfileVO.pronouns,
         )
         UserStatusRow(
             canCopy = true,
             user = userProfileVO,
         )
-        UserPronouns(pronouns = userProfileVO.pronouns)
         LangAndLinkRow(userProfileVO)
     }
 }

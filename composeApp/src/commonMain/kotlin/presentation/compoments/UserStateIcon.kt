@@ -25,10 +25,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -217,6 +220,7 @@ fun UserInfoRow(
     iconSize: Dp = 24.dp,
     style: TextStyle = MaterialTheme.typography.headlineSmall,
     user: IUser?,
+    pronouns: String? = null,
 ) {
     val userNameText = @Composable {
         Text(
@@ -229,42 +233,116 @@ fun UserInfoRow(
             text = user?.displayName.orEmpty(),
             style = style,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.primary,
         )
     }
 
-    Row(
+    val hasPronouns = !pronouns.isNullOrBlank()
+    val isSupporter = user?.isSupporter == true
+    Layout(
         modifier = modifier.offset(x = (-4).dp),
-        horizontalArrangement = Arrangement.spacedBy(spacedBy),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            modifier = Modifier
-                .size(iconSize),
-            imageVector = AppIcons.Shield,
-            contentDescription = "TrustRankIcon",
-            tint = GameColor.Rank.fromValue(user?.trustRank)
-        )
-        if (canCopy) {
-            SelectionContainer {
+        content = {
+            Icon(
+                modifier = Modifier
+                    .size(iconSize),
+                imageVector = AppIcons.Shield,
+                contentDescription = "TrustRankIcon",
+                tint = GameColor.Rank.fromValue(user?.trustRank)
+            )
+            if (canCopy) {
+                SelectionContainer {
+                    userNameText()
+                }
+            } else {
                 userNameText()
             }
+            if (hasPronouns) {
+                Text(
+                    text = pronouns.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (isSupporter) {
+                Canvas(modifier = Modifier.size(iconSize * 0.8f)) {
+                    drawOval(
+                        color = GameColor.Supporter,
+                        topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
+                        size = Size(size.width * 0.2f, size.height * 0.8f)
+                    )
+                    drawOval(
+                        color = GameColor.Supporter,
+                        topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
+                        size = Size(size.width * 0.8f, size.height * 0.2f)
+                    )
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        var childIndex = 0
+        val trustRank = measurables[childIndex++].measure(childConstraints)
+        val userNameMeasurable = measurables[childIndex++]
+        val pronounsMeasurable = if (hasPronouns) measurables[childIndex++] else null
+        val supporter = if (isSupporter) {
+            measurables[childIndex].measure(childConstraints)
         } else {
-            userNameText()
+            null
         }
+        val spacing = spacedBy.roundToPx()
+        val fixedSpacingCount = 1 + if (supporter != null) 1 else 0
+        val fixedWidth = trustRank.width + (supporter?.width ?: 0) + spacing * fixedSpacingCount
 
-        if (user?.isSupporter == true) {
-            Canvas(modifier = Modifier.align(Alignment.Top).size(iconSize * 0.8f)) {
-                drawOval(
-                    color = GameColor.Supporter,
-                    topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
-                    size = Size(size.width * 0.2f, size.height * 0.8f)
-                )
-                drawOval(
-                    color = GameColor.Supporter,
-                    topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
-                    size = Size(size.width * 0.8f, size.height * 0.2f)
-                )
+        // 固定图标和用户名优先，代词仅使用剩余宽度。
+        val userNameMaxWidth = if (constraints.hasBoundedWidth) {
+            (constraints.maxWidth - fixedWidth).coerceAtLeast(0)
+        } else {
+            childConstraints.maxWidth
+        }
+        val userName = userNameMeasurable.measure(
+            childConstraints.copy(maxWidth = userNameMaxWidth),
+        )
+        val pronounsMaxWidth = if (constraints.hasBoundedWidth) {
+            (constraints.maxWidth - fixedWidth - userName.width - spacing).coerceAtLeast(0)
+        } else {
+            childConstraints.maxWidth
+        }
+        val pronounsText = pronounsMeasurable?.takeIf {
+            !constraints.hasBoundedWidth || pronounsMaxWidth > 0
+        }?.measure(
+            childConstraints.copy(maxWidth = pronounsMaxWidth),
+        )
+
+        val contentWidth = trustRank.width + spacing + userName.width +
+            (pronounsText?.let { spacing + it.width } ?: 0) +
+            (supporter?.let { spacing + it.width } ?: 0)
+        val contentHeight = maxOf(
+            trustRank.height,
+            userName.height,
+            pronounsText?.height ?: 0,
+            supporter?.height ?: 0,
+        )
+
+        layout(
+            width = constraints.constrainWidth(contentWidth),
+            height = constraints.constrainHeight(contentHeight),
+        ) {
+            var x = 0
+            trustRank.placeRelative(x, (contentHeight - trustRank.height) / 2)
+            x += trustRank.width + spacing
+            userName.placeRelative(x, (contentHeight - userName.height) / 2)
+            x += userName.width
+            pronounsText?.let {
+                x += spacing
+                it.placeRelative(x, (contentHeight - it.height) / 2)
+                x += it.width
+            }
+            supporter?.let {
+                x += spacing
+                it.placeRelative(x, 0)
             }
         }
     }
