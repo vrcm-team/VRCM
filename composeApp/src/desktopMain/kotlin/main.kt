@@ -54,12 +54,12 @@ fun main() = run {
                 window.minimumSize = Dimension(760, 560)
             }
 //            AppDesktopPreview()
-            App {
+            App(windowChrome = {
                 DesktopWindowTitleBar(
                     windowState = windowState,
                     onCloseRequest = ::exitApplication,
                 )
-            }
+            })
         }
     }
 }
