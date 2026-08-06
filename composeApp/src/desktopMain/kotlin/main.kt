@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,10 +25,12 @@ import androidx.compose.ui.window.rememberWindowState
 import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
+import io.github.vrcmteam.vrcm.presentation.compoments.DesktopWindowTitleBar
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.context.startKoin
 import vrcm.composeapp.generated.resources.Res
 import vrcm.composeapp.generated.resources.logo
+import java.awt.Dimension
 
 fun main() = run {
     startKoin {
@@ -36,18 +39,27 @@ fun main() = run {
     }
     application {
         val windowState = rememberWindowState(
-            width = 400.dp,
-            height = 800.dp,
+            width = 1100.dp,
+            height = 760.dp,
             position = WindowPosition.Aligned(Alignment.Center)
         )
         Window(
             state = windowState,
             onCloseRequest = ::exitApplication,
             title = APP_NAME,
-            icon = painterResource(Res.drawable.logo)
+            icon = painterResource(Res.drawable.logo),
+            undecorated = true,
         ) {
+            LaunchedEffect(window) {
+                window.minimumSize = Dimension(760, 560)
+            }
 //            AppDesktopPreview()
-            App()
+            App {
+                DesktopWindowTitleBar(
+                    windowState = windowState,
+                    onCloseRequest = ::exitApplication,
+                )
+            }
         }
     }
 }
@@ -106,5 +118,4 @@ fun ScaleOnScrollList() {
         }
     }
 }
-
 

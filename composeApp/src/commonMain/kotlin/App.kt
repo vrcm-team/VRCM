@@ -6,7 +6,9 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -54,41 +56,48 @@ import org.koin.compose.koinInject
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun App() {
+fun App(windowChrome: @Composable () -> Unit = {}) {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val windowWidthClass = appWindowWidthClass(maxWidth)
-        KoinContext {
-            val webSocketApi = koinInject<WebSocketApi>()
-            val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
-            LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-                friendLocationPagerModel.onBackground()
-                webSocketApi.onBackground()
-            }
-            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-                webSocketApi.onForeground()
-                friendLocationPagerModel.onForeground()
-            }
-            SettingsProvider {
-                CompositionLocalProvider(
-                    LocalBackNavigationPolicy provides backNavigationPolicy,
-                    LocalNavigator provides navigator,
-                    LocalAppWindowWidthClass provides windowWidthClass,
+    KoinContext {
+        val webSocketApi = koinInject<WebSocketApi>()
+        val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
+        LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+            friendLocationPagerModel.onBackground()
+            webSocketApi.onBackground()
+        }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            webSocketApi.onForeground()
+            friendLocationPagerModel.onForeground()
+        }
+        SettingsProvider {
+            Column(Modifier.fillMaxSize()) {
+                windowChrome()
+                BoxWithConstraints(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
                 ) {
-                    SnackBarToastBox(
-                        Modifier
-                            .systemBarsPadding()
-                            .padding(vertical = 76.dp, horizontal = 12.dp)
+                    val windowWidthClass = appWindowWidthClass(maxWidth)
+                    CompositionLocalProvider(
+                        LocalBackNavigationPolicy provides backNavigationPolicy,
+                        LocalNavigator provides navigator,
+                        LocalAppWindowWidthClass provides windowWidthClass,
                     ) {
-                        VersionDialog()
-                        SharedTransitionScreen(
-                            navigator = navigator,
-                            transitionSpec = { selectTransition(isPop = false) },
-                            popTransitionSpec = { selectTransition(isPop = true) },
-                        ) { screen ->
-                            SharedTransitionDialog(key = screen.key) {
-                                screen.Content()
+                        SnackBarToastBox(
+                            Modifier
+                                .systemBarsPadding()
+                                .padding(vertical = 76.dp, horizontal = 12.dp)
+                        ) {
+                            VersionDialog()
+                            SharedTransitionScreen(
+                                navigator = navigator,
+                                transitionSpec = { selectTransition(isPop = false) },
+                                popTransitionSpec = { selectTransition(isPop = true) },
+                            ) { screen ->
+                                SharedTransitionDialog(key = screen.key) {
+                                    screen.Content()
+                                }
                             }
                         }
                     }
