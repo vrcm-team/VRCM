@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LocationCard(
+    modifier: Modifier = Modifier,
     location: FriendLocation,
     isSelected: Boolean,
     onClickWorldImage: () -> Unit,
@@ -42,8 +43,7 @@ fun LocationCard(
     val instants by location.instants
     val friendList = location.friendList
     Surface(
-        modifier = Modifier
-            .padding(horizontal = 16.dp)
+        modifier = modifier
             .fillMaxWidth(),
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large

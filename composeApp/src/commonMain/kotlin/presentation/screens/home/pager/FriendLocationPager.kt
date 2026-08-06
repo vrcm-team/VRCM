@@ -151,6 +151,7 @@ fun Pager.FriendLocationPager(
 
                 items(instanceFriendLocations, key = { it.location }) { location ->
                     LocationCard(
+                        modifier = Modifier.padding(horizontal = 16.dp),
                         location = location,
                         isSelected = selectLocation == location.location,
                         onClickWorldImage = { onClickWorldImage(location) },

@@ -496,13 +496,7 @@ private fun ColumnScope.ProfileContent(
         }
     }
 
-    // TrustRank + UserName + VRC+
-    UserInfoRow(user = currentUser, canCopy = true)
-    UserPronouns(pronouns = currentUser.pronouns)
-    // status
-    UserStatusRow(canCopy = true, user = currentUser,)
-    // LanguagesRow && LinksRow
-    LangAndLinkRow(currentUser)
+    UserProfileIdentity(userProfileVO = currentUser)
 
     var isSelected by remember { mutableStateOf(false) }
     // LocationCard: show the room of this user and friends in the same room
@@ -523,6 +517,7 @@ private fun ColumnScope.ProfileContent(
         // 防止当前用户的共享元素冲突
         CompositionLocalProvider(LocalSharedSuffixKey provides locationSharedSuffixKey) {
             LocationCard(
+                modifier = Modifier.fillMaxWidth(),
                 location = loc,
                 isSelected = isSelected,
                 onClickWorldImage = onClickWorldImage,
@@ -1367,12 +1362,32 @@ private fun UserFavoritedWorldsSection(
 fun UserPronouns(pronouns: String) {
     if (pronouns.isNotEmpty()) {
         Text(
-            text = "(${pronouns})",
+            text = pronouns,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.secondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun UserProfileIdentity(userProfileVO: UserProfileVo) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        UserInfoRow(
+            user = userProfileVO,
+            canCopy = true,
+        )
+        UserStatusRow(
+            canCopy = true,
+            user = userProfileVO,
+        )
+        UserPronouns(pronouns = userProfileVO.pronouns)
+        LangAndLinkRow(userProfileVO)
     }
 }
 
@@ -1414,37 +1429,33 @@ private fun BottomCardTab(
 }
 
 @Composable
-private inline fun LangAndLinkRow(userProfileVO: UserProfileVo) {
+private fun LangAndLinkRow(userProfileVO: UserProfileVo) {
     val speakLanguages = userProfileVO.speakLanguages
     val bioLinks = userProfileVO.bioLinks
     val width = 32.dp
-    val rowSpaced = 6.dp
-    if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(rowSpaced),
-        ) {
-            // speakLanguages 和 bioLinks 最大大小为3，填充下让分割线居中
-            repeat(3 - speakLanguages.size) {
-                Spacer(modifier = Modifier.width((width)))
-            }
-            // speakLanguages
+    if (speakLanguages.isEmpty() && bioLinks.isEmpty()) return
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(
+            space = 8.dp,
+            alignment = Alignment.CenterHorizontally,
+        ),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (speakLanguages.isNotEmpty()) {
             LanguagesRow(speakLanguages, width)
+        }
+        if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
             VerticalDivider(
-                modifier = Modifier.height(width).padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.height(width).padding(vertical = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
                 thickness = 1.dp,
             )
-            // bioLinks
-            LinksRow(bioLinks, width)
-            repeat(3 - bioLinks.size) {
-                Spacer(modifier = Modifier.width((width)))
-            }
         }
-    } else if (speakLanguages.isNotEmpty()) {
-        LanguagesRow(speakLanguages, width)
-    } else if (bioLinks.isNotEmpty()) {
-        LinksRow(bioLinks, width)
+        if (bioLinks.isNotEmpty()) {
+            LinksRow(bioLinks, width)
+        }
     }
 }
 
