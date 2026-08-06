@@ -2,33 +2,49 @@ package io.github.vrcmteam.vrcm.network.api.avatars.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonTransformingSerializer
+import kotlinx.serialization.json.decodeFromJsonElement
 
-internal object AvatarTagsSerializer : JsonTransformingSerializer<List<String>>(
-    ListSerializer(String.serializer())
-) {
-    override fun transformDeserialize(element: JsonElement): JsonElement =
-        if (element is JsonPrimitive && element.isString && element.content.isEmpty()) {
-            JsonArray(emptyList())
-        } else {
-            element
-        }
+private fun <T> decodeListAllowingEmptyJsonString(
+    decoder: Decoder,
+    delegate: KSerializer<List<T>>,
+): List<T> {
+    if (decoder !is JsonDecoder) return delegate.deserialize(decoder)
+
+    val element = decoder.decodeJsonElement()
+    if (element is JsonPrimitive && element.isString && element.content.isEmpty()) {
+        return emptyList()
+    }
+    return decoder.json.decodeFromJsonElement(delegate, element)
 }
 
-internal object AvatarUnityPackagesSerializer : JsonTransformingSerializer<List<AvatarUnityPackage>>(
-    ListSerializer(AvatarUnityPackage.serializer())
-) {
-    override fun transformDeserialize(element: JsonElement): JsonElement =
-        if (element is JsonPrimitive && element.isString && element.content.isEmpty()) {
-            JsonArray(emptyList())
-        } else {
-            element
-        }
+internal object AvatarTagsSerializer : KSerializer<List<String>> {
+    private val delegate = ListSerializer(String.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<String> =
+        decodeListAllowingEmptyJsonString(decoder, delegate)
+
+    override fun serialize(encoder: Encoder, value: List<String>) =
+        delegate.serialize(encoder, value)
+}
+
+internal object AvatarUnityPackagesSerializer : KSerializer<List<AvatarUnityPackage>> {
+    private val delegate = ListSerializer(AvatarUnityPackage.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<AvatarUnityPackage> =
+        decodeListAllowingEmptyJsonString(decoder, delegate)
+
+    override fun serialize(encoder: Encoder, value: List<AvatarUnityPackage>) =
+        delegate.serialize(encoder, value)
 }
 
 @Serializable

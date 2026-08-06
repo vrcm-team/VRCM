@@ -3,8 +3,12 @@ package io.github.vrcmteam.vrcm.di.modules
 import androidx.compose.ui.graphics.ImageBitmap
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -17,6 +21,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import org.koin.core.qualifier.named
 import org.koin.core.logger.EmptyLogger
 import org.koin.core.logger.Logger
 import kotlinx.coroutines.flow.flowOf
@@ -54,6 +59,7 @@ class PresentationModuleTest {
                         AvatarProfileLoader { Result.failure(IllegalStateException("unused")) }
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
+                    single<AvatarEditor> { EmptyAvatarEditor }
                 },
             )
         }
@@ -79,6 +85,23 @@ class PresentationModuleTest {
         assertNotNull(application.koin.get<PrintImageProcessor>())
         application.close()
     }
+
+    @Test
+    fun avatarCoverImageProcessorCanBeResolvedByEditorQualifier() {
+        val application = koinApplication {
+            modules(
+                presentationModule,
+                module {
+                    single<PlatformImageCodec> { FakePlatformImageCodec }
+                },
+            )
+        }
+
+        assertNotNull(
+            application.koin.get<PrintImageProcessor>(named("avatar-cover-image-processor"))
+        )
+        application.close()
+    }
 }
 
 private data object EmptyAvatarSelector : AvatarSelector {
@@ -86,6 +109,21 @@ private data object EmptyAvatarSelector : AvatarSelector {
 
     override suspend fun select(avatarId: String): Result<Unit> =
         Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarEditor : AvatarEditor {
+    override suspend fun updateMetadata(
+        avatarId: String,
+        update: AvatarUpdateData,
+    ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+
+    override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
+        Result.failure(IllegalStateException("unused"))
+
+    override suspend fun assignCover(
+        avatarId: String,
+        imageUrl: String,
+    ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
 }
 
 private data object EmptyGalleryDataSource : GalleryDataSource {

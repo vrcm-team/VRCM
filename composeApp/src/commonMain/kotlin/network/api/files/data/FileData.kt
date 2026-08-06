@@ -20,6 +20,9 @@ enum class FileTagType(val value: String) {
     @SerialName("gallery")
     Gallery("gallery"),
 
+    @SerialName("avatarimage")
+    AvatarImage("avatarimage"),
+
     @SerialName("print")
     Print("print");
     
@@ -88,4 +91,4 @@ data class FileDetailsData(
     val uploadId: String = "",
     val url: String,
     val category: String
-) 
+)

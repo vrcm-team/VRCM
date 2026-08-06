@@ -164,6 +164,37 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
+    fun avatarCoverCanvasUsesTheFull1920By1080Output() = runBlocking {
+        val originalSize = ImageSize(4_000, 3_000)
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = 1_920, height = 1_080),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = AvatarCoverCanvasSpec,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("cover.jpg", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(
+                CropRenderRequest(
+                    originalSize = originalSize,
+                    transform = CropTransform(),
+                    outputSize = ImageSize(1_920, 1_080),
+                ),
+            ),
+            codec.cropRequests,
+        )
+        assertEquals(ImageSize(1_920, 1_080), codec.encodedSize)
+    }
+
+    @Test
     fun invalidPngSignatureIsRejected() = runBlocking {
         val codec = FakePlatformImageCodec(encodedBytes = byteArrayOf(1, 2, 3))
         val processor = DefaultPrintImageProcessor(codec = codec)

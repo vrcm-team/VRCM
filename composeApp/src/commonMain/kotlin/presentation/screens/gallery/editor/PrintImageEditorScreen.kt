@@ -76,6 +76,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -96,11 +97,11 @@ class PrintImageEditorScreen(
         val navigator = LocalNavigator.currentOrThrow
         val calculator: CropTransformCalculator = koinInject()
         val sessionStore: PrintImageEditorSessionStore = koinInject()
-        val sessionAvailable = remember(sessionId) { sessionStore.get(sessionId) != null }
+        val session = remember(sessionId) { sessionStore.get(sessionId) }
         val locale = strings
         val currentLocale by rememberUpdatedState(locale)
 
-        if (!sessionAvailable) {
+        if (session == null) {
             LaunchedEffect(sessionId) {
                 SharedFlowCentre.toastText.emit(ToastText.Error(locale.printEditorSessionExpired))
                 navigator.pop()
@@ -118,29 +119,47 @@ class PrintImageEditorScreen(
         }
         val state by screenModel.state.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
+        val title = when (session.target) {
+            ImageEditorTarget.Print -> locale.printEditorTitle
+            is ImageEditorTarget.AvatarCover -> locale.avatarEditCover
+        }
+        val submitLabel = when (session.target) {
+            ImageEditorTarget.Print -> locale.printEditorUpload
+            is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadCover
+        }
+        val uploadingText = when (session.target) {
+            ImageEditorTarget.Print -> locale.printEditorUploading
+            is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadingCover
+        }
 
         BlockBackNavigation(blocked = state.isBusy)
 
         LaunchedEffect(screenModel) {
             screenModel.events.collectLatest { event ->
-                if (event == EditorEvent.Uploaded) {
-                    sessionStore.complete(sessionId)
-                    SharedFlowCentre.toastText.emit(ToastText.Success(currentLocale.printEditorUploaded))
-                    navigator.pop()
+                when (event) {
+                    is EditorEvent.Submitted -> {
+                        sessionStore.complete(sessionId, event.submission)
+                        if (event.submission == ImageEditorSubmission.Print) {
+                            SharedFlowCentre.toastText.emit(
+                                ToastText.Success(currentLocale.printEditorUploaded)
+                            )
+                        }
+                        navigator.pop()
+                    }
                 }
             }
         }
 
         LaunchedEffect(state.error) {
             val error = state.error ?: return@LaunchedEffect
-            snackbarHostState.showSnackbar(error.localizedMessage(locale))
+            snackbarHostState.showSnackbar(error.localizedMessage(locale, session.target))
             screenModel.clearError()
         }
 
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(locale.printEditorTitle) },
+                    title = { Text(title) },
                     navigationIcon = {
                         IconButton(
                             onClick = navigator::pop,
@@ -153,7 +172,7 @@ class PrintImageEditorScreen(
                         }
                     },
                     actions = {
-                        ATooltipBox(tooltip = { Text(locale.printEditorUpload) }) {
+                        ATooltipBox(tooltip = { Text(submitLabel) }) {
                             FilledTonalIconButton(
                                 onClick = screenModel::upload,
                                 enabled = !state.isBusy,
@@ -166,7 +185,7 @@ class PrintImageEditorScreen(
                                 } else {
                                     Icon(
                                         imageVector = AppIcons.Publish,
-                                        contentDescription = locale.printEditorUpload,
+                                        contentDescription = submitLabel,
                                     )
                                 }
                             }
@@ -187,6 +206,7 @@ class PrintImageEditorScreen(
                 onFlipVertical = screenModel::flipVertical,
                 onReset = screenModel::reset,
                 locale = locale,
+                uploadingText = uploadingText,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -207,6 +227,7 @@ private fun PrintEditorContent(
     onFlipVertical: () -> Unit,
     onReset: () -> Unit,
     locale: LocaleStrings,
+    uploadingText: String,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
@@ -220,6 +241,7 @@ private fun PrintEditorContent(
             onViewportChanged = { viewport = it },
             onPanAndZoom = onPanAndZoom,
             locale = locale,
+            uploadingText = uploadingText,
             modifier = previewModifier,
         )
     }
@@ -262,6 +284,7 @@ private fun PrintEditorPreview(
     onViewportChanged: (ImageSize) -> Unit,
     onPanAndZoom: (ImageSize, Float, Float, Float) -> Unit,
     locale: LocaleStrings,
+    uploadingText: String,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -306,7 +329,7 @@ private fun PrintEditorPreview(
                         text = if (state.phase == EditorPhase.Processing) {
                             locale.printEditorProcessing
                         } else {
-                            locale.printEditorUploading
+                            uploadingText
                         },
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
@@ -559,14 +582,23 @@ internal fun PrintImageFailure.localizedMessage(locale: LocaleStrings): String =
     is PrintImageFailure.EncodeFailed -> locale.printEditorRenderFailed
 }
 
-private fun EditorError.localizedMessage(locale: LocaleStrings): String = when (this) {
+private fun EditorError.localizedMessage(
+    locale: LocaleStrings,
+    target: ImageEditorTarget,
+): String = when (this) {
     is EditorError.Processing -> failure.localizedMessage(locale)
-    is EditorError.Upload -> when (failure) {
+    is EditorError.Submission -> when (val cause = failure) {
         is PrintUploadFailure.Authentication -> locale.printEditorUploadAuthenticationFailed
         is PrintUploadFailure.Permission -> locale.printEditorUploadPermissionFailed
         is PrintUploadFailure.Network -> locale.printEditorUploadNetworkFailed
         is PrintUploadFailure.Server -> locale.printEditorUploadServerFailed
         is PrintUploadFailure.Unknown -> locale.printEditorUploadUnknownFailed
+        is AvatarCoverUpdateFailure.Upload -> locale.avatarEditCoverUploadFailed
+        is AvatarCoverUpdateFailure.Assignment -> locale.avatarEditCoverAssignmentFailed
+        else -> when (target) {
+            ImageEditorTarget.Print -> locale.printEditorUploadUnknownFailed
+            is ImageEditorTarget.AvatarCover -> locale.avatarEditCoverUploadFailed
+        }
     }
 }
 

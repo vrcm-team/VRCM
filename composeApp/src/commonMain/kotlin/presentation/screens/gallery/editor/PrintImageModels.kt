@@ -96,6 +96,15 @@ data class PrintCanvasSpec(
     val contentOffsetY: Int = 69,
 )
 
+internal val AvatarCoverCanvasSpec = PrintCanvasSpec(
+    canvasWidth = 1_920,
+    canvasHeight = 1_080,
+    contentWidth = 1_920,
+    contentHeight = 1_080,
+    contentOffsetX = 0,
+    contentOffsetY = 0,
+)
+
 object PrintImageLimits {
     const val MAX_FILE_BYTES: Long = 50L * 1024 * 1024
     const val MAX_PIXELS: Long = 100_000_000L

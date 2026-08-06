@@ -36,7 +36,7 @@ class PrintImageEditorNavigationTest {
         assertSame(failure, thrown)
         assertTrue(releaseFailure in thrown.suppressedExceptions)
         assertEquals(listOf<ImageBitmap>(NavigationTestBitmap), released)
-        assertNull(store.get("print-editor-0"))
+        assertNull(store.get("image-editor-0"))
     }
 
     @Test
@@ -57,7 +57,7 @@ class PrintImageEditorNavigationTest {
 
         assertSame(cancellation, thrown)
         assertEquals(listOf<ImageBitmap>(NavigationTestBitmap), released)
-        assertNull(store.get("print-editor-0"))
+        assertNull(store.get("image-editor-0"))
     }
 
     @Test

@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -78,7 +79,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         model.upload()
         yield()
         assertEquals(EditorPhase.Ready, model.state.value.phase)
-        val error = assertIs<EditorError.Upload>(model.state.value.error)
+        val error = assertIs<EditorError.Submission>(model.state.value.error)
         assertIs<PrintUploadFailure.Unknown>(error.failure)
 
         model.upload()
@@ -86,7 +87,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
 
         assertEquals(1, processor.renderCount)
         assertEquals(2, uploader.uploadCount)
-        assertEquals(EditorEvent.Uploaded, uploaded.await())
+        assertEquals(EditorEvent.Submitted(ImageEditorSubmission.Print), uploaded.await())
     }
 
     @Test
@@ -105,7 +106,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         yield()
 
         assertEquals(EditorPhase.Ready, model.state.value.phase)
-        val error = assertIs<EditorError.Upload>(model.state.value.error)
+        val error = assertIs<EditorError.Submission>(model.state.value.error)
         assertIs<PrintUploadFailure.Unknown>(error.failure)
 
         model.upload()
@@ -113,7 +114,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
 
         assertEquals(1, processor.renderCount)
         assertEquals(2, uploader.uploadCount)
-        assertEquals(EditorEvent.Uploaded, uploaded.await())
+        assertEquals(EditorEvent.Submitted(ImageEditorSubmission.Print), uploaded.await())
     }
 
     @Test
@@ -183,7 +184,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         model.upload()
         yield()
 
-        assertEquals(EditorEvent.Uploaded, uploaded.await())
+        assertEquals(EditorEvent.Submitted(ImageEditorSubmission.Print), uploaded.await())
         assertTrue(requireNotNull(uploader.lastFileName).startsWith("print-"))
         assertTrue(requireNotNull(uploader.lastFileName).endsWith(".png"))
     }
@@ -200,7 +201,10 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
             prepared = prepared,
             calculator = CropTransformCalculator(),
             processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
-            uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) },
+            submitter = PrintUploaderSubmitter(
+                FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+            ),
+            target = ImageEditorTarget.Print,
             sessionId = sessionId,
             sessionStore = store,
             workerDispatcher = Dispatchers.Unconfined,
@@ -223,7 +227,10 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
             prepared = PreparedImage(TestImageBitmap, ImageSize(1_920, 1_080)),
             calculator = CropTransformCalculator(),
             processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
-            uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) },
+            submitter = PrintUploaderSubmitter(
+                FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+            ),
+            target = ImageEditorTarget.Print,
             sessionId = "test-session",
             sessionStore = PrintImageEditorSessionStore(),
             workerDispatcher = Dispatchers.Unconfined,
@@ -251,6 +258,38 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         assertEquals(listOf(originalSize), processor.originalSizes)
     }
 
+    @Test
+    fun avatarCoverSubmissionUsesAvatarFileNameAndEmitsUpdatedAvatar() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val updated = AvatarData(
+            id = "avtr_test",
+            name = "Test",
+            imageUrl = "https://example.test/cover.png",
+        )
+        val submitter = FakeImageEditorSubmitter {
+            Result.success(ImageEditorSubmission.AvatarCover(updated))
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.jpg", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_920, 1_080)),
+            calculator = CropTransformCalculator(),
+            processor = processor,
+            submitter = submitter,
+            target = ImageEditorTarget.AvatarCover(updated.id),
+            sessionId = "test-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+            nowMillis = { 123L },
+        )
+        val submitted = async(start = CoroutineStart.UNDISPATCHED) { model.events.first() }
+
+        model.upload()
+        yield()
+
+        assertEquals(EditorEvent.Submitted(ImageEditorSubmission.AvatarCover(updated)), submitted.await())
+        assertEquals("avatar-cover-123.png", submitter.lastFileName)
+    }
+
     private fun createModel(
         processor: PrintImageProcessor,
         uploader: PrintUploader,
@@ -262,7 +301,8 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         prepared = PreparedImage(TestImageBitmap, originalSize),
         calculator = CropTransformCalculator(),
         processor = processor,
-        uploader = uploader,
+        submitter = PrintUploaderSubmitter(uploader),
+        target = ImageEditorTarget.Print,
         sessionId = "test-session",
         sessionStore = PrintImageEditorSessionStore(),
         workerDispatcher = workerDispatcher,
@@ -334,5 +374,33 @@ private class FakePrintUploader(
         uploadCount++
         lastFileName = fileName
         return uploadBlock(imageBytes, fileName)
+    }
+}
+
+private class FakeImageEditorSubmitter(
+    private val submitBlock: suspend () -> Result<ImageEditorSubmission>,
+) : ImageEditorSubmitter {
+    var lastFileName: String? = null
+
+    override suspend fun submit(
+        target: ImageEditorTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+    ): Result<ImageEditorSubmission> {
+        lastFileName = fileName
+        return submitBlock()
+    }
+}
+
+private class PrintUploaderSubmitter(
+    private val uploader: PrintUploader,
+) : ImageEditorSubmitter {
+    override suspend fun submit(
+        target: ImageEditorTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+    ): Result<ImageEditorSubmission> {
+        check(target == ImageEditorTarget.Print)
+        return uploader.upload(imageBytes, fileName).map { ImageEditorSubmission.Print }
     }
 }

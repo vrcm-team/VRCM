@@ -28,11 +28,15 @@ class FileApi(private val client: HttpClient) {
             val versionMatch = versionRegex.find(fileUrl, 30)
             return versionMatch?.groupValues?.last()?.replace("/", "") ?: "1"
         }
+        fun imageUrl(fileId: String, fileVersion: Int, fileSize: Int = 1024): String {
+            if (fileId.isBlank() || fileVersion < 1) return ""
+            return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
+        }
         fun convertFileUrl(fileUrl: String, fileSize: Int = 1024): String {
             if (fileUrl.isEmpty()) return ""
             val fileId = findFileId(fileUrl)
-            val fileVersion = findFileVersion(fileUrl)
-            return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
+            val fileVersion = findFileVersion(fileUrl).toIntOrNull() ?: 1
+            return imageUrl(fileId, fileVersion, fileSize)
         }
 
         fun convertFileUrlToOriginal(fileUrl: String): String {

@@ -11,6 +11,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,12 +39,18 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleFormat
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarPlatformInfo
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.handoffPreparedImageToEditor
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastText = when (this) {
     AvatarProfileNotice.Banned -> ToastText.Error(locale.avatarProfileBanned)
@@ -50,6 +59,13 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
     is AvatarProfileNotice.SelectionFailed -> ToastText.Error(
         message ?: locale.avatarProfileSelectFailed
     )
+    AvatarProfileNotice.InvalidName -> ToastText.Error(locale.avatarEditInvalidName)
+    AvatarProfileNotice.NoMetadataChanges -> ToastText.Info(locale.avatarEditNoChanges)
+    AvatarProfileNotice.MetadataSaved -> ToastText.Success(locale.avatarEditMetadataSaved)
+    is AvatarProfileNotice.MetadataSaveFailed -> ToastText.Error(
+        message ?: locale.avatarEditMetadataSaveFailed
+    )
+    AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -73,9 +89,14 @@ class AvatarProfileScreen(
     override fun Content() {
         val navigator = currentNavigator
         val screenModel: AvatarProfileScreenModel = koinViewModel()
+        val imageProcessor: PrintImageProcessor = koinInject()
+        val editorSessionStore: PrintImageEditorSessionStore = koinInject()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
+        val editState by screenModel.editState.collectAsState()
+        val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val locale = strings
+        var showEditSheet by remember { mutableStateOf(false) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
@@ -87,7 +108,19 @@ class AvatarProfileScreen(
             screenModel.refreshAvatarData(avatarProfileVo)
         }
 
+        LaunchedEffect(editState.canEdit) {
+            if (!editState.canEdit) showEditSheet = false
+        }
+
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
+
+        LaunchedEffect(displayedAvatar.avatarId, avatarCoverUpdates) {
+            val updated = avatarCoverUpdates[displayedAvatar.avatarId]
+                ?: return@LaunchedEffect
+            if (screenModel.applyCoverUpdate(updated)) {
+                editorSessionStore.consumeAvatarCoverUpdate(updated.id)
+            }
+        }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
@@ -101,8 +134,31 @@ class AvatarProfileScreen(
                     contentMinHeight = contentMinHeight,
                     actionState = actionState,
                     onSelectAvatar = screenModel::selectAvatar,
+                    canEdit = editState.canEdit,
+                    onEdit = { showEditSheet = true },
                 )
             }
+        }
+        if (showEditSheet && editState.canEdit) {
+            AvatarEditSheet(
+                avatar = displayedAvatar,
+                state = editState,
+                imageProcessor = imageProcessor,
+                onDismiss = { showEditSheet = false },
+                onSaveMetadata = screenModel::saveMetadata,
+                onEditCover = { source, prepared ->
+                    handoffPreparedImageToEditor(
+                        source = source,
+                        prepared = prepared,
+                        sessionStore = editorSessionStore,
+                        target = ImageEditorTarget.AvatarCover(displayedAvatar.avatarId),
+                        push = { sessionId ->
+                            navigator.push(PrintImageEditorScreen(sessionId))
+                            showEditSheet = false
+                        },
+                    )
+                },
+            )
         }
     }
 }
@@ -114,6 +170,8 @@ private fun AvatarProfileContent(
     contentMinHeight: Dp,
     actionState: AvatarActionState,
     onSelectAvatar: () -> Unit,
+    canEdit: Boolean,
+    onEdit: () -> Unit,
 ) {
     val navigator = currentNavigator
 
@@ -154,6 +212,22 @@ private fun AvatarProfileContent(
         state = actionState,
         onClick = onSelectAvatar,
     )
+
+    if (canEdit) {
+        FilledTonalButton(
+            onClick = onEdit,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                imageVector = AppIcons.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(strings.avatarEditTitle)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
 
     // 描述
     if (avatarProfileVo.avatarDescription.isNotBlank()) {

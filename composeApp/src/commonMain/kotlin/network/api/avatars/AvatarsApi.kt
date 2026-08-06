@@ -4,9 +4,11 @@ import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AVATARS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -17,6 +19,12 @@ class AvatarsApi(private val client: HttpClient) {
 
     suspend fun selectAvatar(avatarId: String): AvatarSelectionData =
         client.put("$AVATARS_API_PREFIX/$avatarId/select").checkSuccess()
+
+    suspend fun updateAvatar(avatarId: String, update: AvatarUpdateData): AvatarData =
+        client.put("$AVATARS_API_PREFIX/$avatarId") {
+            contentType(ContentType.Application.Json)
+            setBody(update)
+        }.checkSuccess()
 
     suspend fun getFavoritedAvatars(
         n: Int = 50,

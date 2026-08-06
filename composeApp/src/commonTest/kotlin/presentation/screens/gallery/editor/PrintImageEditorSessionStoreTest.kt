@@ -4,11 +4,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PrintImageEditorSessionStoreTest {
     @Test
@@ -36,6 +38,30 @@ class PrintImageEditorSessionStoreTest {
         store.complete(id)
 
         assertEquals(Unit, store.uploadCompletions.first())
+        assertNull(store.get(id))
+    }
+
+    @Test
+    fun avatarCoverCompletionWaitsUntilTheMatchingProfileConsumesIt() {
+        val store = PrintImageEditorSessionStore()
+        val target = ImageEditorTarget.AvatarCover("avtr_test")
+        val id = store.create(
+            source = SelectedImage("source.jpg", byteArrayOf(1)),
+            prepared = PreparedImage(SessionTestImageBitmap, ImageSize(16, 9)),
+            target = target,
+        )
+        val updated = AvatarData(
+            id = "avtr_test",
+            name = "Test",
+            imageUrl = "https://example.test/cover.png",
+        )
+
+        assertEquals(target, store.get(id)?.target)
+        store.complete(id, ImageEditorSubmission.AvatarCover(updated))
+
+        assertEquals(updated, store.avatarCoverUpdates.value[updated.id])
+        assertEquals(updated, store.consumeAvatarCoverUpdate(updated.id))
+        assertTrue(store.avatarCoverUpdates.value.isEmpty())
         assertNull(store.get(id))
     }
 }

@@ -8,15 +8,22 @@ import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.AvatarCoverCanvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DefaultPrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorSubmitter
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
@@ -49,6 +56,8 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
+private val AvatarCoverImageProcessorQualifier = named("avatar-cover-image-processor")
+
 val presentationModule: Module = module {
     factoryOf (::SettingsModel)
     factory{ SettingsModel(get(),getAll()) }
@@ -62,7 +71,15 @@ val presentationModule: Module = module {
     single { CropTransformCalculator() }
     singleOf(::PrintImageEditorSessionStore)
     single<PrintImageProcessor> { DefaultPrintImageProcessor(get()) }
+    single<PrintImageProcessor>(AvatarCoverImageProcessorQualifier) {
+        DefaultPrintImageProcessor(
+            codec = get(),
+            spec = AvatarCoverCanvasSpec,
+            maxFileBytes = AvatarCoverLimits.MAX_FILE_BYTES.toInt(),
+        )
+    }
     singleOf(::PrintUploadService) bind PrintUploader::class
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -73,8 +90,12 @@ val presentationModule: Module = module {
             source = session.source,
             prepared = session.prepared,
             calculator = get(),
-            processor = get(),
-            uploader = get(),
+            processor = when (session.target) {
+                ImageEditorTarget.Print -> get()
+                is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+            },
+            submitter = get(),
+            target = session.target,
             sessionId = sessionId,
             sessionStore = sessionStore,
         )
@@ -86,13 +107,12 @@ val presentationModule: Module = module {
     viewModelOf(::GroupProfileScreenModel)
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
-    viewModel { AvatarProfileScreenModel(get(), get()) }
+    singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    viewModel { AvatarProfileScreenModel(get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }
-
-
 
 private val imageLoaderDefinition: Definition<ImageLoader> = {
     val context = get<PlatformContext>()

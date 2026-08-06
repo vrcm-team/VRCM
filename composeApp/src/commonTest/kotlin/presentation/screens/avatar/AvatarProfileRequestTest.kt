@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
@@ -321,11 +322,89 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         noticeCollector.cancel()
     }
 
+    @Test
+    fun accountSwitchPreventsAnOldMetadataResultFromUpdatingThePage() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val selector = FakeAvatarSelector()
+        val editor = FakeAvatarEditor()
+        val model = avatarModel(loader, selector, editor)
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess(
+            avatarId = "avtr_owned",
+            avatarName = "Before",
+            authorId = "usr_current",
+        )
+        yield()
+
+        model.saveMetadata("After", "Description")
+        yield()
+        selector.switchAccount("usr_other")
+        yield()
+        editor.completeMetadata(
+            Result.success(
+                AvatarData(
+                    id = "avtr_owned",
+                    name = "After",
+                    description = "Description",
+                    authorId = "usr_current",
+                )
+            )
+        )
+        yield()
+
+        assertEquals("Before", model.avatarProfileState.value?.avatarName)
+        assertTrue(notices.isEmpty())
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun completedEditorCoverUpdatesTheCurrentAvatarAndEmitsSuccess() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val model = avatarModel(loader)
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess(
+            avatarId = "avtr_owned",
+            avatarName = "Owned",
+            authorId = "usr_current",
+        )
+        yield()
+
+        val applied = model.applyCoverUpdate(
+            AvatarData(
+                id = "avtr_owned",
+                name = "Owned",
+                authorId = "usr_current",
+                imageUrl = "https://example.test/cover.png",
+                thumbnailImageUrl = "https://example.test/thumbnail.png",
+                version = 2,
+            )
+        )
+        yield()
+
+        assertTrue(applied)
+        assertEquals(
+            "https://example.test/cover.png",
+            model.avatarProfileState.value?.avatarImageUrl,
+        )
+        assertEquals(2, model.avatarProfileState.value?.version)
+        assertEquals(listOf<AvatarProfileNotice>(AvatarProfileNotice.CoverSaved), notices)
+        noticeCollector.cancel()
+    }
+
     private fun avatarModel(
         loader: AvatarProfileLoader,
         selector: AvatarSelector = FakeAvatarSelector(),
+        editor: AvatarEditor? = null,
     ): AvatarProfileScreenModel =
-        AvatarProfileScreenModel(loader, selector, Dispatchers.Unconfined)
+        AvatarProfileScreenModel(loader, selector, Dispatchers.Unconfined, editor)
             .also(models::add)
 }
 
@@ -386,4 +465,28 @@ private class FakeAvatarSelector(
     fun completeSelection(result: Result<Unit>) {
         selection.complete(result)
     }
+
+    fun switchAccount(userId: String) {
+        mutableCurrentUser.value = AvatarUserContext(userId, "avtr_other")
+    }
+}
+
+private class FakeAvatarEditor : AvatarEditor {
+    private val metadata = CompletableDeferred<Result<AvatarData>>()
+
+    override suspend fun updateMetadata(
+        avatarId: String,
+        update: AvatarUpdateData,
+    ): Result<AvatarData> = metadata.await()
+
+    override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
+        Result.failure(IllegalStateException("Cover upload is not used"))
+
+    override suspend fun assignCover(avatarId: String, imageUrl: String): Result<AvatarData> =
+        Result.failure(IllegalStateException("Cover assignment is not used"))
+
+    fun completeMetadata(result: Result<AvatarData>) {
+        metadata.complete(result)
+    }
+
 }

@@ -3,8 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrcmteam.vrcm.service.PrintUploader
-import io.github.vrcmteam.vrcm.service.PrintUploadFailure
 import io.github.vrcmteam.vrcm.service.toPrintUploadFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -35,11 +33,11 @@ private enum class UploadStage {
 
 sealed interface EditorError {
     data class Processing(val failure: PrintImageFailure) : EditorError
-    data class Upload(val failure: PrintUploadFailure) : EditorError
+    data class Submission(val failure: Throwable) : EditorError
 }
 
 sealed interface EditorEvent {
-    data object Uploaded : EditorEvent
+    data class Submitted(val submission: ImageEditorSubmission) : EditorEvent
 }
 
 data class PrintImageEditorState(
@@ -57,7 +55,8 @@ class PrintImageEditorScreenModel(
     prepared: PreparedImage,
     private val calculator: CropTransformCalculator,
     private val processor: PrintImageProcessor,
-    private val uploader: PrintUploader,
+    private val submitter: ImageEditorSubmitter,
+    private val target: ImageEditorTarget,
     private val sessionId: String,
     private val sessionStore: PrintImageEditorSessionStore,
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -161,15 +160,19 @@ class PrintImageEditorScreenModel(
                     .getOrThrow()
                     .also {
                         cachedPng = it
-                        cachedFileName = "print-${nowMillis()}.png"
+                        cachedFileName = target.fileName(nowMillis())
                     }
 
                 stage = UploadStage.Uploading
                 _state.update { it.copy(phase = EditorPhase.Uploading, error = null) }
-                uploader.upload(png, cachedFileName ?: "print-${nowMillis()}.png").getOrThrow()
+                val submission = submitter.submit(
+                    target = target,
+                    imageBytes = png,
+                    fileName = cachedFileName ?: target.fileName(nowMillis()),
+                ).getOrThrow()
 
                 _state.update { it.copy(phase = EditorPhase.Ready, error = null) }
-                _events.emit(EditorEvent.Uploaded)
+                _events.emit(EditorEvent.Submitted(submission))
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Exception) {
@@ -177,7 +180,13 @@ class PrintImageEditorScreenModel(
                     UploadStage.Processing -> EditorError.Processing(
                         cause as? PrintImageFailure ?: PrintImageFailure.RenderFailed(cause),
                     )
-                    UploadStage.Uploading -> EditorError.Upload(cause.toPrintUploadFailure())
+                    UploadStage.Uploading -> EditorError.Submission(
+                        if (target == ImageEditorTarget.Print) {
+                            cause.toPrintUploadFailure()
+                        } else {
+                            cause
+                        },
+                    )
                 }
 
                 _state.update {
@@ -203,4 +212,9 @@ class PrintImageEditorScreenModel(
             error = null,
         )
     }
+}
+
+private fun ImageEditorTarget.fileName(nowMillis: Long): String = when (this) {
+    ImageEditorTarget.Print -> "print-$nowMillis.png"
+    is ImageEditorTarget.AvatarCover -> "avatar-cover-$nowMillis.png"
 }

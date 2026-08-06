@@ -34,7 +34,9 @@ class GalleryScreenModel internal constructor(
     // 使用Map存储不同标签类型的图片文件列表
     private val _filesByTag = mutableStateMapOf<FileTagType, List<FileData>>().apply {
         // 不包含 Print，Print 使用独立的 API
-        FileTagType.entries.filter { it != FileTagType.Print }.forEach { tagType ->
+        FileTagType.entries.filter {
+            it != FileTagType.Print && it != FileTagType.AvatarImage
+        }.forEach { tagType ->
             this[tagType] = emptyList()
         }
     }
@@ -186,7 +188,8 @@ class GalleryScreenModel internal constructor(
      * 获取指定标签类型的数量上限（参照 VRCX）
      */
     fun getMaxCount(tagType: FileTagType): Int = when (tagType) {
-        FileTagType.Gallery, FileTagType.Icon, FileTagType.Print -> MAX_FIXED_FILES
+        FileTagType.Gallery, FileTagType.Icon, FileTagType.AvatarImage,
+        FileTagType.Print -> MAX_FIXED_FILES
         FileTagType.Emoji -> MAX_EMOJI_DEFAULT
         FileTagType.Sticker -> MAX_STICKER_DEFAULT
     }

@@ -7,12 +7,13 @@ internal fun handoffPreparedImageToEditor(
     source: SelectedImage,
     prepared: PreparedImage,
     sessionStore: PrintImageEditorSessionStore,
+    target: ImageEditorTarget = ImageEditorTarget.Print,
     releasePreview: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
     push: (String) -> Unit,
 ) {
     var sessionId: String? = null
     try {
-        val createdSessionId = sessionStore.create(source, prepared)
+        val createdSessionId = sessionStore.create(source, prepared, target)
         sessionId = createdSessionId
         push(createdSessionId)
     } catch (cause: CancellationException) {

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
@@ -29,6 +30,33 @@ import org.koin.core.logger.Logger
 
 internal fun interface AvatarProfileLoader {
     suspend fun load(avatarId: String): Result<AvatarData>
+}
+
+internal sealed interface AvatarMetadataChange {
+    data object InvalidName : AvatarMetadataChange
+    data object NoChanges : AvatarMetadataChange
+    data class Update(val data: AvatarUpdateData) : AvatarMetadataChange
+}
+
+internal fun avatarMetadataChange(
+    currentName: String,
+    currentDescription: String,
+    editedName: String,
+    editedDescription: String,
+): AvatarMetadataChange {
+    val normalizedName = editedName.trim()
+    if (normalizedName.isEmpty()) return AvatarMetadataChange.InvalidName
+
+    val name = normalizedName.takeIf { it != currentName }
+    val description = editedDescription.takeIf { it != currentDescription }
+    if (name == null && description == null) return AvatarMetadataChange.NoChanges
+
+    return AvatarMetadataChange.Update(
+        AvatarUpdateData(
+            name = name,
+            description = description,
+        )
+    )
 }
 
 internal class NetworkAvatarProfileLoader(
@@ -100,6 +128,11 @@ internal data class AvatarActionState(
     val isSelecting: Boolean = false,
 )
 
+internal data class AvatarEditState(
+    val canEdit: Boolean = false,
+    val isSavingMetadata: Boolean = false,
+)
+
 private enum class AvatarValidation {
     Checking,
     Available,
@@ -112,6 +145,11 @@ internal sealed interface AvatarProfileNotice {
     data object Switched : AvatarProfileNotice
     data object Copied : AvatarProfileNotice
     data class SelectionFailed(val message: String?) : AvatarProfileNotice
+    data object InvalidName : AvatarProfileNotice
+    data object NoMetadataChanges : AvatarProfileNotice
+    data object MetadataSaved : AvatarProfileNotice
+    data class MetadataSaveFailed(val message: String?) : AvatarProfileNotice
+    data object CoverSaved : AvatarProfileNotice
 }
 
 private enum class AvatarSelectionKind {
@@ -123,6 +161,7 @@ class AvatarProfileScreenModel internal constructor(
     private val avatarProfileLoader: AvatarProfileLoader,
     private val avatarSelector: AvatarSelector,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val avatarEditor: AvatarEditor? = null,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -136,10 +175,15 @@ class AvatarProfileScreenModel internal constructor(
 
     private val validation = MutableStateFlow(AvatarValidation.Checking)
     private val isSelecting = MutableStateFlow(false)
+    private val currentUser = avatarSelector.currentUser.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
     internal val actionState: StateFlow<AvatarActionState> = combine(
         avatarProfileState,
         validation,
-        avatarSelector.currentUser,
+        currentUser,
         isSelecting,
     ) { avatar, currentValidation, user, selecting ->
         AvatarActionState(
@@ -150,6 +194,25 @@ class AvatarProfileScreenModel internal constructor(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = AvatarActionState(),
+    )
+
+    private val isSavingMetadata = MutableStateFlow(false)
+    internal val editState: StateFlow<AvatarEditState> = combine(
+        avatarProfileState,
+        validation,
+        currentUser,
+        isSavingMetadata,
+    ) { avatar, currentValidation, user, savingMetadata ->
+        AvatarEditState(
+            canEdit = currentValidation == AvatarValidation.Available &&
+                avatar?.authorId?.isNotBlank() == true &&
+                avatar.authorId == user?.userId,
+            isSavingMetadata = savingMetadata,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AvatarEditState(),
     )
 
     private val latestRequestToken = MutableStateFlow(0L)
@@ -222,7 +285,81 @@ class AvatarProfileScreenModel internal constructor(
             isSelecting.value = false
         }
     }
+
+    internal fun saveMetadata(name: String, description: String) {
+        val avatar = avatarProfileState.value ?: return
+        val editor = avatarEditor ?: return
+        val target = editableTarget(avatar) ?: return
+        when (val change = avatarMetadataChange(
+            currentName = avatar.avatarName,
+            currentDescription = avatar.avatarDescription,
+            editedName = name,
+            editedDescription = description,
+        )) {
+            AvatarMetadataChange.InvalidName -> {
+                _notices.tryEmit(AvatarProfileNotice.InvalidName)
+                return
+            }
+            AvatarMetadataChange.NoChanges -> {
+                _notices.tryEmit(AvatarProfileNotice.NoMetadataChanges)
+                return
+            }
+            is AvatarMetadataChange.Update -> {
+                if (!isSavingMetadata.compareAndSet(expect = false, update = true)) return
+                viewModelScope.launch(requestDispatcher) {
+                    editor.updateMetadata(target.avatarId, change.data)
+                        .onSuccess { updated ->
+                            if (updated.id == target.avatarId && isCurrentTarget(target)) {
+                                _avatarProfileState.value =
+                                    requireNotNull(_avatarProfileState.value).copy(
+                                        avatarName = updated.name,
+                                        avatarDescription = updated.description.orEmpty(),
+                                        updatedAt = updated.updatedAt,
+                                        version = updated.version,
+                                    )
+                                _notices.emit(AvatarProfileNotice.MetadataSaved)
+                            }
+                        }
+                        .onFailure { error ->
+                            if (isCurrentTarget(target)) {
+                                _notices.emit(AvatarProfileNotice.MetadataSaveFailed(error.message))
+                            }
+                        }
+                    isSavingMetadata.value = false
+                }
+            }
+        }
+    }
+
+    internal fun applyCoverUpdate(updated: AvatarData): Boolean {
+        val current = _avatarProfileState.value ?: return false
+        if (current.avatarId != updated.id) return false
+
+        _avatarProfileState.value = current.copy(
+            avatarImageUrl = updated.imageUrl,
+            thumbnailImageUrl = updated.thumbnailImageUrl,
+            updatedAt = updated.updatedAt,
+            version = updated.version,
+        )
+        _notices.tryEmit(AvatarProfileNotice.CoverSaved)
+        return true
+    }
+
+    private fun editableTarget(avatar: AvatarProfileVo): AvatarEditTarget? {
+        val userId = currentUser.value?.userId ?: return null
+        if (!editState.value.canEdit || avatar.authorId != userId) return null
+        return AvatarEditTarget(avatarId = avatar.avatarId, userId = userId)
+    }
+
+    private fun isCurrentTarget(target: AvatarEditTarget): Boolean =
+        avatarProfileState.value?.avatarId == target.avatarId &&
+            currentUser.value?.userId == target.userId
 }
+
+private data class AvatarEditTarget(
+    val avatarId: String,
+    val userId: String,
+)
 
 private fun avatarActionAvailability(
     avatar: AvatarProfileVo?,
