@@ -28,6 +28,17 @@ import org.koin.core.logger.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+internal class GroupProfileInitialLoadGate {
+    private var initializedGroupId: String? = null
+
+    fun runIfNeeded(groupId: String, load: () -> Unit): Boolean {
+        if (initializedGroupId == groupId) return false
+        initializedGroupId = groupId
+        load()
+        return true
+    }
+}
+
 @OptIn(ExperimentalTime::class)
 class GroupProfileScreenModel(
     private val groupsApi: GroupsApi,
@@ -78,16 +89,23 @@ class GroupProfileScreenModel(
     private val _isActionLoading = MutableStateFlow(false)
     val isActionLoading: StateFlow<Boolean> = _isActionLoading.asStateFlow()
 
-    fun loadGroupData(groupProfileVo: GroupProfileVo) {
-        _groupProfileState.value = groupProfileVo
-        val groupId = groupProfileVo.groupId
-        if (groupId.isBlank()) return
+    private val initialLoadGate = GroupProfileInitialLoadGate()
 
-        val cached = groupProfileCacheDao.load(groupId)
-        if (cached != null) {
-            _groupProfileState.value = GroupProfileVo(cached.group)
+    fun loadGroupData(groupProfileVo: GroupProfileVo) {
+        val groupId = groupProfileVo.groupId
+        if (groupId.isBlank()) {
+            _groupProfileState.value = groupProfileVo
+            return
         }
-        refreshGroupData(refreshProfile = cached == null || cached.isExpired(nowMilliseconds()))
+        initialLoadGate.runIfNeeded(groupId) {
+            _groupProfileState.value = groupProfileVo
+
+            val cached = groupProfileCacheDao.load(groupId)
+            if (cached != null) {
+                _groupProfileState.value = GroupProfileVo(cached.group)
+            }
+            refreshGroupData(refreshProfile = cached == null || cached.isExpired(nowMilliseconds()))
+        }
     }
 
     fun refreshGroupData() {
