@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -142,9 +141,18 @@ internal object PrintDisplayGeometry {
         val photo = targetPhotoRect(bounds)
         val revealedCanvas = revealedCanvasRect(bounds, transitionProgress)
         return Path().apply {
-            fillType = PathFillType.EvenOdd
-            addRect(revealedCanvas)
-            addRect(photo)
+            addRectIfNotEmpty(
+                Rect(revealedCanvas.left, revealedCanvas.top, revealedCanvas.right, photo.top)
+            )
+            addRectIfNotEmpty(
+                Rect(revealedCanvas.left, photo.bottom, revealedCanvas.right, revealedCanvas.bottom)
+            )
+            addRectIfNotEmpty(
+                Rect(revealedCanvas.left, photo.top, photo.left, photo.bottom)
+            )
+            addRectIfNotEmpty(
+                Rect(photo.right, photo.top, revealedCanvas.right, photo.bottom)
+            )
         }
     }
 
@@ -208,6 +216,10 @@ internal object PrintDisplayGeometry {
 
     private fun lerp(start: Float, end: Float, progress: Float): Float =
         start + (end - start) * progress
+}
+
+private fun Path.addRectIfNotEmpty(rect: Rect) {
+    if (rect.width > 0f && rect.height > 0f) addRect(rect)
 }
 
 internal fun Modifier.printSafePhotoToBounds(): Modifier = graphicsLayer {
