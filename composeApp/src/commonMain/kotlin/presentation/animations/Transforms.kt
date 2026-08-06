@@ -45,10 +45,14 @@ val IconBoundsTransform = BoundsTransform { _, _ ->
 @OptIn(ExperimentalSharedTransitionApi::class)
 val DefaultBoundsTransform = BoundsTransform { _, _ -> DefaultSpring }
 
-val DefaultSpring = spring(
+internal fun <T> defaultSpring(
+    visibilityThreshold: T? = null,
+): SpringSpec<T> = spring(
     stiffness = StiffnessMediumLow,
-    visibilityThreshold = Rect.VisibilityThreshold
+    visibilityThreshold = visibilityThreshold,
 )
+
+val DefaultSpring = defaultSpring(Rect.VisibilityThreshold)
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val ParentClip: OverlayClip =

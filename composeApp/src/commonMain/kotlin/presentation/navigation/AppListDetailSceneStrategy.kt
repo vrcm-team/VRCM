@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntRect
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
@@ -48,6 +49,11 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import io.github.vrcmteam.vrcm.presentation.animations.defaultSpring
+
+private val PaneBoundsAnimationSpec = defaultSpring(
+    visibilityThreshold = IntRect(1, 1, 1, 1),
+)
 
 @ExperimentalMaterial3AdaptiveApi
 @Composable
@@ -323,13 +329,16 @@ private class AppListDetailScene<T : Any>(
                 {
                     AnimatedPane(
                         modifier = Modifier.preferredWidth(0.4f),
+                        boundsAnimationSpec = PaneBoundsAnimationSpec,
                     ) {
                         entry.Content()
                     }
                 }
             } ?: {},
             detailPane = {
-                AnimatedPane {
+                AnimatedPane(
+                    boundsAnimationSpec = PaneBoundsAnimationSpec,
+                ) {
                     if (lastDetail != null) {
                         lastDetail.Content()
                     } else {
