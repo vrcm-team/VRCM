@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.shouldLoadNextPage
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -56,9 +58,12 @@ class RecentWorldsScreenModel(
     val endReached by _endReached
 
     private var pagingState = RecentWorldPagingState<WorldData>()
+    private var initialLoadStarted = false
     val loadMoreFailed: Boolean get() = pagingState.failedOffset != null
 
     fun loadRecentWorlds() {
+        if (initialLoadStarted) return
+        initialLoadStarted = true
         loadPage(reset = true)
     }
 
@@ -248,6 +253,7 @@ object RecentWorldsScreen : Screen {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
     Card(
@@ -285,6 +291,7 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
                     imageOptions = ImageOptions(contentScale = ContentScale.Crop),
                     imageLoader = { koinInject() },
                     modifier = Modifier
+                        .sharedBoundsBy("${world.id}WorldImage")
                         .size(80.dp, 45.dp)
                         .clip(RoundedCornerShape(8.dp)),
                 )
