@@ -66,6 +66,10 @@ class HomeScreenModel(
     private val _friendRequestNotifications = mutableStateOf<List<NotificationItemData>>(emptyList())
     val friendRequestNotifications by _friendRequestNotifications
 
+    private val _pendingNotificationActions =
+        mutableStateOf<Map<String, NotificationItemData.ActionData>>(emptyMap())
+    val pendingNotificationActions by _pendingNotificationActions
+
     init {
         friendService.preloadFriendList()
         friendLocationPagerModel.preloadFriendLocations()
@@ -146,35 +150,49 @@ class HomeScreenModel(
         boopSuccessMessage: String,
         boopAlreadySentMessage: String,
     ) {
+        if (_pendingNotificationActions.value.containsKey(item.id)) return
+        _pendingNotificationActions.value += item.id to action
+
         when (item.responseTarget(action)) {
             NotificationResponseTarget.BOOP_USER_API -> {
-                item.senderId?.let {
-                    boopUser(item.id, it, boopSuccessMessage, boopAlreadySentMessage)
+                val senderId = item.senderId
+                if (senderId == null) {
+                    finishNotificationAction(item.id)
+                    return
                 }
+                boopUser(item.id, senderId, boopSuccessMessage, boopAlreadySentMessage)
                 return
             }
             NotificationResponseTarget.NOTIFICATION_API -> Unit
         }
 
-        val id = item.id
         val type = item.type
         if (type == NotificationType.FriendRequest.value) {
-            responseFriendRequest(id, action)
+            responseFriendRequest(item, action)
         } else {
-            responseNotification(id, action)
+            responseNotification(item, action)
         }
     }
 
-    private fun responseFriendRequest(id: String, response: NotificationItemData.ActionData) {
+    private fun responseFriendRequest(item: NotificationItemData, response: NotificationItemData.ActionData) {
         if (response.type == "Accept") {
-            acceptFriendRequest(id)
+            acceptFriendRequest(item)
         } else {
-            hideNotification(id)
+            hideNotification(item)
         }
     }
 
-    private fun responseNotification(id: String, response: NotificationItemData.ActionData) = notificationAction {
-        notificationApi.responseNotification(id, response)
+    private fun responseNotification(item: NotificationItemData, response: NotificationItemData.ActionData) =
+        notificationAction(item) {
+            notificationApi.responseNotification(item.id, response)
+        }
+
+    private fun removeNotification(item: NotificationItemData) {
+        if (item.type == NotificationType.FriendRequest.value) {
+            _friendRequestNotifications.value = _friendRequestNotifications.value.filterNot { it.id == item.id }
+        } else {
+            _notifications.value = _notifications.value.filterNot { it.id == item.id }
+        }
     }
 
     private fun boopUser(
@@ -184,40 +202,52 @@ class HomeScreenModel(
         alreadySentMessage: String,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            when (val result = boopService.send(userId)) {
-                BoopResult.Sent -> {
-                    _notifications.value = _notifications.value.filterNot { it.id == notificationId }
-                    authService.reTryAuthCatching { notificationApi.deleteNotification(notificationId) }
-                        .onFailure { error -> Result.failure<Unit>(error).onHomeFailure() }
-                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            try {
+                when (val result = boopService.send(userId)) {
+                    BoopResult.Sent -> {
+                        _notifications.value = _notifications.value.filterNot { it.id == notificationId }
+                        authService.reTryAuthCatching { notificationApi.deleteNotification(notificationId) }
+                            .onFailure { error -> Result.failure<Unit>(error).onHomeFailure() }
+                        SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                    }
+                    BoopResult.Cooldown -> {
+                        SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
+                    }
+                    is BoopResult.Failed -> Result.failure<Unit>(result.error).onHomeFailure()
+                    BoopResult.InFlight, BoopResult.SessionChanged -> Unit
                 }
-                BoopResult.Cooldown -> {
-                    SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
-                }
-                is BoopResult.Failed -> Result.failure<Unit>(result.error).onHomeFailure()
-                BoopResult.InFlight, BoopResult.SessionChanged -> Unit
+            } finally {
+                finishNotificationAction(notificationId)
             }
         }
     }
 
 
-    private fun acceptFriendRequest(notificationId: String) = notificationAction {
-        notificationApi.acceptFriendRequest(notificationId)
+    private fun acceptFriendRequest(item: NotificationItemData) = notificationAction(item) {
+        notificationApi.acceptFriendRequest(item.id)
     }
 
-    private fun hideNotification(notificationId: String) = notificationAction {
-        notificationApi.deleteNotification(notificationId)
+    private fun hideNotification(item: NotificationItemData) = notificationAction(item) {
+        notificationApi.deleteNotification(item.id)
     }
 
-    private fun notificationAction(action: suspend () -> Unit) {
+    private fun notificationAction(item: NotificationItemData, action: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching { action() }
-                .onHomeFailure()
-                .onSuccess {
-                    runCatching { refreshAllNotification() }
-                        .onHomeFailure()
-                }
+            try {
+                authService.reTryAuthCatching { action() }
+                    .onHomeFailure()
+                    .onSuccess {
+                        removeNotification(item)
+                        refreshAllNotification()
+                    }
+            } finally {
+                finishNotificationAction(item.id)
+            }
         }
+    }
+
+    private fun finishNotificationAction(notificationId: String) {
+        _pendingNotificationActions.value -= notificationId
     }
 
     private fun refreshCurrentUser() =

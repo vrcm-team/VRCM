@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.dialog
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,7 +9,9 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,16 +66,8 @@ object NotificationDialog : SharedDialog {
             )
         }
 
-        AnimatedContent(
-            modifier = Modifier.animateContentSize(),
-            targetState = notifications,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
-                        slideInVertically(animationSpec = tween(220, delayMillis = 90)))
-                    .togetherWith(fadeOut(animationSpec = tween(90)))
-            }
-        ) { notificationItemDataList ->
-            if (notificationItemDataList.isEmpty()) {
+        SharedDialogContainer {
+            if (notifications.isEmpty()) {
                 Text(
                     modifier = Modifier.padding(6.dp),
                     text = strings.homeNotificationEmpty,
@@ -83,14 +76,16 @@ object NotificationDialog : SharedDialog {
                     style = MaterialTheme.typography.titleLarge
                 )
             } else {
-                SharedDialogContainer {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        items(notificationItemDataList, key = { it.id }) { item ->
-                            NotificationItem(item, onResponseNotification)
-                        }
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().padding(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(notifications, key = { it.id }) { item ->
+                        NotificationItem(
+                            item = item,
+                            loadingAction = homeScreenModel.pendingNotificationActions[item.id],
+                            onResponse = onResponseNotification,
+                        )
                     }
                 }
             }
@@ -102,10 +97,10 @@ object NotificationDialog : SharedDialog {
 @Composable
 private fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
+    loadingAction: NotificationItemData.ActionData?,
     onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
 ) {
     var isExpand by remember { mutableStateOf(false) }
-    var respondedAction by remember { mutableStateOf<NotificationItemData.ActionData?>(null) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
     val senderId = item.senderId.orEmpty()
     val linkedUserId = item.linkedUserId.orEmpty()
@@ -189,9 +184,10 @@ private fun LazyItemScope.NotificationItem(
             ) {
                 Spacer(modifier = Modifier.weight(1f))
                 item.actions.forEach { action ->
+                    val isLoading = loadingAction == action
                     FilledTonalButton(
                         modifier = Modifier.animateContentSize(),
-                        enabled = respondedAction != action,
+                        enabled = loadingAction == null,
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         ),
@@ -205,16 +201,25 @@ private fun LazyItemScope.NotificationItem(
                                     sharedSuffixKey = sharedSuffixKey,
                                 )
                             } else {
-                                respondedAction = action
                                 onResponse(item, action)
                             }
                         }
                     ) {
-                        Text(
-                            text = action.type.capitalizeFirst(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                modifier = Modifier.alpha(if (isLoading) 0f else 1f),
+                                text = action.type.capitalizeFirst(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            if (isLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    strokeWidth = 2.dp,
+                                )
+                            }
+                        }
                     }
                 }
                 IconButton(
