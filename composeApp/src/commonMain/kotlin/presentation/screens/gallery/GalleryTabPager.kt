@@ -34,10 +34,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.ImageLoader
+import coil3.compose.SubcomposeAsyncImage
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
-import com.skydoves.landscapist.ImageOptions
-import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -426,13 +426,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 ""
             }
             AnimatedVisibility(dialogContent == null || (dialogContent as ImagePreviewDialog).fileId != file.id) {
-                CoilImage(
-                    imageModel = { imageUrl },
-                    imageOptions = ImageOptions(
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.Center
-                    ),
-                    imageLoader = { koinInject() },
+                SubcomposeAsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    imageLoader = koinInject<ImageLoader>(),
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(shape)
@@ -460,7 +459,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             )
                         }
                     },
-                    failure = {
+                    error = {
                         Column(
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,

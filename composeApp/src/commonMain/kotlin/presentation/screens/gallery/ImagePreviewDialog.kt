@@ -23,11 +23,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.skydoves.landscapist.ImageOptions
-import com.skydoves.landscapist.coil3.CoilImage
 import coil3.ImageLoader
 import coil3.PlatformContext
+import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
@@ -465,18 +465,21 @@ private fun PrintPreviewCanvasImage(
     imageUrl: String,
     modifier: Modifier,
 ) {
-    CoilImage(
-        imageModel = { imageUrl },
-        imageOptions = ImageOptions(
-            contentScale = ContentScale.Fit,
-            alignment = Alignment.Center,
-            requestSize = PrintPreviewPhotoRequestSize,
-            contentDescription = null,
-        ),
-        imageLoader = { koinInject() },
+    val imageLoader = koinInject<ImageLoader>()
+    val platformContext = koinInject<PlatformContext>()
+    val request = remember(imageUrl, platformContext) {
+        ImageRequest.Builder(platformContext)
+            .data(imageUrl)
+            .size(PrintPreviewPhotoRequestSize.width, PrintPreviewPhotoRequestSize.height)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = null,
+        imageLoader = imageLoader,
         modifier = modifier,
-        loading = {},
-        failure = {},
+        alignment = Alignment.Center,
+        contentScale = ContentScale.Fit,
     )
 }
 
@@ -486,22 +489,27 @@ private fun PreviewImage(
     contentDescription: String?,
     modifier: Modifier,
 ) {
-    CoilImage(
-        imageModel = { imageUrl },
-        imageOptions = ImageOptions(
-            contentScale = ContentScale.Fit,
-            alignment = Alignment.Center,
-            requestSize = IntSize(2048, 2048),
-            contentDescription = contentDescription
-        ),
-        imageLoader = { koinInject() },
+    val imageLoader = koinInject<ImageLoader>()
+    val platformContext = koinInject<PlatformContext>()
+    val request = remember(imageUrl, platformContext) {
+        ImageRequest.Builder(platformContext)
+            .data(imageUrl)
+            .size(2_048, 2_048)
+            .build()
+    }
+    SubcomposeAsyncImage(
+        model = request,
+        contentDescription = contentDescription,
+        imageLoader = imageLoader,
         modifier = modifier,
+        alignment = Alignment.Center,
+        contentScale = ContentScale.Fit,
         loading = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         },
-        failure = {
+        error = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = strings.imageLoadFailed,

@@ -18,12 +18,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
-import com.skydoves.landscapist.ImageOptions
-import com.skydoves.landscapist.coil3.CoilImage
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -302,10 +302,11 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                     )
                 }
             } else {
-                CoilImage(
-                    imageModel = { sharedImageCacheKey },
-                    imageOptions = ImageOptions(contentScale = ContentScale.Crop),
-                    imageLoader = { koinInject() },
+                AsyncImage(
+                    model = sharedImageCacheKey,
+                    contentDescription = null,
+                    imageLoader = koinInject<ImageLoader>(),
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .sharedBoundsBy("${world.id}WorldImage")
                         .size(80.dp, 45.dp)

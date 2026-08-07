@@ -39,8 +39,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.exifinterface)
-
-            implementation(libs.koin.androidx.compose)
+            implementation(libs.androidx.sqlite.framework)
 
             implementation(libs.ktor.client.okhttp)
         }
@@ -50,8 +49,8 @@ kotlin {
         }
 
         iosMain.dependencies {
-            implementation(libs.stately.common)
             implementation(libs.ktor.client.darwin)
+            implementation(libs.androidx.sqlite.bundled)
         }
 
         val desktopMain by getting
@@ -64,6 +63,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna.platform)
             implementation(libs.okio)
+            implementation(libs.androidx.sqlite.bundled)
         }
 
         val desktopTest by getting
@@ -95,7 +95,6 @@ kotlin {
 //            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.multiplatform.settings)
-            implementation(libs.multiplatform.settings.no.arg)
 
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
@@ -109,17 +108,11 @@ kotlin {
             implementation(libs.coil.compose.core)
             implementation(libs.coil.network.ktor)
 
-            // landscapist
-            implementation(libs.landscapist.coil)
-            implementation(libs.landscapist.animation)
-            implementation(libs.landscapist.placeholder)
-
             implementation(libs.chrisbanes.haze)
 
             implementation(libs.filekit.dialogs.compose)
 
             implementation(libs.androidx.room.runtime)
-            implementation(libs.androidx.sqlite.bundled)
 
 //            implementation(libs.kamel)
         }
@@ -205,7 +198,9 @@ android {
 
     buildTypes {
         getByName("release") {
-            this.isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             if (storeFile != null) {
                 this.signingConfig = signingConfigs.getByName("release")
             }

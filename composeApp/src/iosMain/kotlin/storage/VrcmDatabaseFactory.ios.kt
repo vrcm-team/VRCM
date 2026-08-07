@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.storage
 
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import io.github.vrcmteam.vrcm.AppPlatform
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSApplicationSupportDirectory
@@ -25,5 +26,6 @@ internal actual fun platformVrcmDatabaseBuilder(
         attributes = null,
         error = null,
     )
-    return Room.databaseBuilder(name = "$directory/$VRCM_DATABASE_NAME")
+    return Room.databaseBuilder<VrcmDatabase>(name = "$directory/$VRCM_DATABASE_NAME")
+        .setDriver(BundledSQLiteDriver())
 }
