@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -40,6 +41,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 class FriendService(
@@ -53,9 +56,11 @@ class FriendService(
     private val friendMapLock = SynchronizedObject()
     private val friendStore = FriendStateStore()
     private val refreshCoordinator = FriendRefreshCoordinator()
+    private val currentUserRefreshMutex = Mutex()
     private val accountTracker = FriendAccountTracker()
     private var activeAccountUserId: String? = null
     private var activeSessionToken: AccountSessionToken? = null
+    private var currentUserLocationRevision = 0L
     private val cacheWriter =
         ConflatedAccountCacheWriter<PendingFriendCacheSnapshot>(serviceScope) { _, pending ->
             accountCacheManager.saveFriendListIfCurrent(
@@ -107,6 +112,7 @@ class FriendService(
                         activeSessionToken = null
                         friendStore.clear()
                         publishFriendState()
+                        currentUserLocationRevision++
                         _currentUserLocation.value = null
                         _friendActivitySource.value = null
                     }
@@ -123,6 +129,7 @@ class FriendService(
             if (activeSessionToken == session.token) return@synchronized false
             activeSessionToken = session.token
             if (activeAccountUserId != session.account.userId) {
+                currentUserLocationRevision++
                 _currentUserLocation.value = null
                 restoreCachedFriendList(session.account.userId)
             }
@@ -133,17 +140,7 @@ class FriendService(
         if (activated) {
             preloadFriendList(session.account.userId)
             serviceScope.launch {
-                runCatching { authService.currentUser(isRefresh = true).presence }.onSuccess { presence ->
-                    if (isCurrentSession(session.token)) {
-                        updateCurrentUserLocation(
-                            sessionToken = session.token,
-                            presence = FriendPresence(
-                            location = presenceLocation(presence.world, presence.instance),
-                            travelingToLocation = presenceLocation(presence.travelingToWorld, presence.travelingToInstance),
-                            ),
-                        )
-                    }
-                }
+                runCatching { refreshCurrentUserLocation(session.token) }
             }
         }
     }
@@ -374,6 +371,39 @@ class FriendService(
         presence: FriendPresence,
     ) = synchronized(friendMapLock) {
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized
+        updateCurrentUserLocationLocked(presence)
+    }
+
+    /**
+     * Refreshes the signed-in user's location while preserving any WebSocket update
+     * that arrives before the HTTP refresh is published.
+     */
+    suspend fun refreshCurrentUserLocation(): CurrentUserData? {
+        val sessionToken = synchronized(friendMapLock) { activeSessionToken } ?: return null
+        return refreshCurrentUserLocation(sessionToken)
+    }
+
+    private suspend fun refreshCurrentUserLocation(
+        sessionToken: AccountSessionToken,
+    ): CurrentUserData? = currentUserRefreshMutex.withLock refresh@{
+        val locationRevision = synchronized(friendMapLock) {
+            if (!isCurrentSessionLocked(sessionToken)) return@refresh null
+            currentUserLocationRevision
+        }
+        val currentUser = authService.refreshCurrentUserPresence(sessionToken) ?: return@refresh null
+        synchronized(friendMapLock) {
+            if (!isCurrentSessionLocked(sessionToken) || currentUser.id != sessionToken.userId) {
+                return@synchronized null
+            }
+            if (currentUserLocationRevision == locationRevision) {
+                updateCurrentUserLocationLocked(currentUser.presence.toFriendPresence())
+            }
+            currentUser
+        }
+    }
+
+    private fun updateCurrentUserLocationLocked(presence: FriendPresence) {
+        currentUserLocationRevision++
         _currentUserLocation.value = presence
         publishFriendActivitySource()
     }
@@ -429,6 +459,12 @@ private fun presenceLocation(world: String, instance: String): String = when {
     world.startsWith("wrld_") && instance.isNotBlank() && instance != "offline" -> "$world:$instance"
     else -> instance
 }
+
+private fun io.github.vrcmteam.vrcm.network.api.auth.data.Presence.toFriendPresence() =
+    FriendPresence(
+        location = presenceLocation(world, instance),
+        travelingToLocation = presenceLocation(travelingToWorld, travelingToInstance),
+    )
 
 private data class PendingFriendCacheSnapshot(
     val token: AccountCacheWriteToken,

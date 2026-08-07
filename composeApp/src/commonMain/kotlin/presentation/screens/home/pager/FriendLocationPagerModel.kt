@@ -271,9 +271,11 @@ class FriendLocationPagerModel(
         val includedIds = mutableSetOf<String>()
         updateMutex.withLock { presenceStore.beginRefresh() }
         try {
-            val currentUser = authService.currentUser(isRefresh = true)
-            updateMutex.withLock {
-                if (accountTracker.isCurrent(token)) {
+            val currentUser = friendService.refreshCurrentUserLocation()
+            if (currentUser != null) {
+                updateMutex.withLock {
+                    if (!accountTracker.isCurrent(token)) return@withLock
+                    currentUserPresence = friendService.currentUserLocation.value
                     presenceStore.setActiveFriends(currentUser.activeFriends)
                 }
             }

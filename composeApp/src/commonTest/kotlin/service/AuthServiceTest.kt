@@ -259,6 +259,73 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun explicitPresenceRefreshReplacesOlderSocketLocation() = runTest {
+        var requestCount = 0
+        val fixture = fixture {
+            requestCount++
+            jsonResponse(
+                if (requestCount == 1) {
+                    currentUserJson(cachedAccount())
+                } else {
+                    currentUserJson(
+                        account = cachedAccount(),
+                        presenceInstance = "offline",
+                    )
+                }
+            )
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        fixture.service.applySocketUserLocation("wrld_old:instance", "")
+
+        val refreshed = assertNotNull(
+            fixture.service.refreshCurrentUserPresence(session.token)
+        )
+
+        assertEquals("offline", refreshed.location)
+        assertEquals("offline", fixture.service.currentUserState.value?.location)
+        assertEquals("offline", fixture.service.currentUser(isRefresh = true).location)
+        fixture.client.close()
+    }
+
+    @Test
+    fun socketLocationReceivedDuringPresenceRefreshWins() = runTest {
+        var requestCount = 0
+        val refreshStarted = CompletableDeferred<Unit>()
+        val finishRefresh = CompletableDeferred<Unit>()
+        val fixture = fixture {
+            requestCount++
+            if (requestCount == 1) {
+                jsonResponse(currentUserJson(cachedAccount()))
+            } else {
+                refreshStarted.complete(Unit)
+                finishRefresh.await()
+                jsonResponse(
+                    currentUserJson(
+                        account = cachedAccount(),
+                        presenceInstance = "offline",
+                    )
+                )
+            }
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        fixture.service.applySocketUserLocation("wrld_old:instance", "")
+        val refresh = async {
+            fixture.service.refreshCurrentUserPresence(session.token)
+        }
+        refreshStarted.await()
+
+        fixture.service.applySocketUserLocation("wrld_new:instance", "")
+        finishRefresh.complete(Unit)
+
+        val refreshed = assertNotNull(refresh.await())
+        assertEquals("wrld_new:instance", refreshed.location)
+        assertEquals("wrld_new:instance", fixture.service.currentUserState.value?.location)
+        fixture.client.close()
+    }
+
+    @Test
     fun sessionBoundRequestReturnsRetryAuthenticationFailure() = runTest {
         val retryError = IllegalStateException("reauth unavailable")
         val fixture = fixture { request ->
@@ -459,6 +526,8 @@ class AuthServiceTest : MainDispatcherTest() {
     private fun currentUserJson(
         account: AccountDto,
         currentAvatar: String = "",
+        presenceWorld: String = "",
+        presenceInstance: String = "",
     ): String = """
         {
           "requiresTwoFactorAuth":null,
@@ -479,9 +548,9 @@ class AuthServiceTest : MainDispatcherTest() {
           "onlineFriends":[],"pastDisplayNames":[],"picoId":"",
           "presence":{
             "avatarThumbnail":null,"displayName":"${account.username}","groups":[],
-            "id":"${account.userId}","instance":"","instanceType":"",
+            "id":"${account.userId}","instance":"$presenceInstance","instanceType":"",
             "isRejoining":null,"platform":"standalonewindows","profilePicOverride":null,
-            "status":"active","travelingToInstance":"","travelingToWorld":"","world":""
+            "status":"active","travelingToInstance":"","travelingToWorld":"","world":"$presenceWorld"
           },
           "profilePicOverride":"","state":"online","status":"active",
           "statusDescription":"","statusFirstTime":false,"statusHistory":[],
