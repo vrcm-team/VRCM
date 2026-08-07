@@ -52,6 +52,107 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchListPagerModelTest : MainDispatcherTest() {
     @Test
+    fun successfulInitialLoadsAreReusedPerSearchType() = runBlocking {
+        var userRequestCount = 0
+        var worldRequestCount = 0
+        val fixture = createFixture { request ->
+            when (request.url.encodedPath) {
+                "/users" -> {
+                    userRequestCount++
+                    jsonResponse("[]")
+                }
+                "/worlds" -> {
+                    worldRequestCount++
+                    jsonResponse(worldJson("wrld_default"))
+                }
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+
+        fixture.model.loadSearchListIfNeeded()
+        fixture.model.setSearchType(1)
+        fixture.model.loadSearchListIfNeeded()
+        fixture.model.setSearchType(0)
+        fixture.model.loadSearchListIfNeeded()
+        fixture.model.setSearchType(1)
+        fixture.model.loadSearchListIfNeeded()
+
+        assertEquals(1, userRequestCount)
+        assertEquals(1, worldRequestCount)
+        fixture.close()
+    }
+
+    @Test
+    fun failedInitialLoadCanRetryWithoutChangingRequestKey() = runBlocking {
+        var requestCount = 0
+        val fixture = createFixture {
+            requestCount++
+            if (requestCount == 1) {
+                respond(
+                    content = "initial search failed",
+                    status = HttpStatusCode.InternalServerError,
+                )
+            } else {
+                jsonResponse("[]")
+            }
+        }
+
+        fixture.model.loadSearchListIfNeeded()
+        fixture.model.loadSearchListIfNeeded()
+
+        assertEquals(2, requestCount)
+        fixture.close()
+    }
+
+    @Test
+    fun groupInitialLoadAndPagingStateAreReusedAfterTabSwitch() = runBlocking {
+        var requestCount = 0
+        val fixture = createFixture { request ->
+            requestCount++
+            when (request.url.parameters["offset"]) {
+                "0" -> jsonResponse(groupsJson((0 until 20).map { "grp_$it" }))
+                "20" -> jsonResponse(groupJson("grp_20"))
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+        fixture.model.setSearchType(3)
+        fixture.model.setSearchText("group")
+
+        fixture.model.loadSearchListIfNeeded()
+        assertTrue(fixture.model.groupHasMore.value)
+        fixture.model.setSearchType(0)
+        fixture.model.setSearchType(3)
+        fixture.model.loadSearchListIfNeeded()
+        assertEquals(1, requestCount)
+        assertTrue(fixture.model.groupHasMore.value)
+
+        assertNotNull(fixture.model.loadMoreGroups()).join()
+        assertEquals(2, requestCount)
+        assertEquals((0..20).map { "grp_$it" }, fixture.model.groupSearchList.value.map { it.id })
+        fixture.close()
+    }
+
+    @Test
+    fun accountChangeInvalidatesSuccessfulInitialLoads() = runBlocking {
+        var requestCount = 0
+        val fixture = createFixture(
+            account = AccountDto(userId = "usr_old", username = "old-user"),
+        ) {
+            requestCount++
+            jsonResponse("[]")
+        }
+
+        fixture.model.loadSearchListIfNeeded()
+        SharedFlowCentre.emitAuthenticated(
+            AccountDto(userId = "usr_new", username = "new-user"),
+        )
+        fixture.model.loadSearchListIfNeeded()
+
+        assertEquals(2, requestCount)
+        fixture.close()
+    }
+
+    @Test
     fun sameUserAuthenticationRetryKeepsSuccessfulSearchResult() = runBlocking {
         val account = AccountDto(
             userId = "usr_same",

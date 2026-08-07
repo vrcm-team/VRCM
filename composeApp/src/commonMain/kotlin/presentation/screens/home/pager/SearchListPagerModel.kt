@@ -77,6 +77,8 @@ class SearchListPagerModel(
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
+    private val successfulRequestKeysByType = MutableStateFlow<Map<Int, SearchRequestKey>>(emptyMap())
+
     private var authenticatedUserId: String? = authService.accountDtoOrNull()?.userId
 
     init {
@@ -87,6 +89,7 @@ class SearchListPagerModel(
                 val accountChanged = authenticatedUserId != account.userId
                 authenticatedUserId = account.userId
                 if (accountChanged) {
+                    successfulRequestKeysByType.value = emptyMap()
                     _userSearchList.value = emptyList()
                     _worldSearchList.value = emptyList()
                     _groupSearchList.value = emptyList()
@@ -104,7 +107,7 @@ class SearchListPagerModel(
         if (!(type in 0..3 && type != searchType.value)) return
         advanceRequestGeneration()
         _searchType.value = type
-        invalidateGroupPaging()
+        groupLoadingGate.invalidate()
     }
 
     fun setSearchText(text: String) {
@@ -131,15 +134,23 @@ class SearchListPagerModel(
     }
 
     /**
-     * 刷新搜索列表
-     * @param name 搜索文本
+     * 当前搜索类型已成功加载相同请求条件时复用现有结果。
+     */
+    suspend fun loadSearchListIfNeeded() {
+        val requestKey = currentRequestKey()
+        if (successfulRequestKeysByType.value[requestKey.searchType] == requestKey) return
+        refreshSearchList()
+    }
+
+    /**
+     * 强制刷新当前搜索列表。
      * @return 是否成功获取新的搜索结果
      */
     suspend fun refreshSearchList(): Boolean {
         val requestKey = currentRequestKey()
         val generation = requestGeneration.value
 
-        return withContext(Dispatchers.IO) {
+        val success = withContext(Dispatchers.IO) {
             when (requestKey.searchType) {
                 0 -> searchUsers(requestKey.searchText, requestKey, generation)
                 1 -> searchWorlds(requestKey, generation)
@@ -151,6 +162,12 @@ class SearchListPagerModel(
                 else -> false
             }
         }
+        if (success && isCurrentRequest(requestKey, generation)) {
+            successfulRequestKeysByType.update { keys ->
+                keys + (requestKey.searchType to requestKey)
+            }
+        }
+        return success
     }
 
     fun loadMoreGroups(): Job? = startGroupPage(retryFailed = false)
@@ -354,6 +371,7 @@ class SearchListPagerModel(
     }
 
     private fun invalidateGroupPaging() {
+        successfulRequestKeysByType.update { it - GROUP_SEARCH_TYPE }
         groupPagingState.value = GroupPagingState()
         _groupHasMore.value = false
         groupLoadingGate.invalidate()
