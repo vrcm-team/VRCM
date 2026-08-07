@@ -82,6 +82,7 @@ internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings)
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
     private val sharedSuffixKey: String = "",
+    private val sharedImageCacheKey: String? = null,
 ) : AppDetailRoute {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
@@ -127,6 +128,7 @@ class AvatarProfileScreen(
                 imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
                 profileImageUrl = displayedAvatar.avatarImageUrl,
                 iconUrl = displayedAvatar.avatarImageUrl,
+                sharedImageCacheKey = sharedImageCacheKey,
                 onReturn = { navigator.pop() },
             ) { ratio, contentMinHeight ->
                 AvatarProfileContent(

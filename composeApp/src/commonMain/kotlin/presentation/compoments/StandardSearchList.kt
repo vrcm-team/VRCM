@@ -92,7 +92,8 @@ fun StandardSearchList(
             coroutineScope.launch {
                 currentNavigator push WorldProfileScreen(
                     worldProfileVO = WorldProfileVo(world),
-                    sharedSuffixKey = sharedSuffixKey
+                    sharedSuffixKey = sharedSuffixKey,
+                    sharedImageCacheKey = world.safeImageUrl(),
                 )
             }
         }

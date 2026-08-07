@@ -14,14 +14,72 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.PlatformContext
+import coil3.intercept.Interceptor
+import coil3.memory.MemoryCache
+import coil3.request.ErrorResult
+import coil3.request.ImageRequest
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class ProfileScaffoldAvatarClickTest {
+    @Test
+    fun profileCoverRequestUsesSharedImageCachePlaceholder() = runComposeUiTest {
+        val requests = CopyOnWriteArrayList<ImageRequest>()
+        val platformContext = PlatformContext.INSTANCE
+        val imageLoader = ImageLoader.Builder(platformContext)
+            .components {
+                add(
+                    Interceptor { chain ->
+                        requests += chain.request
+                        ErrorResult(
+                            image = null,
+                            request = chain.request,
+                            throwable = IllegalStateException("Request captured by test"),
+                        )
+                    },
+                )
+            }
+            .build()
+
+        setContent {
+            KoinApplication(
+                application = {
+                    modules(
+                        module {
+                            single<PlatformContext> { platformContext }
+                            single<ImageLoader> { imageLoader }
+                        },
+                    )
+                },
+            ) {
+                MaterialTheme {
+                    Box(modifier = Modifier.size(width = 400.dp, height = 600.dp)) {
+                        ProfileScaffold(
+                            profileImageUrl = TargetImageUrl,
+                            iconUrl = null,
+                            sharedImageCacheKey = SourceImageCacheKey,
+                            onReturn = {},
+                        ) { _, _ -> Unit }
+                    }
+                }
+            }
+        }
+
+        waitUntil(timeoutMillis = 5_000) {
+            requests.any { it.data == TargetImageUrl }
+        }
+        val coverRequest = requests.first { it.data == TargetImageUrl }
+        assertEquals(
+            MemoryCache.Key(SourceImageCacheKey),
+            coverRequest.placeholderMemoryCacheKey,
+        )
+    }
+
     @Test
     fun avatarClickScrollsContentBeforeExpandingCover() = runComposeUiTest {
         mainClock.autoAdvance = false
@@ -105,5 +163,10 @@ class ProfileScaffoldAvatarClickTest {
         waitForIdle()
         assertEquals(0, runOnIdle { innerScrollState.value })
         assertEquals(0, runOnIdle { outerScrollState.value })
+    }
+
+    private companion object {
+        const val TargetImageUrl = "https://example.com/avatar.png"
+        const val SourceImageCacheKey = "https://example.com/avatar-preview.png"
     }
 }

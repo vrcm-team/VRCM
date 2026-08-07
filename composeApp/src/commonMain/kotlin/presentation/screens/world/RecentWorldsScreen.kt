@@ -229,7 +229,7 @@ object RecentWorldsScreen : AppDetailRoute {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(model.worlds, key = { it.id }) { world ->
-                        RecentWorldItem(world) {
+                        RecentWorldItem(world) { sharedImageCacheKey ->
                             if (world.id == "???") {
                                 scope.launch {
                                     SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
@@ -238,6 +238,7 @@ object RecentWorldsScreen : AppDetailRoute {
                                 navigator.push(
                                     WorldProfileScreen(
                                         worldProfileVO = WorldProfileVo(world),
+                                        sharedImageCacheKey = sharedImageCacheKey,
                                     )
                                 )
                             }
@@ -267,11 +268,14 @@ object RecentWorldsScreen : AppDetailRoute {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
+private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
+    val sharedImageCacheKey = (world.thumbnailImageUrl ?: world.imageUrl)
+        .orEmpty()
+        .ifBlank { null }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable { onClick(sharedImageCacheKey) },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -299,7 +303,7 @@ private fun RecentWorldItem(world: WorldData, onClick: () -> Unit) {
                 }
             } else {
                 CoilImage(
-                    imageModel = { (world.thumbnailImageUrl ?: world.imageUrl).orEmpty().ifBlank { null } },
+                    imageModel = { sharedImageCacheKey },
                     imageOptions = ImageOptions(contentScale = ContentScale.Crop),
                     imageLoader = { koinInject() },
                     modifier = Modifier

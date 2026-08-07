@@ -110,6 +110,7 @@ fun ProfileScaffold(
     imageModifier: Modifier = Modifier,
     profileImageUrl: String?,
     iconUrl: String?,
+    sharedImageCacheKey: String? = null,
     onReturn: () -> Unit,
     onMenu:  (() -> Unit)? = null,
     outerScrollState: ScrollState = rememberScrollState(),
@@ -165,7 +166,8 @@ fun ProfileScaffold(
                 offsetDp,
                 ratio,
                 blurDp,
-                profileImageUrl
+                profileImageUrl,
+                sharedImageCacheKey,
             )
             // 底部信息卡片
             BottomCard(
@@ -215,7 +217,8 @@ private fun ProfileImage(
     offsetDp: Dp,
     ratio: Float,
     blurDp: Dp,
-    imageUrl: String?
+    imageUrl: String?,
+    sharedImageCacheKey: String?,
 ) {
     Box(
         modifier = Modifier
@@ -236,6 +239,7 @@ private fun ProfileImage(
                 .blur(blurDp),
             imageData = imageUrl,
             loadOriginalSize = true,
+            cachedPlaceholderKey = sharedImageCacheKey,
         )
     }
 }

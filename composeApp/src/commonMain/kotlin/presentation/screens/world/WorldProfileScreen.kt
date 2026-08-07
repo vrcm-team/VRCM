@@ -91,6 +91,7 @@ class WorldProfileScreen(
     private val location: String? = null,
     private val sharedSuffixKey: String = "",
     private val sharedKeyPrefix: String = "",
+    private val sharedImageCacheKey: String? = null,
 ) : AppDetailRoute {
 
     @Composable
@@ -117,6 +118,7 @@ class WorldProfileScreen(
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
                 sharedKeyPrefix = sharedKeyPrefix,
+                sharedImageCacheKey = sharedImageCacheKey,
             )
         }
     }
@@ -130,6 +132,7 @@ class WorldProfileScreen(
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
         sharedKeyPrefix: String = "",
+        sharedImageCacheKey: String? = null,
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
@@ -178,7 +181,8 @@ class WorldProfileScreen(
                 imageUrl = worldProfileVo.worldImageUrl ?: "",
                 hazeState = hazeState,
                 imageHeight = sizes.imageHigh * 2,
-                sharedKeyPrefix = sharedKeyPrefix
+                sharedKeyPrefix = sharedKeyPrefix,
+                sharedImageCacheKey = sharedImageCacheKey,
             )
 
             // ========== 应用模糊效果 ==========
@@ -430,6 +434,7 @@ private fun RenderBackgroundImage(
     hazeState: HazeState,
     imageHeight: Dp,
     sharedKeyPrefix: String = "",
+    sharedImageCacheKey: String? = null,
 ) {
     AImage(
         modifier = Modifier
@@ -441,6 +446,7 @@ private fun RenderBackgroundImage(
         ),
         imageData = imageUrl,
         loadOriginalSize = true,
+        cachedPlaceholderKey = sharedImageCacheKey,
     )
 }
 

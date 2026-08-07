@@ -56,6 +56,7 @@ fun UserStateIcon(
     iconUrl: String?,
     userStatus: UserStatus? = null,
     location: String? = null,
+    cachedPlaceholderKey: String? = null,
 ) {
     val isHollow = userStatus != UserStatus.Offline && location != null && LocationType.fromValue(location) == LocationType.Offline
     AImage(
@@ -65,7 +66,8 @@ fun UserStateIcon(
             .aspectRatio(1f)
             .clip(CircleShape),
         imageData = iconUrl.orEmpty(),
-        contentDescription = "UserStateIcon"
+        contentDescription = "UserStateIcon",
+        cachedPlaceholderKey = cachedPlaceholderKey,
     )
 }
 

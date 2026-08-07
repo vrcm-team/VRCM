@@ -26,6 +26,25 @@ import coil3.size.Precision
 import coil3.size.Size
 import org.koin.compose.koinInject
 
+internal fun createAImageRequest(
+    platformContext: PlatformContext,
+    imageUrl: String,
+    loadOriginalSize: Boolean,
+    cachedPlaceholderKey: String?,
+): ImageRequest = ImageRequest.Builder(platformContext)
+    .data(imageUrl)
+    .apply {
+        cachedPlaceholderKey
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::placeholderMemoryCacheKey)
+        if (loadOriginalSize) {
+            size(Size.ORIGINAL)
+            precision(Precision.EXACT)
+        }
+    }
+    .crossfade(600)
+    .build()
+
 /**
  * 闪烁效果修饰符 - 使用drawWithCache确保动画速度与组件大小一致
  */
@@ -82,23 +101,20 @@ fun AImage(
     placeholder: Painter? = remember(color) { ColorPainter(color) },
     contentScale: ContentScale = ContentScale.Crop,
     loadOriginalSize: Boolean = false,
+    cachedPlaceholderKey: String? = null,
 ) {
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
     val isLoading = remember(imageData) { mutableStateOf(true) }
     val imageRequest: Any? =
         when (imageData) {
-            is String -> remember(imageData, loadOriginalSize) {
-                ImageRequest.Builder(platformContext)
-                    .data(imageData)
-                    .apply {
-                        if (loadOriginalSize) {
-                            size(Size.ORIGINAL)
-                            precision(Precision.EXACT)
-                        }
-                    }
-                    .crossfade(600)
-                    .build()
+            is String -> remember(imageData, loadOriginalSize, cachedPlaceholderKey) {
+                createAImageRequest(
+                    platformContext = platformContext,
+                    imageUrl = imageData,
+                    loadOriginalSize = loadOriginalSize,
+                    cachedPlaceholderKey = cachedPlaceholderKey,
+                )
             }
             is ImageRequest -> imageData
             else -> imageData

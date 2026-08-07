@@ -542,7 +542,8 @@ private fun ColumnScope.ProfileContent(
             navigator push WorldProfileScreen(
                 worldProfileVO = tempWorldProfileVo,
                 location = friendLocation.location,
-                sharedSuffixKey = transitionSuffixKey
+                sharedSuffixKey = transitionSuffixKey,
+                sharedImageCacheKey = homeInstanceVo.worldImageUrl,
             )
         }
 
@@ -625,7 +626,11 @@ private fun ColumnScope.ProfileContent(
                         worldImageUrl = resolveOriginalImageUrl(world.imageUrl, world.thumbnailImageUrl)
                     ),
                     sharedSuffixKey = sharedSuffixKey,
-                    sharedKeyPrefix = "Created_"
+                    sharedKeyPrefix = "Created_",
+                    sharedImageCacheKey = resolveOriginalImageUrl(
+                        world.imageUrl,
+                        world.thumbnailImageUrl,
+                    ),
                 )
             }
         }
@@ -675,7 +680,11 @@ private fun ColumnScope.ProfileContent(
                         labsPublicationDate = world.labsPublicationDate
                     ),
                     sharedSuffixKey = sharedSuffixKey,
-                    sharedKeyPrefix = "Fav_"
+                    sharedKeyPrefix = "Fav_",
+                    sharedImageCacheKey = resolveOriginalImageUrl(
+                        world.imageUrl,
+                        world.thumbnailImageUrl,
+                    ),
                 )
             }
         }
@@ -1092,7 +1101,8 @@ class CardListDetailScreen(
                                                 authorName = item.authorName
                                             ),
                                             sharedSuffixKey = sharedSuffixKey,
-                                            sharedKeyPrefix = sharedKeyPrefix
+                                            sharedKeyPrefix = sharedKeyPrefix,
+                                            sharedImageCacheKey = item.imageUrl ?: item.thumbnailUrl,
                                         )
                                     }
                                 }
@@ -1101,6 +1111,7 @@ class CardListDetailScreen(
                                         navigator push AvatarProfileScreen(
                                             avatarProfileVo = AvatarProfileVo(avatar),
                                             sharedSuffixKey = sharedSuffixKey,
+                                            sharedImageCacheKey = item.imageUrl ?: item.thumbnailUrl,
                                         )
                                     }
                                 }
@@ -1283,6 +1294,10 @@ private fun UserCreatedAvatarsSection(
                         )
                     ),
                     sharedSuffixKey = sharedSuffixKey,
+                    sharedImageCacheKey = resolveOriginalImageUrl(
+                        avatar.imageUrl,
+                        avatar.thumbnailImageUrl,
+                    ),
                 )
             },
             onNavigateToDetail = { list ->

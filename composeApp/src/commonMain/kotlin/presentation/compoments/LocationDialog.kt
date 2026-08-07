@@ -58,8 +58,9 @@ class LocationDialog(
             // 创建临时的 WorldProfileVo
             val tempWorldProfileVo = WorldProfileVo(currentInstants)
             currentNavigator push WorldProfileScreen(
-                tempWorldProfileVo,
-                sharedSuffixKey = sharedSuffixKey
+                worldProfileVO = tempWorldProfileVo,
+                sharedSuffixKey = sharedSuffixKey,
+                sharedImageCacheKey = currentInstants.worldImageUrl,
             )
         }
         val onClickUserIcon = { user: IUser ->

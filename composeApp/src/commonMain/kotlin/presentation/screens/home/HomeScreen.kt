@@ -203,6 +203,7 @@ private inline fun AppListRoute.HomeTopAppBar(
                             )
                             .fillMaxSize(),
                         iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl,
+                        cachedPlaceholderKey = homeScreenModel.iconUrl,
                     )
                 }
                 Column(

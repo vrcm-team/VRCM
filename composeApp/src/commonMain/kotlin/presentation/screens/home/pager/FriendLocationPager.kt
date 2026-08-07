@@ -108,7 +108,8 @@ fun Pager.FriendLocationPager(
         navigator push WorldProfileScreen(
             worldProfileVO = tempWorldProfileVo,
             location = friendLocation.location,
-            sharedSuffixKey = sharedSuffixKey
+            sharedSuffixKey = sharedSuffixKey,
+            sharedImageCacheKey = currentLocation.worldImageUrl,
         )
     }
     val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
