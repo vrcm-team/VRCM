@@ -22,6 +22,12 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import io.github.vrcmteam.vrcm.network.api.attributes.AgeVerificationStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.FriendRequestStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.UserState
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -31,7 +37,7 @@ class AccountCacheManagerTest {
     fun mutationQueuedBehindAccountClearRejectsCapturedGeneration() = runTest {
         val manager = accountCacheManager(
             FriendListCacheDao(MapSettings()),
-            UserProfileCacheDao(MapSettings()),
+            InMemoryUserProfileCacheStore(),
         )
         val token = manager.captureWriteToken("usr_a")
         val blockerStarted = CompletableDeferred<Unit>()
@@ -68,37 +74,35 @@ class AccountCacheManagerTest {
     @Test
     fun clearingOneAccountDoesNotRemoveAnotherAccountsCaches() = runTest {
         val friendSettings = MapSettings()
-        val profileSettings = MapSettings()
         val friendDao = FriendListCacheDao(friendSettings)
-        val profileDao = UserProfileCacheDao(profileSettings)
-        val manager = accountCacheManager(friendDao, profileDao)
+        val profileStore = InMemoryUserProfileCacheStore()
+        val manager = accountCacheManager(friendDao, profileStore)
         friendDao.save("usr_a", FriendListCache(emptyList()))
         friendDao.save("usr_b", FriendListCache(emptyList()))
-        profileSettings.putString(profileKey("usr_a", "usr_profile"), "cached-a")
-        profileSettings.putString(profileKey("usr_b", "usr_profile"), "cached-b")
+        profileStore.save("usr_a", "usr_profile", profileCache("A"))
+        profileStore.save("usr_b", "usr_profile", profileCache("B"))
 
         manager.clearAccount("usr_a")
 
         assertNull(friendDao.load("usr_a"))
         assertNotNull(friendDao.load("usr_b"))
-        assertTrue(profileSettings.keys.none { it.contains(".usr_a.") })
-        assertTrue(profileSettings.keys.any { it.contains(".usr_b.") })
+        assertNull(profileStore.load("usr_a", "usr_profile"))
+        assertNotNull(profileStore.load("usr_b", "usr_profile"))
     }
 
     @Test
     fun clearingAllRemovesBothCacheTypesForEveryAccount() = runTest {
         val friendSettings = MapSettings()
-        val profileSettings = MapSettings()
         val friendDao = FriendListCacheDao(friendSettings)
-        val profileDao = UserProfileCacheDao(profileSettings)
+        val profileStore = InMemoryUserProfileCacheStore()
         val fileSystem = FakeFileSystem()
         val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
         val configDao = MeetupCardConfigDao(MapSettings())
-        val manager = accountCacheManager(friendDao, profileDao, configDao, assetStore)
+        val manager = accountCacheManager(friendDao, profileStore, configDao, assetStore)
         friendDao.save("usr_a", FriendListCache(emptyList()))
         friendDao.save("usr_b", FriendListCache(emptyList()))
-        profileSettings.putString(profileKey("usr_a", "usr_profile"), "cached-a")
-        profileSettings.putString(profileKey("usr_b", "usr_profile"), "cached-b")
+        profileStore.save("usr_a", "usr_profile", profileCache("A"))
+        profileStore.save("usr_b", "usr_profile", profileCache("B"))
         val photoBytes = "local-photo".encodeToByteArray()
         val photo = assetStore.writePhoto("usr_a", photoBytes, "png")
         val decorationBytes = "decoration".encodeToByteArray()
@@ -120,7 +124,8 @@ class AccountCacheManagerTest {
         manager.clearAll()
 
         assertTrue(friendSettings.keys.isEmpty())
-        assertTrue(profileSettings.keys.isEmpty())
+        assertNull(profileStore.load("usr_a", "usr_profile"))
+        assertNull(profileStore.load("usr_b", "usr_profile"))
         assertNotNull(configDao.load("usr_a"))
         assertContentEquals(photoBytes, assetStore.read(photo))
         assertContentEquals(decorationBytes, assetStore.read(decoration))
@@ -130,7 +135,7 @@ class AccountCacheManagerTest {
     @Test
     fun queuedWriteCapturedBeforeAccountClearCannotRestoreDeletedCache() = runTest {
         val friendDao = FriendListCacheDao(MapSettings())
-        val manager = accountCacheManager(friendDao, UserProfileCacheDao(MapSettings()))
+        val manager = accountCacheManager(friendDao, InMemoryUserProfileCacheStore())
         val staleToken = manager.captureWriteToken("usr_a")
         assertTrue(manager.isCurrent(staleToken))
 
@@ -149,7 +154,7 @@ class AccountCacheManagerTest {
         val configDao = MeetupCardConfigDao(MapSettings())
         val manager = accountCacheManager(
             FriendListCacheDao(MapSettings()),
-            UserProfileCacheDao(MapSettings()),
+            InMemoryUserProfileCacheStore(),
             configDao,
             assetStore,
         )
@@ -223,7 +228,7 @@ class AccountCacheManagerTest {
         }
         val manager = accountCacheManager(
             FriendListCacheDao(MapSettings()),
-            UserProfileCacheDao(MapSettings()),
+            InMemoryUserProfileCacheStore(),
             MeetupCardConfigDao(MapSettings()),
             MeetupCardAssetStore(failingFileSystem, "/meetup-assets".toPath()),
         )
@@ -235,12 +240,45 @@ class AccountCacheManagerTest {
         fileSystem.checkNoOpenFiles()
     }
 
-    private fun profileKey(ownerUserId: String, userId: String) =
-        "${DaoKeys.UserProfileCache.KEY_PREFIX}.$ownerUserId.$userId"
+    private fun profileCache(displayName: String) = UserProfileCache(
+        user = UserData(
+            ageVerificationStatus = AgeVerificationStatus.Verified,
+            allowAvatarCopying = true,
+            bio = "",
+            bioLinks = emptyList(),
+            currentAvatarImageUrl = "",
+            currentAvatarTags = emptyList(),
+            currentAvatarThumbnailImageUrl = "",
+            dateJoined = "2020-01-01",
+            developerType = "none",
+            displayName = displayName,
+            friendKey = "",
+            friendRequestStatus = FriendRequestStatus.Null,
+            id = "usr_profile",
+            instanceId = "",
+            isFriend = true,
+            lastActivity = "",
+            lastLogin = "",
+            lastPlatform = "standalonewindows",
+            location = "",
+            note = "",
+            profilePicOverride = "",
+            state = UserState.Online,
+            status = UserStatus.Active,
+            statusDescription = "",
+            tags = emptyList(),
+            travelingToInstance = "",
+            travelingToLocation = "",
+            travelingToWorld = "",
+            userIcon = "",
+            worldId = "",
+            pronouns = null,
+        ),
+    )
 
     private fun accountCacheManager(
         friendDao: FriendListCacheDao,
-        profileDao: UserProfileCacheDao,
+        profileStore: UserProfileCacheStore,
         configDao: MeetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
         assetStore: MeetupCardAssetStore = MeetupCardAssetStore(
             FakeFileSystem(),
@@ -248,7 +286,7 @@ class AccountCacheManagerTest {
         ),
     ) = AccountCacheManager(
         friendListCacheDao = friendDao,
-        userProfileCacheDao = profileDao,
+        userProfileCacheStore = profileStore,
         friendActivityStore = NoOpFriendActivityCacheStore,
         meetupCardConfigDao = configDao,
         meetupCardAssetStore = assetStore,

@@ -9,7 +9,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecodedAnim
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore
-import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationAssetType
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCache
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
@@ -1782,7 +1782,7 @@ private class RepositoryFixture(val scope: CoroutineScope) {
     )
     val accountCacheManager = AccountCacheManager(
         friendListCacheDao = FriendListCacheDao(MapSettings()),
-        userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+        userProfileCacheStore = InMemoryUserProfileCacheStore(),
         friendActivityStore = NoOpFriendActivityCacheStore,
         meetupCardConfigDao = configDao,
         meetupCardAssetStore = assetStore,

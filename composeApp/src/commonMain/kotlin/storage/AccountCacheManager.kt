@@ -32,7 +32,7 @@ internal data class MeetupPhotoArtifactLease(
 
 class AccountCacheManager(
     private val friendListCacheDao: FriendListCacheDao,
-    private val userProfileCacheDao: UserProfileCacheDao,
+    private val userProfileCacheStore: UserProfileCacheStore,
     private val friendActivityStore: FriendActivityCacheStore,
     private val meetupCardConfigDao: MeetupCardConfigDao,
     private val meetupCardAssetStore: MeetupCardAssetStore,
@@ -187,10 +187,11 @@ class AccountCacheManager(
                 accountGenerations[userId] = (accountGenerations[userId] ?: 0L) + 1L
                 invalidationEpoch++
                 friendListCacheDao.clear(userId)
-                userProfileCacheDao.clearOwner(userId)
                 meetupCardConfigDao.clear(userId)
                 invalidation = AccountCacheInvalidation(userId, invalidationEpoch)
             }
+            // Room 的清理是挂起调用，只能放在 synchronized 之外。
+            userProfileCacheStore.clearOwner(userId)
             meetupCardAssetStore.deleteAccount(userId)
             friendActivityStore.clearAccount(userId)
             meetupCardAssetStore.pruneDecorations(retainedDecorationTemplateIds())
@@ -209,9 +210,9 @@ class AccountCacheManager(
                 invalidationEpoch++
                 accountGenerations.clear()
                 friendListCacheDao.clearAll()
-                userProfileCacheDao.clearAll()
                 invalidation = AccountCacheInvalidation(null, invalidationEpoch)
             }
+            userProfileCacheStore.clearAll()
             friendActivityStore.clearAll()
         } finally {
             accountMutationMutex.unlock()

@@ -13,7 +13,7 @@ import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
-import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
@@ -505,7 +505,7 @@ class AuthServiceTest : MainDispatcherTest() {
             cookiesStorage = cookies,
             accountCacheManager = AccountCacheManager(
                 friendListCacheDao = FriendListCacheDao(MapSettings()),
-                userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+                userProfileCacheStore = InMemoryUserProfileCacheStore(),
                 friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
                 meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
                 meetupCardAssetStore = MeetupCardAssetStore(

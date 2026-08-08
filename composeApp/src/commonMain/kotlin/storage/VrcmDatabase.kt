@@ -12,14 +12,17 @@ import androidx.room.RoomDatabaseConstructor
         FriendActivitySummaryEntity::class,
         FriendActivityEventEntity::class,
         FriendActivitySessionEntity::class,
+        UserProfileCacheEntity::class,
     ],
-    version = 2,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    version = 3,
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
     exportSchema = true,
 )
 @ConstructedBy(VrcmDatabaseConstructor::class)
 internal abstract class VrcmDatabase : RoomDatabase() {
     abstract fun friendActivityDao(): FriendActivityDao
+
+    abstract fun userProfileCacheDao(): UserProfileCacheRoomDao
 }
 
 @Suppress("NO_ACTUAL_FOR_EXPECT")
