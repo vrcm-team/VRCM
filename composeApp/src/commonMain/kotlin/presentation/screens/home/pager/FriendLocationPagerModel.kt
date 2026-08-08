@@ -317,46 +317,58 @@ class FriendLocationPagerModel(
         }
     }
 
+    /**
+     * 已发布给 Compose 的位置状态只能在主线程改写：分页刷新是在 IO 上下文里调用这里的，
+     * 后台线程往 [FriendLocation.friends] 这类 SnapshotStateMap 插好友，会和主线程读
+     * [FriendLocation.friendList] 的排序撞车——排序先读 size 再迭代，中途被插入就数组越界。
+     */
     private suspend fun syncFriendLocations(
         token: AccountGenerationToken? = null,
         fetchInstanceDetails: Boolean = true,
-    ) = updateMutex.withLock {
-        if (token != null && !accountTracker.isCurrent(token)) return@withLock
-        runCatching {
-            val snapshot = presenceStore.snapshot()
-            publishedState.syncSimpleLocation(LocationType.Offline, snapshot.offline)
-            publishedState.syncSimpleLocation(LocationType.Web, snapshot.web)
-            val own = currentUserPresence?.let { presence ->
-                ownEffectiveLocation(presence)?.let { effectiveLocation ->
-                    authService.currentUser().toFriendData(presence, effectiveLocation)
+    ) = withContext(Dispatchers.Main) {
+        updateMutex.withLock {
+            if (token != null && !accountTracker.isCurrent(token)) return@withLock
+            runCatching {
+                val snapshot = presenceStore.snapshot()
+                publishedState.syncSimpleLocation(LocationType.Offline, snapshot.offline)
+                publishedState.syncSimpleLocation(LocationType.Web, snapshot.web)
+                val own = currentUserPresence?.let { presence ->
+                    ownEffectiveLocation(presence)?.let { effectiveLocation ->
+                        authService.currentUser().toFriendData(presence, effectiveLocation)
+                    }
                 }
-            }
-            val privateFriends = if (own?.location == LocationType.Private.value) {
-                snapshot.private.filterNot { it.id == own.id } + own
-            } else {
-                snapshot.private
-            }
-            publishedState.syncSimpleLocation(LocationType.Private, privateFriends)
-            val instances = snapshot.instances.toMutableMap()
-            if (own != null) {
-                val group = instances[own.location]
-                val ownIsTraveling = currentUserPresence?.location?.startsWith(LocationType.Traveling.value) == true
-                instances[own.location] = if (group == null) {
-                    FriendLocationGroup(
-                        friends = listOf(own),
-                        travelingIds = if (ownIsTraveling) setOf(own.id) else emptySet(),
-                    )
+                val privateFriends = if (own?.location == LocationType.Private.value) {
+                    snapshot.private.filterNot { it.id == own.id } + own
                 } else {
-                    FriendLocationGroup(
-                        friends = group.friends.filterNot { it.id == own.id } + own,
-                        travelingIds = if (ownIsTraveling) group.travelingIds + own.id else group.travelingIds - own.id,
-                    )
+                    snapshot.private
                 }
+                publishedState.syncSimpleLocation(LocationType.Private, privateFriends)
+                val instances = snapshot.instances.toMutableMap()
+                if (own != null) {
+                    val group = instances[own.location]
+                    val ownIsTraveling =
+                        currentUserPresence?.location?.startsWith(LocationType.Traveling.value) == true
+                    instances[own.location] = if (group == null) {
+                        FriendLocationGroup(
+                            friends = listOf(own),
+                            travelingIds = if (ownIsTraveling) setOf(own.id) else emptySet(),
+                        )
+                    } else {
+                        FriendLocationGroup(
+                            friends = group.friends.filterNot { it.id == own.id } + own,
+                            travelingIds = if (ownIsTraveling) {
+                                group.travelingIds + own.id
+                            } else {
+                                group.travelingIds - own.id
+                            },
+                        )
+                    }
+                }
+                syncInstanceLocations(instances, fetchInstanceDetails)
+                publishFriendLocationIndex()
+            }.onApiFailure("FriendLocation") {
+                SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
-            syncInstanceLocations(instances, fetchInstanceDetails)
-            publishFriendLocationIndex()
-        }.onApiFailure("FriendLocation") {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it))
         }
     }
 
