@@ -304,6 +304,54 @@ class DecorationResolverTest {
     }
 
     @Test
+    fun animationThatFailsToDecodeIsNotDownloadedAgainOnNextRefresh() = resolverTest {
+        source.handler = {
+            template(
+                "inv_broken",
+                asset("mainAnimation", "https://cdn/broken.webp"),
+                asset("base", "https://cdn/base.webp"),
+            )
+        }
+        loader.handler = { _, _ -> "bytes".encodeToByteArray() }
+        decoder.failOnDecode = true
+
+        val first = resolver().refresh(listOf("inv_broken")).getValue("inv_broken")
+        assertEquals(DecorationRenderMode.Static, first.mode)
+
+        val second = resolver().refresh(listOf("inv_broken")).getValue("inv_broken")
+
+        assertEquals(DecorationRenderMode.Static, second.mode)
+        // 解不开的动画不该每次刷新都重下最多 20 MiB；base 也已落盘，两次刷新总共只有首轮那两次下载。
+        assertEquals(
+            listOf("https://cdn/broken.webp", "https://cdn/base.webp"),
+            loader.requests.map { it.url },
+        )
+    }
+
+    @Test
+    fun changedAnimationUrlIsRetriedEvenAfterAPreviousDecodeFailure() = resolverTest {
+        var animationUrl = "https://cdn/broken.webp"
+        source.handler = {
+            template(
+                "inv_retry",
+                asset("mainAnimation", animationUrl),
+                asset("base", "https://cdn/base.webp"),
+            )
+        }
+        loader.handler = { _, _ -> "bytes".encodeToByteArray() }
+        decoder.failOnDecode = true
+        resolver().refresh(listOf("inv_retry"))
+
+        // 换了新素材就该重新尝试，失败记忆只针对同一个 URL。
+        animationUrl = "https://cdn/fixed.webp"
+        decoder.failOnDecode = false
+        val result = resolver().refresh(listOf("inv_retry")).getValue("inv_retry")
+
+        assertEquals(DecorationRenderMode.Animated, result.mode)
+        assertTrue(loader.requests.any { it.url == "https://cdn/fixed.webp" })
+    }
+
+    @Test
     fun missingCachedAssetIsDownloadedAgainAndCacheReferenceIsUpdated() = resolverTest {
         val staleRef = assetStore.writeDecoration(
             "inv_missing",
@@ -639,12 +687,15 @@ private class FakeAnimatedWebpDecoder : AnimatedWebpDecoder {
     val decoded = mutableListOf<ByteArray>()
     var closeCount = 0
         private set
+    /** 模拟"下得到但本平台解不开"的素材。 */
+    var failOnDecode = false
     var handler: (ByteArray) -> DecodedAnimation = {
         FakeDecodedAnimation(::recordClose)
     }
 
     override fun decode(bytes: ByteArray): DecodedAnimation {
         decoded += bytes.copyOf()
+        if (failOnDecode) throw IllegalArgumentException("Unsupported animation on this platform")
         return handler(bytes)
     }
 

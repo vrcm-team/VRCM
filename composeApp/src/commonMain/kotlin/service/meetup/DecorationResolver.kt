@@ -161,13 +161,17 @@ class DecorationResolver(
         val workingCache = remote?.toCache(templateId, cached) ?: cached
             ?: return unavailable(templateId)
 
-        val mainAsset = resolveMainAnimation(
+        val mainAnimation = resolveMainAnimation(
             templateId = templateId,
             url = workingCache.mainAnimationUrl,
             cachedAsset = workingCache.mainAnimationAsset,
+            knownFailedUrl = workingCache.failedMainAnimationUrl,
         )
+        val mainAsset = mainAnimation.asset
         if (mainAsset != null) {
-            saveIgnoringFailure(workingCache.copy(mainAnimationAsset = mainAsset))
+            saveIgnoringFailure(
+                workingCache.copy(mainAnimationAsset = mainAsset, failedMainAnimationUrl = ""),
+            )
             return workingCache.resolved(
                 DecorationRenderMode.Animated,
                 mainAsset,
@@ -183,6 +187,10 @@ class DecorationResolver(
         val updatedCache = workingCache.copy(
             mainAnimationAsset = null,
             baseAsset = baseAsset,
+            failedMainAnimationUrl = mainAnimation.failedUrl
+                .ifEmpty { workingCache.failedMainAnimationUrl }
+                .takeIf { it == workingCache.mainAnimationUrl }
+                .orEmpty(),
         )
         saveIgnoringFailure(updatedCache)
         return if (baseAsset != null) {
@@ -205,26 +213,46 @@ class DecorationResolver(
         null
     }
 
+    private class MainAnimationResult(
+        val asset: MeetupAssetRef?,
+        /** 本次下载后解码失败的 URL；仅在确实下载并失败时非空。 */
+        val failedUrl: String = "",
+    )
+
     private suspend fun resolveMainAnimation(
         templateId: String,
         url: String,
         cachedAsset: MeetupAssetRef?,
-    ): MeetupAssetRef? {
-        if (url.isBlank()) return null
+        knownFailedUrl: String,
+    ): MainAnimationResult {
+        if (url.isBlank()) return MainAnimationResult(null)
         cachedAsset?.let { ref ->
             attempt {
                 val bytes = assetStore.read(ref)
                 require(bytes.isNotEmpty()) { "Cached animation is empty" }
                 validateAnimation(bytes)
                 ref
-            }?.let { return it }
+            }?.let { return MainAnimationResult(it) }
         }
-        return attempt {
+        // 同一个 URL 上次下完就解不开，本平台的解码器不会突然学会；直接用 base 兜底。
+        if (url == knownFailedUrl) return MainAnimationResult(null, failedUrl = url)
+
+        var decodeFailed = false
+        val asset = attempt {
             val bytes = remoteBytesLoader.load(url, MAX_DECORATION_BYTES)
             require(bytes.isNotEmpty()) { "Downloaded animation is empty" }
-            validateAnimation(bytes)
+            try {
+                validateAnimation(bytes)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (decodeError: Exception) {
+                // 只把"下得到但解不开"记为失败：网络出问题下次仍应重试。
+                decodeFailed = true
+                throw decodeError
+            }
             assetStore.writeDecoration(templateId, DecorationAssetType.MainAnimation, bytes)
         }
+        return MainAnimationResult(asset, failedUrl = if (decodeFailed) url else "")
     }
 
     private suspend fun resolveBase(
@@ -281,6 +309,10 @@ class DecorationResolver(
             mainAnimationAsset = cached?.mainAnimationAsset
                 ?.takeIf { cached.mainAnimationUrl == mainAnimationUrl },
             baseAsset = cached?.baseAsset?.takeIf { cached.baseUrl == baseUrl },
+            // 失败记忆只对同一份素材有效：URL 一换就重新给它一次机会。
+            failedMainAnimationUrl = cached?.failedMainAnimationUrl
+                ?.takeIf { it == mainAnimationUrl }
+                .orEmpty(),
             gradientStart = metadata.gradientStart.orEmpty(),
             gradientEnd = metadata.gradientEnd.orEmpty(),
         )

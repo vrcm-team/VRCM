@@ -42,10 +42,10 @@
 
 ### 已知余留问题（低优先级，未实现）
 
-- 动画持续解码失败无"失败记忆"，每次刷新会重复下载（最多 3×20 MiB）；可在 Template 缓存记失败 URL。
 - 素材 URL 无 scheme/host 白名单（信任边界是官方 API 响应）。
 - 写入中断的 `.tmp` 孤儿文件无启动清扫；Windows 上 `atomicMove` 覆盖已存在目标依赖 JDK 行为。
 - 配置 JSON 损坏的账号在他人 `clearAccount` 时装饰缓存可能被误删（可自愈）。
+- 动画"失败记忆"只覆盖"下得到但解不开"，不覆盖运行期渲染失败（那条路径仍走 `staticFallback`，不写回缓存）。
 - 漏测清单：DecorationTemplateCacheDao 无专属测试、AccountCacheManager lease 边界、iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
 
 ## 执行边界与文件结构
