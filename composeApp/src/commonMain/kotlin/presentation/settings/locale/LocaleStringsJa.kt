@@ -286,6 +286,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val friendActivityEventLocation = "ワールドを移動しました"
     override val friendActivityEventStatus = "ステータスを更新しました"
     override val friendActivityEventBio = "自己紹介を更新しました"
+    override val friendActivityBioDiffShow = "最新の変更を見る"
+    override val friendActivityBioDiffHide = "自己紹介に戻る"
     override val friendActivityEventMet = "同じインスタンスに合流しました"
     override val friendActivityEventLeft = "同じインスタンスから離れました"
     override val friendActivityAccessPublic = "パブリック"
