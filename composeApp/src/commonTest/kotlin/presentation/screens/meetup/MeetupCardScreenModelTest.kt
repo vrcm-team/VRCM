@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPrepared
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.service.meetup.MeetupRefreshResult
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
@@ -181,9 +182,13 @@ private class FakeMeetupCardRepository(initial: MeetupCardConfig) : MeetupCardRe
     override suspend fun replacePhoto(
         ownerId: String,
         candidate: MeetupPhotoCandidate,
+        target: MeetupPhotoTarget,
     ): Result<Unit> {
         if (replacePhotoFails) return Result.failure(IllegalStateException("disk full"))
         photoReplacements++
+        lastPhotoTarget = target
         return Result.success(Unit)
     }
+
+    var lastPhotoTarget: MeetupPhotoTarget? = null
 }

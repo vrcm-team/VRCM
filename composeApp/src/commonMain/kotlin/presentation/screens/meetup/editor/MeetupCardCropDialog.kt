@@ -62,6 +62,7 @@ fun MeetupCardCropDialog(
     savingPhoto: Boolean,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    orientations: List<MeetupOrientation> = MeetupOrientation.entries,
 ) {
     val photoSessions: MeetupPhotoSessionStore = koinInject()
     val calculator: CropTransformCalculator = koinInject()
@@ -76,7 +77,7 @@ fun MeetupCardCropDialog(
         return
     }
 
-    var orientation by remember(sessionId) { mutableStateOf(MeetupOrientation.Portrait) }
+    var orientation by remember(sessionId) { mutableStateOf(orientations.first()) }
     val crop by session.crop(orientation).collectAsState()
     val source = session.prepared.originalSize
 
@@ -99,22 +100,24 @@ fun MeetupCardCropDialog(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                SingleChoiceSegmentedButtonRow {
-                    MeetupOrientation.entries.forEachIndexed { index, entry ->
-                        SegmentedButton(
-                            selected = orientation == entry,
-                            onClick = { orientation = entry },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = MeetupOrientation.entries.size,
-                            ),
-                        ) {
-                            Text(
-                                text = when (entry) {
-                                    MeetupOrientation.Portrait -> locale.meetupCardPortrait
-                                    MeetupOrientation.Landscape -> locale.meetupCardLandscape
-                                },
-                            )
+                if (orientations.size > 1) {
+                    SingleChoiceSegmentedButtonRow {
+                        orientations.forEachIndexed { index, entry ->
+                            SegmentedButton(
+                                selected = orientation == entry,
+                                onClick = { orientation = entry },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = orientations.size,
+                                ),
+                            ) {
+                                Text(
+                                    text = when (entry) {
+                                        MeetupOrientation.Portrait -> locale.meetupCardPortrait
+                                        MeetupOrientation.Landscape -> locale.meetupCardLandscape
+                                    },
+                                )
+                            }
                         }
                     }
                 }

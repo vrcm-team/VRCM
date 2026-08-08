@@ -93,6 +93,8 @@ data class MeetupCardConfig(
     val showNameplateEffect: Boolean = true,
     val shortText: String = "",
     val photo: MeetupPhoto = MeetupPhoto(),
+    /** 横屏独立照片；为 null 时横屏沿用 [photo]。 */
+    val landscapePhoto: MeetupPhoto? = null,
     val profileBackgroundFallback: MeetupPhoto? = null,
     val portraitCrop: MeetupCrop = MeetupCrop(),
     val landscapeCrop: MeetupCrop = MeetupCrop(),

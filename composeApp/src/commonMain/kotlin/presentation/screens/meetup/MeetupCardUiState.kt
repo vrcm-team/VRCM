@@ -13,6 +13,8 @@ data class MeetupCardUiState(
     val displayName: String,
     val config: MeetupCardConfig,
     val photoModel: String?,
+    /** 横屏独立照片的展示模型；未设置或不可用时为 null。 */
+    val landscapePhotoModel: String? = null,
     val decorations: Map<DecorationSlot, ResolvedDecoration>,
     val orientation: MeetupOrientation,
     /** 手势进行中的裁剪草稿；结束前只影响预览，不落盘。 */

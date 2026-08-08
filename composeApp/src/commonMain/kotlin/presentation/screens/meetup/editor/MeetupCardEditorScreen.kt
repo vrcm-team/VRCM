@@ -56,6 +56,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -83,6 +84,7 @@ fun MeetupCardEditorContent(
     var cropSessionId by remember { mutableStateOf<String?>(null) }
     var pendingGallerySession by rememberSaveable { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf(false) }
+    var photoTarget by remember { mutableStateOf(MeetupPhotoTarget.Both) }
 
     val reportPhotoFailure: suspend (Throwable?) -> Unit = {
         SharedFlowCentre.toastText.emit(ToastText.Error(locale.meetupCardPhotoFailed))
@@ -251,6 +253,8 @@ fun MeetupCardEditorContent(
                     MeetupEditorTools(
                         state = state,
                         actions = actions,
+                        photoTarget = photoTarget,
+                        onPhotoTarget = { photoTarget = it },
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                 }
@@ -264,6 +268,8 @@ fun MeetupCardEditorContent(
                     MeetupEditorTools(
                         state = state,
                         actions = actions,
+                        photoTarget = photoTarget,
+                        onPhotoTarget = { photoTarget = it },
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -275,11 +281,12 @@ fun MeetupCardEditorContent(
         MeetupCardCropDialog(
             sessionId = sessionId,
             savingPhoto = state.savingPhoto,
-            onConfirm = { model.confirmPhoto(sessionId) },
+            onConfirm = { model.confirmPhoto(sessionId, photoTarget) },
             onDismiss = {
                 model.discardPhotoSession(sessionId)
                 cropSessionId = null
             },
+            orientations = photoTarget.editableOrientations(),
         )
     }
 }

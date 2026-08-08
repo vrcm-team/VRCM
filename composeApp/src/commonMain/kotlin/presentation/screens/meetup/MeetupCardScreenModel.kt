@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
@@ -125,14 +126,14 @@ class MeetupCardScreenModel(
     /** 页面离开前提交仍在草稿中的裁剪。 */
     fun flushDrafts() = commitCrop()
 
-    fun confirmPhoto(sessionId: String) {
+    fun confirmPhoto(sessionId: String, target: MeetupPhotoTarget = MeetupPhotoTarget.Both) {
         if (local.value.savingPhoto || sessionId in consumedPhotoSessions) return
         val session = photoSessions.get(sessionId) ?: return
         consumedPhotoSessions += sessionId
         local.update { it.copy(savingPhoto = true) }
         viewModelScope.launch {
             try {
-                val result = repository.replacePhoto(ownerUserId, session.currentCandidate())
+                val result = repository.replacePhoto(ownerUserId, session.currentCandidate(), target)
                 result.fold(
                     onSuccess = {
                         photoSessions.complete(sessionId)
@@ -190,6 +191,7 @@ class MeetupCardScreenModel(
         displayName = config.profile.displayName.ifBlank { ownerUserId },
         config = config,
         photoModel = photoModel,
+        landscapePhotoModel = landscapePhotoModel,
         decorations = decorations,
         orientation = local.orientation,
         cropDraft = local.cropDraft,

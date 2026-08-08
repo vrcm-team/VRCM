@@ -374,6 +374,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val meetupCardNameplateEffect = "銘牌特效"
     override val meetupCardPortrait = "直向"
     override val meetupCardLandscape = "橫向"
+    override val meetupCardPhotoTarget = "套用方向"
+    override val meetupCardPhotoTargetBoth = "兩個方向"
     override val meetupCardAccentColor = "主題色"
     override val meetupCardScrim = "遮罩強度"
     override val meetupCardCropTitle = "調整裁切"

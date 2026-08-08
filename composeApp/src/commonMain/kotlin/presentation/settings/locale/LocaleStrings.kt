@@ -389,6 +389,8 @@ sealed class LocaleStrings {
     open val meetupCardNameplateEffect: String = "Nameplate effect"
     open val meetupCardPortrait: String = "Portrait"
     open val meetupCardLandscape: String = "Landscape"
+    open val meetupCardPhotoTarget: String = "Apply to"
+    open val meetupCardPhotoTargetBoth: String = "Both orientations"
     open val meetupCardAccentColor: String = "Theme color"
     open val meetupCardScrim: String = "Overlay strength"
     open val meetupCardCropTitle: String = "Adjust crop"

@@ -1567,6 +1567,75 @@ class MeetupCardRepositoryTest {
     }
 
     @Test
+    fun landscapeTargetReplacesOnlyLandscapePhotoAndCrop() = repositoryTest {
+        val primary = assetStore.writePhoto("usr_a", "primary".encodeToByteArray(), "png")
+        val primaryPhoto = MeetupPhoto(source = MeetupPhotoSource.LocalAlbum, localAsset = primary)
+        configDao.save(
+            cachedConfig("usr_a", "Cached Name").copy(
+                photo = primaryPhoto,
+                portraitCrop = MeetupCrop(zoom = 1.5f),
+                landscapeCrop = MeetupCrop(zoom = 1.6f),
+            ),
+        )
+
+        val replaced = repository.replacePhoto(
+            "usr_a",
+            photoCandidate(
+                source = MeetupPhotoSource.LocalAlbum,
+                sourceId = null,
+                sourceUrl = null,
+                fileName = "landscape.png",
+                bytes = "landscape-photo".encodeToByteArray(),
+            ),
+            MeetupPhotoTarget.Landscape,
+        )
+
+        assertTrue(replaced.isSuccess)
+        val state = repository.observe("usr_a").value
+        assertEquals(primaryPhoto, state.config.photo)
+        assertEquals(MeetupCrop(zoom = 1.5f), state.config.portraitCrop)
+        assertEquals(MeetupCrop(centerOffsetY = -0.1f, zoom = 1.4f), state.config.landscapeCrop)
+        val landscapeAsset = assertNotNull(state.config.landscapePhoto?.localAsset)
+        assertContentEquals("landscape-photo".encodeToByteArray(), assetStore.read(landscapeAsset))
+        assertEquals(assetStore.model(landscapeAsset), state.landscapePhotoModel)
+        assertEquals(assetStore.model(primary), state.photoModel)
+    }
+
+    @Test
+    fun bothTargetClearsLandscapeOverride() = repositoryTest {
+        val landscapeAsset = assetStore.writePhoto("usr_a", "old-landscape".encodeToByteArray(), "png")
+        configDao.save(
+            cachedConfig("usr_a", "Cached Name").copy(
+                landscapePhoto = MeetupPhoto(
+                    source = MeetupPhotoSource.LocalAlbum,
+                    localAsset = landscapeAsset,
+                ),
+            ),
+        )
+
+        val replaced = repository.replacePhoto(
+            "usr_a",
+            photoCandidate(
+                source = MeetupPhotoSource.LocalAlbum,
+                sourceId = null,
+                sourceUrl = null,
+                fileName = "shared.png",
+                bytes = "shared-photo".encodeToByteArray(),
+            ),
+            MeetupPhotoTarget.Both,
+        )
+
+        assertTrue(replaced.isSuccess)
+        val state = repository.observe("usr_a").value
+        assertNull(state.config.landscapePhoto)
+        assertNull(state.landscapePhotoModel)
+        assertContentEquals(
+            "shared-photo".encodeToByteArray(),
+            assetStore.read(assertNotNull(state.config.photo.localAsset)),
+        )
+    }
+
+    @Test
     fun fatalErrorFromRemoteEscapesRefreshBoundary() = runTest {
         val uncaught = CompletableDeferred<Throwable>()
         val repositoryScope = CoroutineScope(

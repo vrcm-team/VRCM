@@ -374,6 +374,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val meetupCardNameplateEffect = "ネームプレートエフェクト"
     override val meetupCardPortrait = "縦向き"
     override val meetupCardLandscape = "横向き"
+    override val meetupCardPhotoTarget = "適用先"
+    override val meetupCardPhotoTargetBoth = "両方向"
     override val meetupCardAccentColor = "テーマカラー"
     override val meetupCardScrim = "オーバーレイの強さ"
     override val meetupCardCropTitle = "トリミングを調整"

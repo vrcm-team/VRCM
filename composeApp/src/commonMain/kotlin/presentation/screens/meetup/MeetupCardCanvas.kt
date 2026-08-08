@@ -51,10 +51,13 @@ fun MeetupCardCanvas(
                     ),
                 ),
         )
-        // 2. 照片。
+        // 2. 照片：横屏优先使用独立照片，未设置或不可用时沿用竖屏照片。
+        val landscapeOverride = state.config.landscapePhoto
+            ?.takeIf { orientation == MeetupOrientation.Landscape && state.landscapePhotoModel != null }
+        val photoRecord = landscapeOverride ?: state.config.photo
         MeetupCardPhoto(
-            photoModel = state.photoModel,
-            photoSize = state.config.photo
+            photoModel = if (landscapeOverride != null) state.landscapePhotoModel else state.photoModel,
+            photoSize = photoRecord
                 .takeIf { it.width > 0 && it.height > 0 }
                 ?.let { ImageSize(it.width, it.height) },
             crop = crop,
@@ -70,12 +73,13 @@ fun MeetupCardCanvas(
                     .background(Color.Black.copy(alpha = state.config.scrimAlpha.coerceIn(0f, 1f))),
             )
         }
-        // 4. 官方资料特效：不接收指针事件，不改变控件布局。
+        // 4. 官方资料特效：保持素材自身纵横比完整显示（Fit 居中），
+        //    不裁切、不拉伸；不接收指针事件，不改变控件布局。
         if (state.config.showProfileEffect) {
             state.decorations[DecorationSlot.ProfileEffect]?.let { decoration ->
                 AnimatedDecoration(
                     decoration = decoration,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

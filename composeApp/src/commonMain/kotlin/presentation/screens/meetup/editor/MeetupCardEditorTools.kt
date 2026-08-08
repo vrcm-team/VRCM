@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 
 /** 编辑器工具区回调集合；均为幂等操作，由 ViewModel 决定持久化时机。 */
 internal class MeetupEditorActions(
@@ -62,6 +64,13 @@ internal class MeetupEditorActions(
 
 internal enum class MeetupEditorTab { Photo, Layout, Content, Style }
 
+/** 照片应用方向对应的裁剪编辑范围。 */
+internal fun MeetupPhotoTarget.editableOrientations(): List<MeetupOrientation> = when (this) {
+    MeetupPhotoTarget.Both -> MeetupOrientation.entries
+    MeetupPhotoTarget.Portrait -> listOf(MeetupOrientation.Portrait)
+    MeetupPhotoTarget.Landscape -> listOf(MeetupOrientation.Landscape)
+}
+
 private val AccentSwatches = listOf(
     0xFF3F8CFF, 0xFFE85D75, 0xFF34B37E, 0xFFF2A93B,
     0xFF9B6DFF, 0xFF00B8D9, 0xFF66788A, 0xFF17263B,
@@ -72,6 +81,8 @@ private val AccentSwatches = listOf(
 internal fun MeetupEditorTools(
     state: MeetupCardUiState,
     actions: MeetupEditorActions,
+    photoTarget: MeetupPhotoTarget,
+    onPhotoTarget: (MeetupPhotoTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableStateOf(MeetupEditorTab.Photo) }
@@ -103,7 +114,7 @@ internal fun MeetupEditorTools(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (selectedTab) {
-                MeetupEditorTab.Photo -> PhotoTools(state, actions)
+                MeetupEditorTab.Photo -> PhotoTools(state, actions, photoTarget, onPhotoTarget)
                 MeetupEditorTab.Layout -> LayoutTools(state, actions)
                 MeetupEditorTab.Content -> ContentTools(state, actions)
                 MeetupEditorTab.Style -> StyleTools(state, actions)
@@ -113,8 +124,33 @@ internal fun MeetupEditorTools(
 }
 
 @Composable
-private fun PhotoTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
+private fun PhotoTools(
+    state: MeetupCardUiState,
+    actions: MeetupEditorActions,
+    photoTarget: MeetupPhotoTarget,
+    onPhotoTarget: (MeetupPhotoTarget) -> Unit,
+) {
     val enabled = !state.savingPhoto
+    Text(strings.meetupCardPhotoTarget, style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MeetupPhotoTarget.entries.forEach { target ->
+            FilterChip(
+                selected = photoTarget == target,
+                onClick = { onPhotoTarget(target) },
+                enabled = enabled,
+                label = {
+                    Text(
+                        text = when (target) {
+                            MeetupPhotoTarget.Both -> strings.meetupCardPhotoTargetBoth
+                            MeetupPhotoTarget.Portrait -> strings.meetupCardPortrait
+                            MeetupPhotoTarget.Landscape -> strings.meetupCardLandscape
+                        },
+                    )
+                },
+            )
+        }
+    }
+    HorizontalDivider()
     OutlinedButton(
         onClick = actions.onPickProfileBackground,
         enabled = enabled,

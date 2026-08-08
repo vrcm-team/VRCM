@@ -23,6 +23,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.defaultMeetupCardConfig
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
@@ -156,6 +157,7 @@ private data object FakeMeetupCardRepository : MeetupCardRepository {
     override suspend fun replacePhoto(
         ownerId: String,
         candidate: MeetupPhotoCandidate,
+        target: MeetupPhotoTarget,
     ): Result<Unit> = Result.failure(IllegalStateException("unused"))
 }
 

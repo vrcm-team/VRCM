@@ -36,6 +36,8 @@ import kotlinx.coroutines.withContext
 data class MeetupCardState(
     val config: MeetupCardConfig,
     val photoModel: String?,
+    /** 横屏独立照片的展示模型；未设置或不可用时为 null，横屏回退 [photoModel]。 */
+    val landscapePhotoModel: String? = null,
     val decorations: Map<DecorationSlot, ResolvedDecoration> = emptyMap(),
     val refreshing: Boolean = false,
     val lastRefresh: MeetupRefreshResult = MeetupRefreshResult.NotStarted,
@@ -72,6 +74,13 @@ data class MeetupPhotoCandidate(
     val landscapeCrop: MeetupCrop,
 )
 
+/** 新照片的应用范围：双方向共用，或只替换某一方向。 */
+enum class MeetupPhotoTarget {
+    Both,
+    Portrait,
+    Landscape,
+}
+
 /** Supplies the already-authenticated current user without starting another request. */
 fun interface MeetupCurrentUserSnapshotProvider {
     fun snapshot(ownerId: String): MeetupProfileSnapshot?
@@ -92,7 +101,11 @@ interface MeetupCardRepository {
         transform: (MeetupCardConfig) -> MeetupCardConfig,
     )
 
-    suspend fun replacePhoto(ownerId: String, candidate: MeetupPhotoCandidate): Result<Unit>
+    suspend fun replacePhoto(
+        ownerId: String,
+        candidate: MeetupPhotoCandidate,
+        target: MeetupPhotoTarget = MeetupPhotoTarget.Both,
+    ): Result<Unit>
 }
 
 /** Default repository coordinating Settings, private assets and remote profile data. */
@@ -199,6 +212,7 @@ class DefaultMeetupCardRepository(
     override suspend fun replacePhoto(
         ownerId: String,
         candidate: MeetupPhotoCandidate,
+        target: MeetupPhotoTarget,
     ): Result<Unit> = try {
         require(candidate.bytes.isNotEmpty()) { "Meetup photo is empty" }
         val token = accountCacheManager.captureWriteToken(ownerId)
@@ -234,24 +248,48 @@ class DefaultMeetupCardRepository(
                         cleanupPhoto = true
                     } else {
                         val old = loadOrCreateLocked(ownerId)
-                        val updated = old.copy(
-                            revision = old.revision + 1L,
-                            photo = photo,
-                            profileBackgroundFallback = if (
-                                photo.source == MeetupPhotoSource.ProfileBackground
-                            ) {
-                                photo
-                            } else {
-                                old.profileBackgroundFallback
-                            },
-                            portraitCrop = candidate.portraitCrop,
-                            landscapeCrop = candidate.landscapeCrop,
-                        )
+                        val fallback = if (photo.source == MeetupPhotoSource.ProfileBackground) {
+                            photo
+                        } else {
+                            old.profileBackgroundFallback
+                        }
+                        val updated = when (target) {
+                            MeetupPhotoTarget.Both -> old.copy(
+                                revision = old.revision + 1L,
+                                photo = photo,
+                                // 双方向共用时清除横屏独立照片。
+                                landscapePhoto = null,
+                                profileBackgroundFallback = fallback,
+                                portraitCrop = candidate.portraitCrop,
+                                landscapeCrop = candidate.landscapeCrop,
+                            )
+                            MeetupPhotoTarget.Portrait -> old.copy(
+                                revision = old.revision + 1L,
+                                photo = photo,
+                                profileBackgroundFallback = fallback,
+                                portraitCrop = candidate.portraitCrop,
+                            )
+                            MeetupPhotoTarget.Landscape -> old.copy(
+                                revision = old.revision + 1L,
+                                landscapePhoto = photo,
+                                profileBackgroundFallback = fallback,
+                                landscapeCrop = candidate.landscapeCrop,
+                            )
+                        }
                         configDao.save(updated)
+                        val model = assetStore.model(asset)
                         updateState(ownerId) {
                             it.copy(
                                 config = updated,
-                                photoModel = assetStore.model(asset),
+                                photoModel = when (target) {
+                                    MeetupPhotoTarget.Landscape -> it.photoModel
+                                    else -> model
+                                },
+                                landscapePhotoModel = when (target) {
+                                    MeetupPhotoTarget.Both -> null
+                                    MeetupPhotoTarget.Portrait -> it.landscapePhotoModel
+                                    MeetupPhotoTarget.Landscape -> model
+                                },
                             )
                         }
                         photoCommitted = true
@@ -295,6 +333,7 @@ class DefaultMeetupCardRepository(
         if (!isCurrentRefresh(start.identity)) return
 
         val photoResolution = resolvePhoto(start, start.config, photoLease)
+        val landscapeResolution = resolveLandscapePhoto(start, start.config, photoLease)
 
         if (profileResult is FetchResult.Failure && appearanceResult is FetchResult.Failure) {
             val reason = profileResult.error
@@ -365,6 +404,20 @@ class DefaultMeetupCardRepository(
                                 mergedPhotoModel = photoResolution.model
                             }
                         }
+                        var mergedLandscapePhoto = latest.landscapePhoto
+                        var mergedLandscapeModel = currentState.landscapePhotoModel
+                        if (
+                            latest.landscapePhoto != null &&
+                            latest.landscapePhoto == start.config.landscapePhoto
+                        ) {
+                            landscapeResolution.replacement?.let { repaired ->
+                                mergedLandscapePhoto = repaired.photo
+                                mergedLandscapeModel = repaired.model
+                            }
+                            if (landscapeResolution.replacement == null) {
+                                mergedLandscapeModel = landscapeResolution.model
+                            }
+                        }
                         var profileBackgroundFallback = latest.profileBackgroundFallback
                         photoResolution.replacement
                             ?.takeIf { repaired ->
@@ -394,6 +447,7 @@ class DefaultMeetupCardRepository(
                             },
                             appearance = mergedAppearance,
                             photo = mergedPhoto,
+                            landscapePhoto = mergedLandscapePhoto,
                             profileBackgroundFallback = profileBackgroundFallback,
                         )
                         // 内容无变化的刷新不空转 revision，也不做无意义的磁盘写入。
@@ -415,12 +469,13 @@ class DefaultMeetupCardRepository(
                                 add(DECORATIONS_PART)
                             }
                             if (backgroundResult is FetchResult.Failure) add(PROFILE_BACKGROUND_PART)
-                            if (photoResolution.failed) add(PHOTO_PART)
+                            if (photoResolution.failed || landscapeResolution.failed) add(PHOTO_PART)
                         }
                         updateState(ownerId) {
                             it.copy(
                                 config = merged,
                                 photoModel = mergedPhotoModel,
+                                landscapePhotoModel = mergedLandscapeModel,
                                 decorations = resolvedDecorations,
                                 lastRefresh = if (failedParts.isEmpty()) {
                                     MeetupRefreshResult.Success
@@ -641,6 +696,51 @@ class DefaultMeetupCardRepository(
         PreparedPhoto(photo = photo, model = assetStore.model(asset))
     }
 
+    /** 横屏独立照片的解析：可读即用，来源允许时重下；失败回退竖屏照片由渲染层完成。 */
+    private suspend fun resolveLandscapePhoto(
+        start: RefreshStart,
+        config: MeetupCardConfig,
+        photoLease: MeetupPhotoArtifactLease,
+    ): PhotoResolution {
+        val photo = config.landscapePhoto ?: return PhotoResolution(model = null)
+        var failed = false
+        photo.localAsset?.let { asset ->
+            try {
+                require(assetStore.read(asset).isNotEmpty()) { "Cached landscape photo is empty" }
+                return PhotoResolution(model = assetStore.model(asset))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                failed = true
+            }
+        }
+        val sourceUrl = photo.sourceUrl?.trim().orEmpty()
+        if (photo.source != MeetupPhotoSource.LocalAlbum && sourceUrl.isNotEmpty()) {
+            try {
+                val downloaded = downloadPhoto(
+                    identity = start.identity,
+                    source = photo.source,
+                    sourceId = photo.sourceId,
+                    sourceUrl = sourceUrl,
+                    fileName = sourceUrl,
+                    width = photo.width,
+                    height = photo.height,
+                    photoLease = photoLease,
+                )
+                return PhotoResolution(
+                    model = downloaded.model,
+                    replacement = downloaded,
+                    failed = failed,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                failed = true
+            }
+        }
+        return PhotoResolution(model = null, failed = failed)
+    }
+
     private suspend fun downloadPhoto(
         identity: RefreshIdentity,
         source: MeetupPhotoSource,
@@ -734,6 +834,7 @@ class DefaultMeetupCardRepository(
                     MeetupCardState(
                         config = config,
                         photoModel = initialPhotoModel(config),
+                        landscapePhotoModel = initialLandscapePhotoModel(config),
                         decorations = restoreDecorations(config.appearance),
                     ),
                 ),
@@ -754,6 +855,7 @@ class DefaultMeetupCardRepository(
                         holder.flow.value = MeetupCardState(
                             config = config,
                             photoModel = initialPhotoModel(config),
+                            landscapePhotoModel = initialLandscapePhotoModel(config),
                             decorations = restoreDecorations(config.appearance),
                         )
                         holder.epoch = invalidation.epoch
@@ -771,6 +873,11 @@ class DefaultMeetupCardRepository(
             runCatching { asset.takeIf(assetStore::exists)?.let(assetStore::model) }.getOrNull()
         }
         .firstOrNull()
+
+    private fun initialLandscapePhotoModel(config: MeetupCardConfig): String? =
+        config.landscapePhoto?.localAsset?.let { asset ->
+            runCatching { asset.takeIf(assetStore::exists)?.let(assetStore::model) }.getOrNull()
+        }
 
     private fun restoreDecorations(
         appearance: MeetupAppearanceSnapshot,
