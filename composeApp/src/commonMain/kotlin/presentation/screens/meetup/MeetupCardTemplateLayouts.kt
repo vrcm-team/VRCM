@@ -109,19 +109,22 @@ private fun InfoBarTemplate(
             color = lerp(MaterialTheme.colorScheme.surface, state.accentColor, 0.14f)
                 .copy(alpha = 0.94f),
         ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // 名字独占整行，不与二维码抢横向空间。
-                MeetupNameplateBlock(state, onPhoto = false)
-                // 群组横幅同样独占整行：封面被压成窄条就看不出是哪个群组了。
-                MeetupGroupBanner(state)
-                MeetupInfoAndQrRow(
-                    state = state,
-                    onPhoto = false,
-                    shortTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Column {
+                // 群组横幅贴着面板顶边铺满，是整块信息的页眉；
+                // 夹在名字和字段中间既割裂身份信息，又像面板里另外浮了一张卡片。
+                MeetupGroupBanner(state, contentPadding = 20.dp)
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // 名字独占整行，不与二维码抢横向空间。
+                    MeetupNameplateBlock(state, onPhoto = false)
+                    MeetupInfoAndQrRow(
+                        state = state,
+                        onPhoto = false,
+                        shortTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -193,22 +196,25 @@ private fun SpotlightTemplate(
                     ),
                 ),
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
-                MeetupNameplateBlock(
-                    state = state,
-                    onPhoto = true,
-                    large = orientation == MeetupOrientation.Portrait,
-                )
-                MeetupGroupBanner(state)
-                MeetupInfoAndQrRow(
-                    state = state,
-                    onPhoto = true,
-                    shortTextColor = Color.White.copy(alpha = 0.92f),
-                )
+            Column {
+                // 群组横幅贴着信息区顶边铺满，作为这块遮罩的页眉。
+                MeetupGroupBanner(state, contentPadding = 24.dp)
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
+                    MeetupNameplateBlock(
+                        state = state,
+                        onPhoto = true,
+                        large = orientation == MeetupOrientation.Portrait,
+                    )
+                    MeetupInfoAndQrRow(
+                        state = state,
+                        onPhoto = true,
+                        shortTextColor = Color.White.copy(alpha = 0.92f),
+                    )
+                }
             }
         }
     }
@@ -274,29 +280,31 @@ private fun SideTagTemplate(
                 )
                 MeetupFieldsFlow(state, onPhoto = true)
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
-                // 侧签是窄竖条，横幅排在信息末尾，不跟铭牌与名字抢那点高度。
-                MeetupGroupBanner(state)
             }
-            if (landscape) {
-                Row(
-                    modifier = Modifier.fillMaxHeight().padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(MeetupQrColumnGap),
-                ) {
-                    qrCodes(Modifier)
+            Column(modifier = Modifier.fillMaxHeight()) {
+                // 侧栏的页眉：横幅铺满栏宽贴顶，正文再各自留内边距。
+                MeetupGroupBanner(state, contentPadding = 16.dp)
+                if (landscape) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(MeetupQrColumnGap),
+                    ) {
+                        qrCodes(Modifier)
+                        Column(
+                            modifier = Modifier.fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            content = info,
+                        )
+                    }
+                } else {
                     Column(
-                        modifier = Modifier.fillMaxHeight(),
+                        modifier = Modifier.weight(1f).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        content = info,
-                    )
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxHeight().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    info()
-                    Spacer(modifier = Modifier.weight(1f))
-                    qrCodes(Modifier)
+                    ) {
+                        info()
+                        Spacer(modifier = Modifier.weight(1f))
+                        qrCodes(Modifier)
+                    }
                 }
             }
         }
@@ -529,7 +537,7 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
  * 用户开了这个开关就该看到群组，而不是一片空白。
  */
 @Composable
-private fun MeetupGroupBanner(state: MeetupCardUiState) {
+private fun MeetupGroupBanner(state: MeetupCardUiState, contentPadding: Dp) {
     val config = state.config
     if (!config.showRepresentedGroup) return
     val group = config.profile.representedGroup ?: return
@@ -539,7 +547,6 @@ private fun MeetupGroupBanner(state: MeetupCardUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MeetupGroupBannerHeight)
-            .clip(MaterialTheme.shapes.small)
             .background(state.accentColor.tintedScrim(0.72f)),
     ) {
         cover?.let { url ->
@@ -565,7 +572,8 @@ private fun MeetupGroupBanner(state: MeetupCardUiState) {
             )
         }
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            // 与正文同一条左边缘，页眉才像页眉而不是贴上去的贴纸。
+            modifier = Modifier.padding(horizontal = contentPadding, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
