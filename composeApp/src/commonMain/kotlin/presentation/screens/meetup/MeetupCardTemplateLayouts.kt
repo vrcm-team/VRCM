@@ -113,6 +113,8 @@ private fun InfoBarTemplate(
             ) {
                 // 名字独占整行，不与二维码抢横向空间。
                 MeetupNameplateBlock(state, onPhoto = false)
+                // 群组横幅同样独占整行：封面被压成窄条就看不出是哪个群组了。
+                MeetupGroupBanner(state)
                 MeetupInfoAndQrRow(
                     state = state,
                     onPhoto = false,
@@ -146,7 +148,6 @@ private fun MeetupInfoAndQrRow(
             modifier = Modifier.weight(1f).testTag(MeetupCardTestTags.Fields),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            MeetupGroupBanner(state, onPhoto = onPhoto)
             MeetupFieldsFlow(state, onPhoto = onPhoto)
             MeetupShortText(state, color = shortTextColor)
         }
@@ -200,6 +201,7 @@ private fun SpotlightTemplate(
                     onPhoto = true,
                     large = orientation == MeetupOrientation.Portrait,
                 )
+                MeetupGroupBanner(state)
                 MeetupInfoAndQrRow(
                     state = state,
                     onPhoto = true,
@@ -267,9 +269,10 @@ private fun SideTagTemplate(
                     vertical = true,
                     modifier = Modifier.heightIn(max = nameplateMaxHeight),
                 )
-                MeetupGroupBanner(state, onPhoto = true)
                 MeetupFieldsFlow(state, onPhoto = true)
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
+                // 侧签是窄竖条，横幅排在信息末尾，不跟铭牌与名字抢那点高度。
+                MeetupGroupBanner(state)
             }
             if (landscape) {
                 Row(
@@ -523,7 +526,7 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
  * 用户开了这个开关就该看到群组，而不是一片空白。
  */
 @Composable
-private fun MeetupGroupBanner(state: MeetupCardUiState, onPhoto: Boolean) {
+private fun MeetupGroupBanner(state: MeetupCardUiState) {
     val config = state.config
     if (!config.showRepresentedGroup) return
     val group = config.profile.representedGroup ?: return
@@ -585,8 +588,11 @@ private fun MeetupGroupBanner(state: MeetupCardUiState, onPhoto: Boolean) {
     }
 }
 
-/** 群组横幅高度与图标尺寸：封面按 Crop 铺满，文字放大时横幅可以变高。 */
-private val MeetupGroupBannerHeight = 40.dp
+/**
+ * 群组横幅高度与图标尺寸：封面按 Crop 铺满，文字放大时横幅可以变高。
+ * 独占整行后横幅很宽，太矮会把封面裁成一条看不出内容的色带。
+ */
+private val MeetupGroupBannerHeight = 48.dp
 private val MeetupGroupIconSize = 24.dp
 
 /**

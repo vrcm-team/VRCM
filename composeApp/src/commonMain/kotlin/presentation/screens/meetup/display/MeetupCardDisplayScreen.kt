@@ -175,6 +175,37 @@ fun MeetupCardDisplayContent(
                         color = Color.White,
                     )
                     Spacer(modifier = Modifier.weight(1f))
+                    ControlIconButton(
+                        onClick = {
+                            if (!actionInFlight) {
+                                actionInFlight = true
+                                onEdit()
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = rememberVectorPainter(AppIcons.Edit),
+                            tint = Color.White,
+                            contentDescription = strings.meetupCardEdit,
+                        )
+                    }
+                }
+            }
+            // 对卡片本身的操作放在底部两角，离拇指近，也不挡住顶部的身份信息。
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = getInsetPadding(WindowInsets::getBottom))
+                        // 沉浸模式下 inset 可能为 0，额外内边距避开手势条/圆角区域。
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     // 视口本来就是横的时候不需要这个开关。
                     if (!viewportLandscape) {
                         ControlIconButton(onClick = { forcedLandscape = !forcedLandscape }) {
@@ -189,6 +220,7 @@ fun MeetupCardDisplayContent(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.weight(1f))
                     ControlIconButton(
                         onClick = {
                             if (saving) return@ControlIconButton
@@ -234,20 +266,6 @@ fun MeetupCardDisplayContent(
                                 contentDescription = strings.meetupCardSaveImage,
                             )
                         }
-                    }
-                    ControlIconButton(
-                        onClick = {
-                            if (!actionInFlight) {
-                                actionInFlight = true
-                                onEdit()
-                            }
-                        },
-                    ) {
-                        Icon(
-                            painter = rememberVectorPainter(AppIcons.Edit),
-                            tint = Color.White,
-                            contentDescription = strings.meetupCardEdit,
-                        )
                     }
                 }
             }
