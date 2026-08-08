@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +52,14 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
 import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
+
+/** 供布局回归测试定位关键槽位；模板改版时这些名字必须跟着语义走。 */
+internal object MeetupCardTestTags {
+    const val Nameplate = "meetup-card-nameplate"
+    const val QrCodes = "meetup-card-qr"
+    const val Fields = "meetup-card-fields"
+    const val SideBand = "meetup-card-side-band"
+}
 
 /** 用户选择的主题色；照片会盖住底层背景，因此模板前景也要用它才可见。 */
 private val MeetupCardUiState.accentColor: Color get() = Color(config.accentArgb)
@@ -127,7 +136,7 @@ private fun MeetupInfoAndQrRow(
 ) {
     Row(verticalAlignment = Alignment.Top) {
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag(MeetupCardTestTags.Fields),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             MeetupFieldsFlow(state, onPhoto = onPhoto)
@@ -138,7 +147,7 @@ private fun MeetupInfoAndQrRow(
                 userId = state.ownerUserId,
                 linkTypes = state.config.resolvedQrLinkTypes(),
                 size = qrSize,
-                modifier = Modifier.padding(start = 16.dp),
+                modifier = Modifier.padding(start = 16.dp).testTag(MeetupCardTestTags.QrCodes),
             )
         }
     }
@@ -205,6 +214,7 @@ private fun SideTagTemplate(
     Row(modifier = modifier.fillMaxSize()) {
         BoxWithConstraints(
             modifier = Modifier
+                .testTag(MeetupCardTestTags.SideBand)
                 .fillMaxHeight()
                 .width(bandWidth)
                 .background(
@@ -238,6 +248,7 @@ private fun SideTagTemplate(
                         linkTypes = state.config.resolvedQrLinkTypes(),
                         size = MeetupQrSize,
                         vertical = true,
+                        modifier = Modifier.testTag(MeetupCardTestTags.QrCodes),
                     )
                 }
             }
@@ -318,6 +329,7 @@ private fun MeetupNameplateBlock(
         .takeIf { state.config.showPronouns && it.isNotBlank() }
     Box(
         modifier = modifier
+            .testTag(MeetupCardTestTags.Nameplate)
             .clip(MaterialTheme.shapes.small)
             .background(gradient),
     ) {

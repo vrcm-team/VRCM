@@ -42,7 +42,7 @@
 - 素材 URL 无 scheme/host 白名单（信任边界是官方 API 响应）。
 - 写入中断的 `.tmp` 孤儿文件无启动清扫；Windows 上 `atomicMove` 覆盖已存在目标依赖 JDK 行为。
 - 配置 JSON 损坏的账号在他人 `clearAccount` 时装饰缓存可能被误删（可自愈）。
-- 漏测清单：DecorationTemplateCacheDao 无专属测试、AccountCacheManager lease 边界、iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。
+- 漏测清单：DecorationTemplateCacheDao 无专属测试、AccountCacheManager lease 边界、iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
 
 ## 执行边界与文件结构
 
