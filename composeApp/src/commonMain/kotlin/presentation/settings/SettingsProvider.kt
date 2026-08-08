@@ -24,9 +24,18 @@ fun SettingsProvider(
     CompositionLocalProvider(
         LocalSettingsState provides remember { mutableStateOf(settingsModel.settingsVo) }
     ) {
-        val currentSettings = LocalSettingsState.current.value
+        val settingsState = LocalSettingsState.current
+        val currentSettings = settingsState.value
         LaunchedEffect(currentSettings){
             settingsModel.saveSettings(currentSettings)
+        }
+        // The platform can refuse to start background monitoring after a restart or a re-login.
+        // Correcting the in-memory state keeps the switch honest and lets saveSettings persist it,
+        // instead of a direct DAO write that this state would silently overwrite later.
+        LaunchedEffect(Unit) {
+            settingsModel.backgroundMonitoringUnavailable.collect {
+                settingsState.value = settingsState.value.copy(backgroundFriendMonitoringEnabled = false)
+            }
         }
 
         val isDark = currentSettings.isDarkTheme?:isSystemInDarkTheme()
