@@ -9,8 +9,9 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import io.github.vrcmteam.vrcm.service.FriendActivityForegroundService
+import org.koin.core.logger.Logger
 
-class AndroidAppPlatform(val context: Context) : AppPlatform {
+class AndroidAppPlatform(val context: Context, private val logger: Logger) : AppPlatform {
     override val name = "Android"
     override val version = Build.VERSION.SDK_INT.toString()
     override val type = AppPlatformType.Android
@@ -38,7 +39,10 @@ class AndroidAppPlatform(val context: Context) : AppPlatform {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
             else context.startService(intent)
             BackgroundFriendMonitoringResult.Started
-        }.getOrElse { BackgroundFriendMonitoringResult.Unsupported }
+        }.getOrElse {
+            logger.error("Failed to start background friend monitoring: ${it.message.orEmpty()}")
+            BackgroundFriendMonitoringResult.Unsupported
+        }
     }
 
     override val supportsBatteryOptimizationSettings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
@@ -49,9 +53,12 @@ class AndroidAppPlatform(val context: Context) : AppPlatform {
 
     override fun openBatteryOptimizationSettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
-        context.startActivity(
-            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        // Some vendor ROMs ship without this settings screen, so a missing activity must not crash.
+        runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.onFailure { logger.error("Failed to open battery optimization settings: ${it.message.orEmpty()}") }
     }
 }

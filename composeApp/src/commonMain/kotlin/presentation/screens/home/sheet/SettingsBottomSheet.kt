@@ -191,8 +191,8 @@ private inline fun ColumnScope.CustomBlock() {
                 ElevatedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(strings.stettingBackgroundSettings, style = MaterialTheme.typography.titleSmall)
-                        Text("${strings.stettingBackgroundNotifications}：${if (notificationsAllowed) strings.stettingStatusEnabled else strings.stettingStatusDisabled}")
-                        Text("${strings.stettingBackgroundBattery}：${if (batteryUnrestricted) strings.stettingStatusAllowed else strings.stettingStatusManaged}")
+                        Text("${strings.stettingBackgroundNotifications}: ${if (notificationsAllowed) strings.stettingStatusEnabled else strings.stettingStatusDisabled}")
+                        Text("${strings.stettingBackgroundBattery}: ${if (batteryUnrestricted) strings.stettingStatusAllowed else strings.stettingStatusManaged}")
                         TextButton(onClick = platform::openNotificationSettings) {
                             Text(strings.stettingNotificationSettings)
                         }
