@@ -277,7 +277,8 @@ class DefaultMeetupCardRepository(
         val started = accountCacheManager.mutateIfCurrent(identity.token) {
             commitMutex.withLock {
                 if (!isCurrentRefresh(identity)) return@withLock
-                val config = loadOrCreateLocked(ownerId)
+                // 只有 ensureDefault/显式编辑才能创建配置；否则 hasConfig 的首配分流会被刷新破坏。
+                val config = configDao.load(ownerId) ?: return@withLock
                 updateState(ownerId) { it.copy(config = config, refreshing = true) }
                 capturedStart = RefreshStart(identity, config)
             }
@@ -296,7 +297,9 @@ class DefaultMeetupCardRepository(
         val photoResolution = resolvePhoto(start, start.config, photoLease)
 
         if (profileResult is FetchResult.Failure && appearanceResult is FetchResult.Failure) {
-            finishFailed(start, profileResult.error, photoResolution)
+            val reason = profileResult.error
+            if (appearanceResult.error !== reason) reason.addSuppressed(appearanceResult.error)
+            finishFailed(start, reason, photoResolution)
             return
         }
 
@@ -306,7 +309,8 @@ class DefaultMeetupCardRepository(
                 .takeIf(String::isNotEmpty)
                 ?.let { url ->
                     fetchResult {
-                        downloadPhoto(
+                        // §10 第 5 步：URL 未变且本地素材完好时不重复下载。
+                        reusableProfileBackground(start.config, url) ?: downloadPhoto(
                             identity = start.identity,
                             source = MeetupPhotoSource.ProfileBackground,
                             sourceId = null,
@@ -355,7 +359,9 @@ class DefaultMeetupCardRepository(
                                 mergedPhoto = repaired.photo
                                 mergedPhotoModel = repaired.model
                             }
-                            if (photoResolution.replacement == null && photoResolution.model != null) {
+                            if (photoResolution.replacement == null) {
+                                // 回退链全部失败时 model 为 null，落到主题背景，
+                                // 与 finishFailed 的语义保持一致，不保留死路径。
                                 mergedPhotoModel = photoResolution.model
                             }
                         }
@@ -379,8 +385,7 @@ class DefaultMeetupCardRepository(
                                 mergedPhotoModel = backgroundResult.value.model
                             }
                         }
-                        val merged = latest.copy(
-                            revision = latest.revision + 1L,
+                        val mergedContent = latest.copy(
                             profile = when (profileResult) {
                                 is FetchResult.Success -> profileResult.value.toSnapshot(
                                     fallbackDisplayName = latest.profile.displayName,
@@ -391,7 +396,13 @@ class DefaultMeetupCardRepository(
                             photo = mergedPhoto,
                             profileBackgroundFallback = profileBackgroundFallback,
                         )
-                        configDao.save(merged)
+                        // 内容无变化的刷新不空转 revision，也不做无意义的磁盘写入。
+                        val merged = if (mergedContent == latest) {
+                            latest
+                        } else {
+                            mergedContent.copy(revision = latest.revision + 1L)
+                                .also(configDao::save)
+                        }
                         val failedParts = buildSet {
                             if (profileResult is FetchResult.Failure) add(PROFILE_PART)
                             if (appearanceResult is FetchResult.Failure) add(APPEARANCE_PART)
@@ -617,6 +628,19 @@ class DefaultMeetupCardRepository(
         return PhotoResolution(model = null, failed = failed)
     }
 
+    private fun reusableProfileBackground(
+        config: MeetupCardConfig,
+        url: String,
+    ): PreparedPhoto? = listOfNotNull(
+        config.photo.takeIf { it.source == MeetupPhotoSource.ProfileBackground },
+        config.profileBackgroundFallback,
+    ).firstNotNullOfOrNull { photo ->
+        val asset = photo.localAsset ?: return@firstNotNullOfOrNull null
+        if (photo.sourceUrl?.trim() != url) return@firstNotNullOfOrNull null
+        if (!assetStore.exists(asset)) return@firstNotNullOfOrNull null
+        PreparedPhoto(photo = photo, model = assetStore.model(asset))
+    }
+
     private suspend fun downloadPhoto(
         identity: RefreshIdentity,
         source: MeetupPhotoSource,
@@ -742,7 +766,10 @@ class DefaultMeetupCardRepository(
         config.photo.localAsset,
         config.profileBackgroundFallback?.localAsset,
     ).filterNotNull()
-        .mapNotNull { asset -> runCatching { assetStore.model(asset) }.getOrNull() }
+        .mapNotNull { asset ->
+            // 首帧就过滤已被外力删除的文件，直接落到下一级回退而不是渲染死路径。
+            runCatching { asset.takeIf(assetStore::exists)?.let(assetStore::model) }.getOrNull()
+        }
         .firstOrNull()
 
     private fun restoreDecorations(

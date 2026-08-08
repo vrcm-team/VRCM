@@ -46,7 +46,8 @@ class AnimatedWebpDecoderTest {
             )
             assertTrue(finished.await(5, TimeUnit.SECONDS))
             assertNull(playbackError.get())
-            assertEquals(2, streamedFrames.get())
+            // latch 触发后播放仍在继续，只能断言下限。
+            assertTrue(streamedFrames.get() >= 2)
             animation.pause()
         } finally {
             animation.close()
@@ -71,16 +72,19 @@ class AnimatedWebpDecoderTest {
         val animation = SkiaAnimatedWebpDecoder().decode(bytes)
 
         try {
-            animation.start { frame ->
-                try {
-                    if (callbackCount.getAndIncrement() == 1) {
-                        delivered.set(frameChecksum(frame.bitmap.asSkiaBitmap()))
-                        secondFrame.countDown()
+            animation.start(
+                onFrame = { frame ->
+                    try {
+                        if (callbackCount.getAndIncrement() == 1) {
+                            delivered.set(frameChecksum(frame.bitmap.asSkiaBitmap()))
+                            secondFrame.countDown()
+                        }
+                    } finally {
+                        frame.close()
                     }
-                } finally {
-                    frame.close()
-                }
-            }
+                },
+                onError = {},
+            )
 
             assertTrue(secondFrame.await(5, TimeUnit.SECONDS))
             assertEquals(expected, delivered.get())
@@ -127,23 +131,26 @@ class AnimatedWebpDecoderTest {
         val animation = SkiaAnimatedWebpDecoder().decode(animatedWebpFixture())
 
         try {
-            animation.start { frame ->
-                frame.close()
-                animation.start(
-                    onFrame = { replacementFrame ->
-                        try {
-                            when (replacementFrames.incrementAndGet()) {
-                                1 -> firstReplacementFrame.countDown()
-                                2 -> secondReplacementFrame.countDown()
+            animation.start(
+                onFrame = { frame ->
+                    frame.close()
+                    animation.start(
+                        onFrame = { replacementFrame ->
+                            try {
+                                when (replacementFrames.incrementAndGet()) {
+                                    1 -> firstReplacementFrame.countDown()
+                                    2 -> secondReplacementFrame.countDown()
+                                }
+                            } finally {
+                                replacementFrame.close()
                             }
-                        } finally {
-                            replacementFrame.close()
-                        }
-                    },
-                    onError = { replacementErrors.incrementAndGet() },
-                )
-                throw IllegalStateException("old frame consumer failed")
-            }
+                        },
+                        onError = { replacementErrors.incrementAndGet() },
+                    )
+                    throw IllegalStateException("old frame consumer failed")
+                },
+                onError = {},
+            )
             assertTrue(firstReplacementFrame.await(5, TimeUnit.SECONDS))
             assertTrue(secondReplacementFrame.await(5, TimeUnit.SECONDS))
             assertEquals(0, replacementErrors.get())
@@ -161,18 +168,24 @@ class AnimatedWebpDecoderTest {
         val animation = SkiaAnimatedWebpDecoder().decode(animatedWebpFixture())
 
         try {
-            animation.start { frame ->
-                frame.close()
-                oldCallbackStarted.countDown()
-                assertTrue(releaseOldCallback.await(5, TimeUnit.SECONDS))
-            }
+            animation.start(
+                onFrame = { frame ->
+                    frame.close()
+                    oldCallbackStarted.countDown()
+                    assertTrue(releaseOldCallback.await(5, TimeUnit.SECONDS))
+                },
+                onError = {},
+            )
             assertTrue(oldCallbackStarted.await(5, TimeUnit.SECONDS))
 
             val replacementThread = Thread {
-                animation.start { frame ->
-                    frame.close()
-                    replacementFrame.countDown()
-                }
+                animation.start(
+                    onFrame = { frame ->
+                        frame.close()
+                        replacementFrame.countDown()
+                    },
+                    onError = {},
+                )
                 replacementReturned.countDown()
             }
             replacementThread.start()

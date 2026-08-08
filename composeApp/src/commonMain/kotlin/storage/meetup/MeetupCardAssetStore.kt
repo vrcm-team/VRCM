@@ -63,13 +63,28 @@ class MeetupCardAssetStore(
 
     fun model(ref: MeetupAssetRef): String = resolve(ref).toString()
 
+    /** 仅检查引用文件存在且非空，不做 hash 校验；供离线恢复快速过滤悬挂引用。 */
+    fun exists(ref: MeetupAssetRef): Boolean {
+        val path = try {
+            resolve(ref)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        return try {
+            (fileSystem.metadataOrNull(path)?.size ?: 0L) > 0L
+        } catch (_: IOException) {
+            false
+        }
+    }
+
     suspend fun deletePhoto(ref: MeetupAssetRef) = withContext(meetupCardAssetIoDispatcher) {
         require(ref.relativePath.startsWith("accounts/")) { "Asset reference is not a photo" }
         fileSystem.delete(resolve(ref), mustExist = false)
     }
 
     suspend fun deleteAccount(ownerId: String) = withContext(meetupCardAssetIoDispatcher) {
-        requireValidId(ownerId, "ownerId")
+        // 非法 ID 不可能有已写入的数据；静默返回避免中断账号移除流程。
+        if (!ID_PATTERN.matches(ownerId)) return@withContext
         fileSystem.deleteRecursively(root / "accounts" / ownerId, mustExist = false)
     }
 

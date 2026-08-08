@@ -29,6 +29,9 @@ internal interface AndroidWebpPlayback {
 
     fun resume()
 
+    /** 把播放位置回卷到第 0 帧，供再次 start 时从头播放。 */
+    fun reset()
+
     fun stop()
 }
 
@@ -49,6 +52,9 @@ private class AwebpPlayback(bytes: ByteArray) :
     private var frameListener: ((ByteBuffer) -> Unit)? = null
 
     init {
+        // 强制无限循环：loopLimit <= 0 时 FrameSeqDecoder.canStep 恒可步进，
+        // 避免有限 loop_count 的 WebP 播完进入 FINISHING 后永久冻结（与桌面端持续循环行为一致）。
+        decoder.setLoopLimit(0)
         decoder.bounds
     }
 
@@ -75,6 +81,9 @@ private class AwebpPlayback(bytes: ByteArray) :
     override fun pause() = decoder.pause()
 
     override fun resume() = decoder.resume()
+
+    // reset 与 resume 都投递到同一 worker Handler，先 reset 再 resume 可保证从第 0 帧继续。
+    override fun reset() = decoder.reset()
 
     override fun stop() = decoder.stop()
 
@@ -124,9 +133,13 @@ internal class AndroidDecodedAnimation(
     init {
         require(playback.frameCount > 1) { "WebP image must contain more than one frame" }
         durations = IntArray(playback.frameCount) { index ->
-            playback.frameDurationMillis(index).coerceAtLeast(
-                MINIMUM_FRAME_DURATION_MILLIS,
-            )
+            val duration = playback.frameDurationMillis(index)
+            // AWebP 的 FrameSeqDecoder 按原始 frameDuration 调度，过短帧会忙循环；
+            // 直接按解码失败处理，让上层降级到静态 base。
+            require(duration >= MINIMUM_SCHEDULABLE_DURATION_MILLIS) {
+                "WebP frame $index duration ${duration}ms would busy-loop AWebP scheduling"
+            }
+            duration.coerceAtLeast(MINIMUM_FRAME_DURATION_MILLIS)
         }
         playback.setFrameListener(::onRender)
     }
@@ -160,7 +173,13 @@ internal class AndroidDecodedAnimation(
         synchronized(dispatchGate) {
             synchronized(controlGate) {
                 if (closed || failed || generation != transition || activeGeneration != null) return
-                if (started) playback.resume() else playback.start()
+                if (started) {
+                    // 再次 start 时先回卷到第 0 帧，避免 resume 从上次暂停位置继续。
+                    playback.reset()
+                    playback.resume()
+                } else {
+                    playback.start()
+                }
                 if (closed || failed || generation != transition || activeGeneration != null) return
                 started = true
                 paused = false
@@ -280,6 +299,9 @@ internal class AndroidDecodedAnimation(
 
     private companion object {
         const val MINIMUM_FRAME_DURATION_MILLIS = 16
+
+        /** FrameSeqDecoder 可安全调度的最短原始帧时长，低于该值判定解码失败。 */
+        const val MINIMUM_SCHEDULABLE_DURATION_MILLIS = 10
     }
 }
 

@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationAssetType
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCache
 import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupAssetRef
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -188,6 +189,81 @@ class DecorationResolverTest {
         assertTrue(loader.requests.isEmpty())
         assertContentEquals(bytes, decoder.decoded.single())
         assertEquals(1, decoder.closeCount)
+    }
+
+    @Test
+    fun restoreCachedSkipsDanglingAssetsAndKeepsExplicitDegradedState() = resolverTest {
+        val danglingMain = assetStore.writeDecoration(
+            "inv_pruned",
+            DecorationAssetType.MainAnimation,
+            "pruned-animation".encodeToByteArray(),
+        )
+        val readableBase = assetStore.writeDecoration(
+            "inv_pruned",
+            DecorationAssetType.Base,
+            "readable-base".encodeToByteArray(),
+        )
+        fileSystem.delete(assetStore.model(danglingMain).toPath())
+        cacheDao.save(
+            DecorationTemplateCache(
+                templateId = "inv_pruned",
+                mainAnimationUrl = "https://cdn/main.webp",
+                baseUrl = "https://cdn/base.webp",
+                mainAnimationAsset = danglingMain,
+                baseAsset = readableBase,
+                gradientStart = "#112233",
+                gradientEnd = "#445566",
+            ),
+        )
+        cacheDao.save(
+            DecorationTemplateCache(
+                templateId = "inv_gone",
+                mainAnimationUrl = "https://cdn/gone.webp",
+                mainAnimationAsset = MeetupAssetRef(
+                    relativePath = "decorations/inv_gone/" +
+                        "0".repeat(64) + "/main-animation.webp",
+                    sha256 = "0".repeat(64),
+                ),
+            ),
+        )
+
+        val restored = resolver().restoreCached(listOf("inv_pruned", "inv_gone", "inv/bad"))
+
+        val pruned = restored.getValue("inv_pruned")
+        assertEquals(DecorationRenderMode.Static, pruned.mode)
+        assertEquals(readableBase, pruned.asset)
+        assertEquals("#112233", pruned.gradientStart)
+        assertEquals(DecorationRenderMode.Unavailable, restored.getValue("inv_gone").mode)
+        assertEquals(DecorationRenderMode.Unavailable, restored.getValue("inv/bad").mode)
+    }
+
+    @Test
+    fun emptyRemoteTemplateIdIsRejectedAndKeepsValidatedCache() = resolverTest {
+        val cachedBytes = "cached-animation".encodeToByteArray()
+        val cachedRef = assetStore.writeDecoration(
+            "inv_cached",
+            DecorationAssetType.MainAnimation,
+            cachedBytes,
+        )
+        val cached = DecorationTemplateCache(
+            templateId = "inv_cached",
+            mainAnimationUrl = "https://cdn/cached.webp",
+            mainAnimationAsset = cachedRef,
+            gradientStart = "#112233",
+            gradientEnd = "#445566",
+        )
+        cacheDao.save(cached)
+        source.handler = {
+            template("", asset("mainAnimation", "https://cdn/untrusted.webp"))
+        }
+        loader.handler = { _, _ -> error("Empty response ID must not trigger downloads") }
+
+        val result = resolver().refresh(listOf("inv_cached")).getValue("inv_cached")
+
+        assertEquals(DecorationRenderMode.Animated, result.mode)
+        assertEquals(cachedRef, result.asset)
+        assertEquals(cached, cacheDao.load("inv_cached"))
+        assertTrue(loader.requests.isEmpty())
     }
 
     @Test

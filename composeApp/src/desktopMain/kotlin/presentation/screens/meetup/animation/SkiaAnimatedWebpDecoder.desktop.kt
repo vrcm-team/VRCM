@@ -2,12 +2,14 @@ package io.github.vrcmteam.vrcm.presentation.screens.meetup.animation
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
+import kotlin.time.TimeSource
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -23,7 +25,7 @@ class SkiaAnimatedWebpDecoder : AnimatedWebpDecoder {
         val codec = try {
             Codec.makeFromData(data)
         } catch (cause: Throwable) {
-            closeAfterFailure(data, cause)
+            closeAfterFailure(cause) { data.close() }
             throw cause
         }
         try {
@@ -39,8 +41,8 @@ class SkiaAnimatedWebpDecoder : AnimatedWebpDecoder {
             }
             return SkiaDecodedAnimation(data, codec, frameInfo, durations)
         } catch (cause: Throwable) {
-            closeAfterFailure(codec, cause)
-            closeAfterFailure(data, cause)
+            closeAfterFailure(cause) { codec.close() }
+            closeAfterFailure(cause) { data.close() }
             throw cause
         }
     }
@@ -68,7 +70,10 @@ private class SkiaDecodedAnimation(
     private var nextFrameIndex = 0
     private var failed = false
     private var errorListener: ((Throwable) -> Unit)? = null
-    private val composedFrames = arrayOfNulls<Bitmap>(durations.size)
+
+    /** 仅保留最近一帧的合成结果及其序号，顺序播放的下一帧直接在其像素上续解。 */
+    private var composedFrame: Bitmap? = null
+    private var composedFrameIndex = NO_REQUIRED_FRAME
 
     override val frameCount: Int
         get() = synchronized(lock) {
@@ -92,7 +97,7 @@ private class SkiaDecodedAnimation(
             listener = onFrame
             errorListener = onError
             nextFrameIndex = 0
-            clearComposedFramesLocked()
+            clearComposedFrameLocked()
             paused = true
             playbackGeneration++
             playbackJob?.cancel()
@@ -155,8 +160,8 @@ private class SkiaDecodedAnimation(
             playbackJob = null
             listener = null
             errorListener = null
-            clearComposedFramesLocked()
-            closeBoth(codec, data)
+            clearComposedFrameLocked()
+            closeBoth({ codec.close() }, { data.close() })
         }
         job?.cancel()
         synchronized(dispatchGate) {}
@@ -167,7 +172,9 @@ private class SkiaDecodedAnimation(
     }
 
     private suspend fun play(generation: Int) {
-        while (playbackScope.coroutineContext.isActive) {
+        while (currentCoroutineContext().isActive) {
+            // 记录帧起始时间，delay 时补偿解码与分发耗时，保持帧节奏稳定。
+            val frameStart = TimeSource.Monotonic.markNow()
             val playbackFrame = synchronized(lock) {
                 if (!isCurrentPlaybackLocked(generation)) return@synchronized null
                 val callback = listener ?: return@synchronized null
@@ -191,7 +198,7 @@ private class SkiaDecodedAnimation(
                     callback(frame)
                     true
                 } catch (cause: Throwable) {
-                    closeAfterFailure(frame, cause)
+                    closeAfterFailure(cause) { frame.close() }
                     failWhileDispatching(generation, cause)
                     false
                 }
@@ -200,35 +207,67 @@ private class SkiaDecodedAnimation(
                 frame.close()
                 return
             }
-            delay(playbackFrame.durationMillis.toLong())
+            val elapsedMillis = frameStart.elapsedNow().inWholeMilliseconds
+            delay((playbackFrame.durationMillis - elapsedMillis).coerceAtLeast(0))
         }
     }
 
     private fun decodeFrame(index: Int, generation: Int): OwnedAnimationFrame? = synchronized(lock) {
         if (!isCurrentPlaybackLocked(generation)) return@synchronized null
         ensureOpen()
-        durations[index]
-        if (index == 0) clearComposedFramesLocked()
-        val requiredFrame = frameInfo[index].requiredFrame
-        val bitmap = if (requiredFrame == NO_REQUIRED_FRAME) {
-            Bitmap()
-        } else {
-            require(requiredFrame in 0 until index) { "Invalid WebP frame dependency: $requiredFrame" }
-            requireNotNull(composedFrames[requiredFrame]) {
-                "Required WebP frame $requiredFrame has not been decoded"
-            }.makeClone()
-        }
+        val bitmap = composeFrameLocked(index)
         try {
-            if (requiredFrame == NO_REQUIRED_FRAME) {
-                check(bitmap.allocPixels(codec.imageInfo)) { "Unable to allocate animation frame bitmap" }
-            }
-            codec.readPixels(bitmap, index, requiredFrame)
-            composedFrames[index] = bitmap.makeClone()
+            retainComposedFrameLocked(index, bitmap)
             SkiaOwnedAnimationFrame(bitmap)
         } catch (cause: Throwable) {
-            closeAfterFailure(bitmap, cause)
+            closeAfterFailure(cause) { bitmap.close() }
             throw cause
         }
+    }
+
+    /**
+     * 合成第 [index] 帧：顺序播放时直接克隆保留的上一合成帧续解；
+     * 跳帧或回卷时沿 requiredFrame 依赖链回溯到独立帧后重放（最坏 O(n)）。
+     */
+    private fun composeFrameLocked(index: Int): Bitmap {
+        val replay = ArrayDeque<Int>()
+        var cursor = index
+        var base: Bitmap? = null
+        while (true) {
+            val required = frameInfo[cursor].requiredFrame
+            replay.addFirst(cursor)
+            if (required == NO_REQUIRED_FRAME) break
+            require(required in 0 until cursor) { "Invalid WebP frame dependency: $required" }
+            val retained = composedFrame
+            if (retained != null && composedFrameIndex == required) {
+                base = retained.makeClone()
+                break
+            }
+            cursor = required
+        }
+        val bitmap = base ?: Bitmap()
+        try {
+            if (base == null) {
+                check(bitmap.allocPixels(codec.imageInfo)) { "Unable to allocate animation frame bitmap" }
+            }
+            replay.forEach { frameIndex ->
+                codec.readPixels(bitmap, frameIndex, frameInfo[frameIndex].requiredFrame)
+            }
+            return bitmap
+        } catch (cause: Throwable) {
+            closeAfterFailure(cause) { bitmap.close() }
+            throw cause
+        }
+    }
+
+    /** 先释放旧的保留帧再克隆新帧，保证峰值缓存不超过两帧位图。 */
+    private fun retainComposedFrameLocked(index: Int, bitmap: Bitmap) {
+        val previous = composedFrame
+        composedFrame = null
+        composedFrameIndex = NO_REQUIRED_FRAME
+        previous?.close()
+        composedFrame = bitmap.makeClone()
+        composedFrameIndex = index
     }
 
     private fun ensureOpen() {
@@ -238,11 +277,10 @@ private class SkiaDecodedAnimation(
     private fun isCurrentPlaybackLocked(generation: Int): Boolean =
         !closed && !paused && generation == playbackGeneration && activeGeneration == generation
 
-    private fun clearComposedFramesLocked() {
-        composedFrames.forEachIndexed { index, bitmap ->
-            bitmap?.close()
-            composedFrames[index] = null
-        }
+    private fun clearComposedFrameLocked() {
+        composedFrame?.close()
+        composedFrame = null
+        composedFrameIndex = NO_REQUIRED_FRAME
     }
 
     private fun fail(generation: Int, cause: Throwable) {
@@ -260,7 +298,7 @@ private class SkiaDecodedAnimation(
             playbackJob = null
             activeGeneration = null
             listener = null
-            clearComposedFramesLocked()
+            clearComposedFrameLocked()
             errorListener.also { errorListener = null }
         }
         onError?.invoke(cause)
@@ -284,7 +322,7 @@ private class SkiaOwnedAnimationFrame(bitmap: Bitmap) : OwnedAnimationFrame {
     override val bitmap: ImageBitmap = try {
         bitmap.asComposeImageBitmap()
     } catch (cause: Throwable) {
-        closeAfterFailure(bitmap, cause)
+        closeAfterFailure(cause) { bitmap.close() }
         throw cause
     }
 
@@ -294,24 +332,24 @@ private class SkiaOwnedAnimationFrame(bitmap: Bitmap) : OwnedAnimationFrame {
     }
 }
 
-private fun closeBoth(first: AutoCloseable, second: AutoCloseable) {
+private fun closeBoth(first: () -> Unit, second: () -> Unit) {
     var failure: Throwable? = null
     try {
-        first.close()
+        first()
     } catch (cause: Throwable) {
         failure = cause
     }
     try {
-        second.close()
+        second()
     } catch (cause: Throwable) {
         failure?.addSuppressed(cause) ?: run { failure = cause }
     }
     failure?.let { throw it }
 }
 
-private fun closeAfterFailure(resource: AutoCloseable, primaryFailure: Throwable) {
+private fun closeAfterFailure(primaryFailure: Throwable, closeResource: () -> Unit) {
     try {
-        resource.close()
+        closeResource()
     } catch (closeFailure: Throwable) {
         if (closeFailure !== primaryFailure) primaryFailure.addSuppressed(closeFailure)
     }

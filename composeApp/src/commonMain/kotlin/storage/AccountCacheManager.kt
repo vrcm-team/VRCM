@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 
 internal data class AccountCacheWriteToken(
@@ -220,7 +221,15 @@ class AccountCacheManager(
 
     private suspend fun notifyInvalidated(invalidation: AccountCacheInvalidation) {
         val listeners = synchronized(lock) { invalidationListeners.toList() }
-        listeners.forEach { it(invalidation) }
+        listeners.forEach { listener ->
+            // 监听器异常不得让已完成的清理对调用方表现为失败，也不能挡住其余监听器。
+            try {
+                listener(invalidation)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+            }
+        }
     }
 
     private fun retainedDecorationTemplateIds(): Set<String> = buildSet {

@@ -123,6 +123,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.ktor.client.mock)
             implementation(libs.multiplatform.settings.test)
+            // commonTest 直接使用 FakeFileSystem，Android 单元测试编译也需要该依赖。
+            implementation(libs.okio.fakefilesystem)
         }
     }
 }

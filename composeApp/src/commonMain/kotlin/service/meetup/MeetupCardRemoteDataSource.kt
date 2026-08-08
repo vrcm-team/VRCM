@@ -63,6 +63,35 @@ class DefaultMeetupCardRemoteDataSource(
             )
         }
 
-    override suspend fun loadImage(url: String): ByteArray =
-        remoteBytesLoader.load(url, PrintImageLimits.MAX_FILE_BYTES)
+    override suspend fun loadImage(url: String): ByteArray {
+        val bytes = remoteBytesLoader.load(url, PrintImageLimits.MAX_FILE_BYTES)
+        // CDN 可能对图片 URL 返回 200 + 错误页；损坏字节不得替换已缓存的有效照片。
+        require(looksLikeSupportedImage(bytes)) {
+            "Remote meetup image bytes are not a supported image format"
+        }
+        return bytes
+    }
+}
+
+/** 用文件头快速排除明显不是图片的响应；完整解码校验由展示/编辑管线承担。 */
+internal fun looksLikeSupportedImage(bytes: ByteArray): Boolean {
+    if (bytes.size < 12) return false
+    return when {
+        // JPEG: FF D8 FF
+        bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte() -> true
+        // PNG: 89 'P' 'N' 'G'
+        bytes[0] == 0x89.toByte() && bytes.matchesAscii(1, "PNG") -> true
+        // WebP: "RIFF"...."WEBP"
+        bytes.matchesAscii(0, "RIFF") && bytes.matchesAscii(8, "WEBP") -> true
+        // GIF: "GIF8"
+        bytes.matchesAscii(0, "GIF8") -> true
+        // HEIC/HEIF/AVIF: ISO BMFF，第 4 字节起为 "ftyp"
+        bytes.matchesAscii(4, "ftyp") -> true
+        else -> false
+    }
+}
+
+private fun ByteArray.matchesAscii(offset: Int, text: String): Boolean {
+    if (offset + text.length > size) return false
+    return text.indices.all { index -> this[offset + index] == text[index].code.toByte() }
 }

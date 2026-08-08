@@ -12,8 +12,6 @@ interface DecodedAnimation : AutoCloseable {
 
     fun durationMillis(index: Int): Int
 
-    fun start(onFrame: (OwnedAnimationFrame) -> Unit) = start(onFrame) {}
-
     fun start(
         onFrame: (OwnedAnimationFrame) -> Unit,
         onError: (Throwable) -> Unit,

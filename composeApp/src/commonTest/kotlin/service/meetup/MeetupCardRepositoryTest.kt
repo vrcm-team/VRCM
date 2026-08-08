@@ -886,6 +886,8 @@ class MeetupCardRepositoryTest {
 
         val clear = scope.launch { accountCacheManager.clearAccount("usr_a") }
         notificationStarted.await()
+        // 清账号后配置不存在；新代状态由显式 ensureDefault 重新建档后刷新产生。
+        repository.ensureDefault("usr_a")
         val refresh = repository.refresh("usr_a")
         refresh.join()
         assertEquals("New Generation", retained.value.config.profile.displayName)
@@ -1292,6 +1294,79 @@ class MeetupCardRepositoryTest {
     }
 
     @Test
+    fun exhaustedPhotoChainFallsBackToThemeBackgroundInsteadOfDeadPath() = repositoryTest {
+        val missing = assetStore.writePhoto("usr_a", "missing-local".encodeToByteArray(), "png")
+        fileSystem.delete(assetStore.model(missing).toPath())
+        configDao.save(
+            cachedConfig("usr_a", "Cached Name").copy(
+                photo = MeetupPhoto(source = MeetupPhotoSource.LocalAlbum, localAsset = missing),
+            ),
+        )
+        remote.profileHandler = { ownerId -> remoteProfile(ownerId, "Network Name") }
+        remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
+
+        repository.refresh("usr_a").join()
+
+        val state = repository.observe("usr_a").value
+        assertEquals("Network Name", state.config.profile.displayName)
+        assertNull(state.photoModel)
+        assertTrue("photo" in assertIs<MeetupRefreshResult.Partial>(state.lastRefresh).failedParts)
+    }
+
+    @Test
+    fun refreshWithoutExistingConfigDoesNotCreateOne() = repositoryTest {
+        remote.profileHandler = { ownerId -> remoteProfile(ownerId, "Network Name") }
+        remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
+
+        repository.refresh("usr_a").join()
+
+        assertFalse(repository.hasConfig("usr_a"))
+        assertNull(configDao.load("usr_a"))
+    }
+
+    @Test
+    fun unchangedProfileBackgroundUrlIsNotRedownloadedAndKeepsRevision() = repositoryTest {
+        val backgroundAsset = assetStore.writePhoto(
+            "usr_a",
+            "cached-background".encodeToByteArray(),
+            "webp",
+        )
+        val backgroundPhoto = MeetupPhoto(
+            source = MeetupPhotoSource.ProfileBackground,
+            sourceUrl = "https://cdn/background.webp",
+            localAsset = backgroundAsset,
+            width = 1200,
+            height = 675,
+        )
+        val cached = cachedConfig("usr_a", "Cached Name").copy(
+            photo = backgroundPhoto,
+            profileBackgroundFallback = backgroundPhoto,
+        )
+        configDao.save(cached)
+        remote.profileHandler = { ownerId ->
+            remoteProfile(ownerId, "Cached Name").copy(
+                avatarUrl = "",
+                pronouns = "",
+                languages = emptyList(),
+                status = "",
+                statusDescription = "",
+                profileBackgroundUrl = "https://cdn/background.webp",
+            )
+        }
+        remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
+
+        repository.refresh("usr_a").join()
+
+        val state = repository.observe("usr_a").value
+        assertTrue(remote.imageRequests.isEmpty())
+        assertEquals(MeetupRefreshResult.Success, state.lastRefresh)
+        assertEquals(backgroundPhoto, state.config.photo)
+        assertEquals(assetStore.model(backgroundAsset), state.photoModel)
+        assertEquals(cached.revision, state.config.revision)
+        assertEquals(1200, state.config.photo.width)
+    }
+
+    @Test
     fun galleryPhotoReplacedDuringRefreshIsNotOverwrittenByProfileBackground() = repositoryTest {
         val oldRef = assetStore.writePhoto("usr_a", "old-background".encodeToByteArray(), "webp")
         configDao.save(
@@ -1435,6 +1510,7 @@ class MeetupCardRepositoryTest {
 
     @Test
     fun cancellationFromRemoteCancelsRefreshWithoutReportingFailure() = repositoryTest {
+        configDao.save(cachedConfig("usr_a", "Cached Name"))
         remote.profileHandler = { throw CancellationException("cancelled") }
         remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
         val completion = CompletableDeferred<Throwable?>()
@@ -1500,6 +1576,7 @@ class MeetupCardRepositoryTest {
         )
         val fixture = RepositoryFixture(repositoryScope)
         try {
+            fixture.configDao.save(cachedConfig("usr_a", "Cached Name"))
             fixture.remote.profileHandler = { throw AssertionError("fatal") }
             fixture.remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
 

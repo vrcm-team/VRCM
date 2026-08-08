@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupAssetRef
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.contentLength
@@ -32,6 +33,8 @@ data class ResolvedDecoration(
     val asset: MeetupAssetRef?,
     val gradientStart: String,
     val gradientEnd: String,
+    /** Animated 模式下运行期解码失败时可用的静态 base 兜底。 */
+    val staticFallback: MeetupAssetRef? = null,
 )
 
 /** Supplies inventory template metadata without coupling the resolver to a network implementation. */
@@ -61,7 +64,13 @@ class HttpMeetupRemoteBytesLoader(
             "maxBytes must be positive and smaller than Int.MAX_VALUE"
         }
 
-        return client.prepareGet(url).execute { response ->
+        return client.prepareGet(url) {
+            // 共享 client 的 15 秒整体超时对 20/50 MiB 素材下载不可行；按弱网大文件放宽。
+            timeout {
+                requestTimeoutMillis = ASSET_REQUEST_TIMEOUT_MILLIS
+                socketTimeoutMillis = ASSET_SOCKET_TIMEOUT_MILLIS
+            }
+        }.execute { response ->
             if ((response.contentLength() ?: 0L) > maxBytes) {
                 throw IOException("Remote meetup asset exceeds $maxBytes bytes")
             }
@@ -92,23 +101,29 @@ class DecorationResolver(
     private val animatedWebpDecoder: AnimatedWebpDecoder,
     private val cacheDao: DecorationTemplateCacheDao,
 ) {
-    /** Restores persisted decoration references without network or file reads. */
+    /** Restores persisted decoration references without network access or byte-level reads. */
     fun restoreCached(templateIds: List<String>): Map<String, ResolvedDecoration> = buildMap {
         templateIds.asSequence()
             .map(String::trim)
-            .filter(ID_PATTERN::matches)
+            .filter(String::isNotEmpty)
             .distinct()
             .forEach { templateId ->
+                if (!ID_PATTERN.matches(templateId)) {
+                    // 与 refresh 一致：非法 ID 给出明确降级状态，而不是让槽位悄然消失。
+                    put(templateId, unavailable(templateId))
+                    return@forEach
+                }
                 val cached = cacheDao.load(templateId) ?: return@forEach
+                // 元数据可能引用已被普通缓存清理/prune 删除的文件，恢复前过滤悬挂引用。
+                val mainAsset = cached.mainAnimationAsset?.takeIf(assetStore::exists)
+                val baseAsset = cached.baseAsset?.takeIf(assetStore::exists)
                 val resolved = when {
-                    cached.mainAnimationAsset != null -> cached.resolved(
+                    mainAsset != null -> cached.resolved(
                         DecorationRenderMode.Animated,
-                        cached.mainAnimationAsset,
+                        mainAsset,
+                        staticFallback = baseAsset,
                     )
-                    cached.baseAsset != null -> cached.resolved(
-                        DecorationRenderMode.Static,
-                        cached.baseAsset,
-                    )
+                    baseAsset != null -> cached.resolved(DecorationRenderMode.Static, baseAsset)
                     else -> cached.resolved(DecorationRenderMode.Unavailable, null)
                 }
                 put(templateId, resolved)
@@ -153,7 +168,11 @@ class DecorationResolver(
         )
         if (mainAsset != null) {
             saveIgnoringFailure(workingCache.copy(mainAnimationAsset = mainAsset))
-            return workingCache.resolved(DecorationRenderMode.Animated, mainAsset)
+            return workingCache.resolved(
+                DecorationRenderMode.Animated,
+                mainAsset,
+                staticFallback = workingCache.baseAsset,
+            )
         }
 
         val baseAsset = resolveBase(
@@ -175,7 +194,8 @@ class DecorationResolver(
 
     private suspend fun fetchRemote(templateId: String): InventoryTemplateData? = try {
         source.getTemplate(templateId).also { template ->
-            require(template.id.isEmpty() || template.id == templateId) {
+            // 缺失/为空的响应 ID 同样不可信：截断或网关错误页不得覆盖有效缓存。
+            require(template.id == templateId) {
                 "Inventory template response ID does not match the request"
             }
         }
@@ -276,12 +296,14 @@ class DecorationResolver(
     private fun DecorationTemplateCache.resolved(
         mode: DecorationRenderMode,
         asset: MeetupAssetRef?,
+        staticFallback: MeetupAssetRef? = null,
     ) = ResolvedDecoration(
         templateId = templateId,
         mode = mode,
         asset = asset,
         gradientStart = gradientStart,
         gradientEnd = gradientEnd,
+        staticFallback = staticFallback,
     )
 
     private fun unavailable(templateId: String) = ResolvedDecoration(
@@ -299,3 +321,6 @@ class DecorationResolver(
         val ID_PATTERN = Regex("[A-Za-z0-9_-]+")
     }
 }
+
+private const val ASSET_REQUEST_TIMEOUT_MILLIS = 120_000L
+private const val ASSET_SOCKET_TIMEOUT_MILLIS = 30_000L

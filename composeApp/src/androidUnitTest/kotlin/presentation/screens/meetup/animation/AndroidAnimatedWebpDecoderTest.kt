@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -34,13 +35,45 @@ class AndroidAnimatedWebpDecoderTest {
     }
 
     @Test
+    fun rejectsFrameDurationsThatWouldBusyLoopAwebpScheduling() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDecodedAnimation(BlockingPlayback(frameDuration = 9), TestFrameFactory())
+        }
+    }
+
+    @Test
+    fun acceptsSchedulableFrameDurationsAndCoercesReportedValue() {
+        val animation = AndroidDecodedAnimation(BlockingPlayback(frameDuration = 10), TestFrameFactory())
+        try {
+            assertEquals(16, animation.durationMillis(0))
+        } finally {
+            animation.close()
+        }
+    }
+
+    @Test
+    fun secondStartRewindsPlaybackToFirstFrame() {
+        val playback = BlockingPlayback()
+        val animation = AndroidDecodedAnimation(playback, TestFrameFactory())
+        try {
+            animation.start(onFrame = { it.close() }, onError = {})
+            assertEquals(0, playback.resetCount.get())
+            animation.start(onFrame = { it.close() }, onError = {})
+            assertEquals(1, playback.resetCount.get())
+            assertTrue(playback.isRunning.get())
+        } finally {
+            animation.close()
+        }
+    }
+
+    @Test
     fun closeAfterBlockedStartLeavesPlaybackStopped() {
         val playback = BlockingPlayback(blockStart = true)
         val animation = AndroidDecodedAnimation(playback, TestFrameFactory())
         val startFailure = AtomicReference<Throwable>()
         val startThread = Thread {
             try {
-                animation.start { it.close() }
+                animation.start(onFrame = { it.close() }, onError = {})
             } catch (cause: Throwable) {
                 startFailure.set(cause)
             }
@@ -75,7 +108,7 @@ class AndroidAnimatedWebpDecoderTest {
         val startFailure = AtomicReference<Throwable>()
         val startThread = Thread {
             try {
-                animation.start { it.close() }
+                animation.start(onFrame = { it.close() }, onError = {})
             } catch (cause: Throwable) {
                 startFailure.set(cause)
             }
@@ -110,10 +143,13 @@ class AndroidAnimatedWebpDecoderTest {
         val frames = TestFrameFactory(blockCopy = true)
         val animation = AndroidDecodedAnimation(playback, frames)
         val delivered = AtomicInteger()
-        animation.start { frame ->
-            delivered.incrementAndGet()
-            frame.close()
-        }
+        animation.start(
+            onFrame = { frame ->
+                delivered.incrementAndGet()
+                frame.close()
+            },
+            onError = {},
+        )
 
         val renderFailure = AtomicReference<Throwable>()
         val renderThread = Thread {
@@ -154,11 +190,14 @@ class AndroidAnimatedWebpDecoderTest {
         val releaseCallback = CountDownLatch(1)
         val closeReturned = CountDownLatch(1)
         val renderFailure = AtomicReference<Throwable>()
-        animation.start { frame ->
-            frame.close()
-            callbackStarted.countDown()
-            assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
-        }
+        animation.start(
+            onFrame = { frame ->
+                frame.close()
+                callbackStarted.countDown()
+                assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
+            },
+            onError = {},
+        )
 
         val renderThread = Thread {
             try {
@@ -201,11 +240,14 @@ class AndroidAnimatedWebpDecoderTest {
         val releaseCallback = CountDownLatch(1)
         val resumeReturned = CountDownLatch(1)
         val renderFailure = AtomicReference<Throwable>()
-        animation.start { frame ->
-            frame.close()
-            callbackStarted.countDown()
-            assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
-        }
+        animation.start(
+            onFrame = { frame ->
+                frame.close()
+                callbackStarted.countDown()
+                assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
+            },
+            onError = {},
+        )
 
         val renderThread = Thread {
             try {
@@ -248,12 +290,15 @@ class AndroidAnimatedWebpDecoderTest {
         val releaseCallback = CountDownLatch(1)
         val resumeReturned = CountDownLatch(1)
         val renderFailure = AtomicReference<Throwable>()
-        animation.start { frame ->
-            frame.close()
-            animation.pause()
-            callbackPaused.countDown()
-            assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
-        }
+        animation.start(
+            onFrame = { frame ->
+                frame.close()
+                animation.pause()
+                callbackPaused.countDown()
+                assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
+            },
+            onError = {},
+        )
 
         val renderThread = Thread {
             try {
@@ -298,11 +343,14 @@ class AndroidAnimatedWebpDecoderTest {
         val releaseCallback = CountDownLatch(1)
         val replacementReturned = CountDownLatch(1)
         val replacementFrame = CountDownLatch(1)
-        animation.start { frame ->
-            frame.close()
-            callbackStarted.countDown()
-            assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
-        }
+        animation.start(
+            onFrame = { frame ->
+                frame.close()
+                callbackStarted.countDown()
+                assertTrue(releaseCallback.await(5, TimeUnit.SECONDS))
+            },
+            onError = {},
+        )
 
         val renderFailure = AtomicReference<Throwable>()
         val renderThread = Thread {
@@ -318,10 +366,13 @@ class AndroidAnimatedWebpDecoderTest {
         val replacementFailure = AtomicReference<Throwable>()
         val replacementThread = Thread {
             try {
-                animation.start { frame ->
-                    frame.close()
-                    replacementFrame.countDown()
-                }
+                animation.start(
+                    onFrame = { frame ->
+                        frame.close()
+                        replacementFrame.countDown()
+                    },
+                    onError = {},
+                )
                 replacementReturned.countDown()
             } catch (cause: Throwable) {
                 replacementFailure.set(cause)
@@ -495,6 +546,7 @@ class AndroidAnimatedWebpDecoderTest {
 
     private class BlockingPlayback(
         private val blockStart: Boolean = false,
+        private val frameDuration: Int = 100,
     ) : AndroidWebpPlayback {
         override val frameCount: Int = 2
         override val width: Int = 1
@@ -504,13 +556,14 @@ class AndroidAnimatedWebpDecoderTest {
         val releaseStart = CountDownLatch(1)
         val pauseEntered = CountDownLatch(1)
         val isRunning = AtomicBoolean()
+        val resetCount = AtomicInteger()
         private var onFrame: ((ByteBuffer) -> Unit)? = null
 
         override fun setFrameListener(listener: ((ByteBuffer) -> Unit)?) {
             onFrame = listener
         }
 
-        override fun frameDurationMillis(index: Int): Int = 100
+        override fun frameDurationMillis(index: Int): Int = frameDuration
 
         override fun start() {
             startEntered.countDown()
@@ -525,6 +578,10 @@ class AndroidAnimatedWebpDecoderTest {
 
         override fun resume() {
             isRunning.set(true)
+        }
+
+        override fun reset() {
+            resetCount.incrementAndGet()
         }
 
         override fun stop() {

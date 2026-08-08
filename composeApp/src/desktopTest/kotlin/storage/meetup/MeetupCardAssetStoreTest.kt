@@ -234,8 +234,10 @@ class MeetupCardAssetStoreTest {
             assertFailsWith<IllegalArgumentException> {
                 store.writePhoto(ownerId, byteArrayOf(1), "jpg")
             }
-            assertFailsWith<IllegalArgumentException> { store.deleteAccount(ownerId) }
+            // 非法 ID 不可能有已写入数据；deleteAccount 静默跳过，不中断账号移除流程。
+            store.deleteAccount(ownerId)
         }
+        assertTrue(fileSystem.exists(sentinel))
         for (templateId in listOf("", ".", "..", "inv/a", "inv\\a", "inv a")) {
             assertFailsWith<IllegalArgumentException> {
                 store.writeDecoration(templateId, DecorationAssetType.Base, byteArrayOf(1))
