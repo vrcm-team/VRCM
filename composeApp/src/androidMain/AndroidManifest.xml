@@ -18,15 +18,16 @@
         android:theme="@style/Theme.VRCM"
         tools:targetApi="tiramisu">
         <!--
-            singleTask：应用只有这一个 Activity。扫码类应用发出的 VIEW intent 不一定带
-            FLAG_ACTIVITY_NEW_TASK，用 standard/singleTop 时深链会在扫码应用的任务栈里
-            新建一个实例，之后点桌面图标又会起第二个，造成同时存在两份应用状态。
-            本应用没有 share 入站入口，也没有 PendingIntent 通知，singleTask 不影响其他流程。
+            singleTop：深链需要复用已存在的实例，否则扫码会再起一份 MainActivity。
+            这里不用 singleTask——它把本 Activity 变成任务根并改变任务栈语义，
+            会影响系统预测性返回动画；singleTop 只避免重复实例，不动任务结构。
+            代价是调用方未带 FLAG_ACTIVITY_NEW_TASK 时深链可能落在调用方任务里，
+            浏览器与主流扫码应用都会带该 flag，可接受。
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustPan"
             android:theme="@style/Theme.VRCM">
             <intent-filter>
