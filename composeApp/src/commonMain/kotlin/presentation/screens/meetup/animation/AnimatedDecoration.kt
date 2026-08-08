@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -19,31 +20,15 @@ import coil3.compose.AsyncImage
 import io.github.vrcmteam.vrcm.service.meetup.DecorationRenderMode
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-
-/** 保留最近两帧再释放更早的帧，确保 Compose 换帧期间不会绘制已释放位图。 */
-private class FrameHandoff {
-    private var previous: OwnedAnimationFrame? = null
-    private var current: OwnedAnimationFrame? = null
-
-    fun push(frame: OwnedAnimationFrame): ImageBitmap {
-        previous?.close()
-        previous = current
-        current = frame
-        return frame.bitmap
-    }
-
-    fun closeAll() {
-        previous?.close()
-        current?.close()
-        previous = null
-        current = null
-    }
-}
 
 /**
  * 官方 Profile Decoration 播放器：Animated 资产逐帧播放，解码失败时
@@ -74,10 +59,20 @@ fun AnimatedDecoration(
     val decoder: AnimatedWebpDecoder = koinInject()
     var frameBitmap by remember(asset) { mutableStateOf<ImageBitmap?>(null) }
     var animationFailed by remember(asset) { mutableStateOf(false) }
-    val playback = remember(asset) { DecorationPlayback(FrameHandoff()) }
+    val playback = remember(asset) { DecorationPlayback() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(asset) {
+        // 被替换的帧不能在解码线程立即关闭：显示列表可能仍引用旧位图
+        //（Android 上表现为 "trying to use a recycled bitmap"）。
+        // 等两个 Choreographer 帧、让重组与重录制完成后再关闭。
+        launch {
+            for (frame in playback.retiredFrames) {
+                withFrameNanos {}
+                withFrameNanos {}
+                frame.close()
+            }
+        }
         val animation = try {
             val bytes = withContext(Dispatchers.IO) { assetStore.read(asset) }
             decoder.decode(bytes)
@@ -89,8 +84,12 @@ fun AnimatedDecoration(
         }
         playback.attach(animation)
         animation.start(
-            onFrame = { frame -> frameBitmap = playback.push(frame) },
-            onError = { animationFailed = true },
+            onFrame = { frame -> playback.push(frame)?.let { frameBitmap = it } },
+            onError = {
+                // 运行期失败只暂停并切静态回退；帧统一在离开组合时释放。
+                playback.pause()
+                animationFailed = true
+            },
         )
         if (lifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
             animation.pause()
@@ -112,7 +111,6 @@ fun AnimatedDecoration(
     }
 
     if (animationFailed) {
-        // 运行期解码/播放失败：回退同槽位已缓存的静态 base；没有 base 则不渲染。
         decoration.staticFallback?.let { fallback ->
             AsyncImage(
                 model = assetStore.model(fallback),
@@ -134,33 +132,64 @@ fun AnimatedDecoration(
     }
 }
 
-/** 播放器与帧的所有权边界；attach 前的 pause/resume 调用会被忽略。 */
-private class DecorationPlayback(private val frames: FrameHandoff) {
+/**
+ * 播放器与帧的所有权边界。帧在解码线程到达，被替换的帧进入退休队列，
+ * 由 UI 侧协程延迟关闭；[release] 后到达的帧立即关闭。
+ */
+private class DecorationPlayback {
+    private val lock = SynchronizedObject()
+    private val retired = Channel<OwnedAnimationFrame>(Channel.UNLIMITED)
+    private var current: OwnedAnimationFrame? = null
     private var animation: DecodedAnimation? = null
     private var released = false
 
+    /** 供 UI 侧退休协程消费的旧帧。 */
+    val retiredFrames: Channel<OwnedAnimationFrame> get() = retired
+
     fun attach(animation: DecodedAnimation) {
-        if (released) {
-            animation.close()
-            return
+        synchronized(lock) {
+            if (released) {
+                animation.close()
+                return
+            }
+            this.animation = animation
         }
-        this.animation = animation
     }
 
-    fun push(frame: OwnedAnimationFrame): ImageBitmap = frames.push(frame)
+    /** 接管新帧并把旧帧移入退休队列；释放后返回 null 且立即关闭来帧。 */
+    fun push(frame: OwnedAnimationFrame): ImageBitmap? = synchronized(lock) {
+        if (released) {
+            frame.close()
+            return@synchronized null
+        }
+        current?.let { previous ->
+            if (retired.trySend(previous).isFailure) previous.close()
+        }
+        current = frame
+        frame.bitmap
+    }
 
     fun pause() {
-        animation?.pause()
+        synchronized(lock) { animation }?.pause()
     }
 
     fun resume() {
-        animation?.resume()
+        synchronized(lock) { animation }?.resume()
     }
 
     fun release() {
-        released = true
-        animation?.close()
-        animation = null
-        frames.closeAll()
+        val lastFrame = synchronized(lock) {
+            released = true
+            animation?.close()
+            animation = null
+            current.also { current = null }
+        }
+        retired.close()
+        // 帧的 close 幂等：与退休协程竞争关闭同一帧是安全的。
+        while (true) {
+            val frame = retired.tryReceive().getOrNull() ?: break
+            frame.close()
+        }
+        lastFrame?.close()
     }
 }

@@ -31,6 +31,7 @@
 - DecorationResolver：`restoreCached` 过滤悬挂文件引用并对非法 ID 给出显式 Unavailable；空响应 template id 一律拒绝；`ResolvedDecoration` 增加 `staticFallback` 供运行期动画失败回退 base。
 - 存储：`MeetupCardAssetStore.exists()`；`deleteAccount` 对非法 ID 静默跳过（不再中断账号移除）；invalidation listener 异常隔离。
 - 解码器：Android 拒绝 <10ms 帧（awebp 内部按原始时长调度会忙循环）、`setLoopLimit(0)` 强制无限循环、二次 start 回帧 0；Skia 实现改单帧保留合成（峰值 ≤2 帧位图）、修复恒真循环守卫、增加帧节奏补偿；删除吞错的单参 `start` 重载。
+- 位图回收竞态（Android 真机崩溃 "trying to use a recycled bitmap"）：装饰动画被替换的帧改为进退休队列、等两个 Choreographer 帧后再关闭，不在解码线程立即回收；照片会话预览默认不再同步 recycle（complete/discard 时裁剪对话框可能仍在组合中），交给 GC。
 
 ### 已知余留问题（低优先级，未实现）
 

@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.meetup.editor
 
 import androidx.compose.ui.graphics.ImageBitmap
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageSize
-import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.releasePlatformImageBitmap
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
@@ -50,10 +49,12 @@ class MeetupPhotoSession internal constructor(
 
 /**
  * 以内存会话在编辑器与裁剪页之间传递候选照片，路由只携带 session ID。
- * [complete] 一次性取走结果；[discard] 与 [complete] 都会释放预览位图。
+ * [complete] 一次性取走结果。预览位图默认交给 GC 回收：complete/discard 触发时
+ * 裁剪对话框往往仍在组合中，同步 recycle 会让已录制的显示列表引用已回收位图
+ *（Android 上崩溃为 "trying to use a recycled bitmap"）。
  */
 class MeetupPhotoSessionStore(
-    private val releasePreview: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
+    private val releasePreview: (ImageBitmap) -> Unit = {},
 ) {
     private val sessions = mutableMapOf<String, MeetupPhotoSession>()
     private var nextSessionId = 0L
