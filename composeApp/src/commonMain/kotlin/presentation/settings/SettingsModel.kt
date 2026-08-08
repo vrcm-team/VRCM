@@ -5,27 +5,33 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.data.SettingsData
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class SettingsModel(
     private val settingsDao: SettingsDao,
     private val themeColors: List<ThemeColor>
 ) {
-    private val _backgroundMonitoringUnavailable = MutableSharedFlow<Unit>(replay = 1)
+    private val _backgroundMonitoringUnavailable = MutableStateFlow(false)
 
     /**
-     * Emitted when the platform refused to run background monitoring.
+     * True while a refused background monitoring start is still waiting to be applied.
      *
      * Whoever owns the in-memory settings state turns this into a settings change, so the switch is
      * corrected through the same flow as any user edit instead of writing the DAO behind its back.
-     * Replay keeps the report if it happens before the settings UI starts observing.
+     * Holding it as state keeps a report raised before the settings UI observes, and clearing it in
+     * [consumeBackgroundMonitoringUnavailable] stops it from being applied again on every
+     * recomposition or Activity recreation.
      */
-    val backgroundMonitoringUnavailable: SharedFlow<Unit> = _backgroundMonitoringUnavailable.asSharedFlow()
+    val backgroundMonitoringUnavailable: StateFlow<Boolean> = _backgroundMonitoringUnavailable.asStateFlow()
 
     fun reportBackgroundMonitoringUnavailable() {
-        _backgroundMonitoringUnavailable.tryEmit(Unit)
+        _backgroundMonitoringUnavailable.value = true
+    }
+
+    fun consumeBackgroundMonitoringUnavailable() {
+        _backgroundMonitoringUnavailable.value = false
     }
 
     fun saveSettings(settingsVo: SettingsVo) {

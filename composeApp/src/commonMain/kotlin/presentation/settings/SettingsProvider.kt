@@ -31,10 +31,14 @@ fun SettingsProvider(
         }
         // The platform can refuse to start background monitoring after a restart or a re-login.
         // Correcting the in-memory state keeps the switch honest and lets saveSettings persist it,
-        // instead of a direct DAO write that this state would silently overwrite later.
+        // instead of a direct DAO write that this state would silently overwrite later. The report
+        // is cleared once applied, so an Activity recreation cannot switch it off a second time
+        // after the user has turned it back on.
         LaunchedEffect(Unit) {
-            settingsModel.backgroundMonitoringUnavailable.collect {
+            settingsModel.backgroundMonitoringUnavailable.collect { unavailable ->
+                if (!unavailable) return@collect
                 settingsState.value = settingsState.value.copy(backgroundFriendMonitoringEnabled = false)
+                settingsModel.consumeBackgroundMonitoringUnavailable()
             }
         }
 
