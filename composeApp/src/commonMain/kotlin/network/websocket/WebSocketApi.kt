@@ -54,7 +54,11 @@ class WebSocketApi(
         replaceConnection(SharedFlowCentre.currentSession.value?.token)
     }
 
-    fun isConnected(): Boolean = connectedSessionToken.value == SharedFlowCentre.currentSession.value?.token
+    /** True only while a live socket is attached to the session that is currently signed in. */
+    fun isConnected(): Boolean {
+        val connected = connectedSessionToken.value ?: return false
+        return connected == SharedFlowCentre.currentSession.value?.token
+    }
 
     fun setBackgroundMonitoringEnabled(enabled: Boolean) {
         backgroundMonitoringEnabled.value = enabled
