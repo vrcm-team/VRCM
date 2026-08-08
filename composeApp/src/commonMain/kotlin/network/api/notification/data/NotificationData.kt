@@ -8,6 +8,8 @@ data class NotificationData(
     val category: String,
     val createdAt: String,
     val data: Data,
+    /** Newer notification responses place Boop metadata here instead of in `data`. */
+    val details: Data? = null,
     val expiresAt: String,
     val expiryAfterSeen: Int?,
     val id: String,
@@ -34,7 +36,10 @@ data class NotificationData(
 ){
     @Serializable
     data class Data(
-        val announcementTitle: String?,
-        val groupName: String?,
+        val announcementTitle: String? = null,
+        val groupName: String? = null,
+        val emojiId: String? = null,
+        val emojiVersion: Int? = null,
+        val inventoryItemId: String? = null,
     )
 }

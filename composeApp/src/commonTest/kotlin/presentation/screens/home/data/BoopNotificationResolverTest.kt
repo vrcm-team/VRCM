@@ -35,6 +35,19 @@ class BoopNotificationResolverTest {
     }
 
     @Test
+    fun boopEmojiUsesDetailsMetadataWhenPresent() {
+        val item = NotificationItemData(
+            notification(
+                link = null,
+                responses = emptyList(),
+                details = NotificationData.Data(emojiId = "default_heart"),
+            )
+        )
+
+        assertEquals("default_heart", item.boopEmojiId)
+    }
+
+    @Test
     fun senderUserIdEnrichesBoopWithNonUserLink() = runTest {
         val resolver = BoopNotificationResolver()
         val item = boop(id = "generic-link", link = "world:wrld_example")
@@ -129,11 +142,13 @@ class BoopNotificationResolverTest {
     private fun notification(
         link: String?,
         responses: List<ResponseData>,
+        details: NotificationData.Data? = null,
     ) = NotificationData(
         canDelete = true,
         category = "social",
         createdAt = "2026-07-30T00:00:00Z",
         data = NotificationData.Data(announcementTitle = null, groupName = null),
+        details = details,
         expiresAt = "2026-08-30T00:00:00Z",
         expiryAfterSeen = null,
         id = "notification",
