@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
@@ -47,6 +49,17 @@ import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
+
+/** 用户选择的主题色；照片会盖住底层背景，因此模板前景也要用它才可见。 */
+private val MeetupCardUiState.accentColor: Color get() = Color(config.accentArgb)
+
+/** 主题色上的可读前景色。 */
+private fun Color.contrastingContent(): Color =
+    if (luminance() > 0.5f) Color.Black.copy(alpha = 0.86f) else Color.White
+
+/** 深色遮罩混入主题色，让主题色在照片之上依然成立。 */
+private fun Color.tintedScrim(alpha: Float): Color =
+    lerp(Color.Black, this, 0.28f).copy(alpha = alpha)
 
 /** 按模板与方向渲染身份信息层；三套模板共享同一批槽位组件。 */
 @Composable
@@ -72,7 +85,9 @@ private fun InfoBarTemplate(
     val panel: @Composable (Modifier) -> Unit = { panelModifier ->
         Surface(
             modifier = panelModifier,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            // 资料面板整体带一点主题色，避免主题色设置看不出效果。
+            color = lerp(MaterialTheme.colorScheme.surface, state.accentColor, 0.14f)
+                .copy(alpha = 0.94f),
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -143,7 +158,10 @@ private fun SpotlightTemplate(
                 .fillMaxWidth()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f)),
+                        colors = listOf(
+                            Color.Transparent,
+                            state.accentColor.tintedScrim(0.86f),
+                        ),
                     ),
                 ),
         ) {
@@ -188,7 +206,10 @@ private fun SideTagTemplate(
                 .width(bandWidth)
                 .background(
                     Brush.horizontalGradient(
-                        colors = listOf(Color.Black.copy(alpha = 0.72f), Color.Transparent),
+                        colors = listOf(
+                            state.accentColor.tintedScrim(0.78f),
+                            Color.Transparent,
+                        ),
                     ),
                 ),
         ) {
@@ -268,25 +289,33 @@ private fun MeetupNameplateBlock(
 ) {
     val nameplate = state.decorations[DecorationSlot.NameplateEffect]
         .takeIf { state.config.showNameplateEffect }
-    val gradient = nameplate?.let { decoration ->
+    val officialColors = nameplate?.let { decoration ->
         val start = parseHexColor(decoration.gradientStart)
         val end = parseHexColor(decoration.gradientEnd)
         if (start != null && end != null) {
-            val colors = listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f))
-            // 渐变方向跟随铭牌朝向：竖向铭牌自上而下。
-            if (vertical) Brush.verticalGradient(colors) else Brush.horizontalGradient(colors)
+            listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f))
         } else {
             null
         }
     }
-    // 有铭牌装饰时固定使用高对比前景色。
-    val nameColor = if (nameplate != null) Color.White else MeetupNameColor(onPhoto)
+    // 没有官方铭牌渐变时用主题色铺底，让名字真正落在一块"铭牌"上。
+    val accent = state.accentColor
+    val colors = officialColors
+        ?: listOf(accent.copy(alpha = 0.92f), accent.copy(alpha = 0.66f))
+    // 渐变方向跟随铭牌朝向：竖向铭牌自上而下。
+    val gradient = if (vertical) {
+        Brush.verticalGradient(colors)
+    } else {
+        Brush.horizontalGradient(colors)
+    }
+    // 铭牌上固定使用与底色对比的前景色。
+    val nameColor = if (officialColors != null) Color.White else accent.contrastingContent()
     val pronouns = state.config.profile.pronouns
         .takeIf { state.config.showPronouns && it.isNotBlank() }
     Box(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
-            .let { base -> gradient?.let { base.background(it) } ?: base },
+            .background(gradient),
     ) {
         nameplate?.let { decoration ->
             AnimatedDecoration(
@@ -297,10 +326,8 @@ private fun MeetupNameplateBlock(
                     .let { base -> if (vertical) base.rotateClockwise() else base },
             )
         }
-        val contentModifier = Modifier.padding(
-            horizontal = if (nameplate != null) 12.dp else 0.dp,
-            vertical = if (nameplate != null) 8.dp else 0.dp,
-        )
+        // 铭牌现在总有底色，内容始终留出内边距。
+        val contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         if (vertical) {
             // 版式为 Column(头像, Row(人称代词, 名字))；文字各自旋转 90 度竖排，
             // 于是两段文字成为并排的两列，头像仍在最上方保持正脸。

@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -249,45 +249,44 @@ fun MeetupCardEditorContent(
             val expanded = LocalAppWindowWidthClass.current == AppWindowWidthClass.Expanded &&
                 maxWidth >= 840.dp
             val toolsWidth = if (maxWidth >= 1080.dp) 420.dp else 380.dp
-            if (!expanded) {
-                Column(modifier = Modifier.fillMaxSize()) {
+            val preview: @Composable (Modifier) -> Unit = { previewModifier ->
+                // 预览衬在低一层的表面上，与右侧/下方的设置区形成层次。
+                Surface(
+                    modifier = previewModifier,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                ) {
                     EditorPreview(
                         state = state,
                         onOrientation = model::setOrientation,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
+                        modifier = Modifier.fillMaxSize(),
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(top = 12.dp),
-                        thickness = 0.5.dp,
-                    )
+                }
+            }
+            val tools: @Composable (Modifier) -> Unit = { toolsModifier ->
+                Surface(
+                    modifier = toolsModifier,
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
                     MeetupEditorTools(
                         state = state,
                         actions = actions,
                         photoTarget = photoTarget,
                         onPhotoTarget = { photoTarget = it },
-                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        modifier = Modifier.fillMaxSize(),
                     )
+                }
+            }
+            if (!expanded) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    preview(Modifier.fillMaxWidth().weight(1f))
+                    tools(Modifier.fillMaxWidth().weight(1f))
                 }
             } else {
                 // 宽屏：预览占据剩余空间，工具固定宽度靠右成检查器面板。
                 Row(modifier = Modifier.fillMaxSize()) {
-                    EditorPreview(
-                        state = state,
-                        onOrientation = model::setOrientation,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
+                    preview(Modifier.weight(1f).fillMaxHeight())
                     VerticalDivider(thickness = 0.5.dp)
-                    MeetupEditorTools(
-                        state = state,
-                        actions = actions,
-                        photoTarget = photoTarget,
-                        onPhotoTarget = { photoTarget = it },
-                        modifier = Modifier
-                            .width(toolsWidth)
-                            .fillMaxHeight(),
-                    )
+                    tools(Modifier.width(toolsWidth).fillMaxHeight())
                 }
             }
         }

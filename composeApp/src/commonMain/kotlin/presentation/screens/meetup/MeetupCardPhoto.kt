@@ -14,6 +14,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import coil3.ImageLoader
+import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransform
@@ -24,7 +25,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.referenceViewp
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import org.koin.compose.koinInject
-import kotlin.math.roundToInt
 
 /**
  * 按标准化裁剪参数实时渲染身份卡照片。裁剪以方向参考视口（9:16 / 16:9）
@@ -43,20 +43,26 @@ fun MeetupCardPhoto(
 ) {
     if (photoModel == null) return
     val cropMapper = remember(calculator) { MeetupCropMapper(calculator) }
-    BoxWithConstraints(modifier = modifier.clipToBounds()) {
-        val painter = rememberAsyncImagePainter(
+    val imageLoader: ImageLoader = koinInject()
+    val source = photoSize?.takeIf { it.width > 0 && it.height > 0 }
+    if (source == null) {
+        // 原图尺寸未知（历史配置或后台刷新下载的资料背景）时不做自定义裁剪：
+        // Coil 的固有尺寸取决于布局大小，用它算几何会让预览与展示得到不同结果，
+        // 甚至出现空白边。这里直接按 Crop 铺满，保证两端一致且始终无空白边。
+        AsyncImage(
             model = photoModel,
-            imageLoader = koinInject<ImageLoader>(),
+            contentDescription = null,
+            imageLoader = imageLoader,
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
         )
+        return
+    }
+    BoxWithConstraints(modifier = modifier.clipToBounds()) {
+        val painter = rememberAsyncImagePainter(model = photoModel, imageLoader = imageLoader)
         val painterState by painter.state.collectAsState()
         if (painterState !is AsyncImagePainter.State.Success) return@BoxWithConstraints
 
-        // 配置里的尺寸缺失（历史数据或后台刷新）时退回 painter 固有尺寸。
-        val intrinsic = painter.intrinsicSize
-        val source = photoSize?.takeIf { it.width > 0 && it.height > 0 }
-            ?: intrinsic.takeIf { it.width > 0f && it.height > 0f }
-                ?.let { ImageSize(it.width.roundToInt(), it.height.roundToInt()) }
-            ?: return@BoxWithConstraints
         val viewportWidth = constraints.maxWidth
         val viewportHeight = constraints.maxHeight
         if (viewportWidth <= 0 || viewportHeight <= 0) return@BoxWithConstraints

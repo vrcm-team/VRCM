@@ -4,7 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -15,11 +17,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -35,10 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
@@ -92,7 +99,11 @@ internal fun MeetupEditorTools(
     var selectedTab by remember { mutableStateOf(MeetupEditorTab.Photo) }
     val locale = strings
     Column(modifier = modifier) {
-        TabRow(selectedTabIndex = selectedTab.ordinal) {
+        PrimaryTabRow(
+            selectedTabIndex = selectedTab.ordinal,
+            containerColor = Color.Transparent,
+            divider = {},
+        ) {
             MeetupEditorTab.entries.forEach { tab ->
                 Tab(
                     selected = selectedTab == tab,
@@ -105,6 +116,8 @@ internal fun MeetupEditorTools(
                                 MeetupEditorTab.Content -> locale.meetupCardContent
                                 MeetupEditorTab.Style -> locale.meetupCardStyle
                             },
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
                         )
                     },
                 )
@@ -114,7 +127,7 @@ internal fun MeetupEditorTools(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (selectedTab) {
@@ -123,6 +136,33 @@ internal fun MeetupEditorTools(
                 MeetupEditorTab.Content -> ContentTools(state, actions)
                 MeetupEditorTab.Style -> StyleTools(state, actions)
             }
+        }
+    }
+}
+
+/** 统一的设置分组：标题 + 圆角容器，避免整页开关平铺显得杂乱。 */
+@Composable
+private fun ToolSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                content = content,
+            )
         }
     }
 }
@@ -136,116 +176,100 @@ private fun PhotoTools(
     onPhotoTarget: (MeetupPhotoTarget) -> Unit,
 ) {
     val enabled = !state.savingPhoto
-    Text(strings.meetupCardPhotoTarget, style = MaterialTheme.typography.titleSmall)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MeetupPhotoTarget.entries.forEach { target ->
-            FilterChip(
-                selected = photoTarget == target,
-                onClick = { onPhotoTarget(target) },
-                enabled = enabled,
-                label = {
-                    Text(
-                        text = when (target) {
-                            MeetupPhotoTarget.Both -> strings.meetupCardPhotoTargetBoth
-                            MeetupPhotoTarget.Portrait -> strings.meetupCardPortrait
-                            MeetupPhotoTarget.Landscape -> strings.meetupCardLandscape
-                        },
-                    )
-                },
-            )
+    ToolSection(strings.meetupCardPhotoTarget) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MeetupPhotoTarget.entries.forEach { target ->
+                FilterChip(
+                    selected = photoTarget == target,
+                    onClick = { onPhotoTarget(target) },
+                    enabled = enabled,
+                    label = {
+                        Text(
+                            text = when (target) {
+                                MeetupPhotoTarget.Both -> strings.meetupCardPhotoTargetBoth
+                                MeetupPhotoTarget.Portrait -> strings.meetupCardPortrait
+                                MeetupPhotoTarget.Landscape -> strings.meetupCardLandscape
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
-    HorizontalDivider()
-    OutlinedButton(
-        onClick = actions.onPickProfileBackground,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(strings.meetupCardProfileBackground) }
-    OutlinedButton(
-        onClick = actions.onPickLocalAlbum,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(strings.meetupCardAlbum) }
-    OutlinedButton(
-        onClick = actions.onPickGallery,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text(strings.meetupCardGallery) }
+    ToolSection(strings.meetupCardPhoto) {
+        PhotoSourceRow(
+            label = strings.meetupCardProfileBackground,
+            icon = AppIcons.Person,
+            enabled = enabled,
+            onClick = actions.onPickProfileBackground,
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        PhotoSourceRow(
+            label = strings.meetupCardAlbum,
+            icon = AppIcons.Publish,
+            enabled = enabled,
+            onClick = actions.onPickLocalAlbum,
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        PhotoSourceRow(
+            label = strings.meetupCardGallery,
+            icon = AppIcons.Mirror,
+            enabled = enabled,
+            onClick = actions.onPickGallery,
+        )
+    }
+}
+
+/** 照片来源入口：图标 + 文案的整行可点条目。 */
+@Composable
+private fun PhotoSourceRow(
+    label: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LayoutTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        MeetupCardTemplate.entries.forEach { template ->
-            FilterChip(
-                selected = state.config.template == template,
-                onClick = { actions.onTemplate(template) },
-                label = {
-                    Text(
-                        text = when (template) {
-                            MeetupCardTemplate.InfoBar -> strings.meetupCardInfoBar
-                            MeetupCardTemplate.Spotlight -> strings.meetupCardSpotlight
-                            MeetupCardTemplate.SideTag -> strings.meetupCardSideTag
-                        },
-                    )
-                },
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
-    val config = state.config
-    ToggleRow(strings.meetupCardShowAvatar, config.showAvatar, actions.onShowAvatar)
-    ToggleRow(strings.meetupCardShowPronouns, config.showPronouns, actions.onShowPronouns)
-    ToggleRow(strings.meetupCardShowLanguages, config.showLanguages, actions.onShowLanguages)
-    ToggleRow(strings.meetupCardShowStatus, config.showStatus, actions.onShowStatus)
-    ToggleRow(
-        strings.meetupCardShowStatusDescription,
-        config.showStatusDescription,
-        actions.onShowStatusDescription,
-    )
-    HorizontalDivider()
-    ToggleRow(strings.meetupCardShortText, config.showShortText, actions.onShowShortText)
-    if (config.showShortText) {
-        var text by remember(state.ownerUserId) { mutableStateOf(config.shortText) }
-        OutlinedTextField(
-            value = text,
-            onValueChange = { value ->
-                text = value
-                actions.onShortText(value)
-            },
-            isError = state.editorError is MeetupEditorError.ShortTextTooLong,
-            supportingText = {
-                if (state.editorError is MeetupEditorError.ShortTextTooLong) {
-                    Text(
-                        text = strings.meetupCardShortTextTooLong,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            minLines = 2,
-            maxLines = 2,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-    HorizontalDivider()
-    ToggleRow(strings.meetupCardShowQrCode, config.showQrCode, actions.onShowQrCode)
-    if (config.showQrCode) {
-        Text(strings.meetupCardQrLinkType, style = MaterialTheme.typography.titleSmall)
+    ToolSection(strings.meetupCardLayout) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MeetupQrLinkType.entries.forEach { linkType ->
+            MeetupCardTemplate.entries.forEach { template ->
                 FilterChip(
-                    selected = config.qrLinkType == linkType,
-                    onClick = { actions.onQrLinkType(linkType) },
+                    selected = state.config.template == template,
+                    onClick = { actions.onTemplate(template) },
                     label = {
                         Text(
-                            text = when (linkType) {
-                                MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
-                                MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrcm
+                            text = when (template) {
+                                MeetupCardTemplate.InfoBar -> strings.meetupCardInfoBar
+                                MeetupCardTemplate.Spotlight -> strings.meetupCardSpotlight
+                                MeetupCardTemplate.SideTag -> strings.meetupCardSideTag
                             },
                         )
                     },
@@ -255,54 +279,134 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StyleTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
+private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
     val config = state.config
-    Text(strings.meetupCardAccentColor, style = MaterialTheme.typography.titleSmall)
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        AccentSwatches.forEach { argb ->
-            val selected = config.accentArgb == argb
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Color(argb))
-                    .border(
-                        width = if (selected) 3.dp else 1.dp,
-                        color = if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        },
-                        shape = CircleShape,
-                    )
-                    .clickable { actions.onAccent(argb) },
+    ToolSection(strings.meetupCardContent) {
+        ToggleRow(strings.meetupCardShowAvatar, config.showAvatar, actions.onShowAvatar)
+        ToggleRow(strings.meetupCardShowPronouns, config.showPronouns, actions.onShowPronouns)
+        ToggleRow(strings.meetupCardShowLanguages, config.showLanguages, actions.onShowLanguages)
+        ToggleRow(strings.meetupCardShowStatus, config.showStatus, actions.onShowStatus)
+        ToggleRow(
+            strings.meetupCardShowStatusDescription,
+            config.showStatusDescription,
+            actions.onShowStatusDescription,
+        )
+    }
+    ToolSection(strings.meetupCardShortText) {
+        ToggleRow(strings.meetupCardShortText, config.showShortText, actions.onShowShortText)
+        if (config.showShortText) {
+            var text by remember(state.ownerUserId) { mutableStateOf(config.shortText) }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { value ->
+                    text = value
+                    actions.onShortText(value)
+                },
+                isError = state.editorError is MeetupEditorError.ShortTextTooLong,
+                supportingText = {
+                    if (state.editorError is MeetupEditorError.ShortTextTooLong) {
+                        Text(
+                            text = strings.meetupCardShortTextTooLong,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                },
+                shape = MaterialTheme.shapes.medium,
+                minLines = 2,
+                maxLines = 2,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
-    Text(strings.meetupCardScrim, style = MaterialTheme.typography.titleSmall)
-    // 拖动期间只更新本地值，手势结束才提交持久化。
-    var scrimDraft by remember(config.scrimAlpha) { mutableFloatStateOf(config.scrimAlpha) }
-    Slider(
-        value = scrimDraft,
-        onValueChange = { scrimDraft = it },
-        onValueChangeFinished = { actions.onScrim(scrimDraft) },
-        valueRange = 0f..0.8f,
-    )
-    HorizontalDivider()
-    ToggleRow(strings.meetupCardIconFrame, config.showIconFrame, actions.onShowIconFrame)
-    ToggleRow(strings.meetupCardProfileEffect, config.showProfileEffect, actions.onShowProfileEffect)
-    ToggleRow(
-        strings.meetupCardNameplateEffect,
-        config.showNameplateEffect,
-        actions.onShowNameplateEffect,
-    )
+    ToolSection(strings.meetupCardShowQrCode) {
+        ToggleRow(strings.meetupCardShowQrCode, config.showQrCode, actions.onShowQrCode)
+        if (config.showQrCode) {
+            Text(
+                text = strings.meetupCardQrLinkType,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MeetupQrLinkType.entries.forEach { linkType ->
+                    FilterChip(
+                        selected = config.qrLinkType == linkType,
+                        onClick = { actions.onQrLinkType(linkType) },
+                        label = {
+                            Text(
+                                text = when (linkType) {
+                                    MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
+                                    MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrcm
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StyleTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
+    val config = state.config
+    ToolSection(strings.meetupCardAccentColor) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccentSwatches.forEach { argb ->
+                val selected = config.accentArgb == argb
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(argb))
+                        .border(
+                            width = if (selected) 3.dp else 1.dp,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                            shape = CircleShape,
+                        )
+                        .clickable { actions.onAccent(argb) },
+                )
+            }
+        }
+    }
+    ToolSection(strings.meetupCardScrim) {
+        // 拖动期间只更新本地值，手势结束才提交持久化。
+        var scrimDraft by remember(config.scrimAlpha) { mutableFloatStateOf(config.scrimAlpha) }
+        Slider(
+            value = scrimDraft,
+            onValueChange = { scrimDraft = it },
+            onValueChangeFinished = { actions.onScrim(scrimDraft) },
+            valueRange = 0f..0.8f,
+        )
+    }
+    ToolSection(strings.meetupCardStyle) {
+        ToggleRow(strings.meetupCardIconFrame, config.showIconFrame, actions.onShowIconFrame)
+        ToggleRow(
+            strings.meetupCardProfileEffect,
+            config.showProfileEffect,
+            actions.onShowProfileEffect,
+        )
+        ToggleRow(
+            strings.meetupCardNameplateEffect,
+            config.showNameplateEffect,
+            actions.onShowNameplateEffect,
+        )
+    }
 }
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
