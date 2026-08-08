@@ -21,7 +21,7 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
-import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemoryFriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
@@ -62,9 +62,9 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
         val json = Json { ignoreUnknownKeys = true }
         val client = testClient(json)
         val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { it.saveAccountInfo(account) }
-        val friendListCacheDao = FriendListCacheDao(MapSettings())
+        val friendListCacheStore = InMemoryFriendListCacheStore()
         val cacheManager = AccountCacheManager(
-            friendListCacheDao = friendListCacheDao,
+            friendListCacheStore = friendListCacheStore,
             userProfileCacheStore = InMemoryUserProfileCacheStore(),
             friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
             meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
@@ -83,7 +83,7 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
             friendsApi = FriendsApi(client),
             authService = authService,
             json = json,
-            friendListCacheDao = friendListCacheDao,
+            friendListCacheStore = friendListCacheStore,
             accountCacheManager = cacheManager,
         )
         val locationModel = FriendLocationPagerModel(

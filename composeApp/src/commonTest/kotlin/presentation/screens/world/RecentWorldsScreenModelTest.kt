@@ -8,7 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
-import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemoryFriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
@@ -99,7 +99,7 @@ class RecentWorldsScreenModelTest : MainDispatcherTest() {
             accountDao = AccountDao(MapSettings(), InMemorySecureStorage()),
             cookiesStorage = PersistentCookiesStorage(logger),
             accountCacheManager = AccountCacheManager(
-                friendListCacheDao = FriendListCacheDao(MapSettings()),
+                friendListCacheStore = InMemoryFriendListCacheStore(),
                 userProfileCacheStore = InMemoryUserProfileCacheStore(),
                 friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
                 meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),

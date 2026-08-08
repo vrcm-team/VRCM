@@ -19,7 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
-import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -41,7 +41,7 @@ class WorldProfileScreenModel(
     private val authService: AuthService,
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
-    private val worldProfileCacheDao: WorldProfileCacheDao,
+    private val worldProfileCacheStore: WorldProfileCacheStore,
 ) : ViewModel() {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -62,8 +62,12 @@ class WorldProfileScreenModel(
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
         if (worldId.isBlank()) return
+        // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。
+        viewModelScope.launch { applyCachedWorld(worldId, worldProfileVO) }
+    }
 
-        val cached = worldProfileCacheDao.load(worldId)
+    private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
+        val cached = worldProfileCacheStore.load(worldId)
         if (cached != null) {
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
@@ -124,7 +128,7 @@ class WorldProfileScreenModel(
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
-            worldProfileCacheDao.save(
+            worldProfileCacheStore.save(
                 WorldProfileCache(
                     world = worldData,
                     cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),

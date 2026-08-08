@@ -36,7 +36,7 @@ class AccountCacheManagerTest {
     @Test
     fun mutationQueuedBehindAccountClearRejectsCapturedGeneration() = runTest {
         val manager = accountCacheManager(
-            FriendListCacheDao(MapSettings()),
+            InMemoryFriendListCacheStore(),
             InMemoryUserProfileCacheStore(),
         )
         val token = manager.captureWriteToken("usr_a")
@@ -73,34 +73,32 @@ class AccountCacheManagerTest {
 
     @Test
     fun clearingOneAccountDoesNotRemoveAnotherAccountsCaches() = runTest {
-        val friendSettings = MapSettings()
-        val friendDao = FriendListCacheDao(friendSettings)
+        val friendStore = InMemoryFriendListCacheStore()
         val profileStore = InMemoryUserProfileCacheStore()
-        val manager = accountCacheManager(friendDao, profileStore)
-        friendDao.save("usr_a", FriendListCache(emptyList()))
-        friendDao.save("usr_b", FriendListCache(emptyList()))
+        val manager = accountCacheManager(friendStore, profileStore)
+        friendStore.save("usr_a", FriendListCache(emptyList()))
+        friendStore.save("usr_b", FriendListCache(emptyList()))
         profileStore.save("usr_a", "usr_profile", profileCache("A"))
         profileStore.save("usr_b", "usr_profile", profileCache("B"))
 
         manager.clearAccount("usr_a")
 
-        assertNull(friendDao.load("usr_a"))
-        assertNotNull(friendDao.load("usr_b"))
+        assertNull(friendStore.load("usr_a"))
+        assertNotNull(friendStore.load("usr_b"))
         assertNull(profileStore.load("usr_a", "usr_profile"))
         assertNotNull(profileStore.load("usr_b", "usr_profile"))
     }
 
     @Test
     fun clearingAllRemovesBothCacheTypesForEveryAccount() = runTest {
-        val friendSettings = MapSettings()
-        val friendDao = FriendListCacheDao(friendSettings)
+        val friendStore = InMemoryFriendListCacheStore()
         val profileStore = InMemoryUserProfileCacheStore()
         val fileSystem = FakeFileSystem()
         val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
         val configDao = MeetupCardConfigDao(MapSettings())
-        val manager = accountCacheManager(friendDao, profileStore, configDao, assetStore)
-        friendDao.save("usr_a", FriendListCache(emptyList()))
-        friendDao.save("usr_b", FriendListCache(emptyList()))
+        val manager = accountCacheManager(friendStore, profileStore, configDao, assetStore)
+        friendStore.save("usr_a", FriendListCache(emptyList()))
+        friendStore.save("usr_b", FriendListCache(emptyList()))
         profileStore.save("usr_a", "usr_profile", profileCache("A"))
         profileStore.save("usr_b", "usr_profile", profileCache("B"))
         val photoBytes = "local-photo".encodeToByteArray()
@@ -123,7 +121,8 @@ class AccountCacheManagerTest {
 
         manager.clearAll()
 
-        assertTrue(friendSettings.keys.isEmpty())
+        assertNull(friendStore.load("usr_a"))
+        assertNull(friendStore.load("usr_b"))
         assertNull(profileStore.load("usr_a", "usr_profile"))
         assertNull(profileStore.load("usr_b", "usr_profile"))
         assertNotNull(configDao.load("usr_a"))
@@ -134,8 +133,8 @@ class AccountCacheManagerTest {
 
     @Test
     fun queuedWriteCapturedBeforeAccountClearCannotRestoreDeletedCache() = runTest {
-        val friendDao = FriendListCacheDao(MapSettings())
-        val manager = accountCacheManager(friendDao, InMemoryUserProfileCacheStore())
+        val friendStore = InMemoryFriendListCacheStore()
+        val manager = accountCacheManager(friendStore, InMemoryUserProfileCacheStore())
         val staleToken = manager.captureWriteToken("usr_a")
         assertTrue(manager.isCurrent(staleToken))
 
@@ -144,7 +143,7 @@ class AccountCacheManagerTest {
 
         assertTrue(!saved)
         assertFalse(manager.isCurrent(staleToken))
-        assertNull(friendDao.load("usr_a"))
+        assertNull(friendStore.load("usr_a"))
     }
 
     @Test
@@ -153,7 +152,7 @@ class AccountCacheManagerTest {
         val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
         val configDao = MeetupCardConfigDao(MapSettings())
         val manager = accountCacheManager(
-            FriendListCacheDao(MapSettings()),
+            InMemoryFriendListCacheStore(),
             InMemoryUserProfileCacheStore(),
             configDao,
             assetStore,
@@ -227,7 +226,7 @@ class AccountCacheManagerTest {
             }
         }
         val manager = accountCacheManager(
-            FriendListCacheDao(MapSettings()),
+            InMemoryFriendListCacheStore(),
             InMemoryUserProfileCacheStore(),
             MeetupCardConfigDao(MapSettings()),
             MeetupCardAssetStore(failingFileSystem, "/meetup-assets".toPath()),
@@ -277,7 +276,7 @@ class AccountCacheManagerTest {
     )
 
     private fun accountCacheManager(
-        friendDao: FriendListCacheDao,
+        friendStore: FriendListCacheStore,
         profileStore: UserProfileCacheStore,
         configDao: MeetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
         assetStore: MeetupCardAssetStore = MeetupCardAssetStore(
@@ -285,7 +284,7 @@ class AccountCacheManagerTest {
             "/meetup-assets".toPath(),
         ),
     ) = AccountCacheManager(
-        friendListCacheDao = friendDao,
+        friendListCacheStore = friendStore,
         userProfileCacheStore = profileStore,
         friendActivityStore = NoOpFriendActivityCacheStore,
         meetupCardConfigDao = configDao,

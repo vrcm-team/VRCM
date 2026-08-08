@@ -47,8 +47,11 @@ class RoomUserProfileCacheStoreTest {
     fun trimAndClearAreScopedToOneOwner() = withStore(retained = 1) { store ->
         store.save("usr_a", "usr_1", profileCache("A1"))
         store.save("usr_b", "usr_1", profileCache("B1"))
-        // 淘汰只在 usr_a 内部发生，不该殃及 usr_b。
+        // 多账号共用一张表：淘汰必须按账号分组，否则 A 逛得多会把 B 的缓存挤掉。
         store.save("usr_a", "usr_2", profileCache("A2"))
+
+        assertNull(store.load("usr_a", "usr_1"))
+        assertNotNull(store.load("usr_a", "usr_2"))
         assertNotNull(store.load("usr_b", "usr_1"))
 
         store.clearOwner("usr_a")
@@ -69,9 +72,9 @@ class RoomUserProfileCacheStoreTest {
             var clock = 0L
             block(
                 RoomUserProfileCacheStore(
-                    dao = database.userProfileCacheDao(),
+                    dao = database.cachedBlobDao(),
                     nowMillis = { ++clock },
-                    retainedPerOwner = retained,
+                    retained = retained,
                 ),
             )
         } finally {

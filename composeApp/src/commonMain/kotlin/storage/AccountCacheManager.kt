@@ -31,7 +31,7 @@ internal data class MeetupPhotoArtifactLease(
 )
 
 class AccountCacheManager(
-    private val friendListCacheDao: FriendListCacheDao,
+    private val friendListCacheStore: FriendListCacheStore,
     private val userProfileCacheStore: UserProfileCacheStore,
     private val friendActivityStore: FriendActivityCacheStore,
     private val meetupCardConfigDao: MeetupCardConfigDao,
@@ -166,17 +166,12 @@ class AccountCacheManager(
         }
     }
 
-    internal fun saveFriendListIfCurrent(
+    /** 写入是挂起的，用 mutateIfCurrent 让"检查 generation"与"落盘"对清账号保持原子。 */
+    internal suspend fun saveFriendListIfCurrent(
         token: AccountCacheWriteToken,
         cache: FriendListCache,
-    ): Boolean = synchronized(lock) {
-        if (token.globalGeneration != globalGeneration ||
-            token.accountGeneration != (accountGenerations[token.userId] ?: 0L)
-        ) {
-            return@synchronized false
-        }
-        friendListCacheDao.save(token.userId, cache)
-        true
+    ): Boolean = mutateIfCurrent(token) {
+        friendListCacheStore.save(token.userId, cache)
     }
 
     suspend fun clearAccount(userId: String) {
@@ -186,11 +181,11 @@ class AccountCacheManager(
             synchronized(lock) {
                 accountGenerations[userId] = (accountGenerations[userId] ?: 0L) + 1L
                 invalidationEpoch++
-                friendListCacheDao.clear(userId)
                 meetupCardConfigDao.clear(userId)
                 invalidation = AccountCacheInvalidation(userId, invalidationEpoch)
             }
             // Room 的清理是挂起调用，只能放在 synchronized 之外。
+            friendListCacheStore.clear(userId)
             userProfileCacheStore.clearOwner(userId)
             meetupCardAssetStore.deleteAccount(userId)
             friendActivityStore.clearAccount(userId)
@@ -209,9 +204,9 @@ class AccountCacheManager(
                 globalGeneration++
                 invalidationEpoch++
                 accountGenerations.clear()
-                friendListCacheDao.clearAll()
                 invalidation = AccountCacheInvalidation(null, invalidationEpoch)
             }
+            friendListCacheStore.clearAll()
             userProfileCacheStore.clearAll()
             friendActivityStore.clearAll()
         } finally {

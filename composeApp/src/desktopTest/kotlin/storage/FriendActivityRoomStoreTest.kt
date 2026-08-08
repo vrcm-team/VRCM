@@ -256,7 +256,7 @@ class FriendActivityRoomStoreTest {
                 nowMillis = 1_000L,
             )
             val manager = AccountCacheManager(
-                friendListCacheDao = FriendListCacheDao(MapSettings()),
+                friendListCacheStore = InMemoryFriendListCacheStore(),
                 userProfileCacheStore = InMemoryUserProfileCacheStore(),
                 friendActivityStore = store,
                 meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),

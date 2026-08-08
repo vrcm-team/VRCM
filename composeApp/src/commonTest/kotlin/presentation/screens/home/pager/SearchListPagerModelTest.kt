@@ -16,7 +16,7 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
-import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.InMemoryFriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
@@ -625,7 +625,7 @@ private fun createFixture(
         accountDao = accountDao,
         cookiesStorage = PersistentCookiesStorage(logger),
         accountCacheManager = AccountCacheManager(
-            friendListCacheDao = FriendListCacheDao(MapSettings()),
+            friendListCacheStore = InMemoryFriendListCacheStore(),
             userProfileCacheStore = InMemoryUserProfileCacheStore(),
             friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
             meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
