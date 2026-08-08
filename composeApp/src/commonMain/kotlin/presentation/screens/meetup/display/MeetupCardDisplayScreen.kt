@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,9 +33,12 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardCanvas
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
@@ -44,6 +48,7 @@ import androidx.compose.foundation.layout.WindowInsets
  * 身份牌全屏展示页：首帧立即绘制本地内容，刷新只替换对应图层；
  * 控制层默认隐藏，轻点显示，3 秒无交互淡出；展示期间保持沉浸与常亮。
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MeetupCardDisplayContent(
     model: MeetupCardScreenModel,
@@ -81,11 +86,20 @@ fun MeetupCardDisplayContent(
         } else {
             MeetupOrientation.Portrait
         }
+        // 整卡与编辑页预览共享同一元素：进出编辑页时在全屏与缩略图之间连续变换。
         MeetupCardCanvas(
             state = state,
             orientation = orientation,
-            modifier = Modifier.fillMaxSize(),
-        ) {
+            modifier = Modifier
+                .fillMaxSize()
+                .sharedBoundsBy(
+                    key = meetupCardSharedKey(state.ownerUserId),
+                    useSuffixKey = false,
+                    resizeMode = MeetupCardResizeMode,
+                ),
+        )
+        // 控制层不参与共享变换，否则会跟着整卡一起缩放。
+        run {
             val visible by controls.visible.collectAsState()
             AnimatedVisibility(
                 visible = visible,

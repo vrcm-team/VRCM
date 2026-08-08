@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup.editor
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -45,7 +46,10 @@ import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
@@ -55,7 +59,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.galleryImagePickerTy
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardCanvas
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
@@ -239,9 +245,11 @@ fun MeetupCardEditorContent(
         },
     ) { paddingValues ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            val compact = maxWidth < 840.dp
+            // 与项目其他编辑页一致：Expanded 宽度类才并列预览与设置栏。
+            val expanded = LocalAppWindowWidthClass.current == AppWindowWidthClass.Expanded &&
+                maxWidth >= 840.dp
             val toolsWidth = if (maxWidth >= 1080.dp) 420.dp else 380.dp
-            if (compact) {
+            if (!expanded) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     EditorPreview(
                         state = state,
@@ -300,6 +308,7 @@ fun MeetupCardEditorContent(
 }
 
 /** 预览区：分段控件只切换预览方向，不旋转设备。 */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun EditorPreview(
     state: MeetupCardUiState,
@@ -350,6 +359,12 @@ private fun EditorPreview(
                 Box(
                     modifier = Modifier
                         .size(cardWidth * scale, cardHeight * scale)
+                        // 与展示页整卡共享同一元素，进出编辑页连续变换。
+                        .sharedBoundsBy(
+                            key = meetupCardSharedKey(state.ownerUserId),
+                            useSuffixKey = false,
+                            resizeMode = MeetupCardResizeMode,
+                        )
                         .clip(MaterialTheme.shapes.medium),
                     contentAlignment = Alignment.Center,
                 ) {
