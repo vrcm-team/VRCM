@@ -1500,7 +1500,7 @@ private fun BottomCardTab(
                                                 },
                                                 color = when {
                                                     line.unchanged -> MaterialTheme.colorScheme.primary
-                                                    line.added -> MaterialTheme.colorScheme.primary
+                                                    line.added -> MaterialTheme.colorScheme.tertiary
                                                     else -> MaterialTheme.colorScheme.error
                                                 },
                                             )

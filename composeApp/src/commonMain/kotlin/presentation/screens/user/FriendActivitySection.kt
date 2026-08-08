@@ -200,7 +200,7 @@ private fun BioDiffLines(lines: List<FriendActivityBioDiffLine>) {
             Text(
                 text = if (line.added) "+ ${line.text}" else "- ${line.text}",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (line.added) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (line.added) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
