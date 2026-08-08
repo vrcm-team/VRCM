@@ -4,7 +4,14 @@ import com.russhwolf.settings.Settings
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import kotlinx.serialization.json.Json
 
-/** 按账号存取会面身份卡配置，并隔离无法解码的配置项。 */
+/**
+ * 按账号存取会面身份卡配置，并隔离无法解码的配置项。
+ *
+ * 迁移策略：不做字段级迁移。数据结构发生不兼容变化时提升
+ * [MEETUP_CARD_SCHEMA_VERSION]，旧版本配置一律按"不存在"处理，用户重新配置一次。
+ * 这比让 `ignoreUnknownKeys` 把被改名的字段静默丢成默认值可控——那样用户会发现
+ * 某些设置莫名其妙变回默认却没有任何提示。
+ */
 class MeetupCardConfigDao(
     private val settings: Settings,
 ) {
@@ -16,6 +23,7 @@ class MeetupCardConfigDao(
         settings.getStringOrNull(key(ownerUserId))
             ?.let(::decode)
             ?.takeIf { it.ownerUserId == ownerUserId }
+            ?.takeIf { it.schemaVersion == MEETUP_CARD_SCHEMA_VERSION }
 
     fun save(config: MeetupCardConfig) {
         require(config.ownerUserId.isNotBlank()) { "ownerUserId must not be blank" }
@@ -36,6 +44,7 @@ class MeetupCardConfigDao(
             settings.getStringOrNull(storedKey)
                 ?.let(::decode)
                 ?.takeIf { it.ownerUserId == ownerUserId }
+                ?.takeIf { it.schemaVersion == MEETUP_CARD_SCHEMA_VERSION }
         }
     }
 

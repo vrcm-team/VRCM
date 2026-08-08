@@ -2,7 +2,14 @@ package io.github.vrcmteam.vrcm.storage.meetup
 
 import kotlinx.serialization.Serializable
 
-const val MEETUP_CARD_SCHEMA_VERSION = 1
+/**
+ * 配置结构版本。不兼容改动时 +1；[MeetupCardConfigDao] 会把旧版本配置视为不存在，
+ * 由用户重新配置，而不是让缺失字段静默回落默认值。
+ *
+ * 2：二维码类型由单选 `qrLinkType` 改为多选 `qrLinkTypes`，并新增横竖屏独立版式、
+ *    横屏独立照片与 `configured` 首配标记。
+ */
+const val MEETUP_CARD_SCHEMA_VERSION = 2
 
 /** 会面身份卡的内置版式。 */
 @Serializable

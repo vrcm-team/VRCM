@@ -136,6 +136,8 @@ Display Name 使用模板允许范围内的动态字号与最多两行布局，�
 
 配置 JSON 沿用现有 Multiplatform Settings + kotlinx.serialization 模式，并设置 `ignoreUnknownKeys` 与 schema version。大图片和动画字节不写入 Settings 或数据库。
 
+迁移策略：不做字段级迁移。数据结构发生不兼容变化时提升 `MEETUP_CARD_SCHEMA_VERSION`，DAO 把旧版本配置一律按"不存在"处理，用户重新配置一次。这比让 `ignoreUnknownKeys` 把被改名的字段静默丢成默认值可控——那样用户会发现某些设置莫名变回默认却没有任何提示。
+
 ### 7.3 素材存储
 
 新增应用私有 `MeetupCardAssetStore`，元数据与文件写入遵循以下规则：

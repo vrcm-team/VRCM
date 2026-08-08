@@ -67,6 +67,28 @@ class MeetupCardConfigDaoTest {
     }
 
     @Test
+    fun outdatedSchemaIsTreatedAsAbsentWithoutAffectingOtherOwners() {
+        val settings = MapSettings()
+        val dao = MeetupCardConfigDao(settings)
+        dao.save(defaultMeetupCardConfig("usr_a").copy(shortText = "A"))
+        dao.save(defaultMeetupCardConfig("usr_b").copy(shortText = "B"))
+        // 模拟旧版本写下的配置：不做字段级迁移，直接当作没配置过。
+        val ownerAKey = "${DaoKeys.MeetupCard.KEY_PREFIX}.usr_a"
+        val ownerARaw = assertNotNull(settings.getStringOrNull(ownerAKey))
+        settings.putString(
+            ownerAKey,
+            ownerARaw.replace(
+                "\"schemaVersion\":$MEETUP_CARD_SCHEMA_VERSION",
+                "\"schemaVersion\":${MEETUP_CARD_SCHEMA_VERSION - 1}",
+            ),
+        )
+
+        assertNull(dao.load("usr_a"))
+        assertEquals("B", dao.load("usr_b")?.shortText)
+        assertEquals(listOf("usr_b"), dao.all().map(MeetupCardConfig::ownerUserId))
+    }
+
+    @Test
     fun savedJsonIncludesSchemaVersionAndDefaultFields() {
         val settings = MapSettings()
         val dao = MeetupCardConfigDao(settings)
