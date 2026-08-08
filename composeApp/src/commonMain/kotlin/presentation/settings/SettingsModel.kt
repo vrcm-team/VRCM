@@ -6,24 +6,29 @@ import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.data.SettingsData
 
-class SettingsModel(private val settingsDao: SettingsDao, private val themeColors: List<ThemeColor>) {
+class SettingsModel(
+    private val settingsDao: SettingsDao,
+    private val themeColors: List<ThemeColor>
+) {
     fun saveSettings(settingsVo: SettingsVo) {
-        settingsDao.settings = SettingsData(
-            isDarkTheme = settingsVo.isDarkTheme,
-            themeColor = settingsVo.themeColor.name,
-            languageTag = settingsVo.languageTag.tag,
-            friendPresenceNotificationsEnabled = settingsVo.friendPresenceNotificationsEnabled,
-            boopNotificationsEnabled = settingsVo.boopNotificationsEnabled,
-            backgroundFriendMonitoringEnabled = settingsVo.backgroundFriendMonitoringEnabled,
-        )
+        settingsDao.settings = settingsVo.let {
+            SettingsData(
+                isDarkTheme = it.isDarkTheme,
+                themeColor = it.themeColor.name,
+                languageTag = it.languageTag.tag,
+                friendPresenceNotificationsEnabled = it.friendPresenceNotificationsEnabled,
+                boopNotificationsEnabled = it.boopNotificationsEnabled,
+                backgroundFriendMonitoringEnabled = it.backgroundFriendMonitoringEnabled,
+            )
+        }
     }
 
     val settingsVo: SettingsVo
         get() {
             val settings = settingsDao.settings
-            val languageTag = settings.languageTag?.let(LanguageTag::fromTag) ?: LanguageTag.Default
+            val languageTag = settings.languageTag?.let { LanguageTag.fromTag(it) } ?: LanguageTag.Default
             val themeColor = settings.themeColor?.let { name -> themeColors.firstOrNull { it.name == name } }
-                ?: ThemeColor.Default
+                    ?: ThemeColor.Default
             return SettingsVo(
                 isDarkTheme = settings.isDarkTheme,
                 themeColor = themeColor,

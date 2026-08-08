@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -201,7 +200,7 @@ private fun BioDiffLines(lines: List<FriendActivityBioDiffLine>) {
             Text(
                 text = if (line.added) "+ ${line.text}" else "- ${line.text}",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (line.added) BioDiffAddedColor else BioDiffRemovedColor,
+                color = if (line.added) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -209,8 +208,6 @@ private fun BioDiffLines(lines: List<FriendActivityBioDiffLine>) {
     }
 }
 
-internal val BioDiffAddedColor = Color(0xFF238B45)
-internal val BioDiffRemovedColor = Color(0xFFC43C3C)
 
 @Composable
 private fun ActivityMetricRow(

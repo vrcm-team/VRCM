@@ -1500,8 +1500,8 @@ private fun BottomCardTab(
                                                 },
                                                 color = when {
                                                     line.unchanged -> MaterialTheme.colorScheme.primary
-                                                    line.added -> BioDiffAddedColor
-                                                    else -> BioDiffRemovedColor
+                                                    line.added -> MaterialTheme.colorScheme.primary
+                                                    else -> MaterialTheme.colorScheme.error
                                                 },
                                             )
                                         }
