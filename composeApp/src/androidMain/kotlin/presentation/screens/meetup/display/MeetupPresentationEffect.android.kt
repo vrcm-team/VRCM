@@ -5,7 +5,6 @@ import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -48,7 +47,6 @@ private class MeetupWindowPresentation(private val window: Window) {
 
     private var active = false
     private var hadKeepScreenOn = false
-    private var hadVisibleSystemBars = true
     private var previousBarsBehavior = 0
 
     fun acquire() {
@@ -56,9 +54,6 @@ private class MeetupWindowPresentation(private val window: Window) {
         active = true
         hadKeepScreenOn =
             window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0
-        // 读不到 rootWindowInsets（如尚未 attach）时按可见处理，恢复时宁可多显示
-        hadVisibleSystemBars = ViewCompat.getRootWindowInsets(window.decorView)
-            ?.isVisible(WindowInsetsCompat.Type.systemBars()) != false
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         previousBarsBehavior = insetsController.systemBarsBehavior
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -75,8 +70,9 @@ private class MeetupWindowPresentation(private val window: Window) {
         }
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.systemBarsBehavior = previousBarsBehavior
-        if (hadVisibleSystemBars) {
-            insetsController.show(WindowInsetsCompat.Type.systemBars())
-        }
+        // 无条件恢复显示：edge-to-edge 下 rootWindowInsets 的可见性读数在部分设备上
+        // 不可靠，条件恢复会让退出后系统栏停留在隐藏状态；应用内没有其他隐藏系统栏
+        // 的页面，show 幂等无害。
+        insetsController.show(WindowInsetsCompat.Type.systemBars())
     }
 }

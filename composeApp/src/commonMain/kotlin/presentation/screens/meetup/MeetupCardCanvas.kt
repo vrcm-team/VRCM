@@ -58,6 +58,7 @@ fun MeetupCardCanvas(
                 .takeIf { it.width > 0 && it.height > 0 }
                 ?.let { ImageSize(it.width, it.height) },
             crop = crop,
+            orientation = orientation,
             calculator = calculator,
             modifier = Modifier.fillMaxSize(),
         )

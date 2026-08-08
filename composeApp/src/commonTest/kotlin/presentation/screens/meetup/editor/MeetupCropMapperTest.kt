@@ -42,6 +42,22 @@ class MeetupCropMapperTest {
     }
 
     @Test
+    fun deriveRoundTripBetweenReferenceAndDeviceViewportIsStable() {
+        // 真机 19.5:9 视口与 9:16 参考视口之间往返换算不得漂移。
+        val device = ImageSize(1080, 2340)
+        val stored = MeetupCrop(centerOffsetX = .08f, centerOffsetY = -.05f, zoom = 2f)
+
+        val deviceCrop = mapper.derive(source, portrait, device, stored)
+        val roundTripped = mapper.derive(source, device, portrait, deviceCrop)
+
+        val deviceCover = calculator.zoomLimits(source, device, 0).cover
+        assertTrue(deviceCrop.zoom >= deviceCover)
+        assertNear(stored.zoom, roundTripped.zoom)
+        assertNear(stored.centerOffsetX, roundTripped.centerOffsetX)
+        assertNear(stored.centerOffsetY, roundTripped.centerOffsetY)
+    }
+
+    @Test
     fun coverCropStartsCenteredAtViewportCover() {
         val crop = mapper.coverCrop(source, landscape)
 

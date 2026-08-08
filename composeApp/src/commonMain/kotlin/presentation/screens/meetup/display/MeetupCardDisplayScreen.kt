@@ -97,7 +97,8 @@ fun MeetupCardDisplayContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = getInsetPadding(WindowInsets::getTop))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        // 沉浸模式下 inset 可能为 0，额外内边距避开刘海/圆角区域。
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ControlIconButton(

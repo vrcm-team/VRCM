@@ -43,6 +43,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageSize
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardAspectRatio
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
@@ -165,13 +166,11 @@ private fun MeetupCropPreview(
     calculator: CropTransformCalculator,
     enabled: Boolean,
 ) {
-    val aspect = when (orientation) {
-        MeetupOrientation.Portrait -> 9f / 16f
-        MeetupOrientation.Landscape -> 16f / 9f
-    }
+    val cropMapper = remember(calculator) { MeetupCropMapper(calculator) }
     BoxWithConstraints(
+        // 裁剪视口跟随真实窗口纵横比，与预览/展示所见一致。
         modifier = Modifier
-            .aspectRatio(aspect)
+            .aspectRatio(meetupCardAspectRatio(orientation))
             .clipToBounds()
             .background(Color.Black),
     ) {
@@ -179,10 +178,13 @@ private fun MeetupCropPreview(
         val viewportHeight = constraints.maxHeight
         if (viewportWidth <= 0 || viewportHeight <= 0) return@BoxWithConstraints
         val viewport = ImageSize(viewportWidth, viewportHeight)
+        val reference = orientation.referenceViewport
+        // 会话中的裁剪以参考视口为基准；编辑与渲染都换算到设备视口。
+        val deviceCrop = cropMapper.derive(source, reference, viewport, crop)
         val geometry = calculator.geometry(
             source = source,
             viewport = viewport,
-            transform = crop.toTransform(),
+            transform = deviceCrop.toTransform(),
         )
         Box(
             modifier = Modifier
@@ -191,22 +193,30 @@ private fun MeetupCropPreview(
                     if (!enabled) return@pointerInput
                     detectTransformGestures { _, pan, zoom, _ ->
                         val cover = calculator.zoomLimits(source, viewport, 0).cover
+                        val currentDevice = cropMapper.derive(
+                            source = source,
+                            fromViewport = reference,
+                            toViewport = viewport,
+                            from = session.crop(orientation).value,
+                        )
                         val transformed = calculator.transform(
                             source = source,
                             viewport = viewport,
-                            current = session.crop(orientation).value.toTransform(),
+                            current = currentDevice.toTransform(),
                             panX = pan.x,
                             panY = pan.y,
                             zoomChange = zoom,
                         )
+                        val editedDevice = MeetupCrop(
+                            centerOffsetX = transformed.centerOffsetX,
+                            centerOffsetY = transformed.centerOffsetY,
+                            // 身份卡照片始终 cover 视口，不允许缩出留边。
+                            zoom = max(transformed.zoom, cover),
+                        )
+                        // 存储换算回参考视口基准，跨设备与展示端保持同一语义。
                         session.updateCrop(
                             orientation,
-                            MeetupCrop(
-                                centerOffsetX = transformed.centerOffsetX,
-                                centerOffsetY = transformed.centerOffsetY,
-                                // 身份卡照片始终 cover 视口，不允许缩出留边。
-                                zoom = max(transformed.zoom, cover),
-                            ),
+                            cropMapper.derive(source, viewport, reference, editedDevice),
                         )
                     }
                 },

@@ -165,8 +165,8 @@ private fun SideTagTemplate(
     modifier: Modifier,
 ) {
     val bandWidth = when (orientation) {
-        MeetupOrientation.Portrait -> 200.dp
-        MeetupOrientation.Landscape -> 260.dp
+        MeetupOrientation.Portrait -> 180.dp
+        MeetupOrientation.Landscape -> 248.dp
     }
     Row(modifier = modifier.fillMaxSize()) {
         Box(

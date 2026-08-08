@@ -4,13 +4,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -55,6 +60,8 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 身份卡编辑页：实时预览 + 四个工具页；无保存按钮，离散操作立即提交，
@@ -235,7 +242,11 @@ fun MeetupCardEditorContent(
                         onOrientation = model::setOrientation,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1.1f),
+                            .weight(1f),
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(top = 12.dp),
+                        thickness = 0.5.dp,
                     )
                     MeetupEditorTools(
                         state = state,
@@ -303,23 +314,46 @@ private fun EditorPreview(
                 }
             }
         }
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .padding(top = 12.dp)
-                .weight(1f),
+                .weight(1f)
+                .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            val aspect = when (state.orientation) {
-                MeetupOrientation.Portrait -> 9f / 16f
-                MeetupOrientation.Landscape -> 16f / 9f
+            // 预览是真实展示的等比缩略图：按窗口全尺寸渲染再整体缩放，
+            // 字体、间距与模板比例和展示页完全一致，不随预览盒子失真。
+            val container = LocalWindowInfo.current.containerSize
+            val density = LocalDensity.current
+            val shortDp = with(density) { min(container.width, container.height).toDp() }
+            val longDp = with(density) { max(container.width, container.height).toDp() }
+            val portrait = state.orientation == MeetupOrientation.Portrait
+            val cardWidth = if (portrait) shortDp else longDp
+            val cardHeight = if (portrait) longDp else shortDp
+            if (cardWidth > 0.dp && cardHeight > 0.dp && maxWidth > 0.dp && maxHeight > 0.dp) {
+                val scale = minOf(maxWidth / cardWidth, maxHeight / cardHeight, 1f)
+                Box(
+                    modifier = Modifier
+                        .size(cardWidth * scale, cardHeight * scale)
+                        .clip(MaterialTheme.shapes.medium),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .requiredSize(cardWidth, cardHeight)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                    ) {
+                        MeetupCardCanvas(
+                            state = state,
+                            orientation = state.orientation,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
             }
-            MeetupCardCanvas(
-                state = state,
-                orientation = state.orientation,
-                modifier = Modifier
-                    .aspectRatio(aspect)
-                    .clip(MaterialTheme.shapes.medium),
-            )
         }
     }
 }
