@@ -239,6 +239,132 @@ class AccountCacheManagerTest {
         fileSystem.checkNoOpenFiles()
     }
 
+    @Test
+    fun leasesCapturedBeforeAnAccountClearAreRefused() = runTest {
+        val manager = accountCacheManager(
+            InMemoryFriendListCacheStore(),
+            InMemoryUserProfileCacheStore(),
+        )
+        val staleToken = manager.captureWriteToken("usr_a")
+        manager.clearAccount("usr_a")
+
+        // 拿着过期 token 还能开租约的话，被清掉的账号又能往素材目录里写东西了。
+        assertNull(manager.acquireDecorationLease(staleToken, setOf("inv_icon")))
+        assertNull(manager.acquirePhotoArtifactLease(staleToken))
+        assertNotNull(manager.acquirePhotoArtifactLease(manager.captureWriteToken("usr_a")))
+    }
+
+    @Test
+    fun heldDecorationLeaseProtectsInFlightAssetsUntilItIsReleased() = runTest {
+        val fileSystem = FakeFileSystem()
+        val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
+        val configDao = MeetupCardConfigDao(MapSettings())
+        val manager = accountCacheManager(
+            InMemoryFriendListCacheStore(),
+            InMemoryUserProfileCacheStore(),
+            configDao,
+            assetStore,
+        )
+        val inFlightBytes = "in-flight".encodeToByteArray()
+        val inFlight = assetStore.writeDecoration(
+            "inv_in_flight",
+            DecorationAssetType.MainAnimation,
+            inFlightBytes,
+        )
+        val token = manager.captureWriteToken("usr_a")
+        val lease = assertNotNull(manager.acquireDecorationLease(token, setOf("inv_in_flight")))
+
+        // 素材还没写进任何配置，只有租约在护着它；此时清另一个账号不能把它剪掉。
+        manager.clearAccount("usr_b")
+        assertContentEquals(inFlightBytes, assetStore.read(inFlight))
+
+        manager.releaseDecorationLease(lease)
+
+        assertFailsWith<IOException> { assetStore.read(inFlight) }
+        fileSystem.checkNoOpenFiles()
+    }
+
+    @Test
+    fun releasingPhotoLeaseDeletesOnlyUnreferencedArtifacts() = runTest {
+        val fileSystem = FakeFileSystem()
+        val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
+        val configDao = MeetupCardConfigDao(MapSettings())
+        val manager = accountCacheManager(
+            InMemoryFriendListCacheStore(),
+            InMemoryUserProfileCacheStore(),
+            configDao,
+            assetStore,
+        )
+        val committedBytes = "committed".encodeToByteArray()
+        val committed = assetStore.writePhoto("usr_a", committedBytes, "jpg")
+        val discarded = assetStore.writePhoto("usr_a", "discarded".encodeToByteArray(), "png")
+        val otherOwnerBytes = "other-owner".encodeToByteArray()
+        val otherOwner = assetStore.writePhoto("usr_b", otherOwnerBytes, "jpg")
+        configDao.save(
+            defaultMeetupCardConfig("usr_a").copy(photo = MeetupPhoto(localAsset = committed)),
+        )
+        val lease = assertNotNull(
+            manager.acquirePhotoArtifactLease(manager.captureWriteToken("usr_a")),
+        )
+        listOf(committed, discarded).forEach { manager.recordPhotoArtifact(lease, it) }
+
+        manager.releasePhotoArtifactLease(lease)
+
+        assertContentEquals(committedBytes, assetStore.read(committed))
+        assertFailsWith<IOException> { assetStore.read(discarded) }
+        assertContentEquals(otherOwnerBytes, assetStore.read(otherOwner))
+        fileSystem.checkNoOpenFiles()
+    }
+
+    @Test
+    fun concurrentPhotoLeaseForSameOwnerKeepsItsOwnArtifactAlive() = runTest {
+        val fileSystem = FakeFileSystem()
+        val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
+        val manager = accountCacheManager(
+            InMemoryFriendListCacheStore(),
+            InMemoryUserProfileCacheStore(),
+            MeetupCardConfigDao(MapSettings()),
+            assetStore,
+        )
+        val sharedBytes = "shared".encodeToByteArray()
+        val shared = assetStore.writePhoto("usr_a", sharedBytes, "jpg")
+        val token = manager.captureWriteToken("usr_a")
+        val first = assertNotNull(manager.acquirePhotoArtifactLease(token))
+        val second = assertNotNull(manager.acquirePhotoArtifactLease(token))
+        manager.recordPhotoArtifact(first, shared)
+        manager.recordPhotoArtifact(second, shared)
+
+        // 两次刷新写出了同一份内容寻址的照片；先结束的那次不能把还在用的文件删掉。
+        manager.releasePhotoArtifactLease(first)
+        assertContentEquals(sharedBytes, assetStore.read(shared))
+
+        manager.releasePhotoArtifactLease(second)
+
+        assertFailsWith<IOException> { assetStore.read(shared) }
+        fileSystem.checkNoOpenFiles()
+    }
+
+    @Test
+    fun recordingAnArtifactAfterReleaseFailsLoudly() = runTest {
+        val fileSystem = FakeFileSystem()
+        val assetStore = MeetupCardAssetStore(fileSystem, "/meetup-assets".toPath())
+        val manager = accountCacheManager(
+            InMemoryFriendListCacheStore(),
+            InMemoryUserProfileCacheStore(),
+            MeetupCardConfigDao(MapSettings()),
+            assetStore,
+        )
+        val photo = assetStore.writePhoto("usr_a", "photo".encodeToByteArray(), "jpg")
+        val lease = assertNotNull(
+            manager.acquirePhotoArtifactLease(manager.captureWriteToken("usr_a")),
+        )
+        manager.releasePhotoArtifactLease(lease)
+
+        // 静默接受会让这份照片永远没人负责回收，不如当场炸出来。
+        assertFailsWith<IllegalStateException> { manager.recordPhotoArtifact(lease, photo) }
+        fileSystem.checkNoOpenFiles()
+    }
+
     private fun profileCache(displayName: String) = UserProfileCache(
         user = UserData(
             ageVerificationStatus = AgeVerificationStatus.Verified,

@@ -46,7 +46,9 @@
 - Windows 上 `atomicMove` 覆盖已存在目标依赖 JDK 行为。（`.tmp` 孤儿已在卡片功能首次装配时按"修改时间超过一小时"清扫。）
 - 配置 JSON 损坏的账号在他人 `clearAccount` 时装饰缓存可能被误删（可自愈）。
 - 动画"失败记忆"只覆盖"下得到但解不开"，不覆盖运行期渲染失败（那条路径仍走 `staticFallback`，不写回缓存）。
-- 漏测清单：DecorationTemplateCacheDao 无专属测试、AccountCacheManager lease 边界、iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
+- 漏测清单：iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。（DecorationTemplateCacheDao 与 AccountCacheManager 的租约边界已补齐。）（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
+- `DesktopPlatformImageCodecTest.promptCancellationAfterWorkerCompletionClosesOwnedPixels` 断言的是 skiko 全局 `Stats.allocated["Bitmap"]`，原生对象由 cleaner 线程异步回收，整套跑时偶发误报（单跑与连跑各 3 次均通过）。
+- `DesktopWindowTitleBarLocaleTest` 在无 DISPLAY 的环境里必然 `HeadlessException`，非代码问题。
 
 ## 执行边界与文件结构
 
