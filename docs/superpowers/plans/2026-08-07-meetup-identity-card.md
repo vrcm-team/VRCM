@@ -10,16 +10,39 @@
 
 ---
 
+## 实施状态（2026-08-08 更新）
+
+- Task 1–14 已全部实现并通过 `desktopTest`（579 例中仅 `DesktopWindowTitleBarLocaleTest` 因执行机无显示环境（HeadlessException，与本功能无关）失败）。Task 15 的两项人工验收矩阵尚未执行。
+- Task 1–6 由 commit 70d11f02 落地；本次会话完成了对该提交的书面审计、缺陷修复与 Task 7–14。
+
+### 与原计划的主要偏差（均已按实际实现更新语义）
+
+1. **Task 1 解码器平台分立**：`org.jetbrains.skia` 在 androidMain 不可用，原计划的 commonMain 单一 `SkiaAnimatedWebpDecoder` 不可行。实际：commonMain 只保留接口（push 式 `start/pause/resume` + `onError`），desktop/iOS 各有一份逐字节一致的 Skia 实现，Android 用 awebp 3.0.5（`AndroidAnimatedWebpDecoder`）。desktop/iOS 双文件建议后续合并到自建共享 source set。
+2. **Task 7 候选照片不携带 Compose 预览对象**：`MeetupPhotoCandidate` 定义在 repository 层（bytes+尺寸+双向裁剪），预览位图由 `MeetupPreparedPhoto`/会话单独持有并在 complete/discard 时释放。
+3. **Task 8 未改造 GalleryTabPager**：为零回归风险，单选改为独立 `GalleryPickerScreen` 路由复用 `GalleryScreenModel`（数据、VRC+/空态/刷新全复用，仅网格项轻量重复）；`consume` 语义为"pending 不移除"，配合编辑器返回后消费。
+4. **Task 6/9 配置创建职责收紧**：`refresh()` 不再隐式建档（否则破坏 §5.1 首配分流），仅 `ensureDefault`/显式编辑创建；相关测试已同步。
+5. **Task 12 iOS root controller**：category 生成的 final 扩展（`prefersHomeIndicatorAutoHidden` 等）无法 override，采用同名成员函数经 ObjC selector 分发的标准 workaround。
+6. **依赖**：commonTest 补 `okio-fakefilesystem`（70d11f02 已在 commonTest 使用但只在 desktopTest 声明，Android 单测编译因此损坏）。
+
+### 审计修复记录（本次会话）
+
+- Repository：照片回退链穷尽时统一落主题背景（Success/Partial 与 Failed 路径一致）；背景 URL 未变且素材完好不重复下载、内容无变化不空转 revision；`finishFailed` 合并双请求错误；首帧过滤已删除文件的死路径。
+- 远端边界：`DefaultMeetupCardRemoteDataSource.loadImage` 增加图片文件头嗅探（200+错误页不得顶替有效照片）；`HttpMeetupRemoteBytesLoader` 对素材下载放宽 per-request 超时（120s/30s socket），共享 client 的 15s 全局超时不适用于 20/50 MiB 素材。
+- DecorationResolver：`restoreCached` 过滤悬挂文件引用并对非法 ID 给出显式 Unavailable；空响应 template id 一律拒绝；`ResolvedDecoration` 增加 `staticFallback` 供运行期动画失败回退 base。
+- 存储：`MeetupCardAssetStore.exists()`；`deleteAccount` 对非法 ID 静默跳过（不再中断账号移除）；invalidation listener 异常隔离。
+- 解码器：Android 拒绝 <10ms 帧（awebp 内部按原始时长调度会忙循环）、`setLoopLimit(0)` 强制无限循环、二次 start 回帧 0；Skia 实现改单帧保留合成（峰值 ≤2 帧位图）、修复恒真循环守卫、增加帧节奏补偿；删除吞错的单参 `start` 重载。
+
+### 已知余留问题（低优先级，未实现）
+
+- 动画持续解码失败无"失败记忆"，每次刷新会重复下载（最多 3×20 MiB）；可在 Template 缓存记失败 URL。
+- 素材 URL 无 scheme/host 白名单（信任边界是官方 API 响应）。
+- 写入中断的 `.tmp` 孤儿文件无启动清扫；Windows 上 `atomicMove` 覆盖已存在目标依赖 JDK 行为。
+- 配置 JSON 损坏的账号在他人 `clearAccount` 时装饰缓存可能被误删（可自愈）。
+- 漏测清单：DecorationTemplateCacheDao 无专属测试、AccountCacheManager lease 边界、iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。
+
 ## 执行边界与文件结构
 
-执行本计划前先运行 `git status --short`，并重新读取任何将要修改且已有用户改动的文件。计划编写时以下文件已有未提交修改，禁止覆盖：
-
-- `composeApp/src/commonMain/kotlin/presentation/screens/home/HomeScreen.kt`
-- `composeApp/src/commonMain/kotlin/presentation/compoments/ProfileScaffold.kt`
-- `composeApp/src/commonMain/kotlin/presentation/screens/user/UserProfileScreen.kt`
-- `composeApp/src/commonMain/kotlin/presentation/compoments/AImage.kt`
-- `composeApp/src/commonMain/kotlin/presentation/compoments/UserStateIcon.kt`
-- 若 `git status` 出现新的重叠文件，也按相同规则逐段合并。
+执行本计划前先运行 `git status --short`，并重新读取任何将要修改且已有用户改动的文件。（原列出的"未提交修改"文件在 70d11f02 前均已提交，该约束已过时；仍保留通用规则：若 `git status` 出现重叠文件，按相同规则逐段合并。）
 
 本计划不包含 `git add`、`git commit`、推送或 PR 步骤。每个任务结束只运行目标测试、`git diff --check` 和 `git status --short`；这是仓库约束对 writing-plans 默认提交节奏的覆盖。
 
@@ -42,7 +65,7 @@
 - Create: `composeApp/src/desktopTest/kotlin/presentation/screens/meetup/animation/AnimatedWebpDecoderTest.kt`
 - Create binary fixture: `composeApp/src/desktopTest/resources/meetup/animated.webp`
 
-- [ ] **Step 1: 添加与当前工具链兼容的 QRose 版本**
+- [x] **Step 1: 添加与当前工具链兼容的 QRose 版本**
 
 ```toml
 [versions]
@@ -61,7 +84,7 @@ implementation(libs.okio)
 
 不要使用要求 Kotlin 2.3.0 的 QRose `1.1.0` 或 `1.1.1`。
 
-- [ ] **Step 2: 先验证依赖解析覆盖三个目标**
+- [x] **Step 2: 先验证依赖解析覆盖三个目标**
 
 Run:
 
@@ -71,7 +94,7 @@ Run:
 
 Expected: 三个任务均 `BUILD SUCCESSFUL`；依赖图不得升级 Kotlin stdlib 到 2.3.x，也不得降级 Compose 1.10.3。若解析结果违背任一条件，撤销 QRose 两行并把 QRose 1.0.1 的 MIT 许可纯 Kotlin encoder 源码按原 package 纳入 `commonMain`，不能升级项目工具链。
 
-- [ ] **Step 3: 放入真实多帧 WebP fixture**
+- [x] **Step 3: 放入真实多帧 WebP fixture**
 
 ```bash
 mkdir -p composeApp/src/desktopTest/resources/meetup
@@ -81,7 +104,7 @@ file composeApp/src/desktopTest/resources/meetup/animated.webp
 
 Expected: 报告 Web/P image，文件大于 1 KiB；测试运行时不联网。
 
-- [ ] **Step 4: 写失败测试**
+- [x] **Step 4: 写失败测试**
 
 ```kotlin
 class AnimatedWebpDecoderTest {
@@ -99,13 +122,13 @@ class AnimatedWebpDecoderTest {
 }
 ```
 
-- [ ] **Step 5: 运行测试并确认失败**
+- [x] **Step 5: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*AnimatedWebpDecoderTest'`
 
 Expected: FAIL，提示 `SkiaAnimatedWebpDecoder` 未定义。
 
-- [ ] **Step 6: 实现 Skia 所有权边界**
+- [x] **Step 6: 实现 Skia 所有权边界**
 
 ```kotlin
 interface AnimatedWebpDecoder {
@@ -141,7 +164,7 @@ class SkiaAnimatedWebpDecoder : AnimatedWebpDecoder {
 
 `SkiaDecodedAnimation.frame(index)` 分配独立 Skia Bitmap，使用 `getFrameInfo(index).requiredFrame` 作为 `priorFrame` 调用 `codec.readPixels(bitmap, index, priorFrame)`。frame、Codec、Data 的 `close()` 都要幂等；duration 用 `coerceAtLeast(16)` 防止坏资源造成忙循环。
 
-- [ ] **Step 7: 验证探针**
+- [x] **Step 7: 验证探针**
 
 Run:
 
@@ -161,7 +184,7 @@ Expected: PASS；状态只增加本任务文件和执行前已有改动。
 - Create: `composeApp/src/commonMain/kotlin/storage/meetup/MeetupCardConfigDao.kt`
 - Create: `composeApp/src/commonTest/kotlin/storage/meetup/MeetupCardConfigDaoTest.kt`
 
-- [ ] **Step 1: 写账号隔离、未知字段和损坏数据测试**
+- [x] **Step 1: 写账号隔离、未知字段和损坏数据测试**
 
 ```kotlin
 @Test
@@ -191,13 +214,13 @@ fun corruptConfigDoesNotEraseAnotherAccount() {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardConfigDaoTest'`
 
 Expected: FAIL，配置类型与 DAO 尚不存在。
 
-- [ ] **Step 3: 定义序列化模型**
+- [x] **Step 3: 定义序列化模型**
 
 ```kotlin
 const val MEETUP_CARD_SCHEMA_VERSION = 1
@@ -274,11 +297,11 @@ data class MeetupCardConfig(
 )
 ```
 
-- [ ] **Step 4: 实现 DAO**
+- [x] **Step 4: 实现 DAO**
 
 `DaoKeys.MeetupCard.NAME` 为 `vrcm.meetup.card`，key prefix 为 `vrcm.meetup.card.config`。DAO 使用 `Json { encodeDefaults = true; ignoreUnknownKeys = true }`；key 是 `${prefix}.$ownerUserId`；提供 `load/save/all/clear`。损坏 JSON 返回 null，`save` 拒绝空 owner ID。
 
-- [ ] **Step 5: 跑测试**
+- [x] **Step 5: 跑测试**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardConfigDaoTest'`
 
@@ -294,7 +317,7 @@ Expected: 两项配置行为 PASS。
 - Create: `composeApp/src/desktopMain/kotlin/storage/meetup/MeetupCardAssetRoot.desktop.kt`
 - Create: `composeApp/src/desktopTest/kotlin/storage/meetup/MeetupCardAssetStoreTest.kt`
 
-- [ ] **Step 1: 写原子失败与账号清理测试**
+- [x] **Step 1: 写原子失败与账号清理测试**
 
 ```kotlin
 @Test
@@ -326,13 +349,13 @@ fun deletingAccountKeepsSharedDecorationCache() = runTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardAssetStoreTest'`
 
 Expected: FAIL，素材仓库尚不存在。
 
-- [ ] **Step 3: 实现内容寻址 API**
+- [x] **Step 3: 实现内容寻址 API**
 
 ```kotlin
 enum class DecorationAssetType(val fileName: String) {
@@ -355,7 +378,7 @@ class MeetupCardAssetStore(
 
 owner/template ID 只接受 `[A-Za-z0-9_-]+`。SHA-256 使用 Okio；照片名为 `accounts/{owner}/photos/{sha}.{ext}`。先在同目录写随机 `.tmp`，关闭后重读校验 hash，再 `atomicMove`；异常/取消均在 `finally` 删除临时文件，不删除旧文件。`model` 只解析仓库产生的相对路径。
 
-- [ ] **Step 4: 实现平台私有目录**
+- [x] **Step 4: 实现平台私有目录**
 
 ```kotlin
 internal expect fun meetupCardAssetRoot(appPlatform: AppPlatform): Path
@@ -363,7 +386,7 @@ internal expect fun meetupCardAssetRoot(appPlatform: AppPlatform): Path
 
 Android actual 使用 `context.filesDir/meetup-card`；iOS 使用现有数据库相同的 `NSApplicationSupportDirectory/VRCM/meetup-card`；Desktop 使用 `desktopSettingsDirectory()/meetup-card`。不得用 temporary directory 保存相册图片。
 
-- [ ] **Step 5: 验证仓库与三端编译**
+- [x] **Step 5: 验证仓库与三端编译**
 
 Run:
 
@@ -385,7 +408,7 @@ Expected: 测试和三端编译 PASS。
 - Create: `composeApp/src/commonTest/kotlin/network/api/profile/ProfileAppearanceApiTest.kt`
 - Create: `composeApp/src/commonTest/kotlin/network/api/inventory/InventoryApiTest.kt`
 
-- [ ] **Step 1: 写 endpoint 与宽松 DTO 测试**
+- [x] **Step 1: 写 endpoint 与宽松 DTO 测试**
 
 ```kotlin
 @Test
@@ -410,13 +433,13 @@ fun inventoryUsesTemplateEndpoint() = runTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*ProfileAppearanceApiTest' --tests '*InventoryApiTest'`
 
 Expected: FAIL，新 API 未定义。
 
-- [ ] **Step 3: 实现最小 DTO**
+- [x] **Step 3: 实现最小 DTO**
 
 ```kotlin
 @Serializable
@@ -444,7 +467,7 @@ data class InventoryTemplateMetadata(
 data class InventoryTemplateAsset(val type: String = "", val url: String = "")
 ```
 
-- [ ] **Step 4: 实现 API**
+- [x] **Step 4: 实现 API**
 
 ```kotlin
 class ProfileAppearanceApi(private val client: HttpClient) {
@@ -463,7 +486,7 @@ class InventoryApi(private val client: HttpClient) {
 
 请求前拒绝空 ID；响应账号匹配留给 repository，不能写进现有 `UserData`。
 
-- [ ] **Step 5: 运行 API 测试**
+- [x] **Step 5: 运行 API 测试**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*ProfileAppearanceApiTest' --tests '*InventoryApiTest'`
 
@@ -478,7 +501,7 @@ Expected: URL、query 和缺失/空值语义 PASS。
 - Create: `composeApp/src/commonMain/kotlin/service/meetup/DecorationResolver.kt`
 - Create: `composeApp/src/commonTest/kotlin/service/meetup/DecorationResolverTest.kt`
 
-- [ ] **Step 1: 写去重和降级测试**
+- [x] **Step 1: 写去重和降级测试**
 
 ```kotlin
 @Test
@@ -505,13 +528,13 @@ fun missingMainAndBaseDisablesOnlyThatDecoration() = runTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*DecorationResolverTest'`
 
 Expected: FAIL，resolver/cache 类型尚不存在。
 
-- [ ] **Step 3: 定义缓存与渲染结果**
+- [x] **Step 3: 定义缓存与渲染结果**
 
 ```kotlin
 @Serializable
@@ -538,7 +561,7 @@ data class ResolvedDecoration(
 
 DAO key 为 `vrcm.meetup.decoration.template.$templateId`，JSON 忽略未知字段，提供 `load/save/clearAll`。
 
-- [ ] **Step 4: 实现解析器**
+- [x] **Step 4: 实现解析器**
 
 ```kotlin
 interface DecorationTemplateSource {
@@ -552,7 +575,7 @@ fun interface MeetupRemoteBytesLoader {
 
 `refresh` 去空并 `distinct()`；每个 template 独立捕获非取消异常；只识别 `mainAnimation` 和 `base`，忽略 `introAnimation`；动画下载后用 `AnimatedWebpDecoder.decode(bytes).close()` 验证。选择顺序严格为有效 mainAnimation、缓存/新下载 base、Unavailable。生产 loader 使用现有 HttpClient、检查 HTTP success，不创建新客户端；装饰传 20 MiB，照片传 `PrintImageLimits.MAX_FILE_BYTES`。
 
-- [ ] **Step 5: 运行测试**
+- [x] **Step 5: 运行测试**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*DecorationResolverTest'`
 
@@ -567,7 +590,7 @@ Expected: 去重、部分失败和降级链 PASS。
 - Create: `composeApp/src/commonTest/kotlin/service/meetup/MeetupCardRepositoryTest.kt`
 - Modify: `composeApp/src/commonTest/kotlin/storage/AccountCacheManagerTest.kt`
 
-- [ ] **Step 1: 写离线首帧、刷新合并和账号切换测试**
+- [x] **Step 1: 写离线首帧、刷新合并和账号切换测试**
 
 ```kotlin
 @Test
@@ -614,13 +637,13 @@ fun accountGenerationRejectsLateRefresh() = runTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardRepositoryTest'`
 
 Expected: FAIL，repository 尚不存在。
 
-- [ ] **Step 3: 扩展账号 generation 和移除清理契约**
+- [x] **Step 3: 扩展账号 generation 和移除清理契约**
 
 在 `AccountCacheManager` 保持现有 token 行为，并增加：
 
@@ -633,7 +656,7 @@ internal fun isCurrent(token: AccountCacheWriteToken): Boolean = synchronized(lo
 
 构造函数注入 `MeetupCardConfigDao` 与 `MeetupCardAssetStore`。`clearAccount(userId)` 在 generation 增长后清配置和账号照片，再依据 `configDao.all()` 的 appearance IDs 调用 `pruneDecorations`。现有 `clearAll()` 是普通缓存清理，仍不得删除身份牌配置或相册照片。
 
-- [ ] **Step 4: 定义 Repository 单一状态**
+- [x] **Step 4: 定义 Repository 单一状态**
 
 ```kotlin
 data class MeetupCardState(
@@ -663,7 +686,7 @@ interface MeetupCardRepository {
 }
 ```
 
-- [ ] **Step 5: 实现恢复、刷新与 revision 合并**
+- [x] **Step 5: 实现恢复、刷新与 revision 合并**
 
 `DefaultMeetupCardRepository` 用单一 `Mutex` 保护 Settings 提交和 state 更新，网络 I/O 在 mutex 外执行。`ensureDefault` 从当前用户构建 InfoBar、仅 Display Name、QR 关闭的默认配置。
 
@@ -693,7 +716,7 @@ private fun mergeAppearance(
 
 这里 `trim()` 后的空字符串会清除槽位，只有 null 才保留旧值。
 
-- [ ] **Step 6: 跑 Repository 与账号清理测试**
+- [x] **Step 6: 跑 Repository 与账号清理测试**
 
 Run:
 
@@ -713,7 +736,7 @@ Expected: 缓存首帧、失败保留、本地编辑合并、过期结果丢弃�
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/meetup/editor/MeetupCropMapperTest.kt`
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/meetup/editor/MeetupPhotoSessionStoreTest.kt`
 
-- [ ] **Step 1: 写方向独立与安全默认测试**
+- [x] **Step 1: 写方向独立与安全默认测试**
 
 ```kotlin
 @Test
@@ -738,13 +761,13 @@ fun editingPortraitDoesNotMutateLandscape() {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCropMapperTest' --tests '*MeetupPhotoSessionStoreTest'`
 
 Expected: FAIL，新类型未定义。
 
-- [ ] **Step 3: 实现候选图片和 prepare**
+- [x] **Step 3: 实现候选图片和 prepare**
 
 ```kotlin
 data class MeetupPhotoCandidate(
@@ -772,7 +795,7 @@ class MeetupPhotoPreparer(private val codec: PlatformImageCodec) {
 
 `prepare` 复用 `PrintImageLimits`、`DecodeRequest` 和 `PlatformImageCodec.decode`，不调用上传器或 `renderCrop`。两个方向初始 zoom 取 `CropTransformCalculator.zoomLimits(...).cover`；preview Bitmap 由 session 持有并在 discard/complete 释放。
 
-- [ ] **Step 4: 实现映射与 session**
+- [x] **Step 4: 实现映射与 session**
 
 `MeetupCropMapper.derive` 计算 `toCover * (from.zoom / fromCover)`，复制焦点后通过 `CropTransformCalculator.transform` 的零 pan/1x zoom 调用 clamp。Session store 用递增 ID 保存候选、两个方向 StateFlow 和当前方向；`complete(id)` 一次性返回候选并移除，`discard(id)` 释放 preview。
 
@@ -794,7 +817,7 @@ class MeetupPhotoSessionStore {
 }
 ```
 
-- [ ] **Step 5: 运行测试**
+- [x] **Step 5: 运行测试**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCropMapperTest' --tests '*MeetupPhotoSessionStoreTest'`
 
@@ -809,7 +832,7 @@ Expected: 方向隔离、cover 和资源释放 PASS。
 - Modify: `composeApp/src/commonMain/kotlin/presentation/screens/gallery/GalleryTabPager.kt`
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/gallery/GallerySelectionSessionStoreTest.kt`
 
-- [ ] **Step 1: 写一次性返回测试**
+- [x] **Step 1: 写一次性返回测试**
 
 ```kotlin
 @Test
@@ -822,13 +845,13 @@ fun pickerResultIsConsumedOnceAndContainsNoBytes() {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*GallerySelectionSessionStoreTest'`
 
 Expected: FAIL，session/route 未定义。
 
-- [ ] **Step 3: 实现 session 和最小 route payload**
+- [x] **Step 3: 实现 session 和最小 route payload**
 
 ```kotlin
 data class GallerySelection(
@@ -851,7 +874,7 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute
 
 路由只携带 session ID，不能携带 bytes、绝对路径或 URL。
 
-- [ ] **Step 4: 抽取共用 Gallery 内容**
+- [x] **Step 4: 抽取共用 Gallery 内容**
 
 ```kotlin
 internal sealed interface GalleryMode {
@@ -862,7 +885,7 @@ internal sealed interface GalleryMode {
 
 Manage 保持五个 tab、上传、预览、长按选择和删除不变。Pick 只显示 `FileTagType.Gallery`，隐藏 FAB；单击完成 session 后 pop；重复点击只接受第一个结果；返回先 cancel 再 pop。VRC+、空内容和失败继续使用现有状态。
 
-- [ ] **Step 5: 跑 Gallery 回归测试**
+- [x] **Step 5: 跑 Gallery 回归测试**
 
 Run:
 
@@ -880,7 +903,7 @@ Expected: 新 session 与既有上传/删除测试 PASS。
 - Create: `composeApp/src/commonMain/kotlin/presentation/screens/meetup/MeetupCardScreenModel.kt`
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/meetup/MeetupCardScreenModelTest.kt`
 
-- [ ] **Step 1: 写最低状态、短句约束和重复操作测试**
+- [x] **Step 1: 写最低状态、短句约束和重复操作测试**
 
 ```kotlin
 @Test
@@ -909,13 +932,13 @@ fun duplicatePhotoConfirmationCommitsOnce() = runTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardScreenModelTest'`
 
 Expected: FAIL，ViewModel 未定义。
 
-- [ ] **Step 3: 定义唯一公开 state**
+- [x] **Step 3: 定义唯一公开 state**
 
 ```kotlin
 data class MeetupCardUiState(
@@ -941,7 +964,7 @@ sealed interface MeetupEditorError {
 
 Display Name 从 snapshot 读取，空白时回退当前账号名称，再空白时使用 owner ID；任何 state 都不能为空。
 
-- [ ] **Step 4: 实现 ViewModel 操作**
+- [x] **Step 4: 实现 ViewModel 操作**
 
 构造参数为 owner ID、repository 和 photo session store。公开单一 `StateFlow`；操作包括模板、字段开关、主题色、遮罩、短句、方向、crop draft/commit、照片确认、刷新和清错。Unicode surrogate pair 计一个 code point，最多 80；离散值立即持久化，crop/slider 只在手势结束提交；consumed session ID 集合防重复。
 
@@ -963,7 +986,7 @@ class MeetupCardScreenModel(
 }
 ```
 
-- [ ] **Step 5: 运行 ViewModel 测试**
+- [x] **Step 5: 运行 ViewModel 测试**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardScreenModelTest'`
 
@@ -979,7 +1002,7 @@ Expected: 首帧、80 code point、失败保留旧照片和重复提交 PASS。
 - Create: `composeApp/src/commonMain/kotlin/presentation/screens/meetup/animation/AnimatedDecoration.kt`
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/meetup/MeetupCardQrCodeTest.kt`
 
-- [ ] **Step 1: 写固定 QR payload 测试**
+- [x] **Step 1: 写固定 QR payload 测试**
 
 ```kotlin
 @Test
@@ -992,13 +1015,13 @@ fun qrPayloadAlwaysUsesPublicVrchatProfile() {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*MeetupCardQrCodeTest'`
 
 Expected: FAIL，payload 函数未定义。
 
-- [ ] **Step 3: 实现照片和 QR 图层**
+- [x] **Step 3: 实现照片和 QR 图层**
 
 ```kotlin
 internal fun meetupCardProfileUrl(userId: String): String {
@@ -1020,7 +1043,7 @@ fun MeetupCardQrCode(userId: String, modifier: Modifier = Modifier) {
 
 模板给 QR 稳定 1:1 槽位，8.dp 白色 quiet zone 不被装饰覆盖。`MeetupCardPhoto` 根据原图尺寸、viewport 和 crop 调用 `CropTransformCalculator.geometry`，在裁剪 Box 内对 Coil 图片应用 size/translation/scale。照片失败显示主题 surface，不改变文字布局。
 
-- [ ] **Step 4: 实现三套模板和层级**
+- [x] **Step 4: 实现三套模板和层级**
 
 `MeetupCardCanvas` 层级固定为主题背景、照片、scrim、profileEffect、模板内容、iconFrame/nameplateEffect、控制层 slot。`InfoBarTemplate` 明确照片/资料分区；`SpotlightTemplate` 使用底部高对比遮罩；`SideTagTemplate` 使用方向对应侧栏。Display Name 最多两行，在 Material typography 离散档位选择而非随 viewport 连续缩放；字段用 FlowRow/Column 换行，不能覆盖 QR。
 
@@ -1035,7 +1058,7 @@ private fun SpotlightTemplate(content: MeetupTemplateContent, orientation: Meetu
 private fun SideTagTemplate(content: MeetupTemplateContent, orientation: MeetupOrientation)
 ```
 
-- [ ] **Step 5: 实现前台感知动画播放器**
+- [x] **Step 5: 实现前台感知动画播放器**
 
 `AnimatedDecoration` 从 asset store 读 bytes 并解码；只在 Lifecycle RESUMED 时逐帧推进。每次换帧先让 Compose 接管新 bitmap，再释放旧 frame；dispose 释放当前 frame 和 animation。解码失败切同 slot static base，两者失败不渲染。装饰 Modifier 不添加任何指针处理。
 
@@ -1048,7 +1071,7 @@ fun AnimatedDecoration(
 )
 ```
 
-- [ ] **Step 6: 运行测试和编译**
+- [x] **Step 6: 运行测试和编译**
 
 Run:
 
@@ -1067,7 +1090,7 @@ Expected: QR、动画测试 PASS，模板编译成功。
 - Create: `composeApp/src/commonMain/kotlin/presentation/screens/meetup/editor/MeetupCardCropDialog.kt`
 - Create: `composeApp/src/commonMain/kotlin/presentation/screens/meetup/editor/MeetupPhotoSelectionCoordinator.kt`
 
-- [ ] **Step 1: 实现三种照片来源入口**
+- [x] **Step 1: 实现三种照片来源入口**
 
 ```kotlin
 enum class MeetupPhotoAction { ProfileBackground, LocalAlbum, VrchatGallery }
@@ -1088,7 +1111,7 @@ class MeetupPhotoSelectionCoordinator(
 }
 ```
 
-- [ ] **Step 2: 实现裁剪对话框**
+- [x] **Step 2: 实现裁剪对话框**
 
 `MeetupCardCropDialog` 复用 preview、`detectTransformGestures` 和 `CropTransformCalculator`。顶部用分段控件切换 Portrait/Landscape，各自读写独立 draft。只在手势结束、`onValueChangeFinished` 和确认时持久化；取消 discard session。确认必须先 `repository.replacePhoto` 成功再关闭；写失败保留 dialog 和旧配置。
 
@@ -1105,7 +1128,7 @@ fun MeetupCardCropDialog(
 )
 ```
 
-- [ ] **Step 3: 实现四个工具页**
+- [x] **Step 3: 实现四个工具页**
 
 底部四个 tab 为 Photo、Layout、Content、Style。控件固定为：三种照片来源 icon+text action；三模板单选预览；头像/同行代词/语言/状态/状态描述/短句/QR Switch；80 code point TextField；主题色 swatch；scrim Slider；三个官方装饰独立 Switch。`savingPhoto` 或操作进行中时禁用相关控件，不能重复提交。
 
@@ -1120,7 +1143,7 @@ private fun MeetupEditorTools(
 )
 ```
 
-- [ ] **Step 4: 实现响应式编辑布局**
+- [x] **Step 4: 实现响应式编辑布局**
 
 Compact 为上方固定比例预览 + 下方工具；Medium/Expanded 为左预览 + 右工具。预览复用 `MeetupCardCanvas(interactive=false)`，不使用卡片套卡片。方向切换只改变预览，不旋转设备。页面返回前 `flushDrafts()`，不添加保存按钮。
 
@@ -1133,7 +1156,7 @@ fun MeetupCardEditorScreen(
 )
 ```
 
-- [ ] **Step 5: 编译编辑器**
+- [x] **Step 5: 编译编辑器**
 
 Run: `./gradlew :composeApp:compileKotlinDesktop`
 
@@ -1150,7 +1173,7 @@ Expected: 编辑器、FileKit 和 Gallery picker 接线编译成功。
 - Modify: `composeApp/src/iosMain/kotlin/MainViewController.kt`
 - Create: `composeApp/src/commonTest/kotlin/presentation/screens/meetup/display/MeetupControlsStateTest.kt`
 
-- [ ] **Step 1: 写控制层状态机测试**
+- [x] **Step 1: 写控制层状态机测试**
 
 ```kotlin
 @Test
@@ -1175,7 +1198,7 @@ fun anotherInteractionRestartsTimeout() = runTest {
 }
 ```
 
-- [ ] **Step 2: 实现可取消状态机和控制层**
+- [x] **Step 2: 实现可取消状态机和控制层**
 
 `MeetupControlsState` 只保留一个 hide Job；交互取消旧 job、显示并启动产品定义的 3 秒 timeout；`close` 取消 job。展示页轻点、触摸或鼠标活动均重置 timeout。控制层初始隐藏，仅有 Back、Edit 和当前方向图标。Back/Edit 使用 `actionInFlight` 防重复，系统返回始终 pop。
 
@@ -1190,7 +1213,7 @@ class MeetupControlsState(
 }
 ```
 
-- [ ] **Step 3: 定义平台效果**
+- [x] **Step 3: 定义平台效果**
 
 ```kotlin
 @Composable
@@ -1203,7 +1226,7 @@ iOS actual 保存/恢复 `UIApplication.sharedApplication.idleTimerDisabled`。`
 
 Desktop actual 为幂等 no-op，不切 OS fullscreen。
 
-- [ ] **Step 4: 实现展示页**
+- [x] **Step 4: 实现展示页**
 
 展示页订阅 `MeetupCardUiState`，首帧立即绘制本地 Canvas。照片/装饰刷新只换对应层，不显示阻塞 spinner。手机根节点不加 `systemBarsPadding()`；Desktop 填满应用内容区。后台时动画暂停且平台效果恢复，回前台重新 acquire。
 
@@ -1216,7 +1239,7 @@ fun MeetupCardDisplayScreen(
 )
 ```
 
-- [ ] **Step 5: 跑状态测试与三端构建**
+- [x] **Step 5: 跑状态测试与三端构建**
 
 Run:
 
@@ -1235,7 +1258,7 @@ Expected: timeout 测试 PASS，APK 与 iOS framework 构建成功。
 - Modify carefully: `composeApp/src/commonMain/kotlin/presentation/screens/home/HomeScreen.kt`
 - Create: `composeApp/src/desktopTest/kotlin/presentation/screens/home/HomeMeetupCardGestureTest.kt`
 
-- [ ] **Step 1: 写单击/长按导航契约测试**
+- [x] **Step 1: 写单击/长按导航契约测试**
 
 ```kotlin
 @Test
@@ -1256,13 +1279,13 @@ fun clickAndLongClickDispatchDifferentActions() = runComposeUiTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `./gradlew :composeApp:desktopTest --tests '*HomeMeetupCardGestureTest'`
 
 Expected: FAIL，`HomeUserAvatar` 尚未抽取。
 
-- [ ] **Step 3: 定义最小路由 payload**
+- [x] **Step 3: 定义最小路由 payload**
 
 ```kotlin
 @Serializable
@@ -1274,7 +1297,7 @@ data class MeetupCardEditorRoute(val ownerUserId: String) : AppRoute
 
 两者按 owner ID 取得参数化 ScreenModel；路由不含 bytes、路径、配置 JSON 或用户对象。Display 的 Edit push Editor，Editor 返回 pop。
 
-- [ ] **Step 4: 抽取头像手势并保留 shared key**
+- [x] **Step 4: 抽取头像手势并保留 shared key**
 
 将头像 Box 的 `simpleClickable` 换成 `combinedClickable(onClick, onLongClick)`，之后原样保留当前两个 `sharedBoundsBy` key/suffix 与 `.size(54.dp)`；不改 UserStateIcon、cached placeholder 或单击的 `UserProfileScreen(UserProfileVo(user), sharedSuffixKey)`。
 
@@ -1290,7 +1313,7 @@ fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.hasConfig(userId
 
 长按只在 currentUser 非空时 push；用 route/action 闩锁防同一次长按重复入栈；当前 route 已是同 owner Display/Editor 时忽略。
 
-- [ ] **Step 5: 跑手势和导航回归测试**
+- [x] **Step 5: 跑手势和导航回归测试**
 
 Run:
 
@@ -1318,7 +1341,7 @@ Expected: 单击只进资料，长按只进身份牌，现有 shared transition 
 - Modify: `composeApp/src/commonMain/kotlin/presentation/settings/locale/LocaleStringsZhHant.kt`
 - Modify: `composeApp/src/commonTest/kotlin/di/modules/PresentationModuleTest.kt`
 
-- [ ] **Step 1: 注册依赖并保持现有单例边界**
+- [x] **Step 1: 注册依赖并保持现有单例边界**
 
 Network 注册 ProfileAppearanceApi/InventoryApi。Storage 注册 MeetupCardConfigDao、Template cache DAO 和 `MeetupCardAssetStore(FileSystem.SYSTEM, meetupCardAssetRoot(get()))`。Service 注册 production remote source、DecorationResolver、Default repository。Presentation 注册 photo preparer、两个 session store 和参数化 ViewModel：
 
@@ -1334,7 +1357,7 @@ viewModel { parameters ->
 
 不得创建第二个 HttpClient、ImageLoader、PlatformImageCodec 或 Settings factory。
 
-- [ ] **Step 2: 让普通清缓存只清远端装饰副本**
+- [x] **Step 2: 让普通清缓存只清远端装饰副本**
 
 `SettingsBottomSheet` 现有清缓存协程额外调用 Template cache `clearAll()` 和 asset store `clearDecorationCache()`；不得清 MeetupCardConfigDao 或 `accounts/*/photos`。文件错误通过现有 toast 报告。
 
@@ -1343,7 +1366,7 @@ decorationTemplateCacheDao.clearAll()
 meetupCardAssetStore.clearDecorationCache()
 ```
 
-- [ ] **Step 3: 补齐四种语言**
+- [x] **Step 3: 补齐四种语言**
 
 在英文 base 与日/简中/繁中覆盖以下键，Composable 不得硬编码文案：
 
@@ -1368,11 +1391,11 @@ meetupCardAssetStore.clearDecorationCache()
 
 头像、同行代词、语言、状态、状态描述、二维码、头像框、资料特效、铭牌特效、竖屏、横屏、主题色和遮罩也各自建立键，四种语言结构一致。
 
-- [ ] **Step 4: 更新 DI 测试 fake**
+- [x] **Step 4: 更新 DI 测试 fake**
 
 `PresentationModuleTest` 注入 fake repository、PlatformImageCodec 和 session stores，断言参数化 ScreenModel 可解析且两次 route scope 得到不同实例；不要测试简单构造或字段相等。
 
-- [ ] **Step 5: 跑模块测试**
+- [x] **Step 5: 跑模块测试**
 
 Run:
 
@@ -1389,13 +1412,13 @@ Expected: DI、账号清理和语言编译通过；普通清缓存保留配置�
 **Files:**
 - Modify only when a verification failure identifies a root cause in files already listed above.
 
-- [ ] **Step 1: 运行共享/Desktop 测试**
+- [x] **Step 1: 运行共享/Desktop 测试**
 
 Run: `./gradlew :composeApp:desktopTest`
 
 Expected: `BUILD SUCCESSFUL`，无遗留协程、未释放 Skia frame 或 Main dispatcher 污染。
 
-- [ ] **Step 2: 构建 Android 与 iOS**
+- [x] **Step 2: 构建 Android 与 iOS**
 
 Run:
 
@@ -1423,7 +1446,7 @@ Expected: Android APK 与 iOS arm64 framework 生成；不修改 Manifest 权限
 
 确认 Desktop 能编辑、预览、选择本地/Gallery 图片；展示填满应用内容区但不强制 OS 全屏；动画播放与离页释放正常。
 
-- [ ] **Step 5: 最终工作区核对**
+- [x] **Step 5: 最终工作区核对**
 
 Run:
 
