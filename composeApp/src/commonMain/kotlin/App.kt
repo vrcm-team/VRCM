@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.Scene
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
-import io.github.vrcmteam.vrcm.presentation.animations.cornerScreenTransition
+import io.github.vrcmteam.vrcm.presentation.animations.fadeScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.SlideOrientation
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
@@ -151,9 +151,10 @@ fun AnimatedContentTransitionScope<Scene<AppRoute>>.selectTransition(isPop: Bool
         isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<HomeScreen, GroupProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<HomeScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)
-        // 首页头像在左上角：铭牌页从该角展开淡入，返回时向该角收拢淡出。
-        isTransitioningOn<HomeScreen, MeetupCardDisplayRoute>() -> cornerScreenTransition(isPop)
-        isTransitioningOn<HomeScreen, MeetupCardEditorRoute>() -> cornerScreenTransition(isPop)
+        // 首页头像与整张铭牌是同一个共享元素，主体运动由它承担，屏幕只淡入淡出。
+        isTransitioningOn<HomeScreen, MeetupCardDisplayRoute>() -> fadeScreenTransition()
+        isTransitioningOn<HomeScreen, MeetupCardEditorRoute>() -> fadeScreenTransition()
+        isTransitioningOn<MeetupCardDisplayRoute, MeetupCardEditorRoute>() -> fadeScreenTransition()
         isTransitioningOn<MutualFriendsScreen, UserProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)

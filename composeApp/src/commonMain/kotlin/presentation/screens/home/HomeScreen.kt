@@ -38,7 +38,9 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import androidx.compose.ui.platform.testTag
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
@@ -185,8 +187,15 @@ private inline fun AppListRoute.HomeTopAppBar(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 头像+名字这一组就是"我的身份"，铭牌是它的全屏版：以整组作为
+            // 共享主体，形变比从 54dp 头像炸开更平缓，也不必额外包一层节点。
             Row(
                 modifier = Modifier
+                    .sharedBoundsBy(
+                        key = meetupCardSharedKey(homeUserId),
+                        useSuffixKey = false,
+                        resizeMode = MeetupCardResizeMode,
+                    )
                     .clip(MaterialTheme.shapes.medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
