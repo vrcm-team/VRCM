@@ -20,11 +20,27 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustPan"
             android:theme="@style/Theme.VRCM">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 扫描身份牌二维码（VRChat 用户主页链接）时可选择用 VRCM 打开 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="vrchat.com" android:pathPrefix="/home/user/" />
+                <data android:scheme="https" android:host="www.vrchat.com" android:pathPrefix="/home/user/" />
+            </intent-filter>
+            <!-- 应用自定义 scheme：vrcm://user/{userId} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vrcm" android:host="user" />
             </intent-filter>
         </activity>
     </application>

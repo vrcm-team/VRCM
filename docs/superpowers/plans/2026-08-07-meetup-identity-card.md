@@ -32,6 +32,7 @@
 - 存储：`MeetupCardAssetStore.exists()`；`deleteAccount` 对非法 ID 静默跳过（不再中断账号移除）；invalidation listener 异常隔离。
 - 解码器：Android 拒绝 <10ms 帧（awebp 内部按原始时长调度会忙循环）、`setLoopLimit(0)` 强制无限循环、二次 start 回帧 0；Skia 实现改单帧保留合成（峰值 ≤2 帧位图）、修复恒真循环守卫、增加帧节奏补偿；删除吞错的单参 `start` 重载。
 - 位图回收竞态（Android 真机崩溃 "trying to use a recycled bitmap"）：装饰动画被替换的帧改为进退休队列、等两个 Choreographer 帧后再关闭，不在解码线程立即回收；照片会话预览默认不再同步 recycle（complete/discard 时裁剪对话框可能仍在组合中），交给 GC。
+- 深链迭代（2026-08-08）：新增 `AppDeepLinks`（common）+ Android intent-filter（`vrchat.com/home/user/*`、`vrcm://user/*`，MainActivity 改 singleTask + onNewIntent），扫身份牌二维码可用 VRCM 直接打开应用内用户详情页；跳转在登录完成、主页入栈后执行。二维码内容保持公开 VRChat 主页 URL 不变。iOS 受 Universal Links 域名限制暂不支持。
 - 真机验收迭代（2026-08-08）：资料特效改为 Fit 居中保持素材纵横比（Crop 会把设计给资料卡版式的特效放大裁切，竖屏只剩局部）；新增横屏独立照片（`MeetupCardConfig.landscapePhoto`，可选，未设置时沿用竖屏照片；照片选择支持"两个方向/仅竖屏/仅横屏"应用范围，刷新链路对横屏照片做可读校验与来源重下）。
 - 真机验收修复（2026-08-08）：退出展示页系统栏不恢复——edge-to-edge 下 `rootWindowInsets.isVisible(systemBars())` 读数不可靠导致条件恢复被跳过，改为 release 时无条件 `show()`；预览/展示构图偏差——裁剪按 9:16/16:9 参考视口归一化存储，渲染与裁剪编辑改为经 `MeetupCropMapper.derive` 换算到真实视口（保焦点保 cover，19.5:9 屏不再留边），编辑预览改为"窗口全尺寸渲染 + 等比缩放"的真缩略图，字体与模板比例与展示页一致。
 
