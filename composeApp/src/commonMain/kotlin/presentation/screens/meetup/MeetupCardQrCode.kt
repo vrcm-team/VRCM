@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,10 +76,11 @@ fun MeetupCardQrCode(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         lineHeight = 12.sp,
+                        fontWeight = FontWeight.Medium,
                     ),
-                    color = Color.Black.copy(alpha = 0.75f),
+                    color = Color.Black.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -97,8 +99,10 @@ fun MeetupCardQrCodes(
     modifier: Modifier = Modifier,
 ) {
     if (linkTypes.isEmpty()) return
-    // 只有一个码时不存在混淆，省掉标识让二维码本身更大。
-    val showLabel = linkTypes.size > 1
+    // 两个码并列时必须能分清；只有 VRCM 直达时也要标注——没装 VRCM 的人
+    // 扫了打不开，有个标识至少知道原因，而不是以为码坏了。
+    val showLabel = linkTypes.size > 1 ||
+        linkTypes.singleOrNull() == MeetupQrLinkType.VrcmDeepLink
     val spacing = Arrangement.spacedBy(8.dp)
     val itemModifier = Modifier.width(size)
     if (vertical) {
