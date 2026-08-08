@@ -17,6 +17,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VRCM"
         tools:targetApi="tiramisu">
+        <!--
+            singleTask：应用只有这一个 Activity。扫码类应用发出的 VIEW intent 不一定带
+            FLAG_ACTIVITY_NEW_TASK，用 standard/singleTop 时深链会在扫码应用的任务栈里
+            新建一个实例，之后点桌面图标又会起第二个，造成同时存在两份应用状态。
+            本应用没有 share 入站入口，也没有 PendingIntent 通知，singleTask 不影响其他流程。
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
