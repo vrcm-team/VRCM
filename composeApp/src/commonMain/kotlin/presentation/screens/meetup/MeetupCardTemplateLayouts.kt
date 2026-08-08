@@ -175,13 +175,12 @@ private fun SideTagTemplate(
     orientation: MeetupOrientation,
     modifier: Modifier,
 ) {
-    // 侧栏需并排容纳旋转铭牌与字段/二维码两列，同时保留中央主体区域。
     val bandWidth = when (orientation) {
-        MeetupOrientation.Portrait -> 216.dp
-        MeetupOrientation.Landscape -> 280.dp
+        MeetupOrientation.Portrait -> 190.dp
+        MeetupOrientation.Landscape -> 248.dp
     }
     Row(modifier = modifier.fillMaxSize()) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxHeight()
                 .width(bandWidth)
@@ -190,27 +189,20 @@ private fun SideTagTemplate(
                         colors = listOf(Color.Black.copy(alpha = 0.72f), Color.Transparent),
                     ),
                 )
-                .padding(vertical = 16.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            MeetupNameplateBlock(
-                state = state,
-                onPhoto = true,
-                vertical = true,
-            )
-            Column(
-                modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 10.dp, end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                MeetupFieldsFlow(state, onPhoto = true)
-                MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
-                Spacer(modifier = Modifier.weight(1f))
-                if (state.config.showQrCode) {
-                    MeetupCardQrCode(
-                        userId = state.ownerUserId,
-                        linkType = state.config.qrLinkType,
-                        modifier = Modifier.requiredSize(84.dp),
-                    )
-                }
+            // 竖向铭牌：头像在上，人称代词与名字并排在下。
+            MeetupNameplateBlock(state, onPhoto = true, vertical = true)
+            MeetupFieldsFlow(state, onPhoto = true)
+            MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
+            Spacer(modifier = Modifier.weight(1f))
+            if (state.config.showQrCode) {
+                MeetupCardQrCode(
+                    userId = state.ownerUserId,
+                    linkType = state.config.qrLinkType,
+                    modifier = Modifier.requiredSize(88.dp),
+                )
             }
         }
     }
@@ -222,18 +214,18 @@ private fun MeetupNameColor(onPhoto: Boolean): Color =
 
 /** 头像与可选的官方头像框；关闭头像时头像框也随之不显示。 */
 @Composable
-private fun MeetupAvatarBlock(state: MeetupCardUiState, frameSize: Dp = 72.dp) {
+private fun MeetupAvatarBlock(state: MeetupCardUiState) {
     if (!state.config.showAvatar) return
     val avatarUrl = state.config.profile.avatarUrl.takeIf(String::isNotBlank) ?: return
     val frame = state.decorations[DecorationSlot.IconFrame]
         .takeIf { state.config.showIconFrame }
-    Box(modifier = Modifier.size(frameSize), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
         AsyncImage(
             model = avatarUrl,
             contentDescription = null,
             imageLoader = koinInject<ImageLoader>(),
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(frameSize * 0.78f).clip(CircleShape),
+            modifier = Modifier.size(56.dp).clip(CircleShape),
         )
         frame?.let { decoration ->
             AnimatedDecoration(
@@ -247,8 +239,9 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState, frameSize: Dp = 72.dp) {
 
 /**
  * 铭牌块：官方铭牌特效与渐变包裹整块内容，与 VRChat 铭牌结构一致。
- * 横排为 Row(头像, Column(名字, 人称代词))；[vertical] 时整块顺时针旋转
- * 90 度，内部为 Column(头像, Row(人称代词, 名字))。名字始终完整显示。
+ * 横排为 Row(头像, Column(名字, 人称代词))；[vertical] 时内容改为
+ * Column(头像, Row(人称代词, 名字))，横版特效素材顺时针旋转 90 度填满竖向铭牌，
+ * 文字与头像保持正常朝向。名字始终完整显示。
  */
 @Composable
 private fun MeetupNameplateBlock(
@@ -263,7 +256,9 @@ private fun MeetupNameplateBlock(
         val start = parseHexColor(decoration.gradientStart)
         val end = parseHexColor(decoration.gradientEnd)
         if (start != null && end != null) {
-            Brush.horizontalGradient(listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f)))
+            val colors = listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f))
+            // 渐变同样跟随铭牌方向：竖向铭牌用自上而下。
+            if (vertical) Brush.verticalGradient(colors) else Brush.horizontalGradient(colors)
         } else {
             null
         }
@@ -272,66 +267,58 @@ private fun MeetupNameplateBlock(
     val nameColor = if (nameplate != null) Color.White else MeetupNameColor(onPhoto)
     val pronouns = state.config.profile.pronouns
         .takeIf { state.config.showPronouns && it.isNotBlank() }
-    val decorated: @Composable (@Composable () -> Unit) -> Unit = { content ->
-        Box(
-            modifier = Modifier
-                .clip(MaterialTheme.shapes.small)
-                .let { base -> gradient?.let { base.background(it) } ?: base },
-        ) {
-            nameplate?.let { decoration ->
-                AnimatedDecoration(
-                    decoration = decoration,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize(),
-                )
-            }
-            content()
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .let { base -> gradient?.let { base.background(it) } ?: base },
+    ) {
+        nameplate?.let { decoration ->
+            AnimatedDecoration(
+                decoration = decoration,
+                contentScale = ContentScale.Crop,
+                // 官方素材是横版设计：竖向铭牌把它顺时针旋转 90 度后铺满。
+                modifier = Modifier.matchParentSize()
+                    .let { base -> if (vertical) base.rotateClockwise() else base },
+            )
         }
-    }
-    val contentPadding = Modifier.padding(
-        horizontal = if (nameplate != null) 12.dp else 0.dp,
-        vertical = if (nameplate != null) 6.dp else 0.dp,
-    )
-    if (vertical) {
-        Box(modifier = Modifier.rotateClockwise()) {
-            decorated {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = contentPadding,
+        val contentModifier = Modifier.padding(
+            horizontal = if (nameplate != null) 12.dp else 0.dp,
+            vertical = if (nameplate != null) 8.dp else 0.dp,
+        )
+        if (vertical) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = contentModifier,
+            ) {
+                MeetupAvatarBlock(state)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // 旋转后这里的高度就是侧栏占宽，用紧凑头像给字段区留出空间。
-                    MeetupAvatarBlock(state, frameSize = 52.dp)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        pronouns?.let { value ->
-                            Text(
-                                text = value,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = nameColor.copy(alpha = 0.82f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                    pronouns?.let { value ->
                         Text(
-                            text = state.displayName,
-                            style = displayNameStyle(state.displayName, large),
-                            color = nameColor,
+                            text = value,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = nameColor.copy(alpha = 0.82f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    Text(
+                        text = state.displayName,
+                        style = displayNameStyle(state.displayName, large),
+                        color = nameColor,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                 }
             }
-        }
-    } else {
-        decorated {
+        } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = contentPadding,
+                modifier = contentModifier,
             ) {
                 MeetupAvatarBlock(state)
                 Column {
