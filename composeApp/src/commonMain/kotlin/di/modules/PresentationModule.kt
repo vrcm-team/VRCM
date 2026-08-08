@@ -59,8 +59,9 @@ import org.koin.dsl.module
 private val AvatarCoverImageProcessorQualifier = named("avatar-cover-image-processor")
 
 val presentationModule: Module = module {
-    factoryOf (::SettingsModel)
-    factory{ SettingsModel(get(),getAll()) }
+    // Single so the Application side and the settings UI share one instance, and with it the
+    // background monitoring report; it only holds the settings DAO and the theme color list.
+    single { SettingsModel(get(), getAll()) }
     viewModelOf(::AuthScreenModel)
     viewModelOf(::HomeScreenModel)
     viewModelOf(::UserProfileScreenModel)
