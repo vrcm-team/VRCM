@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -85,7 +84,6 @@ private fun InfoBarTemplate(
                     state = state,
                     onPhoto = false,
                     shortTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    qrSize = 92.dp,
                 )
             }
         }
@@ -102,15 +100,15 @@ private fun InfoBarTemplate(
     }
 }
 
-/** 状态等文本与二维码作为同一 Row 的同级子元素并列。 */
+/** 状态等文本与二维码作为同一 Row 的同级子元素并列，标签顶部对齐。 */
 @Composable
 private fun MeetupInfoAndQrRow(
     state: MeetupCardUiState,
     onPhoto: Boolean,
     shortTextColor: Color,
-    qrSize: Dp,
+    qrSize: Dp = MeetupQrSize,
 ) {
-    Row(verticalAlignment = Alignment.Bottom) {
+    Row(verticalAlignment = Alignment.Top) {
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -127,6 +125,9 @@ private fun MeetupInfoAndQrRow(
         }
     }
 }
+
+/** 二维码保持够扫的最小尺寸即可，不与身份信息抢版面。 */
+private val MeetupQrSize = 68.dp
 
 /** 聚光：照片全屏铺设，信息位于底部高对比遮罩，优先远距离识别。 */
 @Composable
@@ -160,7 +161,6 @@ private fun SpotlightTemplate(
                     state = state,
                     onPhoto = true,
                     shortTextColor = Color.White.copy(alpha = 0.92f),
-                    qrSize = 96.dp,
                 )
             }
         }
@@ -169,7 +169,7 @@ private fun SpotlightTemplate(
 
 /**
  * 侧签：信息沿起始侧竖向集中，保留中央主体区域。
- * 铭牌整体顺时针旋转 90 度贴住侧边，其余字段在其内侧竖排。
+ * 铭牌为 Column(头像, Row(人称代词, 名字))，两段文字竖排；字段与二维码排在其下方。
  */
 @Composable
 private fun SideTagTemplate(
@@ -177,7 +177,6 @@ private fun SideTagTemplate(
     orientation: MeetupOrientation,
     modifier: Modifier,
 ) {
-    // 铭牌旋转后占宽约为其内容高度，侧栏只需容纳它与二维码。
     val bandWidth = when (orientation) {
         MeetupOrientation.Portrait -> 168.dp
         MeetupOrientation.Landscape -> 200.dp
@@ -193,13 +192,13 @@ private fun SideTagTemplate(
                     ),
                 ),
         ) {
-            // 旋转后铭牌高度由名字长度决定，限制上限避免顶掉下方字段与二维码。
+            // 竖排文字高度由名字长度决定，限制上限避免顶掉下方字段与二维码。
             val nameplateMaxHeight = maxHeight * 0.55f
             Column(
                 modifier = Modifier.fillMaxHeight().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // 书签式竖向铭牌：整块顺时针旋转，名字与人称代词沿侧边竖向阅读。
+                // 书签式竖向铭牌：头像在上，人称代词与名字两列竖排文字在下。
                 MeetupNameplateBlock(
                     state = state,
                     onPhoto = true,
@@ -213,7 +212,7 @@ private fun SideTagTemplate(
                     MeetupCardQrCode(
                         userId = state.ownerUserId,
                         linkType = state.config.qrLinkType,
-                        modifier = Modifier.requiredSize(88.dp),
+                        modifier = Modifier.requiredSize(MeetupQrSize),
                     )
                 }
             }
@@ -225,18 +224,15 @@ private fun SideTagTemplate(
 private fun MeetupNameColor(onPhoto: Boolean): Color =
     if (onPhoto) Color.White else MaterialTheme.colorScheme.onSurface
 
-/**
- * 头像与可选的官方头像框；关闭头像时头像框也随之不显示。
- * [counterRotate] 用于竖向铭牌：整块已顺时针旋转，这里转回来保持正脸。
- */
+/** 头像与可选的官方头像框；关闭头像时头像框也随之不显示。 */
 @Composable
-private fun MeetupAvatarBlock(state: MeetupCardUiState, counterRotate: Boolean = false) {
+private fun MeetupAvatarBlock(state: MeetupCardUiState) {
     if (!state.config.showAvatar) return
     val avatarUrl = state.config.profile.avatarUrl.takeIf(String::isNotBlank) ?: return
     val frame = state.decorations[DecorationSlot.IconFrame]
         .takeIf { state.config.showIconFrame }
     Box(
-        modifier = Modifier.size(72.dp).let { if (counterRotate) it.rotate(-90f) else it },
+        modifier = Modifier.size(72.dp),
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
@@ -258,9 +254,9 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState, counterRotate: Boolean =
 
 /**
  * 铭牌块：官方铭牌特效与渐变包裹整块内容，与 VRChat 铭牌结构一致。
- * 横排为 Row(头像, Column(名字, 人称代词))；[vertical] 时整块（特效、渐变、
- * 文字）顺时针旋转 90 度成书签样式，内容为 Column(头像, Row(人称代词, 名字))，
- * 文字沿侧边竖向阅读，头像反向旋转保持正脸。名字始终完整显示。
+ * 横排为 Row(头像, Column(名字, 人称代词))；[vertical] 时版式为
+ * Column(头像, Row(人称代词, 名字))，两段文字各自顺时针旋转 90 度竖向排布，
+ * 横版特效素材同样旋转铺满，头像保持正脸。名字始终完整显示。
  */
 @Composable
 private fun MeetupNameplateBlock(
@@ -276,8 +272,9 @@ private fun MeetupNameplateBlock(
         val start = parseHexColor(decoration.gradientStart)
         val end = parseHexColor(decoration.gradientEnd)
         if (start != null && end != null) {
-            // 整块旋转时水平渐变会随之变成自上而下，无需单独处理方向。
-            Brush.horizontalGradient(listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f)))
+            val colors = listOf(start.copy(alpha = 0.85f), end.copy(alpha = 0.85f))
+            // 渐变方向跟随铭牌朝向：竖向铭牌自上而下。
+            if (vertical) Brush.verticalGradient(colors) else Brush.horizontalGradient(colors)
         } else {
             null
         }
@@ -288,7 +285,6 @@ private fun MeetupNameplateBlock(
         .takeIf { state.config.showPronouns && it.isNotBlank() }
     Box(
         modifier = modifier
-            .let { base -> if (vertical) base.rotateClockwise() else base }
             .clip(MaterialTheme.shapes.small)
             .let { base -> gradient?.let { base.background(it) } ?: base },
     ) {
@@ -296,7 +292,9 @@ private fun MeetupNameplateBlock(
             AnimatedDecoration(
                 decoration = decoration,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
+                // 官方素材是横版设计：竖向铭牌把它顺时针旋转 90 度后铺满。
+                modifier = Modifier.matchParentSize()
+                    .let { base -> if (vertical) base.rotateClockwise() else base },
             )
         }
         val contentModifier = Modifier.padding(
@@ -304,15 +302,15 @@ private fun MeetupNameplateBlock(
             vertical = if (nameplate != null) 8.dp else 0.dp,
         )
         if (vertical) {
+            // 版式为 Column(头像, Row(人称代词, 名字))；文字各自旋转 90 度竖排，
+            // 于是两段文字成为并排的两列，头像仍在最上方保持正脸。
             Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = contentModifier,
             ) {
-                MeetupAvatarBlock(state, counterRotate = true)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                MeetupAvatarBlock(state)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     pronouns?.let { value ->
                         Text(
                             text = value,
@@ -320,6 +318,7 @@ private fun MeetupNameplateBlock(
                             color = nameColor.copy(alpha = 0.82f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.rotateClockwise(),
                         )
                     }
                     Text(
@@ -328,7 +327,7 @@ private fun MeetupNameplateBlock(
                         color = nameColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.rotateClockwise(),
                     )
                 }
             }
