@@ -11,10 +11,12 @@ import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRemoteDataSource
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCurrentUserSnapshotProvider
 import io.github.vrcmteam.vrcm.service.meetup.MeetupRemoteBytesLoader
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
@@ -35,9 +37,13 @@ val serviceModule: Module = module {
     singleOf(::DefaultMeetupCardRemoteDataSource) bind MeetupCardRemoteDataSource::class
     single<MeetupCardRepository> {
         val authService = get<AuthService>()
+        val featureScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val assetStore = get<MeetupCardAssetStore>()
+        // 上次写素材时被杀进程会留下 .tmp 孤儿，卡片功能首次装配时扫一遍。
+        featureScope.launch { assetStore.sweepAbandonedTemporaryFiles() }
         DefaultMeetupCardRepository(
             configDao = get(),
-            assetStore = get(),
+            assetStore = assetStore,
             remote = get(),
             decorationResolver = get(),
             accountCacheManager = get(),
@@ -56,7 +62,7 @@ val serviceModule: Module = module {
                         )
                     }
             },
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            scope = featureScope,
         )
     }
 }

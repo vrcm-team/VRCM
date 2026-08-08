@@ -11,6 +11,8 @@ import okio.Sink
 import okio.buffer
 import okio.use
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /** Profile Decoration 素材在本地仓库中的逻辑类型。 */
 enum class DecorationAssetType(val fileName: String) {
@@ -23,9 +25,11 @@ private class ContentHashMismatchException : IOException(
 )
 
 /** 在应用私有目录中原子管理会面身份卡照片与装饰素材。 */
+@OptIn(ExperimentalTime::class)
 class MeetupCardAssetStore(
     private val fileSystem: FileSystem,
     private val root: Path,
+    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     suspend fun writePhoto(
         ownerId: String,
@@ -99,6 +103,45 @@ class MeetupCardAssetStore(
         fileSystem.list(decorations).forEach { templateDirectory ->
             if (templateDirectory.name !in retainedTemplateIds) {
                 fileSystem.deleteRecursively(templateDirectory, mustExist = false)
+            }
+        }
+    }
+
+    /**
+     * 清扫写入过程中被杀进程留下的 `.tmp` 孤儿文件。
+     *
+     * 只删够旧的：正在写的临时文件不可能带上一小时前的修改时间，靠这个年龄门槛
+     * 就不必和并发写入协调顺序。读不到修改时间的文件按陈旧处理——否则在不上报
+     * mtime 的文件系统上孤儿会永远堆着，而这正是要修的问题。
+     */
+    suspend fun sweepAbandonedTemporaryFiles() = withContext(meetupCardAssetIoDispatcher) {
+        sweepDirectory(root, deadline = nowMillis() - ABANDONED_TEMP_AGE_MILLIS, depth = 0)
+    }
+
+    private suspend fun sweepDirectory(directory: Path, deadline: Long, depth: Int) {
+        if (depth > MAX_SWEEP_DEPTH) return
+        val entries = try {
+            fileSystem.listOrNull(directory)
+        } catch (_: IOException) {
+            null
+        } ?: return
+
+        entries.forEach { entry ->
+            currentCoroutineContext().ensureActive()
+            val metadata = try {
+                fileSystem.metadataOrNull(entry)
+            } catch (_: IOException) {
+                null
+            } ?: return@forEach
+
+            when {
+                metadata.isDirectory -> sweepDirectory(entry, deadline, depth + 1)
+                isTemporaryName(entry.name) && (metadata.lastModifiedAtMillis ?: 0L) <= deadline ->
+                    try {
+                        fileSystem.delete(entry, mustExist = false)
+                    } catch (_: IOException) {
+                        // 单个文件删不掉不该让整轮清扫失败。
+                    }
             }
         }
     }
@@ -229,6 +272,9 @@ class MeetupCardAssetStore(
         const val DECORATION_PATH_SEGMENTS = 4
         const val TEMP_RANDOM_BYTES = 16
         const val MAX_TEMP_NAME_ATTEMPTS = 8
+        /** 素材树最深是 root/decorations/<template>/<sha>/<file>，多出来的层级不属于本仓库。 */
+        const val MAX_SWEEP_DEPTH = 3
+        const val ABANDONED_TEMP_AGE_MILLIS = 60L * 60L * 1000L
         val ID_PATTERN = Regex("[A-Za-z0-9_-]+")
         val SHA256_PATTERN = Regex("[a-f0-9]{64}")
         val ALLOWED_PHOTO_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
@@ -246,5 +292,8 @@ class MeetupCardAssetStore(
         }
 
         fun ByteArray.sha256(): String = toByteString().sha256().hex()
+
+        fun isTemporaryName(name: String): Boolean =
+            name.startsWith('.') && name.endsWith(".tmp")
     }
 }

@@ -8,13 +8,25 @@ import okio.Path.Companion.toPath
 import okio.Sink
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalTime::class)
 class MeetupCardAssetStoreTest {
+    /** 与 MeetupCardAssetStore.ABANDONED_TEMP_AGE_MILLIS 一致。 */
+    private val ONE_HOUR_MILLIS = 60L * 60L * 1000L
+
+    /** FakeFileSystem 用它给文件盖 mtime，手动推进就能造出"很旧的临时文件"。 */
+    private class MutableClock(var nowMillis: Long) : Clock {
+        override fun now(): Instant = Instant.fromEpochMilliseconds(nowMillis)
+    }
+
     @Test
     fun deletingSinglePhotoKeepsOtherAccountAssets() = runTest {
         val fileSystem = FakeFileSystem()
@@ -32,6 +44,43 @@ class MeetupCardAssetStoreTest {
 
         assertFailsWith<IOException> { store.read(removed) }
         assertContentEquals("kept".encodeToByteArray(), store.read(kept))
+        assertContentEquals("decoration".encodeToByteArray(), store.read(decoration))
+        fileSystem.checkNoOpenFiles()
+    }
+
+    @Test
+    fun sweepRemovesAbandonedTemporaryFilesButKeepsRealAssetsAndFreshTemporaries() = runTest {
+        val clock = MutableClock(1_000_000L)
+        val fileSystem = FakeFileSystem(clock)
+        val root = "/private/meetup".toPath()
+        var now = clock.nowMillis
+        val store = MeetupCardAssetStore(fileSystem, root) { now }
+        val photo = store.writePhoto("usr_a", "kept".encodeToByteArray(), "jpg")
+        val decoration = store.writeDecoration(
+            "inv_keep",
+            DecorationAssetType.Base,
+            "decoration".encodeToByteArray(),
+        )
+        val photoDirectory = root / "accounts" / "usr_a" / "photos"
+        val decorationDirectory = store.model(decoration).toPath().parent!!
+        val abandonedPhotoTemp = photoDirectory / ".abc.jpg.deadbeef.tmp"
+        val abandonedDecorationTemp = decorationDirectory / ".base.webp.cafe.tmp"
+        val inFlightTemp = photoDirectory / ".xyz.jpg.feedface.tmp"
+        listOf(abandonedPhotoTemp, abandonedDecorationTemp).forEach { path ->
+            fileSystem.write(path) { writeUtf8("partial") }
+        }
+
+        // 两小时后：上面两个临时文件已越过一小时门槛，此刻新建的这个还没有。
+        clock.nowMillis += 2 * ONE_HOUR_MILLIS
+        now = clock.nowMillis
+        fileSystem.write(inFlightTemp) { writeUtf8("still writing") }
+
+        store.sweepAbandonedTemporaryFiles()
+
+        assertFalse(fileSystem.exists(abandonedPhotoTemp))
+        assertFalse(fileSystem.exists(abandonedDecorationTemp))
+        assertTrue(fileSystem.exists(inFlightTemp), "尚在写入的临时文件不该被清扫")
+        assertContentEquals("kept".encodeToByteArray(), store.read(photo))
         assertContentEquals("decoration".encodeToByteArray(), store.read(decoration))
         fileSystem.checkNoOpenFiles()
     }
