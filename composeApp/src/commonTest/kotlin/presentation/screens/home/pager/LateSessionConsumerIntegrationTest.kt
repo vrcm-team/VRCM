@@ -23,6 +23,8 @@ import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -39,6 +41,8 @@ import kotlinx.coroutines.yield
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -63,6 +67,11 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
             friendListCacheDao = friendListCacheDao,
             userProfileCacheDao = UserProfileCacheDao(MapSettings()),
             friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+            meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+            meetupCardAssetStore = MeetupCardAssetStore(
+                FakeFileSystem(),
+                "/meetup-assets".toPath(),
+            ),
         )
         val authService = AuthService(
             authApi = AuthApi(client),

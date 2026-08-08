@@ -102,4 +102,15 @@ object DaoKeys{
         const val NAME = "${PREFIX}.friend.list.cache"
         const val KEY_PREFIX = "${PREFIX}.friend.list.cache"
     }
+
+    object MeetupCard {
+        const val NAME = "${PREFIX}.meetup.card"
+        const val KEY_PREFIX = "${PREFIX}.meetup.card.config"
+    }
+
+    /** 会面身份卡装饰模板缓存的 Settings 命名空间。 */
+    object MeetupDecoration {
+        const val NAME = "${PREFIX}.meetup.decoration"
+        const val KEY_PREFIX = "${PREFIX}.meetup.decoration.template"
+    }
 }

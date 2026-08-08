@@ -18,6 +18,8 @@ import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -42,6 +44,8 @@ import kotlinx.coroutines.yield
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -624,6 +628,11 @@ private fun createFixture(
             friendListCacheDao = FriendListCacheDao(MapSettings()),
             userProfileCacheDao = UserProfileCacheDao(MapSettings()),
             friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+            meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+            meetupCardAssetStore = MeetupCardAssetStore(
+                FakeFileSystem(),
+                "/meetup-assets".toPath(),
+            ),
         ),
     )
     return SearchModelFixture(

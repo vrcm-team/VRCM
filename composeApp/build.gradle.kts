@@ -35,11 +35,11 @@ kotlin {
     }
 
     sourceSets {
-
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.exifinterface)
             implementation(libs.androidx.sqlite.framework)
+            implementation(libs.awebp)
 
             implementation(libs.ktor.client.okhttp)
         }
@@ -62,7 +62,6 @@ kotlin {
 
             implementation(libs.ktor.client.okhttp)
             implementation(libs.jna.platform)
-            implementation(libs.okio)
             implementation(libs.androidx.sqlite.bundled)
         }
 
@@ -77,6 +76,7 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.okio)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -111,6 +111,7 @@ kotlin {
             implementation(libs.chrisbanes.haze)
 
             implementation(libs.filekit.dialogs.compose)
+            implementation(libs.qrose)
 
             implementation(libs.androidx.room.runtime)
 

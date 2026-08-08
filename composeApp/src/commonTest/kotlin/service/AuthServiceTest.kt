@@ -14,6 +14,8 @@ import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -40,6 +42,8 @@ import org.koin.core.logger.Logger
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -503,6 +507,11 @@ class AuthServiceTest : MainDispatcherTest() {
                 friendListCacheDao = FriendListCacheDao(MapSettings()),
                 userProfileCacheDao = UserProfileCacheDao(MapSettings()),
                 friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+                meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+                meetupCardAssetStore = MeetupCardAssetStore(
+                    FakeFileSystem(),
+                    "/meetup-assets".toPath(),
+                ),
             ),
         )
         return Fixture(service, accountDao, client)
