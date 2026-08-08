@@ -366,6 +366,7 @@ sealed class LocaleStrings {
     open val hiddenWorldCannotView: String = "Cannot view hidden world info"
     open val meetupCardTitle: String = "Nameplate"
     open val meetupCardEdit: String = "Edit"
+    open val meetupCardDone: String = "Done"
     open val meetupCardPhoto: String = "Photo"
     open val meetupCardLayout: String = "Layout"
     open val meetupCardContent: String = "Content"

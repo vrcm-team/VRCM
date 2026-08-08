@@ -148,6 +148,15 @@ class MeetupCardScreenModel(
     /** 页面离开前提交仍在草稿中的裁剪。 */
     fun flushDrafts() = commitCrop()
 
+    /**
+     * 用户点"完成"：提交草稿并把首次配置标记为已完成。
+     * 即使没改过任何设置，主动完成也算配置过，之后长按头像直接进展示页。
+     */
+    fun finishSetup() {
+        commitCrop()
+        persist { it }
+    }
+
     fun confirmPhoto(sessionId: String, target: MeetupPhotoTarget = MeetupPhotoTarget.Both) {
         if (local.value.savingPhoto || sessionId in consumedPhotoSessions) return
         val session = photoSessions.get(sessionId) ?: return

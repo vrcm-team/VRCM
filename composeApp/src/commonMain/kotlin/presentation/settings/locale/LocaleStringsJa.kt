@@ -351,6 +351,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val hiddenWorldCannotView = "非公開ワールドの情報は表示できません"
     override val meetupCardTitle = "ネームプレート"
     override val meetupCardEdit = "編集"
+    override val meetupCardDone = "完了"
     override val meetupCardPhoto = "写真"
     override val meetupCardLayout = "レイアウト"
     override val meetupCardContent = "表示内容"

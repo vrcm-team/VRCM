@@ -351,6 +351,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val hiddenWorldCannotView = "无法查看该隐藏世界的信息"
     override val meetupCardTitle = "身份铭牌"
     override val meetupCardEdit = "编辑"
+    override val meetupCardDone = "完成"
     override val meetupCardPhoto = "照片"
     override val meetupCardLayout = "布局"
     override val meetupCardContent = "内容"

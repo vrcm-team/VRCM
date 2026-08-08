@@ -23,6 +23,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -78,6 +79,7 @@ import org.koin.compose.koinInject
 fun MeetupCardEditorContent(
     model: MeetupCardScreenModel,
     onBack: () -> Unit,
+    onDone: () -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val coordinator: MeetupPhotoSelectionCoordinator = koinInject()
@@ -236,6 +238,18 @@ fun MeetupCardEditorContent(
                             tint = MaterialTheme.colorScheme.primary,
                             contentDescription = "back",
                         )
+                    }
+                },
+                actions = {
+                    // 编辑页此前没有通往展示页的出口，首次配置完只能退回首页再长按。
+                    TextButton(
+                        onClick = {
+                            model.finishSetup()
+                            onDone()
+                        },
+                        enabled = !state.savingPhoto,
+                    ) {
+                        Text(locale.meetupCardDone)
                     }
                 },
             )

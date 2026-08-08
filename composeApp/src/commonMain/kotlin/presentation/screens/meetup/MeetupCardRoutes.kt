@@ -32,9 +32,21 @@ data class MeetupCardEditorRoute(val ownerUserId: String) : AppRoute {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: MeetupCardScreenModel = koinViewModel { parametersOf(ownerUserId) }
+        // 从展示页点编辑进来时"完成"退回展示页；首次配置从首页进来时用展示页
+        // 顶替编辑页，让返回键直接回首页而不是又回到编辑页。
+        val cameFromDisplay = navigator.items
+            .getOrNull(navigator.size - 2)
+            .let { it is MeetupCardDisplayRoute && it.ownerUserId == ownerUserId }
         MeetupCardEditorContent(
             model = model,
             onBack = { navigator.pop() },
+            onDone = {
+                if (cameFromDisplay) {
+                    navigator.pop()
+                } else {
+                    navigator replace MeetupCardDisplayRoute(ownerUserId)
+                }
+            },
         )
     }
 }

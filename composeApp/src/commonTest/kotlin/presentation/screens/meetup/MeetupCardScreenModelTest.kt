@@ -27,6 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MeetupCardScreenModelTest : MainDispatcherTest() {
 
@@ -102,6 +103,21 @@ class MeetupCardScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun finishSetupCommitsDraftAndMarksConfigured() = runTest {
+        val repository = FakeMeetupCardRepository(cachedConfig("usr_a", "Cached Name"))
+        val model = model(repository)
+        advanceUntilIdle()
+
+        model.updateCropDraft(MeetupCrop(.15f, 0f, 2f))
+        model.finishSetup()
+        advanceUntilIdle()
+
+        // 未改任何设置也要能完成配置，否则用户永远进不去展示页。
+        assertEquals(MeetupCrop(.15f, 0f, 2f), repository.state.value.config.portraitCrop)
+        assertTrue(repository.updates > 0)
+    }
+
+    @Test
     fun cropDraftOnlyPersistsOnCommitAndOrientationSwitchDropsIt() = runTest {
         val repository = FakeMeetupCardRepository(cachedConfig("usr_a", "Cached Name"))
         val model = model(repository)
@@ -172,11 +188,14 @@ private class FakeMeetupCardRepository(initial: MeetupCardConfig) : MeetupCardRe
         return Job().also { if (refreshCompletes) it.complete() }
     }
 
+    var updates = 0
+
     override suspend fun update(
         ownerId: String,
         transform: (MeetupCardConfig) -> MeetupCardConfig,
     ) {
-        state.update { it.copy(config = transform(it.config)) }
+        updates++
+        state.update { it.copy(config = transform(it.config).copy(configured = true)) }
     }
 
     override suspend fun replacePhoto(
