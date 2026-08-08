@@ -9,8 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.text.SpannableString
-import android.text.style.TypefaceSpan
 import androidx.core.content.ContextCompat
 import io.github.vrcmteam.vrcm.MainActivity
 import io.github.vrcmteam.vrcm.R
@@ -48,7 +46,14 @@ class AndroidFriendOnlineNotifier(private val context: Context) : FriendOnlineNo
     override fun notifyOnline(friend: FriendData) {
         if (!canNotify()) return
         val message = friend.statusDescription.trim().ifBlank { context.getString(R.string.friend_online_default) }
-        // Keep the presence note visually separate from the friend name and online state.`n        val styledMessage = SpannableString(message).apply {`n            setSpan(TypefaceSpan("serif"), 0, length, 0)`n        }`n        context.getSystemService(NotificationManager::class.java).notify(friend.id.hashCode(), factory.social(friend.id.hashCode(), context.getString(R.string.friend_online_title, friend.displayName), styledMessage))
+        context.getSystemService(NotificationManager::class.java).notify(
+            friend.id.hashCode(),
+            factory.social(
+                friend.id.hashCode(),
+                context.getString(R.string.friend_online_title, friend.displayName),
+                message,
+            ),
+        )
     }
     override fun notifyOffline(friendId: String, displayName: String) {
         if (!canNotify()) return

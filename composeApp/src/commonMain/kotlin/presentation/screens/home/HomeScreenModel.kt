@@ -23,7 +23,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
-import io.github.vrcmteam.vrcm.service.FriendOnlineNotificationService
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +39,6 @@ class HomeScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
     private val boopService: BoopService,
-    @Suppress("unused") private val friendOnlineNotificationService: FriendOnlineNotificationService,
 ) : ViewModel() {
 
     private val boopNotificationResolver = BoopNotificationResolver()

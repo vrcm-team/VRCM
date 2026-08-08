@@ -3,7 +3,7 @@ package io.github.vrcmteam.vrcm
 import android.app.Application
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
-import io.github.vrcmteam.vrcm.storage.SettingsDao
+import io.github.vrcmteam.vrcm.service.FriendOnlineNotificationService
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -16,9 +16,6 @@ class VRCMApplication : Application() {
             androidContext(this@VRCMApplication)
             modules(commonModules + platformModule)
         }
-        val koin = app.koin
-        if (koin.get<SettingsDao>().backgroundFriendMonitoringEnabled) {
-            koin.get<AppPlatform>().setBackgroundFriendMonitoringEnabled(true)
-        }
+        app.koin.get<FriendOnlineNotificationService>().start()
     }
 }

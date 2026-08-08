@@ -29,6 +29,7 @@ class WebSocketApi(
     private val connectionLock = SynchronizedObject()
     private val isForeground = atomic(true)
     private val backgroundMonitoringEnabled = atomic(false)
+    private val connectedSessionToken = atomic<AccountSessionToken?>(null)
 
     init {
         scope.launch {
@@ -53,6 +54,8 @@ class WebSocketApi(
         replaceConnection(SharedFlowCentre.currentSession.value?.token)
     }
 
+    fun isConnected(): Boolean = connectedSessionToken.value == SharedFlowCentre.currentSession.value?.token
+
     fun setBackgroundMonitoringEnabled(enabled: Boolean) {
         backgroundMonitoringEnabled.value = enabled
         if (enabled || !isForeground.value) replaceConnection(SharedFlowCentre.currentSession.value?.token.takeIf { enabled || isForeground.value })
@@ -60,6 +63,7 @@ class WebSocketApi(
 
     private fun replaceConnection(sessionToken: AccountSessionToken?) = synchronized(connectionLock) {
         currentJob?.cancel()
+        connectedSessionToken.value = null
         currentJob = sessionToken?.let { token ->
             scope.launch { startWebSocket(token) }
         }
@@ -82,11 +86,16 @@ class WebSocketApi(
                 request = {
                     parameter("auth", token)
                 }) {
-                while (true) {
-                    val othersMessage = receiveDeserialized<WebSocketEvent>()
-                    SharedFlowCentre.emitWebSocket(
-                        AccountWebSocketEvent(sessionToken, othersMessage)
-                    )
+                connectedSessionToken.value = sessionToken
+                try {
+                    while (true) {
+                        val othersMessage = receiveDeserialized<WebSocketEvent>()
+                        SharedFlowCentre.emitWebSocket(
+                            AccountWebSocketEvent(sessionToken, othersMessage)
+                        )
+                    }
+                } finally {
+                    connectedSessionToken.value = null
                 }
             }
         }
@@ -134,7 +143,8 @@ internal suspend fun retryWebSocketConnection(
         }
         // Exponential backoff avoids a permanent five-second reconnect loop
         // when the device has no network or is in Android's idle mode.
-        val delayMillis = retryDelayMillis * (1L shl (consecutiveFailures - 1).coerceAtMost(6))
+        val exponent = (consecutiveFailures - 1).coerceIn(0, 6)
+        val delayMillis = retryDelayMillis * (1L shl exponent)
         delay(delayMillis.coerceAtMost(maxRetryDelayMillis))
     }
 }
