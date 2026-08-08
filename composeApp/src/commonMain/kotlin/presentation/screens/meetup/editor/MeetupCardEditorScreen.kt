@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -21,6 +22,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -237,6 +239,7 @@ fun MeetupCardEditorContent(
     ) { paddingValues ->
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             val compact = maxWidth < 840.dp
+            val toolsWidth = if (maxWidth >= 1080.dp) 420.dp else 380.dp
             if (compact) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     EditorPreview(
@@ -259,18 +262,22 @@ fun MeetupCardEditorContent(
                     )
                 }
             } else {
+                // 宽屏：预览占据剩余空间，工具固定宽度靠右成检查器面板。
                 Row(modifier = Modifier.fillMaxSize()) {
                     EditorPreview(
                         state = state,
                         onOrientation = model::setOrientation,
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
+                    VerticalDivider(thickness = 0.5.dp)
                     MeetupEditorTools(
                         state = state,
                         actions = actions,
                         photoTarget = photoTarget,
                         onPhotoTarget = { photoTarget = it },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        modifier = Modifier
+                            .width(toolsWidth)
+                            .fillMaxHeight(),
                     )
                 }
             }

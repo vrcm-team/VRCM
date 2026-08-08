@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -123,6 +125,7 @@ internal fun MeetupEditorTools(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PhotoTools(
     state: MeetupCardUiState,
@@ -132,7 +135,7 @@ private fun PhotoTools(
 ) {
     val enabled = !state.savingPhoto
     Text(strings.meetupCardPhotoTarget, style = MaterialTheme.typography.titleSmall)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         MeetupPhotoTarget.entries.forEach { target ->
             FilterChip(
                 selected = photoTarget == target,
@@ -168,9 +171,10 @@ private fun PhotoTools(
     ) { Text(strings.meetupCardGallery) }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LayoutTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         MeetupCardTemplate.entries.forEach { template ->
             FilterChip(
                 selected = state.config.template == template,
