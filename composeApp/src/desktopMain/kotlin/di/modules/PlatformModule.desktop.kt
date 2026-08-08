@@ -7,6 +7,8 @@ import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.DesktopAppPlatform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DesktopPlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
+import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
+import io.github.vrcmteam.vrcm.presentation.notifications.NoOpFriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.DesktopSecureStorage
 import io.github.vrcmteam.vrcm.storage.SecureStorage
@@ -111,6 +113,7 @@ actual val platformModule: Module = module {
     }
     singleOf<AppPlatform>(::DesktopAppPlatform)
     singleOf(::DesktopPlatformImageCodec) bind PlatformImageCodec::class
+    singleOf(::NoOpFriendOnlineNotifier) bind FriendOnlineNotifier::class
     single<SecureStorage> {
         DesktopSecureStorage(FileSystem.SYSTEM, desktopSettingsDirectory(), DaoKeys.Account.NAME)
     }

@@ -59,6 +59,8 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.FriendActivityEvent
+import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -574,9 +576,16 @@ private fun ColumnScope.ProfileContent(
     }
 
     // 个人简介
+    val latestBioChange = remember(friendActivityEvents) {
+        friendActivityEvents
+            .asSequence()
+            .filter { it.type == FriendActivityEventType.BioChanged }
+            .maxByOrNull { it.occurredAtMillis }
+    }
     BottomCardTab(
         bioMinHeight = contentMinHeight,
-        userProfileVO = currentUser
+        userProfileVO = currentUser,
+        latestBioChange = latestBioChange,
     )
 
     if (!currentUser.isSelf && friendActivitySummary != null) {
@@ -1443,12 +1452,14 @@ private fun UserProfileIdentity(
 private fun BottomCardTab(
     bioMinHeight: Dp = 0.dp,
     userProfileVO: UserProfileVo,
+    latestBioChange: FriendActivityEvent? = null,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         var state by remember { mutableStateOf(0) }
+        var showBioChange by remember(userProfileVO.id, latestBioChange?.id) { mutableStateOf(false) }
         AnimatedContent(targetState = state) {
             when (it) {
                 0 -> {
@@ -1458,11 +1469,47 @@ private fun BottomCardTab(
                         contentColor = MaterialTheme.colorScheme.primary,
                         shape = MaterialTheme.shapes.extraLarge
                     ) {
-                        SelectionContainer {
-                            Text(
-                                modifier = Modifier.padding(12.dp),
-                                text = userProfileVO.bio
-                            )
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            if (latestBioChange != null) {
+                                TextButton(
+                                    modifier = Modifier.align(Alignment.End),
+                                    onClick = { showBioChange = !showBioChange },
+                                ) {
+                                    Text(
+                                        if (showBioChange) strings.friendActivityBioDiffHide
+                                        else strings.friendActivityBioDiffShow,
+                                    )
+                                }
+                            }
+                            SelectionContainer {
+                                if (showBioChange && latestBioChange != null) {
+                                    val lines = remember(latestBioChange.id, latestBioChange.previousValue, latestBioChange.currentValue) {
+                                        friendActivityBioDiff(
+                                            previous = latestBioChange.previousValue,
+                                            current = latestBioChange.currentValue,
+                                            includeUnchanged = true,
+                                        )
+                                    }
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        lines.forEach { line ->
+                                            Text(
+                                                text = when {
+                                                    line.unchanged -> "  ${line.text}"
+                                                    line.added -> "+ ${line.text}"
+                                                    else -> "- ${line.text}"
+                                                },
+                                                color = when {
+                                                    line.unchanged -> MaterialTheme.colorScheme.primary
+                                                    line.added -> MaterialTheme.colorScheme.tertiary
+                                                    else -> MaterialTheme.colorScheme.error
+                                                },
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(text = userProfileVO.bio)
+                                }
+                            }
                         }
                     }
                 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="friend_social_channel">好友动态提醒</string>
+    <string name="friend_monitor_channel">好友动态监测</string>
+    <string name="friend_monitor_title">动态监测</string>
+    <string name="friend_monitor_message">好友动态监测正在运行</string>
+    <string name="friend_online_title">%1$s 上线</string>
+    <string name="friend_online_default">在线中</string>
+    <string name="friend_offline_title">%1$s 下线</string>
+    <string name="friend_boop_title">%1$s 戳你</string>
+</resources>

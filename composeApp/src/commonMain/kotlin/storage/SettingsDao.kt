@@ -12,7 +12,10 @@ class SettingsDao(
             return SettingsData(
                 isDarkTheme = settingsSettings.getBooleanOrNull(DaoKeys.Settings.IS_DARK_THEME_KEY),
                 themeColor = settingsSettings.getStringOrNull(DaoKeys.Settings.THEME_COLOR_KEY),
-                languageTag = settingsSettings.getStringOrNull(DaoKeys.Settings.LANGUAGE_TAG_KEY)
+                languageTag = settingsSettings.getStringOrNull(DaoKeys.Settings.LANGUAGE_TAG_KEY),
+                friendPresenceNotificationsEnabled = friendPresenceNotificationsEnabled,
+                boopNotificationsEnabled = boopNotificationsEnabled,
+                backgroundFriendMonitoringEnabled = backgroundFriendMonitoringEnabled,
             )
         }
         set(value) {
@@ -27,6 +30,9 @@ class SettingsDao(
             value.languageTag?.let {
                 settingsSettings.putString(DaoKeys.Settings.LANGUAGE_TAG_KEY, it)
             }
+            friendPresenceNotificationsEnabled = value.friendPresenceNotificationsEnabled
+            boopNotificationsEnabled = value.boopNotificationsEnabled
+            backgroundFriendMonitoringEnabled = value.backgroundFriendMonitoringEnabled
         }
 
     var rememberVersion: String?
@@ -39,4 +45,15 @@ class SettingsDao(
             }
         }
 
+    var friendPresenceNotificationsEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.FRIEND_PRESENCE_NOTIFICATIONS_ENABLED_KEY, false)
+        set(value) = settingsSettings.putBoolean(DaoKeys.Settings.FRIEND_PRESENCE_NOTIFICATIONS_ENABLED_KEY, value)
+
+    var boopNotificationsEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.BOOP_NOTIFICATIONS_ENABLED_KEY, false)
+        set(value) = settingsSettings.putBoolean(DaoKeys.Settings.BOOP_NOTIFICATIONS_ENABLED_KEY, value)
+
+    var backgroundFriendMonitoringEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, false)
+        set(value) = settingsSettings.putBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, value)
 }

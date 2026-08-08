@@ -6,6 +6,8 @@ import io.github.vrcmteam.vrcm.AndroidAppPlatform
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.AndroidPlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
+import io.github.vrcmteam.vrcm.presentation.notifications.AndroidFriendOnlineNotifier
+import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.AndroidSecureStorage
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.SecureStorage
@@ -21,5 +23,6 @@ actual val platformModule: Module = module {
     singleOf(SharedPreferencesSettings::Factory) bind Settings.Factory::class
     singleOf(::AndroidAppPlatform) bind AppPlatform::class
     singleOf(::AndroidPlatformImageCodec) bind PlatformImageCodec::class
+    singleOf(::AndroidFriendOnlineNotifier) bind FriendOnlineNotifier::class
     single<SecureStorage> { AndroidSecureStorage(get(), DaoKeys.Account.NAME) }
 }

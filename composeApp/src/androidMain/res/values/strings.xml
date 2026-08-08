@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">VRCM</string>
+    <string name="friend_social_channel">Friend activity alerts</string>
+    <string name="friend_monitor_channel">Friend activity monitor</string>
+    <string name="friend_monitor_title">Activity monitor</string>
+    <string name="friend_monitor_message">Friend activity monitoring is running</string>
+    <string name="friend_online_title">%1$s is online</string>
+    <string name="friend_online_default">Online</string>
+    <string name="friend_offline_title">%1$s is offline</string>
+    <string name="friend_boop_title">%1$s booped you</string>
 </resources>

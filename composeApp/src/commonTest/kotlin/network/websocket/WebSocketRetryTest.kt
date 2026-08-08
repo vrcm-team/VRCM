@@ -41,4 +41,28 @@ class WebSocketRetryTest {
         advanceTimeBy(1_000)
         assertEquals(2, attempts)
     }
+
+    @Test
+    fun reconnectAfterASuccessfulConnectionStillWaitsForTheBaseDelay() = runTest {
+        var attempts = 0
+        val job = launch {
+            retryWebSocketConnection(
+                retryDelayMillis = 100,
+                onFailure = { _, _ -> },
+                connect = {
+                    attempts++
+                    // The first call returns normally, which resets the failure counter.
+                    if (attempts >= 2) awaitCancellation()
+                },
+            )
+        }
+
+        runCurrent()
+        assertEquals(1, attempts, "a reset failure counter must not collapse the backoff to zero")
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(2, attempts)
+
+        job.cancelAndJoin()
+    }
 }

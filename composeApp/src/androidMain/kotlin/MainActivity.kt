@@ -9,13 +9,8 @@ import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge(
-            // 设置底部导航栏透明
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
-        )
+        enableEdgeToEdge(navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
-        setContent {
-            App(isConfigurationChange = { isChangingConfigurations })
-        }
+        setContent { App(isConfigurationChange = { isChangingConfigurations }) }
     }
 }
