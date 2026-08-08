@@ -57,6 +57,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val stettingStatusDisabled = "未開啟"
     override val stettingStatusAllowed = "已允許"
     override val stettingStatusManaged = "系統管理"
+    override val stettingBackgroundPermissionRequired = "需要通知權限"
+    override val stettingBackgroundUnavailable = "背景監測不可用"
     override val profileFriendRequestSent = "已發送好友請求"
     override val profileSendFriendRequest = "發送好友請求"
     override val profileFriendRequestDeleted = "已取消好友請求"

@@ -9,9 +9,9 @@ interface AppPlatform : KoinComponent {
     val version: String
     val type: AppPlatformType
 
+    val supportsFriendActivityNotifications: Boolean get() = false
     val supportsBackgroundFriendMonitoring: Boolean get() = false
     fun hasBackgroundFriendMonitoringPermission(): Boolean = true
-    fun requestBackgroundFriendMonitoringPermission() = Unit
     fun openNotificationSettings() = Unit
     fun setBackgroundFriendMonitoringEnabled(enabled: Boolean): BackgroundFriendMonitoringResult =
         BackgroundFriendMonitoringResult.Unsupported

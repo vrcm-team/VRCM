@@ -15,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.BackgroundFriendMonitoringResult
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
 import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -23,6 +24,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
+import io.github.vrcmteam.vrcm.presentation.settings.rememberNotificationPermissionRequester
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
@@ -137,15 +139,17 @@ private inline fun ColumnScope.CustomBlock() {
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         val platform = koinInject<AppPlatform>()
-        Text(strings.stettingFriendActivity, style = MaterialTheme.typography.titleMedium)
-        ToggleSettingsRow(
-            title = strings.stettingFriendPresenceNotifications,
-            checked = currentSettings.friendPresenceNotificationsEnabled,
-        ) { currentSettings = currentSettings.copy(friendPresenceNotificationsEnabled = it) }
-        ToggleSettingsRow(
-            title = strings.stettingBoopNotifications,
-            checked = currentSettings.boopNotificationsEnabled,
-        ) { currentSettings = currentSettings.copy(boopNotificationsEnabled = it) }
+        if (platform.supportsFriendActivityNotifications) {
+            Text(strings.stettingFriendActivity, style = MaterialTheme.typography.titleMedium)
+            ToggleSettingsRow(
+                title = strings.stettingFriendPresenceNotifications,
+                checked = currentSettings.friendPresenceNotificationsEnabled,
+            ) { currentSettings = currentSettings.copy(friendPresenceNotificationsEnabled = it) }
+            ToggleSettingsRow(
+                title = strings.stettingBoopNotifications,
+                checked = currentSettings.boopNotificationsEnabled,
+            ) { currentSettings = currentSettings.copy(boopNotificationsEnabled = it) }
+        }
         if (platform.supportsBackgroundFriendMonitoring) {
             var backgroundSettingsRevision by remember { mutableIntStateOf(0) }
             LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { backgroundSettingsRevision++ }
@@ -155,16 +159,33 @@ private inline fun ColumnScope.CustomBlock() {
             val batteryUnrestricted = remember(backgroundSettingsRevision) {
                 platform.isIgnoringBatteryOptimizations()
             }
+            val permissionRequiredMessage = strings.stettingBackgroundPermissionRequired
+            val unavailableMessage = strings.stettingBackgroundUnavailable
+            val updateBackgroundMonitoring: (Boolean) -> Unit = { enabled ->
+                when (platform.setBackgroundFriendMonitoringEnabled(enabled)) {
+                    BackgroundFriendMonitoringResult.Started,
+                    BackgroundFriendMonitoringResult.Stopped,
+                    -> currentSettings = currentSettings.copy(backgroundFriendMonitoringEnabled = enabled)
+                    BackgroundFriendMonitoringResult.PermissionRequired -> {
+                        SharedFlowCentre.toastText.tryEmit(ToastText.Info(permissionRequiredMessage))
+                    }
+                    BackgroundFriendMonitoringResult.Unsupported -> {
+                        SharedFlowCentre.toastText.tryEmit(ToastText.Error(unavailableMessage))
+                    }
+                }
+                backgroundSettingsRevision++
+            }
+            val requestNotificationPermission = rememberNotificationPermissionRequester { granted ->
+                if (granted) updateBackgroundMonitoring(true)
+                else SharedFlowCentre.toastText.tryEmit(ToastText.Info(permissionRequiredMessage))
+                backgroundSettingsRevision++
+            }
             ToggleSettingsRow(
                 title = strings.stettingBackgroundMonitoring,
                 checked = currentSettings.backgroundFriendMonitoringEnabled,
             ) { enabled ->
-                if (enabled && !notificationsAllowed) {
-                    platform.requestBackgroundFriendMonitoringPermission()
-                    return@ToggleSettingsRow
-                }
-                currentSettings = currentSettings.copy(backgroundFriendMonitoringEnabled = enabled)
-                platform.setBackgroundFriendMonitoringEnabled(enabled)
+                if (enabled && !notificationsAllowed) requestNotificationPermission()
+                else updateBackgroundMonitoring(enabled)
             }
             if (currentSettings.backgroundFriendMonitoringEnabled) {
                 ElevatedCard(Modifier.fillMaxWidth()) {

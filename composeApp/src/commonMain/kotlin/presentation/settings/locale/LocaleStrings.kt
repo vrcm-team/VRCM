@@ -68,6 +68,8 @@ sealed class LocaleStrings {
     open val stettingStatusDisabled: String = "Disabled"
     open val stettingStatusAllowed: String = "Allowed"
     open val stettingStatusManaged: String = "System managed"
+    open val stettingBackgroundPermissionRequired = "Notification permission is required"
+    open val stettingBackgroundUnavailable = "Background monitoring is unavailable"
     open val profileFriendRequestSent: String = "Friend Request Sent"
     open val profileSendFriendRequest: String = "Send Friend Request"
     open val profileFriendRequestDeleted: String = "Friend Request Deleted"

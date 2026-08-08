@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="friend_social_channel">フレンド通知</string>
+    <string name="friend_monitor_channel">フレンド監視</string>
+    <string name="friend_monitor_title">アクティビティ監視</string>
+    <string name="friend_monitor_message">フレンドの状態を監視しています</string>
+    <string name="friend_online_title">%1$s がオンライン</string>
+    <string name="friend_online_default">オンライン中</string>
+    <string name="friend_offline_title">%1$s がオフライン</string>
+    <string name="friend_boop_title">%1$s がBoopしました</string>
+</resources>

@@ -14,15 +14,12 @@ class AndroidAppPlatform(val context: Context) : AppPlatform {
     override val name = "Android"
     override val version = Build.VERSION.SDK_INT.toString()
     override val type = AppPlatformType.Android
+    override val supportsFriendActivityNotifications = true
     override val supportsBackgroundFriendMonitoring = true
 
     override fun hasBackgroundFriendMonitoringPermission() =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-
-    override fun requestBackgroundFriendMonitoringPermission() {
-        MainActivity.requestNotificationPermissionFromCurrentActivity()
-    }
 
     override fun openNotificationSettings() {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -52,10 +49,9 @@ class AndroidAppPlatform(val context: Context) : AppPlatform {
 
     override fun openBatteryOptimizationSettings() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
-        val request = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(request) }.recoverCatching { context.startActivity(fallback) }
+        context.startActivity(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }

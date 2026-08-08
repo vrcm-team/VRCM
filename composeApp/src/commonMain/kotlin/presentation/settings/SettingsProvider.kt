@@ -49,6 +49,10 @@ fun SettingsProvider(
 @Composable
 expect fun ChangeStatusBarDarkTheme(isDark: Boolean)
 
+/** Requests Android notification permission without retaining an Activity globally. */
+@Composable
+expect fun rememberNotificationPermissionRequester(onResult: (Boolean) -> Unit): () -> Unit
+
 val LocalSettingsState: ProvidableCompositionLocal<MutableState<SettingsVo>> =
     compositionLocalOf {
         mutableStateOf(
