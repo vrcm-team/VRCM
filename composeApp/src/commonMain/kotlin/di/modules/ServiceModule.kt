@@ -52,6 +52,7 @@ val serviceModule: Module = module {
                             languages = user.speakLanguages,
                             status = user.status.value,
                             statusDescription = user.statusDescription,
+                            links = user.bioLinks,
                         )
                     }
             },

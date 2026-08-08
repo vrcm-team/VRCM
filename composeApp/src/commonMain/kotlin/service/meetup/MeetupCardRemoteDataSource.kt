@@ -14,6 +14,7 @@ data class MeetupRemoteProfile(
     val status: String,
     val statusDescription: String,
     val profileBackgroundUrl: String,
+    val links: List<String> = emptyList(),
 )
 
 /** Equipped profile decoration IDs returned by the profile appearance endpoint. */
@@ -50,6 +51,7 @@ class DefaultMeetupCardRemoteDataSource(
                 status = user.status.value,
                 statusDescription = user.statusDescription,
                 profileBackgroundUrl = user.profileImageUrl,
+                links = user.bioLinks,
             )
         }
 

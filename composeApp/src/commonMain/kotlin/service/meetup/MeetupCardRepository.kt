@@ -956,6 +956,7 @@ class DefaultMeetupCardRepository(
         languages = languages,
         status = status,
         statusDescription = statusDescription,
+        links = links,
     )
 
     private data class RefreshStart(

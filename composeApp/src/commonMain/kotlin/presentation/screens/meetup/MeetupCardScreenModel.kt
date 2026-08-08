@@ -11,7 +11,9 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
+import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -93,15 +95,30 @@ class MeetupCardScreenModel(
 
     fun setShowQrCode(value: Boolean) = persist { it.copy(showQrCode = value) }
 
-    /** 二维码类型可多选；至少保留一项，避免开着二维码却什么都不显示。 */
+    /**
+     * 二维码类型可多选；取消最后一项前必须还有资料链接码，
+     * 否则开着二维码却什么都不显示。总数受 [MEETUP_QR_MAX_CODES] 限制。
+     */
     fun toggleQrLinkType(value: MeetupQrLinkType) = persist { config ->
         val current = config.resolvedQrLinkTypes()
+        val links = config.resolvedQrProfileLinks()
         val updated = when {
-            value !in current -> current + value
-            current.size > 1 -> current - value
-            else -> current
+            value in current -> if (current.size > 1 || links.isNotEmpty()) current - value else current
+            current.size + links.size >= MEETUP_QR_MAX_CODES -> current
+            else -> current + value
         }
         config.copy(qrLinkTypes = updated)
+    }
+
+    /** 资料链接二维码可多选；取值来自资料快照，链接被移除后自动失效。 */
+    fun toggleQrProfileLink(value: String) = persist { config ->
+        val current = config.resolvedQrProfileLinks()
+        val updated = when {
+            value in current -> current - value
+            current.size + config.resolvedQrLinkTypes().size >= MEETUP_QR_MAX_CODES -> current
+            else -> current + value
+        }
+        config.copy(qrProfileLinks = updated)
     }
 
     fun setShowIconFrame(value: Boolean) = persist { it.copy(showIconFrame = value) }

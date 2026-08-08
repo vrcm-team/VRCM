@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,12 +46,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.AnimatedDecoration
 import org.koin.compose.koinInject
+import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
+import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
 import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 
@@ -126,7 +132,7 @@ private fun InfoBarTemplate(
     }
 }
 
-/** 状态等文本与二维码作为同一 Row 的同级子元素并列，标签顶部对齐。 */
+/** 语言字段与短句和二维码作为同一 Row 的同级子元素并列，标签顶部对齐。 */
 @Composable
 private fun MeetupInfoAndQrRow(
     state: MeetupCardUiState,
@@ -147,7 +153,12 @@ private fun MeetupInfoAndQrRow(
                 userId = state.ownerUserId,
                 linkTypes = state.config.resolvedQrLinkTypes(),
                 size = qrSize,
-                modifier = Modifier.padding(start = 16.dp).testTag(MeetupCardTestTags.QrCodes),
+                profileLinks = state.config.resolvedQrProfileLinks(),
+                // 二维码最多占两列，再多的码换行；否则窄卡片上状态与语言那一列会被挤没。
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .widthIn(max = qrSize * 2 + 8.dp)
+                    .testTag(MeetupCardTestTags.QrCodes),
             )
         }
     }
@@ -181,7 +192,7 @@ private fun SpotlightTemplate(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // 名字独占整行；状态等文本与二维码在下方同一 Row 并列。
+                // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
                 MeetupNameplateBlock(
                     state = state,
                     onPhoto = true,
@@ -199,7 +210,7 @@ private fun SpotlightTemplate(
 
 /**
  * 侧签：信息沿起始侧竖向集中，保留中央主体区域。
- * 铭牌为 Column(头像, Row(人称代词, 名字))，两段文字竖排；字段与二维码排在其下方。
+ * 铭牌为 Column(头像, Row(状态副行, 名字))，两列文字竖排；字段与二维码排在其下方。
  */
 @Composable
 private fun SideTagTemplate(
@@ -232,7 +243,7 @@ private fun SideTagTemplate(
                 modifier = Modifier.fillMaxHeight().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // 书签式竖向铭牌：头像在上，人称代词与名字两列竖排文字在下。
+                // 书签式竖向铭牌：头像在上，状态副行与名字两列竖排文字在下。
                 MeetupNameplateBlock(
                     state = state,
                     onPhoto = true,
@@ -247,6 +258,7 @@ private fun SideTagTemplate(
                         userId = state.ownerUserId,
                         linkTypes = state.config.resolvedQrLinkTypes(),
                         size = MeetupQrSize,
+                        profileLinks = state.config.resolvedQrProfileLinks(),
                         vertical = true,
                         modifier = Modifier.testTag(MeetupCardTestTags.QrCodes),
                     )
@@ -290,9 +302,10 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState) {
 
 /**
  * 铭牌块：官方铭牌特效与渐变包裹整块内容，与 VRChat 铭牌结构一致。
- * 横排为 Row(头像, Column(名字, 人称代词))；[vertical] 时版式为
- * Column(头像, Row(人称代词, 名字))，两段文字各自顺时针旋转 90 度竖向排布，
+ * 横排为 Row(头像, Column(名字, 副行))；[vertical] 时版式为
+ * Column(头像, Row(副行, 名字))，副行与名字各自顺时针旋转 90 度竖向排布，
  * 横版特效素材同样旋转铺满，头像保持正脸。名字始终完整显示。
+ * 副行内容见 [MeetupNameplateMeta]。
  */
 @Composable
 private fun MeetupNameplateBlock(
@@ -325,8 +338,6 @@ private fun MeetupNameplateBlock(
     }
     // 铭牌上固定使用与底色对比的前景色。
     val nameColor = if (officialColors != null) Color.White else accent.contrastingContent()
-    val pronouns = state.config.profile.pronouns
-        .takeIf { state.config.showPronouns && it.isNotBlank() }
     Box(
         modifier = modifier
             .testTag(MeetupCardTestTags.Nameplate)
@@ -345,8 +356,8 @@ private fun MeetupNameplateBlock(
         // 铭牌现在总有底色，内容始终留出内边距。
         val contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         if (vertical) {
-            // 版式为 Column(头像, Row(人称代词, 名字))；文字各自旋转 90 度竖排，
-            // 于是两段文字成为并排的两列，头像仍在最上方保持正脸。
+            // 版式为 Column(头像, Row(副行, 名字))；两者各自旋转 90 度竖排，
+            // 于是副行与名字成为并排的两列，头像仍在最上方保持正脸。
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -354,16 +365,11 @@ private fun MeetupNameplateBlock(
             ) {
                 MeetupAvatarBlock(state)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    pronouns?.let { value ->
-                        Text(
-                            text = value,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = nameColor.copy(alpha = 0.82f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.rotateClockwise(),
-                        )
-                    }
+                    MeetupNameplateMeta(
+                        state = state,
+                        color = nameColor,
+                        modifier = Modifier.rotateClockwise(),
+                    )
                     Text(
                         text = state.displayName,
                         style = displayNameStyle(state.displayName, large),
@@ -389,20 +395,77 @@ private fun MeetupNameplateBlock(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    pronouns?.let { value ->
-                        Text(
-                            text = value,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = nameColor.copy(alpha = 0.82f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    MeetupNameplateMeta(state = state, color = nameColor)
                 }
             }
         }
     }
 }
+
+/**
+ * 铭牌副行：状态圆点与状态描述依次排在人称代词前面，紧贴名字。
+ * 竖排铭牌由调用方整体旋转，这一行随之成为人称代词所在的那一列。
+ */
+@Composable
+private fun MeetupNameplateMeta(
+    state: MeetupCardUiState,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val config = state.config
+    val status = config.profile.status
+        .takeIf { config.showStatus && it.isNotBlank() }
+        ?.let { value -> UserStatus.entries.firstOrNull { it.value == value } }
+    val statusDescription = config.profile.statusDescription
+        .takeIf { config.showStatusDescription && it.isNotBlank() }
+    val pronouns = config.profile.pronouns
+        .takeIf { config.showPronouns && it.isNotBlank() }
+    if (status == null && statusDescription == null && pronouns == null) return
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        status?.let { value ->
+            // 与好友列表同一套状态色标：铭牌上只留圆点，不再重复一遍状态文案。
+            Box(
+                modifier = Modifier
+                    .size(MeetupStatusDotSize)
+                    .background(GameColor.Status.fromValue(value), CircleShape)
+                    .border(1.dp, color.copy(alpha = 0.35f), CircleShape),
+            )
+        }
+        statusDescription?.let { value ->
+            // 状态描述是这行里唯一可能很长的一段，压缩空间由它让出。
+            MeetupNameplateMetaText(value, color, Modifier.weight(1f, fill = false))
+        }
+        if ((status != null || statusDescription != null) && pronouns != null) {
+            MeetupNameplateMetaText("·", color, alpha = 0.5f)
+        }
+        pronouns?.let { value -> MeetupNameplateMetaText(value, color) }
+    }
+}
+
+/** 铭牌副行文本的统一样式。 */
+@Composable
+private fun MeetupNameplateMetaText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    alpha: Float = 0.82f,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = color.copy(alpha = alpha),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/** 状态圆点直径；与铭牌副行的文字高度相称。 */
+private val MeetupStatusDotSize = 10.dp
 
 /** 在 Material 离散字号档位间按名字长度选择，不随视口连续缩放。 */
 @Composable
@@ -422,50 +485,76 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
     )
 }
 
-/** 可选字段按优先级换行排布，不覆盖名字与二维码；人称代词已并入铭牌块。 */
+/**
+ * 语言用资料页同一套国旗图标呈现，比语言码更省横向空间；
+ * 没有对应国旗的语言退回文字胶囊，不静默丢字段。
+ * 人称代词与状态已并入铭牌块。
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MeetupFieldsFlow(state: MeetupCardUiState, onPhoto: Boolean) {
     val config = state.config
-    val fields = buildList {
-        if (config.showLanguages && config.profile.languages.isNotEmpty()) {
-            add(config.profile.languages.joinToString(" / "))
-        }
-        if (config.showStatus && config.profile.status.isNotBlank()) {
-            add(config.profile.status)
-        }
-        if (config.showStatusDescription && config.profile.statusDescription.isNotBlank()) {
-            add(config.profile.statusDescription)
-        }
-    }
-    if (fields.isEmpty()) return
+    if (!config.showLanguages || config.profile.languages.isEmpty()) return
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        fields.forEach { field ->
-            Surface(
-                color = if (onPhoto) {
-                    Color.Black.copy(alpha = 0.4f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                },
-                contentColor = if (onPhoto) {
-                    Color.White
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text(
-                    text = field,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        config.profile.languages.forEach { language ->
+            val flag = LanguageIcons.getFlag(language)
+            if (flag == null) {
+                MeetupFieldChip(text = language, onPhoto = onPhoto)
+            } else {
+                Image(
+                    imageVector = flag,
+                    contentDescription = language,
+                    contentScale = ContentScale.FillBounds,
+                    // 照片之上白色系国旗容易糊掉边界，统一描一圈细边。
+                    modifier = Modifier
+                        .size(width = MeetupFlagWidth, height = MeetupFlagHeight)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .border(
+                            width = 1.dp,
+                            color = if (onPhoto) {
+                                Color.White.copy(alpha = 0.7f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                            shape = MaterialTheme.shapes.extraSmall,
+                        ),
                 )
             }
         }
+    }
+}
+
+/** 国旗尺寸沿用 [LanguageIcons] 素材的 22:16 比例。 */
+private val MeetupFlagWidth = 22.dp
+private val MeetupFlagHeight = 16.dp
+
+/** 字段胶囊：照片之上用半透明黑底保证可读。 */
+@Composable
+private fun MeetupFieldChip(text: String, onPhoto: Boolean) {
+    Surface(
+        color = if (onPhoto) {
+            Color.Black.copy(alpha = 0.4f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        contentColor = if (onPhoto) {
+            Color.White
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

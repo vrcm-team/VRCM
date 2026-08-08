@@ -11,6 +11,12 @@ import kotlinx.serialization.Serializable
  */
 const val MEETUP_CARD_SCHEMA_VERSION = 2
 
+/**
+ * 同时展示的二维码上限（内置类型与资料链接合计）。
+ * 侧签模板只有一列的宽度，再多就会把铭牌和字段挤出卡片。
+ */
+const val MEETUP_QR_MAX_CODES = 3
+
 /** 会面身份卡的内置版式。 */
 @Serializable
 enum class MeetupCardTemplate {
@@ -79,6 +85,8 @@ data class MeetupProfileSnapshot(
     val languages: List<String> = emptyList(),
     val status: String = "",
     val statusDescription: String = "",
+    /** VRChat 资料里的外部链接；二维码只能从这里取，不接受手工输入的地址。 */
+    val links: List<String> = emptyList(),
 )
 
 /** 生成身份卡时使用的外观资源快照。 */
@@ -114,8 +122,10 @@ data class MeetupCardConfig(
     val showStatusDescription: Boolean = false,
     val showShortText: Boolean = false,
     val showQrCode: Boolean = false,
-    /** 同时展示的二维码链接类型，可多选；为空时按通用主页处理。 */
+    /** 同时展示的二维码链接类型，可多选；与 [qrProfileLinks] 同时为空时按通用主页处理。 */
     val qrLinkTypes: List<MeetupQrLinkType> = listOf(MeetupQrLinkType.VrchatWeb),
+    /** 额外生成二维码的资料链接；取值必须来自 [MeetupProfileSnapshot.links]。 */
+    val qrProfileLinks: List<String> = emptyList(),
     val showIconFrame: Boolean = true,
     val showProfileEffect: Boolean = true,
     val showNameplateEffect: Boolean = true,
@@ -144,6 +154,22 @@ fun MeetupCardConfig.templateFor(orientation: MeetupOrientation): MeetupCardTemp
         MeetupOrientation.Landscape -> landscapeTemplate ?: template
     }
 
-/** 去重且非空的二维码类型列表；配置为空时回退通用主页。 */
-fun MeetupCardConfig.resolvedQrLinkTypes(): List<MeetupQrLinkType> =
-    qrLinkTypes.distinct().ifEmpty { listOf(MeetupQrLinkType.VrchatWeb) }
+/**
+ * 去重后的二维码类型列表；只有在资料链接也没选时才回退通用主页，
+ * 否则用户"只展示自己的外链"这一选择会被强行加回主页码。
+ */
+fun MeetupCardConfig.resolvedQrLinkTypes(): List<MeetupQrLinkType> {
+    val types = qrLinkTypes.distinct()
+    return if (types.isEmpty() && resolvedQrProfileLinks().isEmpty()) {
+        listOf(MeetupQrLinkType.VrchatWeb)
+    } else {
+        types
+    }
+}
+
+/**
+ * 选中的资料链接，且必须仍存在于资料快照中：
+ * 链接从 VRChat 资料删除后，卡片上的二维码也要跟着消失。
+ */
+fun MeetupCardConfig.resolvedQrProfileLinks(): List<String> =
+    qrProfileLinks.distinct().filter { it in profile.links }

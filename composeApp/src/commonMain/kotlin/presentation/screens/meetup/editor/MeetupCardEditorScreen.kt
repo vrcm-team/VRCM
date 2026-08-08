@@ -184,6 +184,7 @@ fun MeetupCardEditorContent(
             onShortText = model::setShortText,
             onShowQrCode = model::setShowQrCode,
             onQrLinkTypeToggle = model::toggleQrLinkType,
+            onQrProfileLinkToggle = model::toggleQrProfileLink,
             onShowIconFrame = model::setShowIconFrame,
             onShowProfileEffect = model::setShowProfileEffect,
             onShowNameplateEffect = model::setShowNameplateEffect,

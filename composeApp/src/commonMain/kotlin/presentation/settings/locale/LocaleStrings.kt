@@ -400,6 +400,8 @@ sealed class LocaleStrings {
     open val meetupCardQrLinkType: String = "QR code link"
     open val meetupCardQrLinkVrchat: String = "VRChat web (universal)"
     open val meetupCardQrLinkVrcm: String = "Open in VRCM"
+    open val meetupCardQrProfileLinks: String = "Profile links"
+    open val meetupCardQrLimit: String = "Up to %d QR codes at a time"
     open val meetupCardQrLabelVrchat: String = "VRChat"
     open val meetupCardQrLabelVrcm: String = "VRCM"
     open val meetupCardLayoutPerOrientation: String =

@@ -41,16 +41,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardLinkLabel
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
+import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
 import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 
 /** 编辑器工具区回调集合；均为幂等操作，由 ViewModel 决定持久化时机。 */
@@ -65,6 +70,7 @@ internal class MeetupEditorActions(
     val onShortText: (String) -> Unit,
     val onShowQrCode: (Boolean) -> Unit,
     val onQrLinkTypeToggle: (MeetupQrLinkType) -> Unit,
+    val onQrProfileLinkToggle: (String) -> Unit,
     val onShowIconFrame: (Boolean) -> Unit,
     val onShowProfileEffect: (Boolean) -> Unit,
     val onShowNameplateEffect: (Boolean) -> Unit,
@@ -341,10 +347,15 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val selectedTypes = config.resolvedQrLinkTypes()
+            val selectedLinks = config.resolvedQrProfileLinks()
+            // 到达上限后只能取消已选项，避免码多到把铭牌挤出卡片。
+            val atLimit = selectedTypes.size + selectedLinks.size >= MEETUP_QR_MAX_CODES
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MeetupQrLinkType.entries.forEach { linkType ->
+                    val selected = linkType in selectedTypes
                     FilterChip(
-                        selected = linkType in selectedTypes,
+                        selected = selected,
+                        enabled = selected || !atLimit,
                         onClick = { actions.onQrLinkTypeToggle(linkType) },
                         label = {
                             Text(
@@ -356,6 +367,46 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                         },
                     )
                 }
+            }
+            val profileLinks = config.profile.links
+            if (profileLinks.isNotEmpty()) {
+                Text(
+                    text = strings.meetupCardQrProfileLinks,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    profileLinks.forEach { link ->
+                        val selected = link in selectedLinks
+                        FilterChip(
+                            selected = selected,
+                            enabled = selected || !atLimit,
+                            onClick = { actions.onQrProfileLinkToggle(link) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = WebIcons.selectIcon(link) ?: AppIcons.Link,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = meetupCardLinkLabel(link),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            if (atLimit) {
+                Text(
+                    text = strings.meetupCardQrLimit
+                        .replaceFirst("%d", MEETUP_QR_MAX_CODES.toString()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -184,7 +184,7 @@ class MeetupCardTemplateLayoutTest {
         }
     }
 
-    /** 打开全部字段、两个二维码和装饰槽位——最挤的一种组合。 */
+    /** 打开全部字段、放满二维码和装饰槽位——最挤的一种组合。 */
     private fun testState(template: MeetupCardTemplate) = MeetupCardUiState(
         ownerUserId = "usr_layout-test",
         displayName = "A Very Long VRChat Display Name",
@@ -198,7 +198,9 @@ class MeetupCardTemplateLayoutTest {
             showShortText = true,
             shortText = "很高兴在这次线下聚会见到你",
             showQrCode = true,
+            // 两种内置码加一条资料链接码，正好用满 MEETUP_QR_MAX_CODES。
             qrLinkTypes = MeetupQrLinkType.entries,
+            qrProfileLinks = listOf("https://x.com/someone"),
             profile = MeetupProfileSnapshot(
                 displayName = "A Very Long VRChat Display Name",
                 avatarUrl = "https://example.test/avatar.png",
@@ -206,6 +208,7 @@ class MeetupCardTemplateLayoutTest {
                 languages = listOf("eng", "jpn"),
                 status = "active",
                 statusDescription = "Looking for friends",
+                links = listOf("https://x.com/someone"),
             ),
         ),
         photoModel = null,
