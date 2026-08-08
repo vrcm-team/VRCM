@@ -42,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 
 /** 编辑器工具区回调集合；均为幂等操作，由 ViewModel 决定持久化时机。 */
 internal class MeetupEditorActions(
@@ -54,6 +55,7 @@ internal class MeetupEditorActions(
     val onShowShortText: (Boolean) -> Unit,
     val onShortText: (String) -> Unit,
     val onShowQrCode: (Boolean) -> Unit,
+    val onQrLinkType: (MeetupQrLinkType) -> Unit,
     val onShowIconFrame: (Boolean) -> Unit,
     val onShowProfileEffect: (Boolean) -> Unit,
     val onShowNameplateEffect: (Boolean) -> Unit,
@@ -193,6 +195,7 @@ private fun LayoutTools(state: MeetupCardUiState, actions: MeetupEditorActions) 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
     val config = state.config
@@ -231,6 +234,25 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
     }
     HorizontalDivider()
     ToggleRow(strings.meetupCardShowQrCode, config.showQrCode, actions.onShowQrCode)
+    if (config.showQrCode) {
+        Text(strings.meetupCardQrLinkType, style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MeetupQrLinkType.entries.forEach { linkType ->
+                FilterChip(
+                    selected = config.qrLinkType == linkType,
+                    onClick = { actions.onQrLinkType(linkType) },
+                    label = {
+                        Text(
+                            text = when (linkType) {
+                                MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
+                                MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrcm
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

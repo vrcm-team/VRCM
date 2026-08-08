@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -73,14 +74,14 @@ fun MeetupCardCanvas(
                     .background(Color.Black.copy(alpha = state.config.scrimAlpha.coerceIn(0f, 1f))),
             )
         }
-        // 4. 官方资料特效：保持素材自身纵横比完整显示（Fit 居中），
-        //    不裁切、不拉伸；不接收指针事件，不改变控件布局。
+        // 4. 官方资料特效：自适应铺满卡片宽度、按素材纵横比等比缩放
+        //    （超出高度部分裁掉），不拉伸；不接收指针事件，不改变控件布局。
         if (state.config.showProfileEffect) {
             state.decorations[DecorationSlot.ProfileEffect]?.let { decoration ->
                 AnimatedDecoration(
                     decoration = decoration,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier.fillMaxSize().clipToBounds(),
                 )
             }
         }

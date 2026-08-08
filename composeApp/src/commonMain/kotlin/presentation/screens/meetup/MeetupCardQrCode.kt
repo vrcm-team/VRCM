@@ -12,25 +12,36 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 
-/** 二维码只指向当前用户的公开 VRChat 主页，不接受任何其他链接。 */
-internal fun meetupCardProfileUrl(userId: String): String {
+/** 二维码只指向当前用户的公开 VRChat 主页或 VRCM 直达链接，不接受任何其他内容。 */
+internal fun meetupCardProfileUrl(
+    userId: String,
+    linkType: MeetupQrLinkType = MeetupQrLinkType.VrchatWeb,
+): String {
     require(Regex("usr_[A-Za-z0-9-]+").matches(userId)) {
         "Meetup card QR payload only accepts a VRChat user ID"
     }
-    return "https://vrchat.com/home/user/$userId"
+    return when (linkType) {
+        MeetupQrLinkType.VrchatWeb -> "https://vrchat.com/home/user/$userId"
+        MeetupQrLinkType.VrcmDeepLink -> "vrcm://user/$userId"
+    }
 }
 
 /** 白底 + 8dp 安静区的稳定 1:1 二维码槽位；深浅照片上均可扫描。 */
 @Composable
-fun MeetupCardQrCode(userId: String, modifier: Modifier = Modifier) {
+fun MeetupCardQrCode(
+    userId: String,
+    linkType: MeetupQrLinkType,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier.aspectRatio(1f),
         color = Color.White,
         shape = MaterialTheme.shapes.small,
     ) {
         Image(
-            painter = rememberQrCodePainter(meetupCardProfileUrl(userId)),
+            painter = rememberQrCodePainter(meetupCardProfileUrl(userId, linkType)),
             contentDescription = strings.meetupCardQrDescription,
             modifier = Modifier.padding(8.dp).fillMaxSize(),
         )

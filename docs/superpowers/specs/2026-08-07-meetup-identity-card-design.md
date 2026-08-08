@@ -206,7 +206,12 @@ https://vrchat.com/home/user/{userId}
 
 二维码默认关闭，完全在本地通过成熟的 Kotlin Multiplatform 二维码编码库生成，不使用远端生成服务、不添加跟踪参数，也不支持自定义链接。二维码区域具有稳定尺寸和安静区，在窄屏或大字体下不能被其他字段挤压或覆盖。
 
-二维码内容不变的前提下，VRCM 在 Android 注册为 `vrchat.com/home/user/*` 与自定义 `vrcm://user/{userId}` 链接的处理者：装有 VRCM 的设备扫码后可选择用 VRCM 打开并直接进入应用内用户详情页（未登录时先完成登录再跳转）；其他设备照常打开 VRChat 网页主页。iOS 因 Universal Links 需要 vrchat.com 域名配合，暂不支持拦截。
+VRCM 在 Android 注册为 `vrchat.com/home/user/*` 与自定义 `vrcm://user/{userId}` 链接的处理者。由于 Android 12+ 对未验证域名的 https 链接不弹应用选择器（vrchat.com 无法配合放置验证文件），编辑器提供二维码链接类型选项，两种内容都固定指向当前用户、不接受自定义：
+
+- **VRChat 主页（通用，默认）**：任何设备可扫，装有 VRChat 官方 App 的设备会跳其应用内主页；VRCM 需用户在系统设置中启用链接接管。
+- **VRCM 直达**：`vrcm://user/{userId}`，装有 VRCM 的设备扫码必定直接进入应用内用户详情页（未登录时先完成登录再跳转）；未安装 VRCM 的设备无法打开，适合参与者都使用 VRCM 的聚会。
+
+iOS 因 Universal Links 需要 vrchat.com 域名配合，暂不支持拦截 https 链接。
 
 ## 10. 离线刷新顺序
 

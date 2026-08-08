@@ -64,7 +64,7 @@ private fun InfoBarTemplate(
     orientation: MeetupOrientation,
     modifier: Modifier,
 ) {
-    val panel: @Composable (Modifier) -> Unit = { panelModifier ->
+    val panel: @Composable (Modifier, Boolean) -> Unit = { panelModifier, includeQr ->
         Surface(
             modifier = panelModifier,
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
@@ -90,9 +90,10 @@ private fun InfoBarTemplate(
                     MeetupFieldsFlow(state, onPhoto = false)
                     MeetupShortText(state, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (state.config.showQrCode) {
+                if (includeQr && state.config.showQrCode) {
                     MeetupCardQrCode(
                         userId = state.ownerUserId,
+                        linkType = state.config.qrLinkType,
                         modifier = Modifier.padding(start = 16.dp).requiredSize(92.dp),
                     )
                 }
@@ -100,13 +101,24 @@ private fun InfoBarTemplate(
         }
     }
     when (orientation) {
+        // 竖屏空间窄：二维码浮在面板上方右侧，不与名字抢横向空间。
         MeetupOrientation.Portrait -> Column(modifier = modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.weight(1f))
-            panel(Modifier.fillMaxWidth())
+            if (state.config.showQrCode) {
+                MeetupCardQrCode(
+                    userId = state.ownerUserId,
+                    linkType = state.config.qrLinkType,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(end = 20.dp, bottom = 10.dp)
+                        .requiredSize(96.dp),
+                )
+            }
+            panel(Modifier.fillMaxWidth(), false)
         }
         MeetupOrientation.Landscape -> Row(modifier = modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.weight(1f))
-            panel(Modifier.fillMaxHeight().widthIn(max = 420.dp))
+            panel(Modifier.fillMaxHeight().widthIn(max = 420.dp), true)
         }
     }
 }
@@ -129,28 +141,39 @@ private fun SpotlightTemplate(
                     ),
                 ),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    MeetupAvatarBlock(state)
-                    MeetupNameplate(
-                        state = state,
-                        color = MeetupNameColor(onPhoto = true),
-                        large = orientation == MeetupOrientation.Portrait,
-                    )
-                    MeetupFieldsFlow(state, onPhoto = true)
-                    MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
-                }
-                if (state.config.showQrCode) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)) {
+                // 竖屏空间窄：二维码放在内容上方右侧，名字保持整行宽度。
+                if (state.config.showQrCode && orientation == MeetupOrientation.Portrait) {
                     MeetupCardQrCode(
                         userId = state.ownerUserId,
-                        modifier = Modifier.padding(start = 16.dp).requiredSize(96.dp),
+                        linkType = state.config.qrLinkType,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(bottom = 12.dp)
+                            .requiredSize(96.dp),
                     )
+                }
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        MeetupAvatarBlock(state)
+                        MeetupNameplate(
+                            state = state,
+                            color = MeetupNameColor(onPhoto = true),
+                            large = orientation == MeetupOrientation.Portrait,
+                        )
+                        MeetupFieldsFlow(state, onPhoto = true)
+                        MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
+                    }
+                    if (state.config.showQrCode && orientation == MeetupOrientation.Landscape) {
+                        MeetupCardQrCode(
+                            userId = state.ownerUserId,
+                            linkType = state.config.qrLinkType,
+                            modifier = Modifier.padding(start = 16.dp).requiredSize(96.dp),
+                        )
+                    }
                 }
             }
         }
@@ -191,6 +214,7 @@ private fun SideTagTemplate(
                 if (state.config.showQrCode) {
                     MeetupCardQrCode(
                         userId = state.ownerUserId,
+                        linkType = state.config.qrLinkType,
                         modifier = Modifier.requiredSize(88.dp),
                     )
                 }

@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -81,6 +82,8 @@ class MeetupCardScreenModel(
     fun setShowShortText(value: Boolean) = persist { it.copy(showShortText = value) }
 
     fun setShowQrCode(value: Boolean) = persist { it.copy(showQrCode = value) }
+
+    fun setQrLinkType(value: MeetupQrLinkType) = persist { it.copy(qrLinkType = value) }
 
     fun setShowIconFrame(value: Boolean) = persist { it.copy(showIconFrame = value) }
 
