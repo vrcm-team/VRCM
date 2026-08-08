@@ -55,6 +55,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupSnapshot
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
 import io.github.vrcmteam.vrcm.storage.meetup.templateFor
@@ -112,7 +113,7 @@ private fun InfoBarTemplate(
             Column {
                 // 群组横幅贴着面板顶边铺满，是整块信息的页眉；
                 // 夹在名字和字段中间既割裂身份信息，又像面板里另外浮了一张卡片。
-                MeetupGroupBanner(state, contentPadding = 20.dp)
+                MeetupGroupBanner(state, MeetupGroupStyle.Header, contentPadding = 20.dp)
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -196,25 +197,23 @@ private fun SpotlightTemplate(
                     ),
                 ),
         ) {
-            Column {
-                // 群组横幅贴着信息区顶边铺满，作为这块遮罩的页眉。
-                MeetupGroupBanner(state, contentPadding = 24.dp)
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
-                    MeetupNameplateBlock(
-                        state = state,
-                        onPhoto = true,
-                        large = orientation == MeetupOrientation.Portrait,
-                    )
-                    MeetupInfoAndQrRow(
-                        state = state,
-                        onPhoto = true,
-                        shortTextColor = Color.White.copy(alpha = 0.92f),
-                    )
-                }
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // 群组条留在遮罩里：贴着遮罩顶边会变成一道横穿照片的深色杠。
+                MeetupGroupBanner(state, MeetupGroupStyle.Inset)
+                // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
+                MeetupNameplateBlock(
+                    state = state,
+                    onPhoto = true,
+                    large = orientation == MeetupOrientation.Portrait,
+                )
+                MeetupInfoAndQrRow(
+                    state = state,
+                    onPhoto = true,
+                    shortTextColor = Color.White.copy(alpha = 0.92f),
+                )
             }
         }
     }
@@ -271,6 +270,11 @@ private fun SideTagTemplate(
             // 竖排文字高度由名字长度决定，限制上限避免顶掉下方字段与二维码。
             val nameplateMaxHeight = maxHeight * 0.55f
             val info: @Composable ColumnScope.() -> Unit = {
+                // 竖栏顶部放封面方块，横栏只剩几十 dp 余量，退成一行胶囊。
+                MeetupGroupBanner(
+                    state = state,
+                    style = if (landscape) MeetupGroupStyle.Compact else MeetupGroupStyle.Tile,
+                )
                 // 书签式竖向铭牌：头像在上，状态副行与名字两列竖排文字在下。
                 MeetupNameplateBlock(
                     state = state,
@@ -281,30 +285,26 @@ private fun SideTagTemplate(
                 MeetupFieldsFlow(state, onPhoto = true)
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
             }
-            Column(modifier = Modifier.fillMaxHeight()) {
-                // 侧栏的页眉：横幅铺满栏宽贴顶，正文再各自留内边距。
-                MeetupGroupBanner(state, contentPadding = 16.dp)
-                if (landscape) {
-                    Row(
-                        modifier = Modifier.weight(1f).padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(MeetupQrColumnGap),
-                    ) {
-                        qrCodes(Modifier)
-                        Column(
-                            modifier = Modifier.fillMaxHeight(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            content = info,
-                        )
-                    }
-                } else {
+            if (landscape) {
+                Row(
+                    modifier = Modifier.fillMaxHeight().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(MeetupQrColumnGap),
+                ) {
+                    qrCodes(Modifier)
                     Column(
-                        modifier = Modifier.weight(1f).padding(16.dp),
+                        modifier = Modifier.fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        info()
-                        Spacer(modifier = Modifier.weight(1f))
-                        qrCodes(Modifier)
-                    }
+                        content = info,
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxHeight().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    info()
+                    Spacer(modifier = Modifier.weight(1f))
+                    qrCodes(Modifier)
                 }
             }
         }
@@ -532,79 +532,188 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
 }
 
 /**
- * 主选群组横幅：封面铺底，群组图标与名称叠在上面。
- * 封面缺失时退回群组图标铺底，两者都没有就只留一条主题色名条——
+ * 主选群组在各模板里的呈现形态：三套模板的信息容器分别是底部面板、
+ * 底部遮罩和窄竖栏，一种形态套不住，位置只能按模板定。
+ */
+private enum class MeetupGroupStyle {
+    /** 通栏页眉：贴容器顶边铺满、方角，资料面板用。 */
+    Header,
+
+    /** 内嵌横幅：留边距的圆角条，聚光用，免得深色块横穿照片。 */
+    Inset,
+
+    /** 封面方块加名字：竖排侧栏用，贴合窄栏比例。 */
+    Tile,
+
+    /** 一行图标加名字：横屏侧栏只剩几十 dp，放不下方块。 */
+    Compact,
+}
+
+/**
+ * 主选群组：封面铺底，群组图标与名称叠在上面。
+ * 封面缺失时退回群组图标，两者都没有就只留主题色底加名字——
  * 用户开了这个开关就该看到群组，而不是一片空白。
  */
 @Composable
-private fun MeetupGroupBanner(state: MeetupCardUiState, contentPadding: Dp) {
+private fun MeetupGroupBanner(
+    state: MeetupCardUiState,
+    style: MeetupGroupStyle,
+    contentPadding: Dp = 0.dp,
+) {
     val config = state.config
     if (!config.showRepresentedGroup) return
     val group = config.profile.representedGroup ?: return
     if (group.name.isBlank() && group.bannerUrl.isBlank() && group.iconUrl.isBlank()) return
-    val cover = group.bannerUrl.takeIf(String::isNotBlank) ?: group.iconUrl.takeIf(String::isNotBlank)
+    when (style) {
+        MeetupGroupStyle.Header, MeetupGroupStyle.Inset -> MeetupGroupBannerBar(
+            state = state,
+            group = group,
+            contentPadding = contentPadding,
+            inset = style == MeetupGroupStyle.Inset,
+        )
+        MeetupGroupStyle.Tile -> MeetupGroupTile(state, group)
+        MeetupGroupStyle.Compact -> MeetupGroupChip(group)
+    }
+}
+
+/** 横幅条：封面铺底 + 左侧图标与名称；[inset] 时收成带圆角的内嵌条。 */
+@Composable
+private fun MeetupGroupBannerBar(
+    state: MeetupCardUiState,
+    group: MeetupGroupSnapshot,
+    contentPadding: Dp,
+    inset: Boolean,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MeetupGroupBannerHeight)
+            .let { if (inset) it.clip(MaterialTheme.shapes.small) else it }
             .background(state.accentColor.tintedScrim(0.72f)),
     ) {
-        cover?.let { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                imageLoader = koinInject<ImageLoader>(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-            )
-            // 封面是任意图片，压一层从左到右的暗色渐变，群组名在任何封面上都读得出来。
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.72f),
-                                Color.Black.copy(alpha = 0.25f),
-                            ),
-                        ),
-                    ),
-            )
-        }
+        MeetupGroupCover(group, Modifier.matchParentSize())
         Row(
-            // 与正文同一条左边缘，页眉才像页眉而不是贴上去的贴纸。
-            modifier = Modifier.padding(horizontal = contentPadding, vertical = 6.dp),
+            // 通栏时与正文同一条左边缘，页眉才像页眉而不是贴上去的贴纸。
+            modifier = Modifier.padding(
+                horizontal = if (inset) 12.dp else contentPadding,
+                vertical = 6.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            group.iconUrl.takeIf(String::isNotBlank)?.let { iconUrl ->
-                AsyncImage(
-                    model = iconUrl,
-                    contentDescription = null,
-                    imageLoader = koinInject<ImageLoader>(),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(MeetupGroupIconSize).clip(CircleShape),
-                )
-            }
-            if (group.name.isNotBlank()) {
-                Text(
-                    text = group.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            MeetupGroupIcon(group)
+            MeetupGroupName(group, Modifier.weight(1f, fill = false))
         }
     }
 }
 
+/** 封面方块加名字：竖栏里横幅只会被压成一条，方块才留得住封面。 */
+@Composable
+private fun MeetupGroupTile(state: MeetupCardUiState, group: MeetupGroupSnapshot) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(MeetupGroupTileSize)
+                .clip(MaterialTheme.shapes.medium)
+                .background(state.accentColor.tintedScrim(0.72f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            MeetupGroupCover(group, Modifier.matchParentSize(), scrim = false)
+            // 只有图标没有封面时，图标当主体居中显示，不再缩成小圆点。
+            if (group.bannerUrl.isBlank()) MeetupGroupIcon(group, size = MeetupGroupTileIconSize)
+        }
+        MeetupGroupName(group)
+    }
+}
+
+/** 一行胶囊：横屏侧栏高度紧张，只保留图标与名字。 */
+@Composable
+private fun MeetupGroupChip(group: MeetupGroupSnapshot) {
+    Surface(
+        color = Color.Black.copy(alpha = 0.4f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            MeetupGroupIcon(group, size = MeetupGroupChipIconSize)
+            MeetupGroupName(group, Modifier.weight(1f, fill = false))
+        }
+    }
+}
+
+/** 封面图；[scrim] 时压一层暗色渐变，保证叠在上面的名字读得出来。 */
+@Composable
+private fun MeetupGroupCover(
+    group: MeetupGroupSnapshot,
+    modifier: Modifier,
+    scrim: Boolean = true,
+) {
+    val cover = group.bannerUrl.takeIf(String::isNotBlank)
+        ?: group.iconUrl.takeIf(String::isNotBlank)
+        ?: return
+    AsyncImage(
+        model = cover,
+        contentDescription = null,
+        imageLoader = koinInject<ImageLoader>(),
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
+    if (scrim) {
+        Box(
+            modifier = modifier.background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.72f),
+                        Color.Black.copy(alpha = 0.25f),
+                    ),
+                ),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun MeetupGroupIcon(group: MeetupGroupSnapshot, size: Dp = MeetupGroupIconSize) {
+    val iconUrl = group.iconUrl.takeIf(String::isNotBlank) ?: return
+    AsyncImage(
+        model = iconUrl,
+        contentDescription = null,
+        imageLoader = koinInject<ImageLoader>(),
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.size(size).clip(CircleShape),
+    )
+}
+
+@Composable
+private fun MeetupGroupName(group: MeetupGroupSnapshot, modifier: Modifier = Modifier) {
+    if (group.name.isBlank()) return
+    Text(
+        text = group.name,
+        style = MaterialTheme.typography.labelLarge,
+        color = Color.White,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
 /**
- * 群组横幅高度与图标尺寸：封面按 Crop 铺满，文字放大时横幅可以变高。
- * 独占整行后横幅很宽，太矮会把封面裁成一条看不出内容的色带。
+ * 群组各形态的尺寸：封面按 Crop 铺满，文字放大时横幅可以变高。
+ * 横幅独占整行后很宽，太矮会把封面裁成一条看不出内容的色带；
+ * 方块尺寸取竖栏内容区的大半宽，再大就会把铭牌顶下去。
  */
 private val MeetupGroupBannerHeight = 48.dp
 private val MeetupGroupIconSize = 24.dp
+private val MeetupGroupTileSize = 96.dp
+private val MeetupGroupTileIconSize = 48.dp
+private val MeetupGroupChipIconSize = 18.dp
 
 /**
  * 语言用资料页同一套国旗图标呈现，比语言码更省横向空间；
