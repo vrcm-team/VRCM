@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -22,6 +23,7 @@ import coil3.request.ErrorResult
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
+import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
@@ -119,6 +121,7 @@ class MeetupCardTemplateLayoutTest {
                 "$label 底部 ${bounds.bottom} 溢出了卡片高度 $cardHeight",
             )
         }
+        assertEveryQrCodeIsWhole("竖屏侧签", DpRect(0.dp, 0.dp, band.right, cardHeight))
     }
 
     /** 横屏侧签只有一屏高，二维码必须能整块放下，而不是被信息挤出卡片。 */
@@ -148,16 +151,46 @@ class MeetupCardTemplateLayoutTest {
             qr.right.value <= band.right.value + 1f,
             "横屏侧签二维码右边界 ${qr.right} 溢出了侧栏 ${band.right}",
         )
-        val qrHeight = qr.bottom.value - qr.top.value
-        assertTrue(
-            qrHeight >= MeetupQrSizeForTest.value * 3 - 1f,
-            "横屏侧签只放下了 ${qrHeight}dp 的二维码，三个码没有完整显示",
-        )
+        assertEveryQrCodeIsWhole("横屏侧签", DpRect(0.dp, 0.dp, band.right, cardWidth))
         assertNoOverlap(nameplate, qr, "横屏侧签")
     }
 
     /** 与模板实现里的二维码尺寸保持一致；变了就该在这里显式改。 */
     private val MeetupQrSizeForTest = 68.dp
+
+    /**
+     * 选满 [MEETUP_QR_MAX_CODES] 个码时，每一个都必须整块画在 [bounds] 里。
+     * 只量二维码容器的边界不够：码会换行换列，空间不足时还会被压成 0 高，
+     * 这两种情况下容器边界都还"在卡片内"，但用户其实扫不到那个码。
+     */
+    private fun SemanticsNodeInteractionsProvider.assertEveryQrCodeIsWhole(
+        label: String,
+        bounds: DpRect,
+    ) {
+        val codes = onAllNodesWithTag(MeetupCardTestTags.QrCode)
+            .fetchSemanticsNodes()
+            .size
+        assertTrue(
+            codes == MEETUP_QR_MAX_CODES,
+            "$label 只渲染了 $codes 个二维码，选满的 $MEETUP_QR_MAX_CODES 个没有全部出现",
+        )
+        repeat(codes) { index ->
+            val code = onAllNodesWithTag(MeetupCardTestTags.QrCode)[index].getBoundsInRoot()
+            val width = code.right.value - code.left.value
+            val height = code.bottom.value - code.top.value
+            assertTrue(
+                width >= MeetupQrSizeForTest.value - 1f && height >= MeetupQrSizeForTest.value - 1f,
+                "$label 第 ${index + 1} 个二维码被压成了 ${width}x${height}dp，扫不出来",
+            )
+            assertTrue(
+                code.left.value >= bounds.left.value - 1f &&
+                    code.right.value <= bounds.right.value + 1f &&
+                    code.top.value >= bounds.top.value - 1f &&
+                    code.bottom.value <= bounds.bottom.value + 1f,
+                "$label 第 ${index + 1} 个二维码 $code 溢出了可用区域 $bounds",
+            )
+        }
+    }
 
     private fun SemanticsNodeInteractionsProvider.assertNoOverlap(
         first: DpRect,
@@ -236,9 +269,9 @@ class MeetupCardTemplateLayoutTest {
             showShortText = true,
             shortText = "很高兴在这次线下聚会见到你",
             showQrCode = true,
-            // 两种内置码加一条资料链接码，正好用满 MEETUP_QR_MAX_CODES。
+            // 两种内置码加两条资料链接码，正好用满 MEETUP_QR_MAX_CODES。
             qrLinkTypes = MeetupQrLinkType.entries,
-            qrProfileLinks = listOf("https://x.com/someone"),
+            qrProfileLinks = listOf("https://x.com/someone", "https://github.com/someone"),
             profile = MeetupProfileSnapshot(
                 displayName = "A Very Long VRChat Display Name",
                 avatarUrl = "https://example.test/avatar.png",
@@ -246,7 +279,7 @@ class MeetupCardTemplateLayoutTest {
                 languages = listOf("eng", "jpn"),
                 status = "active",
                 statusDescription = "Looking for friends",
-                links = listOf("https://x.com/someone"),
+                links = listOf("https://x.com/someone", "https://github.com/someone"),
             ),
         ),
         photoModel = null,

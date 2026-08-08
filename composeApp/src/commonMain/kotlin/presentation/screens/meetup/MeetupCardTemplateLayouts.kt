@@ -64,6 +64,8 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 internal object MeetupCardTestTags {
     const val Nameplate = "meetup-card-nameplate"
     const val QrCodes = "meetup-card-qr"
+    /** 单个二维码；码会换行/换列，只量容器边界看不出有没有被挤掉。 */
+    const val QrCode = "meetup-card-qr-item"
     const val Fields = "meetup-card-fields"
     const val SideBand = "meetup-card-side-band"
 }
@@ -230,7 +232,8 @@ private fun SideTagTemplate(
     val bandWidth = when {
         // 横屏多留出二维码那一列的宽度，信息列可用宽度与竖屏保持一致。
         landscape -> 200.dp + if (showQrCode) qrColumnWidth else 0.dp
-        else -> 168.dp
+        // 竖屏留够两列码的宽度：码放满时高度不够，得靠换列才能全部显示完整。
+        else -> 176.dp
     }
     val qrCodes: @Composable (Modifier) -> Unit = { qrModifier ->
         if (showQrCode) {

@@ -13,9 +13,9 @@ const val MEETUP_CARD_SCHEMA_VERSION = 2
 
 /**
  * 同时展示的二维码上限（内置类型与资料链接合计）。
- * 侧签模板只有一列的宽度，再多就会把铭牌和字段挤出卡片。
+ * 再多就会把铭牌和字段挤出卡片。
  */
-const val MEETUP_QR_MAX_CODES = 3
+const val MEETUP_QR_MAX_CODES = 4
 
 /** 会面身份卡的内置版式。 */
 @Serializable

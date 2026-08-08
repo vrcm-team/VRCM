@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
@@ -168,7 +169,7 @@ fun MeetupCardQrCodes(
         profileLinks.map(MeetupQrTarget::ProfileLink)
     if (targets.isEmpty()) return
     val spacing = Arrangement.spacedBy(8.dp)
-    val itemModifier = Modifier.width(size)
+    val itemModifier = Modifier.width(size).testTag(MeetupCardTestTags.QrCode)
     if (vertical) {
         FlowColumn(
             modifier = modifier,
