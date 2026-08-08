@@ -91,6 +91,8 @@ class MeetupCardScreenModel(
 
     fun setShowStatusDescription(value: Boolean) = persist { it.copy(showStatusDescription = value) }
 
+    fun setShowRepresentedGroup(value: Boolean) = persist { it.copy(showRepresentedGroup = value) }
+
     fun setShowShortText(value: Boolean) = persist { it.copy(showShortText = value) }
 
     fun setShowQrCode(value: Boolean) = persist { it.copy(showQrCode = value) }

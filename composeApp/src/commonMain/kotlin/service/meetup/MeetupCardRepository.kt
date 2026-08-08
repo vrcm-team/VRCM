@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupSnapshot
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupPhoto
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupPhotoSource
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
@@ -922,6 +923,7 @@ class DefaultMeetupCardRepository(
             showLanguages = false,
             showStatus = false,
             showStatusDescription = false,
+            showRepresentedGroup = false,
             showShortText = false,
             showQrCode = false,
             showIconFrame = false,
@@ -957,6 +959,14 @@ class DefaultMeetupCardRepository(
         status = status,
         statusDescription = statusDescription,
         links = links,
+        representedGroup = representedGroup?.let { group ->
+            MeetupGroupSnapshot(
+                id = group.id,
+                name = group.name,
+                bannerUrl = group.bannerUrl,
+                iconUrl = group.iconUrl,
+            )
+        },
     )
 
     private data class RefreshStart(

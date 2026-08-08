@@ -66,6 +66,7 @@ internal class MeetupEditorActions(
     val onShowLanguages: (Boolean) -> Unit,
     val onShowStatus: (Boolean) -> Unit,
     val onShowStatusDescription: (Boolean) -> Unit,
+    val onShowRepresentedGroup: (Boolean) -> Unit,
     val onShowShortText: (Boolean) -> Unit,
     val onShortText: (String) -> Unit,
     val onShowQrCode: (Boolean) -> Unit,
@@ -311,6 +312,15 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
             config.showStatusDescription,
             actions.onShowStatusDescription,
         )
+        // 没有主选群组时开关没有意义；已经开着就继续显示，否则这次没拉到群组
+        // 用户连关掉它的入口都找不到。
+        if (config.profile.representedGroup != null || config.showRepresentedGroup) {
+            ToggleRow(
+                strings.meetupCardShowGroupBanner,
+                config.showRepresentedGroup,
+                actions.onShowRepresentedGroup,
+            )
+        }
     }
     ToolSection(strings.meetupCardShortText) {
         ToggleRow(strings.meetupCardShortText, config.showShortText, actions.onShowShortText)

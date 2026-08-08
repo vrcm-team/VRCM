@@ -76,6 +76,15 @@ data class MeetupPhoto(
     val height: Int = 0,
 )
 
+/** 用户在 VRChat 资料上主选展示的群组；卡片只用到名称与封面。 */
+@Serializable
+data class MeetupGroupSnapshot(
+    val id: String = "",
+    val name: String = "",
+    val bannerUrl: String = "",
+    val iconUrl: String = "",
+)
+
 /** 生成身份卡时使用的用户资料快照。 */
 @Serializable
 data class MeetupProfileSnapshot(
@@ -87,6 +96,8 @@ data class MeetupProfileSnapshot(
     val statusDescription: String = "",
     /** VRChat 资料里的外部链接；二维码只能从这里取，不接受手工输入的地址。 */
     val links: List<String> = emptyList(),
+    /** 主选展示的群组；没有主选或拉取失败时为 null。 */
+    val representedGroup: MeetupGroupSnapshot? = null,
 )
 
 /** 生成身份卡时使用的外观资源快照。 */
@@ -120,6 +131,8 @@ data class MeetupCardConfig(
     val showLanguages: Boolean = false,
     val showStatus: Boolean = false,
     val showStatusDescription: Boolean = false,
+    /** 展示主选群组的封面横幅。 */
+    val showRepresentedGroup: Boolean = false,
     val showShortText: Boolean = false,
     val showQrCode: Boolean = false,
     /** 同时展示的二维码链接类型，可多选；与 [qrProfileLinks] 同时为空时按通用主页处理。 */

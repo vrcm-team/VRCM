@@ -121,6 +121,44 @@ class MeetupCardTemplateLayoutTest {
         }
     }
 
+    /** 横屏侧签只有一屏高，二维码必须能整块放下，而不是被信息挤出卡片。 */
+    @Test
+    fun landscapeSideTagKeepsQrCodesFullyVisible() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                Box(modifier = Modifier.size(cardHeight, cardWidth)) {
+                    MeetupCardTemplateContent(
+                        state = testState(MeetupCardTemplate.SideTag),
+                        orientation = MeetupOrientation.Landscape,
+                        modifier = Modifier.size(cardHeight, cardWidth),
+                    )
+                }
+            }
+        }
+
+        val band = onNodeWithTag(MeetupCardTestTags.SideBand).getBoundsInRoot()
+        val qr = onNodeWithTag(MeetupCardTestTags.QrCodes).getBoundsInRoot()
+        val nameplate = onNodeWithTag(MeetupCardTestTags.Nameplate).getBoundsInRoot()
+
+        assertTrue(
+            qr.bottom.value <= cardWidth.value + 1f && qr.top.value >= -1f,
+            "横屏侧签二维码 $qr 超出了卡片高度 $cardWidth",
+        )
+        assertTrue(
+            qr.right.value <= band.right.value + 1f,
+            "横屏侧签二维码右边界 ${qr.right} 溢出了侧栏 ${band.right}",
+        )
+        val qrHeight = qr.bottom.value - qr.top.value
+        assertTrue(
+            qrHeight >= MeetupQrSizeForTest.value * 3 - 1f,
+            "横屏侧签只放下了 ${qrHeight}dp 的二维码，三个码没有完整显示",
+        )
+        assertNoOverlap(nameplate, qr, "横屏侧签")
+    }
+
+    /** 与模板实现里的二维码尺寸保持一致；变了就该在这里显式改。 */
+    private val MeetupQrSizeForTest = 68.dp
+
     private fun SemanticsNodeInteractionsProvider.assertNoOverlap(
         first: DpRect,
         second: DpRect,

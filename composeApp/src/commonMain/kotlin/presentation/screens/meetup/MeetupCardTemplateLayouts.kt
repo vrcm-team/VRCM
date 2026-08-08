@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -145,6 +146,7 @@ private fun MeetupInfoAndQrRow(
             modifier = Modifier.weight(1f).testTag(MeetupCardTestTags.Fields),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            MeetupGroupBanner(state, onPhoto = onPhoto)
             MeetupFieldsFlow(state, onPhoto = onPhoto)
             MeetupShortText(state, color = shortTextColor)
         }
@@ -210,7 +212,9 @@ private fun SpotlightTemplate(
 
 /**
  * 侧签：信息沿起始侧竖向集中，保留中央主体区域。
- * 铭牌为 Column(头像, Row(状态副行, 名字))，两列文字竖排；字段与二维码排在其下方。
+ * 铭牌为 Column(头像, Row(状态副行, 名字))，两列文字竖排。
+ * 竖屏把二维码压在信息下方；横屏侧签只有一屏高，竖着堆会把二维码挤没，
+ * 因此横屏改为二维码单独占最左一列，信息列排在它右边。
  */
 @Composable
 private fun SideTagTemplate(
@@ -218,9 +222,25 @@ private fun SideTagTemplate(
     orientation: MeetupOrientation,
     modifier: Modifier,
 ) {
-    val bandWidth = when (orientation) {
-        MeetupOrientation.Portrait -> 168.dp
-        MeetupOrientation.Landscape -> 200.dp
+    val landscape = orientation == MeetupOrientation.Landscape
+    val showQrCode = state.config.showQrCode
+    val qrColumnWidth = MeetupQrSize + MeetupQrColumnGap
+    val bandWidth = when {
+        // 横屏多留出二维码那一列的宽度，信息列可用宽度与竖屏保持一致。
+        landscape -> 200.dp + if (showQrCode) qrColumnWidth else 0.dp
+        else -> 168.dp
+    }
+    val qrCodes: @Composable (Modifier) -> Unit = { qrModifier ->
+        if (showQrCode) {
+            MeetupCardQrCodes(
+                userId = state.ownerUserId,
+                linkTypes = state.config.resolvedQrLinkTypes(),
+                size = MeetupQrSize,
+                profileLinks = state.config.resolvedQrProfileLinks(),
+                vertical = true,
+                modifier = qrModifier.testTag(MeetupCardTestTags.QrCodes),
+            )
+        }
     }
     Row(modifier = modifier.fillMaxSize()) {
         BoxWithConstraints(
@@ -239,10 +259,7 @@ private fun SideTagTemplate(
         ) {
             // 竖排文字高度由名字长度决定，限制上限避免顶掉下方字段与二维码。
             val nameplateMaxHeight = maxHeight * 0.55f
-            Column(
-                modifier = Modifier.fillMaxHeight().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+            val info: @Composable ColumnScope.() -> Unit = {
                 // 书签式竖向铭牌：头像在上，状态副行与名字两列竖排文字在下。
                 MeetupNameplateBlock(
                     state = state,
@@ -250,23 +267,38 @@ private fun SideTagTemplate(
                     vertical = true,
                     modifier = Modifier.heightIn(max = nameplateMaxHeight),
                 )
+                MeetupGroupBanner(state, onPhoto = true)
                 MeetupFieldsFlow(state, onPhoto = true)
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
-                Spacer(modifier = Modifier.weight(1f))
-                if (state.config.showQrCode) {
-                    MeetupCardQrCodes(
-                        userId = state.ownerUserId,
-                        linkTypes = state.config.resolvedQrLinkTypes(),
-                        size = MeetupQrSize,
-                        profileLinks = state.config.resolvedQrProfileLinks(),
-                        vertical = true,
-                        modifier = Modifier.testTag(MeetupCardTestTags.QrCodes),
+            }
+            if (landscape) {
+                Row(
+                    modifier = Modifier.fillMaxHeight().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(MeetupQrColumnGap),
+                ) {
+                    qrCodes(Modifier)
+                    Column(
+                        modifier = Modifier.fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        content = info,
                     )
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxHeight().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    info()
+                    Spacer(modifier = Modifier.weight(1f))
+                    qrCodes(Modifier)
                 }
             }
         }
     }
 }
+
+/** 横屏侧签中二维码列与信息列之间的间距。 */
+private val MeetupQrColumnGap = 12.dp
 
 @Composable
 private fun MeetupNameColor(onPhoto: Boolean): Color =
@@ -484,6 +516,78 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
         shadow = Shadow(color = Color.Black.copy(alpha = 0.45f), offset = Offset(0f, 2f), blurRadius = 6f),
     )
 }
+
+/**
+ * 主选群组横幅：封面铺底，群组图标与名称叠在上面。
+ * 封面缺失时退回群组图标铺底，两者都没有就只留一条主题色名条——
+ * 用户开了这个开关就该看到群组，而不是一片空白。
+ */
+@Composable
+private fun MeetupGroupBanner(state: MeetupCardUiState, onPhoto: Boolean) {
+    val config = state.config
+    if (!config.showRepresentedGroup) return
+    val group = config.profile.representedGroup ?: return
+    if (group.name.isBlank() && group.bannerUrl.isBlank() && group.iconUrl.isBlank()) return
+    val cover = group.bannerUrl.takeIf(String::isNotBlank) ?: group.iconUrl.takeIf(String::isNotBlank)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = MeetupGroupBannerHeight)
+            .clip(MaterialTheme.shapes.small)
+            .background(state.accentColor.tintedScrim(0.72f)),
+    ) {
+        cover?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                imageLoader = koinInject<ImageLoader>(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            // 封面是任意图片，压一层从左到右的暗色渐变，群组名在任何封面上都读得出来。
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.72f),
+                                Color.Black.copy(alpha = 0.25f),
+                            ),
+                        ),
+                    ),
+            )
+        }
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            group.iconUrl.takeIf(String::isNotBlank)?.let { iconUrl ->
+                AsyncImage(
+                    model = iconUrl,
+                    contentDescription = null,
+                    imageLoader = koinInject<ImageLoader>(),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(MeetupGroupIconSize).clip(CircleShape),
+                )
+            }
+            if (group.name.isNotBlank()) {
+                Text(
+                    text = group.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** 群组横幅高度与图标尺寸：封面按 Crop 铺满，文字放大时横幅可以变高。 */
+private val MeetupGroupBannerHeight = 40.dp
+private val MeetupGroupIconSize = 24.dp
 
 /**
  * 语言用资料页同一套国旗图标呈现，比语言码更省横向空间；

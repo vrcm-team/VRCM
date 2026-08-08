@@ -3,6 +3,9 @@ package io.github.vrcmteam.vrcm.service.meetup
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLimits
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /** A compact remote profile used to refresh a meetup card snapshot. */
 data class MeetupRemoteProfile(
@@ -15,6 +18,15 @@ data class MeetupRemoteProfile(
     val statusDescription: String,
     val profileBackgroundUrl: String,
     val links: List<String> = emptyList(),
+    val representedGroup: MeetupRemoteGroup? = null,
+)
+
+/** 用户主选展示的群组。 */
+data class MeetupRemoteGroup(
+    val id: String,
+    val name: String,
+    val bannerUrl: String,
+    val iconUrl: String,
 )
 
 /** Equipped profile decoration IDs returned by the profile appearance endpoint. */
@@ -40,8 +52,12 @@ class DefaultMeetupCardRemoteDataSource(
     private val profileAppearanceApi: ProfileAppearanceApi,
     private val remoteBytesLoader: MeetupRemoteBytesLoader,
 ) : MeetupCardRemoteDataSource {
-    override suspend fun getProfile(ownerId: String): MeetupRemoteProfile =
-        usersApi.fetchUser(ownerId).let { user ->
+    override suspend fun getProfile(ownerId: String): MeetupRemoteProfile = coroutineScope {
+        val user = async { usersApi.fetchUser(ownerId) }
+        // 主选群组只是卡片上的可选装饰：单独拉、单独失败，
+        // 群组接口不可用时照样要把名字和照片刷出来。
+        val representedGroup = async { fetchRepresentedGroup(ownerId) }
+        user.await().let { user ->
             MeetupRemoteProfile(
                 id = user.id,
                 displayName = user.displayName,
@@ -52,8 +68,27 @@ class DefaultMeetupCardRemoteDataSource(
                 statusDescription = user.statusDescription,
                 profileBackgroundUrl = user.profileImageUrl,
                 links = user.bioLinks,
+                representedGroup = representedGroup.await(),
             )
         }
+    }
+
+    private suspend fun fetchRepresentedGroup(ownerId: String): MeetupRemoteGroup? = try {
+        usersApi.getUserGroups(ownerId)
+            .firstOrNull { it.isRepresenting }
+            ?.let { group ->
+                MeetupRemoteGroup(
+                    id = group.groupId.takeIf(String::isNotBlank) ?: group.id,
+                    name = group.name,
+                    bannerUrl = group.bannerUrl.orEmpty(),
+                    iconUrl = group.iconUrl.orEmpty(),
+                )
+            }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
     override suspend fun getAppearance(ownerId: String): MeetupRemoteAppearance =
         profileAppearanceApi.get(ownerId).let { appearance ->

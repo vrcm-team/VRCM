@@ -180,6 +180,7 @@ fun MeetupCardEditorContent(
             onShowLanguages = model::setShowLanguages,
             onShowStatus = model::setShowStatus,
             onShowStatusDescription = model::setShowStatusDescription,
+            onShowRepresentedGroup = model::setShowRepresentedGroup,
             onShowShortText = model::setShowShortText,
             onShortText = model::setShortText,
             onShowQrCode = model::setShowQrCode,
