@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.Scene
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
+import io.github.vrcmteam.vrcm.presentation.animations.cornerScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.slideScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.SlideOrientation
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
@@ -47,6 +48,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.VersionDialog
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
@@ -148,6 +151,9 @@ fun AnimatedContentTransitionScope<Scene<AppRoute>>.selectTransition(isPop: Bool
         isTransitioningOn<HomeScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<HomeScreen, GroupProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<HomeScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)
+        // 首页头像在左上角：铭牌页从该角展开淡入，返回时向该角收拢淡出。
+        isTransitioningOn<HomeScreen, MeetupCardDisplayRoute>() -> cornerScreenTransition(isPop)
+        isTransitioningOn<HomeScreen, MeetupCardEditorRoute>() -> cornerScreenTransition(isPop)
         isTransitioningOn<MutualFriendsScreen, UserProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)

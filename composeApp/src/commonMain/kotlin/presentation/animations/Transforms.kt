@@ -102,6 +102,27 @@ fun slideScreenTransition(
     }
 }
 
+/**
+ * 从起始角展开／收拢的转场：进入页面时目标页在 [transformOrigin] 处淡入并展开，
+ * 返回时向同一角收拢淡出。用于首页头像（位于左上角）进出的铭牌页，
+ * 让页面看起来是从被长按的那个角长出来的。
+ */
+fun cornerScreenTransition(
+    isPop: Boolean,
+    transformOrigin: TransformOrigin = TransformOrigin(0f, 0f),
+): ContentTransform {
+    val animationSpec = tween<Float>()
+    return if (isPop) {
+        fadeIn(animationSpec) togetherWith
+            scaleOut(animationSpec, CornerTransitionScale, transformOrigin) + fadeOut(animationSpec)
+    } else {
+        scaleIn(animationSpec, CornerTransitionScale, transformOrigin) + fadeIn(animationSpec) togetherWith
+            fadeOut(animationSpec)
+    }
+}
+
+private const val CornerTransitionScale = 0.85f
+
 internal fun horizontalScreenExitTransition(
     animationSpec: FiniteAnimationSpec<Float>,
 ): ExitTransition = scaleOut(
