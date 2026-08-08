@@ -39,8 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -61,6 +59,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardPageSize
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -69,8 +68,6 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * 身份卡编辑页：实时预览 + 四个工具页；无保存按钮，离散操作立即提交，
@@ -344,15 +341,11 @@ private fun EditorPreview(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center,
         ) {
-            // 预览是真实展示的等比缩略图：按窗口全尺寸渲染再整体缩放，
+            // 预览是真实展示的等比缩略图：按整页尺寸渲染再整体缩放，
             // 字体、间距与模板比例和展示页完全一致，不随预览盒子失真。
-            val container = LocalWindowInfo.current.containerSize
-            val density = LocalDensity.current
-            val shortDp = with(density) { min(container.width, container.height).toDp() }
-            val longDp = with(density) { max(container.width, container.height).toDp() }
-            val portrait = state.orientation == MeetupOrientation.Portrait
-            val cardWidth = if (portrait) shortDp else longDp
-            val cardHeight = if (portrait) longDp else shortDp
+            val pageSize = meetupCardPageSize(state.orientation)
+            val cardWidth = pageSize.width
+            val cardHeight = pageSize.height
             if (cardWidth > 0.dp && cardHeight > 0.dp && maxWidth > 0.dp && maxHeight > 0.dp) {
                 val scale = minOf(maxWidth / cardWidth, maxHeight / cardHeight, 1f)
                 Box(

@@ -161,7 +161,7 @@ private class FakeMeetupCardRepository(initial: MeetupCardConfig) : MeetupCardRe
     var photoReplacements = 0
     var replacePhotoFails = false
 
-    override fun hasConfig(ownerId: String): Boolean = true
+    override fun isConfigured(ownerId: String): Boolean = true
 
     override fun observe(ownerId: String): StateFlow<MeetupCardState> = state.asStateFlow()
 

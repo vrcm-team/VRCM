@@ -141,7 +141,7 @@ private data object FakeMeetupCardRepository : MeetupCardRepository {
         MeetupCardState(config = defaultMeetupCardConfig("usr_a"), photoModel = null),
     )
 
-    override fun hasConfig(ownerId: String): Boolean = false
+    override fun isConfigured(ownerId: String): Boolean = false
 
     override fun observe(ownerId: String): StateFlow<MeetupCardState> = state
 

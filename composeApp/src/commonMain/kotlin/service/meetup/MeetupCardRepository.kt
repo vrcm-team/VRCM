@@ -88,7 +88,8 @@ fun interface MeetupCurrentUserSnapshotProvider {
 
 /** Offline-first read, refresh and mutation boundary for meetup cards. */
 interface MeetupCardRepository {
-    fun hasConfig(ownerId: String): Boolean
+    /** 用户是否已完成首次配置；决定首页长按进展示页还是编辑页。 */
+    fun isConfigured(ownerId: String): Boolean
 
     fun observe(ownerId: String): StateFlow<MeetupCardState>
 
@@ -130,7 +131,8 @@ class DefaultMeetupCardRepository(
         accountCacheManager.addInvalidationListener(::resetInvalidatedStates)
     }
 
-    override fun hasConfig(ownerId: String): Boolean = configDao.load(ownerId) != null
+    override fun isConfigured(ownerId: String): Boolean =
+        configDao.load(ownerId)?.configured == true
 
     override fun observe(ownerId: String): StateFlow<MeetupCardState> = state(ownerId).asStateFlow()
 
@@ -202,6 +204,8 @@ class DefaultMeetupCardRepository(
                 val updated = transform(old).copy(
                     ownerUserId = ownerId,
                     revision = old.revision + 1L,
+                    // 用户提交了一次真实编辑，首次配置就算完成。
+                    configured = true,
                 )
                 configDao.save(updated)
                 updateState(ownerId) { it.copy(config = updated) }
@@ -256,6 +260,7 @@ class DefaultMeetupCardRepository(
                         val updated = when (target) {
                             MeetupPhotoTarget.Both -> old.copy(
                                 revision = old.revision + 1L,
+                                configured = true,
                                 photo = photo,
                                 // 双方向共用时清除横屏独立照片。
                                 landscapePhoto = null,
@@ -265,12 +270,14 @@ class DefaultMeetupCardRepository(
                             )
                             MeetupPhotoTarget.Portrait -> old.copy(
                                 revision = old.revision + 1L,
+                                configured = true,
                                 photo = photo,
                                 profileBackgroundFallback = fallback,
                                 portraitCrop = candidate.portraitCrop,
                             )
                             MeetupPhotoTarget.Landscape -> old.copy(
                                 revision = old.revision + 1L,
+                                configured = true,
                                 landscapePhoto = photo,
                                 profileBackgroundFallback = fallback,
                                 landscapeCrop = candidate.landscapeCrop,
@@ -315,7 +322,7 @@ class DefaultMeetupCardRepository(
         val started = accountCacheManager.mutateIfCurrent(identity.token) {
             commitMutex.withLock {
                 if (!isCurrentRefresh(identity)) return@withLock
-                // 只有 ensureDefault/显式编辑才能创建配置；否则 hasConfig 的首配分流会被刷新破坏。
+                // 只有 ensureDefault/显式编辑才能创建配置；否则首配分流会被刷新破坏。
                 val config = configDao.load(ownerId) ?: return@withLock
                 updateState(ownerId) { it.copy(config = config, refreshing = true) }
                 capturedStart = RefreshStart(identity, config)

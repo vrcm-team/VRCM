@@ -88,6 +88,12 @@ data class MeetupCardConfig(
     val schemaVersion: Int = MEETUP_CARD_SCHEMA_VERSION,
     val ownerUserId: String,
     val revision: Long = 0,
+    /**
+     * 用户是否真正完成过首次配置。仅在用户提交编辑或换图时置为 true；
+     * [defaultMeetupCardConfig] 建档与后台刷新都不算，否则"打开过编辑页"
+     * 就会被当成配置完成，下次长按直接进展示页。
+     */
+    val configured: Boolean = false,
     /** 竖屏版式；[landscapeTemplate] 为空时横屏也用它。 */
     val template: MeetupCardTemplate = MeetupCardTemplate.InfoBar,
     /** 横屏独立版式；为 null 表示跟随竖屏版式。 */

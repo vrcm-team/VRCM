@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.Scene
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
@@ -37,6 +38,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppNavigator
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.appWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -115,6 +117,7 @@ fun App(
                         LocalBackNavigationPolicy provides backNavigationPolicy,
                         LocalNavigator provides navigator,
                         LocalAppWindowWidthClass provides windowWidthClass,
+                        LocalAppContentSize provides DpSize(maxWidth, maxHeight),
                     ) {
                         SnackBarToastBox(
                             Modifier

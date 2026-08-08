@@ -47,7 +47,7 @@ class HomeScreenModel(
 ) : ViewModel() {
 
     /** 长按头像的入口分流：已有配置直接展示，首次使用进入编辑器。 */
-    fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.hasConfig(userId)) {
+    fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.isConfigured(userId)) {
         MeetupCardDisplayRoute(userId)
     } else {
         MeetupCardEditorRoute(userId)

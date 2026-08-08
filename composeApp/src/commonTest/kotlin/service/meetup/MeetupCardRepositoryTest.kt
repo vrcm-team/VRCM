@@ -1320,7 +1320,7 @@ class MeetupCardRepositoryTest {
 
         repository.refresh("usr_a").join()
 
-        assertFalse(repository.hasConfig("usr_a"))
+        assertFalse(repository.isConfigured("usr_a"))
         assertNull(configDao.load("usr_a"))
     }
 
@@ -1564,6 +1564,31 @@ class MeetupCardRepositoryTest {
         assertEquals(8L, updated.revision)
         assertEquals("edited", updated.shortText)
         assertNull(configDao.load("usr_other"))
+    }
+
+    @Test
+    fun ensureDefaultAloneDoesNotCountAsConfigured() = repositoryTest {
+        repository.ensureDefault("usr_a")
+
+        // 只是打开过编辑页：配置已建档，但首配未完成，长按仍应回到编辑页。
+        assertNotNull(configDao.load("usr_a"))
+        assertFalse(repository.isConfigured("usr_a"))
+
+        repository.update("usr_a") { it.copy(showQrCode = true) }
+
+        assertTrue(repository.isConfigured("usr_a"))
+    }
+
+    @Test
+    fun refreshDoesNotMarkConfigured() = repositoryTest {
+        configDao.save(cachedConfig("usr_a", "Cached Name"))
+        remote.profileHandler = { ownerId -> remoteProfile(ownerId, "Network Name") }
+        remote.appearanceHandler = { ownerId -> MeetupRemoteAppearance(id = ownerId) }
+
+        repository.refresh("usr_a").join()
+
+        assertEquals("Network Name", repository.observe("usr_a").value.config.profile.displayName)
+        assertFalse(repository.isConfigured("usr_a"))
     }
 
     @Test
