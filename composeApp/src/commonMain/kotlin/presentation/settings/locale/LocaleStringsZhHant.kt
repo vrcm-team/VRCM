@@ -384,6 +384,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val meetupCardQrLinkType = "QR Code 連結"
     override val meetupCardQrLinkVrchat = "VRChat 主頁（通用）"
     override val meetupCardQrLinkVrcm = "VRCM 直達"
+    override val meetupCardLayoutPerOrientation = "直向與橫向分別儲存各自的版面。"
     override val meetupCardRefreshPartial = "部分身份牌內容重新整理失敗。"
     override val meetupCardRefreshFailed = "身份牌重新整理失敗，正在顯示已儲存的內容。"
     override val meetupCardPhotoFailed = "無法使用所選照片。"

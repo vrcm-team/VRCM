@@ -48,6 +48,8 @@ import org.koin.compose.koinInject
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
+import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 
 /** 用户选择的主题色；照片会盖住底层背景，因此模板前景也要用它才可见。 */
@@ -68,7 +70,7 @@ internal fun MeetupCardTemplateContent(
     orientation: MeetupOrientation,
     modifier: Modifier = Modifier,
 ) {
-    when (state.config.template) {
+    when (state.config.templateFor(orientation)) {
         MeetupCardTemplate.InfoBar -> InfoBarTemplate(state, orientation, modifier)
         MeetupCardTemplate.Spotlight -> SpotlightTemplate(state, orientation, modifier)
         MeetupCardTemplate.SideTag -> SideTagTemplate(state, orientation, modifier)
@@ -132,10 +134,11 @@ private fun MeetupInfoAndQrRow(
             MeetupShortText(state, color = shortTextColor)
         }
         if (state.config.showQrCode) {
-            MeetupCardQrCode(
+            MeetupCardQrCodes(
                 userId = state.ownerUserId,
-                linkType = state.config.qrLinkType,
-                modifier = Modifier.padding(start = 16.dp).requiredSize(qrSize),
+                linkTypes = state.config.resolvedQrLinkTypes(),
+                size = qrSize,
+                modifier = Modifier.padding(start = 16.dp),
             )
         }
     }
@@ -230,10 +233,11 @@ private fun SideTagTemplate(
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
                 Spacer(modifier = Modifier.weight(1f))
                 if (state.config.showQrCode) {
-                    MeetupCardQrCode(
+                    MeetupCardQrCodes(
                         userId = state.ownerUserId,
-                        linkType = state.config.qrLinkType,
-                        modifier = Modifier.requiredSize(MeetupQrSize),
+                        linkTypes = state.config.resolvedQrLinkTypes(),
+                        size = MeetupQrSize,
+                        vertical = true,
                     )
                 }
             }

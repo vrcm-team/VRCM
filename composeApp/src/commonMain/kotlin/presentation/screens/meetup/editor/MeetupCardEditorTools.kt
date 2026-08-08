@@ -50,6 +50,8 @@ import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
+import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 
 /** 编辑器工具区回调集合；均为幂等操作，由 ViewModel 决定持久化时机。 */
 internal class MeetupEditorActions(
@@ -62,7 +64,7 @@ internal class MeetupEditorActions(
     val onShowShortText: (Boolean) -> Unit,
     val onShortText: (String) -> Unit,
     val onShowQrCode: (Boolean) -> Unit,
-    val onQrLinkType: (MeetupQrLinkType) -> Unit,
+    val onQrLinkTypeToggle: (MeetupQrLinkType) -> Unit,
     val onShowIconFrame: (Boolean) -> Unit,
     val onShowProfileEffect: (Boolean) -> Unit,
     val onShowNameplateEffect: (Boolean) -> Unit,
@@ -258,11 +260,21 @@ private fun PhotoSourceRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LayoutTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
-    ToolSection(strings.meetupCardLayout) {
+    // 版式按方向分别保存，这里改的是预览中选中的那个方向。
+    val orientationLabel = when (state.orientation) {
+        MeetupOrientation.Portrait -> strings.meetupCardPortrait
+        MeetupOrientation.Landscape -> strings.meetupCardLandscape
+    }
+    ToolSection("${strings.meetupCardLayout} · $orientationLabel") {
+        Text(
+            text = strings.meetupCardLayoutPerOrientation,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MeetupCardTemplate.entries.forEach { template ->
                 FilterChip(
-                    selected = state.config.template == template,
+                    selected = state.config.templateFor(state.orientation) == template,
                     onClick = { actions.onTemplate(template) },
                     label = {
                         Text(
@@ -328,11 +340,12 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val selectedTypes = config.resolvedQrLinkTypes()
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MeetupQrLinkType.entries.forEach { linkType ->
                     FilterChip(
-                        selected = config.qrLinkType == linkType,
-                        onClick = { actions.onQrLinkType(linkType) },
+                        selected = linkType in selectedTypes,
+                        onClick = { actions.onQrLinkTypeToggle(linkType) },
                         label = {
                             Text(
                                 text = when (linkType) {

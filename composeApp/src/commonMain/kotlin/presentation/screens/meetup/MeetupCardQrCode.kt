@@ -1,6 +1,10 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,6 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -45,5 +50,31 @@ fun MeetupCardQrCode(
             contentDescription = strings.meetupCardQrDescription,
             modifier = Modifier.padding(8.dp).fillMaxSize(),
         )
+    }
+}
+
+/** 同时展示多种链接类型的二维码；纵向排布用于侧签等窄栏。 */
+@Composable
+fun MeetupCardQrCodes(
+    userId: String,
+    linkTypes: List<MeetupQrLinkType>,
+    size: Dp,
+    vertical: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    if (linkTypes.isEmpty()) return
+    val spacing = Arrangement.spacedBy(8.dp)
+    if (vertical) {
+        Column(modifier = modifier, verticalArrangement = spacing) {
+            linkTypes.forEach { linkType ->
+                MeetupCardQrCode(userId, linkType, Modifier.requiredSize(size))
+            }
+        }
+    } else {
+        Row(modifier = modifier, horizontalArrangement = spacing) {
+            linkTypes.forEach { linkType ->
+                MeetupCardQrCode(userId, linkType, Modifier.requiredSize(size))
+            }
+        }
     }
 }

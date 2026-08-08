@@ -83,6 +83,10 @@ fun MeetupCardPhoto(
                 zoom = derivedCrop.zoom,
             ),
         )
+        // 等比补足到至少铺满视口：任何数值误差都不该让照片露出空白边。
+        val rawScaleX = geometry.imageWidth / viewportWidth
+        val rawScaleY = geometry.imageHeight / viewportHeight
+        val coverFix = maxOf(1f / rawScaleX, 1f / rawScaleY, 1f)
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Image(
                 painter = painter,
@@ -91,8 +95,8 @@ fun MeetupCardPhoto(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = geometry.imageWidth / viewportWidth
-                        scaleY = geometry.imageHeight / viewportHeight
+                        scaleX = rawScaleX * coverFix
+                        scaleY = rawScaleY * coverFix
                         translationX = geometry.translationX
                         translationY = geometry.translationY
                     },

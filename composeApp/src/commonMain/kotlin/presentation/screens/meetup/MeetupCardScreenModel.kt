@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -63,7 +64,16 @@ class MeetupCardScreenModel(
         }
     }
 
-    fun setTemplate(value: MeetupCardTemplate) = persist { it.copy(template = value) }
+    /** 版式按方向分别保存：当前预览方向是哪一个就改哪一个。 */
+    fun setTemplate(value: MeetupCardTemplate) {
+        val orientation = local.value.orientation
+        persist { config ->
+            when (orientation) {
+                MeetupOrientation.Portrait -> config.copy(template = value)
+                MeetupOrientation.Landscape -> config.copy(landscapeTemplate = value)
+            }
+        }
+    }
 
     fun setAccentArgb(value: Long) = persist { it.copy(accentArgb = value) }
 
@@ -83,7 +93,16 @@ class MeetupCardScreenModel(
 
     fun setShowQrCode(value: Boolean) = persist { it.copy(showQrCode = value) }
 
-    fun setQrLinkType(value: MeetupQrLinkType) = persist { it.copy(qrLinkType = value) }
+    /** 二维码类型可多选；至少保留一项，避免开着二维码却什么都不显示。 */
+    fun toggleQrLinkType(value: MeetupQrLinkType) = persist { config ->
+        val current = config.resolvedQrLinkTypes()
+        val updated = when {
+            value !in current -> current + value
+            current.size > 1 -> current - value
+            else -> current
+        }
+        config.copy(qrLinkTypes = updated)
+    }
 
     fun setShowIconFrame(value: Boolean) = persist { it.copy(showIconFrame = value) }
 

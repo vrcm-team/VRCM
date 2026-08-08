@@ -88,7 +88,10 @@ data class MeetupCardConfig(
     val schemaVersion: Int = MEETUP_CARD_SCHEMA_VERSION,
     val ownerUserId: String,
     val revision: Long = 0,
+    /** 竖屏版式；[landscapeTemplate] 为空时横屏也用它。 */
     val template: MeetupCardTemplate = MeetupCardTemplate.InfoBar,
+    /** 横屏独立版式；为 null 表示跟随竖屏版式。 */
+    val landscapeTemplate: MeetupCardTemplate? = null,
     val accentArgb: Long = 0xFF3F8CFF,
     val scrimAlpha: Float = 0.36f,
     val showAvatar: Boolean = false,
@@ -98,7 +101,8 @@ data class MeetupCardConfig(
     val showStatusDescription: Boolean = false,
     val showShortText: Boolean = false,
     val showQrCode: Boolean = false,
-    val qrLinkType: MeetupQrLinkType = MeetupQrLinkType.VrchatWeb,
+    /** 同时展示的二维码链接类型，可多选；为空时按通用主页处理。 */
+    val qrLinkTypes: List<MeetupQrLinkType> = listOf(MeetupQrLinkType.VrchatWeb),
     val showIconFrame: Boolean = true,
     val showProfileEffect: Boolean = true,
     val showNameplateEffect: Boolean = true,
@@ -119,3 +123,14 @@ fun defaultMeetupCardConfig(ownerUserId: String): MeetupCardConfig =
         ownerUserId = ownerUserId,
         profile = MeetupProfileSnapshot(displayName = ""),
     )
+
+/** 指定方向实际使用的版式。 */
+fun MeetupCardConfig.templateFor(orientation: MeetupOrientation): MeetupCardTemplate =
+    when (orientation) {
+        MeetupOrientation.Portrait -> template
+        MeetupOrientation.Landscape -> landscapeTemplate ?: template
+    }
+
+/** 去重且非空的二维码类型列表；配置为空时回退通用主页。 */
+fun MeetupCardConfig.resolvedQrLinkTypes(): List<MeetupQrLinkType> =
+    qrLinkTypes.distinct().ifEmpty { listOf(MeetupQrLinkType.VrchatWeb) }

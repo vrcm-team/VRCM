@@ -229,6 +229,10 @@ private fun MeetupCropPreview(
                 },
             contentAlignment = Alignment.Center,
         ) {
+            // 与展示端一致地等比补足，裁剪预览不会出现展示时没有的空白边。
+            val rawScaleX = geometry.imageWidth / viewportWidth
+            val rawScaleY = geometry.imageHeight / viewportHeight
+            val coverFix = maxOf(1f / rawScaleX, 1f / rawScaleY, 1f)
             Image(
                 bitmap = session.prepared.preview,
                 contentDescription = null,
@@ -236,8 +240,8 @@ private fun MeetupCropPreview(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = geometry.imageWidth / viewportWidth
-                        scaleY = geometry.imageHeight / viewportHeight
+                        scaleX = rawScaleX * coverFix
+                        scaleY = rawScaleY * coverFix
                         translationX = geometry.translationX
                         translationY = geometry.translationY
                     },
