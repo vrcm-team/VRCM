@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.extensions
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -103,4 +105,19 @@ fun Modifier.simpleClickable(
     indication = null,
     interactionSource = remember { MutableInteractionSource() },
     onClick = onClick
+)
+
+/**
+ * 去除水波纹的单击 + 长按组合手势
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.simpleCombinedClickable(
+    onLongClick: () -> Unit,
+    onClick: () -> Unit,
+) = this.combinedClickable(
+    indication = null,
+    interactionSource = remember { MutableInteractionSource() },
+    onLongClick = onLongClick,
+    onClick = onClick,
 )

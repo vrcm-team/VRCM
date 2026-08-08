@@ -8,9 +8,11 @@ import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
+import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
+import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.supports.ApiNoticeCenter
@@ -40,6 +42,8 @@ internal val networkModule = module(true) {
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
     singleOf(::PrintsApi)
+    singleOf(::ProfileAppearanceApi)
+    singleOf(::InventoryApi)
     singleOf(::ApiNoticeCenter)
     single<HttpClient> { apiClientDefinition(it) }
     single { createNetworkJson() }

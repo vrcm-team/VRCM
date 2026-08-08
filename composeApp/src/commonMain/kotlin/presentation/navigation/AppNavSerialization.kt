@@ -6,10 +6,13 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
@@ -28,6 +31,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(AuthAnimeScreen::class, AuthAnimeScreen.serializer())
             subclass(HomeScreen::class, HomeScreen.serializer())
             subclass(GalleryScreen::class, GalleryScreen.serializer())
+            subclass(GalleryPickerScreen::class, GalleryPickerScreen.serializer())
             subclass(PrintImageEditorScreen::class, PrintImageEditorScreen.serializer())
             subclass(FriendNetworkScreen::class, FriendNetworkScreen.serializer())
             subclass(UserProfileScreen::class, UserProfileScreen.serializer())
@@ -37,6 +41,8 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(WorldProfileScreen::class, WorldProfileScreen.serializer())
             subclass(RecentWorldsScreen::class, RecentWorldsScreen.serializer())
             subclass(CardListDetailScreen::class, CardListDetailScreen.serializer())
+            subclass(MeetupCardDisplayRoute::class, MeetupCardDisplayRoute.serializer())
+            subclass(MeetupCardEditorRoute::class, MeetupCardEditorRoute.serializer())
         }
     }
 }

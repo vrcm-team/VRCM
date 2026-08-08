@@ -19,6 +19,18 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropRenderReq
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DecodeRequest
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
+import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
+import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
+import io.github.vrcmteam.vrcm.storage.meetup.defaultMeetupCardConfig
+import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.koin.core.parameter.parametersOf
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.koin.core.qualifier.named
@@ -29,7 +41,7 @@ import kotlin.test.Test
 import kotlin.test.assertNotSame
 import kotlin.test.assertNotNull
 
-class PresentationModuleTest {
+class PresentationModuleTest : MainDispatcherTest() {
     @Test
     fun galleryScreenModelUsesFactoryScope() {
         val application = koinApplication {
@@ -102,6 +114,49 @@ class PresentationModuleTest {
         )
         application.close()
     }
+
+    @Test
+    fun meetupCardScreenModelResolvesPerRequestWithOwnerParameter() {
+        val application = koinApplication {
+            modules(
+                presentationModule,
+                module {
+                    single<MeetupCardRepository> { FakeMeetupCardRepository }
+                    single<PlatformImageCodec> { FakePlatformImageCodec }
+                },
+            )
+        }
+
+        val first = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
+        val second = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
+
+        assertNotSame(first, second)
+        application.close()
+    }
+}
+
+private data object FakeMeetupCardRepository : MeetupCardRepository {
+    private val state = MutableStateFlow(
+        MeetupCardState(config = defaultMeetupCardConfig("usr_a"), photoModel = null),
+    )
+
+    override fun hasConfig(ownerId: String): Boolean = false
+
+    override fun observe(ownerId: String): StateFlow<MeetupCardState> = state
+
+    override suspend fun ensureDefault(ownerId: String): MeetupCardConfig = state.value.config
+
+    override fun refresh(ownerId: String): Job = Job().also(CompletableJob::complete)
+
+    override suspend fun update(
+        ownerId: String,
+        transform: (MeetupCardConfig) -> MeetupCardConfig,
+    ) = Unit
+
+    override suspend fun replacePhoto(
+        ownerId: String,
+        candidate: MeetupPhotoCandidate,
+    ): Result<Unit> = Result.failure(IllegalStateException("unused"))
 }
 
 private data object EmptyAvatarSelector : AvatarSelector {

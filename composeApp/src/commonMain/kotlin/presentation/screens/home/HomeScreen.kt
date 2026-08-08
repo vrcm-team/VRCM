@@ -35,7 +35,10 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import androidx.compose.ui.platform.testTag
 import io.github.vrcmteam.vrcm.presentation.extensions.*
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
@@ -145,6 +148,14 @@ private inline fun AppListRoute.HomeTopAppBar(
     val onClickUserIcon = { user: IUser ->
         currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
     }
+    // 长按进入身份牌；当前已在同一 owner 的身份牌路由时忽略，防重复入栈。
+    val onLongClickUserIcon = onLongClickUserIcon@{
+        val last = currentNavigator.lastItem
+        val alreadyOpen = (last as? MeetupCardDisplayRoute)?.ownerUserId == homeUserId ||
+            (last as? MeetupCardEditorRoute)?.ownerUserId == homeUserId
+        if (alreadyOpen) return@onLongClickUserIcon
+        currentNavigator push homeScreenModel.meetupCardStartRoute()
+    }
     var statusVisibility by remember { mutableStateOf(true) }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
         statusVisibility = false
@@ -182,7 +193,11 @@ private inline fun AppListRoute.HomeTopAppBar(
             ) {
                 Box(
                     modifier = Modifier
-                        .simpleClickable { currentUser?.let { onClickUserIcon(it) } }
+                        .simpleCombinedClickable(
+                            onLongClick = { currentUser?.let { onLongClickUserIcon() } },
+                            onClick = { currentUser?.let { onClickUserIcon(it) } },
+                        )
+                        .testTag("home-user-avatar")
                         .sharedBoundsBy(
                             key = "${homeUserId}UserIcon",
                             suffixKey = AuthHomeSharedSuffixKey,

@@ -16,6 +16,7 @@ import io.github.vrcmteam.vrcm.storage.SecureStorage
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
 import io.github.vrcmteam.vrcm.storage.buildVrcmDatabase
+import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.storage.meetup.meetupCardAssetRoot
@@ -39,6 +40,7 @@ internal val storageModule: Module = module {
     single { UserProfileCacheDao(get { parametersOf(DaoKeys.UserProfileCache.NAME) }) }
     single { WorldProfileCacheDao(get { parametersOf(DaoKeys.WorldProfileCache.NAME) }) }
     single { MeetupCardConfigDao(get { parametersOf(DaoKeys.MeetupCard.NAME) }) }
+    single { DecorationTemplateCacheDao(get { parametersOf(DaoKeys.MeetupDecoration.NAME) }) }
     single { MeetupCardAssetStore(FileSystem.SYSTEM, meetupCardAssetRoot(get())) }
     single { buildVrcmDatabase(platformVrcmDatabaseBuilder(get())) }
     single { get<io.github.vrcmteam.vrcm.storage.VrcmDatabase>().friendActivityDao() }

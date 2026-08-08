@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileL
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.AvatarCoverCanvasSpec
@@ -29,6 +30,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEdi
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
@@ -70,6 +75,17 @@ val presentationModule: Module = module {
     viewModel { GalleryScreenModel(get(), get()) }
     single { CropTransformCalculator() }
     singleOf(::PrintImageEditorSessionStore)
+    singleOf(::GallerySelectionSessionStore)
+    single { MeetupPhotoSessionStore() }
+    single { MeetupPhotoPreparer(get(), get()) }
+    singleOf(::MeetupPhotoSelectionCoordinator)
+    viewModel { parameters ->
+        MeetupCardScreenModel(
+            ownerUserId = parameters.get(),
+            repository = get(),
+            photoSessions = get(),
+        )
+    }
     single<PrintImageProcessor> { DefaultPrintImageProcessor(get()) }
     single<PrintImageProcessor>(AvatarCoverImageProcessorQualifier) {
         DefaultPrintImageProcessor(

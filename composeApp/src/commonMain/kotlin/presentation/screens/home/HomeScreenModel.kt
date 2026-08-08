@@ -20,8 +20,12 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemDa
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPresentation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
@@ -39,7 +43,15 @@ class HomeScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
     private val boopService: BoopService,
+    private val meetupCardRepository: MeetupCardRepository,
 ) : ViewModel() {
+
+    /** 长按头像的入口分流：已有配置直接展示，首次使用进入编辑器。 */
+    fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.hasConfig(userId)) {
+        MeetupCardDisplayRoute(userId)
+    } else {
+        MeetupCardEditorRoute(userId)
+    }
 
     private val boopNotificationResolver = BoopNotificationResolver()
 
