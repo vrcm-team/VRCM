@@ -77,16 +77,7 @@ private fun InfoBarTemplate(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        MeetupAvatarBlock(state)
-                        MeetupNameplate(
-                            state = state,
-                            color = MeetupNameColor(onPhoto = false),
-                        )
-                    }
+                    MeetupNameplateBlock(state, onPhoto = false)
                     MeetupFieldsFlow(state, onPhoto = false)
                     MeetupShortText(state, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -158,10 +149,9 @@ private fun SpotlightTemplate(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        MeetupAvatarBlock(state)
-                        MeetupNameplate(
+                        MeetupNameplateBlock(
                             state = state,
-                            color = MeetupNameColor(onPhoto = true),
+                            onPhoto = true,
                             large = orientation == MeetupOrientation.Portrait,
                         )
                         MeetupFieldsFlow(state, onPhoto = true)
@@ -206,8 +196,7 @@ private fun SideTagTemplate(
                 modifier = Modifier.padding(16.dp).fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                MeetupAvatarBlock(state)
-                MeetupNameplate(state = state, color = MeetupNameColor(onPhoto = true))
+                MeetupNameplateBlock(state, onPhoto = true)
                 MeetupFieldsFlow(state, onPhoto = true)
                 MeetupShortText(state, color = Color.White.copy(alpha = 0.92f))
                 Spacer(modifier = Modifier.weight(1f))
@@ -252,11 +241,14 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState) {
     }
 }
 
-/** Display Name 与官方铭牌特效/渐变；名字始终完整显示，最多两行。 */
+/**
+ * 铭牌块：官方铭牌特效与渐变包裹整个 Row(头像, Column(名字, 人称代词))，
+ * 与 VRChat 铭牌结构一致。名字始终完整显示，最多两行。
+ */
 @Composable
-private fun MeetupNameplate(
+private fun MeetupNameplateBlock(
     state: MeetupCardUiState,
-    color: Color,
+    onPhoto: Boolean,
     large: Boolean = false,
 ) {
     val nameplate = state.decorations[DecorationSlot.NameplateEffect]
@@ -270,6 +262,10 @@ private fun MeetupNameplate(
             null
         }
     }
+    // 有铭牌装饰时固定使用高对比前景色。
+    val nameColor = if (nameplate != null) Color.White else MeetupNameColor(onPhoto)
+    val pronouns = state.config.profile.pronouns
+        .takeIf { state.config.showPronouns && it.isNotBlank() }
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
@@ -282,18 +278,34 @@ private fun MeetupNameplate(
                 modifier = Modifier.matchParentSize(),
             )
         }
-        Text(
-            text = state.displayName,
-            style = displayNameStyle(state.displayName, large),
-            // 有铭牌装饰时固定使用高对比前景色。
-            color = if (nameplate != null) Color.White else color,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(
-                horizontal = if (nameplate != null) 10.dp else 0.dp,
-                vertical = if (nameplate != null) 4.dp else 0.dp,
+                horizontal = if (nameplate != null) 12.dp else 0.dp,
+                vertical = if (nameplate != null) 6.dp else 0.dp,
             ),
-        )
+        ) {
+            MeetupAvatarBlock(state)
+            Column {
+                Text(
+                    text = state.displayName,
+                    style = displayNameStyle(state.displayName, large),
+                    color = nameColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                pronouns?.let { value ->
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = nameColor.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -315,15 +327,12 @@ private fun displayNameStyle(name: String, large: Boolean): TextStyle {
     )
 }
 
-/** 可选字段按优先级换行排布，不覆盖名字与二维码。 */
+/** 可选字段按优先级换行排布，不覆盖名字与二维码；人称代词已并入铭牌块。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MeetupFieldsFlow(state: MeetupCardUiState, onPhoto: Boolean) {
     val config = state.config
     val fields = buildList {
-        if (config.showPronouns && config.profile.pronouns.isNotBlank()) {
-            add(config.profile.pronouns)
-        }
         if (config.showLanguages && config.profile.languages.isNotEmpty()) {
             add(config.profile.languages.joinToString(" / "))
         }

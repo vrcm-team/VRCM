@@ -363,7 +363,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val meetupCardSpotlight = "聚光"
     override val meetupCardSideTag = "侧签"
     override val meetupCardShowAvatar = "头像"
-    override val meetupCardShowPronouns = "同行代词"
+    override val meetupCardShowPronouns = "人称代词"
     override val meetupCardShowLanguages = "语言"
     override val meetupCardShowStatus = "状态"
     override val meetupCardShowStatusDescription = "状态描述"

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -40,6 +41,7 @@ fun AnimatedDecoration(
     decoration: ResolvedDecoration,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
+    alignment: Alignment = Alignment.Center,
 ) {
     val asset = decoration.asset
     if (decoration.mode == DecorationRenderMode.Unavailable || asset == null) return
@@ -51,6 +53,7 @@ fun AnimatedDecoration(
             contentDescription = null,
             imageLoader = koinInject<ImageLoader>(),
             contentScale = contentScale,
+            alignment = alignment,
             modifier = modifier,
         )
         return
@@ -117,6 +120,7 @@ fun AnimatedDecoration(
                 contentDescription = null,
                 imageLoader = koinInject<ImageLoader>(),
                 contentScale = contentScale,
+                alignment = alignment,
                 modifier = modifier,
             )
         }
@@ -127,6 +131,7 @@ fun AnimatedDecoration(
             bitmap = bitmap,
             contentDescription = null,
             contentScale = contentScale,
+            alignment = alignment,
             modifier = modifier,
         )
     }

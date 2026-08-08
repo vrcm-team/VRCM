@@ -1134,7 +1134,7 @@ fun MeetupCardCropDialog(
 
 - [x] **Step 3: 实现四个工具页**
 
-底部四个 tab 为 Photo、Layout、Content、Style。控件固定为：三种照片来源 icon+text action；三模板单选预览；头像/同行代词/语言/状态/状态描述/短句/QR Switch；80 code point TextField；主题色 swatch；scrim Slider；三个官方装饰独立 Switch。`savingPhoto` 或操作进行中时禁用相关控件，不能重复提交。
+底部四个 tab 为 Photo、Layout、Content、Style。控件固定为：三种照片来源 icon+text action；三模板单选预览；头像/人称代词/语言/状态/状态描述/短句/QR Switch；80 code point TextField；主题色 swatch；scrim Slider；三个官方装饰独立 Switch。`savingPhoto` 或操作进行中时禁用相关控件，不能重复提交。
 
 ```kotlin
 private enum class MeetupEditorTab { Photo, Layout, Content, Style }
@@ -1393,7 +1393,7 @@ meetupCardAssetStore.clearDecorationCache()
 | `meetupCardRefreshPartial` | Some decorations could not be refreshed. | 部分资料装饰刷新失败。 | 一部の装飾を更新できませんでした。 | 部分資料裝飾重新整理失敗。 |
 | `meetupCardPhotoFailed` | The selected photo could not be used. | 无法使用所选照片。 | 選択した写真を使用できません。 | 無法使用所選照片。 |
 
-头像、同行代词、语言、状态、状态描述、二维码、头像框、资料特效、铭牌特效、竖屏、横屏、主题色和遮罩也各自建立键，四种语言结构一致。
+头像、人称代词、语言、状态、状态描述、二维码、头像框、资料特效、铭牌特效、竖屏、横屏、主题色和遮罩也各自建立键，四种语言结构一致。
 
 - [x] **Step 4: 更新 DI 测试 fake**
 
