@@ -96,7 +96,7 @@ private class AwebpPlayback(bytes: ByteArray) :
     override fun onEnd() = Unit
 }
 
-private object AndroidBitmapFrameFactory : AndroidAnimationFrameFactory {
+internal object AndroidBitmapFrameFactory : AndroidAnimationFrameFactory {
     override fun copyFrame(width: Int, height: Int, buffer: ByteBuffer): OwnedAnimationFrame {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         try {

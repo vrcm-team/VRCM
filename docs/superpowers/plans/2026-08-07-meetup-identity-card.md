@@ -46,7 +46,9 @@
 - Windows 上 `atomicMove` 覆盖已存在目标依赖 JDK 行为。（`.tmp` 孤儿已在卡片功能首次装配时按"修改时间超过一小时"清扫。）
 - 配置 JSON 损坏的账号在他人 `clearAccount` 时装饰缓存可能被误删（可自愈）。
 - 动画"失败记忆"只覆盖"下得到但解不开"，不覆盖运行期渲染失败（那条路径仍走 `staticFallback`，不写回缓存）。
-- 漏测清单：iOS 解码器零测试、Android 真实渲染链路（onRender→ImageBitmap）零覆盖。（DecorationTemplateCacheDao 与 AccountCacheManager 的租约边界已补齐。）（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
+- `SkiaAnimatedWebpDecoder.ios.kt` 与 `.desktop.kt` 逐字节相同（`SettingsProvider`、`PlatformImageBitmapRelease` 同样如此）。所以"iOS 解码器零测试"实际是"没有防漂移保护"：桌面测试跑的就是 iOS 那份逻辑，但两边可以各改各的。真正的修法是抽一个 desktop/ios 共享的中间源集，这需要能编译 iOS 才敢动（Linux 上做不到）。
+- 漏测清单：（DecorationTemplateCacheDao、AccountCacheManager 租约边界、Android 真实渲染链路 `AndroidBitmapFrameFactory` 均已补齐。）（模板布局已补 `MeetupCardTemplateLayoutTest`：双二维码不挤爆字段列、不超出卡片、大字体下不溢出、侧签内容不溢出侧栏且保留中央区域。）
+- CI（`Android_Build.yml`）只跑 `assembleDebug`，从不跑测试，所以 `:composeApp:testDebugUnitTest` 曾长期红着无人发现（commonTest 里构造真 `ImageBitmap` 的三处，在 Android 单测 JVM 上撞未实现的 `android.graphics.Bitmap`；已改用接口桩）。加一步测试到 CI 会防止复发。
 - `DesktopPlatformImageCodecTest.promptCancellationAfterWorkerCompletionClosesOwnedPixels` 断言的是 skiko 全局 `Stats.allocated["Bitmap"]`，原生对象由 cleaner 线程异步回收，整套跑时偶发误报（单跑与连跑各 3 次均通过）。
 - `DesktopWindowTitleBarLocaleTest` 在无 DISPLAY 的环境里必然 `HeadlessException`，非代码问题。
 

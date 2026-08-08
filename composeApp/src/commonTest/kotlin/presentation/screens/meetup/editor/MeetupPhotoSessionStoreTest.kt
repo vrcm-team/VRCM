@@ -67,6 +67,6 @@ class MeetupPhotoSessionStoreTest {
             portraitCrop = MeetupCrop(zoom = 1.4f),
             landscapeCrop = MeetupCrop(zoom = 2.4f),
         ),
-        preview = ImageBitmap(4, 4),
+        preview = stubImageBitmap(4, 4),
     )
 }

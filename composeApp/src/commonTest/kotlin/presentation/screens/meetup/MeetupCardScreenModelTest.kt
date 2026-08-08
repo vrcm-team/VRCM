@@ -1,6 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup
 
-import androidx.compose.ui.graphics.ImageBitmap
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.stubImageBitmap
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPreparedPhoto
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
@@ -164,7 +164,7 @@ class MeetupCardScreenModelTest : MainDispatcherTest() {
             portraitCrop = MeetupCrop(zoom = 1.5f),
             landscapeCrop = MeetupCrop(zoom = 2.5f),
         ),
-        preview = ImageBitmap(4, 4),
+        preview = stubImageBitmap(4, 4),
     )
 }
 

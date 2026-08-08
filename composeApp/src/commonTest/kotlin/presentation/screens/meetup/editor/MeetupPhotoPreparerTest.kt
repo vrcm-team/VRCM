@@ -90,7 +90,7 @@ class MeetupPhotoPreparerTest {
         override suspend fun decode(bytes: ByteArray, request: DecodeRequest): DecodedImage {
             failure?.let { throw it }
             return DecodedImage(
-                bitmap = ImageBitmap(4, 4),
+                bitmap = stubImageBitmap(4, 4),
                 originalSize = checkNotNull(decoded),
             )
         }
