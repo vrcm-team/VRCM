@@ -161,23 +161,35 @@ private inline fun ColumnScope.CustomBlock() {
             }
             val permissionRequiredMessage = strings.stettingBackgroundPermissionRequired
             val unavailableMessage = strings.stettingBackgroundUnavailable
+            // toastText has no replay or buffer, so tryEmit would silently drop these notices and
+            // leave the user without any feedback; emit from a scope like the rest of the app.
+            val toastScope = rememberCoroutineScope()
             val updateBackgroundMonitoring: (Boolean) -> Unit = { enabled ->
                 when (platform.setBackgroundFriendMonitoringEnabled(enabled)) {
                     BackgroundFriendMonitoringResult.Started,
                     BackgroundFriendMonitoringResult.Stopped,
                     -> currentSettings = currentSettings.copy(backgroundFriendMonitoringEnabled = enabled)
                     BackgroundFriendMonitoringResult.PermissionRequired -> {
-                        SharedFlowCentre.toastText.tryEmit(ToastText.Info(permissionRequiredMessage))
+                        toastScope.launch {
+                            SharedFlowCentre.toastText.emit(ToastText.Info(permissionRequiredMessage))
+                        }
                     }
                     BackgroundFriendMonitoringResult.Unsupported -> {
-                        SharedFlowCentre.toastText.tryEmit(ToastText.Error(unavailableMessage))
+                        toastScope.launch {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(unavailableMessage))
+                        }
                     }
                 }
                 backgroundSettingsRevision++
             }
             val requestNotificationPermission = rememberNotificationPermissionRequester { granted ->
-                if (granted) updateBackgroundMonitoring(true)
-                else SharedFlowCentre.toastText.tryEmit(ToastText.Info(permissionRequiredMessage))
+                if (granted) {
+                    updateBackgroundMonitoring(true)
+                } else {
+                    toastScope.launch {
+                        SharedFlowCentre.toastText.emit(ToastText.Info(permissionRequiredMessage))
+                    }
+                }
                 backgroundSettingsRevision++
             }
             ToggleSettingsRow(
