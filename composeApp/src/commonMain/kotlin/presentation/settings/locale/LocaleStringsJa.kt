@@ -385,6 +385,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val meetupCardQrLinkType = "QRコードのリンク"
     override val meetupCardQrLinkVrchat = "VRChat Web（汎用）"
     override val meetupCardQrLinkVrcm = "VRCMで開く"
+    override val meetupCardQrLabelVrchat = "VRChat"
+    override val meetupCardQrLabelVrcm = "VRCM"
     override val meetupCardLayoutPerOrientation = "縦向きと横向きでレイアウトを個別に保存します。"
     override val meetupCardRefreshPartial = "一部のカード内容を更新できませんでした。"
     override val meetupCardRefreshFailed = "カードを更新できません。保存済みの内容を表示しています。"

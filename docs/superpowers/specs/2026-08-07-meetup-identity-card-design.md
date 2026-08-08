@@ -220,7 +220,7 @@ VRCM 在 Android 注册为 `vrchat.com/home/user/*` 与自定义 `vrcm://user/{u
 - **VRChat 主页（通用，默认）**：任何设备可扫，装有 VRChat 官方 App 的设备会跳其应用内主页；VRCM 需用户在系统设置中启用链接接管。
 - **VRCM 直达**：`vrcm://user/{userId}`，装有 VRCM 的设备扫码必定直接进入应用内用户详情页（未登录时先完成登录再跳转）；未安装 VRCM 的设备无法打开，适合参与者都使用 VRCM 的聚会。
 
-两种类型可同时选中并列展示，至少保留一项。
+两种类型可同时选中并列展示，至少保留一项。同时展示两个码时，各自在白底安静区内附一行短标识（VRChat / VRCM）以便区分；只有一个码时省略标识，让码本身更大。
 
 iOS 因 Universal Links 需要 vrchat.com 域名配合，暂不支持拦截 https 链接。
 

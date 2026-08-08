@@ -4,17 +4,21 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.alexzhirkevich.qrose.rememberQrCodePainter
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
@@ -33,23 +37,53 @@ internal fun meetupCardProfileUrl(
     }
 }
 
-/** 白底 + 8dp 安静区的稳定 1:1 二维码槽位；深浅照片上均可扫描。 */
+/** 二维码类型的短标识；品牌名不翻译，四种语言取值相同。 */
+@Composable
+private fun MeetupQrLinkType.shortLabel(): String = when (this) {
+    MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLabelVrchat
+    MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLabelVrcm
+}
+
+/**
+ * 白底 + 安静区的二维码槽位；深浅照片上均可扫描。
+ * [showLabel] 时在白底内部附一行短标识——同时展示两个码时必须能分清哪个是哪个，
+ * 标识放在白底内而不是卡片背景上，才能在任意照片之上都保持可读。
+ */
 @Composable
 fun MeetupCardQrCode(
     userId: String,
     linkType: MeetupQrLinkType,
     modifier: Modifier = Modifier,
+    showLabel: Boolean = false,
 ) {
+    val label = linkType.shortLabel()
     Surface(
-        modifier = modifier.aspectRatio(1f),
+        modifier = modifier,
         color = Color.White,
         shape = MaterialTheme.shapes.small,
     ) {
-        Image(
-            painter = rememberQrCodePainter(meetupCardProfileUrl(userId, linkType)),
-            contentDescription = strings.meetupCardQrDescription,
-            modifier = Modifier.padding(8.dp).fillMaxSize(),
-        )
+        Column(
+            modifier = Modifier.padding(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(
+                painter = rememberQrCodePainter(meetupCardProfileUrl(userId, linkType)),
+                contentDescription = "${strings.meetupCardQrDescription} · $label",
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+            )
+            if (showLabel) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp,
+                    ),
+                    color = Color.Black.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -63,17 +97,20 @@ fun MeetupCardQrCodes(
     modifier: Modifier = Modifier,
 ) {
     if (linkTypes.isEmpty()) return
+    // 只有一个码时不存在混淆，省掉标识让二维码本身更大。
+    val showLabel = linkTypes.size > 1
     val spacing = Arrangement.spacedBy(8.dp)
+    val itemModifier = Modifier.width(size)
     if (vertical) {
         Column(modifier = modifier, verticalArrangement = spacing) {
             linkTypes.forEach { linkType ->
-                MeetupCardQrCode(userId, linkType, Modifier.requiredSize(size))
+                MeetupCardQrCode(userId, linkType, itemModifier, showLabel)
             }
         }
     } else {
         Row(modifier = modifier, horizontalArrangement = spacing) {
             linkTypes.forEach { linkType ->
-                MeetupCardQrCode(userId, linkType, Modifier.requiredSize(size))
+                MeetupCardQrCode(userId, linkType, itemModifier, showLabel)
             }
         }
     }
