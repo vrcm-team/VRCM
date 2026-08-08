@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
@@ -49,6 +53,7 @@ fun SettingsBottomSheet(
 
         Column(
             modifier = Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .align(Alignment.CenterHorizontally)
                 .padding(horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -130,10 +135,66 @@ private inline fun ColumnScope.CustomBlock() {
                 }
             }
         }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        val platform = koinInject<AppPlatform>()
+        Text(strings.stettingFriendActivity, style = MaterialTheme.typography.titleMedium)
+        ToggleSettingsRow(
+            title = strings.stettingFriendPresenceNotifications,
+            checked = currentSettings.friendPresenceNotificationsEnabled,
+        ) { currentSettings = currentSettings.copy(friendPresenceNotificationsEnabled = it) }
+        ToggleSettingsRow(
+            title = strings.stettingBoopNotifications,
+            checked = currentSettings.boopNotificationsEnabled,
+        ) { currentSettings = currentSettings.copy(boopNotificationsEnabled = it) }
+        if (platform.supportsBackgroundFriendMonitoring) {
+            var backgroundSettingsRevision by remember { mutableIntStateOf(0) }
+            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { backgroundSettingsRevision++ }
+            val notificationsAllowed = remember(backgroundSettingsRevision) {
+                platform.hasBackgroundFriendMonitoringPermission()
+            }
+            val batteryUnrestricted = remember(backgroundSettingsRevision) {
+                platform.isIgnoringBatteryOptimizations()
+            }
+            ToggleSettingsRow(
+                title = strings.stettingBackgroundMonitoring,
+                checked = currentSettings.backgroundFriendMonitoringEnabled,
+            ) { enabled ->
+                if (enabled && !notificationsAllowed) {
+                    platform.requestBackgroundFriendMonitoringPermission()
+                    return@ToggleSettingsRow
+                }
+                currentSettings = currentSettings.copy(backgroundFriendMonitoringEnabled = enabled)
+                platform.setBackgroundFriendMonitoringEnabled(enabled)
+            }
+            if (currentSettings.backgroundFriendMonitoringEnabled) {
+                ElevatedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(strings.stettingBackgroundSettings, style = MaterialTheme.typography.titleSmall)
+                        Text("${strings.stettingBackgroundNotifications}：${if (notificationsAllowed) strings.stettingStatusEnabled else strings.stettingStatusDisabled}")
+                        Text("${strings.stettingBackgroundBattery}：${if (batteryUnrestricted) strings.stettingStatusAllowed else strings.stettingStatusManaged}")
+                        TextButton(onClick = platform::openNotificationSettings) {
+                            Text(strings.stettingNotificationSettings)
+                        }
+                        if (platform.supportsBatteryOptimizationSettings) {
+                            TextButton(onClick = platform::openBatteryOptimizationSettings) {
+                                Text(strings.stettingBatterySettings)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
 }
 
+@Composable
+private fun ToggleSettingsRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
 @Composable
 private fun AboutBlock() {
     val versionService = koinInject<VersionService>()

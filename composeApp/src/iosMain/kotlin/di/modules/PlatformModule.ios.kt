@@ -7,6 +7,8 @@ import io.github.vrcmteam.vrcm.AppPlatform
 import io.github.vrcmteam.vrcm.IosAppPlatform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.IosPlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
+import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
+import io.github.vrcmteam.vrcm.presentation.notifications.NoOpFriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.IosKeychainSecureStorage
 import io.github.vrcmteam.vrcm.storage.SecureStorage
@@ -24,5 +26,6 @@ actual val platformModule: Module = module {
     singleOf<Settings.Factory>(NSUserDefaultsSettings::Factory)
     singleOf<AppPlatform>(::IosAppPlatform)
     singleOf(::IosPlatformImageCodec) bind PlatformImageCodec::class
+    singleOf(::NoOpFriendOnlineNotifier) bind FriendOnlineNotifier::class
     single<SecureStorage> { IosKeychainSecureStorage(DaoKeys.Account.NAME) }
 }

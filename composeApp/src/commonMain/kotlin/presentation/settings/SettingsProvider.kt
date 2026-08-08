@@ -55,7 +55,7 @@ val LocalSettingsState: ProvidableCompositionLocal<MutableState<SettingsVo>> =
             SettingsVo(
                 isDarkTheme = null,
                 themeColor = ThemeColor.Default,
-                languageTag = LanguageTag.Default
+                languageTag = LanguageTag.Default,
             )
         )
     }
