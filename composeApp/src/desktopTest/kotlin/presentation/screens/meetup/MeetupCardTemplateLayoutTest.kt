@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupDisplayStyle
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupSnapshot
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
@@ -33,6 +35,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.defaultMeetupCardConfig
 import androidx.compose.ui.unit.DpSize
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -56,6 +59,44 @@ class MeetupCardTemplateLayoutTest {
             onNodeWithTag(MeetupCardTestTags.QrCodes).getBoundsInRoot(),
             "资料栏",
         )
+    }
+
+    @Test
+    fun portraitInfoBarKeepsMediaAbovePanel() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                MeetupCardTemplateContent(
+                    state = testState(MeetupCardTemplate.InfoBar),
+                    orientation = MeetupOrientation.Portrait,
+                    modifier = Modifier.size(cardWidth, cardHeight),
+                )
+            }
+        }
+
+        val media = onNodeWithTag(MeetupCardTestTags.InfoBarMedia).getBoundsInRoot()
+        val panel = onNodeWithTag(MeetupCardTestTags.InfoBarPanel).getBoundsInRoot()
+        assertTrue(media.bottom - media.top > 0.dp, "竖屏资料栏没有给照片与资料特效保留空间：$media")
+        assertTrue(media.bottom <= panel.top, "竖屏图片区 $media 延伸到了资料面板 $panel 下方")
+        assertTrue(panel.bottom <= cardHeight, "竖屏资料面板 $panel 超出了卡片高度 $cardHeight")
+    }
+
+    @Test
+    fun landscapeInfoBarKeepsMediaLeftOfPanel() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                MeetupCardTemplateContent(
+                    state = testState(MeetupCardTemplate.InfoBar),
+                    orientation = MeetupOrientation.Landscape,
+                    modifier = Modifier.size(cardHeight, cardWidth),
+                )
+            }
+        }
+
+        val media = onNodeWithTag(MeetupCardTestTags.InfoBarMedia).getBoundsInRoot()
+        val panel = onNodeWithTag(MeetupCardTestTags.InfoBarPanel).getBoundsInRoot()
+        assertTrue(media.right - media.left > 0.dp, "横屏资料栏没有给照片与资料特效保留空间：$media")
+        assertTrue(media.right <= panel.left, "横屏图片区 $media 延伸到了资料面板 $panel 内部")
+        assertTrue(panel.right <= cardHeight, "横屏资料面板 $panel 超出了卡片宽度 $cardHeight")
     }
 
     @Test
@@ -85,20 +126,16 @@ class MeetupCardTemplateLayoutTest {
     }
 
     @Test
-    fun landscapeSpotlightDoesNotStretchGroupBannerAcrossTheCard() = runComposeUiTest {
+    fun landscapeSpotlightDoesNotStretchSelectedGroupBannerAcrossTheCard() = runComposeUiTest {
         setContent {
             MeetupTestHost(fontScale = 1f) {
                 Box(modifier = Modifier.size(cardHeight, cardWidth)) {
-                    val state = testState(MeetupCardTemplate.Spotlight)
+                    val state = testStateWithGroup(
+                        MeetupCardTemplate.Spotlight,
+                        MeetupGroupDisplayStyle.Banner,
+                    )
                     MeetupCardTemplateContent(
-                        state = state.copy(
-                            config = state.config.copy(
-                                showRepresentedGroup = true,
-                                profile = state.config.profile.copy(
-                                    representedGroup = MeetupGroupSnapshot(name = "VRCM Community"),
-                                ),
-                            ),
-                        ),
+                        state = state,
                         orientation = MeetupOrientation.Landscape,
                         modifier = Modifier.size(cardHeight, cardWidth),
                     )
@@ -112,6 +149,105 @@ class MeetupCardTemplateLayoutTest {
             bannerWidth <= cardWidth.value + 1f,
             "聚光横屏的群组横幅宽 ${bannerWidth}dp，仍然横跨了整张卡片",
         )
+    }
+
+    @Test
+    fun infoBarUsesSelectedBannerWithoutDuplicatingGroupIdentity() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                Box(modifier = Modifier.size(cardWidth, cardHeight)) {
+                    MeetupCardTemplateContent(
+                        state = testStateWithGroup(
+                            MeetupCardTemplate.InfoBar,
+                            MeetupGroupDisplayStyle.Banner,
+                        ),
+                        orientation = MeetupOrientation.Portrait,
+                        modifier = Modifier.size(cardWidth, cardHeight),
+                    )
+                }
+            }
+        }
+
+        assertNodeCount(MeetupCardTestTags.GroupBannerImage, 1, "资料栏应只展示群组 Banner")
+        assertNodeCount(MeetupCardTestTags.GroupIcon, 0, "资料栏有 Banner 时不应重复展示 icon")
+        assertNodeCount(MeetupCardTestTags.GroupName, 0, "资料栏有 Banner 时不应重复展示名字")
+        val banner = onNodeWithTag(MeetupCardTestTags.GroupBanner).getBoundsInRoot()
+        val nameplate = onNodeWithTag(MeetupCardTestTags.Nameplate).getBoundsInRoot()
+        val bannerRatio = (banner.right - banner.left) / (banner.bottom - banner.top)
+        assertTrue(
+            abs(bannerRatio - 21f / 9f) < 0.01f,
+            "资料栏群组比例应为 21:9，实际为 $bannerRatio ($banner)",
+        )
+        assertTrue(
+            banner.bottom <= nameplate.top,
+            "资料栏群组 $banner 应位于名字铭牌 $nameplate 上方",
+        )
+    }
+
+    @Test
+    fun spotlightUsesSelectedGroupIdentityWithoutBannerBackground() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                Box(modifier = Modifier.size(cardWidth, cardHeight)) {
+                    MeetupCardTemplateContent(
+                        state = testStateWithGroup(
+                            MeetupCardTemplate.Spotlight,
+                            MeetupGroupDisplayStyle.IconName,
+                        ),
+                        orientation = MeetupOrientation.Portrait,
+                        modifier = Modifier.size(cardWidth, cardHeight),
+                    )
+                }
+            }
+        }
+
+        assertNodeCount(MeetupCardTestTags.GroupBannerImage, 0, "聚光不应把 Banner 当背景")
+        assertNodeCount(MeetupCardTestTags.GroupIcon, 1, "聚光应展示群组 icon")
+        assertNodeCount(MeetupCardTestTags.GroupName, 1, "聚光应展示群组名字")
+    }
+
+    @Test
+    fun landscapeSpotlightKeepsContentInsideSafeDrawingArea() = runComposeUiTest {
+        val safeStart = 56.dp
+        val safeEnd = 64.dp
+        val safeBottom = 24.dp
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                Box(modifier = Modifier.size(cardHeight, cardWidth)) {
+                    MeetupCardTemplateContent(
+                        state = testState(MeetupCardTemplate.Spotlight),
+                        orientation = MeetupOrientation.Landscape,
+                        contentPadding = PaddingValues(
+                            start = safeStart,
+                            end = safeEnd,
+                            bottom = safeBottom,
+                        ),
+                        modifier = Modifier.size(cardHeight, cardWidth),
+                    )
+                }
+            }
+        }
+
+        val safeRight = cardHeight - safeEnd
+        val safeBottomEdge = cardWidth - safeBottom
+        val nameplate = onNodeWithTag(MeetupCardTestTags.Nameplate).getBoundsInRoot()
+        val qr = onNodeWithTag(MeetupCardTestTags.QrCodes).getBoundsInRoot()
+        assertTrue(nameplate.left >= safeStart, "铭牌 $nameplate 进入了左侧安全区")
+        assertTrue(qr.right <= safeRight, "二维码 $qr 进入了右侧安全区")
+        assertTrue(qr.bottom <= safeBottomEdge, "二维码 $qr 进入了底部安全区")
+        assertEveryQrCodeIsWhole(
+            label = "带安全区的聚光横屏",
+            bounds = DpRect(safeStart, 0.dp, safeRight, safeBottomEdge),
+        )
+    }
+
+    private fun SemanticsNodeInteractionsProvider.assertNodeCount(
+        tag: String,
+        expected: Int,
+        message: String,
+    ) {
+        val count = onAllNodesWithTag(tag).fetchSemanticsNodes().size
+        assertTrue(count == expected, "$message，实际找到 $count 个")
     }
 
     /** 两个二维码必须完整留在卡片内，且不能把状态/语言那一列挤到不可用。 */
@@ -317,4 +453,24 @@ class MeetupCardTemplateLayoutTest {
         decorations = emptyMap<DecorationSlot, ResolvedDecoration>(),
         orientation = MeetupOrientation.Portrait,
     )
+
+    private fun testStateWithGroup(
+        template: MeetupCardTemplate,
+        displayStyle: MeetupGroupDisplayStyle,
+    ): MeetupCardUiState {
+        val state = testState(template)
+        return state.copy(
+            config = state.config.copy(
+                showRepresentedGroup = true,
+                groupDisplayStyle = displayStyle,
+                profile = state.config.profile.copy(
+                    representedGroup = MeetupGroupSnapshot(
+                        name = "VRCM Community",
+                        bannerUrl = "https://example.test/group-banner.png",
+                        iconUrl = "https://example.test/group-icon.png",
+                    ),
+                ),
+            ),
+        )
+    }
 }

@@ -14,9 +14,9 @@ import kotlin.time.Duration.Companion.seconds
 class MeetupControlsStateTest {
 
     @Test
-    fun interactionShowsControlsAndTimeoutHidesThem() = runTest {
+    fun firstTapShowsControlsAndTimeoutHidesThem() = runTest {
         val state = MeetupControlsState(backgroundScope, timeout = 3.seconds)
-        state.onInteraction()
+        state.onTap()
         assertTrue(state.visible.value)
         advanceTimeBy(2_999)
         assertTrue(state.visible.value)
@@ -27,11 +27,11 @@ class MeetupControlsStateTest {
     }
 
     @Test
-    fun anotherInteractionRestartsTimeout() = runTest {
+    fun activityWhileVisibleRestartsTimeout() = runTest {
         val state = MeetupControlsState(backgroundScope, timeout = 3.seconds)
-        state.onInteraction()
+        state.onTap()
         advanceTimeBy(2_000)
-        state.onInteraction()
+        state.onActivity()
         advanceTimeBy(2_000)
         // 旧计时（t=3000）已被取消，距新交互仅过去 2 秒，仍然可见
         assertTrue(state.visible.value)
@@ -41,13 +41,36 @@ class MeetupControlsStateTest {
     }
 
     @Test
+    fun secondTapHidesControlsImmediately() = runTest {
+        val state = MeetupControlsState(backgroundScope, timeout = 3.seconds)
+        state.onTap()
+        state.onTap()
+
+        assertFalse(state.visible.value)
+        advanceUntilIdle()
+        assertFalse(state.visible.value)
+    }
+
+    @Test
+    fun activityDoesNotRevealHiddenControls() = runTest {
+        val state = MeetupControlsState(backgroundScope, timeout = 3.seconds)
+
+        state.onActivity()
+
+        assertFalse(state.visible.value)
+        advanceUntilIdle()
+        assertFalse(state.visible.value)
+    }
+
+    @Test
     fun closeCancelsHideJobAndBlocksFurtherInteractions() = runTest {
         val state = MeetupControlsState(backgroundScope, timeout = 3.seconds)
-        state.onInteraction()
+        state.onTap()
         state.close()
         assertFalse(state.visible.value)
         // close 后交互不再显示，也不再产生新的隐藏 Job
-        state.onInteraction()
+        state.onTap()
+        state.onActivity()
         assertFalse(state.visible.value)
         advanceUntilIdle()
         assertFalse(state.visible.value)

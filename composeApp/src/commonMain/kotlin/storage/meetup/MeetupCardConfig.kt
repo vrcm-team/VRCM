@@ -25,6 +25,16 @@ enum class MeetupCardTemplate {
     SideTag,
 }
 
+/** 主选群组在铭牌中的展示形式。 */
+@Serializable
+enum class MeetupGroupDisplayStyle {
+    /** 兼容旧配置：资料栏显示封面，聚光与侧签显示图标和名称。 */
+    TemplateDefault,
+
+    Banner,
+    IconName,
+}
+
 /** 身份卡照片的来源类型。 */
 @Serializable
 enum class MeetupPhotoSource {
@@ -76,7 +86,7 @@ data class MeetupPhoto(
     val height: Int = 0,
 )
 
-/** 用户在 VRChat 资料上主选展示的群组；卡片只用到名称与封面。 */
+/** 用户在 VRChat 资料上主选展示的群组；卡片只用到名称、封面与图标。 */
 @Serializable
 data class MeetupGroupSnapshot(
     val id: String = "",
@@ -131,8 +141,10 @@ data class MeetupCardConfig(
     val showLanguages: Boolean = false,
     val showStatus: Boolean = false,
     val showStatusDescription: Boolean = false,
-    /** 展示主选群组的封面横幅。 */
+    /** 是否展示主选群组。 */
     val showRepresentedGroup: Boolean = false,
+    /** 群组内容形式；默认值用于兼容尚未保存该字段的旧配置。 */
+    val groupDisplayStyle: MeetupGroupDisplayStyle = MeetupGroupDisplayStyle.TemplateDefault,
     val showShortText: Boolean = false,
     val showQrCode: Boolean = false,
     /** 同时展示的二维码链接类型，可多选；与 [qrProfileLinks] 同时为空时按通用主页处理。 */
@@ -166,6 +178,20 @@ fun MeetupCardConfig.templateFor(orientation: MeetupOrientation): MeetupCardTemp
         MeetupOrientation.Portrait -> template
         MeetupOrientation.Landscape -> landscapeTemplate ?: template
     }
+
+/** 解析群组展示形式；旧配置按当前模板沿用原有表现。 */
+fun MeetupCardConfig.resolvedGroupDisplayStyle(
+    template: MeetupCardTemplate,
+): MeetupGroupDisplayStyle = when (groupDisplayStyle) {
+    MeetupGroupDisplayStyle.TemplateDefault -> when (template) {
+        MeetupCardTemplate.InfoBar -> MeetupGroupDisplayStyle.Banner
+        MeetupCardTemplate.Spotlight,
+        MeetupCardTemplate.SideTag,
+        -> MeetupGroupDisplayStyle.IconName
+    }
+
+    else -> groupDisplayStyle
+}
 
 /**
  * 去重后的二维码类型列表；只有在资料链接也没选时才回退通用主页，

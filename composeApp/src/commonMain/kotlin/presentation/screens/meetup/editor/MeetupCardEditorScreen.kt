@@ -181,6 +181,7 @@ fun MeetupCardEditorContent(
             onShowStatus = model::setShowStatus,
             onShowStatusDescription = model::setShowStatusDescription,
             onShowRepresentedGroup = model::setShowRepresentedGroup,
+            onGroupDisplayStyle = model::setGroupDisplayStyle,
             onShowShortText = model::setShowShortText,
             onShortText = model::setShortText,
             onShowQrCode = model::setShowQrCode,

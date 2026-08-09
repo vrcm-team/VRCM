@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.storage.meetup
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -101,6 +102,29 @@ class MeetupCardConfigDaoTest {
 
         assertEquals(MEETUP_CARD_SCHEMA_VERSION, saved["schemaVersion"]?.jsonPrimitive?.int)
         assertEquals(false, saved["showAvatar"]?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun configurationWithoutGroupDisplayStyleKeepsTemplateDefaults() {
+        val settings = MapSettings()
+        val dao = MeetupCardConfigDao(settings)
+        dao.save(defaultMeetupCardConfig("usr_a"))
+        val key = "${DaoKeys.MeetupCard.KEY_PREFIX}.usr_a"
+        val raw = assertNotNull(settings.getStringOrNull(key))
+        val stored = Json.parseToJsonElement(raw).jsonObject
+        settings.putString(key, JsonObject(stored - "groupDisplayStyle").toString())
+
+        val loaded = assertNotNull(dao.load("usr_a"))
+
+        assertEquals(MeetupGroupDisplayStyle.TemplateDefault, loaded.groupDisplayStyle)
+        assertEquals(
+            MeetupGroupDisplayStyle.Banner,
+            loaded.resolvedGroupDisplayStyle(MeetupCardTemplate.InfoBar),
+        )
+        assertEquals(
+            MeetupGroupDisplayStyle.IconName,
+            loaded.resolvedGroupDisplayStyle(MeetupCardTemplate.Spotlight),
+        )
     }
 
     @Test

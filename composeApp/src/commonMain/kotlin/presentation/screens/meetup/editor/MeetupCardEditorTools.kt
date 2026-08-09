@@ -24,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -53,10 +56,12 @@ import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupDisplayStyle
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
+import io.github.vrcmteam.vrcm.storage.meetup.resolvedGroupDisplayStyle
 import io.github.vrcmteam.vrcm.storage.meetup.templateFor
 
 /** 编辑器工具区回调集合；均为幂等操作，由 ViewModel 决定持久化时机。 */
@@ -68,6 +73,7 @@ internal class MeetupEditorActions(
     val onShowStatus: (Boolean) -> Unit,
     val onShowStatusDescription: (Boolean) -> Unit,
     val onShowRepresentedGroup: (Boolean) -> Unit,
+    val onGroupDisplayStyle: (MeetupGroupDisplayStyle) -> Unit,
     val onShowShortText: (Boolean) -> Unit,
     val onShortText: (String) -> Unit,
     val onShowQrCode: (Boolean) -> Unit,
@@ -321,6 +327,38 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 config.showRepresentedGroup,
                 actions.onShowRepresentedGroup,
             )
+            if (config.showRepresentedGroup) {
+                Text(
+                    text = strings.meetupCardGroupDisplayStyle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                val selectedStyle = config.resolvedGroupDisplayStyle(
+                    config.templateFor(state.orientation),
+                )
+                val displayStyles = listOf(
+                    MeetupGroupDisplayStyle.Banner,
+                    MeetupGroupDisplayStyle.IconName,
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    displayStyles.forEachIndexed { index, style ->
+                        SegmentedButton(
+                            selected = selectedStyle == style,
+                            onClick = { actions.onGroupDisplayStyle(style) },
+                            shape = SegmentedButtonDefaults.itemShape(index, displayStyles.size),
+                            label = {
+                                Text(
+                                    when (style) {
+                                        MeetupGroupDisplayStyle.Banner -> strings.meetupCardGroupBanner
+                                        MeetupGroupDisplayStyle.IconName -> strings.meetupCardGroupIconName
+                                        MeetupGroupDisplayStyle.TemplateDefault -> error("Not selectable")
+                                    },
+                                )
+                            },
+                        )
+                    }
+                }
+            }
         }
     }
     ToolSection(strings.meetupCardShortText) {

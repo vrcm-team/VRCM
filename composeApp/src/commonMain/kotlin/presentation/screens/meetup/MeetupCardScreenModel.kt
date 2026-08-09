@@ -9,6 +9,7 @@ import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoTarget
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfig
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCrop
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupDisplayStyle
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
@@ -92,6 +93,10 @@ class MeetupCardScreenModel(
     fun setShowStatusDescription(value: Boolean) = persist { it.copy(showStatusDescription = value) }
 
     fun setShowRepresentedGroup(value: Boolean) = persist { it.copy(showRepresentedGroup = value) }
+
+    fun setGroupDisplayStyle(value: MeetupGroupDisplayStyle) = persist {
+        it.copy(groupDisplayStyle = value)
+    }
 
     fun setShowShortText(value: Boolean) = persist { it.copy(showShortText = value) }
 
