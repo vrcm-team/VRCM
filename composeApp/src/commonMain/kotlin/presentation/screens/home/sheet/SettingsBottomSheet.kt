@@ -23,8 +23,10 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
-import io.github.vrcmteam.vrcm.presentation.settings.rememberNotificationPermissionRequester
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
@@ -139,86 +141,6 @@ private inline fun ColumnScope.CustomBlock() {
                 }
             }
         }
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-        val platform = koinInject<AppPlatform>()
-        if (platform.supportsFriendActivityNotifications) {
-            Text(strings.stettingFriendActivity, style = MaterialTheme.typography.titleMedium)
-            ToggleSettingsRow(
-                title = strings.stettingFriendPresenceNotifications,
-                checked = currentSettings.friendPresenceNotificationsEnabled,
-            ) { currentSettings = currentSettings.copy(friendPresenceNotificationsEnabled = it) }
-            ToggleSettingsRow(
-                title = strings.stettingBoopNotifications,
-                checked = currentSettings.boopNotificationsEnabled,
-            ) { currentSettings = currentSettings.copy(boopNotificationsEnabled = it) }
-        }
-        if (platform.supportsBackgroundFriendMonitoring) {
-            var backgroundSettingsRevision by remember { mutableIntStateOf(0) }
-            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { backgroundSettingsRevision++ }
-            val notificationsAllowed = remember(backgroundSettingsRevision) {
-                platform.hasBackgroundFriendMonitoringPermission()
-            }
-            val batteryUnrestricted = remember(backgroundSettingsRevision) {
-                platform.isIgnoringBatteryOptimizations()
-            }
-            val permissionRequiredMessage = strings.stettingBackgroundPermissionRequired
-            val unavailableMessage = strings.stettingBackgroundUnavailable
-            // toastText has no replay or buffer, so tryEmit would silently drop these notices and
-            // leave the user without any feedback; emit from a scope like the rest of the app.
-            val toastScope = rememberCoroutineScope()
-            val updateBackgroundMonitoring: (Boolean) -> Unit = { enabled ->
-                when (platform.setBackgroundFriendMonitoringEnabled(enabled)) {
-                    BackgroundFriendMonitoringResult.Started,
-                    BackgroundFriendMonitoringResult.Stopped,
-                    -> currentSettings = currentSettings.copy(backgroundFriendMonitoringEnabled = enabled)
-                    BackgroundFriendMonitoringResult.PermissionRequired -> {
-                        toastScope.launch {
-                            SharedFlowCentre.toastText.emit(ToastText.Info(permissionRequiredMessage))
-                        }
-                    }
-                    BackgroundFriendMonitoringResult.Unsupported -> {
-                        toastScope.launch {
-                            SharedFlowCentre.toastText.emit(ToastText.Error(unavailableMessage))
-                        }
-                    }
-                }
-                backgroundSettingsRevision++
-            }
-            val requestNotificationPermission = rememberNotificationPermissionRequester { granted ->
-                if (granted) {
-                    updateBackgroundMonitoring(true)
-                } else {
-                    toastScope.launch {
-                        SharedFlowCentre.toastText.emit(ToastText.Info(permissionRequiredMessage))
-                    }
-                }
-                backgroundSettingsRevision++
-            }
-            ToggleSettingsRow(
-                title = strings.stettingBackgroundMonitoring,
-                checked = currentSettings.backgroundFriendMonitoringEnabled,
-            ) { enabled ->
-                if (enabled && !notificationsAllowed) requestNotificationPermission()
-                else updateBackgroundMonitoring(enabled)
-            }
-            if (currentSettings.backgroundFriendMonitoringEnabled) {
-                ElevatedCard(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(strings.stettingBackgroundSettings, style = MaterialTheme.typography.titleSmall)
-                        Text("${strings.stettingBackgroundNotifications}: ${if (notificationsAllowed) strings.stettingStatusEnabled else strings.stettingStatusDisabled}")
-                        Text("${strings.stettingBackgroundBattery}: ${if (batteryUnrestricted) strings.stettingStatusAllowed else strings.stettingStatusManaged}")
-                        TextButton(onClick = platform::openNotificationSettings) {
-                            Text(strings.stettingNotificationSettings)
-                        }
-                        if (platform.supportsBatteryOptimizationSettings) {
-                            TextButton(onClick = platform::openBatteryOptimizationSettings) {
-                                Text(strings.stettingBatterySettings)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
 }
@@ -265,6 +187,27 @@ private fun AboutBlock() {
         }
     }
     Column {
+        val platform = koinInject<AppPlatform>()
+        // 通知相关的开关全部收进独立页面，设置面板里只留一个入口；不能投递通知的平台不显示。
+        if (platform.supportsFriendActivityNotifications) {
+            val navigator = LocalNavigator.currentOrThrow
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { navigator push NotificationSettingsScreen }
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "${strings.stettingMoreSettings}:")
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = strings.notificationSettingsTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        }
         val diskCache = imageLoader.diskCache
         var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
         var isClearingCache by remember { mutableStateOf(false) }
