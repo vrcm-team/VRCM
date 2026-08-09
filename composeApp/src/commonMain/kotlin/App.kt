@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.SlideOrientation
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialLinkPrompt
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
@@ -106,6 +107,7 @@ fun App(
                                 .padding(vertical = 76.dp, horizontal = 12.dp)
                         ) {
                             VersionDialog()
+                            OfficialLinkPrompt(navigator)
                             SharedTransitionScreen(
                                 navigator = navigator,
                                 transitionSpec = { selectTransition(isPop = false) },
