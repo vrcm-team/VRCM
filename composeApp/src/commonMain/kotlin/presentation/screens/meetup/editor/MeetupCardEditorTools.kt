@@ -59,6 +59,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupDisplayStyle
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
+import io.github.vrcmteam.vrcm.storage.meetup.editableMeetupQrLinkTypes
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrLinkTypes
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedQrProfileLinks
 import io.github.vrcmteam.vrcm.storage.meetup.resolvedGroupDisplayStyle
@@ -400,7 +401,7 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
             // 到达上限后只能取消已选项，避免码多到把铭牌挤出卡片。
             val atLimit = selectedTypes.size + selectedLinks.size >= MEETUP_QR_MAX_CODES
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MeetupQrLinkType.entries.forEach { linkType ->
+                editableMeetupQrLinkTypes.forEach { linkType ->
                     val selected = linkType in selectedTypes
                     FilterChip(
                         selected = selected,
@@ -410,6 +411,7 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                             Text(
                                 text = when (linkType) {
                                     MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
+                                    MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrchat
                                 },
                             )
                         },

@@ -50,6 +50,7 @@ internal fun meetupCardProfileUrl(
     }
     return when (linkType) {
         MeetupQrLinkType.VrchatWeb -> "https://vrchat.com/home/user/$userId"
+        MeetupQrLinkType.VrcmDeepLink -> "https://vrchat.com/home/user/$userId"
     }
 }
 
@@ -87,6 +88,7 @@ internal fun meetupCardLinkLabel(url: String): String =
 private fun MeetupQrTarget.shortLabel(): String = when (this) {
     is MeetupQrTarget.Builtin -> when (type) {
         MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLabelVrchat
+        MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLabelVrchat
     }
     is MeetupQrTarget.ProfileLink -> meetupCardLinkLabel(url)
 }
@@ -98,6 +100,7 @@ private fun MeetupQrTarget.shortLabel(): String = when (this) {
 private fun MeetupQrTarget.badgeIcon(): ImageVector = when (this) {
     is MeetupQrTarget.Builtin -> when (type) {
         MeetupQrLinkType.VrchatWeb -> AppIcons.AccountCircle
+        MeetupQrLinkType.VrcmDeepLink -> AppIcons.AccountCircle
     }
     is MeetupQrTarget.ProfileLink -> WebIcons.selectIcon(url) ?: AppIcons.Link
 }
