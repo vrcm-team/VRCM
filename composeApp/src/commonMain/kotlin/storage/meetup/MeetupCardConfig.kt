@@ -50,14 +50,10 @@ enum class MeetupOrientation {
     Landscape,
 }
 
-/**
- * 二维码链接类型：通用 VRChat 主页任何设备可扫；
- * VRCM 直达 scheme 在装有 VRCM 的设备上必定跳应用内用户页。
- */
+/** 二维码链接类型：通用 VRChat 主页可由任何设备扫描。 */
 @Serializable
 enum class MeetupQrLinkType {
     VrchatWeb,
-    VrcmDeepLink,
 }
 
 /** 单个画面方向下的照片裁剪参数。 */

@@ -410,7 +410,6 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                             Text(
                                 text = when (linkType) {
                                     MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
-                                    MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrcm
                                 },
                             )
                         },

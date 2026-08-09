@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -58,12 +56,7 @@ import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
-import io.github.vrcmteam.vrcm.core.shared.AppDeepLink
-import io.github.vrcmteam.vrcm.core.shared.AppDeepLinks
-import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.FriendActivityService
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -90,21 +83,6 @@ fun App(
             if (lifecycleEventGate.onResume()) {
                 webSocketApi.onForeground()
                 friendLocationPagerModel.onForeground()
-            }
-        }
-        // 外部深链（扫码等）：等完成登录、主页进入返回栈后再跳转目标页。
-        LaunchedEffect(navigator) {
-            AppDeepLinks.pending.filterNotNull().collect { link ->
-                snapshotFlow { navigator.items.any { it is HomeScreen } }.first { it }
-                when (link) {
-                    is AppDeepLink.UserProfile -> {
-                        val route = UserProfileScreen(UserProfileVo(id = link.userId))
-                        if ((navigator.lastItem as? UserProfileScreen)?.key != route.key) {
-                            navigator push route
-                        }
-                    }
-                }
-                AppDeepLinks.consume(link)
             }
         }
         SettingsProvider {
