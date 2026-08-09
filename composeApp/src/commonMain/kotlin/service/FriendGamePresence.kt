@@ -26,13 +26,24 @@ internal class FavoriteFriendPresenceTracker {
 
     fun reset() { favorites = emptySet(); knownPresence.clear(); names.clear() }
 
-    fun updateFavorites(ids: Set<String>, friends: Map<String, FriendData>) {
+    /**
+     * Registers the favorited friends to watch.
+     *
+     * [presenceTrusted] must be false while [friends] may still be the locally restored snapshot,
+     * whose presence is forced to offline. Such a snapshot only contributes display names: taking a
+     * baseline from it would report every favorited friend as newly online once the real friend
+     * list arrives.
+     */
+    fun updateFavorites(ids: Set<String>, friends: Map<String, FriendData>, presenceTrusted: Boolean) {
+        ids.forEach { id ->
+            friends[id]?.displayName?.takeIf(String::isNotBlank)?.let { names[id] = it }
+        }
+        if (!presenceTrusted) return
         favorites = ids
         knownPresence.keys.retainAll(ids)
         names.keys.retainAll(ids)
         ids.forEach { id -> friends[id]?.let { friend ->
             knownPresence.putIfAbsent(id, isInGameLocation(friend.location))
-            friend.displayName.takeIf(String::isNotBlank)?.let { names[id] = it }
         } }
     }
 

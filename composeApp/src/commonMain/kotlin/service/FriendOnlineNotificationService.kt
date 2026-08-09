@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -53,14 +54,22 @@ class FriendOnlineNotificationService(
                 session?.let { account ->
                     favoriteJob = scope.launch {
                         favoriteService.loadFavoriteByGroup(FavoriteType.Friend)
-                        favoriteService.favoritesByGroup(FavoriteType.Friend).collect { groups ->
-                            val ids = groups.values.flatten().map { it.favoriteId }.toSet()
-                            mutex.withLock {
-                                if (activeToken == account.token) {
-                                    tracker.updateFavorites(ids, friendService.friendMap)
+                        // 冷启动时 friendState 先装的是本地缓存快照，其在线状态被强制写成离线，
+                        // 拿它建立基线会在真实好友列表分页落地时把所有收藏好友判成刚刚上线。
+                        // 因此把刷新状态一起并进来：未完成首次完整刷新时只记名字、不建立基线，
+                        // 刷新成功后这里会重新发射一次，用真实数据补上基线。
+                        combine(
+                            favoriteService.favoritesByGroup(FavoriteType.Friend),
+                            friendService.initialRefreshCompleted,
+                        ) { groups, presenceTrusted -> groups to presenceTrusted }
+                            .collect { (groups, presenceTrusted) ->
+                                val ids = groups.values.flatten().map { it.favoriteId }.toSet()
+                                mutex.withLock {
+                                    if (activeToken == account.token) {
+                                        tracker.updateFavorites(ids, friendService.friendMap, presenceTrusted)
+                                    }
                                 }
                             }
-                        }
                     }
                     refreshBoops(account.token, seedOnly = true)
                 }
