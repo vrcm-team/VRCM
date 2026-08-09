@@ -69,7 +69,7 @@ fun SettingsBottomSheet(
                 CustomBlock()
             }
             SettingsBlockSurface {
-                AboutBlock()
+                AboutBlock(onDismissRequest)
             }
             LogoutButton(onDismissRequest)
         }
@@ -153,7 +153,7 @@ private fun ToggleSettingsRow(title: String, checked: Boolean, onCheckedChange: 
     }
 }
 @Composable
-private fun AboutBlock() {
+private fun AboutBlock(onDismissRequest: () -> Unit) {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
     val accountCacheManager = koinInject<AccountCacheManager>()
@@ -193,7 +193,11 @@ private fun AboutBlock() {
             val navigator = LocalNavigator.currentOrThrow
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .clickable { navigator push NotificationSettingsScreen }
+                    .clickable {
+                        navigator push NotificationSettingsScreen
+                        // 设置面板是盖在内容之上的弹窗，不收起来会把刚推进去的页面挡住。
+                        onDismissRequest()
+                    }
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
