@@ -284,7 +284,7 @@ sealed class LocaleStrings {
     open val profileInviteNotInInstance: String = "You are not in an instance"
     open val friendActivityTitle: String = "Activity"
     open val friendActivityRecentTogether: String = "Recently together"
-    open val friendActivityLastTogether: String = "Last together"
+    open val friendActivityLastTogether: String = "Last met"
     open val friendActivityLastActivity: String = "Last activity"
     open val friendActivityMeetingCount: String = "Meetups"
     open val friendActivityTogetherTime: String = "Time together"

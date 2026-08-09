@@ -272,7 +272,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val profileInviteNotInInstance = "現在インスタンスに参加していません"
     override val friendActivityTitle = "アクティビティ"
     override val friendActivityRecentTogether = "最近一緒にいたユーザー"
-    override val friendActivityLastTogether = "最後に一緒にいた日時"
+    override val friendActivityLastTogether = "最後に会った日時"
     override val friendActivityLastActivity = "最近のアクティビティ"
     override val friendActivityMeetingCount = "会った回数"
     override val friendActivityTogetherTime = "一緒にいた時間"

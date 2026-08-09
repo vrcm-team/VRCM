@@ -272,7 +272,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val profileInviteNotInInstance = "你當前不在任何房間中"
     override val friendActivityTitle = "好友活動"
     override val friendActivityRecentTogether = "最近一起玩過"
-    override val friendActivityLastTogether = "最後同房"
+    override val friendActivityLastTogether = "最後見面"
     override val friendActivityLastActivity = "最近活動"
     override val friendActivityMeetingCount = "見面次數"
     override val friendActivityTogetherTime = "共同遊玩時長"
