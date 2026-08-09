@@ -408,6 +408,9 @@ sealed class LocaleStrings {
     open val meetupCardQrProfileLinks: String = "Profile links"
     open val meetupCardQrLimit: String = "Up to %d QR codes at a time"
     open val meetupCardQrLabelVrchat: String = "VRChat"
+    open val copyOfficialUrl: String = "Copy official URL"
+    open val officialUrlCopied: String = "Link copied"
+    open val officialUrlCopyFailed: String = "Could not copy the official URL"
     open val meetupCardLayoutPerOrientation: String =
         "Portrait and landscape keep separate layouts."
     open val meetupCardRefreshPartial: String = "Some card content could not be refreshed."

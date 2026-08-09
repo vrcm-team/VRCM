@@ -963,6 +963,9 @@ private fun AppRoute.RenderBottomSheetContent(
                             }
                         }
                     }
+                    OfficialUrlRow(
+                        url = "https://vrchat.com/home/world/${worldProfileVo.worldId}",
+                    )
                 }
             }
 
@@ -1017,6 +1020,7 @@ private fun AppRoute.RenderBottomSheetContent(
                 Text(strings.favoriteWorld)
             }
         }
+
     }
 }
 
