@@ -5,7 +5,9 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 import io.github.vrcmteam.vrcm.network.websocket.data.type.NotificationEvents
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.SettingsDao
@@ -98,48 +100,84 @@ class FriendOnlineNotificationService(
         }
     }
 
-    private fun anyInboxNotificationEnabled(): Boolean =
-        settingsDao.boopNotificationsEnabled ||
-            settingsDao.friendRequestNotificationsEnabled ||
-            settingsDao.groupAnnouncementNotificationsEnabled
+    private fun anyV1NotificationEnabled(): Boolean =
+        settingsDao.boopNotificationsEnabled || settingsDao.groupAnnouncementNotificationsEnabled
 
     /**
      * 拉取收件箱通知并按类型分派。
      *
-     * 戳一戳、好友请求和群组公告共用同一个接口，因此只拉一次、按 type 分流；三类各自受开关控制，
-     * 但去重集合是共用的：首次拉取只把已有通知记为基线，避免把历史消息当成新消息补发。
+     * 戳一戳与群组公告来自 V1 的 /notifications，好友请求要单独走 V2——本仓库的 HomeScreenModel
+     * 也是这么分开拉的，V1 不返回 friendRequest。两条路径共用同一份已见 ID 集合，因为两边的 id
+     * 都是通知 ID；首次拉取只把已有通知记为基线，避免把历史消息当成新消息补发。
      */
     private suspend fun refreshInboxNotifications(
         token: AccountSessionToken,
         seedOnly: Boolean = false,
     ) {
-        if (!anyInboxNotificationEnabled() || !SharedFlowCentre.isCurrentSession(token)) return
-        val notifications = try {
-            notificationApi.fetchNotifications()
-        } catch (error: Exception) {
-            logger.warn("Unable to refresh notifications: ${error.message.orEmpty()}")
-            return
+        if (!SharedFlowCentre.isCurrentSession(token)) return
+        val v1Notifications = if (anyV1NotificationEnabled()) {
+            try {
+                notificationApi.fetchNotifications()
+            } catch (error: Exception) {
+                logger.warn("Unable to refresh notifications: ${error.message.orEmpty()}")
+                null
+            }
+        } else {
+            emptyList()
         }
+        val friendRequests = if (settingsDao.friendRequestNotificationsEnabled) {
+            try {
+                notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value)
+            } catch (error: Exception) {
+                logger.warn("Unable to refresh friend requests: ${error.message.orEmpty()}")
+                null
+            }
+        } else {
+            emptyList()
+        }
+        // 任一路径失败就整轮跳过，避免只用半份数据去重后把另一半当成新消息补发。
+        if (v1Notifications == null || friendRequests == null) return
+        if (v1Notifications.isEmpty() && friendRequests.isEmpty() && !seedOnly) return
+
+        val ids = v1Notifications.map(NotificationData::id) + friendRequests.map(NotificationDataV2::id)
         val pending = mutex.withLock {
             if (activeToken != token || !SharedFlowCentre.isCurrentSession(token)) {
-                return@withLock emptyList()
+                return@withLock emptyList<() -> Unit>()
             }
             if (!notificationsSeeded || seedOnly) {
                 knownNotificationIds.clear()
-                knownNotificationIds += notifications.map(NotificationData::id)
+                knownNotificationIds += ids
                 notificationsSeeded = true
                 emptyList()
             } else {
-                notifications.filter { knownNotificationIds.add(it.id) }
+                buildList {
+                    v1Notifications.forEach { notification ->
+                        if (knownNotificationIds.add(notification.id)) {
+                            add { dispatchV1Notification(notification) }
+                        }
+                    }
+                    friendRequests.forEach { request ->
+                        if (knownNotificationIds.add(request.id)) {
+                            add { dispatchFriendRequest(request) }
+                        }
+                    }
+                }
             }
         }
-        pending.forEach { notification ->
-            if (SharedFlowCentre.isCurrentSession(token)) dispatchInboxNotification(notification)
+        pending.forEach { deliver ->
+            if (SharedFlowCentre.isCurrentSession(token)) deliver()
         }
     }
 
+    private fun dispatchFriendRequest(request: NotificationDataV2) {
+        if (!settingsDao.friendRequestNotificationsEnabled) return
+        // V2 的字段比 V1 少，没有 senderUsername，只能退到发送者 ID。
+        val sender = request.senderUserId.takeIf(String::isNotBlank) ?: "Unknown"
+        notifier.notifyFriendRequest(request.id, sender)
+    }
+
     /** 本地弹出提醒不改变服务器上的已读状态。 */
-    private fun dispatchInboxNotification(notification: NotificationData) {
+    private fun dispatchV1Notification(notification: NotificationData) {
         val sender = notification.senderUsername?.takeIf(String::isNotBlank)
             ?: notification.senderUserId?.takeIf(String::isNotBlank)
             ?: "Unknown"
@@ -151,11 +189,6 @@ class FriendOnlineNotificationService(
                     sender,
                     notification.details?.emojiId ?: notification.data.emojiId,
                 )
-            }
-
-            notification.type.equals(FRIEND_REQUEST_TYPE, ignoreCase = true) -> {
-                if (!settingsDao.friendRequestNotificationsEnabled) return
-                notifier.notifyFriendRequest(notification.id, sender)
             }
 
             notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
@@ -198,7 +231,6 @@ class FriendOnlineNotificationService(
 
     private companion object {
         const val BOOP_TYPE = "boop"
-        const val FRIEND_REQUEST_TYPE = "friendRequest"
 
         /** VRChat 把群组类通知统一放在 group. 前缀下，公告是其中的 group.announcement。 */
         const val GROUP_ANNOUNCEMENT_TYPE_PREFIX = "group.announcement"
