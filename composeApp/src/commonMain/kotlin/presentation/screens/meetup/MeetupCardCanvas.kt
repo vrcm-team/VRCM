@@ -14,7 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageSize
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.AnimatedDecoration
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisualImage
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.rememberDecorationVisual
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import org.koin.compose.koinInject
@@ -77,20 +78,31 @@ fun MeetupCardCanvas(
         }
         // 4. 官方资料特效：顶部对齐、自适应铺满卡片宽度、按素材纵横比
         //    等比缩放（超出高度部分裁掉），不拉伸；不接收指针事件。
-        if (state.config.showProfileEffect) {
-            state.decorations[DecorationSlot.ProfileEffect]?.let { decoration ->
-                AnimatedDecoration(
-                    decoration = decoration,
-                    contentScale = ContentScale.FillWidth,
-                    alignment = Alignment.TopCenter,
-                    modifier = Modifier.fillMaxSize().clipToBounds(),
-                )
-            }
-        }
+        DecorationVisualImage(
+            visual = rememberDecorationVisual(
+                state.decorations[DecorationSlot.ProfileEffect]
+                    .takeIf { state.config.showProfileEffect },
+            ),
+            contentScale = ContentScale.FillWidth,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier.fillMaxSize().clipToBounds(),
+        )
         // 5. 模板内容（名字、字段、二维码、头像框与铭牌特效在内部按槽位渲染）。
+        //    装饰的解码与播放留在这一层：切换版式会重建整棵模板树，
+        //    播放器跟着重建就要在主线程等解码器放锁再从头重放，连续切换会卡死 UI。
         MeetupCardTemplateContent(
             state = state,
             orientation = orientation,
+            decorations = MeetupDecorationVisuals(
+                iconFrame = rememberDecorationVisual(
+                    state.decorations[DecorationSlot.IconFrame]
+                        .takeIf { state.config.showIconFrame },
+                ),
+                nameplateEffect = rememberDecorationVisual(
+                    state.decorations[DecorationSlot.NameplateEffect]
+                        .takeIf { state.config.showNameplateEffect },
+                ),
+            ),
             modifier = Modifier.fillMaxSize(),
         )
         // 6. 控制层 slot。

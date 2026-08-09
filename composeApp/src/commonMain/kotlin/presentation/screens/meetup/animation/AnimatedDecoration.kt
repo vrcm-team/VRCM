@@ -31,32 +31,32 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
+/** 装饰当前可绘制的画面：动画的某一帧，或静态回退图。 */
+sealed interface DecorationVisual {
+    data class Frame(val bitmap: ImageBitmap) : DecorationVisual
+
+    data class Static(val model: String) : DecorationVisual
+}
+
 /**
  * 官方 Profile Decoration 播放器：Animated 资产逐帧播放，解码失败时
  * 回退同槽位 static base，两者都不可用则不渲染。装饰层不接收指针事件。
  * 只在 Lifecycle RESUMED 时推进帧；离开组合释放全部帧与解码器。
+ *
+ * 播放状态挂在调用它的那一层：装饰若跟着会重建的子树（例如切换卡片版式时
+ * 整棵模板树），每次重建都要在主线程等解码器放锁、再从第 0 帧重放整段动画，
+ * 连续切换会直接卡住 UI。因此卡片侧在稳定的层调用它，把画面传下去渲染。
  */
 @Composable
-fun AnimatedDecoration(
-    decoration: ResolvedDecoration,
-    modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Fit,
-    alignment: Alignment = Alignment.Center,
-) {
-    val asset = decoration.asset
-    if (decoration.mode == DecorationRenderMode.Unavailable || asset == null) return
+fun rememberDecorationVisual(decoration: ResolvedDecoration?): DecorationVisual? {
+    val asset = decoration?.asset
+    if (decoration == null || decoration.mode == DecorationRenderMode.Unavailable || asset == null) {
+        return null
+    }
     val assetStore: MeetupCardAssetStore = koinInject()
 
     if (decoration.mode == DecorationRenderMode.Static) {
-        AsyncImage(
-            model = assetStore.model(asset),
-            contentDescription = null,
-            imageLoader = koinInject<ImageLoader>(),
-            contentScale = contentScale,
-            alignment = alignment,
-            modifier = modifier,
-        )
-        return
+        return DecorationVisual.Static(assetStore.model(asset))
     }
 
     val decoder: AnimatedWebpDecoder = koinInject()
@@ -114,22 +114,32 @@ fun AnimatedDecoration(
     }
 
     if (animationFailed) {
-        decoration.staticFallback?.let { fallback ->
-            AsyncImage(
-                model = assetStore.model(fallback),
-                contentDescription = null,
-                imageLoader = koinInject<ImageLoader>(),
-                contentScale = contentScale,
-                alignment = alignment,
-                modifier = modifier,
-            )
-        }
-        return
+        return decoration.staticFallback?.let { DecorationVisual.Static(assetStore.model(it)) }
     }
-    frameBitmap?.let { bitmap ->
-        Image(
-            bitmap = bitmap,
+    return frameBitmap?.let(DecorationVisual::Frame)
+}
+
+/** 纯渲染：画面由 [rememberDecorationVisual] 在上层维护，这里只负责画出来。 */
+@Composable
+fun DecorationVisualImage(
+    visual: DecorationVisual?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Fit,
+    alignment: Alignment = Alignment.Center,
+) {
+    when (visual) {
+        null -> Unit
+        is DecorationVisual.Frame -> Image(
+            bitmap = visual.bitmap,
             contentDescription = null,
+            contentScale = contentScale,
+            alignment = alignment,
+            modifier = modifier,
+        )
+        is DecorationVisual.Static -> AsyncImage(
+            model = visual.model,
+            contentDescription = null,
+            imageLoader = koinInject<ImageLoader>(),
             contentScale = contentScale,
             alignment = alignment,
             modifier = modifier,

@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +49,8 @@ import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.AnimatedDecoration
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisual
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisualImage
 import org.koin.compose.koinInject
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
@@ -82,17 +84,28 @@ private fun Color.contrastingContent(): Color =
 private fun Color.tintedScrim(alpha: Float): Color =
     lerp(Color.Black, this, 0.28f).copy(alpha = alpha)
 
+/**
+ * 卡片层已经解码好的装饰画面。装饰不在模板里播放：切换版式会重建整棵模板树，
+ * 播放器跟着重建就要在主线程等解码器放锁，再从第 0 帧重放整段动画。
+ */
+@Immutable
+internal data class MeetupDecorationVisuals(
+    val iconFrame: DecorationVisual? = null,
+    val nameplateEffect: DecorationVisual? = null,
+)
+
 /** 按模板与方向渲染身份信息层；三套模板共享同一批槽位组件。 */
 @Composable
 internal fun MeetupCardTemplateContent(
     state: MeetupCardUiState,
     orientation: MeetupOrientation,
     modifier: Modifier = Modifier,
+    decorations: MeetupDecorationVisuals = MeetupDecorationVisuals(),
 ) {
     when (state.config.templateFor(orientation)) {
-        MeetupCardTemplate.InfoBar -> InfoBarTemplate(state, orientation, modifier)
-        MeetupCardTemplate.Spotlight -> SpotlightTemplate(state, orientation, modifier)
-        MeetupCardTemplate.SideTag -> SideTagTemplate(state, orientation, modifier)
+        MeetupCardTemplate.InfoBar -> InfoBarTemplate(state, orientation, decorations, modifier)
+        MeetupCardTemplate.Spotlight -> SpotlightTemplate(state, orientation, decorations, modifier)
+        MeetupCardTemplate.SideTag -> SideTagTemplate(state, orientation, decorations, modifier)
     }
 }
 
@@ -101,6 +114,7 @@ internal fun MeetupCardTemplateContent(
 private fun InfoBarTemplate(
     state: MeetupCardUiState,
     orientation: MeetupOrientation,
+    decorations: MeetupDecorationVisuals,
     modifier: Modifier,
 ) {
     val panel: @Composable (Modifier) -> Unit = { panelModifier ->
@@ -119,7 +133,7 @@ private fun InfoBarTemplate(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     // 名字独占整行，不与二维码抢横向空间。
-                    MeetupNameplateBlock(state, onPhoto = false)
+                    MeetupNameplateBlock(state, decorations, onPhoto = false)
                     MeetupInfoAndQrRow(
                         state = state,
                         onPhoto = false,
@@ -181,6 +195,7 @@ private val MeetupQrSize = 68.dp
 private fun SpotlightTemplate(
     state: MeetupCardUiState,
     orientation: MeetupOrientation,
+    decorations: MeetupDecorationVisuals,
     modifier: Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -206,6 +221,7 @@ private fun SpotlightTemplate(
                 // 名字与状态等副行独占铭牌；语言与二维码在下方同一 Row 并列。
                 MeetupNameplateBlock(
                     state = state,
+                    decorations = decorations,
                     onPhoto = true,
                     large = orientation == MeetupOrientation.Portrait,
                 )
@@ -229,6 +245,7 @@ private fun SpotlightTemplate(
 private fun SideTagTemplate(
     state: MeetupCardUiState,
     orientation: MeetupOrientation,
+    decorations: MeetupDecorationVisuals,
     modifier: Modifier,
 ) {
     val landscape = orientation == MeetupOrientation.Landscape
@@ -278,6 +295,7 @@ private fun SideTagTemplate(
                 // 书签式竖向铭牌：头像在上，状态副行与名字两列竖排文字在下。
                 MeetupNameplateBlock(
                     state = state,
+                    decorations = decorations,
                     onPhoto = true,
                     vertical = true,
                     modifier = Modifier.heightIn(max = nameplateMaxHeight),
@@ -320,11 +338,9 @@ private fun MeetupNameColor(onPhoto: Boolean): Color =
 
 /** 头像与可选的官方头像框；关闭头像时头像框也随之不显示。 */
 @Composable
-private fun MeetupAvatarBlock(state: MeetupCardUiState) {
+private fun MeetupAvatarBlock(state: MeetupCardUiState, decorations: MeetupDecorationVisuals) {
     if (!state.config.showAvatar) return
     val avatarUrl = state.config.profile.avatarUrl.takeIf(String::isNotBlank) ?: return
-    val frame = state.decorations[DecorationSlot.IconFrame]
-        .takeIf { state.config.showIconFrame }
     Box(
         modifier = Modifier.size(72.dp),
         contentAlignment = Alignment.Center,
@@ -336,13 +352,11 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState) {
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(56.dp).clip(CircleShape),
         )
-        frame?.let { decoration ->
-            AnimatedDecoration(
-                decoration = decoration,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.matchParentSize(),
-            )
-        }
+        DecorationVisualImage(
+            visual = decorations.iconFrame,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.matchParentSize(),
+        )
     }
 }
 
@@ -356,6 +370,7 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState) {
 @Composable
 private fun MeetupNameplateBlock(
     state: MeetupCardUiState,
+    decorations: MeetupDecorationVisuals,
     onPhoto: Boolean,
     large: Boolean = false,
     vertical: Boolean = false,
@@ -390,9 +405,9 @@ private fun MeetupNameplateBlock(
             .clip(MaterialTheme.shapes.small)
             .background(gradient),
     ) {
-        nameplate?.let { decoration ->
-            AnimatedDecoration(
-                decoration = decoration,
+        nameplate?.let {
+            DecorationVisualImage(
+                visual = decorations.nameplateEffect,
                 contentScale = ContentScale.Crop,
                 // 官方素材是横版设计：竖向铭牌把它顺时针旋转 90 度后铺满。
                 modifier = Modifier.matchParentSize()
@@ -409,7 +424,7 @@ private fun MeetupNameplateBlock(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = contentModifier,
             ) {
-                MeetupAvatarBlock(state)
+                MeetupAvatarBlock(state, decorations)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MeetupNameplateMeta(
                         state = state,
@@ -432,7 +447,7 @@ private fun MeetupNameplateBlock(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = contentModifier,
             ) {
-                MeetupAvatarBlock(state)
+                MeetupAvatarBlock(state, decorations)
                 Column {
                     Text(
                         text = state.displayName,

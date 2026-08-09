@@ -21,6 +21,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
@@ -201,14 +202,19 @@ class DefaultMeetupCardRepository(
         val token = accountCacheManager.captureWriteToken(ownerId)
         accountCacheManager.mutateIfCurrent(token) {
             commitMutex.withLock {
-                val old = loadOrCreateLocked(ownerId)
-                val updated = transform(old).copy(
-                    ownerUserId = ownerId,
-                    revision = old.revision + 1L,
-                    // 用户提交了一次真实编辑，首次配置就算完成。
-                    configured = true,
-                )
-                configDao.save(updated)
+                // 一次编辑要读一遍配置再写回去，两趟 JSON 加一次落盘（iOS 上是
+                // NSUserDefaults）。编辑器每点一下都会走这里，留在主线程上连续
+                // 切换版式会把 UI 卡住，因此整段挪到后台；状态是 StateFlow，
+                // 换线程发射没有问题。
+                val updated = withContext(Dispatchers.Default) {
+                    val old = loadOrCreateLocked(ownerId)
+                    transform(old).copy(
+                        ownerUserId = ownerId,
+                        revision = old.revision + 1L,
+                        // 用户提交了一次真实编辑，首次配置就算完成。
+                        configured = true,
+                    ).also(configDao::save)
+                }
                 updateState(ownerId) { it.copy(config = updated) }
             }
         }
