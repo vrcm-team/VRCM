@@ -39,7 +39,10 @@ class FriendOnlineNotificationService(
     private var activeToken: AccountSessionToken? = null
     private var favoriteJob: Job? = null
     private val knownNotificationIds = mutableSetOf<String>()
-    private var notificationsSeeded = false
+
+    // 两条拉取路径各自记录是否已播种：开关可以中途打开，晚开的那一类不能补发历史。
+    private var v1Seeded = false
+    private var friendRequestsSeeded = false
     private var favoriteGroupIdsByUser: Map<String, Set<String>> = emptyMap()
 
     /** Starts one account-bound observer set. Calling it repeatedly is safe. */
@@ -52,7 +55,8 @@ class FriendOnlineNotificationService(
                     activeToken = session?.token
                     tracker.reset()
                     knownNotificationIds.clear()
-                    notificationsSeeded = false
+                    v1Seeded = false
+                    friendRequestsSeeded = false
                     favoriteGroupIdsByUser = emptyMap()
                 }
                 session?.let { account ->
@@ -107,15 +111,20 @@ class FriendOnlineNotificationService(
      * 拉取收件箱通知并按类型分派。
      *
      * 戳一戳与群组公告来自 V1 的 /notifications，好友请求要单独走 V2——本仓库的 HomeScreenModel
-     * 也是这么分开拉的，V1 不返回 friendRequest。两条路径共用同一份已见 ID 集合，因为两边的 id
-     * 都是通知 ID；首次拉取只把已有通知记为基线，避免把历史消息当成新消息补发。
+     * 也是这么分开拉的，V1 不返回 friendRequest。
+     *
+     * 两条路径共用一份已见 ID 集合（两边的 id 都是通知 ID），但**播种状态各记各的**：开关是可以
+     * 中途打开的，如果只用一个标记，先开戳一戳、之后再开好友请求时，那一类的历史消息会因为从没
+     * 进过基线而被整批当成新消息推出来。因此每条路径在本会话内第一次真正取回数据时只并入 ID、
+     * 不产出通知，之后才走增量分派。
      */
     private suspend fun refreshInboxNotifications(
         token: AccountSessionToken,
         seedOnly: Boolean = false,
     ) {
         if (!SharedFlowCentre.isCurrentSession(token)) return
-        val v1Notifications = if (anyV1NotificationEnabled()) {
+        val v1Requested = anyV1NotificationEnabled()
+        val v1Notifications = if (v1Requested) {
             try {
                 notificationApi.fetchNotifications()
             } catch (error: Exception) {
@@ -123,9 +132,10 @@ class FriendOnlineNotificationService(
                 null
             }
         } else {
-            emptyList()
+            null
         }
-        val friendRequests = if (settingsDao.friendRequestNotificationsEnabled) {
+        val friendRequestsRequested = settingsDao.friendRequestNotificationsEnabled
+        val friendRequests = if (friendRequestsRequested) {
             try {
                 notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value)
             } catch (error: Exception) {
@@ -133,33 +143,32 @@ class FriendOnlineNotificationService(
                 null
             }
         } else {
-            emptyList()
+            null
         }
-        // 任一路径失败就整轮跳过，避免只用半份数据去重后把另一半当成新消息补发。
-        if (v1Notifications == null || friendRequests == null) return
-        if (v1Notifications.isEmpty() && friendRequests.isEmpty() && !seedOnly) return
+        // 请求过但失败的路径这一轮整体跳过：只用半份数据去重，会让另一半在下次被当成新消息补发。
+        if (v1Requested && v1Notifications == null) return
+        if (friendRequestsRequested && friendRequests == null) return
+        if (v1Notifications == null && friendRequests == null) return
 
-        val ids = v1Notifications.map(NotificationData::id) + friendRequests.map(NotificationDataV2::id)
         val pending = mutex.withLock {
             if (activeToken != token || !SharedFlowCentre.isCurrentSession(token)) {
-                return@withLock emptyList<() -> Unit>()
+                return@withLock emptyList<suspend () -> Unit>()
             }
-            if (!notificationsSeeded || seedOnly) {
-                knownNotificationIds.clear()
-                knownNotificationIds += ids
-                notificationsSeeded = true
-                emptyList()
-            } else {
-                buildList {
-                    v1Notifications.forEach { notification ->
-                        if (knownNotificationIds.add(notification.id)) {
-                            add { dispatchV1Notification(notification) }
-                        }
+            buildList {
+                v1Notifications?.let { notifications ->
+                    val seeding = seedOnly || !v1Seeded
+                    v1Seeded = true
+                    notifications.forEach { notification ->
+                        val unseen = knownNotificationIds.add(notification.id)
+                        if (unseen && !seeding) add { dispatchV1Notification(notification) }
                     }
-                    friendRequests.forEach { request ->
-                        if (knownNotificationIds.add(request.id)) {
-                            add { dispatchFriendRequest(request) }
-                        }
+                }
+                friendRequests?.let { requests ->
+                    val seeding = seedOnly || !friendRequestsSeeded
+                    friendRequestsSeeded = true
+                    requests.forEach { request ->
+                        val unseen = knownNotificationIds.add(request.id)
+                        if (unseen && !seeding) add { dispatchFriendRequest(request) }
                     }
                 }
             }
@@ -169,7 +178,7 @@ class FriendOnlineNotificationService(
         }
     }
 
-    private fun dispatchFriendRequest(request: NotificationDataV2) {
+    private suspend fun dispatchFriendRequest(request: NotificationDataV2) {
         if (!settingsDao.friendRequestNotificationsEnabled) return
         // V2 的字段比 V1 少，没有 senderUsername，只能退到发送者 ID。
         val sender = request.senderUserId.takeIf(String::isNotBlank) ?: "Unknown"
