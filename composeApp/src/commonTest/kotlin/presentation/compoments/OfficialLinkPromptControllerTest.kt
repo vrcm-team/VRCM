@@ -14,6 +14,137 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfficialLinkPromptControllerTest {
     @Test
+    fun recreatedControllerKeepsTheClipboardConfirmation() = runTest {
+        val firstController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        firstController.updateAuthentication(true)
+        val url = "https://vrchat.com/home/user/usr_saved"
+        firstController.inspectClipboard(url)
+        assertIs<OfficialLinkPromptState.ClipboardConfirmation>(firstController.state.value)
+
+        val recreatedController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+            initialSnapshot = firstController.snapshot()
+                .toSaveableValues()
+                .toPromptSnapshot(),
+        )
+        recreatedController.updateAuthentication(true)
+
+        assertIs<OfficialLinkPromptState.ClipboardConfirmation>(recreatedController.state.value)
+    }
+
+    @Test
+    fun recreatedControllerTurnsInterruptedClipboardResolutionBackIntoConfirmation() = runTest {
+        val completion = CompletableDeferred<Result<String>>()
+        val firstController = OfficialLinkPromptController(
+            scope = this,
+            resolve = { completion.await() },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        firstController.updateAuthentication(true)
+        firstController.inspectClipboard("https://vrchat.com/home/user/usr_saved")
+        firstController.confirmClipboard()
+        runCurrent()
+        val snapshot = firstController.snapshot()
+            .toSaveableValues()
+            .toPromptSnapshot()
+        firstController.updateAuthentication(false)
+
+        val recreatedController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+            initialSnapshot = snapshot,
+        )
+        recreatedController.updateAuthentication(true)
+
+        assertIs<OfficialLinkPromptState.ClipboardConfirmation>(recreatedController.state.value)
+    }
+
+    @Test
+    fun recreatedControllerKeepsClipboardFailureRetryable() = runTest {
+        val firstController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.failure(IllegalStateException("network")) },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        firstController.updateAuthentication(true)
+        firstController.inspectClipboard("https://vrchat.com/home/world/wrld_saved")
+        firstController.confirmClipboard()
+        runCurrent()
+        val snapshot = firstController.snapshot()
+            .toSaveableValues()
+            .toPromptSnapshot()
+
+        val recreatedController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+            initialSnapshot = snapshot,
+        )
+        recreatedController.updateAuthentication(true)
+
+        val failure = assertIs<OfficialLinkPromptState.Failure>(recreatedController.state.value)
+        assertEquals(OfficialLinkType.World, failure.operation?.target?.type)
+    }
+
+    @Test
+    fun recreatedExternalFailureRebindsTheInboxRequestWithoutAutomaticRetry() = runTest {
+        val url = "https://vrchat.com/home/user/usr_saved"
+        val firstController = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.failure(IllegalStateException("network")) },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        firstController.updateAuthentication(true)
+        firstController.openExternal(OfficialLinkRequest(1, url))
+        runCurrent()
+        val snapshot = firstController.snapshot()
+            .toSaveableValues()
+            .toPromptSnapshot()
+
+        var resolveCount = 0
+        val resolved = mutableListOf<String>()
+        val consumed = mutableListOf<OfficialLinkRequest>()
+        val recreatedController = OfficialLinkPromptController(
+            scope = this,
+            resolve = {
+                resolveCount++
+                Result.success("resolved")
+            },
+            onResolved = resolved::add,
+            onExternalConsumed = consumed::add,
+            initialSnapshot = snapshot,
+        )
+        recreatedController.updateAuthentication(true)
+        val restoredRequest = OfficialLinkRequest(7, url)
+        recreatedController.openExternal(restoredRequest)
+
+        val failure = assertIs<OfficialLinkPromptState.Failure>(recreatedController.state.value)
+        assertEquals(7, failure.operation?.externalRequest?.id)
+        assertEquals(0, resolveCount)
+
+        recreatedController.retry()
+        runCurrent()
+
+        assertEquals(1, resolveCount)
+        assertEquals(listOf("resolved"), resolved)
+        assertEquals(listOf(restoredRequest), consumed)
+    }
+
+    @Test
     fun newerExternalRequestCancelsTheOldResolutionAndWinsNavigation() = runTest {
         val firstStarted = CompletableDeferred<Unit>()
         val firstCancelled = CompletableDeferred<Unit>()
@@ -89,6 +220,70 @@ class OfficialLinkPromptControllerTest {
         assertTrue(resolved.isEmpty())
         assertTrue(consumed.isEmpty())
         assertEquals(OfficialLinkPromptState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun sourceRequestChangeRejectsAResultBeforeTheControllerReceivesTheNewRequest() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val completion = CompletableDeferred<Result<String>>()
+        val resolved = mutableListOf<String>()
+        val consumed = mutableListOf<OfficialLinkRequest>()
+        var currentExternalRequestId: Long? = 1L
+        val controller = OfficialLinkPromptController(
+            scope = this,
+            resolve = {
+                started.complete(Unit)
+                completion.await()
+            },
+            onResolved = resolved::add,
+            onExternalConsumed = consumed::add,
+            isOperationCurrent = { operation ->
+                operation.externalRequest?.id == currentExternalRequestId
+            },
+        )
+        controller.updateAuthentication(true)
+        controller.openExternal(
+            OfficialLinkRequest(1, "https://vrchat.com/home/user/usr_first"),
+        )
+        started.await()
+
+        currentExternalRequestId = 2L
+        completion.complete(Result.success("stale"))
+        runCurrent()
+
+        assertTrue(resolved.isEmpty())
+        assertTrue(consumed.isEmpty())
+    }
+
+    @Test
+    fun sourceLogoutRejectsAResultBeforeTheControllerReceivesAuthenticationUpdate() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val completion = CompletableDeferred<Result<String>>()
+        val resolved = mutableListOf<String>()
+        val consumed = mutableListOf<OfficialLinkRequest>()
+        var sourceIsAuthenticated = true
+        val controller = OfficialLinkPromptController(
+            scope = this,
+            resolve = {
+                started.complete(Unit)
+                completion.await()
+            },
+            onResolved = resolved::add,
+            onExternalConsumed = consumed::add,
+            isOperationCurrent = { sourceIsAuthenticated },
+        )
+        controller.updateAuthentication(true)
+        controller.openExternal(
+            OfficialLinkRequest(1, "https://vrchat.com/home/user/usr_first"),
+        )
+        started.await()
+
+        sourceIsAuthenticated = false
+        completion.complete(Result.success("stale"))
+        runCurrent()
+
+        assertTrue(resolved.isEmpty())
+        assertTrue(consumed.isEmpty())
     }
 
     @Test

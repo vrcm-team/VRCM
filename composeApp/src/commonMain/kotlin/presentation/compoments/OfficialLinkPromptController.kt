@@ -24,22 +24,37 @@ internal sealed interface OfficialLinkPromptState {
     data class Failure(val operation: OfficialLinkOperation?) : OfficialLinkPromptState
 }
 
+/** Saveable prompt data used to rebuild a controller after its coroutine scope is gone. */
+internal data class OfficialLinkPromptSnapshot(
+    val state: OfficialLinkPromptState,
+    val nextOperationId: Long,
+    val lastInspectedTargetKey: String?,
+)
+
 /** Owns the prompt state and guarantees that only the latest authenticated resolution can finish. */
 internal class OfficialLinkPromptController<T>(
     private val scope: CoroutineScope,
     private val resolve: suspend (OfficialLinkTarget) -> Result<T>,
     private val onResolved: (T) -> Unit,
     private val onExternalConsumed: (OfficialLinkRequest) -> Unit,
-    initialInspectedTargetKey: String? = null,
-    private val onTargetInspected: (String) -> Unit = {},
+    private val isOperationCurrent: (OfficialLinkOperation) -> Boolean = { true },
+    initialSnapshot: OfficialLinkPromptSnapshot? = null,
 ) {
-    private val _state = MutableStateFlow<OfficialLinkPromptState>(OfficialLinkPromptState.Idle)
+    private val _state = MutableStateFlow(
+        initialSnapshot?.restoredState() ?: OfficialLinkPromptState.Idle,
+    )
     val state: StateFlow<OfficialLinkPromptState> = _state.asStateFlow()
 
     private var activeJob: Job? = null
     private var isAuthenticated = false
-    private var nextOperationId = 0L
-    private var lastInspectedTargetKey = initialInspectedTargetKey
+    private var nextOperationId = initialSnapshot?.nextOperationId ?: 0L
+    private var lastInspectedTargetKey = initialSnapshot?.lastInspectedTargetKey
+
+    fun snapshot() = OfficialLinkPromptSnapshot(
+        state = _state.value,
+        nextOperationId = nextOperationId,
+        lastInspectedTargetKey = lastInspectedTargetKey,
+    )
 
     fun updateAuthentication(authenticated: Boolean) {
         isAuthenticated = authenticated
@@ -70,6 +85,19 @@ internal class OfficialLinkPromptController<T>(
             cancelActiveResolution()
             onExternalConsumed(request)
             _state.value = OfficialLinkPromptState.Failure(operation = null)
+            return
+        }
+
+        val restoredFailure = (_state.value as? OfficialLinkPromptState.Failure)
+            ?.operation
+            ?.takeIf { operation ->
+                operation.externalRequest?.url == request.url && operation.target == target
+            }
+        if (restoredFailure != null) {
+            markInspected(target.key())
+            _state.value = OfficialLinkPromptState.Failure(
+                restoredFailure.copy(externalRequest = request),
+            )
             return
         }
 
@@ -115,7 +143,11 @@ internal class OfficialLinkPromptController<T>(
                 Result.failure(exception)
             }
             result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
-            if (!isAuthenticated || _state.value != OfficialLinkPromptState.Resolving(operation)) {
+            if (
+                !isAuthenticated ||
+                _state.value != OfficialLinkPromptState.Resolving(operation) ||
+                !isOperationCurrent(operation)
+            ) {
                 return@launch
             }
 
@@ -157,8 +189,17 @@ internal class OfficialLinkPromptController<T>(
 
     private fun markInspected(targetKey: String) {
         lastInspectedTargetKey = targetKey
-        onTargetInspected(targetKey)
     }
 }
+
+private fun OfficialLinkPromptSnapshot.restoredState(): OfficialLinkPromptState =
+    when (val savedState = state) {
+        is OfficialLinkPromptState.Resolving -> if (savedState.operation.externalRequest == null) {
+            OfficialLinkPromptState.ClipboardConfirmation(savedState.operation)
+        } else {
+            OfficialLinkPromptState.Idle
+        }
+        else -> savedState
+    }
 
 private fun OfficialLinkTarget.key(): String = "$type:$id"
