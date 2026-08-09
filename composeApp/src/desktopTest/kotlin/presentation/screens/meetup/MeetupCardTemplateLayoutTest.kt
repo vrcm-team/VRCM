@@ -25,6 +25,7 @@ import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardTemplate
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupGroupSnapshot
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
@@ -81,6 +82,36 @@ class MeetupCardTemplateLayoutTest {
             "大字体下铭牌右边界 ${nameplate.right} 超出了卡片宽度 $cardWidth",
         )
         assertQrAndFieldsShareTheRow("大字体")
+    }
+
+    @Test
+    fun landscapeSpotlightDoesNotStretchGroupBannerAcrossTheCard() = runComposeUiTest {
+        setContent {
+            MeetupTestHost(fontScale = 1f) {
+                Box(modifier = Modifier.size(cardHeight, cardWidth)) {
+                    val state = testState(MeetupCardTemplate.Spotlight)
+                    MeetupCardTemplateContent(
+                        state = state.copy(
+                            config = state.config.copy(
+                                showRepresentedGroup = true,
+                                profile = state.config.profile.copy(
+                                    representedGroup = MeetupGroupSnapshot(name = "VRCM Community"),
+                                ),
+                            ),
+                        ),
+                        orientation = MeetupOrientation.Landscape,
+                        modifier = Modifier.size(cardHeight, cardWidth),
+                    )
+                }
+            }
+        }
+
+        val banner = onNodeWithTag(MeetupCardTestTags.GroupBanner).getBoundsInRoot()
+        val bannerWidth = banner.right.value - banner.left.value
+        assertTrue(
+            bannerWidth <= cardWidth.value + 1f,
+            "聚光横屏的群组横幅宽 ${bannerWidth}dp，仍然横跨了整张卡片",
+        )
     }
 
     /** 两个二维码必须完整留在卡片内，且不能把状态/语言那一列挤到不可用。 */

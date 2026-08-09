@@ -66,6 +66,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupOrientation
 /** 供布局回归测试定位关键槽位；模板改版时这些名字必须跟着语义走。 */
 internal object MeetupCardTestTags {
     const val Nameplate = "meetup-card-nameplate"
+    const val GroupBanner = "meetup-card-group-banner"
     const val QrCodes = "meetup-card-qr"
     /** 单个二维码；码会换行/换列，只量容器边界看不出有没有被挤掉。 */
     const val QrCode = "meetup-card-qr-item"
@@ -362,10 +363,10 @@ private fun MeetupAvatarBlock(state: MeetupCardUiState, decorations: MeetupDecor
 
 /**
  * 铭牌块：官方铭牌特效与渐变包裹整块内容，与 VRChat 铭牌结构一致。
- * 横排为 Row(头像, Column(名字, 副行))；[vertical] 时版式为
- * Column(头像, Row(副行, 名字))，副行与名字各自顺时针旋转 90 度竖向排布，
+ * 横排为 Row(头像, Column(名字, 副信息组))；[vertical] 时版式为
+ * Column(头像, Row(副信息组, 名字))，副信息组与名字各自顺时针旋转 90 度竖向排布，
  * 横版特效素材同样旋转铺满，头像保持正脸。名字始终完整显示。
- * 副行内容见 [MeetupNameplateMeta]。
+ * 副信息内容见 [MeetupNameplateMeta]。
  */
 @Composable
 private fun MeetupNameplateBlock(
@@ -417,8 +418,8 @@ private fun MeetupNameplateBlock(
         // 铭牌现在总有底色，内容始终留出内边距。
         val contentModifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         if (vertical) {
-            // 版式为 Column(头像, Row(副行, 名字))；两者各自旋转 90 度竖排，
-            // 于是副行与名字成为并排的两列，头像仍在最上方保持正脸。
+            // 版式为 Column(头像, Row(副信息组, 名字))；两者各自旋转 90 度竖排，
+            // 于是副信息与名字成为并排的列，头像仍在最上方保持正脸。
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -429,6 +430,7 @@ private fun MeetupNameplateBlock(
                     MeetupNameplateMeta(
                         state = state,
                         color = nameColor,
+                        stacked = true,
                         modifier = Modifier.rotateClockwise(),
                     )
                     Text(
@@ -448,7 +450,7 @@ private fun MeetupNameplateBlock(
                 modifier = contentModifier,
             ) {
                 MeetupAvatarBlock(state, decorations)
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = state.displayName,
                         style = displayNameStyle(state.displayName, large),
@@ -464,13 +466,15 @@ private fun MeetupNameplateBlock(
 }
 
 /**
- * 铭牌副行：状态圆点与状态描述依次排在人称代词前面，紧贴名字。
- * 竖排铭牌由调用方整体旋转，这一行随之成为人称代词所在的那一列。
+ * 铭牌副信息：人称代词与状态分别成组，避免全开时变成一串缺少层级的文本。
+ * 横排先放稳定的身份信息，再用剩余宽度展示状态；竖排则让两组各占一列，
+ * 旋转后不会因为状态描述较长而把代词和状态串成一根过长的竖排。
  */
 @Composable
 private fun MeetupNameplateMeta(
     state: MeetupCardUiState,
     color: Color,
+    stacked: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val config = state.config
@@ -482,51 +486,96 @@ private fun MeetupNameplateMeta(
     val pronouns = config.profile.pronouns
         .takeIf { config.showPronouns && it.isNotBlank() }
     if (status == null && statusDescription == null && pronouns == null) return
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        status?.let { value ->
-            // 与好友列表同一套状态色标：铭牌上只留圆点，不再重复一遍状态文案。
-            Box(
-                modifier = Modifier
-                    .size(MeetupStatusDotSize)
-                    .background(GameColor.Status.fromValue(value), CircleShape)
-                    .border(1.dp, color.copy(alpha = 0.35f), CircleShape),
+    val items: @Composable () -> Unit = {
+        pronouns?.let { value -> MeetupNameplateMetaChip(value, color) }
+        if (status != null || statusDescription != null) {
+            MeetupNameplateStatus(
+                status = status,
+                description = statusDescription,
+                color = color,
             )
         }
-        statusDescription?.let { value ->
-            // 状态描述是这行里唯一可能很长的一段，压缩空间由它让出。
-            MeetupNameplateMetaText(value, color, Modifier.weight(1f, fill = false))
-        }
-        if ((status != null || statusDescription != null) && pronouns != null) {
-            MeetupNameplateMetaText("·", color, alpha = 0.5f)
-        }
-        pronouns?.let { value -> MeetupNameplateMetaText(value, color) }
+    }
+    if (stacked) {
+        Column(
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            content = { items() },
+        )
+    } else {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            content = { items() },
+        )
     }
 }
 
-/** 铭牌副行文本的统一样式。 */
+/** 人称代词作为独立身份标签，不再与临时状态依靠标点硬拼在一起。 */
 @Composable
-private fun MeetupNameplateMetaText(
+private fun MeetupNameplateMetaChip(
     text: String,
     color: Color,
-    modifier: Modifier = Modifier,
-    alpha: Float = 0.82f,
 ) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = color.copy(alpha = alpha),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
-    )
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        contentColor = color,
+        shape = CircleShape,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+        )
+    }
 }
 
-/** 状态圆点直径；与铭牌副行的文字高度相称。 */
-private val MeetupStatusDotSize = 10.dp
+/** 状态类型与描述合成一个视觉单元；描述不足空间时由它先截断。 */
+@Composable
+private fun MeetupNameplateStatus(
+    status: UserStatus?,
+    description: String?,
+    color: Color,
+) {
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        contentColor = color,
+        shape = CircleShape,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = if (description == null) 5.dp else 7.dp,
+                vertical = 2.dp,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            status?.let { value ->
+                // 与好友列表同一套状态色标，颜色承担状态类型，不重复英文状态名。
+                Box(
+                    modifier = Modifier
+                        .size(MeetupStatusDotSize)
+                        .background(GameColor.Status.fromValue(value), CircleShape)
+                        .border(1.dp, color.copy(alpha = 0.35f), CircleShape),
+                )
+            }
+            description?.let { value ->
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** 状态圆点直径；标签已经提供留白，圆点只需承担颜色识别。 */
+private val MeetupStatusDotSize = 8.dp
 
 /** 在 Material 离散字号档位间按名字长度选择，不随视口连续缩放。 */
 @Composable
@@ -601,7 +650,16 @@ private fun MeetupGroupBannerBar(
 ) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .testTag(MeetupCardTestTags.GroupBanner)
+            .let { base ->
+                if (inset) {
+                    // 聚光横屏的信息区很宽，横幅保持适合阅读与识别封面的长度；
+                    // 竖屏可用宽度小于上限时仍然完整填充。
+                    base.widthIn(max = MeetupGroupInsetMaxWidth).fillMaxWidth()
+                } else {
+                    base.fillMaxWidth()
+                }
+            }
             .heightIn(min = MeetupGroupBannerHeight)
             .let { if (inset) it.clip(MaterialTheme.shapes.small) else it }
             .background(state.accentColor.tintedScrim(0.72f)),
@@ -725,6 +783,7 @@ private fun MeetupGroupName(group: MeetupGroupSnapshot, modifier: Modifier = Mod
  * 方块尺寸取竖栏内容区的大半宽，再大就会把铭牌顶下去。
  */
 private val MeetupGroupBannerHeight = 48.dp
+private val MeetupGroupInsetMaxWidth = 360.dp
 private val MeetupGroupIconSize = 24.dp
 private val MeetupGroupTileSize = 96.dp
 private val MeetupGroupTileIconSize = 48.dp
