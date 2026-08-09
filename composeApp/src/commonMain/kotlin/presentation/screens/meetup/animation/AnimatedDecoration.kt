@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -48,24 +49,25 @@ sealed interface DecorationVisual {
  * 连续切换会直接卡住 UI。因此卡片侧在稳定的层调用它，把画面传下去渲染。
  */
 @Composable
-fun rememberDecorationVisual(decoration: ResolvedDecoration?): DecorationVisual? {
-    val asset = decoration?.asset
-    if (decoration == null || decoration.mode == DecorationRenderMode.Unavailable || asset == null) {
-        return null
-    }
+fun rememberDecorationVisual(
+    decoration: ResolvedDecoration?,
+    enabled: Boolean = true,
+): DecorationVisual? {
     val assetStore: MeetupCardAssetStore = koinInject()
-
-    if (decoration.mode == DecorationRenderMode.Static) {
-        return DecorationVisual.Static(assetStore.model(asset))
-    }
-
     val decoder: AnimatedWebpDecoder = koinInject()
-    var frameBitmap by remember(asset) { mutableStateOf<ImageBitmap?>(null) }
-    var animationFailed by remember(asset) { mutableStateOf(false) }
-    val playback = remember(asset) { DecorationPlayback() }
     val lifecycleOwner = LocalLifecycleOwner.current
+    // 播放器只跟着素材走：开关关掉时暂停而不是销毁，
+    // 否则每次开关都要在主线程等解码器放锁，再从第 0 帧重放整段动画。
+    val animatedAsset = decoration
+        ?.takeIf { it.mode == DecorationRenderMode.Animated }
+        ?.asset
+    var frameBitmap by remember(animatedAsset) { mutableStateOf<ImageBitmap?>(null) }
+    var animationFailed by remember(animatedAsset) { mutableStateOf(false) }
+    val playback = remember(animatedAsset) { DecorationPlayback() }
+    val playbackEnabled by rememberUpdatedState(enabled)
 
-    LaunchedEffect(asset) {
+    LaunchedEffect(animatedAsset) {
+        val asset = animatedAsset ?: return@LaunchedEffect
         // 被替换的帧不能在解码线程立即关闭：显示列表可能仍引用旧位图
         //（Android 上表现为 "trying to use a recycled bitmap"）。
         // 等两个 Choreographer 帧、让重组与重录制完成后再关闭。
@@ -94,14 +96,24 @@ fun rememberDecorationVisual(decoration: ResolvedDecoration?): DecorationVisual?
                 animationFailed = true
             },
         )
-        if (lifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
+        if (!playbackEnabled || lifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
             animation.pause()
         }
     }
-    DisposableEffect(asset, lifecycleOwner) {
+    // 关掉开关只停帧，不动播放器；重新打开就地续播。
+    LaunchedEffect(animatedAsset, enabled) {
+        if (animatedAsset == null) return@LaunchedEffect
+        if (enabled && lifecycleOwner.lifecycle.currentState == Lifecycle.State.RESUMED) {
+            playback.resume()
+        } else {
+            playback.pause()
+        }
+    }
+    DisposableEffect(animatedAsset, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> playback.resume()
+                // 应用回前台时，被开关关掉的装饰不该跟着恢复播放。
+                Lifecycle.Event.ON_RESUME -> if (playbackEnabled) playback.resume()
                 Lifecycle.Event.ON_PAUSE -> playback.pause()
                 else -> Unit
             }
@@ -113,10 +125,15 @@ fun rememberDecorationVisual(decoration: ResolvedDecoration?): DecorationVisual?
         }
     }
 
-    if (animationFailed) {
-        return decoration.staticFallback?.let { DecorationVisual.Static(assetStore.model(it)) }
+    val asset = decoration?.asset
+    return when {
+        !enabled || decoration == null || asset == null -> null
+        decoration.mode == DecorationRenderMode.Unavailable -> null
+        decoration.mode == DecorationRenderMode.Static -> DecorationVisual.Static(assetStore.model(asset))
+        animationFailed ->
+            decoration.staticFallback?.let { DecorationVisual.Static(assetStore.model(it)) }
+        else -> frameBitmap?.let(DecorationVisual::Frame)
     }
-    return frameBitmap?.let(DecorationVisual::Frame)
 }
 
 /** 纯渲染：画面由 [rememberDecorationVisual] 在上层维护，这里只负责画出来。 */
