@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.OfficialLinkContent
+import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.OfficialLinkService
 import io.github.vrcmteam.vrcm.service.OfficialLinkTarget
 import io.github.vrcmteam.vrcm.service.OfficialLinkType
@@ -48,16 +50,23 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Composable
-internal fun OfficialLinkPrompt(navigator: AppNavigator) {
+internal fun OfficialLinkPrompt(
+    navigator: AppNavigator,
+    inbox: OfficialLinkInbox,
+) {
     val clipboard = LocalClipboardManager.current
     val service: OfficialLinkService = koinInject()
     val locale = strings
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val incomingRequest by inbox.pendingRequest.collectAsState()
     var foregroundGeneration by remember { mutableIntStateOf(0) }
     var lastInspectedTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingText by rememberSaveable { mutableStateOf<String?>(null) }
     var isOpening by remember { mutableStateOf(false) }
     var openFailed by remember { mutableStateOf(false) }
+    var isOpeningExternalLink by remember { mutableStateOf(false) }
+    var failedExternalLink by rememberSaveable { mutableStateOf<String?>(null) }
+    var invalidExternalLink by rememberSaveable { mutableStateOf(false) }
     val isAuthenticated = navigator.items.any { it is HomeScreen }
     val target = pendingText?.let(::parseOfficialLink)
 
@@ -73,6 +82,94 @@ internal fun OfficialLinkPrompt(navigator: AppNavigator) {
         if (targetKey == lastInspectedTargetKey) return@LaunchedEffect
         lastInspectedTargetKey = targetKey
         pendingText = clipboardText.trim()
+    }
+
+    LaunchedEffect(incomingRequest?.id, isAuthenticated) {
+        val request = incomingRequest ?: return@LaunchedEffect
+        if (!isAuthenticated) return@LaunchedEffect
+        failedExternalLink = null
+        invalidExternalLink = false
+        val incomingTarget = parseOfficialLink(request.url)
+        if (incomingTarget == null) {
+            inbox.consume(request)
+            invalidExternalLink = true
+            return@LaunchedEffect
+        }
+
+        pendingText = null
+        lastInspectedTargetKey = "${incomingTarget.type}:${incomingTarget.id}"
+        isOpeningExternalLink = true
+        try {
+            service.resolve(incomingTarget)
+                .onSuccess { content ->
+                    inbox.consume(request)
+                    navigator push content.toRoute()
+                }
+                .onFailure {
+                    inbox.consume(request)
+                    failedExternalLink = incomingTarget.canonicalUrl()
+                }
+        } finally {
+            isOpeningExternalLink = false
+        }
+    }
+
+    if (isOpeningExternalLink) {
+        AlertDialog(
+            onDismissRequest = {},
+            icon = { Icon(AppIcons.Link, contentDescription = null) },
+            title = { Text(locale.officialLinkPromptTitle) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Text(locale.loading)
+                }
+            },
+            confirmButton = {},
+        )
+    }
+
+    if (failedExternalLink != null || invalidExternalLink) {
+        val retryTarget = failedExternalLink?.let(::parseOfficialLink)
+        AlertDialog(
+            onDismissRequest = {
+                failedExternalLink = null
+                invalidExternalLink = false
+            },
+            icon = { Icon(AppIcons.Link, contentDescription = null) },
+            title = { Text(locale.officialLinkPromptTitle) },
+            text = {
+                Text(
+                    text = locale.officialLinkOpenFailed,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            },
+            confirmButton = {
+                if (retryTarget != null) {
+                    Button(
+                        onClick = {
+                            failedExternalLink = null
+                            inbox.submit(retryTarget.canonicalUrl())
+                        },
+                    ) {
+                        Text(locale.retry)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        failedExternalLink = null
+                        invalidExternalLink = false
+                    },
+                ) {
+                    Text(locale.cancel)
+                }
+            },
+        )
     }
 
     if (target != null) {
@@ -151,6 +248,9 @@ private fun OfficialLinkType.localizedName(locale: LocaleStrings): String = when
     OfficialLinkType.Group -> locale.officialLinkTypeGroup
     OfficialLinkType.Avatar -> locale.officialLinkTypeAvatar
 }
+
+private fun OfficialLinkTarget.canonicalUrl(): String =
+    "https://vrchat.com/home/${type.pathSegment}/$id"
 
 private fun OfficialLinkContent.toRoute() = when (this) {
     is OfficialLinkContent.User -> UserProfileScreen(UserProfileVo(data))

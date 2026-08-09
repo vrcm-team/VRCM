@@ -58,6 +58,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -66,10 +67,14 @@ import org.koin.compose.koinInject
 fun App(
     isConfigurationChange: () -> Boolean = { false },
     windowChrome: @Composable () -> Unit = {},
+    officialLinkInbox: OfficialLinkInbox? = null,
 ) {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
     val lifecycleEventGate = remember { AppLifecycleEventGate() }
+    val activeOfficialLinkInbox = remember(officialLinkInbox) {
+        officialLinkInbox ?: OfficialLinkInbox()
+    }
     KoinContext {
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
@@ -107,7 +112,7 @@ fun App(
                                 .padding(vertical = 76.dp, horizontal = 12.dp)
                         ) {
                             VersionDialog()
-                            OfficialLinkPrompt(navigator)
+                            OfficialLinkPrompt(navigator, activeOfficialLinkInbox)
                             SharedTransitionScreen(
                                 navigator = navigator,
                                 transitionSpec = { selectTransition(isPop = false) },
