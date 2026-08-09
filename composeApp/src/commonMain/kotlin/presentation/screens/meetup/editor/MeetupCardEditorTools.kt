@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -422,16 +423,22 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StyleTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
     val config = state.config
     ToolSection(strings.meetupCardAccentColor) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // 色块必须是正圆：Row 里 size 会服从父约束，窄屏放不下最后一个就会被
+        // 压成椭圆。改用 Flow 布局换行，并用 requiredSize 锁死尺寸。
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             AccentSwatches.forEach { argb ->
                 val selected = config.accentArgb == argb
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .requiredSize(34.dp)
                         .clip(CircleShape)
                         .background(Color(argb))
                         .border(

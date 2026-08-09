@@ -80,8 +80,8 @@ fun MeetupCardCanvas(
         //    等比缩放（超出高度部分裁掉），不拉伸；不接收指针事件。
         DecorationVisualImage(
             visual = rememberDecorationVisual(
-                state.decorations[DecorationSlot.ProfileEffect]
-                    .takeIf { state.config.showProfileEffect },
+                decoration = state.decorations[DecorationSlot.ProfileEffect],
+                enabled = state.config.showProfileEffect,
             ),
             contentScale = ContentScale.FillWidth,
             alignment = Alignment.TopCenter,
@@ -95,12 +95,12 @@ fun MeetupCardCanvas(
             orientation = orientation,
             decorations = MeetupDecorationVisuals(
                 iconFrame = rememberDecorationVisual(
-                    state.decorations[DecorationSlot.IconFrame]
-                        .takeIf { state.config.showIconFrame },
+                    decoration = state.decorations[DecorationSlot.IconFrame],
+                    enabled = state.config.showIconFrame,
                 ),
                 nameplateEffect = rememberDecorationVisual(
-                    state.decorations[DecorationSlot.NameplateEffect]
-                        .takeIf { state.config.showNameplateEffect },
+                    decoration = state.decorations[DecorationSlot.NameplateEffect],
+                    enabled = state.config.showNameplateEffect,
                 ),
             ),
             modifier = Modifier.fillMaxSize(),
