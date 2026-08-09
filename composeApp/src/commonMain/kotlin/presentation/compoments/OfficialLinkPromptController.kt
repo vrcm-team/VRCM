@@ -49,6 +49,9 @@ internal class OfficialLinkPromptController<T>(
     private var isAuthenticated = false
     private var nextOperationId = initialSnapshot?.nextOperationId ?: 0L
     private var lastInspectedTargetKey = initialSnapshot?.lastInspectedTargetKey
+    private var pendingRestoredExternalFailure = (initialSnapshot?.state as? OfficialLinkPromptState.Failure)
+        ?.operation
+        ?.takeIf { it.externalRequest != null }
 
     fun snapshot() = OfficialLinkPromptSnapshot(
         state = _state.value,
@@ -80,6 +83,8 @@ internal class OfficialLinkPromptController<T>(
 
     fun openExternal(request: OfficialLinkRequest) {
         if (!isAuthenticated) return
+        val restoredFailure = pendingRestoredExternalFailure
+        pendingRestoredExternalFailure = null
         val target = parseOfficialLink(request.url)
         if (target == null) {
             cancelActiveResolution()
@@ -88,12 +93,12 @@ internal class OfficialLinkPromptController<T>(
             return
         }
 
-        val restoredFailure = (_state.value as? OfficialLinkPromptState.Failure)
-            ?.operation
-            ?.takeIf { operation ->
-                operation.externalRequest?.url == request.url && operation.target == target
-            }
-        if (restoredFailure != null) {
+        if (
+            restoredFailure != null &&
+            _state.value == OfficialLinkPromptState.Failure(restoredFailure) &&
+            restoredFailure.externalRequest?.url == request.url &&
+            restoredFailure.target == target
+        ) {
             markInspected(target.key())
             _state.value = OfficialLinkPromptState.Failure(
                 restoredFailure.copy(externalRequest = request),

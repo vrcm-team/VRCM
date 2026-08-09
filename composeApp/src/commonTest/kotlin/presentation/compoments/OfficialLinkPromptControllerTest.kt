@@ -145,6 +145,40 @@ class OfficialLinkPromptControllerTest {
     }
 
     @Test
+    fun reopeningTheSameExternalLinkAfterFailureStartsANewResolution() = runTest {
+        val url = "https://vrchat.com/home/user/usr_reopened"
+        var resolveCount = 0
+        val resolved = mutableListOf<String>()
+        val consumed = mutableListOf<OfficialLinkRequest>()
+        val controller = OfficialLinkPromptController(
+            scope = this,
+            resolve = {
+                resolveCount++
+                if (resolveCount == 1) {
+                    Result.failure(IllegalStateException("network"))
+                } else {
+                    Result.success("resolved")
+                }
+            },
+            onResolved = resolved::add,
+            onExternalConsumed = consumed::add,
+        )
+        controller.updateAuthentication(true)
+        controller.openExternal(OfficialLinkRequest(1, url))
+        runCurrent()
+        assertIs<OfficialLinkPromptState.Failure>(controller.state.value)
+
+        val reopenedRequest = OfficialLinkRequest(2, url)
+        controller.openExternal(reopenedRequest)
+        runCurrent()
+
+        assertEquals(2, resolveCount)
+        assertEquals(listOf("resolved"), resolved)
+        assertEquals(listOf(reopenedRequest), consumed)
+        assertEquals(OfficialLinkPromptState.Idle, controller.state.value)
+    }
+
+    @Test
     fun newerExternalRequestCancelsTheOldResolutionAndWinsNavigation() = runTest {
         val firstStarted = CompletableDeferred<Unit>()
         val firstCancelled = CompletableDeferred<Unit>()
