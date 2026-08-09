@@ -41,7 +41,11 @@ class SettingsModel(
                 themeColor = it.themeColor.name,
                 languageTag = it.languageTag.tag,
                 friendPresenceNotificationsEnabled = it.friendPresenceNotificationsEnabled,
+                friendOfflineNotificationsEnabled = it.friendOfflineNotificationsEnabled,
                 boopNotificationsEnabled = it.boopNotificationsEnabled,
+                friendRequestNotificationsEnabled = it.friendRequestNotificationsEnabled,
+                groupAnnouncementNotificationsEnabled = it.groupAnnouncementNotificationsEnabled,
+                friendPresenceFilter = it.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = it.backgroundFriendMonitoringEnabled,
             )
         }
@@ -58,7 +62,11 @@ class SettingsModel(
                 themeColor = themeColor,
                 languageTag = languageTag,
                 friendPresenceNotificationsEnabled = settings.friendPresenceNotificationsEnabled,
+                friendOfflineNotificationsEnabled = settings.friendOfflineNotificationsEnabled,
                 boopNotificationsEnabled = settings.boopNotificationsEnabled,
+                friendRequestNotificationsEnabled = settings.friendRequestNotificationsEnabled,
+                groupAnnouncementNotificationsEnabled = settings.groupAnnouncementNotificationsEnabled,
+                friendPresenceFilter = settings.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = settings.backgroundFriendMonitoringEnabled,
             )
         }
