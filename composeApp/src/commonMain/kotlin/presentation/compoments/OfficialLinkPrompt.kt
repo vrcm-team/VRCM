@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -15,11 +14,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -43,10 +44,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.OfficialLinkContent
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 import io.github.vrcmteam.vrcm.service.OfficialLinkService
-import io.github.vrcmteam.vrcm.service.OfficialLinkTarget
 import io.github.vrcmteam.vrcm.service.OfficialLinkType
-import io.github.vrcmteam.vrcm.service.parseOfficialLink
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Composable
@@ -57,189 +55,152 @@ internal fun OfficialLinkPrompt(
     val clipboard = LocalClipboardManager.current
     val service: OfficialLinkService = koinInject()
     val locale = strings
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     val incomingRequest by inbox.pendingRequest.collectAsState()
     var foregroundGeneration by remember { mutableIntStateOf(0) }
     var lastInspectedTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingText by rememberSaveable { mutableStateOf<String?>(null) }
-    var isOpening by remember { mutableStateOf(false) }
-    var openFailed by remember { mutableStateOf(false) }
-    var isOpeningExternalLink by remember { mutableStateOf(false) }
-    var failedExternalLink by rememberSaveable { mutableStateOf<String?>(null) }
-    var invalidExternalLink by rememberSaveable { mutableStateOf(false) }
     val isAuthenticated = navigator.items.any { it is HomeScreen }
-    val target = pendingText?.let(::parseOfficialLink)
+    val controller = remember(service, scope, inbox, navigator) {
+        OfficialLinkPromptController(
+            scope = scope,
+            resolve = service::resolve,
+            onResolved = { navigator push it.toRoute() },
+            onExternalConsumed = inbox::consume,
+            initialInspectedTargetKey = lastInspectedTargetKey,
+            onTargetInspected = { lastInspectedTargetKey = it },
+        )
+    }
+    val promptState by controller.state.collectAsState()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         foregroundGeneration++
     }
 
-    LaunchedEffect(foregroundGeneration, isAuthenticated) {
-        if (foregroundGeneration == 0 || !isAuthenticated || pendingText != null) return@LaunchedEffect
-        val clipboardText = runCatching { clipboard.getText()?.text }.getOrNull() ?: return@LaunchedEffect
-        val clipboardTarget = parseOfficialLink(clipboardText) ?: return@LaunchedEffect
-        val targetKey = "${clipboardTarget.type}:${clipboardTarget.id}"
-        if (targetKey == lastInspectedTargetKey) return@LaunchedEffect
-        lastInspectedTargetKey = targetKey
-        pendingText = clipboardText.trim()
+    SideEffect {
+        controller.updateAuthentication(isAuthenticated)
     }
 
-    LaunchedEffect(incomingRequest?.id, isAuthenticated) {
-        val request = incomingRequest ?: return@LaunchedEffect
-        if (!isAuthenticated) return@LaunchedEffect
-        failedExternalLink = null
-        invalidExternalLink = false
-        val incomingTarget = parseOfficialLink(request.url)
-        if (incomingTarget == null) {
-            inbox.consume(request)
-            invalidExternalLink = true
+    LaunchedEffect(
+        controller,
+        foregroundGeneration,
+        isAuthenticated,
+        incomingRequest?.id,
+    ) {
+        if (foregroundGeneration == 0 || !isAuthenticated || incomingRequest != null) {
             return@LaunchedEffect
         }
-
-        pendingText = null
-        lastInspectedTargetKey = "${incomingTarget.type}:${incomingTarget.id}"
-        isOpeningExternalLink = true
-        try {
-            service.resolve(incomingTarget)
-                .onSuccess { content ->
-                    inbox.consume(request)
-                    navigator push content.toRoute()
-                }
-                .onFailure {
-                    inbox.consume(request)
-                    failedExternalLink = incomingTarget.canonicalUrl()
-                }
-        } finally {
-            isOpeningExternalLink = false
-        }
+        val clipboardText = runCatching { clipboard.getText()?.text }.getOrNull() ?: return@LaunchedEffect
+        controller.inspectClipboard(clipboardText)
     }
 
-    if (isOpeningExternalLink) {
-        AlertDialog(
-            onDismissRequest = {},
-            icon = { Icon(AppIcons.Link, contentDescription = null) },
-            title = { Text(locale.officialLinkPromptTitle) },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    Text(locale.loading)
-                }
-            },
-            confirmButton = {},
+    LaunchedEffect(controller, incomingRequest?.id, isAuthenticated) {
+        val request = incomingRequest ?: return@LaunchedEffect
+        if (!isAuthenticated) return@LaunchedEffect
+        controller.openExternal(request)
+    }
+
+    when (val state = promptState) {
+        OfficialLinkPromptState.Idle -> Unit
+        is OfficialLinkPromptState.ClipboardConfirmation -> ClipboardConfirmationDialog(
+            targetType = state.operation.target.type,
+            locale = locale,
+            onConfirm = controller::confirmClipboard,
+            onDismiss = controller::dismiss,
+        )
+        is OfficialLinkPromptState.Resolving -> ResolvingOfficialLinkDialog(locale)
+        is OfficialLinkPromptState.Failure -> OfficialLinkFailureDialog(
+            retryAvailable = state.operation != null,
+            locale = locale,
+            onRetry = controller::retry,
+            onDismiss = controller::dismiss,
         )
     }
+}
 
-    if (failedExternalLink != null || invalidExternalLink) {
-        val retryTarget = failedExternalLink?.let(::parseOfficialLink)
-        AlertDialog(
-            onDismissRequest = {
-                failedExternalLink = null
-                invalidExternalLink = false
-            },
-            icon = { Icon(AppIcons.Link, contentDescription = null) },
-            title = { Text(locale.officialLinkPromptTitle) },
-            text = {
-                Text(
-                    text = locale.officialLinkOpenFailed,
-                    color = MaterialTheme.colorScheme.error,
+@Composable
+private fun ClipboardConfirmationDialog(
+    targetType: OfficialLinkType,
+    locale: LocaleStrings,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(AppIcons.Link, contentDescription = null) },
+        title = { Text(locale.officialLinkPromptTitle) },
+        text = {
+            Text(
+                locale.officialLinkPromptMessage.replace(
+                    "%s",
+                    targetType.localizedName(locale),
                 )
-            },
-            confirmButton = {
-                if (retryTarget != null) {
-                    Button(
-                        onClick = {
-                            failedExternalLink = null
-                            inbox.submit(retryTarget.canonicalUrl())
-                        },
-                    ) {
-                        Text(locale.retry)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        failedExternalLink = null
-                        invalidExternalLink = false
-                    },
-                ) {
-                    Text(locale.cancel)
-                }
-            },
-        )
-    }
+            )
+        },
+        confirmButton = {
+            Button(
+                modifier = Modifier.widthIn(min = 96.dp),
+                onClick = onConfirm,
+            ) {
+                Text(locale.officialLinkOpen)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(locale.cancel)
+            }
+        },
+    )
+}
 
-    if (target != null) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!isOpening) pendingText = null
-            },
-            icon = { Icon(AppIcons.Link, contentDescription = null) },
-            title = { Text(locale.officialLinkPromptTitle) },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        locale.officialLinkPromptMessage.replace(
-                            "%s",
-                            target.type.localizedName(locale),
-                        )
-                    )
-                    if (openFailed) {
-                        Text(
-                            text = locale.officialLinkOpenFailed,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
+@Composable
+private fun ResolvingOfficialLinkDialog(locale: LocaleStrings) {
+    AlertDialog(
+        onDismissRequest = {},
+        icon = { Icon(AppIcons.Link, contentDescription = null) },
+        title = { Text(locale.officialLinkPromptTitle) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                Text(locale.loading)
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun OfficialLinkFailureDialog(
+    retryAvailable: Boolean,
+    locale: LocaleStrings,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(AppIcons.Link, contentDescription = null) },
+        title = { Text(locale.officialLinkPromptTitle) },
+        text = {
+            Text(
+                text = locale.officialLinkOpenFailed,
+                color = MaterialTheme.colorScheme.error,
+            )
+        },
+        confirmButton = {
+            if (retryAvailable) {
+                Button(onClick = onRetry) {
+                    Text(locale.retry)
                 }
-            },
-            confirmButton = {
-                Button(
-                    modifier = Modifier.widthIn(min = 96.dp),
-                    enabled = !isOpening,
-                    onClick = {
-                        isOpening = true
-                        openFailed = false
-                        scope.launch {
-                            service.resolve(target)
-                                .onSuccess { content ->
-                                    pendingText = null
-                                    navigator push content.toRoute()
-                                }
-                                .onFailure { openFailed = true }
-                            isOpening = false
-                        }
-                    },
-                ) {
-                    if (isOpening) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(locale.loading)
-                    } else {
-                        Text(locale.officialLinkOpen)
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !isOpening,
-                    onClick = { pendingText = null },
-                ) {
-                    Text(locale.cancel)
-                }
-            },
-        )
-    }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(locale.cancel)
+            }
+        },
+    )
 }
 
 private fun OfficialLinkType.localizedName(locale: LocaleStrings): String = when (this) {
@@ -248,9 +209,6 @@ private fun OfficialLinkType.localizedName(locale: LocaleStrings): String = when
     OfficialLinkType.Group -> locale.officialLinkTypeGroup
     OfficialLinkType.Avatar -> locale.officialLinkTypeAvatar
 }
-
-private fun OfficialLinkTarget.canonicalUrl(): String =
-    "https://vrchat.com/home/${type.pathSegment}/$id"
 
 private fun OfficialLinkContent.toRoute() = when (this) {
     is OfficialLinkContent.User -> UserProfileScreen(UserProfileVo(data))
