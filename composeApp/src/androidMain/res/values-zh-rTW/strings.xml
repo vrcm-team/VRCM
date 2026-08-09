@@ -8,4 +8,6 @@
     <string name="friend_online_default">在線中</string>
     <string name="friend_offline_title">%1$s 下線</string>
     <string name="friend_boop_title">%1$s 戳你</string>
+    <string name="friend_request_title">%1$s 申請加為好友</string>
+    <string name="group_announcement_title">%1$s 發布了公告</string>
 </resources>

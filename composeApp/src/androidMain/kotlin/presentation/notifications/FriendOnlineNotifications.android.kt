@@ -71,5 +71,27 @@ class AndroidFriendOnlineNotifier(private val context: Context) : FriendOnlineNo
             id, factory.social(id, context.getString(R.string.friend_boop_title, displayName), glyph)
         )
     }
+    override fun notifyFriendRequest(notificationId: String, displayName: String) {
+        if (!canNotify()) return
+        val id = notificationId.hashCode()
+        context.getSystemService(NotificationManager::class.java).notify(
+            id,
+            factory.social(id, context.getString(R.string.friend_request_title, displayName), ""),
+        )
+    }
+
+    override fun notifyGroupAnnouncement(notificationId: String, groupName: String, title: String) {
+        if (!canNotify()) return
+        val id = notificationId.hashCode()
+        context.getSystemService(NotificationManager::class.java).notify(
+            id,
+            factory.social(
+                id,
+                context.getString(R.string.group_announcement_title, groupName),
+                title,
+            ),
+        )
+    }
+
     private fun canNotify() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 }

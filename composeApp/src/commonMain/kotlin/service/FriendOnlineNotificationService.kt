@@ -36,8 +36,9 @@ class FriendOnlineNotificationService(
     private val tracker = FavoriteFriendPresenceTracker()
     private var activeToken: AccountSessionToken? = null
     private var favoriteJob: Job? = null
-    private val knownBoopIds = mutableSetOf<String>()
-    private var boopsSeeded = false
+    private val knownNotificationIds = mutableSetOf<String>()
+    private var notificationsSeeded = false
+    private var favoriteGroupIdsByUser: Map<String, Set<String>> = emptyMap()
 
     /** Starts one account-bound observer set. Calling it repeatedly is safe. */
     fun start() {
@@ -48,8 +49,9 @@ class FriendOnlineNotificationService(
                 mutex.withLock {
                     activeToken = session?.token
                     tracker.reset()
-                    knownBoopIds.clear()
-                    boopsSeeded = false
+                    knownNotificationIds.clear()
+                    notificationsSeeded = false
+                    favoriteGroupIdsByUser = emptyMap()
                 }
                 session?.let { account ->
                     favoriteJob = scope.launch {
@@ -64,14 +66,23 @@ class FriendOnlineNotificationService(
                         ) { groups, presenceTrusted -> groups to presenceTrusted }
                             .collect { (groups, presenceTrusted) ->
                                 val ids = groups.values.flatten().map { it.favoriteId }.toSet()
+                                // 名单可以整组选，所以要记住每位好友属于哪些收藏分组。
+                                val groupIdsByUser = buildMap<String, MutableSet<String>> {
+                                    groups.forEach { (group, favorites) ->
+                                        favorites.forEach { favorite ->
+                                            getOrPut(favorite.favoriteId) { mutableSetOf() } += group.id
+                                        }
+                                    }
+                                }
                                 mutex.withLock {
                                     if (activeToken == account.token) {
+                                        favoriteGroupIdsByUser = groupIdsByUser
                                         tracker.updateFavorites(ids, friendService.friendMap, presenceTrusted)
                                     }
                                 }
                             }
                     }
-                    refreshBoops(account.token, seedOnly = true)
+                    refreshInboxNotifications(account.token, seedOnly = true)
                 }
             }
         }
@@ -81,57 +92,115 @@ class FriendOnlineNotificationService(
                 if (event.event.type == NotificationEvents.Notification.typeName &&
                     SharedFlowCentre.isCurrentSession(event.token)
                 ) {
-                    refreshBoops(event.token)
+                    refreshInboxNotifications(event.token)
                 }
             }
         }
     }
 
-    private suspend fun refreshBoops(token: AccountSessionToken, seedOnly: Boolean = false) {
-        if (!settingsDao.boopNotificationsEnabled || !SharedFlowCentre.isCurrentSession(token)) return
-        val boops = try {
+    private fun anyInboxNotificationEnabled(): Boolean =
+        settingsDao.boopNotificationsEnabled ||
+            settingsDao.friendRequestNotificationsEnabled ||
+            settingsDao.groupAnnouncementNotificationsEnabled
+
+    /**
+     * 拉取收件箱通知并按类型分派。
+     *
+     * 戳一戳、好友请求和群组公告共用同一个接口，因此只拉一次、按 type 分流；三类各自受开关控制，
+     * 但去重集合是共用的：首次拉取只把已有通知记为基线，避免把历史消息当成新消息补发。
+     */
+    private suspend fun refreshInboxNotifications(
+        token: AccountSessionToken,
+        seedOnly: Boolean = false,
+    ) {
+        if (!anyInboxNotificationEnabled() || !SharedFlowCentre.isCurrentSession(token)) return
+        val notifications = try {
             notificationApi.fetchNotifications()
-                .filter { it.type.equals("boop", ignoreCase = true) }
         } catch (error: Exception) {
-            logger.warn("Unable to refresh Boop notifications: ${error.message.orEmpty()}")
+            logger.warn("Unable to refresh notifications: ${error.message.orEmpty()}")
             return
         }
-        val newBoops = mutex.withLock {
-            if (activeToken != token || !SharedFlowCentre.isCurrentSession(token) ||
-                !settingsDao.boopNotificationsEnabled
-            ) {
+        val pending = mutex.withLock {
+            if (activeToken != token || !SharedFlowCentre.isCurrentSession(token)) {
                 return@withLock emptyList()
             }
-            if (!boopsSeeded || seedOnly) {
-                knownBoopIds.clear()
-                knownBoopIds += boops.map(NotificationData::id)
-                boopsSeeded = true
+            if (!notificationsSeeded || seedOnly) {
+                knownNotificationIds.clear()
+                knownNotificationIds += notifications.map(NotificationData::id)
+                notificationsSeeded = true
                 emptyList()
             } else {
-                boops.filter { knownBoopIds.add(it.id) }
+                notifications.filter { knownNotificationIds.add(it.id) }
             }
         }
-        newBoops.forEach { boop ->
-            if (SharedFlowCentre.isCurrentSession(token)) notifyBoop(boop)
+        pending.forEach { notification ->
+            if (SharedFlowCentre.isCurrentSession(token)) dispatchInboxNotification(notification)
         }
     }
 
-    private suspend fun notifyBoop(boop: NotificationData) {
-        val sender = boop.senderUsername?.takeIf(String::isNotBlank)
-            ?: boop.senderUserId?.takeIf(String::isNotBlank)
+    /** 本地弹出提醒不改变服务器上的已读状态。 */
+    private fun dispatchInboxNotification(notification: NotificationData) {
+        val sender = notification.senderUsername?.takeIf(String::isNotBlank)
+            ?: notification.senderUserId?.takeIf(String::isNotBlank)
             ?: "Unknown"
-        // Delivering a local alert must not change the unread state on VRChat's servers.
-        notifier.notifyBoop(boop.id, sender, boop.details?.emojiId ?: boop.data.emojiId)
+        when {
+            notification.type.equals(BOOP_TYPE, ignoreCase = true) -> {
+                if (!settingsDao.boopNotificationsEnabled) return
+                notifier.notifyBoop(
+                    notification.id,
+                    sender,
+                    notification.details?.emojiId ?: notification.data.emojiId,
+                )
+            }
+
+            notification.type.equals(FRIEND_REQUEST_TYPE, ignoreCase = true) -> {
+                if (!settingsDao.friendRequestNotificationsEnabled) return
+                notifier.notifyFriendRequest(notification.id, sender)
+            }
+
+            notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
+                if (!settingsDao.groupAnnouncementNotificationsEnabled) return
+                // 群组公告本来就只发给已加入的群组成员，不需要再按群组过滤一次。
+                val details = notification.details ?: notification.data
+                notifier.notifyGroupAnnouncement(
+                    notification.id,
+                    details.groupName ?: notification.title.orEmpty(),
+                    details.announcementTitle ?: notification.message,
+                )
+            }
+        }
     }
 
     private suspend fun onFriendsChanged(friends: Map<String, FriendData>) {
-        val transitions = mutex.withLock {
-            if (activeToken == null) emptyList() else tracker.observe(friends)
+        val (transitions, groupIdsByUser) = mutex.withLock {
+            if (activeToken == null) {
+                emptyList<FriendPresenceTransition>() to emptyMap()
+            } else {
+                tracker.observe(friends) to favoriteGroupIdsByUser
+            }
         }
-        if (!settingsDao.friendPresenceNotificationsEnabled) return
+        if (transitions.isEmpty()) return
+        // 上线与下线是两个独立开关，名单同时作用于两者。
+        val onlineEnabled = settingsDao.friendPresenceNotificationsEnabled
+        val offlineEnabled = settingsDao.friendOfflineNotificationsEnabled
+        if (!onlineEnabled && !offlineEnabled) return
+        val filter = settingsDao.friendPresenceFilter
         transitions.forEach { transition ->
+            val enabled = if (transition.inGame) onlineEnabled else offlineEnabled
+            if (!enabled) return@forEach
+            if (!filter.allows(transition.userId, groupIdsByUser[transition.userId].orEmpty())) {
+                return@forEach
+            }
             if (transition.inGame) notifier.notifyOnline(transition.friend ?: return@forEach)
             else notifier.notifyOffline(transition.userId, transition.displayName)
         }
+    }
+
+    private companion object {
+        const val BOOP_TYPE = "boop"
+        const val FRIEND_REQUEST_TYPE = "friendRequest"
+
+        /** VRChat 把群组类通知统一放在 group. 前缀下，公告是其中的 group.announcement。 */
+        const val GROUP_ANNOUNCEMENT_TYPE_PREFIX = "group.announcement"
     }
 }

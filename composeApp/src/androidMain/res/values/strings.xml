@@ -8,4 +8,6 @@
     <string name="friend_online_default">Online</string>
     <string name="friend_offline_title">%1$s is offline</string>
     <string name="friend_boop_title">%1$s booped you</string>
+    <string name="friend_request_title">%1$s sent a friend request</string>
+    <string name="group_announcement_title">%1$s posted an announcement</string>
 </resources>
