@@ -23,6 +23,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class, ExperimentalSharedTransitionApi::class)
@@ -52,7 +53,14 @@ class UserStatusRowSharedTransitionTest {
     )
 
     @Test
-    fun userStatusRowUsesScaleToBoundsModifier() = runComposeUiTest {
+    fun navigationSharedBoundsBelongToStatusTextInsteadOfCompositeRow() = runComposeUiTest {
+        val user = UserProfileVo(
+            id = UserId,
+            displayName = UserName,
+            status = UserStatus.Active,
+            statusDescription = UserStatusDescription,
+        )
+
         setContent {
             MaterialTheme {
                 SharedTransitionLayout {
@@ -63,7 +71,7 @@ class UserStatusRowSharedTransitionTest {
                         ) {
                             UserStatusRow(
                                 modifier = Modifier.testTag(StatusRowTag),
-                                user = null,
+                                user = user,
                             )
                         }
                     }
@@ -72,16 +80,30 @@ class UserStatusRowSharedTransitionTest {
         }
 
         waitForIdle()
-        val modifierNames = onNodeWithTag(StatusRowTag, useUnmergedTree = true)
+        val rowModifierNames = onNodeWithTag(StatusRowTag, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .layoutInfo
+            .getModifierInfo()
+            .mapNotNull { it.modifier::class.qualifiedName }
+        val textModifierNames = onNodeWithText(UserStatusDescription, useUnmergedTree = true)
             .fetchSemanticsNode()
             .layoutInfo
             .getModifierInfo()
             .mapNotNull { it.modifier::class.qualifiedName }
 
         assertTrue(
-            ScaleToBoundsModifierName in modifierNames,
-            "UserStatusRow should scale its final layout during shared transitions; " +
-                "modifiers=$modifierNames",
+            SharedBoundsNodeElementName in textModifierNames,
+            "status Text should own the navigation shared bounds; modifiers=$textModifierNames",
+        )
+        assertTrue(
+            ScaleToBoundsModifierName in textModifierNames,
+            "status Text should scale its final layout during shared transitions; " +
+                "modifiers=$textModifierNames",
+        )
+        assertFalse(
+            SharedBoundsNodeElementName in rowModifierNames,
+            "the composite status Row must not participate in navigation shared bounds; " +
+                "modifiers=$rowModifierNames",
         )
     }
 

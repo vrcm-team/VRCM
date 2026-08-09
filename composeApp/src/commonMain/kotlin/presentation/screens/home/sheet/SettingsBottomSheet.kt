@@ -32,8 +32,10 @@ import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.VersionService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
-import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
-import io.github.vrcmteam.vrcm.storage.WorldProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.GroupProfileCacheStore
+import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
+import io.github.vrcmteam.vrcm.storage.meetup.DecorationTemplateCacheDao
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
@@ -233,8 +235,10 @@ private fun AboutBlock() {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
     val accountCacheManager = koinInject<AccountCacheManager>()
-    val groupProfileCacheDao = koinInject<GroupProfileCacheDao>()
-    val worldProfileCacheDao = koinInject<WorldProfileCacheDao>()
+    val groupProfileCacheStore = koinInject<GroupProfileCacheStore>()
+    val worldProfileCacheStore = koinInject<WorldProfileCacheStore>()
+    val decorationTemplateCacheDao = koinInject<DecorationTemplateCacheDao>()
+    val meetupCardAssetStore = koinInject<MeetupCardAssetStore>()
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(VersionVo()) }
     // 不能直接version.not()因为默认为false会导致一点开就显示
@@ -272,8 +276,11 @@ private fun AboutBlock() {
                         try {
                             diskCache?.clear()
                             accountCacheManager.clearAll()
-                            groupProfileCacheDao.clearAll()
-                            worldProfileCacheDao.clearAll()
+                            groupProfileCacheStore.clearAll()
+                            worldProfileCacheStore.clearAll()
+                            // 普通清缓存只删远端装饰副本；身份牌配置与相册照片保留。
+                            decorationTemplateCacheDao.clearAll()
+                            meetupCardAssetStore.clearDecorationCache()
                             size = 0
                         } finally {
                             isClearingCache = false

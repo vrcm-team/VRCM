@@ -45,6 +45,25 @@ actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
 }
 
 /**
+ * Desktop平台实现：保存已生成的图片字节到用户图片目录
+ */
+actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        try {
+            val platform = this@saveImageBytesToGallery as DesktopAppPlatform
+            val vrcmDir = File(platform.getPicturesDirectory(), "VRCM")
+            if (!vrcmDir.exists()) {
+                vrcmDir.mkdirs()
+            }
+            File(vrcmDir, fileName).writeBytes(bytes)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+/**
  * Desktop平台实现：读取文件字节
  */
 actual suspend fun AppPlatform.readFileBytes(filePath: String): ByteArray = withContext(Dispatchers.IO) {

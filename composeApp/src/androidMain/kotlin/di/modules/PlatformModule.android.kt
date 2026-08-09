@@ -8,6 +8,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.AndroidPlatfo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.notifications.AndroidFriendOnlineNotifier
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.AndroidAnimatedWebpDecoder
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.AnimatedWebpDecoder
 import io.github.vrcmteam.vrcm.storage.AndroidSecureStorage
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.SecureStorage
@@ -24,5 +26,6 @@ actual val platformModule: Module = module {
     singleOf(::AndroidAppPlatform) bind AppPlatform::class
     singleOf(::AndroidPlatformImageCodec) bind PlatformImageCodec::class
     singleOf(::AndroidFriendOnlineNotifier) bind FriendOnlineNotifier::class
+    singleOf(::AndroidAnimatedWebpDecoder) bind AnimatedWebpDecoder::class
     single<SecureStorage> { AndroidSecureStorage(get(), DaoKeys.Account.NAME) }
 }

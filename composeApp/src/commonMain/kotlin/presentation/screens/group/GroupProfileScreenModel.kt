@@ -13,7 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
-import io.github.vrcmteam.vrcm.storage.GroupProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.GroupProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -31,7 +31,7 @@ import kotlin.time.ExperimentalTime
 internal class GroupProfileInitialLoadGate {
     private var initializedGroupId: String? = null
 
-    fun runIfNeeded(groupId: String, load: () -> Unit): Boolean {
+    suspend fun runIfNeeded(groupId: String, load: suspend () -> Unit): Boolean {
         if (initializedGroupId == groupId) return false
         initializedGroupId = groupId
         load()
@@ -45,7 +45,7 @@ class GroupProfileScreenModel(
     private val usersApi: UsersApi,
     private val authService: AuthService,
     private val logger: Logger,
-    private val groupProfileCacheDao: GroupProfileCacheDao,
+    private val groupProfileCacheStore: GroupProfileCacheStore,
 ) : ViewModel() {
 
     private val _groupProfileState = MutableStateFlow<GroupProfileVo?>(null)
@@ -97,14 +97,18 @@ class GroupProfileScreenModel(
             _groupProfileState.value = groupProfileVo
             return
         }
-        initialLoadGate.runIfNeeded(groupId) {
-            _groupProfileState.value = groupProfileVo
+        viewModelScope.launch {
+            initialLoadGate.runIfNeeded(groupId) {
+                _groupProfileState.value = groupProfileVo
 
-            val cached = groupProfileCacheDao.load(groupId)
-            if (cached != null) {
-                _groupProfileState.value = GroupProfileVo(cached.group)
+                val cached = groupProfileCacheStore.load(groupId)
+                if (cached != null) {
+                    _groupProfileState.value = GroupProfileVo(cached.group)
+                }
+                refreshGroupData(
+                    refreshProfile = cached == null || cached.isExpired(nowMilliseconds()),
+                )
             }
-            refreshGroupData(refreshProfile = cached == null || cached.isExpired(nowMilliseconds()))
         }
     }
 
@@ -146,7 +150,7 @@ class GroupProfileScreenModel(
                     authService.reTryAuthCatching {
                         groupsApi.fetchGroup(groupId, includeRoles = true)
                     }.onSuccess { groupData ->
-                        groupProfileCacheDao.save(
+                        groupProfileCacheStore.save(
                             GroupProfileCache(
                                 group = groupData,
                                 cachedAtEpochMilliseconds = nowMilliseconds(),

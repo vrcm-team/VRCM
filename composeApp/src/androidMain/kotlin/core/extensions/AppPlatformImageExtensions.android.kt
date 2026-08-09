@@ -39,6 +39,21 @@ actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
     }
 
 /**
+ * Android平台实现：保存已生成的图片字节到系统相册
+ */
+actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        this@saveImageBytesToGallery as AndroidAppPlatform
+        bytes.inputStream().use { inputStream ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                saveImageWithMediaStore(inputStream, fileName)
+            } else {
+                saveImageLegacy(inputStream, fileName)
+            }
+        }
+    }
+
+/**
  * Android平台实现：读取文件字节
  */
 actual suspend fun AppPlatform.readFileBytes(filePath: String): ByteArray = withContext(Dispatchers.IO) {
@@ -106,11 +121,15 @@ actual suspend fun AppPlatform.getImageDimensions(filePath: String): Pair<Int, I
     }
 }
 
+/** 相册里的 MIME 必须与真实字节一致，PNG 写成 image/jpeg 会让部分相册应用打不开。 */
+private fun mimeTypeFor(fileName: String): String =
+    if (fileName.endsWith(".png", ignoreCase = true)) "image/png" else "image/jpeg"
+
 // 辅助方法
 private fun AndroidAppPlatform.saveImageWithMediaStore(inputStream: InputStream, fileName: String): Boolean {
     val contentValues = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+        put(MediaStore.MediaColumns.MIME_TYPE, mimeTypeFor(fileName))
         put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + File.separator + "VRCM")
     }
 

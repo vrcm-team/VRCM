@@ -18,7 +18,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendUpdateConten
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserLocationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
-import io.github.vrcmteam.vrcm.storage.FriendListCacheDao
+import io.github.vrcmteam.vrcm.storage.FriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
@@ -49,7 +49,7 @@ class FriendService(
     private val friendsApi: FriendsApi,
     private val authService: AuthService,
     private val json: Json,
-    private val friendListCacheDao: FriendListCacheDao,
+    private val friendListCacheStore: FriendListCacheStore,
     private val accountCacheManager: AccountCacheManager,
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -125,18 +125,22 @@ class FriendService(
     }
 
     private fun activateSession(session: AuthenticatedAccount) {
+        var accountToRestore: String? = null
         val activated = synchronized(friendMapLock) {
             if (activeSessionToken == session.token) return@synchronized false
             activeSessionToken = session.token
             if (activeAccountUserId != session.account.userId) {
                 currentUserLocationRevision++
                 _currentUserLocation.value = null
-                restoreCachedFriendList(session.account.userId)
+                activeAccountUserId = session.account.userId
+                accountToRestore = session.account.userId
             }
             accountTracker.onAuthenticated(session.account.userId)
             publishFriendActivitySource()
             true
         }
+        // 缓存读取是挂起的（Room），不能在 synchronized 里做；放到协程中回填。
+        accountToRestore?.let { userId -> serviceScope.launch { restoreCachedFriendList(userId) } }
         if (activated) {
             preloadFriendList(session.account.userId)
             serviceScope.launch {
@@ -417,11 +421,14 @@ class FriendService(
         )
     }
 
-    private fun restoreCachedFriendList(userId: String) {
-        activeAccountUserId = userId
-        val friends = friendListCacheDao.load(userId)?.friends.orEmpty()
+    private suspend fun restoreCachedFriendList(userId: String) {
+        val friends = friendListCacheStore.load(userId)?.friends.orEmpty()
             .map(FriendData::asCachedOffline)
-        friendStore.restore(friends)
+        synchronized(friendMapLock) {
+            // 读取期间可能已经切到别的账号，过期结果直接丢弃。
+            if (activeAccountUserId != userId) return
+            friendStore.restore(friends)
+        }
         publishFriendState()
     }
 

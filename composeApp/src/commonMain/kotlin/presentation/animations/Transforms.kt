@@ -102,6 +102,15 @@ fun slideScreenTransition(
     }
 }
 
+/**
+ * 纯淡入淡出的转场：留给由共享元素承担主体运动的页面对。
+ * 屏幕级再叠加缩放会和共享元素的形变打架，看起来像缩放了两次。
+ */
+fun fadeScreenTransition(): ContentTransform {
+    val animationSpec = tween<Float>()
+    return fadeIn(animationSpec) togetherWith fadeOut(animationSpec)
+}
+
 internal fun horizontalScreenExitTransition(
     animationSpec: FiniteAnimationSpec<Float>,
 ): ExitTransition = scaleOut(

@@ -373,13 +373,21 @@ fun UserStatusRow(
 ) {
     val statusText = @Composable {
         Text(
-            modifier = Modifier.enableIf(animatedVisibilityScope != null){
-                sharedBoundsBy(
-                    key = "${sharedUserId}UserStatusText",
-                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                    animatedVisibilityScope = animatedVisibilityScope!!
+            modifier = Modifier
+                .sharedBoundsBy(
+                    key = "${sharedUserId}UserStatusRow",
+                    suffixKey = sharedSuffixKey,
+                    resizeMode = SharedTextBoundsResizeMode,
+                    boundsTransform = TextBoundsTransform,
+                    clipInOverlayDuringTransition = NoClip,
                 )
-            },
+                .enableIf(animatedVisibilityScope != null) {
+                    sharedBoundsBy(
+                        key = "${sharedUserId}UserStatusText",
+                        sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                        animatedVisibilityScope = animatedVisibilityScope!!,
+                    )
+                },
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -389,13 +397,7 @@ fun UserStatusRow(
     }
 
     Row(
-        modifier = modifier.sharedBoundsBy(
-            key = "${sharedUserId}UserStatusRow",
-            suffixKey = sharedSuffixKey,
-            resizeMode = SharedTextBoundsResizeMode,
-            boundsTransform = TextBoundsTransform,
-            clipInOverlayDuringTransition = NoClip,
-        ),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {

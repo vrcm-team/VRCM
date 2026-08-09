@@ -19,7 +19,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
-import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheDao
+import io.github.vrcmteam.vrcm.storage.FriendNetworkCacheStore
 import io.github.vrcmteam.vrcm.storage.data.FriendNetworkCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -77,7 +77,7 @@ class FriendNetworkScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val friendService: FriendService,
-    private val cacheDao: FriendNetworkCacheDao,
+    private val cacheStore: FriendNetworkCacheStore,
     private val logger: Logger,
 ) : ViewModel() {
 
@@ -264,7 +264,7 @@ class FriendNetworkScreenModel(
             uiState = uiState.copy(isPreparing = true)
             try {
                 val currentUser = authService.currentUser()
-                val cache = cacheDao.load(currentUser.id)
+                val cache = cacheStore.load(currentUser.id)
                 if (cache != null) {
                     val selfId = cache.userId
                     val (filteredNodes, filteredEdges) = filterSelf(cache.nodes, cache.edges, selfId)
@@ -346,7 +346,7 @@ class FriendNetworkScreenModel(
                     nodes = nodes,
                     edges = finalEdges
                 )
-                cacheDao.save(cache)
+                cacheStore.save(cache)
                 val selfId = currentUser.id
                 val (filteredNodes, filteredEdges) = filterSelf(nodes, finalEdges, selfId)
                 val communities = assignCommunities(nodes, finalEdges, selfId)

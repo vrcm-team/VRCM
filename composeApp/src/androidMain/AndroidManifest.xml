@@ -17,10 +17,37 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VRCM"
         tools:targetApi="tiramisu">
-        <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustPan" android:theme="@style/Theme.VRCM">
+        <!--
+            singleTop：深链需要复用已存在的实例，否则扫码会再起一份 MainActivity。
+            这里不用 singleTask——它把本 Activity 变成任务根并改变任务栈语义，
+            会影响系统预测性返回动画；singleTop 只避免重复实例，不动任务结构。
+            代价是调用方未带 FLAG_ACTIVITY_NEW_TASK 时深链可能落在调用方任务里，
+            浏览器与主流扫码应用都会带该 flag，可接受。
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustPan"
+            android:theme="@style/Theme.VRCM">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 扫描身份牌二维码（VRChat 用户主页链接）时可选择用 VRCM 打开 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="vrchat.com" android:pathPrefix="/home/user/" />
+                <data android:scheme="https" android:host="www.vrchat.com" android:pathPrefix="/home/user/" />
+            </intent-filter>
+            <!-- 应用自定义 scheme：vrcm://user/{userId} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vrcm" android:host="user" />
             </intent-filter>
         </activity>
         <service android:name=".service.FriendActivityForegroundService" android:exported="false" android:foregroundServiceType="dataSync" />

@@ -2,8 +2,10 @@ package io.github.vrcmteam.vrcm.presentation.supports
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CropSquare
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FilterNone
 import androidx.compose.material.icons.outlined.Minimize
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.DefaultFillType
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -14,8 +16,10 @@ import androidx.compose.ui.unit.dp
 object AppIcons {
 
     val WindowMinimize: ImageVector by lazy { Icons.Outlined.Minimize }
+    val Edit: ImageVector by lazy { Icons.Outlined.Edit }
     val WindowMaximize: ImageVector by lazy { Icons.Outlined.CropSquare }
     val WindowRestore: ImageVector by lazy { Icons.Outlined.FilterNone }
+    val ScreenRotation: ImageVector by lazy { Icons.Outlined.ScreenRotation }
 
     val Mirror: ImageVector by lazy {
         ImageVector.Builder(

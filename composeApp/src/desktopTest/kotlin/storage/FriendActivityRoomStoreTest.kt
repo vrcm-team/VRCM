@@ -13,11 +13,15 @@ import io.github.vrcmteam.vrcm.service.FriendActivityObservation
 import io.github.vrcmteam.vrcm.service.FriendMeetingChange
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.service.trackFriendActivity
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
+import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import okio.Path.Companion.toPath
+import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -252,9 +256,14 @@ class FriendActivityRoomStoreTest {
                 nowMillis = 1_000L,
             )
             val manager = AccountCacheManager(
-                friendListCacheDao = FriendListCacheDao(MapSettings()),
-                userProfileCacheDao = UserProfileCacheDao(MapSettings()),
+                friendListCacheStore = InMemoryFriendListCacheStore(),
+                userProfileCacheStore = InMemoryUserProfileCacheStore(),
                 friendActivityStore = store,
+                meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+                meetupCardAssetStore = MeetupCardAssetStore(
+                    FakeFileSystem(),
+                    "/meetup-assets".toPath(),
+                ),
             )
 
             manager.clearAccount("usr_owner")

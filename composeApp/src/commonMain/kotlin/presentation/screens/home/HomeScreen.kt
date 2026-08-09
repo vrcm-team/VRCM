@@ -35,7 +35,12 @@ import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import androidx.compose.ui.platform.testTag
 import io.github.vrcmteam.vrcm.presentation.extensions.*
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
@@ -145,6 +150,14 @@ private inline fun AppListRoute.HomeTopAppBar(
     val onClickUserIcon = { user: IUser ->
         currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
     }
+    // 长按进入身份牌；当前已在同一 owner 的身份牌路由时忽略，防重复入栈。
+    val onLongClickUserIcon = onLongClickUserIcon@{
+        val last = currentNavigator.lastItem
+        val alreadyOpen = (last as? MeetupCardDisplayRoute)?.ownerUserId == homeUserId ||
+            (last as? MeetupCardEditorRoute)?.ownerUserId == homeUserId
+        if (alreadyOpen) return@onLongClickUserIcon
+        currentNavigator push homeScreenModel.meetupCardStartRoute()
+    }
     var statusVisibility by remember { mutableStateOf(true) }
     val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
         statusVisibility = false
@@ -174,15 +187,26 @@ private inline fun AppListRoute.HomeTopAppBar(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 头像+名字这一组就是"我的身份"，铭牌是它的全屏版：以整组作为
+            // 共享主体，形变比从 54dp 头像炸开更平缓，也不必额外包一层节点。
             Row(
                 modifier = Modifier
+                    .sharedBoundsBy(
+                        key = meetupCardSharedKey(homeUserId),
+                        useSuffixKey = false,
+                        resizeMode = MeetupCardResizeMode,
+                    )
                     .clip(MaterialTheme.shapes.medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .simpleClickable { currentUser?.let { onClickUserIcon(it) } }
+                        .simpleCombinedClickable(
+                            onLongClick = { currentUser?.let { onLongClickUserIcon() } },
+                            onClick = { currentUser?.let { onClickUserIcon(it) } },
+                        )
+                        .testTag("home-user-avatar")
                         .sharedBoundsBy(
                             key = "${homeUserId}UserIcon",
                             suffixKey = AuthHomeSharedSuffixKey,

@@ -2,12 +2,15 @@ package io.github.vrcmteam.vrcm.core.extensions
 
 import io.github.vrcmteam.vrcm.AppPlatform
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSData
 import platform.Foundation.NSURL
+import platform.Foundation.create
 import platform.Foundation.dataWithContentsOfURL
 import platform.Photos.PHAssetCreationRequest
 import platform.Photos.PHAssetResourceTypePhoto
@@ -73,6 +76,44 @@ actual suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
         return@withContext success
 
     }
+
+/**
+ * iOS平台实现：保存已生成的图片字节到系统相册
+ */
+@OptIn(ExperimentalForeignApi::class)
+actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        if (bytes.isEmpty()) return@withContext false
+        if (!requestPhotoLibraryPermission()) return@withContext false
+        savePhotoData(bytes.toNSData())
+    }
+
+/** 把已编码的图片数据写入相册，等待系统回调后再返回结果。 */
+private suspend fun savePhotoData(data: NSData): Boolean = withContext(Dispatchers.IO) {
+    var success = false
+    val semaphore = Semaphore(1)
+    semaphore.acquire()
+
+    PHPhotoLibrary.sharedPhotoLibrary().performChanges({
+        PHAssetCreationRequest.creationRequestForAsset().addResourceWithType(
+            PHAssetResourceTypePhoto,
+            data,
+            null,
+        )
+    }, { didSucceed, _ ->
+        success = didSucceed
+        semaphore.release()
+    })
+
+    semaphore.acquire()
+    semaphore.release()
+    success
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
+    NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
+}
 
 /**
  * 请求相册权限

@@ -40,7 +40,7 @@ import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
-import io.github.vrcmteam.vrcm.storage.UserProfileCacheDao
+import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.ktor.client.call.*
@@ -191,7 +191,7 @@ class UserProfileScreenModel(
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
     private val inviteApi: InviteApi,
-    private val userProfileCacheDao: UserProfileCacheDao,
+    private val userProfileCacheStore: UserProfileCacheStore,
     private val friendLocationPagerModel: FriendLocationPagerModel,
     friendActivityService: FriendActivityService,
     private val boopService: BoopService,
@@ -272,7 +272,11 @@ class UserProfileScreenModel(
                 _friendActivityEvents.value = it
             }
         }
-        userProfileCacheDao.load(cacheOwnerUserId, userProfileVO.id)?.let(::restoreCachedProfile)
+        viewModelScope.launch {
+            // Room 读取是挂起的，缓存会比首帧稍晚一点到；只在网络结果尚未覆盖时回填。
+            userProfileCacheStore.load(cacheOwnerUserId, userProfileVO.id)
+                ?.let(::restoreCachedProfile)
+        }
         if (userProfileVO.id == cacheOwnerUserId) {
             viewModelScope.launch {
                 authService.currentUserState.collect { currentUser ->
@@ -325,7 +329,7 @@ class UserProfileScreenModel(
         cacheMutex.withLock {
             user?.let { cachedUserData = it }
             val cachedUser = cachedUserData ?: return
-            userProfileCacheDao.save(
+            userProfileCacheStore.save(
                 ownerUserId = cacheOwnerUserId,
                 userId = cachedUser.id,
                 cache = UserProfileCache(
