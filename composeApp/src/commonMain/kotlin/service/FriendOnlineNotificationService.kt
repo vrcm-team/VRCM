@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.websocket.data.type.NotificationEvents
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.SettingsDao
@@ -30,6 +31,7 @@ class FriendOnlineNotificationService(
     private val friendService: FriendService,
     private val settingsDao: SettingsDao,
     private val notifier: FriendOnlineNotifier,
+    private val usersApi: UsersApi,
     private val logger: Logger,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -180,8 +182,13 @@ class FriendOnlineNotificationService(
 
     private suspend fun dispatchFriendRequest(request: NotificationDataV2) {
         if (!settingsDao.friendRequestNotificationsEnabled) return
-        // V2 的字段比 V1 少，没有 senderUsername，只能退到发送者 ID。
-        val sender = request.senderUserId.takeIf(String::isNotBlank) ?: "Unknown"
+        // V2 没有 senderUsername，直接显示 usr_ 开头的原始 ID 用户根本认不出是谁，
+        // 因此按 HomeScreenModel 的做法查一次用户取昵称；查询失败仍退回 ID，不吞掉整条通知。
+        val sender = runCatching { usersApi.fetchUser(request.senderUserId).displayName }
+            .getOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: request.senderUserId.takeIf(String::isNotBlank)
+            ?: "Unknown"
         notifier.notifyFriendRequest(request.id, sender)
     }
 
