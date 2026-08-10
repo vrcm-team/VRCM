@@ -93,6 +93,7 @@ internal class FriendActivityTracker(
     private val activeMeetings = mutableMapOf<String, ActiveMeeting>()
     private val lastKnownInstanceByUserId = mutableMapOf<String, String>()
     private val lastKnownFriendByUserId = mutableMapOf<String, FriendActivityObservation>()
+    private var hasObservedSelfLocation = false
 
     fun observe(
         friends: Collection<FriendActivityObservation>,
@@ -100,6 +101,8 @@ internal class FriendActivityTracker(
         nowMillis: Long,
     ): FriendActivityBatch {
         val selfInstance = selfLocation.normalizedInstanceKey()
+        val canAnnounceNewMeeting = hasObservedSelfLocation
+        if (selfLocation != null) hasObservedSelfLocation = true
         val events = mutableListOf<FriendActivityEventDraft>()
         val currentUserIds = friends.mapTo(mutableSetOf(), FriendActivityObservation::userId)
         val meetings = buildList {
@@ -168,7 +171,7 @@ internal class FriendActivityTracker(
                             occurredAtMillis = nowMillis,
                             worldId = sharedInstance.substringBefore(':'),
                             accessType = sharedInstance.accessType(),
-                            announce = true,
+                            announce = canAnnounceNewMeeting,
                         )
                     )
                 }
@@ -223,6 +226,7 @@ internal class FriendActivityTracker(
         previousByUserId.clear()
         lastKnownInstanceByUserId.clear()
         lastKnownFriendByUserId.clear()
+        hasObservedSelfLocation = false
         return FriendActivityBatch(meetings = ended)
     }
 

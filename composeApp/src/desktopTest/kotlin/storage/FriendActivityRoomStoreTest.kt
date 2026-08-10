@@ -407,6 +407,44 @@ class FriendActivityRoomStoreTest {
     }
 
     @Test
+    fun firstKnownSelfLocationStartsUnannouncedMeeting() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flowOf(
+                    FriendActivityInputSnapshot(session.token, listOf(friend), null, 1_000L),
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 2_000L),
+                    FriendActivityInputSnapshot(
+                        session.token,
+                        listOf(friend),
+                        friend.location,
+                        3_000L,
+                        trackingControl = FriendActivityTrackingControl.Stop,
+                    ),
+                ),
+                store = store,
+            )
+
+            val summary = store.summary(session.account.userId, friend.userId)
+            assertEquals(0, summary?.meetingCount)
+            assertEquals(
+                emptyList(),
+                store.observeEvents(session.account.userId, friend.userId).first().map { it.type },
+            )
+            assertEquals(
+                listOf(false),
+                store.sessions(session.account.userId, friend.userId).map { it.announced },
+            )
+        }
+    }
+
+    @Test
     fun replayedResumeStartsTrackingAtCollectorSubscriptionTime() = runTest {
         withStore { store ->
             val session = AuthenticatedAccount(

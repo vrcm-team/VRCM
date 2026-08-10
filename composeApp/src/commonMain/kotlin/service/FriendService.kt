@@ -159,6 +159,7 @@ class FriendService(
             if (activeAccountUserId != session.account.userId) {
                 currentUserLocationRevision++
                 _currentUserLocation.value = null
+                _friendActivitySource.value = null
                 activeAccountUserId = session.account.userId
                 accountToRestore = session.account.userId
                 // 新账号要重新完成一次完整刷新，才能把在线状态当作可信读数。
@@ -399,6 +400,9 @@ class FriendService(
     ): Boolean = synchronized(friendMapLock) {
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
         if (committed) {
+            if (replaceUntouched) {
+                _initialRefreshCompleted.value = true
+            }
             publishFriendState()
             activeSessionToken?.let { sessionToken ->
                 _friendLastActivitySource.value = FriendActivitySourceSnapshot(
@@ -407,7 +411,6 @@ class FriendService(
                     selfLocation = null,
                 )
             }
-            _initialRefreshCompleted.value = true
         }
         committed
     }
@@ -472,6 +475,7 @@ class FriendService(
     }
 
     private fun publishFriendActivitySource() {
+        if (!_initialRefreshCompleted.value) return
         val token = activeSessionToken ?: return
         _friendActivitySource.value = FriendActivitySourceSnapshot(
             token = token,
