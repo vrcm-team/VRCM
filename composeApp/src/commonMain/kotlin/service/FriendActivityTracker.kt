@@ -11,6 +11,14 @@ internal data class FriendActivityObservation(
     val lastActivityAtMillis: Long?,
 )
 
+internal enum class FriendSocketPresenceType { Online, Offline }
+
+internal data class FriendSocketPresenceEvent(
+    val userId: String,
+    val type: FriendSocketPresenceType,
+    val occurredAtMillis: Long,
+)
+
 enum class FriendActivityAccessType {
     Public,
     FriendsPlus,
@@ -34,6 +42,12 @@ internal sealed interface FriendMeetingChange {
     ) : FriendMeetingChange
 
     data class Ended(
+        override val userId: String,
+        override val occurredAtMillis: Long,
+        val durationMillis: Long,
+    ) : FriendMeetingChange
+
+    data class Checkpoint(
         override val userId: String,
         override val occurredAtMillis: Long,
         val durationMillis: Long,
@@ -67,7 +81,9 @@ internal data class FriendActivityBatch(
     val events: List<FriendActivityEventDraft> = emptyList(),
 )
 
-internal class FriendActivityTracker {
+internal class FriendActivityTracker(
+    private val derivePresenceEvents: Boolean = false,
+) {
     private data class ActiveMeeting(
         val instanceKey: String,
         val startedAtMillis: Long,
@@ -75,6 +91,8 @@ internal class FriendActivityTracker {
 
     private val previousByUserId = mutableMapOf<String, FriendActivityObservation>()
     private val activeMeetings = mutableMapOf<String, ActiveMeeting>()
+    private val lastKnownInstanceByUserId = mutableMapOf<String, String>()
+    private val lastKnownFriendByUserId = mutableMapOf<String, FriendActivityObservation>()
 
     fun observe(
         friends: Collection<FriendActivityObservation>,
@@ -100,8 +118,10 @@ internal class FriendActivityTracker {
             }
 
             friends.forEach { friend ->
+                lastKnownFriendByUserId[friend.userId] = friend
                 val previous = previousByUserId[friend.userId]
                 val friendInstance = friend.location.normalizedInstanceKey()
+                if (friendInstance != null) lastKnownInstanceByUserId[friend.userId] = friendInstance
                 val sharedInstance = selfInstance?.takeIf { it == friendInstance }
                 val activeMeeting = activeMeetings[friend.userId]
 
@@ -123,6 +143,11 @@ internal class FriendActivityTracker {
                 }
 
                 events += friend.eventsSince(previous, nowMillis)
+
+                if (activeMeeting != null && sharedInstance == activeMeeting.instanceKey) {
+                    val elapsed = (nowMillis - activeMeeting.startedAtMillis).coerceAtLeast(0L)
+                    if (elapsed > 0L) add(FriendMeetingChange.Checkpoint(friend.userId, nowMillis, elapsed))
+                }
 
                 if (activeMeeting != null && activeMeeting.instanceKey != sharedInstance) {
                     add(
@@ -153,6 +178,54 @@ internal class FriendActivityTracker {
         return FriendActivityBatch(meetings = meetings, events = events)
     }
 
+    fun observeSocketPresence(
+        friends: Collection<FriendActivityObservation>,
+        event: FriendSocketPresenceEvent,
+    ): FriendActivityBatch {
+        val friend = friends.firstOrNull { it.userId == event.userId }
+            ?: lastKnownFriendByUserId[event.userId]
+            ?: FriendActivityObservation(
+                userId = event.userId,
+                displayName = "",
+                profileImageUrl = "",
+                location = "offline",
+                status = "offline",
+                statusDescription = "",
+                bio = "",
+                lastActivityAtMillis = null,
+            )
+        val type = when (event.type) {
+            FriendSocketPresenceType.Online -> FriendActivityEventType.Online
+            FriendSocketPresenceType.Offline -> FriendActivityEventType.Offline
+        }
+        val location = friend.location.normalizedInstanceKey() ?: lastKnownInstanceByUserId[event.userId]
+        return FriendActivityBatch(events = listOf(FriendActivityEventDraft(
+            userId = friend.userId,
+            displayName = friend.displayName,
+            profileImageUrl = friend.profileImageUrl,
+            type = type,
+            occurredAtMillis = event.occurredAtMillis,
+            currentValue = if (type == FriendActivityEventType.Online) friend.statusValue() else null,
+            worldId = location?.substringBefore(':'),
+            accessType = location?.accessType(),
+        )))
+    }
+
+    fun finish(nowMillis: Long): FriendActivityBatch {
+        val ended = activeMeetings.map { (userId, active) ->
+            FriendMeetingChange.Ended(
+                userId = userId,
+                occurredAtMillis = nowMillis,
+                durationMillis = (nowMillis - active.startedAtMillis).coerceAtLeast(0L),
+            )
+        }
+        activeMeetings.clear()
+        previousByUserId.clear()
+        lastKnownInstanceByUserId.clear()
+        lastKnownFriendByUserId.clear()
+        return FriendActivityBatch(meetings = ended)
+    }
+
     private fun FriendActivityObservation.eventsSince(
         previous: FriendActivityObservation,
         nowMillis: Long,
@@ -170,7 +243,7 @@ internal class FriendActivityTracker {
         )
 
         when {
-            previousInstance == null && currentInstance != null -> add(
+            derivePresenceEvents && previousInstance == null && currentInstance != null -> add(
                 baseEvent.copy(
                     type = FriendActivityEventType.Online,
                     currentValue = statusValue(),
@@ -178,7 +251,7 @@ internal class FriendActivityTracker {
                     accessType = currentInstance.accessType(),
                 )
             )
-            previousInstance != null && currentInstance == null -> add(
+            derivePresenceEvents && previousInstance != null && currentInstance == null -> add(
                 baseEvent.copy(
                     type = FriendActivityEventType.Offline,
                     worldId = previousInstance.substringBefore(':'),

@@ -78,15 +78,19 @@ fun App(
     KoinContext {
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
-        koinInject<FriendActivityService>()
+        val friendActivityService = koinInject<FriendActivityService>()
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
             if (lifecycleEventGate.onStop(isConfigurationChange())) {
                 friendLocationPagerModel.onBackground()
                 webSocketApi.onBackground()
+                if (!webSocketApi.isBackgroundMonitoringEnabled()) {
+                    friendActivityService.onAppStopped()
+                }
             }
         }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
             if (lifecycleEventGate.onResume()) {
+                friendActivityService.onAppResumed()
                 webSocketApi.onForeground()
                 friendLocationPagerModel.onForeground()
             }

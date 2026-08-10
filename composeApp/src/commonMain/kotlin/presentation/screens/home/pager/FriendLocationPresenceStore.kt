@@ -87,9 +87,9 @@ internal class FriendLocationPresenceStore {
             }
 
             is FriendUpdateEvent.Online -> {
-                markRefreshOverride(event.friend.id, isActive = false)
-                activeFriendIds -= event.friend.id
-                friendsById[event.friend.id] = event.friend
+                markRefreshOverride(event.userId, isActive = false)
+                activeFriendIds -= event.userId
+                event.friend?.let { friendsById[event.userId] = it }
             }
 
             is FriendUpdateEvent.LocationChanged -> {

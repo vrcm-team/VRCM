@@ -120,10 +120,19 @@ internal interface FriendActivityDao {
     suspend fun openSession(ownerUserId: String, friendUserId: String): FriendActivitySessionEntity?
 
     @Query(
+        "SELECT * FROM friend_activity_sessions " +
+            "WHERE ownerUserId = :ownerUserId AND endedAtMillis IS NULL"
+    )
+    suspend fun incompleteSessions(ownerUserId: String): List<FriendActivitySessionEntity>
+
+    @Query(
         "UPDATE friend_activity_sessions SET endedAtMillis = :endedAtMillis, durationMillis = :durationMillis " +
             "WHERE id = :sessionId"
     )
     suspend fun completeSession(sessionId: Long, endedAtMillis: Long, durationMillis: Long)
+
+    @Query("UPDATE friend_activity_sessions SET durationMillis = :durationMillis WHERE id = :sessionId")
+    suspend fun checkpointSession(sessionId: Long, durationMillis: Long)
 
     @Query(
         "SELECT * FROM friend_activity_sessions " +
@@ -134,6 +143,24 @@ internal interface FriendActivityDao {
 
     @Query("DELETE FROM friend_activity_sessions WHERE ownerUserId = :ownerUserId AND endedAtMillis IS NULL")
     suspend fun deleteIncompleteSessions(ownerUserId: String)
+
+    @Transaction
+    suspend fun discardIncompleteSessions(ownerUserId: String) {
+        val summariesByUserId = summaries(ownerUserId)
+            .associateByTo(mutableMapOf(), FriendActivitySummaryEntity::friendUserId)
+        incompleteSessions(ownerUserId).forEach { session ->
+            if (session.durationMillis <= 0L) return@forEach
+            val summary = summariesByUserId[session.friendUserId] ?: return@forEach
+            summariesByUserId[session.friendUserId] = summary.copy(
+                lastSeenTogetherAtMillis = latest(
+                    summary.lastSeenTogetherAtMillis,
+                    session.startedAtMillis + session.durationMillis,
+                ),
+            )
+        }
+        if (summariesByUserId.isNotEmpty()) upsertSummaries(summariesByUserId.values.toList())
+        deleteIncompleteSessions(ownerUserId)
+    }
 
     @Query(
         "DELETE FROM friend_activity_sessions WHERE ownerUserId = :ownerUserId " +
@@ -230,7 +257,6 @@ internal interface FriendActivityDao {
                 lastOfflineAtMillis = if (event.type == FriendActivityEventType.Offline) {
                     event.occurredAtMillis
                 } else current.lastOfflineAtMillis,
-                lastActivityAtMillis = latest(current.lastActivityAtMillis, event.occurredAtMillis),
             )
             event.toEntity(token.ownerUserId)
         }.toMutableList()
@@ -258,8 +284,7 @@ internal interface FriendActivityDao {
                         )
                     )
                     summariesByUserId[meeting.userId] = current.copy(
-                        lastSeenTogetherAtMillis = meeting.occurredAtMillis,
-                        lastActivityAtMillis = latest(current.lastActivityAtMillis, meeting.occurredAtMillis),
+                        meetingCount = current.meetingCount + if (meeting.announce) 1 else 0,
                     )
                     if (meeting.announce) {
                         storedEvents += meeting.toEvent(
@@ -272,12 +297,12 @@ internal interface FriendActivityDao {
                 }
                 is FriendMeetingChange.Ended -> {
                     val session = openSession(token.ownerUserId, meeting.userId) ?: return@forEach
-                    completeSession(session.id, meeting.occurredAtMillis, meeting.durationMillis)
+                    val duration = maxOf(session.durationMillis, meeting.durationMillis)
+                    val additionalDuration = duration - session.durationMillis
+                    completeSession(session.id, meeting.occurredAtMillis, duration)
                     summariesByUserId[meeting.userId] = current.copy(
                         lastSeenTogetherAtMillis = meeting.occurredAtMillis,
-                        meetingCount = current.meetingCount + 1,
-                        togetherDurationMillis = current.togetherDurationMillis + meeting.durationMillis,
-                        lastActivityAtMillis = latest(current.lastActivityAtMillis, meeting.occurredAtMillis),
+                        togetherDurationMillis = current.togetherDurationMillis + additionalDuration,
                     )
                     if (session.announced) {
                         storedEvents += meeting.toEvent(
@@ -287,6 +312,15 @@ internal interface FriendActivityDao {
                             accessType = session.accessType,
                         )
                     }
+                }
+                is FriendMeetingChange.Checkpoint -> {
+                    val session = openSession(token.ownerUserId, meeting.userId) ?: return@forEach
+                    val duration = maxOf(session.durationMillis, meeting.durationMillis)
+                    val additionalDuration = duration - session.durationMillis
+                    checkpointSession(session.id, duration)
+                    summariesByUserId[meeting.userId] = current.copy(
+                        togetherDurationMillis = current.togetherDurationMillis + additionalDuration,
+                    )
                 }
             }
         }
