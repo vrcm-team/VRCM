@@ -50,15 +50,15 @@ enum class MeetupOrientation {
     Landscape,
 }
 
-/**
- * 二维码链接类型：通用 VRChat 主页任何设备可扫；
- * VRCM 直达 scheme 在装有 VRCM 的设备上必定跳应用内用户页。
- */
+/** 二维码链接类型；旧的 VRCM 直达值只用于读取已有配置。 */
 @Serializable
 enum class MeetupQrLinkType {
     VrchatWeb,
     VrcmDeepLink,
 }
+
+/** 编辑器允许新增的二维码类型，不包含仅用于反序列化的兼容值。 */
+internal val editableMeetupQrLinkTypes = listOf(MeetupQrLinkType.VrchatWeb)
 
 /** 单个画面方向下的照片裁剪参数。 */
 @Serializable
@@ -198,7 +198,15 @@ fun MeetupCardConfig.resolvedGroupDisplayStyle(
  * 否则用户"只展示自己的外链"这一选择会被强行加回主页码。
  */
 fun MeetupCardConfig.resolvedQrLinkTypes(): List<MeetupQrLinkType> {
-    val types = qrLinkTypes.distinct()
+    val types = qrLinkTypes
+        .map { type ->
+            when (type) {
+                MeetupQrLinkType.VrchatWeb,
+                MeetupQrLinkType.VrcmDeepLink,
+                -> MeetupQrLinkType.VrchatWeb
+            }
+        }
+        .distinct()
     return if (types.isEmpty() && resolvedQrProfileLinks().isEmpty()) {
         listOf(MeetupQrLinkType.VrchatWeb)
     } else {

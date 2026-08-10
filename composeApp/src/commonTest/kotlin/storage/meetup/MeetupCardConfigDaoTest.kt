@@ -128,6 +128,42 @@ class MeetupCardConfigDaoTest {
     }
 
     @Test
+    fun legacyVrcmQrTypeKeepsTheRestOfTheSavedConfiguration() {
+        val settings = MapSettings()
+        val dao = MeetupCardConfigDao(settings)
+        val expected = defaultMeetupCardConfig("usr_a").copy(
+            configured = true,
+            template = MeetupCardTemplate.SideTag,
+            shortText = "keep me",
+            photo = MeetupPhoto(
+                source = MeetupPhotoSource.LocalAlbum,
+                sourceId = "photo-1",
+                width = 1080,
+                height = 1920,
+            ),
+            portraitCrop = MeetupCrop(centerOffsetX = 0.25f, zoom = 1.75f),
+        )
+        dao.save(expected)
+        val key = "${DaoKeys.MeetupCard.KEY_PREFIX}.usr_a"
+        val raw = assertNotNull(settings.getStringOrNull(key))
+        settings.putString(
+            key,
+            raw.replace(
+                "\"qrLinkTypes\":[\"VrchatWeb\"]",
+                "\"qrLinkTypes\":[\"VrcmDeepLink\"]",
+            ),
+        )
+
+        val loaded = assertNotNull(dao.load("usr_a"))
+
+        assertEquals(expected.template, loaded.template)
+        assertEquals(expected.shortText, loaded.shortText)
+        assertEquals(expected.photo, loaded.photo)
+        assertEquals(expected.portraitCrop, loaded.portraitCrop)
+        assertEquals(listOf(MeetupQrLinkType.VrchatWeb), loaded.resolvedQrLinkTypes())
+    }
+
+    @Test
     fun saveRejectsBlankOwnerUserIdBeforeWriting() {
         val settings = MapSettings()
         val dao = MeetupCardConfigDao(settings)

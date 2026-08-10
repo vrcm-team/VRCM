@@ -1,36 +1,52 @@
 package io.github.vrcmteam.vrcm
 
-import android.content.Intent
 import android.graphics.Color
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import io.github.vrcmteam.vrcm.core.shared.AppDeepLinks
+import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
 
 class MainActivity : ComponentActivity() {
+    private val officialLinkInbox = OfficialLinkInbox()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
-        // 只在全新启动时消费启动 intent。本 Activity 未声明 configChanges，旋转屏幕
-        // 或进程恢复都会带着同一个 intent 重跑 onCreate，重复投递会把已经翻到别处的
-        // 用户又拽回深链目标页。
-        if (savedInstanceState == null) handleDeepLink(intent)
+        if (savedInstanceState == null) {
+            submitOfficialLink(intent)
+        } else {
+            savedInstanceState.getString(PENDING_OFFICIAL_LINK_KEY)?.let(officialLinkInbox::submit)
+        }
         setContent {
-            App(isConfigurationChange = { isChangingConfigurations })
+            App(
+                isConfigurationChange = { isChangingConfigurations },
+                officialLinkInbox = officialLinkInbox,
+            )
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // 更新 Activity 持有的 intent，避免重建时又拿到启动时那个旧的。
         setIntent(intent)
-        handleDeepLink(intent)
+        submitOfficialLink(intent)
     }
 
-    private fun handleDeepLink(intent: Intent?) {
-        val uri = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data ?: return
-        AppDeepLinks.offerUrl(uri.toString())
+    override fun onSaveInstanceState(outState: Bundle) {
+        officialLinkInbox.pendingUrl()?.let {
+            outState.putString(PENDING_OFFICIAL_LINK_KEY, it)
+        }
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun submitOfficialLink(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        intent.dataString?.let(officialLinkInbox::submit)
+    }
+
+    private companion object {
+        const val PENDING_OFFICIAL_LINK_KEY = "pending-official-link"
     }
 }

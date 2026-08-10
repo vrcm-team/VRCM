@@ -31,6 +31,7 @@ import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlRow
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
@@ -262,6 +263,10 @@ private fun AvatarProfileContent(
     if (knownPlatforms.isNotEmpty()) {
         AvatarPlatformSection(knownPlatforms)
     }
+
+    OfficialUrlRow(
+        url = "https://vrchat.com/home/avatar/${avatarProfileVo.avatarId}",
+    )
 }
 
 @Composable

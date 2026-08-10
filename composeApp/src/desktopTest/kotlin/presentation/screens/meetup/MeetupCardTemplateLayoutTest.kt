@@ -436,9 +436,13 @@ class MeetupCardTemplateLayoutTest {
             showShortText = true,
             shortText = "很高兴在这次线下聚会见到你",
             showQrCode = true,
-            // 两种内置码加两条资料链接码，正好用满 MEETUP_QR_MAX_CODES。
+            // 一个主页码加三条资料链接码，正好用满 MEETUP_QR_MAX_CODES。
             qrLinkTypes = MeetupQrLinkType.entries,
-            qrProfileLinks = listOf("https://x.com/someone", "https://github.com/someone"),
+            qrProfileLinks = listOf(
+                "https://x.com/someone",
+                "https://github.com/someone",
+                "https://example.com/someone",
+            ),
             profile = MeetupProfileSnapshot(
                 displayName = "A Very Long VRChat Display Name",
                 avatarUrl = "https://example.test/avatar.png",
@@ -446,7 +450,11 @@ class MeetupCardTemplateLayoutTest {
                 languages = listOf("eng", "jpn"),
                 status = "active",
                 statusDescription = "Looking for friends",
-                links = listOf("https://x.com/someone", "https://github.com/someone"),
+                links = listOf(
+                    "https://x.com/someone",
+                    "https://github.com/someone",
+                    "https://example.com/someone",
+                ),
             ),
         ),
         photoModel = null,
