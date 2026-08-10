@@ -1474,6 +1474,8 @@ private fun BottomCardTab(
                     ) {
                         Column {
                             Column(modifier = Modifier.padding(12.dp)) {
+                                // TODO: UI 需要重写后恢复“查看最近更改”入口，相关逻辑暂时保留。
+                                /*
                                 if (latestBioChange != null) {
                                     TextButton(
                                         modifier = Modifier.align(Alignment.End),
@@ -1485,6 +1487,7 @@ private fun BottomCardTab(
                                         )
                                     }
                                 }
+                                */
                                 SelectionContainer {
                                     if (showBioChange && latestBioChange != null) {
                                         val lines = remember(latestBioChange.id, latestBioChange.previousValue, latestBioChange.currentValue) {
