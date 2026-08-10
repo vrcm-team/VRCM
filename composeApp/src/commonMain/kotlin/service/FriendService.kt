@@ -171,7 +171,15 @@ class FriendService(
             if (restoreCacheBeforeRefresh) {
                 // 先恢复本地回退数据，再发首次网络刷新，避免两个写入逆序提交。
                 serviceScope.launch {
-                    restoreCachedFriendList(session.token)
+                    try {
+                        restoreCachedFriendList(session.token)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        SharedFlowCentre.toastText.emit(
+                            ToastText.Error("恢复好友缓存失败，将重新获取好友列表: ${error.message}")
+                        )
+                    }
                     if (isCurrentSession(session.token)) {
                         preloadFriendList(session.token)
                     }

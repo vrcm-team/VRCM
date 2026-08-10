@@ -311,6 +311,63 @@ class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun cacheLoadFailureStillStartsInitialNetworkRefresh() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(userId = "usr_owner", username = "owner")
+        SharedFlowCentre.emitAuthenticated(account)
+        val liveFriend = friend()
+        val json = Json { ignoreUnknownKeys = true }
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.encodedPath) {
+                        "/auth/user/friends" -> {
+                            val offline = request.url.parameters["offline"] == "true"
+                            val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                            respond(
+                                content = json.encodeToString(
+                                    if (!offline && offset == 0) listOf(liveFriend) else emptyList(),
+                                ),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        }
+                        "/auth/user" -> respond(
+                            content = "unavailable",
+                            status = HttpStatusCode.InternalServerError,
+                        )
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val friendService = createFriendService(
+            account = account,
+            client = client,
+            json = json,
+            friendListCacheStore = ThrowingFriendListCacheStore,
+        )
+
+        try {
+            withTimeout(3_000L) {
+                while (!friendService.initialRefreshCompleted.value ||
+                    friendService.friendState.value[liveFriend.id] != liveFriend ||
+                    friendService.friendActivitySource.value
+                        ?.friends
+                        ?.singleOrNull { it.id == liveFriend.id } != liveFriend
+                ) {
+                    yield()
+                }
+            }
+        } finally {
+            friendService.dispose()
+            SharedFlowCentre.emitLogout()
+            client.close()
+        }
+    }
+
     private suspend fun createFriendService(
         account: AccountDto,
         client: HttpClient,
@@ -436,4 +493,15 @@ private class SwitchingFriendListCacheStore(
     override suspend fun clearAll() {
         entries.value = emptyMap()
     }
+}
+
+private object ThrowingFriendListCacheStore : FriendListCacheStore {
+    override suspend fun load(userId: String): FriendListCache =
+        error("cache read failed")
+
+    override suspend fun save(userId: String, cache: FriendListCache) = Unit
+
+    override suspend fun clear(userId: String) = Unit
+
+    override suspend fun clearAll() = Unit
 }
