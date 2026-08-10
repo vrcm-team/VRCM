@@ -532,47 +532,53 @@ class FriendActivityRoomStoreTest {
             val summary = store.summary("usr_owner", friend.userId)
             assertEquals(4_000L, summary?.togetherDurationMillis)
             assertEquals(5_000L, summary?.lastSeenTogetherAtMillis)
+            assertEquals(5_000L, summary?.lastActivityAtMillis)
             assertEquals(5_000L, store.sessions("usr_owner", friend.userId).single().endedAtMillis)
         }
     }
 
     @Test
-    fun onlyApiRefreshSnapshotUpdatesLastActivity() = runTest {
+    fun onlineSnapshotsAdvanceLastActivityAndOfflineSnapshotUsesApiTime() = runTest {
         withStore { store ->
             val session = AuthenticatedAccount(
                 account = AccountDto(userId = "usr_owner"),
                 token = AccountSessionToken(userId = "usr_owner", generation = 1L),
             )
-            val friend = observation().copy(location = "offline", status = "offline")
+            val friend = observation().copy(lastActivityAtMillis = null)
 
             trackFriendActivity(
                 session = session,
-                snapshots = flowOf(
-                    FriendActivityInputSnapshot(
-                        session.token,
-                        listOf(friend.copy(lastActivityAtMillis = 900L)),
-                        null,
+                snapshots = flow {
+                    emit(FriendActivityInputSnapshot(session.token, listOf(friend), null, 1_000L))
+                    assertEquals(
                         1_000L,
-                        updateLastActivityOnly = true,
-                    ),
-                    FriendActivityInputSnapshot(
-                        session.token,
-                        listOf(friend.copy(lastActivityAtMillis = 1_900L)),
-                        null,
+                        store.summary(session.account.userId, friend.userId)?.lastActivityAtMillis,
+                    )
+                    emit(FriendActivityInputSnapshot(session.token, listOf(friend), null, 2_000L))
+                    assertEquals(
                         2_000L,
-                    ),
-                    FriendActivityInputSnapshot(
-                        session.token,
-                        listOf(friend.copy(lastActivityAtMillis = 800L)),
-                        null,
-                        3_000L,
-                        updateLastActivityOnly = true,
-                    ),
-                ),
+                        store.summary(session.account.userId, friend.userId)?.lastActivityAtMillis,
+                    )
+                    emit(
+                        FriendActivityInputSnapshot(
+                            session.token,
+                            listOf(
+                                friend.copy(
+                                    location = "offline",
+                                    status = "offline",
+                                    lastActivityAtMillis = 2_500L,
+                                )
+                            ),
+                            null,
+                            3_000L,
+                            updateLastActivityOnly = true,
+                        )
+                    )
+                },
                 store = store,
             )
 
-            assertEquals(900L, store.summary("usr_owner", friend.userId)?.lastActivityAtMillis)
+            assertEquals(2_500L, store.summary("usr_owner", friend.userId)?.lastActivityAtMillis)
         }
     }
 

@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.storage.FriendActivityEventEntity
@@ -371,10 +372,15 @@ internal suspend fun trackFriendActivity(
                     tracker.observeSocketPresence(snapshot.friends, it)
                 } ?: tracker.observe(snapshot.friends, snapshot.selfLocation, snapshot.observedAtMillis)
             }
-            val observations = if (snapshot.updateLastActivityOnly) {
-                snapshot.friends
-            } else {
-                snapshot.friends.map { it.copy(lastActivityAtMillis = null) }
+            val observations = snapshot.friends.map { observation ->
+                if (snapshot.updateLastActivityOnly) {
+                    observation
+                } else {
+                    observation.copy(
+                        lastActivityAtMillis = snapshot.observedAtMillis
+                            .takeIf { observation.status != UserStatus.Offline.value },
+                    )
+                }
             }
             val recorded = store.record(
                 token = writeToken,
@@ -408,7 +414,12 @@ internal suspend fun trackFriendActivity(
                 val stoppedAtMillis = cancellationTimeMillis()
                 store.record(
                     token = writeToken,
-                    observations = latestObservations.map { it.copy(lastActivityAtMillis = null) },
+                    observations = latestObservations.map { observation ->
+                        observation.copy(
+                            lastActivityAtMillis = stoppedAtMillis
+                                .takeIf { observation.status != UserStatus.Offline.value },
+                        )
+                    },
                     batch = tracker.finish(stoppedAtMillis),
                     nowMillis = stoppedAtMillis,
                 )
@@ -438,7 +449,7 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
             bio = friend.bio.orEmpty(),
             lastActivityAtMillis = friend.lastActivity.toEpochMillisOrNull()
                 ?.takeIf { includeLastActivity }
-                ?.takeIf { friend.status == io.github.vrcmteam.vrcm.network.api.attributes.UserStatus.Offline },
+                ?.takeIf { friend.status == UserStatus.Offline },
         )
     },
     selfLocation = selfLocation,

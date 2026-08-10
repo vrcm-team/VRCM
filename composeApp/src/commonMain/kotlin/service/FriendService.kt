@@ -22,6 +22,7 @@ import io.github.vrcmteam.vrcm.storage.FriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -76,6 +77,12 @@ class FriendService(
             synchronized(friendMapLock) { activeAccountUserId == userId }
         },
         runTask = { refreshFriendList() },
+    )
+    private val offlineLastActivityRefreshSequence = atomic(0L)
+    private val offlineLastActivityRefreshTask = AccountBoundTask<OfflineLastActivityRefreshRequest>(
+        scope = serviceScope,
+        isCurrent = { isCurrentSession(it.sessionToken) },
+        runTask = { refreshFriendList(offline = true) },
     )
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
@@ -135,7 +142,9 @@ class FriendService(
                         _initialRefreshCompleted.value = false
                     }
                     preloadTask.cancelAndJoin()
+                    offlineLastActivityRefreshTask.cancelAndJoin()
                 } else {
+                    offlineLastActivityRefreshTask.cancelAndJoin()
                     activateSession(session)
                 }
             }
@@ -227,6 +236,12 @@ class FriendService(
                     sessionToken = sessionToken,
                     event = FriendUpdateEvent.Offline(content.userId),
                     occurredAtMillis = receivedAtMillis,
+                )
+                offlineLastActivityRefreshTask.start(
+                    OfflineLastActivityRefreshRequest(
+                        sessionToken = sessionToken,
+                        sequence = offlineLastActivityRefreshSequence.incrementAndGet(),
+                    )
                 )
             }
 
@@ -520,6 +535,11 @@ private fun io.github.vrcmteam.vrcm.network.api.auth.data.Presence.toFriendPrese
 private data class PendingFriendCacheSnapshot(
     val token: AccountCacheWriteToken,
     val snapshot: Map<String, FriendData>,
+)
+
+private data class OfflineLastActivityRefreshRequest(
+    val sessionToken: AccountSessionToken,
+    val sequence: Long,
 )
 
 internal fun FriendData.asCachedOffline(): FriendData = copy(
