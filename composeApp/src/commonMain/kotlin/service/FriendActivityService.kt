@@ -18,8 +18,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -28,10 +29,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.atomicfu.atomic
 import org.koin.core.logger.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -84,27 +85,27 @@ internal enum class FriendActivityTrackingControl { Stop, Resume }
  * Tracking changes only when the aggregate state crosses between zero and one active source.
  */
 internal class FriendActivityTrackingState {
-    private val activeSources = atomic(0)
+    private val activeSources = MutableStateFlow(0)
 
-    fun setAppForeground(active: Boolean): FriendActivityTrackingControl? =
+    /** Replays the current aggregate state whenever an account collector starts. */
+    val controls: Flow<FriendActivityTrackingControl> = activeSources
+        .map { sources ->
+            if (sources == 0) FriendActivityTrackingControl.Stop
+            else FriendActivityTrackingControl.Resume
+        }
+        .distinctUntilChanged()
+
+    fun setAppForeground(active: Boolean) =
         setSourceActive(APP_FOREGROUND_SOURCE, active)
 
-    fun setBackgroundMonitoring(active: Boolean): FriendActivityTrackingControl? =
+    fun setBackgroundMonitoring(active: Boolean) =
         setSourceActive(BACKGROUND_MONITORING_SOURCE, active)
 
     fun isEnabled(): Boolean = activeSources.value != 0
 
-    private fun setSourceActive(source: Int, active: Boolean): FriendActivityTrackingControl? {
-        while (true) {
-            val previous = activeSources.value
-            val updated = if (active) previous or source else previous and source.inv()
-            if (previous == updated) return null
-            if (!activeSources.compareAndSet(previous, updated)) continue
-            return when {
-                previous == 0 && updated != 0 -> FriendActivityTrackingControl.Resume
-                previous != 0 && updated == 0 -> FriendActivityTrackingControl.Stop
-                else -> null
-            }
+    private fun setSourceActive(source: Int, active: Boolean) {
+        activeSources.update { current ->
+            if (active) current or source else current and source.inv()
         }
     }
 
@@ -113,12 +114,6 @@ internal class FriendActivityTrackingState {
         const val BACKGROUND_MONITORING_SOURCE = 1 shl 1
     }
 }
-
-private data class FriendActivityTrackingSignal(
-    val token: AccountSessionToken,
-    val control: FriendActivityTrackingControl,
-    val occurredAtMillis: Long,
-)
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class FriendActivityService internal constructor(
@@ -129,9 +124,6 @@ class FriendActivityService internal constructor(
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val trackingState = FriendActivityTrackingState()
-    private val trackingControls = MutableSharedFlow<FriendActivityTrackingSignal>(
-        extraBufferCapacity = TRACKING_CONTROL_BUFFER_CAPACITY,
-    )
     private val worldNameResolver = FriendActivityWorldNameResolver(
         readCachedName = store::cachedWorldName,
         fetchWorldName = { worldId ->
@@ -190,23 +182,23 @@ class FriendActivityService internal constructor(
                                     }
                                 }
                             },
-                            trackingControls.map { signal ->
+                            trackingState.controls.map { control ->
+                                val observedAtMillis = Clock.System.now().toEpochMilliseconds()
                                 val source = friendService.friendActivitySource.value
-                                    ?.takeIf { it.token == signal.token }
+                                    ?.takeIf { it.token == session.token }
                                 source?.toInputSnapshot(
-                                    trackingControl = signal.control,
-                                    observedAtMillis = signal.occurredAtMillis,
+                                    trackingControl = control,
+                                    observedAtMillis = observedAtMillis,
                                 ) ?: FriendActivityInputSnapshot(
-                                    token = signal.token,
+                                    token = session.token,
                                     friends = emptyList(),
                                     selfLocation = null,
-                                    observedAtMillis = signal.occurredAtMillis,
-                                    trackingControl = signal.control,
+                                    observedAtMillis = observedAtMillis,
+                                    trackingControl = control,
                                 )
                             },
                         ),
                         store = store,
-                        initialTrackingEnabled = trackingState.isEnabled(),
                     )
                 } catch (error: CancellationException) {
                     throw error
@@ -263,31 +255,19 @@ class FriendActivityService internal constructor(
     }
 
     fun onAppStopped() {
-        dispatchTrackingControl(trackingState.setAppForeground(false))
+        trackingState.setAppForeground(false)
     }
 
     fun onAppResumed() {
-        dispatchTrackingControl(trackingState.setAppForeground(true))
+        trackingState.setAppForeground(true)
     }
 
     fun onBackgroundMonitoringStarted() {
-        dispatchTrackingControl(trackingState.setBackgroundMonitoring(true))
+        trackingState.setBackgroundMonitoring(true)
     }
 
     fun onBackgroundMonitoringStopped() {
-        dispatchTrackingControl(trackingState.setBackgroundMonitoring(false))
-    }
-
-    private fun dispatchTrackingControl(control: FriendActivityTrackingControl?) {
-        if (control == null) return
-        val token = SharedFlowCentre.currentSession.value?.token ?: return
-        trackingControls.tryEmit(
-            FriendActivityTrackingSignal(
-                token = token,
-                control = control,
-                occurredAtMillis = Clock.System.now().toEpochMilliseconds(),
-            )
-        )
+        trackingState.setBackgroundMonitoring(false)
     }
 
     private fun resolveWorldName(ownerUserId: String, worldId: String) {
@@ -305,7 +285,6 @@ class FriendActivityService internal constructor(
     private companion object {
         const val WORLD_NAME_TIMEOUT_MILLIS = 5_000L
         const val MEETING_CHECKPOINT_MILLIS = 15_000L
-        const val TRACKING_CONTROL_BUFFER_CAPACITY = 8
     }
 }
 
@@ -314,13 +293,12 @@ internal suspend fun trackFriendActivity(
     session: AuthenticatedAccount,
     snapshots: Flow<FriendActivityInputSnapshot>,
     store: RoomFriendActivityStore,
-    initialTrackingEnabled: Boolean = true,
     cancellationTimeMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     var writeToken = store.activateAccount(session.account.userId)
     store.discardIncompleteSessions(session.account.userId)
     var tracker = FriendActivityTracker(derivePresenceEvents = false)
-    var trackingEnabled = initialTrackingEnabled
+    var trackingEnabled = true
     var latestObservations: Collection<FriendActivityObservation> = emptyList()
     try {
         snapshots.collect { snapshot ->

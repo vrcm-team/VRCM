@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.service.FriendActivityInputSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityObservation
 import io.github.vrcmteam.vrcm.service.FriendActivitySourceSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityTrackingControl
+import io.github.vrcmteam.vrcm.service.FriendActivityTrackingState
 import io.github.vrcmteam.vrcm.service.FriendSocketPresenceEvent
 import io.github.vrcmteam.vrcm.service.FriendSocketPresenceType
 import io.github.vrcmteam.vrcm.service.FriendMeetingChange
@@ -27,6 +28,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okio.Path.Companion.toPath
@@ -399,6 +402,38 @@ class FriendActivityRoomStoreTest {
             assertEquals(
                 listOf(5_000L, 1_000L),
                 store.sessions("usr_owner", friend.userId).map { it.startedAtMillis },
+            )
+        }
+    }
+
+    @Test
+    fun resumeBeforeCollectorSubscriptionIsReplayedAndStartsTracking() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+            val trackingState = FriendActivityTrackingState()
+            trackingState.setBackgroundMonitoring(true)
+
+            trackFriendActivity(
+                session = session,
+                snapshots = trackingState.controls.take(1).map { control ->
+                    FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = listOf(friend),
+                        selfLocation = friend.location,
+                        observedAtMillis = 1_000L,
+                        trackingControl = control,
+                    )
+                },
+                store = store,
+            )
+
+            assertEquals(
+                listOf(1_000L),
+                store.sessions(session.account.userId, friend.userId).map { it.startedAtMillis },
             )
         }
     }
