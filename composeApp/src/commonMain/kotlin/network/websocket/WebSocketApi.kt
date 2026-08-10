@@ -81,7 +81,7 @@ class WebSocketApi(
         retryWebSocketConnection(
             maxRetryDelayMillis = MAX_RETRY_DELAY_MILLIS,
             onFailure = ::reportConnectionFailure,
-        ) {
+        ) { markConnected ->
             val authResponse = apiClient.get(AUTH_API_PREFIX)
             check(authResponse.status == HttpStatusCode.OK) {
                 "WebSocket auth failed with HTTP ${authResponse.status.value}"
@@ -95,6 +95,7 @@ class WebSocketApi(
                     parameter("auth", token)
                 }) {
                 connectedSessionToken.value = sessionToken
+                markConnected()
                 try {
                     while (true) {
                         val othersMessage = receiveDeserialized<WebSocketEvent>()
@@ -156,7 +157,7 @@ internal suspend fun retryWebSocketConnection(
     retryDelayMillis: Long = 5_000L,
     maxRetryDelayMillis: Long = retryDelayMillis,
     onFailure: suspend (Exception, consecutiveFailures: Int) -> Unit,
-    connect: suspend () -> Unit,
+    connect: suspend (markConnected: () -> Unit) -> Unit,
 ) {
     require(retryDelayMillis > 0) { "retryDelayMillis must be positive" }
     require(maxRetryDelayMillis >= retryDelayMillis) { "maxRetryDelayMillis must not be lower than retryDelayMillis" }
@@ -164,7 +165,7 @@ internal suspend fun retryWebSocketConnection(
     var consecutiveFailures = 0
     while (currentCoroutineContext().isActive) {
         try {
-            connect()
+            connect { consecutiveFailures = 0 }
             consecutiveFailures = 0
         } catch (e: CancellationException) {
             throw e

@@ -22,7 +22,7 @@ class WebSocketRetryTest {
                 onFailure = { error, consecutiveFailures ->
                     failures += consecutiveFailures to error.message
                 },
-                connect = {
+                connect = { _ ->
                     attempts++
                     if (attempts == 1) error("network changed")
                     awaitCancellation()
@@ -49,7 +49,7 @@ class WebSocketRetryTest {
             retryWebSocketConnection(
                 retryDelayMillis = 100,
                 onFailure = { _, _ -> },
-                connect = {
+                connect = { _ ->
                     attempts++
                     // The first call returns normally, which resets the failure counter.
                     if (attempts >= 2) awaitCancellation()
@@ -62,6 +62,51 @@ class WebSocketRetryTest {
         advanceTimeBy(100)
         runCurrent()
         assertEquals(2, attempts)
+
+        job.cancelAndJoin()
+    }
+
+    @Test
+    fun establishedConnectionResetsFailuresBeforeItLaterDisconnects() = runTest {
+        var attempts = 0
+        val failures = mutableListOf<Pair<Int, String?>>()
+        val job = launch {
+            retryWebSocketConnection(
+                retryDelayMillis = 100,
+                maxRetryDelayMillis = 800,
+                onFailure = { error, consecutiveFailures ->
+                    failures += consecutiveFailures to error.message
+                },
+                connect = { markConnected ->
+                    attempts++
+                    when (attempts) {
+                        1 -> error("initial failure")
+                        2 -> {
+                            markConnected()
+                            error("dropped after handshake")
+                        }
+                        else -> awaitCancellation()
+                    }
+                },
+            )
+        }
+
+        runCurrent()
+        assertEquals(listOf<Pair<Int, String?>>(1 to "initial failure"), failures)
+
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(
+            listOf<Pair<Int, String?>>(
+                1 to "initial failure",
+                1 to "dropped after handshake",
+            ),
+            failures,
+        )
+
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(3, attempts, "a dropped established connection must use the base retry delay")
 
         job.cancelAndJoin()
     }
