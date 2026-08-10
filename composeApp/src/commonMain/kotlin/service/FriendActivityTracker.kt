@@ -209,17 +209,20 @@ internal class FriendActivityTracker {
                     )
                 )
             }
-            if (previous.bio != bio) {
-                add(
-                    baseEvent.copy(
-                        type = FriendActivityEventType.BioChanged,
-                        previousValue = previous.bio,
-                        currentValue = bio,
-                        worldId = null,
-                        accessType = null,
-                    )
+        }
+
+        // A profile update can arrive while the friend is offline or only on the web.
+        // Keep it independent from game-presence transitions so the profile diff is usable.
+        if (previous.bio != bio) {
+            add(
+                baseEvent.copy(
+                    type = FriendActivityEventType.BioChanged,
+                    previousValue = previous.bio,
+                    currentValue = bio,
+                    worldId = null,
+                    accessType = null,
                 )
-            }
+            )
         }
     }
 

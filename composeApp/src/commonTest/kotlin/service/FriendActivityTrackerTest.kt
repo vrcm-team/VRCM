@@ -164,6 +164,36 @@ class FriendActivityTrackerTest {
     }
 
     @Test
+    fun bioChangesAreRecordedWithoutAnInGameLocation() {
+        val tracker = FriendActivityTracker()
+        val baselineFriend = FriendActivityObservation(
+            userId = "usr_friend",
+            displayName = "Friend",
+            profileImageUrl = "",
+            location = "offline",
+            status = "offline",
+            statusDescription = "",
+            bio = "Old bio",
+            lastActivityAtMillis = null,
+        )
+        tracker.observe(
+            friends = listOf(baselineFriend),
+            selfLocation = null,
+            nowMillis = 1_000L,
+        )
+
+        val changes = tracker.observe(
+            friends = listOf(baselineFriend.copy(bio = "New bio")),
+            selfLocation = null,
+            nowMillis = 2_000L,
+        )
+
+        assertEquals(listOf(FriendActivityEventType.BioChanged), changes.events.map(FriendActivityEventDraft::type))
+        assertEquals("Old bio", changes.events.single().previousValue)
+        assertEquals("New bio", changes.events.single().currentValue)
+    }
+
+    @Test
     fun onlyExactSharedInstanceProducesCompletedTogetherSession() {
         val tracker = FriendActivityTracker()
         val friend = FriendActivityObservation(
