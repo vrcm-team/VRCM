@@ -407,15 +407,17 @@ class FriendActivityRoomStoreTest {
     }
 
     @Test
-    fun resumeBeforeCollectorSubscriptionIsReplayedAndStartsTracking() = runTest {
+    fun replayedResumeStartsTrackingAtCollectorSubscriptionTime() = runTest {
         withStore { store ->
             val session = AuthenticatedAccount(
                 account = AccountDto(userId = "usr_owner"),
                 token = AccountSessionToken(userId = "usr_owner", generation = 1L),
             )
             val friend = observation().copy(location = "wrld_world:instance_a")
-            val trackingState = FriendActivityTrackingState { 1_000L }
+            var nowMillis = 1_000L
+            val trackingState = FriendActivityTrackingState { nowMillis }
             trackingState.setBackgroundMonitoring(true)
+            nowMillis = 5_000L
 
             trackFriendActivity(
                 session = session,
@@ -432,7 +434,7 @@ class FriendActivityRoomStoreTest {
             )
 
             assertEquals(
-                listOf(1_000L),
+                listOf(5_000L),
                 store.sessions(session.account.userId, friend.userId).map { it.startedAtMillis },
             )
         }

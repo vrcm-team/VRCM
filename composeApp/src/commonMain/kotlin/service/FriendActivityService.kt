@@ -90,8 +90,8 @@ internal data class FriendActivityTrackingTransition(
 
 /**
  * Combines every lifecycle owner that can keep friend activity tracking alive.
- * The current transition initializes a new account collector, while the channel preserves every
- * later transition in occurrence order if database work temporarily suspends that collector.
+ * The current control initializes a new account collector at subscription time, while the channel
+ * preserves every later transition in occurrence order if database work suspends that collector.
  */
 @OptIn(ExperimentalTime::class)
 internal class FriendActivityTrackingState(
@@ -110,7 +110,9 @@ internal class FriendActivityTrackingState(
     )
 
     val controls: Flow<FriendActivityTrackingTransition> = flow {
-        val initial = currentTransition.value
+        val initial = synchronized(lock) {
+            currentTransition.value.copy(occurredAtMillis = nowMillis())
+        }
         emit(initial)
         transitionEvents.receiveAsFlow().collect { transition ->
             if (transition.sequence > initial.sequence) {
