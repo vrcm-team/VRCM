@@ -152,7 +152,7 @@ class FriendService(
     }
 
     private fun activateSession(session: AuthenticatedAccount) {
-        var accountToRestore: String? = null
+        var restoreCacheBeforeRefresh = false
         val activated = synchronized(friendMapLock) {
             if (activeSessionToken == session.token) return@synchronized false
             activeSessionToken = session.token
@@ -161,7 +161,7 @@ class FriendService(
                 _currentUserLocation.value = null
                 _friendActivitySource.value = null
                 activeAccountUserId = session.account.userId
-                accountToRestore = session.account.userId
+                restoreCacheBeforeRefresh = true
                 // 新账号要重新完成一次完整刷新，才能把在线状态当作可信读数。
                 _initialRefreshCompleted.value = false
             }
@@ -169,10 +169,18 @@ class FriendService(
             publishFriendActivitySource()
             true
         }
-        // 缓存读取是挂起的（Room），不能在 synchronized 里做；放到协程中回填。
-        accountToRestore?.let { userId -> serviceScope.launch { restoreCachedFriendList(userId) } }
         if (activated) {
-            preloadFriendList(session.account.userId)
+            if (restoreCacheBeforeRefresh) {
+                // 先恢复本地回退数据，再发首次网络刷新，避免两个写入逆序提交。
+                serviceScope.launch {
+                    restoreCachedFriendList(session.token)
+                    if (isCurrentSession(session.token)) {
+                        preloadFriendList(session.account.userId)
+                    }
+                }
+            } else {
+                preloadFriendList(session.account.userId)
+            }
             serviceScope.launch {
                 runCatching { refreshCurrentUserLocation(session.token) }
             }
@@ -484,15 +492,17 @@ class FriendService(
         )
     }
 
-    private suspend fun restoreCachedFriendList(userId: String) {
-        val friends = friendListCacheStore.load(userId)?.friends.orEmpty()
+    private suspend fun restoreCachedFriendList(sessionToken: AccountSessionToken) {
+        val friends = friendListCacheStore.load(sessionToken.userId)?.friends.orEmpty()
             .map(FriendData::asCachedOffline)
         synchronized(friendMapLock) {
-            // 读取期间可能已经切到别的账号，过期结果直接丢弃。
-            if (activeAccountUserId != userId) return
+            // 读取期间可能已经切换 session 或完成网络刷新，迟到缓存不能再覆盖实时数据。
+            if (!isCurrentSessionLocked(sessionToken) || _initialRefreshCompleted.value) {
+                return@synchronized
+            }
             friendStore.restore(friends)
+            publishFriendState()
         }
-        publishFriendState()
     }
 
     private fun isCurrentSession(sessionToken: AccountSessionToken): Boolean =
