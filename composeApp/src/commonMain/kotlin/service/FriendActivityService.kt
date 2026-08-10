@@ -79,6 +79,41 @@ internal data class FriendActivityInputSnapshot(
 
 internal enum class FriendActivityTrackingControl { Stop, Resume }
 
+/**
+ * Combines every lifecycle owner that can keep friend activity tracking alive.
+ * Tracking changes only when the aggregate state crosses between zero and one active source.
+ */
+internal class FriendActivityTrackingState {
+    private val activeSources = atomic(0)
+
+    fun setAppForeground(active: Boolean): FriendActivityTrackingControl? =
+        setSourceActive(APP_FOREGROUND_SOURCE, active)
+
+    fun setBackgroundMonitoring(active: Boolean): FriendActivityTrackingControl? =
+        setSourceActive(BACKGROUND_MONITORING_SOURCE, active)
+
+    fun isEnabled(): Boolean = activeSources.value != 0
+
+    private fun setSourceActive(source: Int, active: Boolean): FriendActivityTrackingControl? {
+        while (true) {
+            val previous = activeSources.value
+            val updated = if (active) previous or source else previous and source.inv()
+            if (previous == updated) return null
+            if (!activeSources.compareAndSet(previous, updated)) continue
+            return when {
+                previous == 0 && updated != 0 -> FriendActivityTrackingControl.Resume
+                previous != 0 && updated == 0 -> FriendActivityTrackingControl.Stop
+                else -> null
+            }
+        }
+    }
+
+    private companion object {
+        const val APP_FOREGROUND_SOURCE = 1
+        const val BACKGROUND_MONITORING_SOURCE = 1 shl 1
+    }
+}
+
 private data class FriendActivityTrackingSignal(
     val token: AccountSessionToken,
     val control: FriendActivityTrackingControl,
@@ -93,7 +128,7 @@ class FriendActivityService internal constructor(
     private val logger: Logger,
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val appTrackingEnabled = atomic(true)
+    private val trackingState = FriendActivityTrackingState()
     private val trackingControls = MutableSharedFlow<FriendActivityTrackingSignal>(
         extraBufferCapacity = TRACKING_CONTROL_BUFFER_CAPACITY,
     )
@@ -117,7 +152,7 @@ class FriendActivityService internal constructor(
                         session = session,
                         snapshots = merge(
                             friendService.friendActivitySource.filterNotNull().mapNotNull {
-                                it.takeIf { appTrackingEnabled.value }?.toInputSnapshot()
+                                it.takeIf { trackingState.isEnabled() }?.toInputSnapshot()
                             },
                             friendService.friendLastActivitySource.filterNotNull().map {
                                 it.toInputSnapshot(
@@ -126,7 +161,7 @@ class FriendActivityService internal constructor(
                                 )
                             },
                             friendService.friendUpdateFlow.mapNotNull { update ->
-                                if (!appTrackingEnabled.value) return@mapNotNull null
+                                if (!trackingState.isEnabled()) return@mapNotNull null
                                 val type = when (update.event) {
                                     is FriendUpdateEvent.Online -> FriendSocketPresenceType.Online
                                     is FriendUpdateEvent.Offline -> FriendSocketPresenceType.Offline
@@ -150,7 +185,7 @@ class FriendActivityService internal constructor(
                             flow {
                                 while (true) {
                                     delay(MEETING_CHECKPOINT_MILLIS)
-                                    if (appTrackingEnabled.value) {
+                                    if (trackingState.isEnabled()) {
                                         friendService.friendActivitySource.value?.let { emit(it.toInputSnapshot()) }
                                     }
                                 }
@@ -171,6 +206,7 @@ class FriendActivityService internal constructor(
                             },
                         ),
                         store = store,
+                        initialTrackingEnabled = trackingState.isEnabled(),
                     )
                 } catch (error: CancellationException) {
                     throw error
@@ -227,24 +263,28 @@ class FriendActivityService internal constructor(
     }
 
     fun onAppStopped() {
-        appTrackingEnabled.value = false
-        val token = SharedFlowCentre.currentSession.value?.token ?: return
-        trackingControls.tryEmit(
-            FriendActivityTrackingSignal(
-                token = token,
-                control = FriendActivityTrackingControl.Stop,
-                occurredAtMillis = Clock.System.now().toEpochMilliseconds(),
-            )
-        )
+        dispatchTrackingControl(trackingState.setAppForeground(false))
     }
 
     fun onAppResumed() {
-        appTrackingEnabled.value = true
+        dispatchTrackingControl(trackingState.setAppForeground(true))
+    }
+
+    fun onBackgroundMonitoringStarted() {
+        dispatchTrackingControl(trackingState.setBackgroundMonitoring(true))
+    }
+
+    fun onBackgroundMonitoringStopped() {
+        dispatchTrackingControl(trackingState.setBackgroundMonitoring(false))
+    }
+
+    private fun dispatchTrackingControl(control: FriendActivityTrackingControl?) {
+        if (control == null) return
         val token = SharedFlowCentre.currentSession.value?.token ?: return
         trackingControls.tryEmit(
             FriendActivityTrackingSignal(
                 token = token,
-                control = FriendActivityTrackingControl.Resume,
+                control = control,
                 occurredAtMillis = Clock.System.now().toEpochMilliseconds(),
             )
         )
@@ -274,12 +314,13 @@ internal suspend fun trackFriendActivity(
     session: AuthenticatedAccount,
     snapshots: Flow<FriendActivityInputSnapshot>,
     store: RoomFriendActivityStore,
+    initialTrackingEnabled: Boolean = true,
     cancellationTimeMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     var writeToken = store.activateAccount(session.account.userId)
     store.discardIncompleteSessions(session.account.userId)
     var tracker = FriendActivityTracker(derivePresenceEvents = false)
-    var trackingEnabled = true
+    var trackingEnabled = initialTrackingEnabled
     var latestObservations: Collection<FriendActivityObservation> = emptyList()
     try {
         snapshots.collect { snapshot ->

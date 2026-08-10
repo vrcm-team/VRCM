@@ -31,7 +31,7 @@ class FriendActivityForegroundService : Service() {
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
         val friendService = koin.get<FriendService>()
-        koin.get<FriendActivityService>()
+        koin.get<FriendActivityService>().onBackgroundMonitoringStarted()
         val webSocketApi = koin.get<WebSocketApi>()
         val logger = koin.get<Logger>()
         scope.launch {
@@ -50,9 +50,7 @@ class FriendActivityForegroundService : Service() {
         GlobalContext.getOrNull()?.let { koin ->
             val webSocketApi = koin.get<WebSocketApi>()
             webSocketApi.setBackgroundMonitoringEnabled(false)
-            if (!webSocketApi.isAppForeground()) {
-                koin.get<FriendActivityService>().onAppStopped()
-            }
+            koin.get<FriendActivityService>().onBackgroundMonitoringStopped()
         }
         scope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)

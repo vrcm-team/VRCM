@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -79,13 +80,14 @@ fun App(
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
         val friendActivityService = koinInject<FriendActivityService>()
+        LaunchedEffect(friendActivityService) {
+            friendActivityService.onAppResumed()
+        }
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
             if (lifecycleEventGate.onStop(isConfigurationChange())) {
                 friendLocationPagerModel.onBackground()
                 webSocketApi.onBackground()
-                if (!webSocketApi.isBackgroundMonitoringEnabled()) {
-                    friendActivityService.onAppStopped()
-                }
+                friendActivityService.onAppStopped()
             }
         }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
