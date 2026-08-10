@@ -7,6 +7,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.EmojiEmotions
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.PsychologyAlt
+import androidx.compose.material.icons.outlined.SentimentDissatisfied
+import androidx.compose.material.icons.outlined.SentimentVerySatisfied
+import androidx.compose.material.icons.outlined.ThumbUpOffAlt
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.WavingHand
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -163,11 +172,30 @@ private fun LazyItemScope.NotificationItem(
                         )
                     }
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        text = item.type,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (item.type.equals("boop", ignoreCase = true)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = boopIcon(item.boopEmojiId),
+                                contentDescription = strings.profileBoop,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                            )
+                            Text(
+                                text = strings.profileBoop,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = item.type,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
                         text = remember {
                             @OptIn(ExperimentalTime::class)
@@ -252,4 +280,15 @@ private fun LazyItemScope.NotificationItem(
 
         }
     }
+}
+
+private fun boopIcon(emojiId: String?) = when (emojiId?.lowercase()) {
+    "default_heart" -> Icons.Outlined.FavoriteBorder
+    "default_hand_wave" -> Icons.Outlined.WavingHand
+    "default_laugh" -> Icons.Outlined.SentimentVerySatisfied
+    "default_thumbs_up" -> Icons.Outlined.ThumbUpOffAlt
+    "default_thinking" -> Icons.Outlined.PsychologyAlt
+    "default_wow" -> Icons.Outlined.EmojiEmotions
+    "default_angry" -> Icons.Outlined.SentimentDissatisfied
+    else -> Icons.Outlined.TouchApp
 }

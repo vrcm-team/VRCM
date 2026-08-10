@@ -13,10 +13,7 @@ class MainActivity : ComponentActivity() {
     private val officialLinkInbox = OfficialLinkInbox()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge(
-            // 设置底部导航栏透明
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
-        )
+        enableEdgeToEdge(navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
             submitOfficialLink(intent)

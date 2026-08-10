@@ -66,6 +66,14 @@ object DaoKeys{
          */
         const val REMEMBER_VERSION_KEY = "${PREFIX}.rememberVersion"
 
+        const val FRIEND_PRESENCE_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendPresenceNotificationsEnabled"
+        const val FRIEND_OFFLINE_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendOfflineNotificationsEnabled"
+        const val BOOP_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.boopNotificationsEnabled"
+        const val FRIEND_REQUEST_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendRequestNotificationsEnabled"
+        const val GROUP_ANNOUNCEMENT_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.groupAnnouncementNotificationsEnabled"
+        const val PRESENCE_FILTER_KEY = "${PREFIX}.friendPresenceFilter"
+        const val BACKGROUND_FRIEND_MONITORING_ENABLED_KEY = "${PREFIX}.backgroundFriendMonitoringEnabled"
+
     }
 
     /**

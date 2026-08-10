@@ -145,6 +145,13 @@ internal fun FriendActivitySection(
 @Composable
 private fun ActivityEventRow(event: FriendActivityEvent) {
     val detail = event.activityDetail()
+    val bioDiff = remember(event.id, event.previousValue, event.currentValue) {
+        if (event.type == FriendActivityEventType.BioChanged) {
+            friendActivityBioDiff(event.previousValue, event.currentValue)
+        } else {
+            emptyList()
+        }
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -165,7 +172,9 @@ private fun ActivityEventRow(event: FriendActivityEvent) {
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
-            if (detail != null) {
+            if (bioDiff.isNotEmpty()) {
+                BioDiffLines(bioDiff)
+            } else if (detail != null) {
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
@@ -183,6 +192,22 @@ private fun ActivityEventRow(event: FriendActivityEvent) {
         )
     }
 }
+
+@Composable
+private fun BioDiffLines(lines: List<FriendActivityBioDiffLine>) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        lines.forEach { line ->
+            Text(
+                text = if (line.added) "+ ${line.text}" else "- ${line.text}",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (line.added) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun ActivityMetricRow(

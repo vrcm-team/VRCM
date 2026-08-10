@@ -84,6 +84,17 @@ class FriendService(
     internal val friendActivitySource: StateFlow<FriendActivitySourceSnapshot?> =
         _friendActivitySource.asStateFlow()
 
+    private val _initialRefreshCompleted = MutableStateFlow(false)
+
+    /**
+     * True once the current session has completed one full friend list refresh.
+     *
+     * Until then [friendState] may hold the locally restored snapshot, whose presence is forced to
+     * offline by [asCachedOffline] and therefore must not be treated as a real presence reading.
+     * Resets on every account switch and logout.
+     */
+    val initialRefreshCompleted: StateFlow<Boolean> = _initialRefreshCompleted.asStateFlow()
+
     val friendMap: Map<String, FriendData>
         get() = friendState.value
 
@@ -115,6 +126,7 @@ class FriendService(
                         currentUserLocationRevision++
                         _currentUserLocation.value = null
                         _friendActivitySource.value = null
+                        _initialRefreshCompleted.value = false
                     }
                     preloadTask.cancelAndJoin()
                 } else {
@@ -134,6 +146,8 @@ class FriendService(
                 _currentUserLocation.value = null
                 activeAccountUserId = session.account.userId
                 accountToRestore = session.account.userId
+                // 新账号要重新完成一次完整刷新，才能把在线状态当作可信读数。
+                _initialRefreshCompleted.value = false
             }
             accountTracker.onAuthenticated(session.account.userId)
             publishFriendActivitySource()
@@ -349,7 +363,10 @@ class FriendService(
         replaceUntouched: Boolean,
     ): Boolean = synchronized(friendMapLock) {
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
-        if (committed) publishFriendState()
+        if (committed) {
+            publishFriendState()
+            _initialRefreshCompleted.value = true
+        }
         committed
     }
 

@@ -28,11 +28,13 @@ class WebSocketApi(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val connectionLock = SynchronizedObject()
     private val isForeground = atomic(true)
+    private val backgroundMonitoringEnabled = atomic(false)
+    private val connectedSessionToken = atomic<AccountSessionToken?>(null)
 
     init {
         scope.launch {
             SharedFlowCentre.authed.collect { session ->
-                if (isForeground.value) replaceConnection(session.token)
+                if (isForeground.value || backgroundMonitoringEnabled.value) replaceConnection(session.token)
             }
         }
         scope.launch {
@@ -44,7 +46,7 @@ class WebSocketApi(
 
     fun onBackground() {
         isForeground.value = false
-        replaceConnection(null)
+        if (!backgroundMonitoringEnabled.value) replaceConnection(null)
     }
 
     fun onForeground() {
@@ -52,15 +54,30 @@ class WebSocketApi(
         replaceConnection(SharedFlowCentre.currentSession.value?.token)
     }
 
+    /** True only while a live socket is attached to the session that is currently signed in. */
+    fun isConnected(): Boolean {
+        val connected = connectedSessionToken.value ?: return false
+        return connected == SharedFlowCentre.currentSession.value?.token
+    }
+
+    fun setBackgroundMonitoringEnabled(enabled: Boolean) {
+        backgroundMonitoringEnabled.value = enabled
+        if (enabled || !isForeground.value) replaceConnection(SharedFlowCentre.currentSession.value?.token.takeIf { enabled || isForeground.value })
+    }
+
     private fun replaceConnection(sessionToken: AccountSessionToken?) = synchronized(connectionLock) {
         currentJob?.cancel()
+        connectedSessionToken.value = null
         currentJob = sessionToken?.let { token ->
             scope.launch { startWebSocket(token) }
         }
     }
 
     private suspend fun startWebSocket(sessionToken: AccountSessionToken) {
-        retryWebSocketConnection(onFailure = ::reportConnectionFailure) {
+        retryWebSocketConnection(
+            maxRetryDelayMillis = MAX_RETRY_DELAY_MILLIS,
+            onFailure = ::reportConnectionFailure,
+        ) {
             val authResponse = apiClient.get(AUTH_API_PREFIX)
             check(authResponse.status == HttpStatusCode.OK) {
                 "WebSocket auth failed with HTTP ${authResponse.status.value}"
@@ -73,11 +90,16 @@ class WebSocketApi(
                 request = {
                     parameter("auth", token)
                 }) {
-                while (true) {
-                    val othersMessage = receiveDeserialized<WebSocketEvent>()
-                    SharedFlowCentre.emitWebSocket(
-                        AccountWebSocketEvent(sessionToken, othersMessage)
-                    )
+                connectedSessionToken.value = sessionToken
+                try {
+                    while (true) {
+                        val othersMessage = receiveDeserialized<WebSocketEvent>()
+                        SharedFlowCentre.emitWebSocket(
+                            AccountWebSocketEvent(sessionToken, othersMessage)
+                        )
+                    }
+                } finally {
+                    connectedSessionToken.value = null
                 }
             }
         }
@@ -99,14 +121,19 @@ class WebSocketApi(
 
     private companion object {
         const val USER_NOTICE_INTERVAL = 12
+        const val MAX_RETRY_DELAY_MILLIS = 5 * 60 * 1_000L
     }
 }
 
 internal suspend fun retryWebSocketConnection(
     retryDelayMillis: Long = 5_000L,
+    maxRetryDelayMillis: Long = retryDelayMillis,
     onFailure: suspend (Exception, consecutiveFailures: Int) -> Unit,
     connect: suspend () -> Unit,
 ) {
+    require(retryDelayMillis > 0) { "retryDelayMillis must be positive" }
+    require(maxRetryDelayMillis >= retryDelayMillis) { "maxRetryDelayMillis must not be lower than retryDelayMillis" }
+
     var consecutiveFailures = 0
     while (currentCoroutineContext().isActive) {
         try {
@@ -118,6 +145,10 @@ internal suspend fun retryWebSocketConnection(
             consecutiveFailures++
             onFailure(e, consecutiveFailures)
         }
-        delay(retryDelayMillis)
+        // Exponential backoff avoids a permanent five-second reconnect loop
+        // when the device has no network or is in Android's idle mode.
+        val exponent = (consecutiveFailures - 1).coerceIn(0, 6)
+        val delayMillis = retryDelayMillis * (1L shl exponent)
+        delay(delayMillis.coerceAtMost(maxRetryDelayMillis))
     }
 }

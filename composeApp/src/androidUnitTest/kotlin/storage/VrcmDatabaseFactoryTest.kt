@@ -8,6 +8,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.koin.core.logger.EmptyLogger
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
@@ -31,7 +32,7 @@ class VrcmDatabaseFactoryTest {
     @Test
     fun androidSystemSqliteSupportsTheRoomDatabaseAtMinSdk() = runBlocking {
         val database = buildVrcmDatabase(
-            platformVrcmDatabaseBuilder(AndroidAppPlatform(context)),
+            platformVrcmDatabaseBuilder(AndroidAppPlatform(context, EmptyLogger())),
         )
         try {
             val dao = database.friendActivityDao()

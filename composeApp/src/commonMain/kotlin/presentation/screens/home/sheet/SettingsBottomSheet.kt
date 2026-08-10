@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.sheet
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,8 +11,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.BackgroundFriendMonitoringResult
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
 import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -18,6 +23,9 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
+import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -51,6 +59,7 @@ fun SettingsBottomSheet(
 
         Column(
             modifier = Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .align(Alignment.CenterHorizontally)
                 .padding(horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -60,7 +69,7 @@ fun SettingsBottomSheet(
                 CustomBlock()
             }
             SettingsBlockSurface {
-                AboutBlock()
+                AboutBlock(onDismissRequest)
             }
             LogoutButton(onDismissRequest)
         }
@@ -137,7 +146,14 @@ private inline fun ColumnScope.CustomBlock() {
 }
 
 @Composable
-private fun AboutBlock() {
+private fun ToggleSettingsRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+@Composable
+private fun AboutBlock(onDismissRequest: () -> Unit) {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
     val accountCacheManager = koinInject<AccountCacheManager>()
@@ -171,6 +187,31 @@ private fun AboutBlock() {
         }
     }
     Column {
+        val platform = koinInject<AppPlatform>()
+        // 通知相关的开关全部收进独立页面，设置面板里只留一个入口；不能投递通知的平台不显示。
+        if (platform.supportsFriendActivityNotifications) {
+            val navigator = LocalNavigator.currentOrThrow
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable {
+                        navigator push NotificationSettingsScreen
+                        // 设置面板是盖在内容之上的弹窗，不收起来会把刚推进去的页面挡住。
+                        onDismissRequest()
+                    }
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = "${strings.stettingMoreSettings}:")
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = strings.notificationSettingsTitle,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        }
         val diskCache = imageLoader.diskCache
         var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
         var isClearingCache by remember { mutableStateOf(false) }

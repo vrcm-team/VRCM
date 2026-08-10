@@ -11,7 +11,9 @@ data class NotificationItemData(
     val senderUserId: String,
     val link: String?,
     val type: String,
-    val actions: List<ActionData>
+    val actions: List<ActionData>,
+    /** The selected default or custom Boop emoji identifier, when VRChat supplies it. */
+    val boopEmojiId: String? = null,
 ) {
     /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
     val senderId: String?
@@ -45,7 +47,8 @@ data class NotificationItemData(
                 type = responses.type,
                 icon = responses.icon,
             )
-        }
+        },
+        boopEmojiId = n.details?.emojiId ?: n.data.emojiId,
     )
 
 }
