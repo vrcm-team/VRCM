@@ -8,11 +8,66 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfficialLinkPromptControllerTest {
+    @Test
+    fun externalLinkSuppressesClipboardInspectionForTheSameForegroundEvent() {
+        val gate = OfficialLinkClipboardInspectionGate()
+
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = true,
+            ),
+        )
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+            ),
+        )
+        assertTrue(
+            gate.shouldInspect(
+                foregroundGeneration = 2,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+            ),
+        )
+    }
+
+    @Test
+    fun authenticationDoesNotConsumeAClipboardInspection() {
+        val gate = OfficialLinkClipboardInspectionGate()
+
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = false,
+                hasExternalRequest = false,
+            ),
+        )
+        assertTrue(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+            ),
+        )
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+            ),
+        )
+    }
+
     @Test
     fun recreatedControllerKeepsTheClipboardConfirmation() = runTest {
         val firstController = OfficialLinkPromptController<String>(

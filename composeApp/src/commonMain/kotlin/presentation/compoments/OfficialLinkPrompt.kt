@@ -59,6 +59,7 @@ internal fun OfficialLinkPrompt(
     val locale = strings
     val incomingRequest by inbox.pendingRequest.collectAsState()
     var foregroundGeneration by remember { mutableIntStateOf(0) }
+    val clipboardInspectionGate = remember { OfficialLinkClipboardInspectionGate() }
     val isAuthenticated = navigator.items.any { it is HomeScreen }
     val controller = rememberOfficialLinkPromptController(service, navigator, inbox)
     val promptState by controller.state.collectAsState()
@@ -77,7 +78,13 @@ internal fun OfficialLinkPrompt(
         isAuthenticated,
         incomingRequest?.id,
     ) {
-        if (foregroundGeneration == 0 || !isAuthenticated || incomingRequest != null) {
+        if (
+            !clipboardInspectionGate.shouldInspect(
+                foregroundGeneration = foregroundGeneration,
+                isAuthenticated = isAuthenticated,
+                hasExternalRequest = incomingRequest != null,
+            )
+        ) {
             return@LaunchedEffect
         }
         val clipboardText = runCatching { clipboard.getText()?.text }.getOrNull() ?: return@LaunchedEffect
@@ -105,6 +112,32 @@ internal fun OfficialLinkPrompt(
             onRetry = controller::retry,
             onDismiss = controller::dismiss,
         )
+    }
+}
+
+/** Prevents an external link and a clipboard link from being handled in the same foreground event. */
+internal class OfficialLinkClipboardInspectionGate {
+    private var handledForegroundGeneration = 0
+
+    fun shouldInspect(
+        foregroundGeneration: Int,
+        isAuthenticated: Boolean,
+        hasExternalRequest: Boolean,
+    ): Boolean {
+        if (hasExternalRequest) {
+            handledForegroundGeneration = foregroundGeneration
+            return false
+        }
+        if (
+            foregroundGeneration == 0 ||
+            !isAuthenticated ||
+            handledForegroundGeneration == foregroundGeneration
+        ) {
+            return false
+        }
+
+        handledForegroundGeneration = foregroundGeneration
+        return true
     }
 }
 
