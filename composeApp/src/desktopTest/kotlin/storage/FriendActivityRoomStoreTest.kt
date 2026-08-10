@@ -414,18 +414,18 @@ class FriendActivityRoomStoreTest {
                 token = AccountSessionToken(userId = "usr_owner", generation = 1L),
             )
             val friend = observation().copy(location = "wrld_world:instance_a")
-            val trackingState = FriendActivityTrackingState()
+            val trackingState = FriendActivityTrackingState { 1_000L }
             trackingState.setBackgroundMonitoring(true)
 
             trackFriendActivity(
                 session = session,
-                snapshots = trackingState.controls.take(1).map { control ->
+                snapshots = trackingState.controls.take(1).map { transition ->
                     FriendActivityInputSnapshot(
                         token = session.token,
                         friends = listOf(friend),
                         selfLocation = friend.location,
-                        observedAtMillis = 1_000L,
-                        trackingControl = control,
+                        observedAtMillis = transition.occurredAtMillis,
+                        trackingControl = transition.control,
                     )
                 },
                 store = store,
@@ -435,6 +435,70 @@ class FriendActivityRoomStoreTest {
                 listOf(1_000L),
                 store.sessions(session.account.userId, friend.userId).map { it.startedAtMillis },
             )
+        }
+    }
+
+    @Test
+    fun trackingTransitionsRetainOccurredTimesWhileCollectorIsBusy() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+            val baselineRecorded = CompletableDeferred<Unit>()
+            val stopDequeued = CompletableDeferred<Unit>()
+            val releaseStop = CompletableDeferred<Unit>()
+            var nowMillis = 0L
+            val trackingState = FriendActivityTrackingState { nowMillis }
+
+            nowMillis = 1_000L
+            trackingState.setAppForeground(true)
+            val collector = launch {
+                trackFriendActivity(
+                    session = session,
+                    snapshots = flow {
+                        trackingState.controls.take(4).collect { transition ->
+                            if (transition.sequence == 2L) {
+                                stopDequeued.complete(Unit)
+                                releaseStop.await()
+                            }
+                            emit(
+                                FriendActivityInputSnapshot(
+                                    token = session.token,
+                                    friends = listOf(friend),
+                                    selfLocation = friend.location,
+                                    observedAtMillis = transition.occurredAtMillis,
+                                    trackingControl = transition.control,
+                                )
+                            )
+                            if (transition.sequence == 1L) {
+                                baselineRecorded.complete(Unit)
+                            }
+                        }
+                    },
+                    store = store,
+                )
+            }
+
+            baselineRecorded.await()
+            nowMillis = 2_000L
+            trackingState.setAppForeground(false)
+            stopDequeued.await()
+            nowMillis = 5_000L
+            trackingState.setAppForeground(true)
+            nowMillis = 7_000L
+            trackingState.setAppForeground(false)
+            releaseStop.complete(Unit)
+            collector.join()
+
+            val sessions = store.sessions(session.account.userId, friend.userId)
+            assertEquals(
+                3_000L,
+                store.summary(session.account.userId, friend.userId)?.togetherDurationMillis,
+            )
+            assertEquals(listOf(5_000L, 1_000L), sessions.map { it.startedAtMillis })
+            assertEquals(listOf(7_000L, 2_000L), sessions.map { it.endedAtMillis })
         }
     }
 

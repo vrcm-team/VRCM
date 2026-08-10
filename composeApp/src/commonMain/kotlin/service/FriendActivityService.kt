@@ -16,11 +16,11 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -29,10 +29,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import org.koin.core.logger.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -80,20 +82,42 @@ internal data class FriendActivityInputSnapshot(
 
 internal enum class FriendActivityTrackingControl { Stop, Resume }
 
+internal data class FriendActivityTrackingTransition(
+    val sequence: Long,
+    val control: FriendActivityTrackingControl,
+    val occurredAtMillis: Long,
+)
+
 /**
  * Combines every lifecycle owner that can keep friend activity tracking alive.
- * Tracking changes only when the aggregate state crosses between zero and one active source.
+ * The current transition initializes a new account collector, while the channel preserves every
+ * later transition in occurrence order if database work temporarily suspends that collector.
  */
-internal class FriendActivityTrackingState {
-    private val activeSources = MutableStateFlow(0)
+@OptIn(ExperimentalTime::class)
+internal class FriendActivityTrackingState(
+    private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+) {
+    private val lock = SynchronizedObject()
+    private var activeSources = 0
+    private var sequence = 0L
+    private val transitionEvents = Channel<FriendActivityTrackingTransition>(Channel.UNLIMITED)
+    private val currentTransition = MutableStateFlow(
+        FriendActivityTrackingTransition(
+            sequence = sequence,
+            control = FriendActivityTrackingControl.Stop,
+            occurredAtMillis = nowMillis(),
+        )
+    )
 
-    /** Replays the current aggregate state whenever an account collector starts. */
-    val controls: Flow<FriendActivityTrackingControl> = activeSources
-        .map { sources ->
-            if (sources == 0) FriendActivityTrackingControl.Stop
-            else FriendActivityTrackingControl.Resume
+    val controls: Flow<FriendActivityTrackingTransition> = flow {
+        val initial = currentTransition.value
+        emit(initial)
+        transitionEvents.receiveAsFlow().collect { transition ->
+            if (transition.sequence > initial.sequence) {
+                emit(transition)
+            }
         }
-        .distinctUntilChanged()
+    }
 
     fun setAppForeground(active: Boolean) =
         setSourceActive(APP_FOREGROUND_SOURCE, active)
@@ -101,11 +125,36 @@ internal class FriendActivityTrackingState {
     fun setBackgroundMonitoring(active: Boolean) =
         setSourceActive(BACKGROUND_MONITORING_SOURCE, active)
 
-    fun isEnabled(): Boolean = activeSources.value != 0
+    fun isEnabled(): Boolean =
+        currentTransition.value.control == FriendActivityTrackingControl.Resume
 
     private fun setSourceActive(source: Int, active: Boolean) {
-        activeSources.update { current ->
-            if (active) current or source else current and source.inv()
+        synchronized(lock) {
+            val updatedSources = if (active) {
+                activeSources or source
+            } else {
+                activeSources and source.inv()
+            }
+            if (updatedSources == activeSources) return@synchronized
+
+            val wasEnabled = activeSources != 0
+            activeSources = updatedSources
+            val isEnabled = activeSources != 0
+            if (wasEnabled == isEnabled) return@synchronized
+
+            val transition = FriendActivityTrackingTransition(
+                sequence = ++sequence,
+                control = if (isEnabled) {
+                    FriendActivityTrackingControl.Resume
+                } else {
+                    FriendActivityTrackingControl.Stop
+                },
+                occurredAtMillis = nowMillis(),
+            )
+            currentTransition.value = transition
+            check(transitionEvents.trySend(transition).isSuccess) {
+                "Friend activity tracking transition channel is unavailable"
+            }
         }
     }
 
@@ -182,19 +231,18 @@ class FriendActivityService internal constructor(
                                     }
                                 }
                             },
-                            trackingState.controls.map { control ->
-                                val observedAtMillis = Clock.System.now().toEpochMilliseconds()
+                            trackingState.controls.map { transition ->
                                 val source = friendService.friendActivitySource.value
                                     ?.takeIf { it.token == session.token }
                                 source?.toInputSnapshot(
-                                    trackingControl = control,
-                                    observedAtMillis = observedAtMillis,
+                                    trackingControl = transition.control,
+                                    observedAtMillis = transition.occurredAtMillis,
                                 ) ?: FriendActivityInputSnapshot(
                                     token = session.token,
                                     friends = emptyList(),
                                     selfLocation = null,
-                                    observedAtMillis = observedAtMillis,
-                                    trackingControl = control,
+                                    observedAtMillis = transition.occurredAtMillis,
+                                    trackingControl = transition.control,
                                 )
                             },
                         ),
