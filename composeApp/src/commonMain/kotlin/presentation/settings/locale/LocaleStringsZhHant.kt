@@ -44,7 +44,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val stettingClearCache = "清除快取"
     override val stettingAlreadyLatest = "已是最新版本"
     override val stettingFriendActivity = "好友動態"
-    override val stettingFriendPresenceNotifications = "上下線提醒"
+    override val stettingFriendPresenceNotifications = "上線提醒"
     override val stettingBoopNotifications = "戳戳提醒"
     override val stettingBackgroundMonitoring = "背景監測"
     override val stettingBackgroundSettings = "背景設定"
