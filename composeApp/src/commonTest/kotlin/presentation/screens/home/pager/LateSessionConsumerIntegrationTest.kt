@@ -85,6 +85,7 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
             json = json,
             friendListCacheStore = friendListCacheStore,
             accountCacheManager = cacheManager,
+            logger = EmptyLogger(),
         )
         val locationModel = FriendLocationPagerModel(
             friendService = friendService,

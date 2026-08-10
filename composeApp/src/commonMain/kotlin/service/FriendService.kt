@@ -47,6 +47,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.Json
+import org.koin.core.logger.Logger
 
 class FriendService(
     private val friendsApi: FriendsApi,
@@ -54,6 +55,7 @@ class FriendService(
     private val json: Json,
     private val friendListCacheStore: FriendListCacheStore,
     private val accountCacheManager: AccountCacheManager,
+    private val logger: Logger,
 ) {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val friendMapLock = SynchronizedObject()
@@ -176,9 +178,7 @@ class FriendService(
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
-                        SharedFlowCentre.toastText.emit(
-                            ToastText.Error("恢复好友缓存失败，将重新获取好友列表: ${error.message}")
-                        )
+                        logger.warn("Failed to restore friend cache: ${error.message.orEmpty()}")
                     }
                     if (isCurrentSession(session.token)) {
                         preloadFriendList(session.token)

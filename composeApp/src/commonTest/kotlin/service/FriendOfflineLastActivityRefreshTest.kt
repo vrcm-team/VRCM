@@ -399,6 +399,7 @@ class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
             json = json,
             friendListCacheStore = friendListCacheStore,
             accountCacheManager = cacheManager,
+            logger = EmptyLogger(),
         )
     }
 
