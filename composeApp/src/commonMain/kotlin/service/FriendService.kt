@@ -71,18 +71,16 @@ class FriendService(
                 cache = FriendListCache(pending.snapshot.values.toList()),
             )
     }
-    private val preloadTask = AccountBoundTask<String>(
+    private val preloadTask = AccountBoundTask<AccountSessionToken>(
         scope = serviceScope,
-        isCurrent = { userId ->
-            synchronized(friendMapLock) { activeAccountUserId == userId }
-        },
-        runTask = { refreshFriendList() },
+        isCurrent = ::isCurrentSession,
+        runTask = { refreshFriendList(it) },
     )
     private val offlineLastActivityRefreshSequence = atomic(0L)
     private val offlineLastActivityRefreshTask = AccountBoundTask<OfflineLastActivityRefreshRequest>(
         scope = serviceScope,
         isCurrent = { isCurrentSession(it.sessionToken) },
-        runTask = { refreshFriendList(offline = true) },
+        runTask = { refreshFriendList(it.sessionToken, offline = true) },
     )
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
@@ -175,11 +173,11 @@ class FriendService(
                 serviceScope.launch {
                     restoreCachedFriendList(session.token)
                     if (isCurrentSession(session.token)) {
-                        preloadFriendList(session.account.userId)
+                        preloadFriendList(session.token)
                     }
                 }
             } else {
-                preloadFriendList(session.account.userId)
+                preloadFriendList(session.token)
             }
             serviceScope.launch {
                 runCatching { refreshCurrentUserLocation(session.token) }
@@ -318,8 +316,20 @@ class FriendService(
     suspend fun refreshFriendList(
         offline: Boolean? = null,
         onUpdater: suspend (List<FriendData>) -> Unit = {},
+    ): Boolean {
+        val sessionToken = synchronized(friendMapLock) { activeSessionToken } ?: return false
+        return refreshFriendList(sessionToken, offline, onUpdater)
+    }
+
+    private suspend fun refreshFriendList(
+        sessionToken: AccountSessionToken,
+        offline: Boolean? = null,
+        onUpdater: suspend (List<FriendData>) -> Unit = {},
     ): Boolean = refreshCoordinator.runRefresh {
-        val refreshToken = synchronized(friendMapLock) { friendStore.beginRefresh() }
+        val refreshToken = synchronized(friendMapLock) {
+            if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
+            friendStore.beginRefresh()
+        } ?: return@runRefresh false
         val collectedFriends = mutableListOf<FriendData>()
         var succeeded = true
         try {
@@ -338,6 +348,7 @@ class FriendService(
 
             if (succeeded) {
                 return@runRefresh commitRefresh(
+                    sessionToken = sessionToken,
                     token = refreshToken,
                     friends = collectedFriends,
                     replaceUntouched = offline == null,
@@ -402,23 +413,23 @@ class FriendService(
     }
 
     private fun commitRefresh(
+        sessionToken: AccountSessionToken,
         token: FriendRefreshToken,
         friends: Collection<FriendData>,
         replaceUntouched: Boolean,
     ): Boolean = synchronized(friendMapLock) {
+        if (!isCurrentSessionLocked(sessionToken)) return@synchronized false
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
         if (committed) {
             if (replaceUntouched) {
                 _initialRefreshCompleted.value = true
             }
             publishFriendState()
-            activeSessionToken?.let { sessionToken ->
-                _friendLastActivitySource.value = FriendActivitySourceSnapshot(
-                    token = sessionToken,
-                    friends = friends.toList(),
-                    selfLocation = null,
-                )
-            }
+            _friendLastActivitySource.value = FriendActivitySourceSnapshot(
+                token = sessionToken,
+                friends = friends.toList(),
+                selfLocation = null,
+            )
         }
         committed
     }
@@ -512,11 +523,11 @@ class FriendService(
         activeSessionToken == sessionToken && SharedFlowCentre.isCurrentSession(sessionToken)
 
     fun preloadFriendList() {
-        val userId = synchronized(friendMapLock) { activeAccountUserId } ?: return
-        preloadFriendList(userId)
+        val sessionToken = synchronized(friendMapLock) { activeSessionToken } ?: return
+        preloadFriendList(sessionToken)
     }
 
-    private fun preloadFriendList(userId: String) = preloadTask.start(userId)
+    private fun preloadFriendList(sessionToken: AccountSessionToken) = preloadTask.start(sessionToken)
 
     internal fun dispose() {
         serviceScope.cancel()

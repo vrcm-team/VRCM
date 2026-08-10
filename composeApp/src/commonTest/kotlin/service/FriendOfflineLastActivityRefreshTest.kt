@@ -34,7 +34,9 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -212,6 +214,103 @@ class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun previousSessionRefreshCannotCommitWhileNewSessionCacheIsLoading() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val accountA = AccountDto(userId = "usr_owner_a", username = "owner-a")
+        val accountB = AccountDto(userId = "usr_owner_b", username = "owner-b")
+        SharedFlowCentre.emitAuthenticated(accountA)
+        val friendA = friend().copy(id = "usr_friend_a", displayName = "Friend A")
+        val friendB = friend().copy(id = "usr_friend_b", displayName = "Friend B")
+        val cacheStore = SwitchingFriendListCacheStore(blockedUserId = accountB.userId)
+        val json = Json { ignoreUnknownKeys = true }
+        val releaseAccountARefresh = CompletableDeferred<Unit>()
+        val accountBRefreshStarted = CompletableDeferred<Unit>()
+        val releaseAccountBRefresh = CompletableDeferred<Unit>()
+        val onlineRefreshCount = atomic(0)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.encodedPath) {
+                        "/auth/user/friends" -> {
+                            val offline = request.url.parameters["offline"] == "true"
+                            val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                            val friends = if (!offline && offset == 0) {
+                                when (onlineRefreshCount.incrementAndGet()) {
+                                    1 -> {
+                                        releaseAccountARefresh.await()
+                                        listOf(friendA)
+                                    }
+                                    2 -> {
+                                        accountBRefreshStarted.complete(Unit)
+                                        releaseAccountBRefresh.await()
+                                        listOf(friendB)
+                                    }
+                                    else -> listOf(friendB)
+                                }
+                            } else {
+                                emptyList()
+                            }
+                            respond(
+                                content = json.encodeToString(friends),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        }
+                        "/auth/user" -> respond(
+                            content = "unavailable",
+                            status = HttpStatusCode.InternalServerError,
+                        )
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val friendService = createFriendService(accountA, client, json, cacheStore)
+        var accountBRefresh: Deferred<Boolean>? = null
+
+        try {
+            withTimeout(3_000L) {
+                while (onlineRefreshCount.value == 0) yield()
+            }
+            SharedFlowCentre.emitAuthenticated(accountB)
+            withTimeout(3_000L) { cacheStore.blockedLoadStarted.await() }
+            val refresh = async { friendService.refreshFriendList() }
+            accountBRefresh = refresh
+
+            releaseAccountARefresh.complete(Unit)
+            withTimeout(3_000L) { accountBRefreshStarted.await() }
+
+            assertTrue(friendService.friendState.value.values.none { it.id == friendA.id })
+            assertTrue(
+                friendService.friendActivitySource.value
+                    ?.friends
+                    .orEmpty()
+                    .none { it.id == friendA.id },
+            )
+            assertTrue(
+                friendService.friendLastActivitySource.value
+                    ?.friends
+                    .orEmpty()
+                    .none { it.id == friendA.id },
+            )
+            assertTrue(cacheStore.saved(accountB.userId)?.friends.orEmpty().none { it.id == friendA.id })
+
+            releaseAccountBRefresh.complete(Unit)
+            assertTrue(refresh.await())
+            assertEquals(friendB, friendService.friendState.value[friendB.id])
+        } finally {
+            releaseAccountARefresh.complete(Unit)
+            releaseAccountBRefresh.complete(Unit)
+            cacheStore.releaseBlockedLoad.complete(Unit)
+            accountBRefresh?.cancel()
+            friendService.dispose()
+            SharedFlowCentre.emitLogout()
+            client.close()
+        }
+    }
+
     private suspend fun createFriendService(
         account: AccountDto,
         client: HttpClient,
@@ -305,5 +404,36 @@ private class BlockingFriendListCacheStore(
 
     override suspend fun clearAll() {
         cache = null
+    }
+}
+
+private class SwitchingFriendListCacheStore(
+    private val blockedUserId: String,
+) : FriendListCacheStore {
+    val blockedLoadStarted = CompletableDeferred<Unit>()
+    val releaseBlockedLoad = CompletableDeferred<Unit>()
+    private val entries = atomic<Map<String, FriendListCache>>(emptyMap())
+
+    override suspend fun load(userId: String): FriendListCache? {
+        val result = entries.value[userId]
+        if (userId == blockedUserId) {
+            blockedLoadStarted.complete(Unit)
+            releaseBlockedLoad.await()
+        }
+        return result
+    }
+
+    override suspend fun save(userId: String, cache: FriendListCache) {
+        entries.value = entries.value + (userId to cache)
+    }
+
+    fun saved(userId: String): FriendListCache? = entries.value[userId]
+
+    override suspend fun clear(userId: String) {
+        entries.value = entries.value - userId
+    }
+
+    override suspend fun clearAll() {
+        entries.value = emptyMap()
     }
 }
