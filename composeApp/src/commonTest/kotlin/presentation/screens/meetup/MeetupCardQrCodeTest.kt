@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.meetup
 
-import io.github.vrcmteam.vrcm.storage.meetup.MeetupQrLinkType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -12,17 +11,6 @@ class MeetupCardQrCodeTest {
             "https://vrchat.com/home/user/usr_abc-123",
             meetupCardProfileUrl("usr_abc-123"),
         )
-    }
-
-    @Test
-    fun deepLinkTypeUsesVrcmScheme() {
-        assertEquals(
-            "vrcm://user/usr_abc-123",
-            meetupCardProfileUrl("usr_abc-123", MeetupQrLinkType.VrcmDeepLink),
-        )
-        assertFailsWith<IllegalArgumentException> {
-            meetupCardProfileUrl("https://other", MeetupQrLinkType.VrcmDeepLink)
-        }
     }
 
     @Test
@@ -44,7 +32,6 @@ class MeetupCardQrCodeTest {
         assertFailsWith<IllegalArgumentException> {
             meetupCardProfileLinkUrl("javascript:alert(1)")
         }
-        assertFailsWith<IllegalArgumentException> { meetupCardProfileLinkUrl("vrcm://user/usr_x") }
         assertFailsWith<IllegalArgumentException> { meetupCardProfileLinkUrl("") }
     }
 }

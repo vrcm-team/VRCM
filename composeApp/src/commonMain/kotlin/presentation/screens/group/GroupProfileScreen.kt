@@ -42,6 +42,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -90,6 +91,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDial
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlRow
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.TextChip
@@ -578,7 +580,14 @@ private fun DetailsContent(group: GroupProfileVo, owner: UserData?, instances: L
                         )
                     }
                 }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
             }
+            OfficialUrlRow(
+                url = "https://vrchat.com/home/group/${group.groupId}",
+                containerColor = Color.Transparent,
+            )
         }
         if (group.badges.isNotEmpty()) {
             ChipSection(title = strings.groupBadges, items = group.badges)

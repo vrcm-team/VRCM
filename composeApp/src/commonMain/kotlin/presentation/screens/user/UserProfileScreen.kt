@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -576,7 +577,8 @@ private fun ColumnScope.ProfileContent(
     // 个人简介
     BottomCardTab(
         bioMinHeight = contentMinHeight,
-        userProfileVO = currentUser
+        userProfileVO = currentUser,
+        officialUrl = "https://vrchat.com/home/user/${currentUser.id}",
     )
 
     if (!currentUser.isSelf && friendActivitySummary != null) {
@@ -689,6 +691,7 @@ private fun ColumnScope.ProfileContent(
             }
         }
     )
+
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -1443,6 +1446,7 @@ private fun UserProfileIdentity(
 private fun BottomCardTab(
     bioMinHeight: Dp = 0.dp,
     userProfileVO: UserProfileVo,
+    officialUrl: String,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1458,10 +1462,21 @@ private fun BottomCardTab(
                         contentColor = MaterialTheme.colorScheme.primary,
                         shape = MaterialTheme.shapes.extraLarge
                     ) {
-                        SelectionContainer {
-                            Text(
-                                modifier = Modifier.padding(12.dp),
-                                text = userProfileVO.bio
+                        Column {
+                            SelectionContainer {
+                                Text(
+                                    modifier = Modifier.padding(12.dp),
+                                    text = userProfileVO.bio,
+                                )
+                            }
+                            Spacer(Modifier.weight(1f))
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                            OfficialUrlRow(
+                                url = officialUrl,
+                                containerColor = Color.Transparent,
                             )
                         }
                     }

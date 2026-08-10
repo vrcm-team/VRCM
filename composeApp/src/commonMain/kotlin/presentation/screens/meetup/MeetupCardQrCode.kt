@@ -33,14 +33,14 @@ import io.ktor.http.URLBuilder
 
 /** 身份卡上一个二维码槽位的内容来源。 */
 internal sealed interface MeetupQrTarget {
-    /** 内置链接：当前用户的 VRChat 主页或 VRCM 直达。 */
+    /** 内置链接：当前用户的 VRChat 主页。 */
     data class Builtin(val type: MeetupQrLinkType) : MeetupQrTarget
 
     /** 用户 VRChat 资料里已有的外部链接。 */
     data class ProfileLink(val url: String) : MeetupQrTarget
 }
 
-/** 二维码只指向当前用户的公开 VRChat 主页或 VRCM 直达链接，不接受任何其他内容。 */
+/** 二维码只指向当前用户的公开 VRChat 主页，不接受任何其他内容。 */
 internal fun meetupCardProfileUrl(
     userId: String,
     linkType: MeetupQrLinkType = MeetupQrLinkType.VrchatWeb,
@@ -50,7 +50,7 @@ internal fun meetupCardProfileUrl(
     }
     return when (linkType) {
         MeetupQrLinkType.VrchatWeb -> "https://vrchat.com/home/user/$userId"
-        MeetupQrLinkType.VrcmDeepLink -> "vrcm://user/$userId"
+        MeetupQrLinkType.VrcmDeepLink -> "https://vrchat.com/home/user/$userId"
     }
 }
 
@@ -88,19 +88,19 @@ internal fun meetupCardLinkLabel(url: String): String =
 private fun MeetupQrTarget.shortLabel(): String = when (this) {
     is MeetupQrTarget.Builtin -> when (type) {
         MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLabelVrchat
-        MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLabelVrcm
+        MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLabelVrchat
     }
     is MeetupQrTarget.ProfileLink -> meetupCardLinkLabel(url)
 }
 
 /**
- * 角标图标是区分多个码的唯一标识：VRChat 主页用人像，VRCM 直达用手机（装了应用才跳得动），
- * 资料链接复用资料页的站点图标，认不出的站点退回通用链接图标。
+ * 角标图标是区分多个码的唯一标识：VRChat 主页用人像，资料链接复用资料页的站点图标，
+ * 认不出的站点退回通用链接图标。
  */
 private fun MeetupQrTarget.badgeIcon(): ImageVector = when (this) {
     is MeetupQrTarget.Builtin -> when (type) {
         MeetupQrLinkType.VrchatWeb -> AppIcons.AccountCircle
-        MeetupQrLinkType.VrcmDeepLink -> AppIcons.Smartphone
+        MeetupQrLinkType.VrcmDeepLink -> AppIcons.AccountCircle
     }
     is MeetupQrTarget.ProfileLink -> WebIcons.selectIcon(url) ?: AppIcons.Link
 }
