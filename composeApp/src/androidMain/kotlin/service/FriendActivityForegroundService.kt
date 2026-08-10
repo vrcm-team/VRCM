@@ -25,9 +25,12 @@ import org.koin.core.context.GlobalContext
  */
 class FriendActivityForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var networkWakeLock: BackgroundNetworkWakeLock? = null
+
     override fun onCreate() {
         super.onCreate()
         startForeground(MONITOR_ID, FriendNotificationFactory(this).monitoringNotification())
+        networkWakeLock = BackgroundNetworkWakeLock(this)
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
         val friendService = koin.get<FriendService>()
@@ -48,6 +51,8 @@ class FriendActivityForegroundService : Service() {
     override fun onDestroy() {
         GlobalContext.getOrNull()?.get<WebSocketApi>()?.setBackgroundMonitoringEnabled(false)
         scope.cancel()
+        networkWakeLock?.close()
+        networkWakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
