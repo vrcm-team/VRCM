@@ -142,14 +142,10 @@ class FriendActivityService internal constructor(
                                     occurredAtMillis = update.occurredAtMillis
                                         ?: Clock.System.now().toEpochMilliseconds(),
                                 )
-                                friendService.friendActivitySource.value?.toInputSnapshot(presenceEvent)
-                                    ?: FriendActivityInputSnapshot(
-                                        token = update.sessionToken,
-                                        friends = emptyList(),
-                                        selfLocation = null,
-                                        observedAtMillis = presenceEvent.occurredAtMillis,
-                                        socketPresenceEvent = presenceEvent,
-                                    )
+                                friendService.friendActivitySource.value.toSocketPresenceInputSnapshot(
+                                    eventToken = update.sessionToken,
+                                    presenceEvent = presenceEvent,
+                                )
                             },
                             flow {
                                 while (true) {
@@ -382,6 +378,19 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
     trackingControl = trackingControl,
     updateLastActivityOnly = updateLastActivityOnly,
 )
+
+/** Keeps the event token authoritative and only enriches it from the same session snapshot. */
+internal fun FriendActivitySourceSnapshot?.toSocketPresenceInputSnapshot(
+    eventToken: AccountSessionToken,
+    presenceEvent: FriendSocketPresenceEvent,
+): FriendActivityInputSnapshot = this?.takeIf { it.token == eventToken }?.toInputSnapshot(presenceEvent)
+    ?: FriendActivityInputSnapshot(
+        token = eventToken,
+        friends = emptyList(),
+        selfLocation = null,
+        observedAtMillis = presenceEvent.occurredAtMillis,
+        socketPresenceEvent = presenceEvent,
+    )
 
 @OptIn(ExperimentalTime::class)
 private fun String.toEpochMillisOrNull(): Long? =

@@ -10,9 +10,13 @@ import io.github.vrcmteam.vrcm.service.FriendActivityBatch
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import io.github.vrcmteam.vrcm.service.FriendActivityInputSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityObservation
+import io.github.vrcmteam.vrcm.service.FriendActivitySourceSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityTrackingControl
+import io.github.vrcmteam.vrcm.service.FriendSocketPresenceEvent
+import io.github.vrcmteam.vrcm.service.FriendSocketPresenceType
 import io.github.vrcmteam.vrcm.service.FriendMeetingChange
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import io.github.vrcmteam.vrcm.service.toSocketPresenceInputSnapshot
 import io.github.vrcmteam.vrcm.service.trackFriendActivity
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
@@ -313,6 +317,37 @@ class FriendActivityRoomStoreTest {
                 3_000L,
                 store.summary("usr_owner", friend.userId)?.lastSeenTogetherAtMillis,
             )
+        }
+    }
+
+    @Test
+    fun delayedSocketPresenceFromPreviousSessionIsRejectedAfterAccountSwitch() = runTest {
+        withStore { store ->
+            val currentSession = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_current_owner"),
+                token = AccountSessionToken(userId = "usr_current_owner", generation = 2L),
+            )
+            val previousToken = AccountSessionToken(userId = "usr_previous_owner", generation = 1L)
+            val delayedInput = FriendActivitySourceSnapshot(
+                token = currentSession.token,
+                friends = emptyList(),
+                selfLocation = null,
+            ).toSocketPresenceInputSnapshot(
+                eventToken = previousToken,
+                presenceEvent = FriendSocketPresenceEvent(
+                    userId = "usr_previous_friend",
+                    type = FriendSocketPresenceType.Offline,
+                    occurredAtMillis = 1_000L,
+                ),
+            )
+
+            trackFriendActivity(
+                session = currentSession,
+                snapshots = flowOf(delayedInput),
+                store = store,
+            )
+
+            assertNull(store.summary(currentSession.account.userId, "usr_previous_friend"))
         }
     }
 
