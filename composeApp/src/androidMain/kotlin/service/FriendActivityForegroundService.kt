@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.service
 
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
@@ -26,10 +27,12 @@ import org.koin.core.context.GlobalContext
 class FriendActivityForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var networkWakeLock: BackgroundNetworkWakeLock? = null
+    private var monitoringStartedAtMillis = 0L
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(MONITOR_ID, FriendNotificationFactory(this).monitoringNotification())
+        monitoringStartedAtMillis = System.currentTimeMillis()
+        showMonitoringNotification()
         networkWakeLock = BackgroundNetworkWakeLock(this)
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
@@ -47,7 +50,11 @@ class FriendActivityForegroundService : Service() {
         }
         scope.launch { SharedFlowCentre.logout.collect { stopSelf() } }
     }
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESTORE_MONITOR_NOTIFICATION) showMonitoringNotification()
+        return START_STICKY
+    }
+
     override fun onDestroy() {
         GlobalContext.getOrNull()?.get<WebSocketApi>()?.setBackgroundMonitoringEnabled(false)
         scope.cancel()
@@ -57,7 +64,27 @@ class FriendActivityForegroundService : Service() {
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun showMonitoringNotification() {
+        val restoreIntent = PendingIntent.getService(
+            this,
+            MONITOR_ID,
+            Intent(this, FriendActivityForegroundService::class.java)
+                .setAction(ACTION_RESTORE_MONITOR_NOTIFICATION),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        startForeground(
+            MONITOR_ID,
+            FriendNotificationFactory(this).monitoringNotification(
+                startedAtMillis = monitoringStartedAtMillis,
+                restoreIntent = restoreIntent,
+            ),
+        )
+    }
+
     private companion object {
+        const val ACTION_RESTORE_MONITOR_NOTIFICATION =
+            "io.github.vrcmteam.vrcm.action.RESTORE_MONITOR_NOTIFICATION"
         const val MONITOR_ID = 0x5652434d
         const val FALLBACK_REFRESH_INTERVAL_MILLIS = 15 * 60 * 1_000L
     }
