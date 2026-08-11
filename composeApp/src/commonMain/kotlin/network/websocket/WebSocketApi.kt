@@ -27,14 +27,13 @@ class WebSocketApi(
     private var currentJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val connectionLock = SynchronizedObject()
-    private val isForeground = atomic(true)
-    private val backgroundMonitoringEnabled = atomic(false)
+    private val connectionPolicy = WebSocketConnectionPolicy()
     private val connectedSessionToken = atomic<AccountSessionToken?>(null)
 
     init {
         scope.launch {
             SharedFlowCentre.authed.collect { session ->
-                if (isForeground.value || backgroundMonitoringEnabled.value) replaceConnection(session.token)
+                if (connectionPolicy.shouldKeepConnection) replaceConnection(session.token)
             }
         }
         scope.launch {
@@ -44,13 +43,13 @@ class WebSocketApi(
         }
     }
 
-    fun onBackground() {
-        isForeground.value = false
-        if (!backgroundMonitoringEnabled.value) replaceConnection(null)
+    fun onBackground(backgroundMonitoringConfigured: Boolean) {
+        connectionPolicy.onBackground(backgroundMonitoringConfigured)
+        if (!connectionPolicy.shouldKeepConnection) replaceConnection(null)
     }
 
     fun onForeground() {
-        if (isForeground.getAndSet(true)) return
+        if (!connectionPolicy.onForeground()) return
         replaceConnection(SharedFlowCentre.currentSession.value?.token)
     }
 
@@ -61,13 +60,14 @@ class WebSocketApi(
     }
 
     fun setBackgroundMonitoringEnabled(enabled: Boolean) {
-        backgroundMonitoringEnabled.value = enabled
-        if (enabled || !isForeground.value) replaceConnection(SharedFlowCentre.currentSession.value?.token.takeIf { enabled || isForeground.value })
+        connectionPolicy.setBackgroundServiceActive(enabled)
+        if (enabled || !connectionPolicy.isForeground) {
+            replaceConnection(
+                SharedFlowCentre.currentSession.value?.token
+                    .takeIf { connectionPolicy.shouldKeepConnection }
+            )
+        }
     }
-
-    fun isBackgroundMonitoringEnabled(): Boolean = backgroundMonitoringEnabled.value
-
-    fun isAppForeground(): Boolean = isForeground.value
 
     private fun replaceConnection(sessionToken: AccountSessionToken?) = synchronized(connectionLock) {
         currentJob?.cancel()
@@ -81,7 +81,7 @@ class WebSocketApi(
         retryWebSocketConnection(
             maxRetryDelayMillis = MAX_RETRY_DELAY_MILLIS,
             onFailure = ::reportConnectionFailure,
-        ) {
+        ) { markConnected ->
             val authResponse = apiClient.get(AUTH_API_PREFIX)
             check(authResponse.status == HttpStatusCode.OK) {
                 "WebSocket auth failed with HTTP ${authResponse.status.value}"
@@ -95,6 +95,7 @@ class WebSocketApi(
                     parameter("auth", token)
                 }) {
                 connectedSessionToken.value = sessionToken
+                markConnected()
                 try {
                     while (true) {
                         val othersMessage = receiveDeserialized<WebSocketEvent>()
@@ -129,11 +130,34 @@ class WebSocketApi(
     }
 }
 
+internal class WebSocketConnectionPolicy {
+    private val foreground = atomic(true)
+    private val monitoringConfigured = atomic(false)
+    private val backgroundServiceActive = atomic(false)
+
+    val isForeground: Boolean
+        get() = foreground.value
+
+    val shouldKeepConnection: Boolean
+        get() = foreground.value || monitoringConfigured.value || backgroundServiceActive.value
+
+    fun onBackground(isMonitoringConfigured: Boolean) {
+        monitoringConfigured.value = isMonitoringConfigured
+        foreground.value = false
+    }
+
+    fun onForeground(): Boolean = !foreground.getAndSet(true)
+
+    fun setBackgroundServiceActive(active: Boolean) {
+        backgroundServiceActive.value = active
+    }
+}
+
 internal suspend fun retryWebSocketConnection(
     retryDelayMillis: Long = 5_000L,
     maxRetryDelayMillis: Long = retryDelayMillis,
     onFailure: suspend (Exception, consecutiveFailures: Int) -> Unit,
-    connect: suspend () -> Unit,
+    connect: suspend (markConnected: () -> Unit) -> Unit,
 ) {
     require(retryDelayMillis > 0) { "retryDelayMillis must be positive" }
     require(maxRetryDelayMillis >= retryDelayMillis) { "maxRetryDelayMillis must not be lower than retryDelayMillis" }
@@ -141,7 +165,7 @@ internal suspend fun retryWebSocketConnection(
     var consecutiveFailures = 0
     while (currentCoroutineContext().isActive) {
         try {
-            connect()
+            connect { consecutiveFailures = 0 }
             consecutiveFailures = 0
         } catch (e: CancellationException) {
             throw e
