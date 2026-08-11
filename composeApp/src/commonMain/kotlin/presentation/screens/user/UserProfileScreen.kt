@@ -238,6 +238,9 @@ data class UserProfileScreen(
             onBioSave = { bio ->
                 userProfileScreenModel.updateUserProfile(bio = bio, successMessage = editSuccessMsg)
             },
+            onBioLinksSave = { bioLinks ->
+                userProfileScreenModel.updateUserProfile(bioLinks = bioLinks, successMessage = editSuccessMsg)
+            },
         )
         // 编辑备注弹窗
         val noteSavedMsg = strings.userNoteSaved
