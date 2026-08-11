@@ -43,7 +43,7 @@ internal class FavoriteFriendPresenceTracker {
         knownPresence.keys.retainAll(ids)
         names.keys.retainAll(ids)
         ids.forEach { id -> friends[id]?.let { friend ->
-            knownPresence.putIfAbsent(id, isInGameLocation(friend.location))
+            knownPresence.getOrPut(id) { isInGameLocation(friend.location) }
         } }
     }
 
