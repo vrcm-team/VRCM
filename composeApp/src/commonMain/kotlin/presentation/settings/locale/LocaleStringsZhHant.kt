@@ -51,6 +51,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val stettingBackgroundNotifications = "通知"
     override val stettingBackgroundBattery = "耗電"
     override val stettingNotificationSettings = "通知設定"
+    override val stettingAppManagement = "應用程式管理"
     override val stettingBatterySettings = "耗電設定"
     override val stettingStatusEnabled = "已開啟"
     override val stettingStatusDisabled = "未開啟"

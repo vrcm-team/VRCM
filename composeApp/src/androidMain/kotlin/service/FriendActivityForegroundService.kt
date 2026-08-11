@@ -1,8 +1,13 @@
 package io.github.vrcmteam.vrcm.service
 
+import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendNotificationFactory
@@ -25,9 +30,22 @@ import org.koin.core.context.GlobalContext
  */
 class FriendActivityForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var networkWakeLock: BackgroundNetworkWakeLock? = null
+    private var monitoringStartedAtMillis = 0L
+    private var timerResetReceiverRegistered = false
+    private val timerResetReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ACTION_RESET_MONITORING_TIMER) return
+            monitoringStartedAtMillis = System.currentTimeMillis()
+            showMonitoringNotification()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
-        startForeground(MONITOR_ID, FriendNotificationFactory(this).monitoringNotification())
+        monitoringStartedAtMillis = System.currentTimeMillis()
+        showMonitoringNotification()
+        networkWakeLock = BackgroundNetworkWakeLock(this)
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
         val friendService = koin.get<FriendService>()
@@ -44,8 +62,22 @@ class FriendActivityForegroundService : Service() {
             }
         }
         scope.launch { SharedFlowCentre.logout.collect { stopSelf() } }
+        ContextCompat.registerReceiver(
+            this,
+            timerResetReceiver,
+            IntentFilter(ACTION_RESET_MONITORING_TIMER),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        timerResetReceiverRegistered = true
     }
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESTORE_MONITOR_NOTIFICATION) {
+            showMonitoringNotification()
+        }
+        return START_STICKY
+    }
+
     override fun onDestroy() {
         GlobalContext.getOrNull()?.let { koin ->
             val webSocketApi = koin.get<WebSocketApi>()
@@ -53,12 +85,40 @@ class FriendActivityForegroundService : Service() {
             koin.get<FriendActivityService>().onBackgroundMonitoringStopped()
         }
         scope.cancel()
+        if (timerResetReceiverRegistered) {
+            unregisterReceiver(timerResetReceiver)
+            timerResetReceiverRegistered = false
+        }
+        networkWakeLock?.close()
+        networkWakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
     override fun onBind(intent: Intent?): IBinder? = null
-    private companion object {
-        const val MONITOR_ID = 0x5652434d
-        const val FALLBACK_REFRESH_INTERVAL_MILLIS = 15 * 60 * 1_000L
+
+    private fun showMonitoringNotification() {
+        val restoreIntent = PendingIntent.getService(
+            this,
+            MONITOR_ID,
+            Intent(this, FriendActivityForegroundService::class.java)
+                .setAction(ACTION_RESTORE_MONITOR_NOTIFICATION),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        startForeground(
+            MONITOR_ID,
+            FriendNotificationFactory(this).monitoringNotification(
+                startedAtMillis = monitoringStartedAtMillis,
+                restoreIntent = restoreIntent,
+            ),
+        )
+    }
+
+    companion object {
+        internal const val ACTION_RESET_MONITORING_TIMER =
+            "io.github.vrcmteam.vrcm.action.RESET_MONITORING_TIMER"
+        private const val ACTION_RESTORE_MONITOR_NOTIFICATION =
+            "io.github.vrcmteam.vrcm.action.RESTORE_MONITOR_NOTIFICATION"
+        private const val MONITOR_ID = 0x5652434d
+        private const val FALLBACK_REFRESH_INTERVAL_MILLIS = 15 * 60 * 1_000L
     }
 }

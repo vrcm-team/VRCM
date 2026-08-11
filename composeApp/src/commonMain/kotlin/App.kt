@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.Scene
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.fadeScreenTransition
@@ -53,6 +55,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsProvider
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
@@ -78,20 +81,29 @@ fun App(
         val webSocketApi = koinInject<WebSocketApi>()
         val friendLocationPagerModel = koinInject<FriendLocationPagerModel>()
         val friendActivityService = koinInject<FriendActivityService>()
-        LaunchedEffect(friendActivityService) {
-            friendActivityService.onAppResumed()
-        }
-        LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-            friendLocationPagerModel.onBackground()
-            webSocketApi.onBackground()
-            friendActivityService.onAppStopped()
-        }
-        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-            friendActivityService.onAppResumed()
-            webSocketApi.onForeground()
-            friendLocationPagerModel.onForeground()
-        }
+        val platform = koinInject<AppPlatform>()
         SettingsProvider {
+            val backgroundMonitoringEnabled = rememberUpdatedState(
+                LocalSettingsState.current.value.backgroundFriendMonitoringEnabled
+            )
+            LaunchedEffect(friendActivityService) {
+                friendActivityService.onAppResumed()
+            }
+            LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+                friendLocationPagerModel.onBackground()
+                webSocketApi.onBackground(backgroundMonitoringEnabled.value)
+                friendActivityService.onAppStopped()
+            }
+            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                friendActivityService.onAppResumed()
+                webSocketApi.onForeground()
+                friendLocationPagerModel.onForeground()
+                if (backgroundMonitoringEnabled.value &&
+                    SharedFlowCentre.currentSession.value != null
+                ) {
+                    platform.resetBackgroundFriendMonitoringTimer()
+                }
+            }
             Column(Modifier.fillMaxSize()) {
                 windowChrome()
                 BoxWithConstraints(

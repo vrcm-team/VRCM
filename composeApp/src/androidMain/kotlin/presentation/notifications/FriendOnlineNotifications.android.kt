@@ -20,11 +20,25 @@ private const val MONITOR_CHANNEL = "friend_activity_monitor"
 class FriendNotificationFactory(private val context: Context) {
     private val manager = context.getSystemService(NotificationManager::class.java)
     init { channels() }
-    fun monitoringNotification(): Notification = builder(MONITOR_CHANNEL, 1)
-        .setContentTitle(context.getString(R.string.friend_monitor_title))
-        .setContentText(context.getString(R.string.friend_monitor_message))
-        .setCategory(Notification.CATEGORY_SERVICE)
-        .setOngoing(true).setOnlyAlertOnce(true).build()
+    fun monitoringNotification(
+        startedAtMillis: Long,
+        restoreIntent: PendingIntent,
+    ): Notification {
+        val builder = builder(MONITOR_CHANNEL, 1)
+            .setContentTitle(context.getString(R.string.friend_monitor_title))
+            .setContentText(context.getString(R.string.friend_monitor_message))
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setWhen(startedAtMillis)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setDeleteIntent(restoreIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        }
+        return builder.build()
+    }
     fun social(id: Int, title: String, message: CharSequence): Notification = builder(SOCIAL_CHANNEL, id)
         .setContentTitle(title).setContentText(message).setStyle(Notification.BigTextStyle().bigText(message))
         .setCategory(Notification.CATEGORY_SOCIAL).setAutoCancel(true).build()

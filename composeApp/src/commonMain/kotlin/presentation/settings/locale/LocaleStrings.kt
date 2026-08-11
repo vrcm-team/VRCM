@@ -62,6 +62,7 @@ sealed class LocaleStrings {
     open val stettingBackgroundNotifications: String = "Notifications"
     open val stettingBackgroundBattery: String = "Battery"
     open val stettingNotificationSettings: String = "Notification settings"
+    open val stettingAppManagement: String = "App settings"
     open val stettingBatterySettings: String = "Battery settings"
     open val stettingStatusEnabled: String = "Enabled"
     open val stettingStatusDisabled: String = "Disabled"
