@@ -4,11 +4,13 @@ import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
 import io.github.vrcmteam.vrcm.service.data.VersionDto
 import io.github.vrcmteam.vrcm.storage.SettingsDao
+import kotlinx.atomicfu.atomic
 
 class VersionService(
     private val gitHubApi: GitHubApi,
     private val settingsDao: SettingsDao,
 ) {
+    private val dismissedVersion = atomic<String?>(null)
 
     /**
      * 获取最新的版本号,和版本链接
@@ -22,9 +24,11 @@ class VersionService(
                     val releaseData = it.getOrNull()!!
                     val tagName = releaseData.tagName
                     val downloadUrl = releaseData.assets.map { asset -> asset.browserDownloadUrl }
-                    if (AppConst.APP_VERSION == tagName
-                        || (checkRemember && settingsDao.rememberVersion == tagName)
-                    ) {
+                    val isIgnored = checkRemember && (
+                        settingsDao.rememberVersion == tagName
+                            || dismissedVersion.value == tagName
+                    )
+                    if (AppConst.APP_VERSION == tagName || isIgnored) {
                         // 当前版本是最新版本
                         Result.success(VersionDto(tagName, releaseData.htmlUrl, releaseData.body, false,downloadUrl))
                     } else {
@@ -39,6 +43,12 @@ class VersionService(
 
     fun rememberVersion(version: String?) {
         settingsDao.rememberVersion = version
+    }
+
+    fun dismissVersionForSession(version: String) {
+        if (version.isNotEmpty()) {
+            dismissedVersion.value = version
+        }
     }
 
 }
