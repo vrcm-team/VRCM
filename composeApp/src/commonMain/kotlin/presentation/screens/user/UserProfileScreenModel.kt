@@ -61,6 +61,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
 
+internal const val MAX_PROFILE_BIO_LINKS = 3
+
 private enum class UserLoadState {
     Idle,
     Loading,
@@ -425,12 +427,13 @@ class UserProfileScreenModel(
     ) {
         if (!bioLinksUpdateStateMachine.tryStart()) return
         val targetUserId = userState.id
+        val linksToSave = bioLinks.take(MAX_PROFILE_BIO_LINKS)
 
         viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
                 usersApi.updateUserInfo(
                     userId = targetUserId,
-                    updateUserInfoData = UpdateUserInfoData(bioLinks = bioLinks),
+                    updateUserInfoData = UpdateUserInfoData(bioLinks = linksToSave),
                 )
             }.mapCatching { updatedUser ->
                 check(updatedUser.id == targetUserId) {

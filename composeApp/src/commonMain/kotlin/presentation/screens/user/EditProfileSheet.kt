@@ -70,7 +70,9 @@ fun EditProfileSheet(
     var statusDescription by remember { mutableStateOf(currentUser.statusDescription) }
     var pronouns by remember { mutableStateOf(currentUser.pronouns) }
     var bio by remember { mutableStateOf(currentUser.bio) }
-    var bioLinks by remember { mutableStateOf(currentUser.bioLinks) }
+    var bioLinks by remember {
+        mutableStateOf(currentUser.bioLinks.take(MAX_PROFILE_BIO_LINKS))
+    }
     var languages by remember { mutableStateOf(extractLanguages(currentUser.tags)) }
     var editStatus by remember { mutableStateOf(status) }
     var editStatusDesc by remember { mutableStateOf(statusDescription) }
@@ -93,8 +95,9 @@ fun EditProfileSheet(
         if (bioLinksUpdateState.completedRequestId == handledBioLinksRequestId) return@LaunchedEffect
         handledBioLinksRequestId = bioLinksUpdateState.completedRequestId
         bioLinksUpdateState.savedLinks?.let { savedLinks ->
-            bioLinks = savedLinks
-            editBioLinks = savedLinks
+            val limitedLinks = savedLinks.take(MAX_PROFILE_BIO_LINKS)
+            bioLinks = limitedLinks
+            editBioLinks = limitedLinks
             if (editingField == EditField.SocialLinks) editingField = null
         }
     }
@@ -155,7 +158,9 @@ fun EditProfileSheet(
                     EditField.SocialLinks -> EditSocialLinksField(
                         bioLinks = editBioLinks,
                         isSaving = bioLinksUpdateState.isSaving,
-                        onBioLinksChange = { editBioLinks = it },
+                        onBioLinksChange = {
+                            editBioLinks = it.take(MAX_PROFILE_BIO_LINKS)
+                        },
                         onSave = { onBioLinksSave(editBioLinks) },
                         onBack = { editingField = null },
                     )
@@ -204,7 +209,7 @@ private fun EditSocialLinksField(
     OutlinedButton(
         onClick = { onBioLinksChange(bioLinks + "") },
         modifier = Modifier.fillMaxWidth(),
-        enabled = !isSaving,
+        enabled = !isSaving && bioLinks.size < MAX_PROFILE_BIO_LINKS,
     ) {
         Icon(AppIcons.Add, contentDescription = null)
         Spacer(Modifier.width(8.dp))
