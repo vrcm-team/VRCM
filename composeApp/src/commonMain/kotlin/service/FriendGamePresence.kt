@@ -16,44 +16,48 @@ internal fun isInGameLocation(location: String?): Boolean {
     }
 }
 
-internal data class FriendPresenceTransition(val userId: String, val displayName: String, val inGame: Boolean, val friend: FriendData?)
+internal data class FriendPresenceTransition(
+    val userId: String,
+    val displayName: String,
+    val inGame: Boolean,
+    val friend: FriendData?,
+)
 
-/** Emits only real in-game transitions for favorited friends; website-only presence is offline. */
-internal class FavoriteFriendPresenceTracker {
-    private var favorites: Set<String> = emptySet()
+/** Emits real in-game transitions for every friend after a trusted full-list baseline. */
+internal class FriendPresenceTracker {
+    private var baselineEstablished = false
     private val knownPresence = mutableMapOf<String, Boolean>()
     private val names = mutableMapOf<String, String>()
 
-    fun reset() { favorites = emptySet(); knownPresence.clear(); names.clear() }
-
-    /**
-     * Registers the favorited friends to watch.
-     *
-     * [presenceTrusted] must be false while [friends] may still be the locally restored snapshot,
-     * whose presence is forced to offline. Such a snapshot only contributes display names: taking a
-     * baseline from it would report every favorited friend as newly online once the real friend
-     * list arrives.
-     */
-    fun updateFavorites(ids: Set<String>, friends: Map<String, FriendData>, presenceTrusted: Boolean) {
-        ids.forEach { id ->
-            friends[id]?.displayName?.takeIf(String::isNotBlank)?.let { names[id] = it }
-        }
-        if (!presenceTrusted) return
-        favorites = ids
-        knownPresence.keys.retainAll(ids)
-        names.keys.retainAll(ids)
-        ids.forEach { id -> friends[id]?.let { friend ->
-            knownPresence.getOrPut(id) { isInGameLocation(friend.location) }
-        } }
+    fun reset() {
+        baselineEstablished = false
+        knownPresence.clear()
+        names.clear()
     }
 
+    /**
+     * Observes a full friend snapshot whose presence has passed FriendService's initial-refresh
+     * gate. The first snapshot establishes a baseline; later snapshots emit only actual changes.
+     */
     fun observe(friends: Map<String, FriendData>): List<FriendPresenceTransition> = buildList {
-        favorites.forEach { id ->
+        friends.forEach { (id, friend) ->
+            friend.displayName.takeIf(String::isNotBlank)?.let { names[id] = it }
+        }
+        if (!baselineEstablished) {
+            baselineEstablished = true
+            friends.forEach { (id, friend) ->
+                knownPresence[id] = isInGameLocation(friend.location)
+            }
+            return@buildList
+        }
+
+        (knownPresence.keys + friends.keys).forEach { id ->
             val friend = friends[id]
             if (friend == null) {
-                if (knownPresence[id] == true) {
-                    knownPresence[id] = false
-                    add(FriendPresenceTransition(id, names[id] ?: id, false, null))
+                val previous = knownPresence.remove(id)
+                val displayName = names.remove(id) ?: id
+                if (previous == true) {
+                    add(FriendPresenceTransition(id, displayName, false, null))
                 }
                 return@forEach
             }

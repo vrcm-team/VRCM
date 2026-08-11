@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
-import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
@@ -40,7 +39,7 @@ class FriendOnlineNotificationService(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
     private val started = atomic(false)
-    private val tracker = FavoriteFriendPresenceTracker()
+    private val tracker = FriendPresenceTracker()
     private var activeToken: AccountSessionToken? = null
     private var favoriteJob: Job? = null
     private val knownNotificationIds = mutableSetOf<String>()
@@ -48,7 +47,6 @@ class FriendOnlineNotificationService(
     // 两条拉取路径各自记录是否已播种：开关可以中途打开，晚开的那一类不能补发历史。
     private var v1Seeded = false
     private var friendRequestsSeeded = false
-    private var favoriteGroupIdsByUser: Map<String, Set<String>> = emptyMap()
 
     /** Starts one account-bound observer set. Calling it repeatedly is safe. */
     fun start() {
@@ -62,21 +60,17 @@ class FriendOnlineNotificationService(
                     knownNotificationIds.clear()
                     v1Seeded = false
                     friendRequestsSeeded = false
-                    favoriteGroupIdsByUser = emptyMap()
                 }
                 session?.let { account ->
                     favoriteJob = scope.launch {
                         favoriteService.loadFavoriteByGroup(FavoriteType.Friend)
-                        // 冷启动时 friendState 先装的是本地缓存快照，其在线状态被强制写成离线，
-                        // 拿它建立基线会在真实好友列表分页落地时把所有收藏好友判成刚刚上线。
-                        // 因此把刷新状态一起并进来：未完成首次完整刷新时只记名字、不建立基线，
-                        // 刷新成功后这里会重新发射一次，用真实数据补上基线。
+                        // friendActivitySource 只在首次完整好友刷新后发布，并且携带账号令牌。
+                        // 收藏数据只提供分组归属，不能把 presence 监听范围缩成收藏好友。
                         combine(
                             favoriteService.favoritesByGroup(FavoriteType.Friend),
-                            friendService.initialRefreshCompleted,
-                        ) { groups, presenceTrusted -> groups to presenceTrusted }
-                            .collect { (groups, presenceTrusted) ->
-                                val ids = groups.values.flatten().map { it.favoriteId }.toSet()
+                            friendService.friendActivitySource,
+                        ) { groups, source -> groups to source }
+                            .collect { (groups, source) ->
                                 // 名单可以整组选，所以要记住每位好友属于哪些收藏分组。
                                 val groupIdsByUser = buildMap<String, MutableSet<String>> {
                                     groups.forEach { (group, favorites) ->
@@ -85,19 +79,13 @@ class FriendOnlineNotificationService(
                                         }
                                     }
                                 }
-                                mutex.withLock {
-                                    if (activeToken == account.token) {
-                                        favoriteGroupIdsByUser = groupIdsByUser
-                                        tracker.updateFavorites(ids, friendService.friendMap, presenceTrusted)
-                                    }
-                                }
+                                onFriendsChanged(account.token, source, groupIdsByUser)
                             }
                     }
                     refreshInboxNotifications(account.token, seedOnly = true)
                 }
             }
         }
-        scope.launch { friendService.friendState.collect(::onFriendsChanged) }
         scope.launch {
             SharedFlowCentre.webSocket.collect { event ->
                 if (event.event.type == NotificationEvents.Notification.typeName &&
@@ -269,12 +257,16 @@ class FriendOnlineNotificationService(
         }
     }
 
-    private suspend fun onFriendsChanged(friends: Map<String, FriendData>) {
-        val (transitions, groupIdsByUser) = mutex.withLock {
-            if (activeToken == null) {
-                emptyList<FriendPresenceTransition>() to emptyMap()
+    private suspend fun onFriendsChanged(
+        token: AccountSessionToken,
+        source: FriendActivitySourceSnapshot?,
+        groupIdsByUser: Map<String, Set<String>>,
+    ) {
+        val transitions = mutex.withLock {
+            if (activeToken != token || source?.token != token) {
+                emptyList()
             } else {
-                tracker.observe(friends) to favoriteGroupIdsByUser
+                tracker.observe(source.friends.associateBy { it.id })
             }
         }
         if (transitions.isEmpty()) return
