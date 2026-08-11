@@ -52,6 +52,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -143,6 +146,41 @@ internal class UserProfileLoadCoordinator {
     ) {
         userGate.runLoad(forceRefresh, loadUser)
         groupsGate.runLoad(forceRefresh, loadGroups)
+    }
+}
+
+/** State of the current social-link update request. */
+data class BioLinksUpdateState(
+    val isSaving: Boolean = false,
+    val completedRequestId: Long = 0,
+    val savedLinks: List<String>? = null,
+)
+
+internal class BioLinksUpdateStateMachine {
+    private val _state = MutableStateFlow(BioLinksUpdateState())
+    val state: StateFlow<BioLinksUpdateState> = _state.asStateFlow()
+
+    fun tryStart(): Boolean {
+        val current = _state.value
+        if (current.isSaving) return false
+        return _state.compareAndSet(
+            expect = current,
+            update = current.copy(isSaving = true, savedLinks = null),
+        )
+    }
+
+    fun complete(savedLinks: List<String>) = finish(savedLinks)
+
+    fun fail() = finish(savedLinks = null)
+
+    private fun finish(savedLinks: List<String>?) {
+        val current = _state.value
+        if (!current.isSaving) return
+        _state.value = current.copy(
+            isSaving = false,
+            completedRequestId = current.completedRequestId + 1,
+            savedLinks = savedLinks,
+        )
     }
 }
 
@@ -247,6 +285,9 @@ class UserProfileScreenModel(
     private val loadCoordinator = UserProfileLoadCoordinator()
     private val cacheMutex = Mutex()
     private var cachedUserData: UserData? = null
+    private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
+    internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
+        bioLinksUpdateStateMachine.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -378,9 +419,40 @@ class UserProfileScreenModel(
             )
         }
 
+    fun updateBioLinks(
+        bioLinks: List<String>,
+        successMessage: String,
+    ) {
+        if (!bioLinksUpdateStateMachine.tryStart()) return
+        val targetUserId = userState.id
+
+        viewModelScope.launch(Dispatchers.IO) {
+            authService.reTryAuthCatching {
+                usersApi.updateUserInfo(
+                    userId = targetUserId,
+                    updateUserInfoData = UpdateUserInfoData(bioLinks = bioLinks),
+                )
+            }.mapCatching { updatedUser ->
+                check(updatedUser.id == targetUserId) {
+                    "Profile update returned a different user"
+                }
+                updatedUser
+            }.onSuccess { updatedUser ->
+                if (_userState.value.id == targetUserId) {
+                    _userState.value = _userState.value.copy(bioLinks = updatedUser.bioLinks)
+                }
+                bioLinksUpdateStateMachine.complete(updatedUser.bioLinks)
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                refreshUser(targetUserId, forceRefresh = true)
+            }.onFailure { error ->
+                bioLinksUpdateStateMachine.fail()
+                handleError(error)
+            }
+        }
+    }
+
     fun updateUserProfile(
         bio: String? = null,
-        bioLinks: List<String>? = null,
         status: UserStatus? = null,
         statusDescription: String? = null,
         pronouns: String? = null,
@@ -394,7 +466,6 @@ class UserProfileScreenModel(
                     userId = userState.id,
                     updateUserInfoData = UpdateUserInfoData(
                         bio = bio,
-                        bioLinks = bioLinks,
                         status = status,
                         statusDescription = statusDescription,
                         pronouns = pronouns,

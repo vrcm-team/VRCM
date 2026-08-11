@@ -222,9 +222,11 @@ data class UserProfileScreen(
         }
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
+        val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
+            bioLinksUpdateState = bioLinksUpdateState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
                 userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
@@ -237,6 +239,12 @@ data class UserProfileScreen(
             },
             onBioSave = { bio ->
                 userProfileScreenModel.updateUserProfile(bio = bio, successMessage = editSuccessMsg)
+            },
+            onBioLinksSave = { bioLinks ->
+                userProfileScreenModel.updateBioLinks(
+                    bioLinks = bioLinks,
+                    successMessage = editSuccessMsg,
+                )
             },
         )
         // 编辑备注弹窗

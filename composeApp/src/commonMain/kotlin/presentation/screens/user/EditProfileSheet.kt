@@ -35,7 +35,7 @@ private fun extractLanguages(tags: List<String>): List<String> =
 private fun UserStatus?.safeStatus(): UserStatus =
     if (this == null || this == UserStatus.Offline) UserStatus.Active else this
 
-private enum class EditField { Status, Language, Pronouns, Bio }
+private enum class EditField { Status, Language, Pronouns, Bio, SocialLinks }
 
 private val STATUS_OPTIONS = listOf(
     UserStatus.JoinMe, UserStatus.Active, UserStatus.AskMe, UserStatus.Busy,
@@ -55,11 +55,13 @@ private fun UserStatus.toLocalizedString(): String = when (this) {
 fun EditProfileSheet(
     isVisible: Boolean,
     currentUser: UserProfileVo,
+    bioLinksUpdateState: BioLinksUpdateState,
     onDismiss: () -> Unit,
     onStatusSave: (status: UserStatus, statusDescription: String) -> Unit,
     onLanguageSave: (languages: List<String>) -> Unit,
     onPronounsSave: (pronouns: String) -> Unit,
     onBioSave: (bio: String) -> Unit,
+    onBioLinksSave: (bioLinks: List<String>) -> Unit,
 ) {
     if (!isVisible) return
 
@@ -68,22 +70,51 @@ fun EditProfileSheet(
     var statusDescription by remember { mutableStateOf(currentUser.statusDescription) }
     var pronouns by remember { mutableStateOf(currentUser.pronouns) }
     var bio by remember { mutableStateOf(currentUser.bio) }
+    var bioLinks by remember { mutableStateOf(currentUser.bioLinks) }
     var languages by remember { mutableStateOf(extractLanguages(currentUser.tags)) }
     var editStatus by remember { mutableStateOf(status) }
     var editStatusDesc by remember { mutableStateOf(statusDescription) }
     var editPronouns by remember { mutableStateOf(pronouns) }
     var editBio by remember { mutableStateOf(bio) }
+    var editBioLinks by remember { mutableStateOf(bioLinks) }
     var editLanguages by remember { mutableStateOf(languages) }
+    var handledBioLinksRequestId by remember {
+        mutableLongStateOf(bioLinksUpdateState.completedRequestId)
+    }
+    val latestBioLinksSaving = rememberUpdatedState(bioLinksUpdateState.isSaving)
+    val profileSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestBioLinksSaving.value
+        },
+    )
+
+    LaunchedEffect(bioLinksUpdateState.completedRequestId) {
+        if (bioLinksUpdateState.completedRequestId == handledBioLinksRequestId) return@LaunchedEffect
+        handledBioLinksRequestId = bioLinksUpdateState.completedRequestId
+        bioLinksUpdateState.savedLinks?.let { savedLinks ->
+            bioLinks = savedLinks
+            editBioLinks = savedLinks
+            if (editingField == EditField.SocialLinks) editingField = null
+        }
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { if (!bioLinksUpdateState.isSaving) onDismiss() },
+        sheetState = profileSheetState,
+        sheetGesturesEnabled = !bioLinksUpdateState.isSaving,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                .then(if (editingField == null) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                .then(
+                    if (editingField == null || editingField == EditField.SocialLinks) {
+                        Modifier.verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    }
+                ),
         ) {
             if (editingField == null) {
                 Text(
@@ -104,6 +135,9 @@ fun EditProfileSheet(
                 ProfileFieldRow(strings.editProfileBio, bio.ifBlank { "—" }.let { if (it.length > 60) it.take(60) + "…" else it }) {
                     editBio = bio; editingField = EditField.Bio
                 }
+                ProfileFieldRow(strings.editProfileSocialLinks, bioLinks.filter(String::isNotBlank).joinToString().ifBlank { "—" }) {
+                    editBioLinks = bioLinks; editingField = EditField.SocialLinks
+                }
             } else {
                 when (editingField) {
                     EditField.Status -> EditStatusField(editStatus, editStatusDesc, { editStatus = it }, { editStatusDesc = it }, {
@@ -118,10 +152,85 @@ fun EditProfileSheet(
                     EditField.Bio -> EditContentField(strings.editProfileBio, editBio, { editBio = it }, 512, 8, {
                         bio = editBio; onBioSave(editBio); editingField = null
                     }) { editingField = null }
+                    EditField.SocialLinks -> EditSocialLinksField(
+                        bioLinks = editBioLinks,
+                        isSaving = bioLinksUpdateState.isSaving,
+                        onBioLinksChange = { editBioLinks = it },
+                        onSave = { onBioLinksSave(editBioLinks) },
+                        onBack = { editingField = null },
+                    )
                     null -> {}
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EditSocialLinksField(
+    bioLinks: List<String>,
+    isSaving: Boolean,
+    onBioLinksChange: (List<String>) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+) {
+    EditHeader(strings.editProfileSocialLinks, onBack, enabled = !isSaving)
+    bioLinks.forEachIndexed { index, link ->
+        OutlinedTextField(
+            value = link,
+            onValueChange = { value ->
+                onBioLinksChange(bioLinks.toMutableList().also { it[index] = value })
+            },
+            label = {
+                Text(strings.editProfileSocialLink.replace("%s", (index + 1).toString()))
+            },
+            leadingIcon = { Icon(AppIcons.Link, contentDescription = null) },
+            trailingIcon = {
+                IconButton(
+                    onClick = {
+                        onBioLinksChange(bioLinks.filterIndexed { itemIndex, _ -> itemIndex != index })
+                    },
+                    enabled = !isSaving,
+                ) {
+                    Icon(AppIcons.Close, contentDescription = strings.editProfileRemoveSocialLink)
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !isSaving,
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    OutlinedButton(
+        onClick = { onBioLinksChange(bioLinks + "") },
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !isSaving,
+    ) {
+        Icon(AppIcons.Add, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(strings.editProfileAddSocialLink)
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        strings.editProfileSocialLinksHint,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(16.dp))
+    Button(
+        onClick = onSave,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !isSaving,
+    ) {
+        if (isSaving) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(strings.editProfileSave)
     }
 }
 
@@ -142,9 +251,11 @@ private fun ProfileFieldRow(label: String, value: String, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun EditHeader(title: String, onBack: () -> Unit) {
+internal fun EditHeader(title: String, onBack: () -> Unit, enabled: Boolean = true) {
     Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f)) }
+        IconButton(onClick = onBack, enabled = enabled) {
+            Icon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f))
+        }
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
     }
     Spacer(Modifier.height(12.dp))
