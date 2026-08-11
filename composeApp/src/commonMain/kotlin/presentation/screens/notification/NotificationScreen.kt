@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.home.dialog
+package io.github.vrcmteam.vrcm.presentation.screens.notification
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -32,15 +33,13 @@ import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog
-import io.github.vrcmteam.vrcm.presentation.compoments.SharedDialogContainer
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
-import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
-import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.indexOfNotificationTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -50,22 +49,40 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 import kotlin.time.ExperimentalTime
 
-object NotificationDialog : SharedDialog {
+@Serializable
+data class NotificationScreen(
+    val targetNotificationId: String? = null,
+) : AppDetailRoute {
+    override val key = "NotificationScreen:${targetNotificationId.orEmpty()}"
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
-        val homeScreenModel: HomeScreenModel = koinViewModel()
+    override fun Content() {
+        val notificationCenter = koinInject<NotificationCenterModel>()
+        val navigator = LocalNavigator.currentOrThrow
         // 每打开一次刷新一次
         LaunchedEffect(Unit) {
-            homeScreenModel.refreshAllNotification()
+            notificationCenter.refreshAllNotification()
         }
         val notifications: List<NotificationItemData> by remember {
             derivedStateOf {
-                (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications)
+                (notificationCenter.friendRequestNotifications + notificationCenter.notifications)
                     .sortedByDescending { it.createdAt }
             }
+        }
+        val listState = rememberLazyListState()
+        var lastTargetIndex by remember(targetNotificationId) { mutableIntStateOf(-1) }
+        LaunchedEffect(targetNotificationId, notifications) {
+            val targetIndex = notifications.indexOfNotificationTarget(targetNotificationId)
+            if (targetIndex < 0 || targetIndex == lastTargetIndex) return@LaunchedEffect
+            listState.animateScrollToItem(targetIndex)
+            // Only mark the target after the animation completes. A list refresh can cancel this
+            // effect, in which case the next snapshot must retry even if the index is unchanged.
+            lastTargetIndex = targetIndex
         }
         var boopReply by remember { mutableStateOf<BoopReply?>(null) }
         val boopSuccessMessage = strings.profileBoopSuccess
@@ -75,7 +92,7 @@ object NotificationDialog : SharedDialog {
             if (item.responseTarget(response) == NotificationResponseTarget.BOOP_USER_API) {
                 boopReply = BoopReply(item, response)
             } else {
-                homeScreenModel.responseAllNotification(
+                notificationCenter.responseAllNotification(
                     item = item,
                     action = response,
                     boopSuccessMessage = boopSuccessMessage,
@@ -87,7 +104,7 @@ object NotificationDialog : SharedDialog {
 
         val currentBoopReply = boopReply
         val boopReplySending = currentBoopReply?.let {
-            homeScreenModel.pendingNotificationActions[it.item.id] == it.action
+            notificationCenter.pendingNotificationActions[it.item.id] == it.action
         } == true
         val boopReplyStillExists = currentBoopReply?.let { reply ->
             notifications.any { it.id == reply.item.id }
@@ -96,24 +113,52 @@ object NotificationDialog : SharedDialog {
             if (currentBoopReply != null && !boopReplyStillExists) boopReply = null
         }
 
-        SharedDialogContainer {
-            if (notifications.isEmpty()) {
-                Text(
-                    modifier = Modifier.padding(6.dp),
-                    text = strings.homeNotificationEmpty,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    style = MaterialTheme.typography.titleLarge
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.notificationSectionInbox) },
+                    navigationIcon = {
+                        IconButton(onClick = { navigator.pop() }) {
+                            Icon(
+                                imageVector = AppIcons.ArrowBackIosNew,
+                                contentDescription = "Back",
+                            )
+                        }
+                    },
                 )
+            },
+        ) { contentPadding ->
+            if (notifications.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        modifier = Modifier.padding(16.dp),
+                        text = strings.homeNotificationEmpty,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        top = contentPadding.calculateTopPadding() + 12.dp,
+                        end = 12.dp,
+                        bottom = contentPadding.calculateBottomPadding() + 12.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(notifications, key = { it.id }) { item ->
                         NotificationItem(
                             item = item,
-                            loadingAction = homeScreenModel.pendingNotificationActions[item.id],
+                            loadingAction = notificationCenter.pendingNotificationActions[item.id],
                             onResponse = onResponseNotification,
                         )
                     }
@@ -128,7 +173,7 @@ object NotificationDialog : SharedDialog {
             onDismiss = { boopReply = null },
             onSend = { emojiId ->
                 currentBoopReply?.let { reply ->
-                    homeScreenModel.responseAllNotification(
+                    notificationCenter.responseAllNotification(
                         item = reply.item,
                         action = reply.action,
                         boopEmojiId = emojiId,

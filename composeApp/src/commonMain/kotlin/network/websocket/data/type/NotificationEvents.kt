@@ -7,6 +7,12 @@ object NotificationEvents {
      */
     data object Notification: WebSocketEventType("notification",Unit::class)
 
+    /** 新版通知；Boop、群组公告等当前收件箱事件会通过这条通道推送。 */
+    data object NotificationV2: WebSocketEventType("notification-v2", Unit::class)
+
+    /** 已存在的新版聚合通知发生更新，例如同一发送者再次 Boop。 */
+    data object NotificationV2Update: WebSocketEventType("notification-v2-update", Unit::class)
+
     /**
      * 响应通知
      * 用于响应先前发送的事件

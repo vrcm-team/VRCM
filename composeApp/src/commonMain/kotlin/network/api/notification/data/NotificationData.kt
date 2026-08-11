@@ -37,6 +37,7 @@ data class NotificationData(
     @Serializable
     data class Data(
         val announcementTitle: String? = null,
+        val boopingUserDisplayName: String? = null,
         val groupName: String? = null,
         val emojiId: String? = null,
         val emojiVersion: Int? = null,

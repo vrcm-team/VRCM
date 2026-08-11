@@ -49,6 +49,7 @@ class FriendActivityForegroundService : Service() {
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
         val friendService = koin.get<FriendService>()
+        val notificationService = koin.get<FriendOnlineNotificationService>()
         koin.get<FriendActivityService>().onBackgroundMonitoringStarted()
         val webSocketApi = koin.get<WebSocketApi>()
         val logger = koin.get<Logger>()
@@ -58,6 +59,7 @@ class FriendActivityForegroundService : Service() {
                 if (SharedFlowCentre.currentSession.value != null && !webSocketApi.isConnected()) {
                     runCatching { friendService.refreshFriendList() }
                         .onFailure { logger.warn("Background friend refresh failed: ${it.message.orEmpty()}") }
+                    notificationService.refreshInboxNotifications()
                 }
             }
         }

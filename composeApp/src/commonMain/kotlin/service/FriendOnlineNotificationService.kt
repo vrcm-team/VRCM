@@ -3,6 +3,14 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
+import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.websocket.data.content.NotificationContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.NotificationV2UpdateContent
+import io.github.vrcmteam.vrcm.network.websocket.data.type.NotificationEvents
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendOnlineNotifier
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import kotlinx.atomicfu.atomic
@@ -15,13 +23,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import org.koin.core.logger.Logger
 
-/** Sends opt-in friend presence alerts for the active account. */
+/** Sends opt-in Android alerts for friend presence changes and incoming inbox notifications. */
 class FriendOnlineNotificationService(
     private val favoriteService: FavoriteService,
+    private val notificationApi: NotificationApi,
     private val friendService: FriendService,
     private val settingsDao: SettingsDao,
     private val notifier: FriendOnlineNotifier,
+    private val usersApi: UsersApi,
+    private val json: Json,
+    private val logger: Logger,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
@@ -29,6 +43,12 @@ class FriendOnlineNotificationService(
     private val tracker = FriendPresenceTracker()
     private var activeToken: AccountSessionToken? = null
     private var favoriteJob: Job? = null
+    private val knownNotificationIds = mutableSetOf<String>()
+    private val notificationDeliveryTracker = NotificationDeliveryTracker()
+
+    // 两条拉取路径各自记录是否已播种：开关可以中途打开，晚开的那一类不能补发历史。
+    private var inboxSeeded = false
+    private var friendRequestsSeeded = false
 
     /** Starts one account-bound observer set. Calling it repeatedly is safe. */
     fun start() {
@@ -39,6 +59,10 @@ class FriendOnlineNotificationService(
                 mutex.withLock {
                     activeToken = session?.token
                     tracker.reset()
+                    knownNotificationIds.clear()
+                    notificationDeliveryTracker.reset()
+                    inboxSeeded = false
+                    friendRequestsSeeded = false
                 }
                 session?.let { account ->
                     favoriteJob = scope.launch {
@@ -61,7 +85,255 @@ class FriendOnlineNotificationService(
                                 onFriendsChanged(account.token, source, groupIdsByUser)
                             }
                     }
+                    refreshInboxNotifications(account.token, seedOnly = true)
                 }
+            }
+        }
+        scope.launch {
+            SharedFlowCentre.webSocket.collect { event ->
+                if (!SharedFlowCentre.isCurrentSession(event.token)) return@collect
+                when (event.event.type) {
+                    NotificationEvents.Notification.typeName ->
+                        handlePipelineNotification(event.token, event.event.content, isV2 = false)
+
+                    NotificationEvents.NotificationV2.typeName ->
+                        handlePipelineNotification(event.token, event.event.content, isV2 = true)
+
+                    NotificationEvents.NotificationV2Update.typeName ->
+                        handlePipelineNotificationUpdate(event.token, event.event.content)
+                }
+            }
+        }
+    }
+
+    private fun anyInboxNotificationEnabled(): Boolean =
+        settingsDao.boopNotificationsEnabled || settingsDao.groupAnnouncementNotificationsEnabled
+
+    /** Polls the inbox for the foreground service's disconnected-WebSocket fallback. */
+    fun refreshInboxNotifications() {
+        val token = activeToken ?: return
+        scope.launch { refreshInboxNotifications(token) }
+    }
+
+    private suspend fun handlePipelineNotification(
+        token: AccountSessionToken,
+        content: String,
+        isV2: Boolean,
+    ) {
+        val notification = runCatching { json.decodeFromString<NotificationContent>(content) }
+            .onFailure {
+                logger.warn("Unable to decode Pipeline notification; falling back to inbox refresh: ${it.message.orEmpty()}")
+            }
+            .getOrNull()
+        if (notification == null) {
+            refreshInboxNotifications(token)
+            return
+        }
+
+        val shouldDeliver = mutex.withLock {
+            if (activeToken != token || !SharedFlowCentre.isCurrentSession(token)) return@withLock false
+            knownNotificationIds += notification.id
+            if (isV2) {
+                notificationDeliveryTracker.shouldDeliverV2(
+                    id = notification.id,
+                    version = notification.version,
+                    relatedId = notification.relatedNotificationsId,
+                    isPipelineEvent = true,
+                )
+            } else {
+                notificationDeliveryTracker.shouldDeliverLegacy(notification.id)
+            }
+        }
+        if (!shouldDeliver) return
+
+        logger.debug("Dispatching Pipeline notification ${notification.id} (${notification.type})")
+        val eventId = notification.relatedNotificationsId?.takeIf(String::isNotBlank)
+            ?: notification.id
+        when {
+            notification.type.equals(NotificationType.FriendRequest.value, ignoreCase = true) -> {
+                dispatchFriendRequest(
+                    notificationId = notification.id,
+                    senderUserId = notification.senderUserId,
+                    senderUsername = notification.senderUsername,
+                )
+            }
+
+            notification.type.equals(BOOP_TYPE, ignoreCase = true) -> {
+                if (!settingsDao.boopNotificationsEnabled) return
+                notifier.notifyBoop(
+                    eventId,
+                    notification.senderName(),
+                    notification.details?.emojiId ?: notification.data.emojiId,
+                )
+            }
+
+            notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
+                if (!settingsDao.groupAnnouncementNotificationsEnabled) return
+                val details = notification.details ?: notification.data
+                notifier.notifyGroupAnnouncement(
+                    eventId,
+                    details.groupName ?: notification.title.orEmpty(),
+                    details.announcementTitle ?: notification.message,
+                )
+            }
+
+            else -> refreshInboxNotifications(token)
+        }
+    }
+
+    private suspend fun handlePipelineNotificationUpdate(
+        token: AccountSessionToken,
+        content: String,
+    ) {
+        val update = runCatching { json.decodeFromString<NotificationV2UpdateContent>(content) }
+            .onFailure {
+                logger.warn("Unable to decode Pipeline notification-v2-update: ${it.message.orEmpty()}")
+            }
+            .getOrNull()
+        if (update == null) {
+            refreshInboxNotifications(token)
+            return
+        }
+
+        logger.debug("Refreshing Pipeline notification ${update.id} at version ${update.version}")
+        // Updates are partial and may only contain a new related notification ID. The REST item is
+        // the canonical full snapshot; its version and relation decide whether this is a new alert.
+        refreshInboxNotifications(token)
+    }
+
+    /**
+     * 拉取收件箱通知并按类型分派。
+     *
+     * 戳一戳与群组公告来自当前 `/notifications` 收件箱，好友请求仍要单独走旧版
+     * `/auth/user/notifications`——本仓库的 NotificationCenterModel 也是这么分开拉的。
+     *
+     * 两条路径共用一份已见 ID 集合（两边的 id 都是通知 ID），但**播种状态各记各的**：开关是可以
+     * 中途打开的，如果只用一个标记，先开戳一戳、之后再开好友请求时，那一类的历史消息会因为从没
+     * 进过基线而被整批当成新消息推出来。因此每条路径在本会话内第一次真正取回数据时只并入 ID、
+     * 不产出通知，之后才走增量分派。
+     */
+    private suspend fun refreshInboxNotifications(
+        token: AccountSessionToken,
+        seedOnly: Boolean = false,
+    ) {
+        if (!SharedFlowCentre.isCurrentSession(token)) return
+        val inboxRequested = anyInboxNotificationEnabled()
+        val inboxNotifications = if (inboxRequested) {
+            try {
+                notificationApi.fetchNotifications()
+            } catch (error: Exception) {
+                logger.warn("Unable to refresh notifications: ${error.message.orEmpty()}")
+                null
+            }
+        } else {
+            null
+        }
+        val friendRequestsRequested = settingsDao.friendRequestNotificationsEnabled
+        val friendRequests = if (friendRequestsRequested) {
+            try {
+                notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value)
+            } catch (error: Exception) {
+                logger.warn("Unable to refresh friend requests: ${error.message.orEmpty()}")
+                null
+            }
+        } else {
+            null
+        }
+        // 请求过但失败的路径这一轮整体跳过：只用半份数据去重，会让另一半在下次被当成新消息补发。
+        if (inboxRequested && inboxNotifications == null) return
+        if (friendRequestsRequested && friendRequests == null) return
+        if (inboxNotifications == null && friendRequests == null) return
+
+        val pending = mutex.withLock {
+            if (activeToken != token || !SharedFlowCentre.isCurrentSession(token)) {
+                return@withLock emptyList<suspend () -> Unit>()
+            }
+            buildList {
+                inboxNotifications?.let { notifications ->
+                    val seeding = seedOnly || !inboxSeeded
+                    inboxSeeded = true
+                    notifications.forEach { notification ->
+                        knownNotificationIds += notification.id
+                        val shouldDeliver = notificationDeliveryTracker.shouldDeliverV2(
+                            id = notification.id,
+                            version = notification.version,
+                            relatedId = notification.relatedNotificationsId,
+                            seedOnly = seeding,
+                        )
+                        if (shouldDeliver) {
+                            add { dispatchInboxNotification(notification) }
+                        }
+                    }
+                }
+                friendRequests?.let { requests ->
+                    val seeding = seedOnly || !friendRequestsSeeded
+                    friendRequestsSeeded = true
+                    requests.forEach { request ->
+                        val unseen = knownNotificationIds.add(request.id)
+                        if (unseen && !seeding && notificationDeliveryTracker.shouldDeliverLegacy(request.id)) {
+                            add { dispatchFriendRequest(request) }
+                        }
+                    }
+                }
+            }
+        }
+        pending.forEach { deliver ->
+            if (SharedFlowCentre.isCurrentSession(token)) deliver()
+        }
+    }
+
+    private suspend fun dispatchFriendRequest(request: NotificationDataV2) {
+        dispatchFriendRequest(
+            notificationId = request.id,
+            senderUserId = request.senderUserId,
+            senderUsername = null,
+        )
+    }
+
+    private suspend fun dispatchFriendRequest(
+        notificationId: String,
+        senderUserId: String?,
+        senderUsername: String?,
+    ) {
+        if (!settingsDao.friendRequestNotificationsEnabled) return
+        val sender = senderUsername?.takeIf(String::isNotBlank)
+            ?: senderUserId?.let { id ->
+                runCatching { usersApi.fetchUser(id).displayName }
+                    .getOrNull()
+                    ?.takeIf(String::isNotBlank)
+            }
+            ?: senderUserId?.takeIf(String::isNotBlank)
+            ?: "Unknown"
+        notifier.notifyFriendRequest(notificationId, sender)
+    }
+
+    /** 本地弹出提醒不改变服务器上的已读状态。 */
+    private fun dispatchInboxNotification(notification: NotificationData) {
+        val eventId = notification.relatedNotificationsId?.takeIf(String::isNotBlank)
+            ?: notification.id
+        val sender = notification.data.boopingUserDisplayName?.takeIf(String::isNotBlank)
+            ?: notification.senderUsername?.takeIf(String::isNotBlank)
+            ?: notification.senderUserId?.takeIf(String::isNotBlank)
+            ?: "Unknown"
+        when {
+            notification.type.equals(BOOP_TYPE, ignoreCase = true) -> {
+                if (!settingsDao.boopNotificationsEnabled) return
+                notifier.notifyBoop(
+                    eventId,
+                    sender,
+                    notification.details?.emojiId ?: notification.data.emojiId,
+                )
+            }
+
+            notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
+                if (!settingsDao.groupAnnouncementNotificationsEnabled) return
+                // 群组公告本来就只发给已加入的群组成员，不需要再按群组过滤一次。
+                val details = notification.details ?: notification.data
+                notifier.notifyGroupAnnouncement(
+                    eventId,
+                    details.groupName ?: notification.title.orEmpty(),
+                    details.announcementTitle ?: notification.message,
+                )
             }
         }
     }
@@ -94,4 +366,17 @@ class FriendOnlineNotificationService(
             else notifier.notifyOffline(transition.userId, transition.displayName)
         }
     }
+
+    private companion object {
+        const val BOOP_TYPE = "boop"
+
+        /** VRChat 把群组类通知统一放在 group. 前缀下，公告是其中的 group.announcement。 */
+        const val GROUP_ANNOUNCEMENT_TYPE_PREFIX = "group.announcement"
+    }
 }
+
+private fun NotificationContent.senderName(): String =
+    data.boopingUserDisplayName?.takeIf(String::isNotBlank)
+        ?: senderUsername?.takeIf(String::isNotBlank)
+        ?: senderUserId?.takeIf(String::isNotBlank)
+        ?: "Unknown"
