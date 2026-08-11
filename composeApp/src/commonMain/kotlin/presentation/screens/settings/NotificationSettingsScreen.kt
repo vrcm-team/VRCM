@@ -2,13 +2,17 @@ package io.github.vrcmteam.vrcm.presentation.screens.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,23 +21,35 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Velocity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vrcmteam.vrcm.AppPlatform
@@ -71,9 +87,38 @@ object NotificationSettingsScreen : AppDetailRoute {
         val favoriteService = koinInject<FavoriteService>()
         val friendService = koinInject<FriendService>()
         var currentSettings by LocalSettingsState.current
+        var showFriendOverrides by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) { favoriteService.loadFavoriteByGroup(FavoriteType.Friend) }
         val favoriteGroups by favoriteService.favoritesByGroup(FavoriteType.Friend).collectAsState()
+        val friends by friendService.friendState.collectAsState()
+        val favoriteUserIds = remember(favoriteGroups) {
+            favoriteGroups.values.flatten().map { it.favoriteId }.distinct()
+        }
+        val friendOverrideItems = remember(favoriteUserIds, friends) {
+            favoriteUserIds.mapNotNull { userId ->
+                friends[userId]?.displayName
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { displayName -> FriendOverrideItem(userId, displayName) }
+            }
+        }
+
+        if (showFriendOverrides) {
+            FriendOverridesBottomSheet(
+                friends = friendOverrideItems,
+                overrides = currentSettings.friendPresenceFilter.userOverrides,
+                onDismiss = { showFriendOverrides = false },
+                onChange = { userId, next ->
+                    val overrides = currentSettings.friendPresenceFilter.userOverrides.toMutableMap()
+                    if (next == null) overrides -= userId else overrides[userId] = next
+                    currentSettings = currentSettings.copy(
+                        friendPresenceFilter = currentSettings.friendPresenceFilter.copy(
+                            userOverrides = overrides,
+                        ),
+                    )
+                },
+            )
+        }
 
         Scaffold(
             topBar = {
@@ -167,28 +212,12 @@ object NotificationSettingsScreen : AppDetailRoute {
                             )
                         }
                     }
-                    item { SectionTitle(strings.notificationFilterFriends) }
                     item {
-                        Text(
-                            text = strings.notificationFilterFriendsDescription,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        SettingsNavigationRow(
+                            title = strings.notificationFilterFriends,
+                            description = strings.notificationFilterFriendsDescription,
+                            onClick = { showFriendOverrides = true },
                         )
-                    }
-                    val favoriteUserIds = favoriteGroups.values.flatten().map { it.favoriteId }.distinct()
-                    items(favoriteUserIds, key = { it }) { userId ->
-                        val friend = friendService.friendMap[userId]
-                        val override = currentSettings.friendPresenceFilter.userOverrides[userId]
-                        FriendOverrideRow(
-                            name = friend?.displayName?.takeIf(String::isNotBlank) ?: userId,
-                            override = override,
-                        ) { next ->
-                            val overrides = currentSettings.friendPresenceFilter.userOverrides.toMutableMap()
-                            if (next == null) overrides -= userId else overrides[userId] = next
-                            currentSettings = currentSettings.copy(
-                                friendPresenceFilter = currentSettings.friendPresenceFilter.copy(userOverrides = overrides),
-                            )
-                        }
                     }
                 }
 
@@ -354,11 +383,140 @@ private fun SettingsSwitchRow(
     }
 }
 
+@Composable
+private fun SettingsNavigationRow(
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = AppIcons.ExpandMore,
+            contentDescription = null,
+            modifier = Modifier.graphicsLayer { rotationZ = -90f },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private data class FriendOverrideItem(
+    val userId: String,
+    val displayName: String,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FriendOverridesBottomSheet(
+    friends: List<FriendOverrideItem>,
+    overrides: Map<String, Boolean>,
+    onDismiss: () -> Unit,
+    onChange: (String, Boolean?) -> Unit,
+) {
+    val listNestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset = Offset(x = 0f, y = available.y)
+
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity,
+            ): Velocity = Velocity(x = 0f, y = available.y)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetGesturesEnabled = true,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+        ) {
+            Text(
+                text = strings.notificationFilterFriends,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = strings.notificationFilterFriendsDescription,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (friends.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = strings.userCreatedEmpty,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .nestedScroll(listNestedScrollConnection),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    itemsIndexed(
+                        items = friends,
+                        key = { _, friend -> friend.userId },
+                    ) { index, friend ->
+                        if (index > 0) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                        FriendOverrideRow(
+                            name = friend.displayName,
+                            override = overrides[friend.userId],
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        ) { next -> onChange(friend.userId, next) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** 单个好友是三态：跟随分组、始终提醒、始终不提醒。 */
 @Composable
-private fun FriendOverrideRow(name: String, override: Boolean?, onChange: (Boolean?) -> Unit) {
+private fun FriendOverrideRow(
+    name: String,
+    override: Boolean?,
+    modifier: Modifier = Modifier,
+    onChange: (Boolean?) -> Unit,
+) {
+    val options = listOf(
+        null to strings.notificationOverrideFollowGroupShort,
+        true to strings.notificationOverrideAlwaysShort,
+        false to strings.notificationOverrideNeverShort,
+    )
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -369,20 +527,18 @@ private fun FriendOverrideRow(name: String, override: Boolean?, onChange: (Boole
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium,
         )
-        FilterChip(
-            selected = override == null,
-            onClick = { onChange(null) },
-            label = { Text(strings.notificationOverrideFollowGroup) },
-        )
-        FilterChip(
-            selected = override == true,
-            onClick = { onChange(true) },
-            label = { Text(strings.notificationOverrideAlways) },
-        )
-        FilterChip(
-            selected = override == false,
-            onClick = { onChange(false) },
-            label = { Text(strings.notificationOverrideNever) },
-        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.width(210.dp)) {
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = value == override,
+                    onClick = { onChange(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    icon = {},
+                ) {
+                    Text(label, maxLines = 1)
+                }
+            }
+        }
     }
 }
