@@ -97,6 +97,8 @@ sealed class LocaleStrings {
     open val notificationSectionBackground: String = "Background"
     open val notificationBackgroundDescription: String =
         "Keeps monitoring friend activity while the app is in the background"
+    open val notificationBackgroundVendorGuide: String =
+        "Some vendor systems also require background activity permission. On HarmonyOS 4.2: Settings > Apps & services > Apps > VRCM > Power usage details > Launch settings; turn off Manage automatically, then turn on Allow background activity."
     open val profileFriendRequestSent: String = "Friend Request Sent"
     open val profileSendFriendRequest: String = "Send Friend Request"
     open val profileFriendRequestDeleted: String = "Friend Request Deleted"

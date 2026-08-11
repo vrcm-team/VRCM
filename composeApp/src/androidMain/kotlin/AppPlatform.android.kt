@@ -45,6 +45,17 @@ class AndroidAppPlatform(val context: Context, private val logger: Logger) : App
         }
     }
 
+    override fun resetBackgroundFriendMonitoringTimer() {
+        val intent = Intent(context, FriendActivityForegroundService::class.java)
+            .setAction(FriendActivityForegroundService.ACTION_RESET_MONITORING_TIMER)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
+            else context.startService(intent)
+        }.onFailure {
+            logger.error("Failed to reset background monitoring timer: ${it.message.orEmpty()}")
+        }
+    }
+
     override val supportsBatteryOptimizationSettings = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
 
     override fun isIgnoringBatteryOptimizations(): Boolean =

@@ -82,6 +82,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val notificationGroupAnnouncementDescription = "已加入的群组发布公告时提醒"
     override val notificationSectionBackground = "后台"
     override val notificationBackgroundDescription = "应用退到后台后继续监测好友动态"
+    override val notificationBackgroundVendorGuide =
+        "部分厂商系统还需单独允许后台活动。鸿蒙 4.2：打开“设置 > 应用与服务 > 应用管理 > VRCM > 耗电详细 > 启动管理”，关闭自动管理，再开启允许后台活动。"
     override val profileFriendRequestSent = "已发送好友请求"
     override val profileSendFriendRequest = "发送好友请求"
     override val profileFriendRequestDeleted = "已取消好友请求"

@@ -22,9 +22,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.koin.core.logger.Logger
 
-/** Sends opt-in Android alerts only for favorited friends entering or leaving the game. */
+/** Sends opt-in friend presence and inbox alerts for the active account. */
 class FriendOnlineNotificationService(
     private val favoriteService: FavoriteService,
     private val notificationApi: NotificationApi,
@@ -33,6 +35,7 @@ class FriendOnlineNotificationService(
     private val notifier: FriendOnlineNotifier,
     private val usersApi: UsersApi,
     private val logger: Logger,
+    private val json: Json,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
@@ -100,9 +103,55 @@ class FriendOnlineNotificationService(
                 if (event.event.type == NotificationEvents.Notification.typeName &&
                     SharedFlowCentre.isCurrentSession(event.token)
                 ) {
-                    refreshInboxNotifications(event.token)
+                    handleRealtimeInboxNotification(event.token, event.event.content)
                 }
             }
+        }
+    }
+
+    private suspend fun handleRealtimeInboxNotification(
+        token: AccountSessionToken,
+        content: String,
+    ) {
+        if (!SharedFlowCentre.isCurrentSession(token)) return
+        val notification = try {
+            decodeRealtimeInboxNotification(json, content)
+        } catch (error: Exception) {
+            logger.warn("Unable to decode real-time notification: ${error.message.orEmpty()}")
+            return
+        }
+        val unseen = mutex.withLock {
+            activeToken == token &&
+                SharedFlowCentre.isCurrentSession(token) &&
+                knownNotificationIds.add(notification.id)
+        }
+        if (!unseen) return
+
+        when (
+            val alert = notification.resolveAlert(
+                boopEnabled = settingsDao.boopNotificationsEnabled,
+                friendRequestEnabled = settingsDao.friendRequestNotificationsEnabled,
+                groupAnnouncementEnabled = settingsDao.groupAnnouncementNotificationsEnabled,
+            )
+        ) {
+            is RealtimeInboxAlert.Boop -> notifier.notifyBoop(
+                alert.id,
+                alert.sender,
+                alert.emojiId,
+            )
+
+            is RealtimeInboxAlert.FriendRequest -> notifier.notifyFriendRequest(
+                alert.id,
+                alert.sender,
+            )
+
+            is RealtimeInboxAlert.GroupAnnouncement -> notifier.notifyGroupAnnouncement(
+                alert.id,
+                alert.groupName,
+                alert.title,
+            )
+
+            null -> Unit
         }
     }
 
@@ -250,5 +299,70 @@ class FriendOnlineNotificationService(
 
         /** VRChat 把群组类通知统一放在 group. 前缀下，公告是其中的 group.announcement。 */
         const val GROUP_ANNOUNCEMENT_TYPE_PREFIX = "group.announcement"
+    }
+}
+
+/** Minimal payload carried by a pipeline `notification` event. */
+@Serializable
+internal data class RealtimeInboxNotification(
+    val id: String,
+    val type: String,
+    val senderUserId: String? = null,
+    val senderUsername: String? = null,
+    val title: String? = null,
+    val message: String = "",
+    val data: NotificationData.Data? = null,
+    val details: NotificationData.Data? = null,
+)
+
+internal sealed interface RealtimeInboxAlert {
+    val id: String
+
+    data class Boop(
+        override val id: String,
+        val sender: String,
+        val emojiId: String?,
+    ) : RealtimeInboxAlert
+
+    data class FriendRequest(
+        override val id: String,
+        val sender: String,
+    ) : RealtimeInboxAlert
+
+    data class GroupAnnouncement(
+        override val id: String,
+        val groupName: String,
+        val title: String,
+    ) : RealtimeInboxAlert
+}
+
+internal fun decodeRealtimeInboxNotification(json: Json, content: String): RealtimeInboxNotification =
+    json.decodeFromString(content)
+
+internal fun RealtimeInboxNotification.resolveAlert(
+    boopEnabled: Boolean,
+    friendRequestEnabled: Boolean,
+    groupAnnouncementEnabled: Boolean,
+): RealtimeInboxAlert? {
+    val sender = senderUsername?.takeIf(String::isNotBlank)
+        ?: senderUserId?.takeIf(String::isNotBlank)
+        ?: "Unknown"
+    return when {
+        type.equals("boop", ignoreCase = true) && boopEnabled ->
+            RealtimeInboxAlert.Boop(id, sender, details?.emojiId ?: data?.emojiId)
+
+        type.equals(NotificationType.FriendRequest.value, ignoreCase = true) && friendRequestEnabled ->
+            RealtimeInboxAlert.FriendRequest(id, sender)
+
+        type.startsWith("group.announcement", ignoreCase = true) && groupAnnouncementEnabled -> {
+            val announcement = details ?: data
+            RealtimeInboxAlert.GroupAnnouncement(
+                id = id,
+                groupName = announcement?.groupName ?: title.orEmpty(),
+                title = announcement?.announcementTitle ?: message,
+            )
+        }
+
+        else -> null
     }
 }

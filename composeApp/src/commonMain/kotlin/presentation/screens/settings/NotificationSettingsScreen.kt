@@ -100,7 +100,8 @@ object NotificationSettingsScreen : AppDetailRoute {
                     SectionTitle(strings.notificationSectionFriendPresence)
                 }
                 item {
-                    SettingsSwitchRow(
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
                         title = strings.stettingFriendPresenceNotifications,
                         description = strings.notificationOnlineDescription,
                         checked = currentSettings.friendPresenceNotificationsEnabled,
@@ -109,7 +110,8 @@ object NotificationSettingsScreen : AppDetailRoute {
                     }
                 }
                 item {
-                    SettingsSwitchRow(
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
                         title = strings.notificationFriendOffline,
                         description = strings.notificationOfflineDescription,
                         checked = currentSettings.friendOfflineNotificationsEnabled,
@@ -195,21 +197,24 @@ object NotificationSettingsScreen : AppDetailRoute {
                 item { HorizontalDivider() }
                 item { SectionTitle(strings.notificationSectionInbox) }
                 item {
-                    SettingsSwitchRow(
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
                         title = strings.stettingBoopNotifications,
                         description = strings.notificationBoopDescription,
                         checked = currentSettings.boopNotificationsEnabled,
                     ) { currentSettings = currentSettings.copy(boopNotificationsEnabled = it) }
                 }
                 item {
-                    SettingsSwitchRow(
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
                         title = strings.notificationFriendRequestAlert,
                         description = strings.notificationFriendRequestAlertDescription,
                         checked = currentSettings.friendRequestNotificationsEnabled,
                     ) { currentSettings = currentSettings.copy(friendRequestNotificationsEnabled = it) }
                 }
                 item {
-                    SettingsSwitchRow(
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
                         title = strings.notificationGroupAnnouncement,
                         description = strings.notificationGroupAnnouncementDescription,
                         checked = currentSettings.groupAnnouncementNotificationsEnabled,
@@ -293,6 +298,11 @@ private fun BackgroundMonitoringSection(platform: AppPlatform) {
                             onAction = platform::openBatteryOptimizationSettings,
                         )
                     }
+                    Text(
+                        text = strings.notificationBackgroundVendorGuide,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -351,6 +361,38 @@ private fun SettingsSwitchRow(
             }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun NotificationPermissionSwitchRow(
+    platform: AppPlatform,
+    title: String,
+    description: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val permissionRequiredMessage = strings.stettingBackgroundPermissionRequired
+    val requestPermission = rememberNotificationPermissionRequester { granted ->
+        if (granted) {
+            onCheckedChange(true)
+        } else {
+            scope.launch {
+                SharedFlowCentre.toastText.emit(ToastText.Info(permissionRequiredMessage))
+            }
+        }
+    }
+    SettingsSwitchRow(
+        title = title,
+        description = description,
+        checked = checked,
+    ) { enabled ->
+        if (!enabled || platform.hasBackgroundFriendMonitoringPermission()) {
+            onCheckedChange(enabled)
+        } else {
+            requestPermission()
+        }
     }
 }
 

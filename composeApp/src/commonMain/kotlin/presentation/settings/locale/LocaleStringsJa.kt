@@ -83,6 +83,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val notificationGroupAnnouncementDescription = "参加中のグループがお知らせを投稿したときに通知します"
     override val notificationSectionBackground = "バックグラウンド"
     override val notificationBackgroundDescription = "アプリがバックグラウンドでもフレンドの動向を監視します"
+    override val notificationBackgroundVendorGuide =
+        "一部の端末では、バックグラウンド動作の追加許可が必要です。HarmonyOS 4.2 では「設定 > アプリとサービス > アプリ > VRCM > 電力消費の詳細 > 起動管理」を開き、自動管理を無効にしてからバックグラウンド動作を許可してください。"
     override val profileFriendRequestSent = "フレンドリクエストを送信しました"
     override val profileSendFriendRequest = "フレンドリクエストを送信"
     override val profileFriendRequestDeleted = "フレンドリクエストをキャンセルしました"

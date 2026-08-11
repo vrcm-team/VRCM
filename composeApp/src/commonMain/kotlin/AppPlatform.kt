@@ -15,6 +15,7 @@ interface AppPlatform : KoinComponent {
     fun openNotificationSettings() = Unit
     fun setBackgroundFriendMonitoringEnabled(enabled: Boolean): BackgroundFriendMonitoringResult =
         BackgroundFriendMonitoringResult.Unsupported
+    fun resetBackgroundFriendMonitoringTimer() = Unit
     val supportsBatteryOptimizationSettings: Boolean get() = false
     fun isIgnoringBatteryOptimizations(): Boolean = true
     fun openBatteryOptimizationSettings() = Unit

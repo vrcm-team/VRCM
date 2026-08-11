@@ -82,6 +82,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val notificationGroupAnnouncementDescription = "已加入的群組發布公告時提醒"
     override val notificationSectionBackground = "背景"
     override val notificationBackgroundDescription = "應用退到背景後繼續監測好友動態"
+    override val notificationBackgroundVendorGuide =
+        "部分廠商系統還需另外允許背景活動。HarmonyOS 4.2：開啟「設定 > 應用程式與服務 > 應用程式管理 > VRCM > 耗電詳細資料 > 啟動管理」，關閉自動管理，再開啟允許背景活動。"
     override val profileFriendRequestSent = "已發送好友請求"
     override val profileSendFriendRequest = "發送好友請求"
     override val profileFriendRequestDeleted = "已取消好友請求"
