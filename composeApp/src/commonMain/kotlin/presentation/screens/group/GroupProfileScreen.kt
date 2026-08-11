@@ -41,8 +41,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -91,7 +91,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDial
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
-import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlRow
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlCopyButton
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.TextChip
@@ -114,7 +114,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
-import presentation.compoments.topMenuActionColors
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -170,18 +169,6 @@ class GroupProfileScreen(
                 }
                 val topBarHeight = 64.dp
                 val sysTopPadding = getInsetPadding(WindowInsets::getTop)
-                val refreshActionColors = topMenuActionColors(
-                    ratio = ratio,
-                    onPrimary = MaterialTheme.colorScheme.onPrimary,
-                    primary = MaterialTheme.colorScheme.primary,
-                    primaryContainer = MaterialTheme.colorScheme.primaryContainer,
-                )
-                val refreshButtonColors = IconButtonColors(
-                    containerColor = refreshActionColors.container,
-                    contentColor = refreshActionColors.content,
-                    disabledContainerColor = refreshActionColors.container,
-                    disabledContentColor = refreshActionColors.content,
-                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -243,35 +230,32 @@ class GroupProfileScreen(
                         offsetDp = 0.dp,
                         ratio = ratio,
                         onReturn = { currentNavigator.pop() },
-                        onMenu = null
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(topBarHeight + sysTopPadding)
-                            .padding(top = sysTopPadding, end = 10.dp),
-                        contentAlignment = Alignment.CenterEnd,
-                    ) {
-                        IconButton(
-                            enabled = !isLoading,
-                            colors = refreshButtonColors,
-                            onClick = screenModel::refreshGroupData,
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(22.dp),
-                                    color = refreshActionColors.content,
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh",
-                                    tint = refreshActionColors.content,
-                                )
+                        onMenu = null,
+                        actions = { colors ->
+                            OfficialUrlCopyButton(
+                                url = "https://vrchat.com/home/group/${group.groupId}",
+                                colors = colors,
+                            )
+                            IconButton(
+                                enabled = !isLoading,
+                                colors = colors,
+                                onClick = screenModel::refreshGroupData,
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(22.dp),
+                                        color = LocalContentColor.current,
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refresh",
+                                    )
+                                }
                             }
-                        }
-                    }
+                        },
+                    )
                     CollapsingTitleRow(
                         group = group,
                         membershipStatus = group.membershipStatus,
@@ -418,11 +402,15 @@ private fun CollapsingTitleRow(
     val statusAlpha = 1f - progress
     val statusText = membershipStatus.lowercase()
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(bannerHeight)
     ) {
+        val trailingActionsWidth = 112.dp * progress
+        val nameMaxWidth = (
+            maxWidth - 16.dp - xShift - iconSize - rowSpacing - trailingActionsWidth
+        ).coerceAtLeast(32.dp)
         Row(
             modifier = Modifier
                 .padding(start = 16.dp)
@@ -452,7 +440,7 @@ private fun CollapsingTitleRow(
                     modifier = Modifier.sharedBoundsBy(
                         key = groupNameSharedKey(group.groupId),
                         resizeMode = SharedTextBoundsResizeMode,
-                    ),
+                    ).widthIn(max = nameMaxWidth),
                     text = group.name.ifBlank { strings.unknown },
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -549,7 +537,10 @@ private fun DetailsContent(group: GroupProfileVo, owner: UserData?, instances: L
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        SectionCard(title = strings.groupTabDetails, modifier = Modifier.fillMaxWidth()) {
+        SectionCard(
+            title = strings.groupTabDetails,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
 
             val detailItems = listOf(
                 strings.groupPrivacy to group.privacy,
@@ -580,14 +571,7 @@ private fun DetailsContent(group: GroupProfileVo, owner: UserData?, instances: L
                         )
                     }
                 }
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
             }
-            OfficialUrlRow(
-                url = "https://vrchat.com/home/group/${group.groupId}",
-                containerColor = Color.Transparent,
-            )
         }
         if (group.badges.isNotEmpty()) {
             ChipSection(title = strings.groupBadges, items = group.badges)

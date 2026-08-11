@@ -43,7 +43,8 @@ fun TopMenuBar(
     ratio: Float,
     color: Color = MaterialTheme.colorScheme.onPrimary,
     onReturn: () -> Unit,
-    onMenu: (() -> Unit)?
+    onMenu: (() -> Unit)?,
+    actions: @Composable RowScope.(IconButtonColors) -> Unit = {},
 ) {
     // image上滑反比例
     val inverseRatio = 1 - ratio
@@ -73,8 +74,8 @@ fun TopMenuBar(
             val iconButtonColors = IconButtonColors(
                 containerColor = actionColors.container,
                 contentColor = actionColors.content,
-                disabledContainerColor = Color.Unspecified,
-                disabledContentColor = Color.Unspecified,
+                disabledContainerColor = actionColors.container,
+                disabledContentColor = actionColors.content,
             )
             IconButton(
                 modifier = Modifier
@@ -89,6 +90,12 @@ fun TopMenuBar(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.padding(end = if (onMenu == null) 10.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                actions(iconButtonColors)
+            }
             onMenu?.let {
                 IconButton(
                     modifier = Modifier

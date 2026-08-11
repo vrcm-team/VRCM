@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -162,6 +161,12 @@ data class UserProfileScreen(
                 onMenu = { bottomSheetIsVisible = true },
                 outerScrollState = outerScrollState,
                 innerScrollState = innerScrollState,
+                topBarActions = { colors ->
+                    OfficialUrlCopyButton(
+                        url = "https://vrchat.com/home/user/${currentUser.id}",
+                        colors = colors,
+                    )
+                },
             ) { _, contentMinHeight ->
                 ProfileContent(
                     currentUser = currentUser,
@@ -589,7 +594,6 @@ private fun ColumnScope.ProfileContent(
         bioMinHeight = contentMinHeight,
         userProfileVO = currentUser,
         latestBioChange = latestBioChange,
-        officialUrl = "https://vrchat.com/home/user/${currentUser.id}",
     )
 
     if (!currentUser.isSelf && friendActivitySummary != null) {
@@ -1457,7 +1461,6 @@ private fun BottomCardTab(
     bioMinHeight: Dp = 0.dp,
     userProfileVO: UserProfileVo,
     latestBioChange: FriendActivityEvent? = null,
-    officialUrl: String,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1521,14 +1524,6 @@ private fun BottomCardTab(
                                 }
                             }
                             Spacer(Modifier.weight(1f))
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                            )
-                            OfficialUrlRow(
-                                url = officialUrl,
-                                containerColor = Color.Transparent,
-                            )
                         }
                     }
                 }

@@ -103,6 +103,7 @@ internal class ProfileScrollToTopController(
  * @param onMenu 菜单按钮点击事件
  * @param outerScrollState 外层滚动状态（控制头部视差），可从外部传入以保存/恢复滚动位置
  * @param innerScrollState 内层滚动状态（控制卡片内容滚动），可从外部传入以保存/恢复滚动位置
+ * @param topBarActions 顶部栏右侧操作，复用顶部栏随滚动变化的按钮配色
  * @param content 详情页内容
  */
 @Composable
@@ -115,6 +116,7 @@ fun ProfileScaffold(
     onMenu:  (() -> Unit)? = null,
     outerScrollState: ScrollState = rememberScrollState(),
     innerScrollState: ScrollState = rememberScrollState(),
+    topBarActions: @Composable RowScope.(IconButtonColors) -> Unit = {},
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
     BoxWithConstraints {
@@ -190,7 +192,8 @@ fun ProfileScaffold(
                 offsetDp,
                 ratio,
                 onReturn = onReturn,
-                onMenu = onMenu
+                onMenu = onMenu,
+                actions = topBarActions,
             )
             // 用户icon
             ProfileIcon(

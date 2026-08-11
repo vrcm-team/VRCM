@@ -31,7 +31,7 @@ import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
-import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlRow
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlCopyButton
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
@@ -131,6 +131,12 @@ class AvatarProfileScreen(
                 iconUrl = displayedAvatar.avatarImageUrl,
                 sharedImageCacheKey = sharedImageCacheKey,
                 onReturn = { navigator.pop() },
+                topBarActions = { colors ->
+                    OfficialUrlCopyButton(
+                        url = "https://vrchat.com/home/avatar/${displayedAvatar.avatarId}",
+                        colors = colors,
+                    )
+                },
             ) { ratio, contentMinHeight ->
                 AvatarProfileContent(
                     avatarProfileVo = displayedAvatar,
@@ -264,9 +270,6 @@ private fun AvatarProfileContent(
         AvatarPlatformSection(knownPlatforms)
     }
 
-    OfficialUrlRow(
-        url = "https://vrchat.com/home/avatar/${avatarProfileVo.avatarId}",
-    )
 }
 
 @Composable

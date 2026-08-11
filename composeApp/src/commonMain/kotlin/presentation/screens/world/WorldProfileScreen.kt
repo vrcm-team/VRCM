@@ -74,7 +74,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
-import presentation.compoments.topMenuActionColors
 import kotlin.math.abs
 
 /**
@@ -218,6 +217,7 @@ class WorldProfileScreen(
 
             // ========== 顶部菜单栏 ==========
             RenderTopBar(
+                worldId = worldProfileVo.worldId,
                 worldName = worldProfileVo.worldName,
                 blurProgress = bottomSheetState.blurProgress,
                 topBarHeight = sizes.topBarHeight,
@@ -718,6 +718,7 @@ private fun ColumnScope.InfoArea(
  */
 @Composable
 private fun RenderTopBar(
+    worldId: String,
     worldName: String,
     blurProgress: Float,
     topBarHeight: Dp,
@@ -728,24 +729,13 @@ private fun RenderTopBar(
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val refreshActionColors = topMenuActionColors(
-            ratio = topBarRatio,
-            onPrimary = MaterialTheme.colorScheme.onPrimary,
-            primary = MaterialTheme.colorScheme.primary,
-            primaryContainer = MaterialTheme.colorScheme.primaryContainer,
-        )
-        val refreshButtonColors = IconButtonColors(
-            containerColor = refreshActionColors.container,
-            contentColor = refreshActionColors.content,
-            disabledContainerColor = refreshActionColors.container,
-            disabledContentColor = refreshActionColors.content,
-        )
+        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -755,35 +745,32 @@ private fun RenderTopBar(
             ratio = topBarRatio,
             color = MaterialTheme.colorScheme.surface,
             onReturn = onReturn,
-            onMenu = null
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(topBarHeight + sysTopPadding)
-                .padding(top = sysTopPadding, end = 10.dp),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            IconButton(
-                enabled = !isRefreshing,
-                colors = refreshButtonColors,
-                onClick = onRefresh,
-            ) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        color = refreshActionColors.content,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = refreshActionColors.content,
-                    )
+            onMenu = null,
+            actions = { colors ->
+                OfficialUrlCopyButton(
+                    url = "https://vrchat.com/home/world/$worldId",
+                    colors = colors,
+                )
+                IconButton(
+                    enabled = !isRefreshing,
+                    colors = colors,
+                    onClick = onRefresh,
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = LocalContentColor.current,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                        )
+                    }
                 }
-            }
-        }
+            },
+        )
         // 标题显示
         Box(
             modifier = Modifier
@@ -800,7 +787,7 @@ private fun RenderTopBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    modifier = Modifier.widthIn(max = 200.dp),
+                    modifier = Modifier.widthIn(max = titleMaxWidth),
                     text = worldName,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
@@ -980,9 +967,6 @@ private fun AppRoute.RenderBottomSheetContent(
                             }
                         }
                     }
-                    OfficialUrlRow(
-                        url = "https://vrchat.com/home/world/${worldProfileVo.worldId}",
-                    )
                 }
             }
 
