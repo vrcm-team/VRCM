@@ -2,8 +2,12 @@ package io.github.vrcmteam.vrcm.service
 
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketApi
 import io.github.vrcmteam.vrcm.presentation.notifications.FriendNotificationFactory
@@ -28,6 +32,14 @@ class FriendActivityForegroundService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var networkWakeLock: BackgroundNetworkWakeLock? = null
     private var monitoringStartedAtMillis = 0L
+    private var timerResetReceiverRegistered = false
+    private val timerResetReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ACTION_RESET_MONITORING_TIMER) return
+            monitoringStartedAtMillis = System.currentTimeMillis()
+            showMonitoringNotification()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -50,13 +62,17 @@ class FriendActivityForegroundService : Service() {
             }
         }
         scope.launch { SharedFlowCentre.logout.collect { stopSelf() } }
+        ContextCompat.registerReceiver(
+            this,
+            timerResetReceiver,
+            IntentFilter(ACTION_RESET_MONITORING_TIMER),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        timerResetReceiverRegistered = true
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_RESET_MONITORING_TIMER) {
-            monitoringStartedAtMillis = System.currentTimeMillis()
-            showMonitoringNotification()
-        } else if (intent?.action == ACTION_RESTORE_MONITOR_NOTIFICATION) {
+        if (intent?.action == ACTION_RESTORE_MONITOR_NOTIFICATION) {
             showMonitoringNotification()
         }
         return START_STICKY
@@ -69,6 +85,10 @@ class FriendActivityForegroundService : Service() {
             koin.get<FriendActivityService>().onBackgroundMonitoringStopped()
         }
         scope.cancel()
+        if (timerResetReceiverRegistered) {
+            unregisterReceiver(timerResetReceiver)
+            timerResetReceiverRegistered = false
+        }
         networkWakeLock?.close()
         networkWakeLock = null
         stopForeground(STOP_FOREGROUND_REMOVE)

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.scene.Scene
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.animations.AuthAnimeToHomeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.HomeToAuthAnimeTransition
 import io.github.vrcmteam.vrcm.presentation.animations.fadeScreenTransition
@@ -97,7 +98,9 @@ fun App(
                 friendActivityService.onAppResumed()
                 webSocketApi.onForeground()
                 friendLocationPagerModel.onForeground()
-                if (backgroundMonitoringEnabled.value) {
+                if (backgroundMonitoringEnabled.value &&
+                    SharedFlowCentre.currentSession.value != null
+                ) {
                     platform.resetBackgroundFriendMonitoringTimer()
                 }
             }
