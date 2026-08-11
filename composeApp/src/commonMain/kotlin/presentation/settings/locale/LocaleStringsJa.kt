@@ -297,6 +297,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val profileBoop = "Boop"
     override val profileBoopSuccess = "Boopを送信しました"
     override val profileBoopAlreadySent = "すでにBoopを送信しています"
+    override val profileBoopDisabled = "相手がBoopを無効にしているため、送信できません"
     override val boopSelectorTitle = "%name% に Boop"
     override val boopSend = "送信"
     override val boopEmojiDefault = "デフォルト"

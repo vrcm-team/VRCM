@@ -59,6 +59,18 @@ class UsersApiBoopTest {
         client.close()
     }
 
+    @Test
+    fun forbiddenRecipientIsRecognizedAsBoopDisabled() = runBlocking {
+        val client = boopClient { HttpStatusCode.Forbidden }
+
+        val error = assertFailsWith<VRCApiException> {
+            UsersApi(client).boop("usr_friend", emojiId = null)
+        }
+
+        assertTrue(error.isBoopDisabled())
+        client.close()
+    }
+
     private fun boopClient(status: (HttpRequestData) -> HttpStatusCode) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->

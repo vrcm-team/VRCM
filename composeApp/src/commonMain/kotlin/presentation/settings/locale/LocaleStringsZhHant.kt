@@ -296,6 +296,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val profileBoop = "戳一下"
     override val profileBoopSuccess = "已戳一下"
     override val profileBoopAlreadySent = "已經戳過了"
+    override val profileBoopDisabled = "對方已關閉戳一戳功能，暫時無法傳送"
     override val boopSelectorTitle = "戳一下 %name%"
     override val boopSend = "傳送"
     override val boopEmojiDefault = "預設"

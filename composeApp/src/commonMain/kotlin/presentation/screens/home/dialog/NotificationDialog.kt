@@ -40,6 +40,9 @@ import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -64,15 +67,33 @@ object NotificationDialog : SharedDialog {
                     .sortedByDescending { it.createdAt }
             }
         }
+        var boopReply by remember { mutableStateOf<BoopReply?>(null) }
         val boopSuccessMessage = strings.profileBoopSuccess
         val boopAlreadySentMessage = strings.profileBoopAlreadySent
+        val boopDisabledMessage = strings.profileBoopDisabled
         val onResponseNotification: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, response ->
-            homeScreenModel.responseAllNotification(
-                item = item,
-                action = response,
-                boopSuccessMessage = boopSuccessMessage,
-                boopAlreadySentMessage = boopAlreadySentMessage,
-            )
+            if (item.responseTarget(response) == NotificationResponseTarget.BOOP_USER_API) {
+                boopReply = BoopReply(item, response)
+            } else {
+                homeScreenModel.responseAllNotification(
+                    item = item,
+                    action = response,
+                    boopSuccessMessage = boopSuccessMessage,
+                    boopAlreadySentMessage = boopAlreadySentMessage,
+                    boopDisabledMessage = boopDisabledMessage,
+                )
+            }
+        }
+
+        val currentBoopReply = boopReply
+        val boopReplySending = currentBoopReply?.let {
+            homeScreenModel.pendingNotificationActions[it.item.id] == it.action
+        } == true
+        val boopReplyStillExists = currentBoopReply?.let { reply ->
+            notifications.any { it.id == reply.item.id }
+        } ?: true
+        LaunchedEffect(currentBoopReply?.item?.id, boopReplyStillExists) {
+            if (currentBoopReply != null && !boopReplyStillExists) boopReply = null
         }
 
         SharedDialogContainer {
@@ -99,8 +120,32 @@ object NotificationDialog : SharedDialog {
                 }
             }
         }
+        BoopSelectorDialog(
+            visible = currentBoopReply != null,
+            targetName = currentBoopReply?.item?.title
+                ?: currentBoopReply?.item?.message.orEmpty(),
+            sending = boopReplySending,
+            onDismiss = { boopReply = null },
+            onSend = { emojiId ->
+                currentBoopReply?.let { reply ->
+                    homeScreenModel.responseAllNotification(
+                        item = reply.item,
+                        action = reply.action,
+                        boopEmojiId = emojiId,
+                        boopSuccessMessage = boopSuccessMessage,
+                        boopAlreadySentMessage = boopAlreadySentMessage,
+                        boopDisabledMessage = boopDisabledMessage,
+                    )
+                }
+            },
+        )
     }
 }
+
+private data class BoopReply(
+    val item: NotificationItemData,
+    val action: NotificationItemData.ActionData,
+)
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable

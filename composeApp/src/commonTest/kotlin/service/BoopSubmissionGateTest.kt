@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -48,6 +49,31 @@ class BoopSubmissionGateTest {
             )
 
             assertEquals(BoopResult.SessionChanged, send.await())
+        } finally {
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
+    fun forbiddenRecipientMapsToDisabledResult() = runTest {
+        val request = ControlledBoopRequest()
+        try {
+            SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_a"))
+            val send = async(start = CoroutineStart.UNDISPATCHED) {
+                BoopService(request).send("usr_friend")
+            }
+            val capturedToken = request.started.await()
+
+            request.complete(
+                AuthenticatedBoopResponse(
+                    response = Result.failure(
+                        VRCApiException("Forbidden", 403, "Boops are disabled"),
+                    ),
+                    sessionToken = capturedToken,
+                ),
+            )
+
+            assertEquals(BoopResult.Disabled, send.await())
         } finally {
             SharedFlowCentre.emitLogout()
         }

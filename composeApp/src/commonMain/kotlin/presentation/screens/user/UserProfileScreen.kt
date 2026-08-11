@@ -247,6 +247,7 @@ data class UserProfileScreen(
         )
         val boopSuccessMessage = strings.profileBoopSuccess
         val boopCooldownMessage = strings.profileBoopAlreadySent
+        val boopDisabledMessage = strings.profileBoopDisabled
         BoopSelectorDialog(
             visible = openBoopDialog,
             targetName = currentUser.displayName,
@@ -261,6 +262,7 @@ data class UserProfileScreen(
                             emojiId = emojiId,
                             successMessage = boopSuccessMessage,
                             cooldownMessage = boopCooldownMessage,
+                            disabledMessage = boopDisabledMessage,
                         )
                         boopSending = false
                         if (result == BoopResult.Sent) openBoopDialog = false

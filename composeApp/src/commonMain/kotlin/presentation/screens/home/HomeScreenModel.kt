@@ -159,8 +159,10 @@ class HomeScreenModel(
     fun responseAllNotification(
         item: NotificationItemData,
         action: NotificationItemData.ActionData,
+        boopEmojiId: String? = null,
         boopSuccessMessage: String,
         boopAlreadySentMessage: String,
+        boopDisabledMessage: String,
     ) {
         if (_pendingNotificationActions.value.containsKey(item.id)) return
         _pendingNotificationActions.value += item.id to action
@@ -172,7 +174,14 @@ class HomeScreenModel(
                     finishNotificationAction(item.id)
                     return
                 }
-                boopUser(item.id, senderId, boopSuccessMessage, boopAlreadySentMessage)
+                boopUser(
+                    notificationId = item.id,
+                    userId = senderId,
+                    emojiId = boopEmojiId,
+                    successMessage = boopSuccessMessage,
+                    alreadySentMessage = boopAlreadySentMessage,
+                    disabledMessage = boopDisabledMessage,
+                )
                 return
             }
             NotificationResponseTarget.NOTIFICATION_API -> Unit
@@ -210,12 +219,14 @@ class HomeScreenModel(
     private fun boopUser(
         notificationId: String,
         userId: String,
+        emojiId: String?,
         successMessage: String,
         alreadySentMessage: String,
+        disabledMessage: String,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                when (val result = boopService.send(userId)) {
+                when (val result = boopService.send(userId, emojiId)) {
                     BoopResult.Sent -> {
                         _notifications.value = _notifications.value.filterNot { it.id == notificationId }
                         authService.reTryAuthCatching { notificationApi.deleteNotification(notificationId) }
@@ -224,6 +235,9 @@ class HomeScreenModel(
                     }
                     BoopResult.Cooldown -> {
                         SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
+                    }
+                    BoopResult.Disabled -> {
+                        SharedFlowCentre.toastText.emit(ToastText.Error(disabledMessage))
                     }
                     is BoopResult.Failed -> Result.failure<Unit>(result.error).onHomeFailure()
                     BoopResult.InFlight, BoopResult.SessionChanged -> Unit

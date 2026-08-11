@@ -643,12 +643,16 @@ class UserProfileScreenModel(
         emojiId: String?,
         successMessage: String,
         cooldownMessage: String,
+        disabledMessage: String,
     ): BoopResult = when (val result = boopService.send(userId, emojiId)) {
         BoopResult.Sent -> result.also {
             SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
         }
         BoopResult.Cooldown -> result.also {
             SharedFlowCentre.toastText.emit(ToastText.Info(cooldownMessage))
+        }
+        BoopResult.Disabled -> result.also {
+            SharedFlowCentre.toastText.emit(ToastText.Error(disabledMessage))
         }
         is BoopResult.Failed -> result.also { handleError(it.error) }
         BoopResult.InFlight, BoopResult.SessionChanged -> result

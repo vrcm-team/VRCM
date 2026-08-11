@@ -312,6 +312,7 @@ sealed class LocaleStrings {
     open val profileBoop: String = "Boop"
     open val profileBoopSuccess: String = "Boop sent"
     open val profileBoopAlreadySent: String = "Already booped"
+    open val profileBoopDisabled: String = "This user has turned off Boops"
     open val boopSelectorTitle: String = "Boop %name%"
     open val boopSend: String = "Send"
     open val boopEmojiDefault: String = "Default"

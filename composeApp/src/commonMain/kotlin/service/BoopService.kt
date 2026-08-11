@@ -5,12 +5,14 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.isBoopCooldown
+import io.github.vrcmteam.vrcm.network.api.users.isBoopDisabled
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 
 sealed interface BoopResult {
     data object Sent : BoopResult
     data object Cooldown : BoopResult
+    data object Disabled : BoopResult
     data object InFlight : BoopResult
     data object SessionChanged : BoopResult
     data class Failed(val error: Throwable) : BoopResult
@@ -79,24 +81,23 @@ class BoopService internal constructor(private val request: BoopRequest) {
                 return BoopResult.SessionChanged
             }
             response.response.fold(
-                    onSuccess = { response ->
-                        response.toResult().fold(
-                            onSuccess = { BoopResult.Sent },
-                            onFailure = { error ->
-                                if (error.isBoopCooldown()) BoopResult.Cooldown else BoopResult.Failed(error)
-                            },
-                        )
-                    },
-                    onFailure = { error ->
-                        when {
-                            error === BoopSessionChangedException -> BoopResult.SessionChanged
-                            error.isBoopCooldown() -> BoopResult.Cooldown
-                            else -> BoopResult.Failed(error)
-                        }
-                    },
-                )
+                onSuccess = { response ->
+                    response.toResult().fold(
+                        onSuccess = { BoopResult.Sent },
+                        onFailure = { error -> error.toBoopResult() },
+                    )
+                },
+                onFailure = { error -> error.toBoopResult() },
+            )
         } finally {
             submissionGate.finish(userId)
         }
     }
+}
+
+private fun Throwable.toBoopResult(): BoopResult = when {
+    this === BoopSessionChangedException -> BoopResult.SessionChanged
+    isBoopCooldown() -> BoopResult.Cooldown
+    isBoopDisabled() -> BoopResult.Disabled
+    else -> BoopResult.Failed(this)
 }

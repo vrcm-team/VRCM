@@ -17,6 +17,7 @@ class LocaleActionMessagesTest {
             val messages = listOf(
                 locale.retry,
                 locale.profileBoopSuccess,
+                locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
             )
