@@ -54,11 +54,10 @@ internal class FriendPresenceTracker {
         (knownPresence.keys + friends.keys).forEach { id ->
             val friend = friends[id]
             if (friend == null) {
-                val previous = knownPresence.remove(id)
-                val displayName = names.remove(id) ?: id
-                if (previous == true) {
-                    add(FriendPresenceTransition(id, displayName, false, null))
-                }
+                // Real offline updates retain the friend with an offline location. A missing entry
+                // means the friendship was removed, so only discard its tracking baseline.
+                knownPresence.remove(id)
+                names.remove(id)
                 return@forEach
             }
             val now = isInGameLocation(friend.location)

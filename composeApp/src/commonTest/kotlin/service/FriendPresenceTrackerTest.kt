@@ -80,6 +80,27 @@ class FriendPresenceTrackerTest {
         assertEquals(listOf(ungroupedUserId), blacklistAlerts.map { it.userId })
     }
 
+    @Test
+    fun removedOnlineFriendDoesNotEmitOfflineButLocationChangeDoes() {
+        val tracker = FriendPresenceTracker()
+        val removedUserId = "usr_removed"
+        val offlineUserId = "usr_offline"
+        tracker.observe(
+            mapOf(
+                removedUserId to friend(removedUserId, location = "wrld_world:instance_a"),
+                offlineUserId to friend(offlineUserId, location = "wrld_world:instance_b"),
+            )
+        )
+
+        val transitions = tracker.observe(
+            mapOf(offlineUserId to friend(offlineUserId, location = "offline"))
+        )
+
+        assertEquals(1, transitions.size)
+        assertEquals(offlineUserId, transitions.single().userId)
+        assertEquals(false, transitions.single().inGame)
+    }
+
     private fun friend(
         userId: String = "usr_friend",
         location: String,
