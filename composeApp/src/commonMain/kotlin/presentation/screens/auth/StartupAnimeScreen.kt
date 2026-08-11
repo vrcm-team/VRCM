@@ -89,7 +89,6 @@ fun VersionDialog() {
     UpdateDialog(
         version = version,
         onDismissRequest = {
-            versionService.dismissVersionForSession(version.tagName)
             version = VersionVo()
         },
         onRememberVersion = versionService::rememberVersion
