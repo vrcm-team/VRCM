@@ -153,7 +153,10 @@ fun ProfileScaffold(
             }
         Surface(
             Modifier
-                .verticalScroll(scrollState)
+                .verticalScroll(
+                    state = scrollState,
+                    enabled = innerScrollState.value == 0,
+                )
                 .height(imageHeight + maxHeight)
                 .fillMaxWidth(),
             contentColor = MaterialTheme.colorScheme.primary
