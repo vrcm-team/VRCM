@@ -66,13 +66,11 @@ import org.koin.compose.koinInject
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun App(
-    isConfigurationChange: () -> Boolean = { false },
     windowChrome: @Composable () -> Unit = {},
     officialLinkInbox: OfficialLinkInbox? = null,
 ) {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
-    val lifecycleEventGate = remember { AppLifecycleEventGate() }
     val activeOfficialLinkInbox = remember(officialLinkInbox) {
         officialLinkInbox ?: OfficialLinkInbox()
     }
@@ -84,18 +82,14 @@ fun App(
             friendActivityService.onAppResumed()
         }
         LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-            if (lifecycleEventGate.onStop(isConfigurationChange())) {
-                friendLocationPagerModel.onBackground()
-                webSocketApi.onBackground()
-                friendActivityService.onAppStopped()
-            }
+            friendLocationPagerModel.onBackground()
+            webSocketApi.onBackground()
+            friendActivityService.onAppStopped()
         }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-            if (lifecycleEventGate.onResume()) {
-                friendActivityService.onAppResumed()
-                webSocketApi.onForeground()
-                friendLocationPagerModel.onForeground()
-            }
+            friendActivityService.onAppResumed()
+            webSocketApi.onForeground()
+            friendLocationPagerModel.onForeground()
         }
         SettingsProvider {
             Column(Modifier.fillMaxSize()) {

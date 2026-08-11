@@ -22,7 +22,6 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             App(
-                isConfigurationChange = { isChangingConfigurations },
                 officialLinkInbox = officialLinkInbox,
             )
         }

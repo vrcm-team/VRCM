@@ -18,6 +18,7 @@ package io.github.vrcmteam.vrcm.presentation.navigation
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
@@ -43,6 +44,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntRect
+import androidx.window.core.layout.WindowSizeClass
+import androidx.window.core.layout.computeWindowSizeClass
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
@@ -52,6 +55,7 @@ import androidx.navigationevent.NavigationEventTransitionState
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import io.github.vrcmteam.vrcm.presentation.animations.defaultSpring
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
 
 private val PaneBoundsAnimationSpec = defaultSpring(
     visibilityThreshold = IntRect(1, 1, 1, 1),
@@ -63,7 +67,7 @@ internal val LocalPaneSharedTransitionsEnabled = staticCompositionLocalOf { true
 @Composable
 internal fun <T : Any> rememberAppListDetailSceneStrategy(
     backNavigationBehavior: BackNavigationBehavior = BackNavigationBehavior.PopLatest,
-    directive: PaneScaffoldDirective = calculatePaneScaffoldDirective(currentWindowAdaptiveInfo()),
+    directive: PaneScaffoldDirective = currentAppPaneScaffoldDirective(),
     adaptStrategies: ThreePaneScaffoldAdaptStrategies =
         ListDetailPaneScaffoldDefaults.adaptStrategies(),
     paneExpansionDragHandle: (@Composable ThreePaneScaffoldScope.(PaneExpansionState) -> Unit)? =
@@ -85,6 +89,23 @@ internal fun <T : Any> rememberAppListDetailSceneStrategy(
             paneExpansionState = paneExpansionState,
         )
     }
+
+@Composable
+@ExperimentalMaterial3AdaptiveApi
+private fun currentAppPaneScaffoldDirective(): PaneScaffoldDirective {
+    val contentSize = LocalAppContentSize.current
+    val windowPosture = currentWindowAdaptiveInfo().windowPosture
+    val windowSizeClass = WindowSizeClass.BREAKPOINTS_V1.computeWindowSizeClass(
+        widthDp = contentSize.width.value,
+        heightDp = contentSize.height.value,
+    )
+    return calculatePaneScaffoldDirective(
+        WindowAdaptiveInfo(
+            windowSizeClass = windowSizeClass,
+            windowPosture = windowPosture,
+        )
+    )
+}
 
 @ExperimentalMaterial3AdaptiveApi
 internal class AppListDetailSceneStrategy<T : Any>(

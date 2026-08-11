@@ -13,16 +13,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
@@ -107,15 +113,17 @@ class SharedTransitionScreenAdaptiveTest {
     }
 
     @Test
-    fun expandedListAndDetailDoNotReceiveScreenSharedTransitionScope() = runComposeUiTest {
+    fun listAndDetailReturnToSinglePaneWhenContentWidthBecomesCompact() = runComposeUiTest {
         val navigator = AppNavigator(
             mutableStateListOf<AppRoute>(TestListRoute, TestDetailRoute),
         )
+        var contentSize by mutableStateOf(DpSize(1_200.dp, 800.dp))
 
         setContent {
             MaterialTheme {
                 CompositionLocalProvider(
                     LocalBackNavigationPolicy provides BackNavigationPolicy(),
+                    LocalAppContentSize provides contentSize,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         SharedTransitionScreen(
@@ -137,6 +145,16 @@ class SharedTransitionScreenAdaptiveTest {
         listOf(TestListRoute, TestDetailRoute).forEach { route ->
             onNodeWithText("${route.key}:false").fetchSemanticsNode()
         }
+
+        runOnUiThread {
+            contentSize = DpSize(360.dp, 800.dp)
+        }
+        waitForIdle()
+
+        assertTrue(
+            onAllNodesWithText("${TestListRoute.key}:false").fetchSemanticsNodes().isEmpty()
+        )
+        onNodeWithText("${TestDetailRoute.key}:true").fetchSemanticsNode()
     }
 
     @Test
