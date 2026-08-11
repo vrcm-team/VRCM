@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.serialization.Serializable
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -166,6 +167,22 @@ class WorldProfileScreen(
             // ========== BottomSheet状态管理 ==========
             var sheetState by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(SheetState.HALF_EXPANDED) }
             var dragOffset by remember { mutableStateOf(0f) }
+            val collapseExpandedInstances = {
+                sheetState = SheetState.HALF_EXPANDED
+                dragOffset = 0f
+            }
+            val handleReturn = {
+                if (sheetState == SheetState.EXPANDED) {
+                    collapseExpandedInstances()
+                } else {
+                    onReturn()
+                }
+            }
+
+            HandleBackNavigation(
+                enabled = sheetState == SheetState.EXPANDED,
+                onBack = collapseExpandedInstances,
+            )
 
             // 计算目标高度和当前高度
             val bottomSheetState = calculateBottomSheetState(
@@ -205,7 +222,7 @@ class WorldProfileScreen(
                 blurProgress = bottomSheetState.blurProgress,
                 topBarHeight = sizes.topBarHeight,
                 sysTopPadding = sizes.sysTopPadding,
-                onReturn = onReturn,
+                onReturn = handleReturn,
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
