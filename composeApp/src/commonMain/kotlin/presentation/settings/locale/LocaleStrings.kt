@@ -62,6 +62,7 @@ sealed class LocaleStrings {
     open val stettingBackgroundNotifications: String = "Notifications"
     open val stettingBackgroundBattery: String = "Battery"
     open val stettingNotificationSettings: String = "Notification settings"
+    open val stettingAppManagement: String = "App settings"
     open val stettingBatterySettings: String = "Battery settings"
     open val stettingStatusEnabled: String = "Enabled"
     open val stettingStatusDisabled: String = "Disabled"
@@ -87,6 +88,9 @@ sealed class LocaleStrings {
     open val notificationOverrideFollowGroup: String = "Follow group"
     open val notificationOverrideAlways: String = "Always"
     open val notificationOverrideNever: String = "Never"
+    open val notificationOverrideFollowGroupShort: String = "Group"
+    open val notificationOverrideAlwaysShort: String = "Alert"
+    open val notificationOverrideNeverShort: String = "Mute"
     open val notificationSectionInbox: String = "Inbox"
     open val notificationBoopDescription: String = "Alerts for every Boop you receive"
     open val notificationFriendRequestAlert: String = "Friend requests"
@@ -97,8 +101,6 @@ sealed class LocaleStrings {
     open val notificationSectionBackground: String = "Background"
     open val notificationBackgroundDescription: String =
         "Keeps monitoring friend activity while the app is in the background"
-    open val notificationBackgroundVendorGuide: String =
-        "Some vendor systems also require background activity permission. On HarmonyOS 4.2: Settings > Apps & services > Apps > VRCM > Power usage details > Launch settings; turn off Manage automatically, then turn on Allow background activity."
     open val profileFriendRequestSent: String = "Friend Request Sent"
     open val profileSendFriendRequest: String = "Send Friend Request"
     open val profileFriendRequestDeleted: String = "Friend Request Deleted"

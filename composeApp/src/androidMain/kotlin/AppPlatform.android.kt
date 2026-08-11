@@ -31,6 +31,14 @@ class AndroidAppPlatform(val context: Context, private val logger: Logger) : App
         context.startActivity(intent)
     }
 
+    override fun openAppSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
     override fun setBackgroundFriendMonitoringEnabled(enabled: Boolean): BackgroundFriendMonitoringResult {
         val intent = Intent(context, FriendActivityForegroundService::class.java)
         if (!enabled) { context.stopService(intent); return BackgroundFriendMonitoringResult.Stopped }
