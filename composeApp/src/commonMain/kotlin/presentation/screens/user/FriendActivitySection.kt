@@ -1,19 +1,25 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,10 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
-import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
-import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -41,44 +46,24 @@ internal fun FriendActivitySection(
     summary: FriendActivitySummary,
     events: List<FriendActivityEvent>,
 ) {
-    var expanded by remember(summary.friendUserId) { mutableStateOf(false) }
+    var showRecentActivity by remember(summary.friendUserId) { mutableStateOf(false) }
+
+    if (showRecentActivity) {
+        RecentActivityBottomSheet(
+            events = events,
+            onDismiss = { showRecentActivity = false },
+        )
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Surface(
-                modifier = Modifier.size(32.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Box(
-                    modifier = Modifier.padding(6.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = AppIcons.Groups,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = strings.friendActivityTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = strings.friendActivityObservedHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Text(
+            text = strings.friendActivityTitle,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -101,40 +86,21 @@ internal fun FriendActivitySection(
                         rightLabel = strings.friendActivityTogetherTime,
                         rightValue = summary.togetherDurationMillis.asActivityDuration(),
                     )
-
-                    if (events.isNotEmpty()) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(top = 4.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                        )
-                        val visibleEvents = if (expanded) events else events.take(2)
-                        visibleEvents.forEachIndexed { index, event ->
-                            if (index > 0) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                            ActivityEventRow(event)
-                        }
-                    }
                 }
 
-                if (events.size > 2) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    TextButton(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.fillMaxWidth(),
+                if (events.isNotEmpty()) {
+                    FilledTonalButton(
+                        onClick = { showRecentActivity = true },
+                        modifier = Modifier
+                            .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                            .fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
                     ) {
-                        Text(
-                            if (expanded) {
-                                strings.friendActivityHideTimeline
-                            } else {
-                                strings.friendActivityShowTimeline
-                            }
-                        )
-                        Icon(
-                            imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        Text(strings.friendActivityShowTimeline)
                     }
                 }
             }
@@ -142,8 +108,56 @@ internal fun FriendActivitySection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ActivityEventRow(event: FriendActivityEvent) {
+private fun RecentActivityBottomSheet(
+    events: List<FriendActivityEvent>,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 600.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        ) {
+            item {
+                Text(
+                    text = strings.friendActivityLastActivity,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = strings.friendActivityObservedHint,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            itemsIndexed(
+                items = events,
+                key = { _, event -> event.id },
+            ) { index, event ->
+                if (index > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+                ActivityEventRow(
+                    event = event,
+                    modifier = Modifier.padding(vertical = 10.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityEventRow(
+    event: FriendActivityEvent,
+    modifier: Modifier = Modifier,
+) {
     val detail = event.activityDetail()
     val bioDiff = remember(event.id, event.previousValue, event.currentValue) {
         if (event.type == FriendActivityEventType.BioChanged) {
@@ -153,7 +167,7 @@ private fun ActivityEventRow(event: FriendActivityEvent) {
         }
     }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
