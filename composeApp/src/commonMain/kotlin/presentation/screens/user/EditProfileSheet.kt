@@ -37,9 +37,6 @@ private fun UserStatus?.safeStatus(): UserStatus =
 
 private enum class EditField { Status, Language, Pronouns, Bio, SocialLinks }
 
-private const val MAX_SOCIAL_LINKS = 3
-private const val MAX_SOCIAL_LINK_LENGTH = 1000
-
 private val STATUS_OPTIONS = listOf(
     UserStatus.JoinMe, UserStatus.Active, UserStatus.AskMe, UserStatus.Busy,
 )
@@ -58,6 +55,7 @@ private fun UserStatus.toLocalizedString(): String = when (this) {
 fun EditProfileSheet(
     isVisible: Boolean,
     currentUser: UserProfileVo,
+    bioLinksUpdateState: BioLinksUpdateState,
     onDismiss: () -> Unit,
     onStatusSave: (status: UserStatus, statusDescription: String) -> Unit,
     onLanguageSave: (languages: List<String>) -> Unit,
@@ -80,9 +78,22 @@ fun EditProfileSheet(
     var editBio by remember { mutableStateOf(bio) }
     var editBioLinks by remember { mutableStateOf(bioLinks) }
     var editLanguages by remember { mutableStateOf(languages) }
+    var handledBioLinksRequestId by remember {
+        mutableLongStateOf(bioLinksUpdateState.completedRequestId)
+    }
+
+    LaunchedEffect(bioLinksUpdateState.completedRequestId) {
+        if (bioLinksUpdateState.completedRequestId == handledBioLinksRequestId) return@LaunchedEffect
+        handledBioLinksRequestId = bioLinksUpdateState.completedRequestId
+        bioLinksUpdateState.savedLinks?.let { savedLinks ->
+            bioLinks = savedLinks
+            editBioLinks = savedLinks
+            if (editingField == EditField.SocialLinks) editingField = null
+        }
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!bioLinksUpdateState.isSaving) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
@@ -133,9 +144,13 @@ fun EditProfileSheet(
                     EditField.Bio -> EditContentField(strings.editProfileBio, editBio, { editBio = it }, 512, 8, {
                         bio = editBio; onBioSave(editBio); editingField = null
                     }) { editingField = null }
-                    EditField.SocialLinks -> EditSocialLinksField(editBioLinks, { editBioLinks = it }, {
-                        bioLinks = editBioLinks; onBioLinksSave(editBioLinks); editingField = null
-                    }) { editingField = null }
+                    EditField.SocialLinks -> EditSocialLinksField(
+                        bioLinks = editBioLinks,
+                        isSaving = bioLinksUpdateState.isSaving,
+                        onBioLinksChange = { editBioLinks = it },
+                        onSave = { onBioLinksSave(editBioLinks) },
+                        onBack = { editingField = null },
+                    )
                     null -> {}
                 }
             }
@@ -146,38 +161,42 @@ fun EditProfileSheet(
 @Composable
 private fun EditSocialLinksField(
     bioLinks: List<String>,
+    isSaving: Boolean,
     onBioLinksChange: (List<String>) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
 ) {
-    EditHeader(strings.editProfileSocialLinks, onBack)
+    EditHeader(strings.editProfileSocialLinks, onBack, enabled = !isSaving)
     bioLinks.forEachIndexed { index, link ->
         OutlinedTextField(
             value = link,
             onValueChange = { value ->
-                if (value.length <= MAX_SOCIAL_LINK_LENGTH) {
-                    onBioLinksChange(bioLinks.toMutableList().also { it[index] = value })
-                }
+                onBioLinksChange(bioLinks.toMutableList().also { it[index] = value })
             },
             label = {
                 Text(strings.editProfileSocialLink.replace("%s", (index + 1).toString()))
             },
             leadingIcon = { Icon(AppIcons.Link, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = { onBioLinksChange(bioLinks.filterIndexed { itemIndex, _ -> itemIndex != index }) }) {
+                IconButton(
+                    onClick = {
+                        onBioLinksChange(bioLinks.filterIndexed { itemIndex, _ -> itemIndex != index })
+                    },
+                    enabled = !isSaving,
+                ) {
                     Icon(AppIcons.Close, contentDescription = strings.editProfileRemoveSocialLink)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            supportingText = { Text("${link.length}/$MAX_SOCIAL_LINK_LENGTH") },
+            enabled = !isSaving,
         )
         Spacer(Modifier.height(8.dp))
     }
     OutlinedButton(
         onClick = { onBioLinksChange(bioLinks + "") },
         modifier = Modifier.fillMaxWidth(),
-        enabled = bioLinks.size < MAX_SOCIAL_LINKS,
+        enabled = !isSaving,
     ) {
         Icon(AppIcons.Add, contentDescription = null)
         Spacer(Modifier.width(8.dp))
@@ -190,7 +209,21 @@ private fun EditSocialLinksField(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(16.dp))
-    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text(strings.editProfileSave) }
+    Button(
+        onClick = onSave,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !isSaving,
+    ) {
+        if (isSaving) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(strings.editProfileSave)
+    }
 }
 
 @Composable
@@ -210,9 +243,11 @@ private fun ProfileFieldRow(label: String, value: String, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun EditHeader(title: String, onBack: () -> Unit) {
+internal fun EditHeader(title: String, onBack: () -> Unit, enabled: Boolean = true) {
     Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f)) }
+        IconButton(onClick = onBack, enabled = enabled) {
+            Icon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f))
+        }
         Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
     }
     Spacer(Modifier.height(12.dp))

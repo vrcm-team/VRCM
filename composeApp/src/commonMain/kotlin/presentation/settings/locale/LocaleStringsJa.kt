@@ -109,7 +109,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val editProfileSocialLink = "リンク %s"
     override val editProfileAddSocialLink = "リンクを追加"
     override val editProfileRemoveSocialLink = "リンクを削除"
-    override val editProfileSocialLinksHint = "最大3件のリンクを追加できます。"
+    override val editProfileSocialLinksHint = "リンクは保存時にVRChatで検証されます。失敗した内容は修正して再試行できます。"
     override val editProfileLanguage = "言語"
     override val editProfileAddLanguage = "言語を追加"
     override val editProfileLanguageHint = "最大3言語。タップで削除。"

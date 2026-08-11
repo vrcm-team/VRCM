@@ -108,7 +108,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val editProfileSocialLink = "連結 %s"
     override val editProfileAddSocialLink = "添加連結"
     override val editProfileRemoveSocialLink = "移除連結"
-    override val editProfileSocialLinksHint = "最多添加 3 條連結。"
+    override val editProfileSocialLinksHint = "連結將在儲存時提交給 VRChat 驗證；失敗後會保留內容，可修改並重試。"
     override val editProfileLanguage = "語言"
     override val editProfileAddLanguage = "添加語言"
     override val editProfileLanguageHint = "最多 3 種語言，點擊可移除。"

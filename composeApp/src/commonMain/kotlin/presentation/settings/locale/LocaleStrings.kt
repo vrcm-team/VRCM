@@ -123,7 +123,7 @@ sealed class LocaleStrings {
     open val editProfileSocialLink: String = "Link %s"
     open val editProfileAddSocialLink: String = "Add Link"
     open val editProfileRemoveSocialLink: String = "Remove link"
-    open val editProfileSocialLinksHint: String = "Max 3 links."
+    open val editProfileSocialLinksHint: String = "VRChat validates links when you save. Failed changes remain here for editing and retry."
     open val editProfileLanguage: String = "Language"
     open val editProfileAddLanguage: String = "Add Language"
     open val editProfileLanguageHint: String = "Max 3 languages. Tap to remove."
