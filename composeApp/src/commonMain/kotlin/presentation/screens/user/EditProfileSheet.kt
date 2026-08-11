@@ -81,6 +81,13 @@ fun EditProfileSheet(
     var handledBioLinksRequestId by remember {
         mutableLongStateOf(bioLinksUpdateState.completedRequestId)
     }
+    val latestBioLinksSaving = rememberUpdatedState(bioLinksUpdateState.isSaving)
+    val profileSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestBioLinksSaving.value
+        },
+    )
 
     LaunchedEffect(bioLinksUpdateState.completedRequestId) {
         if (bioLinksUpdateState.completedRequestId == handledBioLinksRequestId) return@LaunchedEffect
@@ -94,7 +101,8 @@ fun EditProfileSheet(
 
     ModalBottomSheet(
         onDismissRequest = { if (!bioLinksUpdateState.isSaving) onDismiss() },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = profileSheetState,
+        sheetGesturesEnabled = !bioLinksUpdateState.isSaving,
     ) {
         Column(
             modifier = Modifier
