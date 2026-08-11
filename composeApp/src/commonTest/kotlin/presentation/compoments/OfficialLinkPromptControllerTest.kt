@@ -15,6 +15,33 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class OfficialLinkPromptControllerTest {
     @Test
+    fun clipboardAcceptsSupportedOfficialIds() = runTest {
+        val controller = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        controller.updateAuthentication(true)
+        val ids = listOf(
+            "usr_abc-123" to OfficialLinkType.User,
+            "wrld_abc-123" to OfficialLinkType.World,
+            "grp_abc-123" to OfficialLinkType.Group,
+            "avtr_abc-123" to OfficialLinkType.Avatar,
+        )
+
+        ids.forEach { (id, expectedType) ->
+            controller.inspectClipboard(id)
+
+            val confirmation = assertIs<OfficialLinkPromptState.ClipboardConfirmation>(
+                controller.state.value,
+            )
+            assertEquals(expectedType, confirmation.operation.target.type)
+            assertEquals(id, confirmation.operation.target.id)
+        }
+    }
+
+    @Test
     fun externalLinkSuppressesClipboardInspectionForTheSameForegroundEvent() {
         val gate = OfficialLinkClipboardInspectionGate()
 

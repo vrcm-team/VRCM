@@ -6,6 +6,20 @@ import kotlin.test.assertNull
 
 class OfficialLinkServiceTest {
     @Test
+    fun parsesSupportedOfficialIds() {
+        val ids = mapOf(
+            "usr_abc-123" to OfficialLinkTarget(OfficialLinkType.User, "usr_abc-123"),
+            "wrld_abc-123" to OfficialLinkTarget(OfficialLinkType.World, "wrld_abc-123"),
+            "grp_abc-123" to OfficialLinkTarget(OfficialLinkType.Group, "grp_abc-123"),
+            "avtr_abc-123" to OfficialLinkTarget(OfficialLinkType.Avatar, "avtr_abc-123"),
+        )
+
+        ids.forEach { (id, expected) ->
+            assertEquals(expected, parseOfficialId("  $id\n"))
+        }
+    }
+
+    @Test
     fun parsesSupportedOfficialLinks() {
         val links = mapOf(
             "https://vrchat.com/home/user/usr_abc-123" to
@@ -35,5 +49,18 @@ class OfficialLinkServiceTest {
         )
 
         links.forEach { assertNull(parseOfficialLink(it), it) }
+    }
+
+    @Test
+    fun rejectsMalformedOfficialIds() {
+        val ids = listOf(
+            "usr_abc_123",
+            "usr_abc-123 extra",
+            "file_abc-123",
+            "wrld_abc-123:instance",
+            "not-an-id",
+        )
+
+        ids.forEach { assertNull(parseOfficialId(it), it) }
     }
 }

@@ -34,6 +34,14 @@ internal sealed interface OfficialLinkContent {
     data class Avatar(val data: AvatarData) : OfficialLinkContent
 }
 
+/** Parses a standalone ID for a VRChat content type that VRCM can open. */
+internal fun parseOfficialId(value: String): OfficialLinkTarget? {
+    val id = value.trim()
+    val type = OfficialLinkType.entries.firstOrNull { id.startsWith(it.idPrefix) }
+        ?: return null
+    return type.targetFor(id)
+}
+
 /** Parses an exact public VRChat profile URL and rejects foreign hosts or mismatched IDs. */
 internal fun parseOfficialLink(value: String): OfficialLinkTarget? {
     val url = runCatching { Url(value.trim()) }.getOrNull() ?: return null
@@ -44,10 +52,12 @@ internal fun parseOfficialLink(value: String): OfficialLinkTarget? {
     if (segments.size != 3 || segments[0] != "home") return null
     val type = OfficialLinkType.entries.firstOrNull { it.pathSegment == segments[1] }
         ?: return null
-    val id = segments[2]
-    if (!Regex("${type.idPrefix}[A-Za-z0-9-]+").matches(id)) return null
-    return OfficialLinkTarget(type = type, id = id)
+    return type.targetFor(segments[2])
 }
+
+private fun OfficialLinkType.targetFor(id: String): OfficialLinkTarget? =
+    id.takeIf { Regex("$idPrefix[A-Za-z0-9-]+").matches(it) }
+        ?.let { OfficialLinkTarget(type = this, id = it) }
 
 internal class OfficialLinkService(
     private val usersApi: UsersApi,

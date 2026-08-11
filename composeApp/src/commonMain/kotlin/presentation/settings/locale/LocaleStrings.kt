@@ -456,12 +456,12 @@ sealed class LocaleStrings {
     open val copyOfficialUrl: String = "Copy official URL"
     open val officialUrlCopied: String = "Link copied"
     open val officialUrlCopyFailed: String = "Could not copy the official URL"
-    open val officialLinkPromptTitle: String = "Open VRChat link"
+    open val officialLinkPromptTitle: String = "Open VRChat content"
     open val officialLinkPromptMessage: String =
-        "A VRChat %s link was found in your clipboard. Open it in VRCM?"
+        "A VRChat %s link or ID was found in your clipboard. Open it in VRCM?"
     open val officialLinkOpen: String = "Open"
     open val officialLinkOpenFailed: String =
-        "Could not open this link. It may have expired, been removed, or be unavailable to this account."
+        "Could not open this content. It may have expired, been removed, or be unavailable to this account."
     open val officialLinkTypeUser: String = "user"
     open val officialLinkTypeWorld: String = "world"
     open val officialLinkTypeGroup: String = "group"
