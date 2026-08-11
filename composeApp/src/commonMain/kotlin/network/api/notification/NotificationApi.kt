@@ -77,6 +77,14 @@ class NotificationApi(
             }
         }.checkSuccess()
 
+    /** Deletes a notification returned by the current `/notifications` API. */
+    suspend fun deleteNotificationV2(notificationId: String) {
+        client.delete {
+            url { path(NOTIFICATIONS_API_PREFIX, notificationId) }
+        }.checkSuccess<Unit>()
+    }
+
+    /** Hides a notification returned by the legacy `/auth/user/notifications` API. */
     suspend fun deleteNotification(notificationId: String): VRChatResponse =
         client.put {
             url {
