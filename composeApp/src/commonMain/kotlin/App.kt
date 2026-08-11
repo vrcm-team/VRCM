@@ -150,10 +150,9 @@ fun AnimatedContentTransitionScope<Scene<AppRoute>>.selectTransition(isPop: Bool
         isTransitioningOn<CardListDetailScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<CardListDetailScreen, AvatarProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<UserProfileScreen, WorldProfileScreen>() -> slideScreenTransition(isPop)
+        isTransitioningOn<UserProfileScreen, UserProfileScreen>() -> slideScreenTransition(isPop)
         isTransitioningOn<UserProfileScreen, GalleryScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
-        isTransitioningOn<UserProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
-        isTransitioningOn<WorldProfileScreen, UserProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
-        isTransitioningOn<WorldProfileScreen, GroupProfileScreen>() -> slideScreenTransition(isPop, SlideOrientation.Horizontal)
         isTransitioningFromTo<HomeScreen, AuthAnimeScreen>() -> HomeToAuthAnimeTransition
         isTransitioningFromTo<AuthAnimeScreen, HomeScreen>() -> AuthAnimeToHomeTransition
         isTransitioning<StartupAnimeScreen>() -> ContentTransform(EnterTransition.None, ExitTransition.None)
