@@ -31,6 +31,7 @@ class FriendActivityForegroundService : Service() {
         val koin = GlobalContext.get()
         koin.get<WebSocketApi>().setBackgroundMonitoringEnabled(true)
         val friendService = koin.get<FriendService>()
+        koin.get<FriendActivityService>().onBackgroundMonitoringStarted()
         val webSocketApi = koin.get<WebSocketApi>()
         val logger = koin.get<Logger>()
         scope.launch {
@@ -46,7 +47,11 @@ class FriendActivityForegroundService : Service() {
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
     override fun onDestroy() {
-        GlobalContext.getOrNull()?.get<WebSocketApi>()?.setBackgroundMonitoringEnabled(false)
+        GlobalContext.getOrNull()?.let { koin ->
+            val webSocketApi = koin.get<WebSocketApi>()
+            webSocketApi.setBackgroundMonitoringEnabled(false)
+            koin.get<FriendActivityService>().onBackgroundMonitoringStopped()
+        }
         scope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

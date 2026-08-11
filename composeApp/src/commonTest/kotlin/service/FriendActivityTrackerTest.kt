@@ -6,6 +6,55 @@ import kotlin.test.assertTrue
 
 class FriendActivityTrackerTest {
     @Test
+    fun socketPresenceIsRecordedBeforeFriendSnapshotIsAvailable() {
+        val result = FriendActivityTracker().observeSocketPresence(
+            friends = emptyList(),
+            event = FriendSocketPresenceEvent(
+                userId = "usr_friend",
+                type = FriendSocketPresenceType.Offline,
+                occurredAtMillis = 1_000L,
+            ),
+        )
+
+        assertEquals(1, result.events.size)
+        assertEquals("usr_friend", result.events.single().userId)
+        assertEquals(FriendActivityEventType.Offline, result.events.single().type)
+    }
+
+    @Test
+    fun snapshotPresenceChangesDoNotCreateSocketOnlyEvents() {
+        val tracker = FriendActivityTracker(derivePresenceEvents = false)
+        val friend = FriendActivityObservation(
+            userId = "usr_friend",
+            displayName = "Friend",
+            profileImageUrl = "",
+            location = "offline",
+            status = "offline",
+            statusDescription = "",
+            bio = "",
+            lastActivityAtMillis = 1_000L,
+        )
+        tracker.observe(listOf(friend), null, 1_000L)
+
+        val refreshed = tracker.observe(
+            listOf(friend.copy(location = "wrld_world:instance_a", status = "active")),
+            null,
+            2_000L,
+        )
+        val socket = tracker.observeSocketPresence(
+            friends = listOf(friend.copy(location = "wrld_world:instance_a", status = "active")),
+            event = FriendSocketPresenceEvent(
+                userId = friend.userId,
+                type = FriendSocketPresenceType.Online,
+                occurredAtMillis = 3_000L,
+            ),
+        )
+
+        assertTrue(refreshed.events.none { it.type == FriendActivityEventType.Online })
+        assertEquals(listOf(FriendActivityEventType.Online), socket.events.map { it.type })
+    }
+
+    @Test
     fun comingOnlineKeepsLocationAndCurrentStatusInOneEvent() {
         val tracker = FriendActivityTracker()
         val offlineFriend = FriendActivityObservation(
@@ -24,16 +73,19 @@ class FriendActivityTrackerTest {
             nowMillis = 1_000L,
         )
 
-        val result = tracker.observe(
-            friends = listOf(
-                offlineFriend.copy(
-                    location = "wrld_world:instance_a~friends(usr_owner)",
-                    status = "join me",
-                    statusDescription = "Come over",
-                )
+        val onlineFriend = offlineFriend.copy(
+            location = "wrld_world:instance_a~friends(usr_owner)",
+            status = "join me",
+            statusDescription = "Come over",
+        )
+        tracker.observe(listOf(onlineFriend), null, 2_000L)
+        val result = tracker.observeSocketPresence(
+            friends = listOf(onlineFriend),
+            event = FriendSocketPresenceEvent(
+                userId = onlineFriend.userId,
+                type = FriendSocketPresenceType.Online,
+                occurredAtMillis = 2_000L,
             ),
-            selfLocation = null,
-            nowMillis = 2_000L,
         )
 
         assertEquals(1, result.events.size)
@@ -62,16 +114,19 @@ class FriendActivityTrackerTest {
             nowMillis = 1_000L,
         )
 
-        val result = tracker.observe(
-            friends = listOf(
-                onlineFriend.copy(
-                    location = "offline",
-                    status = "offline",
-                    statusDescription = "",
-                )
+        val offlineFriend = onlineFriend.copy(
+            location = "offline",
+            status = "offline",
+            statusDescription = "",
+        )
+        tracker.observe(listOf(offlineFriend), null, 2_000L)
+        val result = tracker.observeSocketPresence(
+            friends = listOf(offlineFriend),
+            event = FriendSocketPresenceEvent(
+                userId = offlineFriend.userId,
+                type = FriendSocketPresenceType.Offline,
+                occurredAtMillis = 2_000L,
             ),
-            selfLocation = null,
-            nowMillis = 2_000L,
         )
 
         assertEquals(1, result.events.size)

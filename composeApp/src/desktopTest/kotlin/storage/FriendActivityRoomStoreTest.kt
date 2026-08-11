@@ -10,15 +10,27 @@ import io.github.vrcmteam.vrcm.service.FriendActivityBatch
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import io.github.vrcmteam.vrcm.service.FriendActivityInputSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityObservation
+import io.github.vrcmteam.vrcm.service.FriendActivitySourceSnapshot
+import io.github.vrcmteam.vrcm.service.FriendActivityTrackingControl
+import io.github.vrcmteam.vrcm.service.FriendActivityTrackingState
+import io.github.vrcmteam.vrcm.service.FriendSocketPresenceEvent
+import io.github.vrcmteam.vrcm.service.FriendSocketPresenceType
 import io.github.vrcmteam.vrcm.service.FriendMeetingChange
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import io.github.vrcmteam.vrcm.service.toSocketPresenceInputSnapshot
 import io.github.vrcmteam.vrcm.service.trackFriendActivity
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
@@ -28,7 +40,7 @@ import kotlin.test.assertNull
 
 class FriendActivityRoomStoreTest {
     @Test
-    fun restoreDropsIncompleteSessionWithoutAddingDuration() = runTest {
+    fun restoreFinalizesIncompleteSessionAtLastCheckpoint() = runTest {
         withStore { store ->
             val token = store.activateAccount("usr_owner")
             val observation = observation()
@@ -48,13 +60,28 @@ class FriendActivityRoomStoreTest {
                 ),
                 nowMillis = 1_000L,
             )
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Checkpoint(
+                            userId = observation.userId,
+                            occurredAtMillis = 31_000L,
+                            durationMillis = 30_000L,
+                        )
+                    )
+                ),
+                nowMillis = 31_000L,
+            )
 
             store.discardIncompleteSessions("usr_owner")
 
             assertEquals(emptyList(), store.sessions("usr_owner", observation.userId))
             val summary = store.summary("usr_owner", observation.userId)
             assertEquals(0, summary?.meetingCount)
-            assertEquals(0L, summary?.togetherDurationMillis)
+            assertEquals(30_000L, summary?.togetherDurationMillis)
+            assertEquals(31_000L, summary?.lastSeenTogetherAtMillis)
         }
     }
 
@@ -79,6 +106,22 @@ class FriendActivityRoomStoreTest {
                 ),
                 nowMillis = 1_000L,
             )
+            assertNull(store.summary("usr_owner", observation.userId)?.lastSeenTogetherAtMillis)
+            store.record(
+                token = token,
+                observations = listOf(observation),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Checkpoint(
+                            userId = observation.userId,
+                            occurredAtMillis = 31_000L,
+                            durationMillis = 30_000L,
+                        )
+                    )
+                ),
+                nowMillis = 31_000L,
+            )
+            assertNull(store.summary("usr_owner", observation.userId)?.lastSeenTogetherAtMillis)
             store.record(
                 token = token,
                 observations = listOf(observation),
@@ -177,6 +220,20 @@ class FriendActivityRoomStoreTest {
             )
             store.record(
                 token = token,
+                observations = listOf(older),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Ended(
+                            userId = older.userId,
+                            occurredAtMillis = 1_500L,
+                            durationMillis = 500L,
+                        )
+                    )
+                ),
+                nowMillis = 1_500L,
+            )
+            store.record(
+                token = token,
                 observations = listOf(newer),
                 batch = FriendActivityBatch(
                     meetings = listOf(
@@ -190,6 +247,20 @@ class FriendActivityRoomStoreTest {
                     )
                 ),
                 nowMillis = 3_000L,
+            )
+            store.record(
+                token = token,
+                observations = listOf(newer),
+                batch = FriendActivityBatch(
+                    meetings = listOf(
+                        FriendMeetingChange.Ended(
+                            userId = newer.userId,
+                            occurredAtMillis = 3_500L,
+                            durationMillis = 500L,
+                        )
+                    )
+                ),
+                nowMillis = 3_500L,
             )
 
             val recent = store.observeRecentTogether(
@@ -233,15 +304,319 @@ class FriendActivityRoomStoreTest {
                         selfLocation = "wrld_world:instance_a",
                         observedAtMillis = 2_000L,
                     ),
+                    FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = listOf(friend.copy(location = "wrld_world:instance_a")),
+                        selfLocation = "wrld_world:instance_a",
+                        observedAtMillis = 3_000L,
+                        trackingControl = FriendActivityTrackingControl.Stop,
+                    ),
                 ),
                 store = store,
             )
 
             assertNull(store.summary("usr_owner", "usr_wrong"))
             assertEquals(
-                2_000L,
+                3_000L,
                 store.summary("usr_owner", friend.userId)?.lastSeenTogetherAtMillis,
             )
+        }
+    }
+
+    @Test
+    fun delayedSocketPresenceFromPreviousSessionIsRejectedAfterAccountSwitch() = runTest {
+        withStore { store ->
+            val currentSession = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_current_owner"),
+                token = AccountSessionToken(userId = "usr_current_owner", generation = 2L),
+            )
+            val previousToken = AccountSessionToken(userId = "usr_previous_owner", generation = 1L)
+            val delayedInput = FriendActivitySourceSnapshot(
+                token = currentSession.token,
+                friends = emptyList(),
+                selfLocation = null,
+            ).toSocketPresenceInputSnapshot(
+                eventToken = previousToken,
+                presenceEvent = FriendSocketPresenceEvent(
+                    userId = "usr_previous_friend",
+                    type = FriendSocketPresenceType.Offline,
+                    occurredAtMillis = 1_000L,
+                ),
+            )
+
+            trackFriendActivity(
+                session = currentSession,
+                snapshots = flowOf(delayedInput),
+                store = store,
+            )
+
+            assertNull(store.summary(currentSession.account.userId, "usr_previous_friend"))
+        }
+    }
+
+    @Test
+    fun stoppedCollectorDoesNotRestartUntilResume() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flowOf(
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 1_000L),
+                    FriendActivityInputSnapshot(
+                        session.token,
+                        listOf(friend),
+                        friend.location,
+                        2_000L,
+                        trackingControl = FriendActivityTrackingControl.Stop,
+                    ),
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 3_000L),
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 4_000L),
+                    FriendActivityInputSnapshot(
+                        session.token,
+                        listOf(friend),
+                        friend.location,
+                        5_000L,
+                        trackingControl = FriendActivityTrackingControl.Resume,
+                    ),
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 6_000L),
+                    FriendActivityInputSnapshot(
+                        session.token,
+                        listOf(friend),
+                        friend.location,
+                        7_000L,
+                        trackingControl = FriendActivityTrackingControl.Stop,
+                    ),
+                ),
+                store = store,
+            )
+
+            val summary = store.summary("usr_owner", friend.userId)
+            assertEquals(3_000L, summary?.togetherDurationMillis)
+            assertEquals(7_000L, summary?.lastSeenTogetherAtMillis)
+            assertEquals(0, summary?.meetingCount)
+            assertEquals(
+                listOf(5_000L, 1_000L),
+                store.sessions("usr_owner", friend.userId).map { it.startedAtMillis },
+            )
+        }
+    }
+
+    @Test
+    fun firstKnownSelfLocationStartsUnannouncedMeeting() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flowOf(
+                    FriendActivityInputSnapshot(session.token, listOf(friend), null, 1_000L),
+                    FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 2_000L),
+                    FriendActivityInputSnapshot(
+                        session.token,
+                        listOf(friend),
+                        friend.location,
+                        3_000L,
+                        trackingControl = FriendActivityTrackingControl.Stop,
+                    ),
+                ),
+                store = store,
+            )
+
+            val summary = store.summary(session.account.userId, friend.userId)
+            assertEquals(0, summary?.meetingCount)
+            assertEquals(
+                emptyList(),
+                store.observeEvents(session.account.userId, friend.userId).first().map { it.type },
+            )
+            assertEquals(
+                listOf(false),
+                store.sessions(session.account.userId, friend.userId).map { it.announced },
+            )
+        }
+    }
+
+    @Test
+    fun replayedResumeStartsTrackingAtCollectorSubscriptionTime() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+            var nowMillis = 1_000L
+            val trackingState = FriendActivityTrackingState { nowMillis }
+            trackingState.setBackgroundMonitoring(true)
+            nowMillis = 5_000L
+
+            trackFriendActivity(
+                session = session,
+                snapshots = trackingState.controls.take(1).map { transition ->
+                    FriendActivityInputSnapshot(
+                        token = session.token,
+                        friends = listOf(friend),
+                        selfLocation = friend.location,
+                        observedAtMillis = transition.occurredAtMillis,
+                        trackingControl = transition.control,
+                    )
+                },
+                store = store,
+            )
+
+            assertEquals(
+                listOf(5_000L),
+                store.sessions(session.account.userId, friend.userId).map { it.startedAtMillis },
+            )
+        }
+    }
+
+    @Test
+    fun trackingTransitionsRetainOccurredTimesWhileCollectorIsBusy() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+            val baselineRecorded = CompletableDeferred<Unit>()
+            val stopDequeued = CompletableDeferred<Unit>()
+            val releaseStop = CompletableDeferred<Unit>()
+            var nowMillis = 0L
+            val trackingState = FriendActivityTrackingState { nowMillis }
+
+            nowMillis = 1_000L
+            trackingState.setAppForeground(true)
+            val collector = launch {
+                trackFriendActivity(
+                    session = session,
+                    snapshots = flow {
+                        trackingState.controls.take(4).collect { transition ->
+                            if (transition.sequence == 2L) {
+                                stopDequeued.complete(Unit)
+                                releaseStop.await()
+                            }
+                            emit(
+                                FriendActivityInputSnapshot(
+                                    token = session.token,
+                                    friends = listOf(friend),
+                                    selfLocation = friend.location,
+                                    observedAtMillis = transition.occurredAtMillis,
+                                    trackingControl = transition.control,
+                                )
+                            )
+                            if (transition.sequence == 1L) {
+                                baselineRecorded.complete(Unit)
+                            }
+                        }
+                    },
+                    store = store,
+                )
+            }
+
+            baselineRecorded.await()
+            nowMillis = 2_000L
+            trackingState.setAppForeground(false)
+            stopDequeued.await()
+            nowMillis = 5_000L
+            trackingState.setAppForeground(true)
+            nowMillis = 7_000L
+            trackingState.setAppForeground(false)
+            releaseStop.complete(Unit)
+            collector.join()
+
+            val sessions = store.sessions(session.account.userId, friend.userId)
+            assertEquals(
+                3_000L,
+                store.summary(session.account.userId, friend.userId)?.togetherDurationMillis,
+            )
+            assertEquals(listOf(5_000L, 1_000L), sessions.map { it.startedAtMillis })
+            assertEquals(listOf(7_000L, 2_000L), sessions.map { it.endedAtMillis })
+        }
+    }
+
+    @Test
+    fun cancellingCollectorCompletesActiveMeetingAtCancellationTime() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(location = "wrld_world:instance_a")
+            val baselineRecorded = CompletableDeferred<Unit>()
+
+            val collector = launch {
+                trackFriendActivity(
+                    session = session,
+                    snapshots = flow {
+                        emit(FriendActivityInputSnapshot(session.token, listOf(friend), friend.location, 1_000L))
+                        baselineRecorded.complete(Unit)
+                        awaitCancellation()
+                    },
+                    store = store,
+                    cancellationTimeMillis = { 5_000L },
+                )
+            }
+            baselineRecorded.await()
+            collector.cancelAndJoin()
+
+            val summary = store.summary("usr_owner", friend.userId)
+            assertEquals(4_000L, summary?.togetherDurationMillis)
+            assertEquals(5_000L, summary?.lastSeenTogetherAtMillis)
+            assertEquals(5_000L, summary?.lastActivityAtMillis)
+            assertEquals(5_000L, store.sessions("usr_owner", friend.userId).single().endedAtMillis)
+        }
+    }
+
+    @Test
+    fun onlineSnapshotsAdvanceLastActivityAndOfflineSnapshotUsesApiTime() = runTest {
+        withStore { store ->
+            val session = AuthenticatedAccount(
+                account = AccountDto(userId = "usr_owner"),
+                token = AccountSessionToken(userId = "usr_owner", generation = 1L),
+            )
+            val friend = observation().copy(lastActivityAtMillis = null)
+
+            trackFriendActivity(
+                session = session,
+                snapshots = flow {
+                    emit(FriendActivityInputSnapshot(session.token, listOf(friend), null, 1_000L))
+                    assertEquals(
+                        1_000L,
+                        store.summary(session.account.userId, friend.userId)?.lastActivityAtMillis,
+                    )
+                    emit(FriendActivityInputSnapshot(session.token, listOf(friend), null, 2_000L))
+                    assertEquals(
+                        2_000L,
+                        store.summary(session.account.userId, friend.userId)?.lastActivityAtMillis,
+                    )
+                    emit(
+                        FriendActivityInputSnapshot(
+                            session.token,
+                            listOf(
+                                friend.copy(
+                                    location = "offline",
+                                    status = "offline",
+                                    lastActivityAtMillis = 2_500L,
+                                )
+                            ),
+                            null,
+                            3_000L,
+                            updateLastActivityOnly = true,
+                        )
+                    )
+                },
+                store = store,
+            )
+
+            assertEquals(2_500L, store.summary("usr_owner", friend.userId)?.lastActivityAtMillis)
         }
     }
 

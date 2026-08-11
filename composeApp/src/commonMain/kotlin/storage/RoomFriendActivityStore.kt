@@ -24,7 +24,7 @@ internal class RoomFriendActivityStore(
     ): Boolean = dao.record(token, observations, batch, nowMillis)
 
     suspend fun discardIncompleteSessions(ownerUserId: String) =
-        dao.deleteIncompleteSessions(ownerUserId)
+        dao.discardIncompleteSessions(ownerUserId)
 
     override suspend fun clearAccount(ownerUserId: String) = dao.clearAccount(ownerUserId)
 

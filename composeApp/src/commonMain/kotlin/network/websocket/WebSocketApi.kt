@@ -65,6 +65,10 @@ class WebSocketApi(
         if (enabled || !isForeground.value) replaceConnection(SharedFlowCentre.currentSession.value?.token.takeIf { enabled || isForeground.value })
     }
 
+    fun isBackgroundMonitoringEnabled(): Boolean = backgroundMonitoringEnabled.value
+
+    fun isAppForeground(): Boolean = isForeground.value
+
     private fun replaceConnection(sessionToken: AccountSessionToken?) = synchronized(connectionLock) {
         currentJob?.cancel()
         connectedSessionToken.value = null
