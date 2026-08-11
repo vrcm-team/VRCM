@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionDialog
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialLinkPrompt
+import io.github.vrcmteam.vrcm.presentation.compoments.NotificationLaunchHandler
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
@@ -63,6 +64,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
 import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
+import io.github.vrcmteam.vrcm.service.NotificationLaunchInbox
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -71,11 +73,15 @@ import org.koin.compose.koinInject
 fun App(
     windowChrome: @Composable () -> Unit = {},
     officialLinkInbox: OfficialLinkInbox? = null,
+    notificationLaunchInbox: NotificationLaunchInbox? = null,
 ) {
     val backNavigationPolicy = remember { BackNavigationPolicy() }
     val navigator = rememberAppNavigator(StartupAnimeScreen)
     val activeOfficialLinkInbox = remember(officialLinkInbox) {
         officialLinkInbox ?: OfficialLinkInbox()
+    }
+    val activeNotificationLaunchInbox = remember(notificationLaunchInbox) {
+        notificationLaunchInbox ?: NotificationLaunchInbox()
     }
     KoinContext {
         val webSocketApi = koinInject<WebSocketApi>()
@@ -125,6 +131,7 @@ fun App(
                         ) {
                             VersionDialog()
                             OfficialLinkPrompt(navigator, activeOfficialLinkInbox)
+                            NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
                             SharedTransitionScreen(
                                 navigator = navigator,
                                 transitionSpec = { selectTransition(isPop = false) },

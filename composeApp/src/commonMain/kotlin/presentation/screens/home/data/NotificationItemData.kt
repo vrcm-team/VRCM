@@ -14,6 +14,8 @@ data class NotificationItemData(
     val actions: List<ActionData>,
     /** The selected default or custom Boop emoji identifier, when VRChat supplies it. */
     val boopEmojiId: String? = null,
+    /** Pipeline events can reference this inbox item through a different notification ID. */
+    val relatedNotificationId: String? = null,
 ) {
     /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
     val senderId: String?
@@ -48,9 +50,18 @@ data class NotificationItemData(
                 icon = responses.icon,
             )
         },
+        relatedNotificationId = n.relatedNotificationsId,
         boopEmojiId = n.details?.emojiId ?: n.data.emojiId,
     )
 
+}
+
+/** Resolves either the inbox ID or the related Pipeline event ID to its rendered item. */
+internal fun List<NotificationItemData>.indexOfNotificationTarget(targetId: String?): Int {
+    val requestedId = targetId?.takeIf(String::isNotBlank) ?: return -1
+    return indexOfFirst { item ->
+        item.id == requestedId || item.relatedNotificationId == requestedId
+    }
 }
 
 internal enum class NotificationResponseTarget {

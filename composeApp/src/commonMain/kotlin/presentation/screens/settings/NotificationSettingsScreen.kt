@@ -223,6 +223,39 @@ object NotificationSettingsScreen : AppDetailRoute {
                     }
                 }
 
+                item { HorizontalDivider() }
+                item { SectionTitle(strings.notificationSectionInbox) }
+                item {
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
+                        title = strings.stettingBoopNotifications,
+                        description = strings.notificationBoopDescription,
+                        checked = currentSettings.boopNotificationsEnabled,
+                    ) {
+                        currentSettings = currentSettings.copy(boopNotificationsEnabled = it)
+                    }
+                }
+                item {
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
+                        title = strings.notificationFriendRequestAlert,
+                        description = strings.notificationFriendRequestAlertDescription,
+                        checked = currentSettings.friendRequestNotificationsEnabled,
+                    ) {
+                        currentSettings = currentSettings.copy(friendRequestNotificationsEnabled = it)
+                    }
+                }
+                item {
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
+                        title = strings.notificationGroupAnnouncement,
+                        description = strings.notificationGroupAnnouncementDescription,
+                        checked = currentSettings.groupAnnouncementNotificationsEnabled,
+                    ) {
+                        currentSettings = currentSettings.copy(groupAnnouncementNotificationsEnabled = it)
+                    }
+                }
+
                 if (platform.supportsBackgroundFriendMonitoring) {
                     item { HorizontalDivider() }
                     item { BackgroundMonitoringSection(platform) }

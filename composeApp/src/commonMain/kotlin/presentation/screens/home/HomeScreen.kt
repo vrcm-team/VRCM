@@ -42,8 +42,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
-import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.NotificationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
+import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
@@ -55,6 +56,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 
 @Serializable
@@ -139,7 +141,12 @@ private inline fun AppListRoute.HomeTopAppBar(
 ) {
     val homeScreenModel: HomeScreenModel = koinViewModel()
     val currentUser = homeScreenModel.currentUser
-    val hasNotifications by remember { derivedStateOf { (homeScreenModel.friendRequestNotifications + homeScreenModel.notifications).isNotEmpty() } }
+    val notificationCenter = koinInject<NotificationCenterModel>()
+    val hasNotifications by remember {
+        derivedStateOf {
+            (notificationCenter.friendRequestNotifications + notificationCenter.notifications).isNotEmpty()
+        }
+    }
     // to ProfileScreen
     val currentNavigator = currentNavigator
     val homeUserId = homeScreenModel.userId
@@ -419,9 +426,9 @@ fun SettingsActionButton(
 fun NotificationActionButton(
     hasNotifications: Boolean,
 ) {
-    val (_, onClickNotification) = LocationDialogContent.current
+    val navigator = currentNavigator
     IconButton(
-        onClick = { onClickNotification(NotificationDialog) },
+        onClick = { navigator push NotificationScreen() },
         colors = IconButtonDefaults.iconButtonColors(
             contentColor = MaterialTheme.colorScheme.tertiary
         ),
