@@ -20,6 +20,16 @@ expect suspend fun AppPlatform.saveImageToGallery(imageUrl: String, fileName: St
 expect suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileName: String): Boolean
 
 /**
+ * 通过系统分享面板分享已编码的图片，不写入系统相册。
+ */
+expect suspend fun AppPlatform.shareImageBytes(bytes: ByteArray, fileName: String): Boolean
+
+/**
+ * 下载并通过系统分享面板分享图片，不写入系统相册。
+ */
+expect suspend fun AppPlatform.shareImage(imageUrl: String, fileName: String): Boolean
+
+/**
  * 读取文件字节
  * @param filePath 文件路径
  * @return 文件字节数组

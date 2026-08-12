@@ -136,7 +136,6 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val friendNetworkEmpty = "ネットワークデータがありません"
     override val friendNetworkViewCommunity = "コミュニティ"
     override val friendNetworkViewEgo = "自分中心"
-    override val friendNetworkSaveScreenshot = "表示中の関係図を保存"
     override val locationDialogOwner = "オーナー"
     override val locationDialogAuthor = "作者"
     override val locationDialogDescription = "説明"
@@ -257,8 +256,11 @@ internal object LocaleStringsJa : LocaleStrings() {
 
     // ImagePreviewDialog
     override val imageSaveError = "イメージの保存エラー: %s"
+    override val imageSave = "画像を保存"
     override val imageSaveSuccess = "イメージが保存されました"
     override val imageSaveFailed = "イメージの保存に失敗しました"
+    override val imageShare = "画像を共有"
+    override val imageShareFailed = "画像共有を開けませんでした"
     override val imageLoadFailed = "イメージの読み込みに失敗しました"
 
     // Group

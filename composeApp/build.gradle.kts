@@ -37,6 +37,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.core)
             implementation(libs.androidx.exifinterface)
             implementation(libs.androidx.sqlite.framework)
             implementation(libs.awebp)

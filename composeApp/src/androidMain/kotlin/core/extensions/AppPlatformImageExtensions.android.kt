@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.core.extensions
 
 import android.content.ContentValues
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import androidx.core.content.FileProvider
 
 /**
  * Android平台实现：保存图片到系统相册
@@ -50,6 +52,44 @@ actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileNam
             } else {
                 saveImageLegacy(inputStream, fileName)
             }
+        }
+    }
+
+actual suspend fun AppPlatform.shareImageBytes(bytes: ByteArray, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        this@shareImageBytes as AndroidAppPlatform
+        if (bytes.isEmpty()) return@withContext false
+        val shareFile = File(context.cacheDir, "share/${fileName.sanitizeShareFileName()}")
+        shareFile.parentFile?.mkdirs()
+        shareFile.writeBytes(bytes)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            shareFile,
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeTypeFor(fileName)
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        withContext(Dispatchers.Main) {
+            runCatching {
+                context.startActivity(
+                    Intent.createChooser(intent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }.isSuccess
+        }
+    }
+
+actual suspend fun AppPlatform.shareImage(imageUrl: String, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        this@shareImage as AndroidAppPlatform
+        val httpClient = HttpClient()
+        try {
+            val response = httpClient.get(imageUrl)
+            shareImageBytes(response.bodyAsChannel().toInputStream().use { it.readBytes() }, fileName)
+        } finally {
+            httpClient.close()
         }
     }
 
@@ -124,6 +164,9 @@ actual suspend fun AppPlatform.getImageDimensions(filePath: String): Pair<Int, I
 /** 相册里的 MIME 必须与真实字节一致，PNG 写成 image/jpeg 会让部分相册应用打不开。 */
 private fun mimeTypeFor(fileName: String): String =
     if (fileName.endsWith(".png", ignoreCase = true)) "image/png" else "image/jpeg"
+
+private fun String.sanitizeShareFileName(): String =
+    replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "image.png" }
 
 // 辅助方法
 private fun AndroidAppPlatform.saveImageWithMediaStore(inputStream: InputStream, fileName: String): Boolean {

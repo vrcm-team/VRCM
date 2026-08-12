@@ -19,6 +19,10 @@ import platform.Photos.PHPhotoLibrary
 import platform.UIKit.UIImage
 import platform.UIKit.UIImageJPEGRepresentation
 import platform.UIKit.UIImagePNGRepresentation
+import platform.UIKit.UIApplication
+import platform.UIKit.UIActivityViewController
+import platform.UIKit.UIViewController
+import platform.UIKit.popoverPresentationController
 
 /**
  * iOS平台实现：保存图片到系统相册
@@ -88,6 +92,43 @@ actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileNam
         savePhotoData(bytes.toNSData())
     }
 
+@OptIn(ExperimentalForeignApi::class)
+actual suspend fun AppPlatform.shareImageBytes(bytes: ByteArray, fileName: String): Boolean =
+    withContext(Dispatchers.Main) {
+        if (bytes.isEmpty()) return@withContext false
+        sharePhotoData(bytes.toNSData())
+    }
+
+@OptIn(ExperimentalForeignApi::class)
+private fun sharePhotoData(data: NSData): Boolean {
+        val presenter = UIApplication.sharedApplication.keyWindow
+            ?.rootViewController
+            ?.topPresentedViewController()
+            ?: return false
+        val controller = UIActivityViewController(
+            activityItems = listOf(data),
+            applicationActivities = null,
+        )
+        controller.popoverPresentationController?.apply {
+            sourceView = presenter.view
+            sourceRect = presenter.view.bounds
+            permittedArrowDirections = 0u
+        }
+        presenter.presentViewController(controller, animated = true, completion = null)
+        return true
+}
+
+@OptIn(ExperimentalForeignApi::class)
+actual suspend fun AppPlatform.shareImage(imageUrl: String, fileName: String): Boolean =
+    withContext(Dispatchers.IO) {
+        val url = NSURL.URLWithString(imageUrl) ?: return@withContext false
+        val data = NSData.dataWithContentsOfURL(url) ?: return@withContext false
+        withContext(Dispatchers.Main) { sharePhotoData(data) }
+    }
+
+private tailrec fun UIViewController.topPresentedViewController(): UIViewController =
+    presentedViewController?.topPresentedViewController() ?: this
+
 /** 把已编码的图片数据写入相册，等待系统回调后再返回结果。 */
 private suspend fun savePhotoData(data: NSData): Boolean = withContext(Dispatchers.IO) {
     var success = false
@@ -114,6 +155,7 @@ private suspend fun savePhotoData(data: NSData): Boolean = withContext(Dispatche
 private fun ByteArray.toNSData(): NSData = usePinned { pinned ->
     NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
 }
+
 
 /**
  * 请求相册权限

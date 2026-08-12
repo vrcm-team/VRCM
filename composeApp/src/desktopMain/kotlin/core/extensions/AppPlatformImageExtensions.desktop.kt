@@ -63,6 +63,10 @@ actual suspend fun AppPlatform.saveImageBytesToGallery(bytes: ByteArray, fileNam
         }
     }
 
+actual suspend fun AppPlatform.shareImageBytes(bytes: ByteArray, fileName: String): Boolean = false
+
+actual suspend fun AppPlatform.shareImage(imageUrl: String, fileName: String): Boolean = false
+
 /**
  * Desktop平台实现：读取文件字节
  */

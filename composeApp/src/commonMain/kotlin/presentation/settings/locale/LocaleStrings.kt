@@ -151,7 +151,6 @@ sealed class LocaleStrings {
     open val friendNetworkEmpty: String = "No network data yet"
     open val friendNetworkViewCommunity: String = "Circles"
     open val friendNetworkViewEgo: String = "Around me"
-    open val friendNetworkSaveScreenshot: String = "Save visible network"
     open val locationDialogOwner: String = "Owner"
     open val locationDialogAuthor: String = "Author"
     open val locationDialogDescription: String = "Description"
@@ -273,8 +272,11 @@ sealed class LocaleStrings {
     
     // ImagePreviewDialog
     open val imageSaveError: String = "Image save error: %s"
+    open val imageSave: String = "Save image"
     open val imageSaveSuccess: String = "Image saved to gallery"
     open val imageSaveFailed: String = "Failed to save image"
+    open val imageShare: String = "Share image"
+    open val imageShareFailed: String = "Failed to open image sharing"
     open val imageLoadFailed: String = "Image loading failed"
 
     // Group

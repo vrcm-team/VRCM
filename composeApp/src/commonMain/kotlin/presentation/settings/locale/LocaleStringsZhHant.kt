@@ -135,7 +135,6 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val friendNetworkEmpty = "暫無關係網資料"
     override val friendNetworkViewCommunity = "社區"
     override val friendNetworkViewEgo = "以我為中心"
-    override val friendNetworkSaveScreenshot = "儲存目前關係網截圖"
     override val locationDialogOwner = "房主"
     override val locationDialogAuthor = "作者"
     override val locationDialogDescription = "描述"
@@ -256,8 +255,11 @@ internal object LocaleStringsZhHant : LocaleStrings() {
 
     // ImagePreviewDialog
     override val imageSaveError = "保存圖片出錯: %s"
+    override val imageSave = "保存圖片"
     override val imageSaveSuccess = "圖片已保存到相冊"
     override val imageSaveFailed = "保存圖片失敗"
+    override val imageShare = "分享圖片"
+    override val imageShareFailed = "無法開啟圖片分享"
     override val imageLoadFailed = "圖片加載失敗"
 
     // Group

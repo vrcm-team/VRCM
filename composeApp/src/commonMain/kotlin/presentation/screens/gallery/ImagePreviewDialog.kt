@@ -31,6 +31,7 @@ import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
+import io.github.vrcmteam.vrcm.core.extensions.shareImage
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
@@ -71,6 +72,7 @@ class ImagePreviewDialog(
         val (_, setDialogContent) = LocationDialogContent.current
         // 添加保存状态跟踪
         var isSaving by remember { mutableStateOf(false) }
+        var isSharing by remember { mutableStateOf(false) }
         val authService = koinInject<AuthService>()
         val strings = strings
         Box(
@@ -79,7 +81,9 @@ class ImagePreviewDialog(
 
         ) {
             // 如果提供了直接URL（如拍立得），直接使用；否则从fileId构造
-            val imageUrl = directImageUrl ?: FileApi.convertFileUrl(fileId, 2048)
+            val previewImageUrl = directImageUrl ?: FileApi.convertFileUrl(fileId, 2048)
+            // 导出和分享使用原始文件端点，预览仍使用受控尺寸避免大图占用内存。
+            val imageUrl = directImageUrl ?: FileApi.convertFileUrlToOriginal(fileId)
             // 为了防止ZoomableImage拦截背景点击事件，单独放在一个Box中
             Box(
                 modifier = Modifier
@@ -87,7 +91,7 @@ class ImagePreviewDialog(
             ) {
                 ZoomableImage(
                     id = fileId,
-                    imageUrl = imageUrl,
+                    imageUrl = previewImageUrl,
                     contentDescription = fileName,
                     maxScale = 5f,
                     minScale = 0.5f,
@@ -100,53 +104,81 @@ class ImagePreviewDialog(
                 )
             }
 
-            // 添加FloatingActionButton用于保存图片，放在右下角
-            FloatingActionButton(
-                onClick = {
-                    if (isSaving) return@FloatingActionButton
-                    // 设置保存状态为true
-                    isSaving = true
-                    coroutineScope.launch(Dispatchers.IO) {
-                        authService.reTryAuthCatching {
-                            platform.saveImageToGallery(
-                                imageUrl = imageUrl,
-                                fileName = "${fileName}${fileExtension}"
-                            )
-                        }.onFailure {
-                            SharedFlowCentre.toastText.emit(
-                                ToastText.Error(
-                                    strings.imageSaveError.replace(
-                                        "%s",
-                                        it.message.orEmpty()
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .align(Alignment.BottomEnd),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        if (isSharing) return@FloatingActionButton
+                        isSharing = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            runCatching { platform.shareImage(imageUrl, "${fileName}${fileExtension}") }
+                                .onSuccess { shared ->
+                                    if (!shared) {
+                                        SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageShareFailed))
+                                    }
+                                }
+                                .onFailure {
+                                    SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageShareFailed))
+                                }
+                            isSharing = false
+                        }
+                    },
+                ) {
+                    if (isSharing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = AppIcons.Share,
+                            contentDescription = strings.imageShare,
+                        )
+                    }
+                }
+                FloatingActionButton(
+                    onClick = {
+                        if (isSaving) return@FloatingActionButton
+                        isSaving = true
+                        coroutineScope.launch(Dispatchers.IO) {
+                            authService.reTryAuthCatching {
+                                platform.saveImageToGallery(
+                                    imageUrl = imageUrl,
+                                    fileName = "${fileName}${fileExtension}"
+                                )
+                            }.onFailure {
+                                SharedFlowCentre.toastText.emit(
+                                    ToastText.Error(
+                                        strings.imageSaveError.replace("%s", it.message.orEmpty())
                                     )
                                 )
-                            )
-                        }.onSuccess { isSuccess ->
-                            if (isSuccess) {
-                                SharedFlowCentre.toastText.emit(ToastText.Success(strings.imageSaveSuccess))
-                            } else {
-                                SharedFlowCentre.toastText.emit(ToastText.Error(strings.imageSaveFailed))
+                            }.onSuccess { isSuccess ->
+                                SharedFlowCentre.toastText.emit(
+                                    if (isSuccess) ToastText.Success(strings.imageSaveSuccess)
+                                    else ToastText.Error(strings.imageSaveFailed)
+                                )
                             }
+                            isSaving = false
                         }
-                        isSaving = false
+                    },
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(
+                            painter = rememberVectorPainter(AppIcons.SaveAlt),
+                            contentDescription = strings.imageSave,
+                        )
                     }
-                },
-                modifier = Modifier.padding(16.dp)
-                    .align(Alignment.BottomEnd),
-            ) {
-                if (isSaving) {
-                    // 保存中显示进度指示器
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 3.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    // 正常状态显示保存图标
-                    Icon(
-                        painter = rememberVectorPainter(AppIcons.SaveAlt),
-                        contentDescription = "Save Image"
-                    )
                 }
             }
 
