@@ -73,9 +73,9 @@ jobs:
           IFS=$'\t' read -r ios_asset ios_size <<< "${ios}"
           IFS=$'\t' read -r desktop_asset desktop_size <<< "${desktop}"
 
-          write_badge badge-data/android-installer-size.json installer 3ddc84 android "${android_size}"
+          write_badge badge-data/android-installer-size.json Android 3ddc84 android "${android_size}"
           write_badge badge-data/ios-installer-size.json iOS 000000 apple "${ios_size}"
-          write_badge badge-data/desktop-installer-size.json Desktop 4a4a4a "" "${desktop_size}"
+          write_badge badge-data/desktop-installer-size.json MacOS 4a4a4a "" "${desktop_size}"
 
           if [ -n "${windows}" ]; then
             IFS=$'\t' read -r windows_asset windows_size <<< "${windows}"
