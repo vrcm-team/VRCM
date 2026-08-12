@@ -51,6 +51,7 @@ class FriendNotificationFactory(private val context: Context) {
         targetId: String,
     ): Notification = builder(SOCIAL_CHANNEL, id, destination, targetId)
         .setContentTitle(title).setContentText(message).setStyle(Notification.BigTextStyle().bigText(message))
+        .setWhen(System.currentTimeMillis()).setShowWhen(true)
         .setCategory(Notification.CATEGORY_SOCIAL).setAutoCancel(true).build()
     private fun builder(
         channel: String,
