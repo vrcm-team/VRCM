@@ -4,7 +4,7 @@
   "message": "pending",
   "color": "0078d4",
   "labelColor": "6e6e73",
-  "logo": "windows",
+  "namedLogo": "windows",
   "logoColor": "white",
   "cacheSeconds": 300
 }
