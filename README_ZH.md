@@ -16,6 +16,10 @@
 
 ## 把 VRChat 社交带到手机上
 
+<div align="center">
+  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM 跨平台 VRChat 社交伴侣界面预览"/>
+</div>
+
 VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它不只展示谁在线，还帮助你理解社交圈、回顾和好友一起玩过的经历，并把分享链接、加入房间、戳一戳和线下聚会等操作接到手机上的真实使用场景里。
 
 与更偏桌面端信息管理和日志查看的工具相比，VRCM 的重点是移动场景中的社交数据、及时提醒和可直接执行的互动流程；这是一种产品侧重点差异，并不是对其他项目的兼容或替代承诺。
@@ -93,14 +97,6 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 | Android | 完整支持 | 包含原生系统提醒、后台好友监测和 VRChat 官网链接接管 |
 | iOS | 支持 | 需要[自签](self-signing.md)；不包含 Android 后台系统提醒 |
 | Desktop | 支持 | Windows、macOS、Linux 原生发行包；系统分享回退为复制链接 |
-
-## 界面预览
-
-<div align="center">
-
-![VRCM 多平台界面预览](image/MultiPlatformPreview.png)
-
-</div>
 
 ## 技术架构
 

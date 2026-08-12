@@ -16,6 +16,10 @@
 
 ## Bring your VRChat social life to your phone
 
+<div align="center">
+  <img src="image/MultiPlatformPreview.png" width="720" alt="VRCM cross-platform VRChat social companion preview"/>
+</div>
+
 VRCM is a cross-platform VRChat companion focused on social connection and convenience. It goes beyond showing who is online: explore your social circles, remember time spent together, and move smoothly from shared links to worlds, interactions, and real-world meetups.
 
 Compared with tools centered on desktop information management and logs, VRCM emphasizes social data, timely alerts, and actions designed for mobile use. This describes a product focus, not a compatibility or replacement claim for another project.
@@ -93,14 +97,6 @@ Compared with tools centered on desktop information management and logs, VRCM em
 | Android | Full | Includes native alerts, background friend monitoring, and VRChat web-link handling |
 | iOS | Supported | Requires [self-signing](self-signing.md); Android background system alerts are not available |
 | Desktop | Supported | Native Windows, macOS, and Linux packages; sharing falls back to copying links |
-
-## Preview
-
-<div align="center">
-
-![VRCM multi-platform UI preview](image/MultiPlatformPreview.png)
-
-</div>
 
 ## Technology
 
