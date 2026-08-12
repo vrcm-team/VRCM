@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "label": "installer",
+  "message": "3.85 MB",
+  "color": "3ddc84",
+  "labelColor": "6e6e73",
+  "logo": "android",
+  "logoColor": "white",
+  "cacheSeconds": 300
+}

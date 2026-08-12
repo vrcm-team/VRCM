@@ -1,0 +1,101 @@
+name: Update release badges
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # Recheck periodically because Windows MSI may be uploaded after release publication.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-badges:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update installer size data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          release_json="$(curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${REPOSITORY}/releases/latest")"
+
+          asset_size() {
+            local pattern="$1"
+            printf '%s' "${release_json}" | jq -r --arg pattern "${pattern}" '
+              [.assets[] | select(.name | test($pattern; "i"))] | .[0] | if . then [.name, (.size | tonumber)] | @tsv else empty end
+            '
+          }
+
+          write_badge() {
+            local output="$1"
+            local label="$2"
+            local color="$3"
+            local logo="$4"
+            local asset="$5"
+            local size="$6"
+            local megabytes
+            megabytes="$(awk -v bytes="${size}" 'BEGIN { printf "%.2f MB", bytes / 1000000 }')"
+
+            jq -n \
+              --arg label "${label}" \
+              --arg message "${megabytes}" \
+              --arg color "${color}" \
+              --arg logo "${logo}" \
+              --arg asset "${asset}" \
+              '{schemaVersion: 1, label: $label, message: $message, color: $color, labelColor: "6e6e73", cacheSeconds: 300, asset: $asset} + (if $logo != "" then {logo: $logo, logoColor: "white"} else {} end)' \
+              > "${output}"
+          }
+
+          android="$(asset_size '\.apk$')"
+          ios="$(asset_size '\.ipa$')"
+          desktop="$(asset_size '\.(dmg|deb)$')"
+          windows="$(asset_size '\.msi$')"
+
+          if [ -z "${android}" ] || [ -z "${ios}" ] || [ -z "${desktop}" ]; then
+            echo "The latest release is missing an APK, IPA, DMG, or DEB asset." >&2
+            printf 'android=%s\nios=%s\ndesktop=%s\n' "${android}" "${ios}" "${desktop}" >&2
+            exit 1
+          fi
+
+          IFS=$'\t' read -r android_asset android_size <<< "${android}"
+          IFS=$'\t' read -r ios_asset ios_size <<< "${ios}"
+          IFS=$'\t' read -r desktop_asset desktop_size <<< "${desktop}"
+
+          write_badge badge-data/android-installer-size.json installer 3ddc84 android "${android_asset}" "${android_size}"
+          write_badge badge-data/ios-installer-size.json iOS 000000 apple "${ios_asset}" "${ios_size}"
+          write_badge badge-data/desktop-installer-size.json Desktop 4a4a4a "" "${desktop_asset}" "${desktop_size}"
+
+          if [ -n "${windows}" ]; then
+            IFS=$'\t' read -r windows_asset windows_size <<< "${windows}"
+            write_badge badge-data/windows-installer-size.json Windows 0078d4 windows "${windows_asset}" "${windows_size}"
+          else
+            echo "No Windows MSI in the latest release; keeping the Windows badge placeholder."
+          fi
+
+      - name: Commit updated badge data
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- badge-data; then
+            echo "Badge data is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add badge-data
+          git commit -m "chore: update release size badges"
+          git push

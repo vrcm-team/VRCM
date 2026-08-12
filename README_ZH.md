@@ -8,9 +8,10 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat&labelColor=6e6e73)](https://opensource.org/licenses/MIT)
 [![GitHub release](https://img.shields.io/github/release/vrcm-team/VRCM.svg?style=flat&labelColor=6e6e73)](https://github.com/vrcm-team/VRCM/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/vrcm-team/VRCM/total?style=flat&labelColor=6e6e73&color=6451f1)](https://github.com/vrcm-team/VRCM/releases/latest)
-[![Installer](https://img.shields.io/badge/installer-11.03%20MB-3ddc84?style=flat&labelColor=6e6e73&logo=android&logoColor=white)](https://github.com/vrcm-team/VRCM/releases/latest)
-[![iOS](https://img.shields.io/badge/iOS-15.18%20MB-000000?style=flat&labelColor=6e6e73&logo=apple&logoColor=white)](https://github.com/vrcm-team/VRCM/releases/latest)
-[![Desktop](https://img.shields.io/badge/Desktop-Supported-4a4a4a?style=flat&labelColor=6e6e73)](https://github.com/vrcm-team/VRCM/releases/latest)
+[![Installer](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vrcm-team/VRCM/main/badge-data/android-installer-size.json&style=flat)](https://github.com/vrcm-team/VRCM/releases/latest)
+[![iOS](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vrcm-team/VRCM/main/badge-data/ios-installer-size.json&style=flat)](https://github.com/vrcm-team/VRCM/releases/latest)
+[![Desktop](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vrcm-team/VRCM/main/badge-data/desktop-installer-size.json&style=flat)](https://github.com/vrcm-team/VRCM/releases/latest)
+[![Windows](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/vrcm-team/VRCM/main/badge-data/windows-installer-size.json&style=flat)](https://github.com/vrcm-team/VRCM/releases/latest)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-blue.svg?style=flat&labelColor=6e6e73&logo=kotlin)](https://kotlinlang.org)
 [![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.10.3-blue?style=flat&labelColor=6e6e73)](https://www.jetbrains.com/lp/compose-multiplatform/)
 
