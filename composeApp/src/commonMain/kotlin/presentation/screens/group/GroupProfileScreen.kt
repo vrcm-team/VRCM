@@ -91,7 +91,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDial
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
-import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlCopyButton
+import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.TextChip
@@ -232,7 +232,7 @@ class GroupProfileScreen(
                         onReturn = { currentNavigator.pop() },
                         onMenu = null,
                         actions = { colors ->
-                            OfficialUrlCopyButton(
+                            OfficialUrlShareButton(
                                 url = "https://vrchat.com/home/group/${group.groupId}",
                                 colors = colors,
                             )

@@ -447,6 +447,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val copyOfficialUrl = "复制官网链接"
     override val officialUrlCopied = "链接已复制"
     override val officialUrlCopyFailed = "无法复制官网链接"
+    override val shareOfficialUrl = "分享官网链接"
+    override val officialUrlShareFailed = "无法打开系统分享"
     override val officialLinkPromptTitle = "打开 VRChat 内容"
     override val officialLinkPromptMessage = "剪贴板中有一个 VRChat %s链接或 ID，是否在 VRCM 中打开？"
     override val officialLinkOpen = "打开"

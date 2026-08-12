@@ -466,6 +466,8 @@ sealed class LocaleStrings {
     open val copyOfficialUrl: String = "Copy official URL"
     open val officialUrlCopied: String = "Link copied"
     open val officialUrlCopyFailed: String = "Could not copy the official URL"
+    open val shareOfficialUrl: String = "Share official URL"
+    open val officialUrlShareFailed: String = "Could not open the share sheet"
     open val officialLinkPromptTitle: String = "Open VRChat content"
     open val officialLinkPromptMessage: String =
         "A VRChat %s link or ID was found in your clipboard. Open it in VRCM?"

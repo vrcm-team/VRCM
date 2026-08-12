@@ -8,5 +8,10 @@ actual fun AppPlatform.openUrl(url: String) {
     Desktop.getDesktop().browse(URI(url))
 }
 
+actual val AppPlatform.supportsSystemShare: Boolean
+    get() = false
+
+actual fun AppPlatform.shareUrl(url: String): Boolean = false
+
 actual val AppPlatform.isSupportBlur: Boolean
     get() = true

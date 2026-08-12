@@ -162,7 +162,7 @@ data class UserProfileScreen(
                 outerScrollState = outerScrollState,
                 innerScrollState = innerScrollState,
                 topBarActions = { colors ->
-                    OfficialUrlCopyButton(
+                    OfficialUrlShareButton(
                         url = "https://vrchat.com/home/user/${currentUser.id}",
                         colors = colors,
                     )

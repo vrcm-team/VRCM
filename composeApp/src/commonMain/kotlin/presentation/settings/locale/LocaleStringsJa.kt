@@ -448,6 +448,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val copyOfficialUrl = "公式URLをコピー"
     override val officialUrlCopied = "リンクをコピーしました"
     override val officialUrlCopyFailed = "公式URLをコピーできませんでした"
+    override val shareOfficialUrl = "公式URLを共有"
+    override val officialUrlShareFailed = "共有シートを開けませんでした"
     override val officialLinkPromptTitle = "VRChatコンテンツを開く"
     override val officialLinkPromptMessage =
         "クリップボードにVRChatの%sリンクまたはIDがあります。VRCMで開きますか？"

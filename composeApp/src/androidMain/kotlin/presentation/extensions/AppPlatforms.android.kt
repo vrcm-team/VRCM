@@ -17,6 +17,22 @@ actual fun AppPlatform.openUrl(url: String) {
     }
 }
 
+actual val AppPlatform.supportsSystemShare: Boolean
+    get() = true
+
+actual fun AppPlatform.shareUrl(url: String): Boolean = runCatching {
+    with(this as AndroidAppPlatform) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        context.startActivity(
+            Intent.createChooser(sendIntent, null)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}.isSuccess
+
 actual val AppPlatform.isSupportBlur: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 

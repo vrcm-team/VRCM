@@ -747,7 +747,7 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null,
             actions = { colors ->
-                OfficialUrlCopyButton(
+                OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
                 )

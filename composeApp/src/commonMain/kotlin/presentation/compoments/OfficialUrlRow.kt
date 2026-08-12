@@ -13,46 +13,64 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.presentation.extensions.shareUrl
+import io.github.vrcmteam.vrcm.presentation.extensions.supportsSystemShare
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.launch
 
-/** Provides an icon action that copies a public VRChat URL without displaying it inline. */
+/** Shares a public VRChat URL, with a clipboard fallback on unsupported platforms. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OfficialUrlCopyButton(
+fun OfficialUrlShareButton(
     url: String,
     modifier: Modifier = Modifier,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
 ) {
+    val platform = getAppPlatform()
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val usesSystemShare = platform.supportsSystemShare
+    val actionDescription = if (usesSystemShare) strings.shareOfficialUrl else strings.copyOfficialUrl
     val copiedMessage = strings.officialUrlCopied
-    val failedMessage = strings.officialUrlCopyFailed
+    val failedMessage = if (usesSystemShare) {
+        strings.officialUrlShareFailed
+    } else {
+        strings.officialUrlCopyFailed
+    }
 
-    ATooltipBox(tooltip = { Text(strings.copyOfficialUrl) }) {
+    ATooltipBox(tooltip = { Text(actionDescription) }) {
         IconButton(
             modifier = modifier,
             colors = colors,
             onClick = {
-                val copied = runCatching {
-                    clipboard.setText(AnnotatedString(url))
-                }.isSuccess
-                scope.launch {
-                    SharedFlowCentre.toastText.emit(
-                        if (copied) {
-                            ToastText.Success(copiedMessage)
-                        } else {
-                            ToastText.Error(failedMessage)
+                if (usesSystemShare) {
+                    if (!runCatching { platform.shareUrl(url) }.getOrDefault(false)) {
+                        scope.launch {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(failedMessage))
                         }
-                    )
+                    }
+                } else {
+                    val copied = runCatching {
+                        clipboard.setText(AnnotatedString(url))
+                    }.isSuccess
+                    scope.launch {
+                        SharedFlowCentre.toastText.emit(
+                            if (copied) {
+                                ToastText.Success(copiedMessage)
+                            } else {
+                                ToastText.Error(failedMessage)
+                            }
+                        )
+                    }
                 }
             },
         ) {
             Icon(
-                imageVector = AppIcons.ContentCopy,
-                contentDescription = strings.copyOfficialUrl,
+                imageVector = if (usesSystemShare) AppIcons.Share else AppIcons.ContentCopy,
+                contentDescription = actionDescription,
                 modifier = Modifier.size(20.dp),
             )
         }
