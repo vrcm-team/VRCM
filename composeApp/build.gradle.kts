@@ -231,6 +231,10 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = libs.versions.app.packageName.get()
             packageVersion = libs.versions.app.version.get()
+
+            macOS {
+                iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+            }
         }
     }
 }
