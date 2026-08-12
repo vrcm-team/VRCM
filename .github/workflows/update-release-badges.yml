@@ -47,7 +47,7 @@ jobs:
             local logo="$4"
             local size="$5"
             local megabytes
-            megabytes="$(awk -v bytes="${size}" 'BEGIN { printf "%.2f MB", bytes / 1000000 }')"
+            megabytes="$(awk -v bytes="${size}" 'BEGIN { printf "%.2f MB", bytes / 1048576 }')"
 
             jq -n \
               --arg label "${label}" \
