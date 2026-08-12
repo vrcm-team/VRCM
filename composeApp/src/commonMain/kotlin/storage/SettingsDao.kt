@@ -22,6 +22,7 @@ class SettingsDao(
                 boopNotificationsEnabled = boopNotificationsEnabled,
                 friendRequestNotificationsEnabled = friendRequestNotificationsEnabled,
                 groupAnnouncementNotificationsEnabled = groupAnnouncementNotificationsEnabled,
+                vrchatStatusNotificationsEnabled = vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = backgroundFriendMonitoringEnabled,
             )
@@ -43,6 +44,7 @@ class SettingsDao(
             boopNotificationsEnabled = value.boopNotificationsEnabled
             friendRequestNotificationsEnabled = value.friendRequestNotificationsEnabled
             groupAnnouncementNotificationsEnabled = value.groupAnnouncementNotificationsEnabled
+            vrchatStatusNotificationsEnabled = value.vrchatStatusNotificationsEnabled
             friendPresenceFilter = value.friendPresenceFilter
             backgroundFriendMonitoringEnabled = value.backgroundFriendMonitoringEnabled
         }
@@ -77,6 +79,21 @@ class SettingsDao(
     var groupAnnouncementNotificationsEnabled: Boolean
         get() = settingsSettings.getBoolean(DaoKeys.Settings.GROUP_ANNOUNCEMENT_NOTIFICATIONS_ENABLED_KEY, false)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.GROUP_ANNOUNCEMENT_NOTIFICATIONS_ENABLED_KEY, value)
+
+    var vrchatStatusNotificationsEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.VRCHAT_STATUS_NOTIFICATIONS_ENABLED_KEY, false)
+        set(value) {
+            settingsSettings.putBoolean(DaoKeys.Settings.VRCHAT_STATUS_NOTIFICATIONS_ENABLED_KEY, value)
+            if (!value) lastVrchatStatusIndicator = null
+        }
+
+    var lastVrchatStatusIndicator: String?
+        get() = settingsSettings.getStringOrNull(DaoKeys.Settings.LAST_VRCHAT_STATUS_INDICATOR_KEY)
+        set(value) {
+            value?.takeIf(String::isNotBlank)?.let {
+                settingsSettings.putString(DaoKeys.Settings.LAST_VRCHAT_STATUS_INDICATOR_KEY, it)
+            } ?: settingsSettings.remove(DaoKeys.Settings.LAST_VRCHAT_STATUS_INDICATOR_KEY)
+        }
 
     /** 名单是结构化数据，Settings 只能存字符串，因此整体序列化；解析失败按默认值处理。 */
     var friendPresenceFilter: FriendPresenceFilter

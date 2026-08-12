@@ -10,4 +10,21 @@
     <string name="friend_boop_title">%1$s がBoopしました</string>
     <string name="friend_request_title">%1$s からフレンド申請</string>
     <string name="group_announcement_title">%1$s のお知らせ</string>
+    <string name="group_notification_default_name">グループ</string>
+    <string name="group_notification_title">%1$s の通知</string>
+    <string name="group_event_created_title">%1$s がイベントを作成しました</string>
+    <string name="group_event_starting_title">%1$s のイベントがまもなく開始します</string>
+    <string name="group_informative_title">%1$s のグループ情報</string>
+    <string name="group_change_title">%1$s のグループが変更されました</string>
+    <string name="group_join_request_title">%1$s に新しい参加申請があります</string>
+    <string name="group_transfer_title">%1$s に譲渡リクエストがあります</string>
+    <string name="group_queue_ready_title">%1$s のキューの準備ができました</string>
+    <string name="vrchat_status_channel">VRChat サービス状況</string>
+    <string name="vrchat_status_incident_title">VRChat サービス障害</string>
+    <string name="vrchat_status_restored_title">VRChat サービス復旧</string>
+    <string name="vrchat_status_minor">一部の VRChat サービスで問題が発生しています</string>
+    <string name="vrchat_status_major">VRChat サービスで大規模な障害が発生しています</string>
+    <string name="vrchat_status_critical">VRChat サービスで重大な障害が発生しています</string>
+    <string name="vrchat_status_unknown">VRChat がサービス障害を報告しています</string>
+    <string name="vrchat_status_restored_message">すべてのシステムが正常に戻りました</string>
 </resources>

@@ -6,11 +6,14 @@ import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.service.FriendOnlineNotificationService
+import io.github.vrcmteam.vrcm.service.VrchatStatusNotificationService
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -28,6 +31,17 @@ class VRCMApplication : Application() {
             modules(commonModules + platformModule)
         }
         val koin = app.koin
+
+        // Statuspage is public and independent of VRChat authentication. The application owns the
+        // polling lifetime; Android's optional foreground monitor keeps this process alive when the
+        // user also wants reliable background delivery.
+        scope.launch {
+            val statusNotifications = koin.get<VrchatStatusNotificationService>()
+            while (isActive) {
+                statusNotifications.checkOnce()
+                delay(STATUS_REFRESH_INTERVAL_MILLIS)
+            }
+        }
 
         // 好友通知与后台监测都只在登录之后才有意义，所以整条依赖链等出现有效会话再解析。
         // 放在 onCreate 里同步 get 会把 Room、网络客户端、通知渠道以及 AccountCacheManager
@@ -47,5 +61,9 @@ class VRCMApplication : Application() {
                 koin.get<Logger>().error("Background friend monitoring could not be restored: $result")
             }
         }
+    }
+
+    private companion object {
+        const val STATUS_REFRESH_INTERVAL_MILLIS = 5 * 60_000L
     }
 }

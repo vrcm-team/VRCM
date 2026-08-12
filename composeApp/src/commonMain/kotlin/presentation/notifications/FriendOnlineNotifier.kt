@@ -9,8 +9,10 @@ interface FriendOnlineNotifier {
     fun notifyBoop(notificationId: String, displayName: String, emojiId: String?)
     fun notifyFriendRequest(notificationId: String, displayName: String)
 
-    /** [groupName] and [title] come straight from the announcement payload. */
-    fun notifyGroupAnnouncement(notificationId: String, groupName: String, title: String)
+    /** [groupName] and [message] come from the VRChat group notification payload. */
+    fun notifyGroupEvent(notificationId: String, type: String, groupName: String, message: String)
+    fun notifyVrchatServiceIncident(indicator: String, description: String)
+    fun notifyVrchatServiceRestored()
 }
 
 internal class NoOpFriendOnlineNotifier : FriendOnlineNotifier {
@@ -18,5 +20,7 @@ internal class NoOpFriendOnlineNotifier : FriendOnlineNotifier {
     override fun notifyOffline(friendId: String, displayName: String) = Unit
     override fun notifyBoop(notificationId: String, displayName: String, emojiId: String?) = Unit
     override fun notifyFriendRequest(notificationId: String, displayName: String) = Unit
-    override fun notifyGroupAnnouncement(notificationId: String, groupName: String, title: String) = Unit
+    override fun notifyGroupEvent(notificationId: String, type: String, groupName: String, message: String) = Unit
+    override fun notifyVrchatServiceIncident(indicator: String, description: String) = Unit
+    override fun notifyVrchatServiceRestored() = Unit
 }

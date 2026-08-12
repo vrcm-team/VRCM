@@ -95,9 +95,13 @@ sealed class LocaleStrings {
     open val notificationBoopDescription: String = "Alerts for every Boop you receive"
     open val notificationFriendRequestAlert: String = "Friend requests"
     open val notificationFriendRequestAlertDescription: String = "Alerts for every incoming friend request"
-    open val notificationGroupAnnouncement: String = "Group announcements"
+    open val notificationGroupAnnouncement: String = "Group notifications"
     open val notificationGroupAnnouncementDescription: String =
-        "Alerts for announcements from groups you joined"
+        "Alerts for announcements, events, and management messages from groups you joined"
+    open val notificationSectionServiceStatus: String = "Service status"
+    open val notificationVrchatStatus: String = "VRChat service alerts"
+    open val notificationVrchatStatusDescription: String =
+        "Alerts when VRChat reports an outage and when services recover"
     open val notificationSectionBackground: String = "Background"
     open val notificationBackgroundDescription: String =
         "Keeps monitoring friend activity while the app is in the background"
@@ -147,6 +151,7 @@ sealed class LocaleStrings {
     open val friendNetworkEmpty: String = "No network data yet"
     open val friendNetworkViewCommunity: String = "Circles"
     open val friendNetworkViewEgo: String = "Around me"
+    open val friendNetworkSaveScreenshot: String = "Save visible network"
     open val locationDialogOwner: String = "Owner"
     open val locationDialogAuthor: String = "Author"
     open val locationDialogDescription: String = "Description"

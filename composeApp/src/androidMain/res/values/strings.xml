@@ -10,4 +10,21 @@
     <string name="friend_boop_title">%1$s booped you</string>
     <string name="friend_request_title">%1$s sent a friend request</string>
     <string name="group_announcement_title">%1$s posted an announcement</string>
+    <string name="group_notification_default_name">A group</string>
+    <string name="group_notification_title">%1$s notification</string>
+    <string name="group_event_created_title">%1$s created an event</string>
+    <string name="group_event_starting_title">%1$s event is starting</string>
+    <string name="group_informative_title">%1$s group information</string>
+    <string name="group_change_title">%1$s group changed</string>
+    <string name="group_join_request_title">%1$s join request</string>
+    <string name="group_transfer_title">%1$s transfer request</string>
+    <string name="group_queue_ready_title">%1$s queue is ready</string>
+    <string name="vrchat_status_channel">VRChat service status</string>
+    <string name="vrchat_status_incident_title">VRChat service issue</string>
+    <string name="vrchat_status_restored_title">VRChat service restored</string>
+    <string name="vrchat_status_minor">Some VRChat services are experiencing issues</string>
+    <string name="vrchat_status_major">A major VRChat service outage is in progress</string>
+    <string name="vrchat_status_critical">VRChat services are experiencing a critical outage</string>
+    <string name="vrchat_status_unknown">VRChat reports a service issue</string>
+    <string name="vrchat_status_restored_message">All systems are operational again</string>
 </resources>

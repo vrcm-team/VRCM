@@ -167,13 +167,14 @@ class FriendOnlineNotificationService(
                 )
             }
 
-            notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
+            isGroupNotificationType(notification.type) -> {
                 if (!settingsDao.groupAnnouncementNotificationsEnabled) return
                 val details = notification.details ?: notification.data
-                notifier.notifyGroupAnnouncement(
+                notifier.notifyGroupEvent(
                     eventId,
+                    notification.type,
                     details.groupName ?: notification.title.orEmpty(),
-                    details.announcementTitle ?: notification.message,
+                    details.announcementTitle ?: notification.message.ifBlank { notification.title.orEmpty() },
                 )
             }
 
@@ -325,14 +326,15 @@ class FriendOnlineNotificationService(
                 )
             }
 
-            notification.type.startsWith(GROUP_ANNOUNCEMENT_TYPE_PREFIX, ignoreCase = true) -> {
+            isGroupNotificationType(notification.type) -> {
                 if (!settingsDao.groupAnnouncementNotificationsEnabled) return
-                // 群组公告本来就只发给已加入的群组成员，不需要再按群组过滤一次。
+                // 群组通知本来就只发给已加入的群组成员，不需要再按群组过滤一次。
                 val details = notification.details ?: notification.data
-                notifier.notifyGroupAnnouncement(
+                notifier.notifyGroupEvent(
                     eventId,
+                    notification.type,
                     details.groupName ?: notification.title.orEmpty(),
-                    details.announcementTitle ?: notification.message,
+                    details.announcementTitle ?: notification.message.ifBlank { notification.title.orEmpty() },
                 )
             }
         }
@@ -370,10 +372,25 @@ class FriendOnlineNotificationService(
     private companion object {
         const val BOOP_TYPE = "boop"
 
-        /** VRChat 把群组类通知统一放在 group. 前缀下，公告是其中的 group.announcement。 */
-        const val GROUP_ANNOUNCEMENT_TYPE_PREFIX = "group.announcement"
     }
 }
+
+/**
+ * VRChat notification types that represent group announcements, events, or management messages.
+ * Group invites are intentionally excluded because they have a dedicated in-app flow.
+ */
+internal fun isGroupNotificationType(type: String): Boolean = type.trim().lowercase() in GROUP_NOTIFICATION_TYPES
+
+private val GROUP_NOTIFICATION_TYPES = setOf(
+    "groupchange",
+    "group.announcement",
+    "group.event.created",
+    "group.event.starting",
+    "group.informative",
+    "group.joinrequest",
+    "group.transfer",
+    "group.queueready",
+)
 
 private fun NotificationContent.senderName(): String =
     data.boopingUserDisplayName?.takeIf(String::isNotBlank)

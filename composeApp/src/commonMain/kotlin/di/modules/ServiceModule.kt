@@ -29,6 +29,7 @@ val serviceModule: Module = module {
     singleOf(::FriendService)
     singleOf(::FriendActivityService)
     singleOf(::FriendOnlineNotificationService)
+    singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
     singleOf(::WorldPlatformService)

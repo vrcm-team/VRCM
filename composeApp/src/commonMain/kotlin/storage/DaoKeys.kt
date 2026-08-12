@@ -71,6 +71,8 @@ object DaoKeys{
         const val BOOP_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.boopNotificationsEnabled"
         const val FRIEND_REQUEST_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.friendRequestNotificationsEnabled"
         const val GROUP_ANNOUNCEMENT_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.groupAnnouncementNotificationsEnabled"
+        const val VRCHAT_STATUS_NOTIFICATIONS_ENABLED_KEY = "${PREFIX}.vrchatStatusNotificationsEnabled"
+        const val LAST_VRCHAT_STATUS_INDICATOR_KEY = "${PREFIX}.lastVrchatStatusIndicator"
         const val PRESENCE_FILTER_KEY = "${PREFIX}.friendPresenceFilter"
         const val BACKGROUND_FRIEND_MONITORING_ENABLED_KEY = "${PREFIX}.backgroundFriendMonitoringEnabled"
 

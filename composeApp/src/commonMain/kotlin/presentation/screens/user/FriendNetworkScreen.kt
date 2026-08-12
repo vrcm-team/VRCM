@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -49,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -60,6 +62,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -71,6 +75,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.core.extensions.saveImageBytesToGallery
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.getAppPlatform
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -78,14 +85,18 @@ import io.github.vrcmteam.vrcm.core.algorithms.ForceLayoutResult
 import io.github.vrcmteam.vrcm.core.algorithms.convexHull
 import io.github.vrcmteam.vrcm.network.api.users.data.MutualFriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.time.ExperimentalTime
@@ -104,7 +115,15 @@ object FriendNetworkScreen : AppRoute {
         // 图例选中的社区，与个人长按高亮互斥
         val selectedCommunityState = remember { mutableStateOf<Int?>(null) }
         var showSheet by remember { mutableStateOf(false) }
+        var savingScreenshot by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
+        val scope = rememberCoroutineScope()
+        val platform = getAppPlatform()
+        val imageCodec = koinInject<PlatformImageCodec>()
+        val graphLayer = rememberGraphicsLayer()
+        val saveSuccessMessage = strings.imageSaveSuccess
+        val saveFailedMessage = strings.imageSaveFailed
+        val saveErrorTemplate = strings.imageSaveError
 
         val density = LocalDensity.current
         // 最大头像尺寸（基础 40dp + 度数加成 44dp），布局间距按此计算
@@ -153,6 +172,47 @@ object FriendNetworkScreen : AppRoute {
                         }
                     },
                     actions = {
+                        IconButton(
+                            enabled = state.nodes.isNotEmpty() &&
+                                !state.isLoading &&
+                                !state.isPreparing &&
+                                !savingScreenshot,
+                            onClick = {
+                                if (savingScreenshot) return@IconButton
+                                savingScreenshot = true
+                                scope.launch {
+                                    runCatching {
+                                        val bytes = imageCodec.encodePng(graphLayer.toImageBitmap())
+                                        platform.saveImageBytesToGallery(
+                                            bytes = bytes,
+                                            fileName = friendNetworkScreenshotFileName(),
+                                        )
+                                    }.onSuccess { saved ->
+                                        SharedFlowCentre.toastText.emit(
+                                            if (saved) ToastText.Success(saveSuccessMessage)
+                                            else ToastText.Error(saveFailedMessage),
+                                        )
+                                    }.onFailure { error ->
+                                        SharedFlowCentre.toastText.emit(
+                                            ToastText.Error(
+                                                saveErrorTemplate.replace("%s", error.message.orEmpty()),
+                                            ),
+                                        )
+                                    }
+                                    savingScreenshot = false
+                                }
+                            },
+                        ) {
+                            if (savingScreenshot) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    painter = rememberVectorPainter(AppIcons.SaveAlt),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    contentDescription = strings.friendNetworkSaveScreenshot,
+                                )
+                            }
+                        }
                         IconButton(
                             enabled = !state.isLoading,
                             onClick = { model.refresh(nodeSizePx) }
@@ -216,7 +276,16 @@ object FriendNetworkScreen : AppRoute {
                         }
                     )
                 }
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Capture only the visible graph viewport. The toolbar, status text and
+                        // controls stay out of the saved screenshot.
+                        .drawWithContent {
+                            graphLayer.record { this@drawWithContent.drawContent() }
+                            drawLayer(graphLayer)
+                        },
+                ) {
                     val isEgoView = state.viewMode == FriendNetworkViewMode.Ego
                     val layout = if (isEgoView) state.egoLayout else state.layout
                     if (state.nodes.isEmpty() && !state.isLoading && !state.isPreparing) {
@@ -291,6 +360,10 @@ object FriendNetworkScreen : AppRoute {
         }
     }
 }
+
+@OptIn(ExperimentalTime::class)
+private fun friendNetworkScreenshotFileName(): String =
+    "VRCM_FriendNetwork_${kotlin.time.Clock.System.now().toEpochMilliseconds()}.png"
 
 @Composable
 private fun FriendNetworkHeader(

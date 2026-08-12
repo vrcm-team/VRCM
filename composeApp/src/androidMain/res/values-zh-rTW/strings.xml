@@ -10,4 +10,21 @@
     <string name="friend_boop_title">%1$s 戳你</string>
     <string name="friend_request_title">%1$s 申請加為好友</string>
     <string name="group_announcement_title">%1$s 發布了公告</string>
+    <string name="group_notification_default_name">群組</string>
+    <string name="group_notification_title">%1$s 有新通知</string>
+    <string name="group_event_created_title">%1$s 建立了活動</string>
+    <string name="group_event_starting_title">%1$s 的活動即將開始</string>
+    <string name="group_informative_title">%1$s 發布了群組資訊</string>
+    <string name="group_change_title">%1$s 發生了群組變更</string>
+    <string name="group_join_request_title">%1$s 有新的加入申請</string>
+    <string name="group_transfer_title">%1$s 有新的轉讓請求</string>
+    <string name="group_queue_ready_title">%1$s 佇列已就緒</string>
+    <string name="vrchat_status_channel">VRChat 服務狀態</string>
+    <string name="vrchat_status_incident_title">VRChat 服務異常</string>
+    <string name="vrchat_status_restored_title">VRChat 服務已恢復</string>
+    <string name="vrchat_status_minor">部分 VRChat 服務出現異常</string>
+    <string name="vrchat_status_major">VRChat 服務發生大範圍異常</string>
+    <string name="vrchat_status_critical">VRChat 服務發生嚴重中斷</string>
+    <string name="vrchat_status_unknown">VRChat 回報了服務異常</string>
+    <string name="vrchat_status_restored_message">所有系統已恢復正常</string>
 </resources>

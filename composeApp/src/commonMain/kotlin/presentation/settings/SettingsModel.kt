@@ -45,6 +45,7 @@ class SettingsModel(
                 boopNotificationsEnabled = it.boopNotificationsEnabled,
                 friendRequestNotificationsEnabled = it.friendRequestNotificationsEnabled,
                 groupAnnouncementNotificationsEnabled = it.groupAnnouncementNotificationsEnabled,
+                vrchatStatusNotificationsEnabled = it.vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = it.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = it.backgroundFriendMonitoringEnabled,
             )
@@ -66,6 +67,7 @@ class SettingsModel(
                 boopNotificationsEnabled = settings.boopNotificationsEnabled,
                 friendRequestNotificationsEnabled = settings.friendRequestNotificationsEnabled,
                 groupAnnouncementNotificationsEnabled = settings.groupAnnouncementNotificationsEnabled,
+                vrchatStatusNotificationsEnabled = settings.vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = settings.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = settings.backgroundFriendMonitoringEnabled,
             )

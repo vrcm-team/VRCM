@@ -256,6 +256,19 @@ object NotificationSettingsScreen : AppDetailRoute {
                     }
                 }
 
+                item { HorizontalDivider() }
+                item { SectionTitle(strings.notificationSectionServiceStatus) }
+                item {
+                    NotificationPermissionSwitchRow(
+                        platform = platform,
+                        title = strings.notificationVrchatStatus,
+                        description = strings.notificationVrchatStatusDescription,
+                        checked = currentSettings.vrchatStatusNotificationsEnabled,
+                    ) {
+                        currentSettings = currentSettings.copy(vrchatStatusNotificationsEnabled = it)
+                    }
+                }
+
                 if (platform.supportsBackgroundFriendMonitoring) {
                     item { HorizontalDivider() }
                     item { BackgroundMonitoringSection(platform) }

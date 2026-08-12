@@ -13,6 +13,7 @@ data class SettingsData(
     val boopNotificationsEnabled: Boolean = false,
     val friendRequestNotificationsEnabled: Boolean = false,
     val groupAnnouncementNotificationsEnabled: Boolean = false,
+    val vrchatStatusNotificationsEnabled: Boolean = false,
     val friendPresenceFilter: FriendPresenceFilter = FriendPresenceFilter.Default,
     val backgroundFriendMonitoringEnabled: Boolean = false,
 )

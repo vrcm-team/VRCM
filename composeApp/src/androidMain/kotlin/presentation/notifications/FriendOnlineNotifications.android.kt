@@ -20,6 +20,8 @@ import io.github.vrcmteam.vrcm.service.NotificationLaunchDestination
 
 private const val SOCIAL_CHANNEL = "friend_activity_alerts_v2"
 private const val MONITOR_CHANNEL = "friend_activity_monitor"
+private const val SERVICE_STATUS_CHANNEL = "vrchat_service_status"
+private const val SERVICE_STATUS_NOTIFICATION_ID = 0x56525354
 
 class FriendNotificationFactory(private val context: Context) {
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -53,6 +55,16 @@ class FriendNotificationFactory(private val context: Context) {
         .setContentTitle(title).setContentText(message).setStyle(Notification.BigTextStyle().bigText(message))
         .setWhen(System.currentTimeMillis()).setShowWhen(true)
         .setCategory(Notification.CATEGORY_SOCIAL).setAutoCancel(true).build()
+    fun serviceStatus(title: String, message: CharSequence): Notification =
+        builder(SERVICE_STATUS_CHANNEL, SERVICE_STATUS_NOTIFICATION_ID)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(Notification.BigTextStyle().bigText(message))
+            .setWhen(System.currentTimeMillis())
+            .setShowWhen(true)
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .build()
     private fun builder(
         channel: String,
         code: Int,
@@ -75,6 +87,7 @@ class FriendNotificationFactory(private val context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         manager.createNotificationChannel(NotificationChannel(SOCIAL_CHANNEL, context.getString(R.string.friend_social_channel), NotificationManager.IMPORTANCE_HIGH))
         manager.createNotificationChannel(NotificationChannel(MONITOR_CHANNEL, context.getString(R.string.friend_monitor_channel), NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) })
+        manager.createNotificationChannel(NotificationChannel(SERVICE_STATUS_CHANNEL, context.getString(R.string.vrchat_status_channel), NotificationManager.IMPORTANCE_HIGH))
     }
 }
 
@@ -141,17 +154,57 @@ class AndroidFriendOnlineNotifier(private val context: Context) : FriendOnlineNo
         )
     }
 
-    override fun notifyGroupAnnouncement(notificationId: String, groupName: String, title: String) {
+    override fun notifyGroupEvent(notificationId: String, type: String, groupName: String, message: String) {
         if (!canNotify()) return
         val id = notificationId.hashCode()
         context.getSystemService(NotificationManager::class.java).notify(
             id,
             factory.social(
                 id,
-                context.getString(R.string.group_announcement_title, groupName),
-                title,
+                groupEventTitle(type, groupName),
+                message,
                 NotificationLaunchDestination.NotificationCenter,
                 notificationId,
+            ),
+        )
+    }
+
+    private fun groupEventTitle(type: String, groupName: String): String {
+        val name = groupName.ifBlank { context.getString(R.string.group_notification_default_name) }
+        return when (type.trim().lowercase()) {
+            "group.announcement" -> context.getString(R.string.group_announcement_title, name)
+            "group.event.created" -> context.getString(R.string.group_event_created_title, name)
+            "group.event.starting" -> context.getString(R.string.group_event_starting_title, name)
+            "group.informative" -> context.getString(R.string.group_informative_title, name)
+            "groupchange" -> context.getString(R.string.group_change_title, name)
+            "group.joinrequest" -> context.getString(R.string.group_join_request_title, name)
+            "group.transfer" -> context.getString(R.string.group_transfer_title, name)
+            "group.queueready" -> context.getString(R.string.group_queue_ready_title, name)
+            else -> context.getString(R.string.group_notification_title, name)
+        }
+    }
+
+    override fun notifyVrchatServiceIncident(indicator: String, description: String) {
+        if (!canNotify()) return
+        val message = when (indicator) {
+            "minor" -> context.getString(R.string.vrchat_status_minor)
+            "major" -> context.getString(R.string.vrchat_status_major)
+            "critical" -> context.getString(R.string.vrchat_status_critical)
+            else -> description.ifBlank { context.getString(R.string.vrchat_status_unknown) }
+        }
+        context.getSystemService(NotificationManager::class.java).notify(
+            SERVICE_STATUS_NOTIFICATION_ID,
+            factory.serviceStatus(context.getString(R.string.vrchat_status_incident_title), message),
+        )
+    }
+
+    override fun notifyVrchatServiceRestored() {
+        if (!canNotify()) return
+        context.getSystemService(NotificationManager::class.java).notify(
+            SERVICE_STATUS_NOTIFICATION_ID,
+            factory.serviceStatus(
+                context.getString(R.string.vrchat_status_restored_title),
+                context.getString(R.string.vrchat_status_restored_message),
             ),
         )
     }
