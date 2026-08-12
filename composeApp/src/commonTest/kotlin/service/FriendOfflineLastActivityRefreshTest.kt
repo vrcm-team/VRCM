@@ -10,7 +10,9 @@ import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -40,6 +42,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
@@ -48,10 +52,108 @@ import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
+    @Test
+    fun repeatedPresenceSocketEventsOnlyPublishRealTransitions() {
+        runBlocking {
+            SharedFlowCentre.emitLogout()
+            val account = AccountDto(userId = "usr_owner", username = "owner")
+            SharedFlowCentre.emitAuthenticated(account)
+            val session = assertNotNull(SharedFlowCentre.currentSession.value)
+            val friend = friend()
+            val json = Json { ignoreUnknownKeys = true }
+            val client = HttpClient(MockEngine) {
+                engine {
+                    addHandler { request ->
+                        when (request.url.encodedPath) {
+                            "/auth/user/friends" -> {
+                                val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                                val offline = request.url.parameters["offline"] == "true"
+                                respond(
+                                    content = json.encodeToString(
+                                        if (offset == 0 && !offline) listOf(friend) else emptyList()
+                                    ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                                )
+                            }
+                            "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
+                            else -> error("Unexpected request: ${request.url}")
+                        }
+                    }
+                }
+                install(ContentNegotiation) { json(json) }
+            }
+            val friendService = createFriendService(
+                account,
+                client,
+                json,
+                InMemoryFriendListCacheStore(),
+            )
+
+            try {
+                withTimeout(3_000L) {
+                    while (!friendService.initialRefreshCompleted.value) yield()
+                }
+                val subscribed = CompletableDeferred<Unit>()
+                val received = mutableListOf<FriendUpdateEvent>()
+                val terminalEvent = async {
+                    friendService.friendUpdateFlow
+                        .onStart { subscribed.complete(Unit) }
+                        .first { update ->
+                            received += update.event
+                            update.event is FriendUpdateEvent.LocationChanged
+                        }
+                }
+                subscribed.await()
+
+                suspend fun emit(type: String, content: String) = SharedFlowCentre.emitWebSocket(
+                    AccountWebSocketEvent(session.token, WebSocketEvent(type, content))
+                )
+                val onlineContent = json.encodeToString(
+                    FriendOnlineContent(
+                        location = friend.location,
+                        platform = friend.lastPlatform,
+                        travelingToLocation = "",
+                        userId = friend.id,
+                        worldId = "wrld_world",
+                    )
+                )
+                val offlineContent = json.encodeToString(FriendOfflineContent(userId = friend.id))
+                emit(FriendEvents.FriendOnline.typeName, onlineContent)
+                emit(FriendEvents.FriendOffline.typeName, offlineContent)
+                emit(FriendEvents.FriendOffline.typeName, offlineContent)
+                emit(FriendEvents.FriendOnline.typeName, onlineContent)
+                emit(
+                    FriendEvents.FriendLocation.typeName,
+                    json.encodeToString(
+                        FriendLocationContent(
+                            canRequestInvite = false,
+                            location = "wrld_other:instance_b",
+                            travelingToLocation = "",
+                            userId = friend.id,
+                            worldId = "wrld_other",
+                        )
+                    ),
+                )
+                withTimeout(3_000L) { terminalEvent.await() }
+
+                assertEquals(3, received.size)
+                assertIs<FriendUpdateEvent.Offline>(received[0])
+                assertIs<FriendUpdateEvent.Online>(received[1])
+                assertIs<FriendUpdateEvent.LocationChanged>(received[2])
+            } finally {
+                friendService.dispose()
+                SharedFlowCentre.emitLogout()
+                client.close()
+            }
+        }
+    }
+
     @Test
     fun offlineSocketRefreshesLastActivityFromOfflineFriendsEndpoint() = runBlocking {
         SharedFlowCentre.emitLogout()

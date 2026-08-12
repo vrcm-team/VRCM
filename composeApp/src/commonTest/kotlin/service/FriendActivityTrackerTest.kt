@@ -6,6 +6,39 @@ import kotlin.test.assertTrue
 
 class FriendActivityTrackerTest {
     @Test
+    fun repeatedSocketPresenceOnlyRecordsStateTransitions() {
+        val tracker = FriendActivityTracker()
+        val friend = FriendActivityObservation(
+            userId = "usr_friend",
+            displayName = "Friend",
+            profileImageUrl = "",
+            location = "wrld_world:instance_a",
+            status = "active",
+            statusDescription = "",
+            bio = "",
+            lastActivityAtMillis = null,
+        )
+
+        fun presence(type: FriendSocketPresenceType, occurredAtMillis: Long) =
+            tracker.observeSocketPresence(
+                friends = listOf(friend),
+                event = FriendSocketPresenceEvent(friend.userId, type, occurredAtMillis),
+            )
+
+        val firstOnline = presence(FriendSocketPresenceType.Online, 1_000L)
+        val repeatedOnline = presence(FriendSocketPresenceType.Online, 2_000L)
+        val firstOffline = presence(FriendSocketPresenceType.Offline, 3_000L)
+        val repeatedOffline = presence(FriendSocketPresenceType.Offline, 4_000L)
+        val onlineAgain = presence(FriendSocketPresenceType.Online, 5_000L)
+
+        assertEquals(listOf(FriendActivityEventType.Online), firstOnline.events.map { it.type })
+        assertTrue(repeatedOnline.events.isEmpty())
+        assertEquals(listOf(FriendActivityEventType.Offline), firstOffline.events.map { it.type })
+        assertTrue(repeatedOffline.events.isEmpty())
+        assertEquals(listOf(FriendActivityEventType.Online), onlineAgain.events.map { it.type })
+    }
+
+    @Test
     fun socketPresenceIsRecordedBeforeFriendSnapshotIsAvailable() {
         val result = FriendActivityTracker().observeSocketPresence(
             friends = emptyList(),
@@ -216,6 +249,43 @@ class FriendActivityTrackerTest {
         assertEquals("join me\nCome over", changes.events.first().currentValue)
         assertEquals("First line\nShared line", changes.events[1].previousValue)
         assertEquals("Second line\nShared line", changes.events[1].currentValue)
+    }
+
+    @Test
+    fun travelingToAnotherWorldRecordsOneLocationChange() {
+        val tracker = FriendActivityTracker()
+        val friend = FriendActivityObservation(
+            userId = "usr_friend",
+            displayName = "Friend",
+            profileImageUrl = "",
+            location = "wrld_first:instance_a",
+            status = "active",
+            statusDescription = "",
+            bio = "",
+            lastActivityAtMillis = null,
+        )
+        tracker.observe(listOf(friend), null, 1_000L)
+
+        val traveling = tracker.observe(
+            friends = listOf(
+                friend.copy(
+                    location = "traveling",
+                    travelingToLocation = "wrld_second:instance_b",
+                )
+            ),
+            selfLocation = null,
+            nowMillis = 2_000L,
+        )
+        val arrived = tracker.observe(
+            friends = listOf(friend.copy(location = "wrld_second:instance_b")),
+            selfLocation = null,
+            nowMillis = 3_000L,
+        )
+
+        assertEquals(listOf(FriendActivityEventType.LocationChanged), traveling.events.map { it.type })
+        assertEquals("wrld_first", traveling.events.single().previousValue)
+        assertEquals("wrld_second", traveling.events.single().worldId)
+        assertTrue(arrived.events.isEmpty())
     }
 
     @Test

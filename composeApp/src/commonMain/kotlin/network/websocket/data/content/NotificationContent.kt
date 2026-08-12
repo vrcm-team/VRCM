@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class NotificationContent(
     val id: String,
+    val groupId: String? = null,
     val version: Int = 0,
     val type: String,
     val senderUserId: String? = null,
@@ -14,6 +15,8 @@ data class NotificationContent(
     val relatedNotificationsId: String? = null,
     val message: String = "",
     val title: String? = null,
+    val link: String? = null,
+    val imageUrl: String? = null,
     val data: Data = Data(),
     val details: Data? = null,
 ) {
@@ -22,6 +25,9 @@ data class NotificationContent(
         val announcementTitle: String? = null,
         val boopingUserDisplayName: String? = null,
         val groupName: String? = null,
+        val groupId: String? = null,
+        val ownerId: String? = null,
+        val imageUrl: String? = null,
         val emojiId: String? = null,
     )
 }

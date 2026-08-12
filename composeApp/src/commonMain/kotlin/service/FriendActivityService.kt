@@ -450,6 +450,7 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
             lastActivityAtMillis = friend.lastActivity.toEpochMillisOrNull()
                 ?.takeIf { includeLastActivity }
                 ?.takeIf { friend.status == UserStatus.Offline },
+            travelingToLocation = friend.travelingToLocation,
         )
     },
     selfLocation = selfLocation,

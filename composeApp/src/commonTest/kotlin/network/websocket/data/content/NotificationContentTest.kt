@@ -59,4 +59,22 @@ class NotificationContentTest {
         assertEquals(5, content.version)
         assertEquals("not_next", content.updates["relatedNotificationsId"]?.jsonPrimitive?.content)
     }
+
+    @Test
+    fun decodesGroupIdAndImageFromNotificationPayload() {
+        val content = json.decodeFromString<NotificationContent>(
+            """{
+                "id":"group_event",
+                "type":"group.announcement",
+                "groupId":"grp_test",
+                "link":"event:grp_link",
+                "data":{"groupId":"grp_data","ownerId":"grp_owner","imageUrl":"https://example/icon.png"}
+            }""",
+        )
+
+        assertEquals("grp_test", content.groupId)
+        assertEquals("grp_data", content.data.groupId)
+        assertEquals("grp_owner", content.data.ownerId)
+        assertEquals("https://example/icon.png", content.data.imageUrl)
+    }
 }

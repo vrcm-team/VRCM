@@ -9,6 +9,7 @@ internal data class FriendActivityObservation(
     val statusDescription: String,
     val bio: String,
     val lastActivityAtMillis: Long?,
+    val travelingToLocation: String = "",
 )
 
 internal enum class FriendSocketPresenceType { Online, Offline }
@@ -93,6 +94,7 @@ internal class FriendActivityTracker(
     private val activeMeetings = mutableMapOf<String, ActiveMeeting>()
     private val lastKnownInstanceByUserId = mutableMapOf<String, String>()
     private val lastKnownFriendByUserId = mutableMapOf<String, FriendActivityObservation>()
+    private val lastSocketPresenceByUserId = mutableMapOf<String, FriendSocketPresenceType>()
     private var hasObservedSelfLocation = false
 
     fun observe(
@@ -185,6 +187,9 @@ internal class FriendActivityTracker(
         friends: Collection<FriendActivityObservation>,
         event: FriendSocketPresenceEvent,
     ): FriendActivityBatch {
+        if (lastSocketPresenceByUserId.put(event.userId, event.type) == event.type) {
+            return FriendActivityBatch()
+        }
         val friend = friends.firstOrNull { it.userId == event.userId }
             ?: lastKnownFriendByUserId[event.userId]
             ?: FriendActivityObservation(
@@ -226,6 +231,7 @@ internal class FriendActivityTracker(
         previousByUserId.clear()
         lastKnownInstanceByUserId.clear()
         lastKnownFriendByUserId.clear()
+        lastSocketPresenceByUserId.clear()
         hasObservedSelfLocation = false
         return FriendActivityBatch(meetings = ended)
     }
@@ -234,8 +240,8 @@ internal class FriendActivityTracker(
         previous: FriendActivityObservation,
         nowMillis: Long,
     ): List<FriendActivityEventDraft> = buildList {
-        val previousInstance = previous.location.normalizedInstanceKey()
-        val currentInstance = location.normalizedInstanceKey()
+        val previousInstance = previous.activityInstanceKey()
+        val currentInstance = activityInstanceKey()
         val locationChanged =
             previousInstance != null && currentInstance != null && previousInstance != currentInstance
         val baseEvent = FriendActivityEventDraft(
@@ -305,6 +311,12 @@ internal class FriendActivityTracker(
 
     private fun FriendActivityObservation.statusValue(): String =
         listOf(status.trim(), statusDescription.trim()).filter(String::isNotEmpty).joinToString("\n")
+
+    private fun FriendActivityObservation.activityInstanceKey(): String? =
+        location.normalizedInstanceKey()
+            ?: travelingToLocation.normalizedInstanceKey().takeIf {
+                location.trim() == "traveling"
+            }
 
     private fun String?.normalizedInstanceKey(): String? =
         this?.trim()?.takeIf { it.startsWith("wrld_") && ':' in it }

@@ -38,6 +38,8 @@ internal class FriendStateStore {
     val snapshot: Map<String, FriendData>
         get() = friendsById.toMap()
 
+    fun friend(userId: String): FriendData? = friendsById[userId]
+
     fun beginRefresh(): FriendRefreshToken {
         return FriendRefreshToken(generation, eventVersion)
     }

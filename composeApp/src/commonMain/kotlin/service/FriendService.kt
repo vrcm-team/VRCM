@@ -219,16 +219,19 @@ class FriendService(
             }
             FriendEvents.FriendOnline.typeName -> {
                 val content = json.decodeFromString<FriendOnlineContent>(socketEvent.content)
-                val friend = updateFriend(sessionToken, content.userId, content::mergeWith)
+                val update = updateFriendPresence(sessionToken, content.userId, content::mergeWith)
+                val friend = update?.current
                     ?: run {
                         refreshAfterIncompleteEvent(sessionToken)
                         friendMap[content.userId]
                     }
-                emitFriendUpdate(
-                    sessionToken = sessionToken,
-                    event = FriendUpdateEvent.Online(friend, content.userId),
-                    occurredAtMillis = receivedAtMillis,
-                )
+                if (update == null || !isInGameLocation(update.previous?.location)) {
+                    emitFriendUpdate(
+                        sessionToken = sessionToken,
+                        event = FriendUpdateEvent.Online(friend, content.userId),
+                        occurredAtMillis = receivedAtMillis,
+                    )
+                }
             }
 
             FriendEvents.FriendActive.typeName -> {
@@ -240,13 +243,14 @@ class FriendService(
 
             FriendEvents.FriendOffline.typeName -> {
                 val content = json.decodeFromString<FriendOfflineContent>(socketEvent.content)
-                if (!updateOrRemoveFriend(sessionToken, content.userId) { existing ->
+                val update = updateFriendPresenceOrRemove(sessionToken, content.userId) { existing ->
                     existing?.copy(
                         location = LocationType.Offline.value,
                         travelingToLocation = "",
                         status = UserStatus.Offline,
                     )
-                }) return
+                } ?: return
+                if (update.previous != null && !isInGameLocation(update.previous.location)) return
                 emitFriendUpdate(
                     sessionToken = sessionToken,
                     event = FriendUpdateEvent.Offline(content.userId),
@@ -382,15 +386,28 @@ class FriendService(
         updated
     }
 
-    private fun updateOrRemoveFriend(
+    private fun updateFriendPresence(
         sessionToken: AccountSessionToken,
         userId: String,
         update: (FriendData?) -> FriendData?,
-    ): Boolean = synchronized(friendMapLock) {
-        if (!isCurrentSessionLocked(sessionToken)) return@synchronized false
-        friendStore.updateOrRemoveFromEvent(userId, update)
+    ): FriendPresenceUpdate? = synchronized(friendMapLock) {
+        if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
+        val previous = friendStore.friend(userId)
+        val current = friendStore.updateFromEvent(userId, update) ?: return@synchronized null
         publishFriendState()
-        true
+        FriendPresenceUpdate(previous, current)
+    }
+
+    private fun updateFriendPresenceOrRemove(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        update: (FriendData?) -> FriendData?,
+    ): FriendPresenceUpdate? = synchronized(friendMapLock) {
+        if (!isCurrentSessionLocked(sessionToken)) return@synchronized null
+        val previous = friendStore.friend(userId)
+        val current = friendStore.updateOrRemoveFromEvent(userId, update)
+        publishFriendState()
+        FriendPresenceUpdate(previous, current)
     }
 
     private fun putFriend(sessionToken: AccountSessionToken, friend: FriendData): Boolean =
@@ -552,6 +569,11 @@ class FriendService(
 }
 
 data class FriendPresence(val location: String, val travelingToLocation: String = "")
+
+private data class FriendPresenceUpdate(
+    val previous: FriendData?,
+    val current: FriendData?,
+)
 
 private fun presenceLocation(world: String, instance: String): String = when {
     instance.startsWith("wrld_") -> instance

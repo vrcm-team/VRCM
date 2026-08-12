@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.websocket.data.content.NotificationContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.NotificationV2UpdateContent
@@ -34,6 +35,7 @@ class FriendOnlineNotificationService(
     private val settingsDao: SettingsDao,
     private val notifier: FriendOnlineNotifier,
     private val usersApi: UsersApi,
+    private val groupsApi: GroupsApi,
     private val json: Json,
     private val logger: Logger,
 ) {
@@ -164,6 +166,7 @@ class FriendOnlineNotificationService(
                     eventId,
                     notification.senderName(),
                     notification.details?.emojiId ?: notification.data.emojiId,
+                    iconUrl = resolveUserIcon(notification.senderUserId),
                 )
             }
 
@@ -175,6 +178,14 @@ class FriendOnlineNotificationService(
                     notification.type,
                     details.groupName ?: notification.title.orEmpty(),
                     details.announcementTitle ?: notification.message.ifBlank { notification.title.orEmpty() },
+                    iconUrl = notification.imageUrl
+                        ?: details.imageUrl
+                        ?: resolveGroupIcon(
+                            groupId = notification.groupId
+                                ?: details.groupId
+                                ?: details.ownerId
+                                ?: extractGroupId(notification.link),
+                        ),
                 )
             }
 
@@ -297,19 +308,16 @@ class FriendOnlineNotificationService(
         senderUsername: String?,
     ) {
         if (!settingsDao.friendRequestNotificationsEnabled) return
+        val senderUser = senderUserId?.let { id -> runCatching { usersApi.fetchUser(id) }.getOrNull() }
         val sender = senderUsername?.takeIf(String::isNotBlank)
-            ?: senderUserId?.let { id ->
-                runCatching { usersApi.fetchUser(id).displayName }
-                    .getOrNull()
-                    ?.takeIf(String::isNotBlank)
-            }
+            ?: senderUser?.displayName?.takeIf(String::isNotBlank)
             ?: senderUserId?.takeIf(String::isNotBlank)
             ?: "Unknown"
-        notifier.notifyFriendRequest(notificationId, sender)
+        notifier.notifyFriendRequest(notificationId, sender, iconUrl = senderUser?.iconUrl)
     }
 
     /** 本地弹出提醒不改变服务器上的已读状态。 */
-    private fun dispatchInboxNotification(notification: NotificationData) {
+    private suspend fun dispatchInboxNotification(notification: NotificationData) {
         val eventId = notification.relatedNotificationsId?.takeIf(String::isNotBlank)
             ?: notification.id
         val sender = notification.data.boopingUserDisplayName?.takeIf(String::isNotBlank)
@@ -323,6 +331,10 @@ class FriendOnlineNotificationService(
                     eventId,
                     sender,
                     notification.details?.emojiId ?: notification.data.emojiId,
+                    iconUrl = resolveUserIcon(notification.senderUserId)
+                        ?: notification.imageUrl
+                        ?: notification.details?.imageUrl
+                        ?: notification.data.imageUrl,
                 )
             }
 
@@ -335,10 +347,38 @@ class FriendOnlineNotificationService(
                     notification.type,
                     details.groupName ?: notification.title.orEmpty(),
                     details.announcementTitle ?: notification.message.ifBlank { notification.title.orEmpty() },
+                    iconUrl = notification.imageUrl
+                        ?: details.imageUrl
+                        ?: resolveGroupIcon(
+                            groupId = notification.groupId
+                                ?: details.groupId
+                                ?: details.ownerId
+                                ?: extractGroupId(notification.link),
+                        ),
                 )
             }
         }
     }
+
+    private suspend fun resolveUserIcon(userId: String?): String? = userId
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?.let { id -> runCatching { usersApi.fetchUser(id).iconUrl }.getOrNull() }
+
+    private suspend fun resolveGroupIcon(groupId: String?): String? = groupId
+        ?.trim()
+        ?.takeIf { it.startsWith("grp_") }
+        ?.takeIf(String::isNotEmpty)
+        ?.let { id -> runCatching { groupsApi.fetchGroup(id).iconUrl }.getOrNull() }
+
+    private fun extractGroupId(link: String?): String? = link
+        ?.split(',', '&', '?')
+        ?.firstNotNullOfOrNull { part ->
+            val marker = "grp_"
+            part.substringAfter(marker, "")
+                .takeIf(String::isNotEmpty)
+                ?.let { marker + it.takeWhile { char -> char.isLetterOrDigit() || char == '-' } }
+        }
 
     private suspend fun onFriendsChanged(
         token: AccountSessionToken,
@@ -365,7 +405,11 @@ class FriendOnlineNotificationService(
                 return@forEach
             }
             if (transition.inGame) notifier.notifyOnline(transition.friend ?: return@forEach)
-            else notifier.notifyOffline(transition.userId, transition.displayName)
+            else notifier.notifyOffline(
+                friendId = transition.userId,
+                displayName = transition.displayName,
+                iconUrl = transition.friend?.iconUrl,
+            )
         }
     }
 
