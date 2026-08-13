@@ -226,11 +226,21 @@ android {
 compose.desktop {
     application {
         mainClass = "io.github.vrcmteam.vrcm.MainKt"
+        buildTypes.release.proguard {
+            isEnabled.set(false)
+        }
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = libs.versions.app.packageName.get()
+            targetFormats(TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            packageName = "VRCM"
             packageVersion = libs.versions.app.version.get()
+            description = "VRChat friend and content manager"
+            vendor = "VRCM Team"
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/VRCM.ico"))
+                menuGroup = "VRCM"
+                upgradeUuid = "aebfb803-0655-4c7e-8c79-f29e14618397"
+            }
         }
     }
 }
