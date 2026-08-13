@@ -38,6 +38,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val stettingLightThemeMode = "ライトモード"
     override val stettingDarkThemeMode = "ダークモード"
     override val stettingThemeColor = "テーマカラー"
+    override val stettingClipboardReading = "クリップボードを読み取る"
     override val stettingLogout = "ログアウト"
     override val stettingAbout = "アプリについて"
     override val stettingVersion = "バージョン"

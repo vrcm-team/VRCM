@@ -141,6 +141,14 @@ private inline fun ColumnScope.CustomBlock() {
                 }
             }
         }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        ToggleSettingsRow(
+            title = strings.stettingClipboardReading,
+            checked = currentSettings.clipboardReadingEnabled,
+            onCheckedChange = { enabled ->
+                currentSettings = currentSettings.copy(clipboardReadingEnabled = enabled)
+            },
+        )
     }
 
 }
