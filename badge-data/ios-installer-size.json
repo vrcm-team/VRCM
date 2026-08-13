@@ -4,7 +4,7 @@
   "message": "19.56 MB",
   "color": "000000",
   "labelColor": "6e6e73",
+  "cacheSeconds": 300,
   "namedLogo": "apple",
-  "logoColor": "white",
-  "cacheSeconds": 300
+  "logoColor": "white"
 }
