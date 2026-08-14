@@ -536,7 +536,13 @@ internal fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
     val isOffline = it.status == UserStatus.Offline
     val locationType = LocationType.fromValue(it.location)
     buildString {
-        append(if (isOffline) "0" else "1")
+        append(
+            when {
+                isOffline -> "0"
+                locationType == LocationType.Offline || locationType == LocationType.Web -> "1"
+                else -> "2"
+            }
+        )
         append('-')
         append(
             when (locationType) {
