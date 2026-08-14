@@ -12,7 +12,7 @@
 最终产物位于：
 
 ```text
-composeApp/build/installer/VRCM-<version>-setup.exe
+composeApp/build/installer/VRCM-v<version>-setup.exe
 ```
 
 安装程序默认安装到：
@@ -120,7 +120,7 @@ app-image 构建成功后，在仓库根目录执行：
 编译成功时，输出末尾会显示最终路径：
 
 ```text
-composeApp/build/installer/VRCM-<version>-setup.exe
+composeApp/build/installer/VRCM-v<version>-setup.exe
 ```
 
 安装器当前提供：
@@ -157,7 +157,7 @@ git diff --check
 计算安装器 SHA-256：
 
 ```powershell
-Get-FileHash 'composeApp\build\installer\VRCM-<version>-setup.exe' -Algorithm SHA256
+Get-FileHash 'composeApp\build\installer\VRCM-v<version>-setup.exe' -Algorithm SHA256
 ```
 
 ### 安装后冒烟验证
