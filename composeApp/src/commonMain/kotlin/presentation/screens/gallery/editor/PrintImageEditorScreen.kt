@@ -78,6 +78,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -122,14 +123,17 @@ class PrintImageEditorScreen(
         val title = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorTitle
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val submitLabel = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUpload
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val uploadingText = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUploading
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadingCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploading
         }
 
         BlockBackNavigation(blocked = state.isBusy)
@@ -139,10 +143,14 @@ class PrintImageEditorScreen(
                 when (event) {
                     is EditorEvent.Submitted -> {
                         sessionStore.complete(sessionId, event.submission)
-                        if (event.submission == ImageEditorSubmission.Print) {
-                            SharedFlowCentre.toastText.emit(
-                                ToastText.Success(currentLocale.printEditorUploaded)
+                        when (event.submission) {
+                            ImageEditorSubmission.Print -> SharedFlowCentre.toastText.emit(
+                                ToastText.Success(currentLocale.printEditorUploaded),
                             )
+                            is ImageEditorSubmission.Gallery -> SharedFlowCentre.toastText.emit(
+                                ToastText.Success(currentLocale.galleryTabUploadSuccess),
+                            )
+                            is ImageEditorSubmission.AvatarCover -> Unit
                         }
                         navigator.pop()
                     }
@@ -207,6 +215,7 @@ class PrintImageEditorScreen(
                 onReset = screenModel::reset,
                 locale = locale,
                 uploadingText = uploadingText,
+                aspectRatio = session.target.cropAspectRatio,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -228,6 +237,7 @@ private fun PrintEditorContent(
     onReset: () -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
+    aspectRatio: Float,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
@@ -242,6 +252,7 @@ private fun PrintEditorContent(
             onPanAndZoom = onPanAndZoom,
             locale = locale,
             uploadingText = uploadingText,
+            aspectRatio = aspectRatio,
             modifier = previewModifier,
         )
     }
@@ -285,6 +296,7 @@ private fun PrintEditorPreview(
     onPanAndZoom: (ImageSize, Float, Float, Float) -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
+    aspectRatio: Float,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -293,16 +305,16 @@ private fun PrintEditorPreview(
     ) {
         val availableWidth = (maxWidth - 24.dp).coerceAtLeast(1.dp)
         val availableHeight = (maxHeight - 24.dp).coerceAtLeast(1.dp)
-        val cropWidth = if (availableWidth * 9f / 16f <= availableHeight) {
+        val cropWidth = if (availableWidth / aspectRatio <= availableHeight) {
             availableWidth
         } else {
-            availableHeight * 16f / 9f
+            availableHeight * aspectRatio
         }
 
         Box(
             modifier = Modifier
                 .width(cropWidth)
-                .aspectRatio(16f / 9f)
+                .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(4.dp))
                 .background(Color.White),
         ) {
@@ -598,8 +610,20 @@ private fun EditorError.localizedMessage(
         else -> when (target) {
             ImageEditorTarget.Print -> locale.printEditorUploadUnknownFailed
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCoverUploadFailed
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadFailed
         }
     }
 }
+
+private val ImageEditorTarget.cropAspectRatio: Float
+    get() = when (this) {
+        ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
+        is ImageEditorTarget.Gallery -> when (tagType) {
+            FileTagType.Gallery -> 4f / 3f
+            FileTagType.Icon, FileTagType.Emoji, FileTagType.Sticker -> 1f
+            FileTagType.AvatarImage, FileTagType.Print ->
+                error("Unsupported gallery editor target: $tagType")
+        }
+    }
 
 private fun ImageSize.isValid(): Boolean = width > 0 && height > 0

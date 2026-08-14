@@ -19,15 +19,18 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.AvatarCoverCanvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DefaultPrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.GalleryCanvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.SquareCanvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
@@ -98,7 +101,7 @@ val presentationModule: Module = module {
         )
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get()) }
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -112,6 +115,15 @@ val presentationModule: Module = module {
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
+                    codec = get(),
+                    spec = when (session.target.tagType) {
+                        FileTagType.Gallery -> GalleryCanvasSpec
+                        FileTagType.Icon, FileTagType.Emoji, FileTagType.Sticker -> SquareCanvasSpec
+                        FileTagType.AvatarImage, FileTagType.Print ->
+                            error("Unsupported gallery editor target: ${session.target.tagType}")
+                    },
+                )
             },
             submitter = get(),
             target = session.target,

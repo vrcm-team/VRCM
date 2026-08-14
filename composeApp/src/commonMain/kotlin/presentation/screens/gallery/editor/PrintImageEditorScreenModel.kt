@@ -217,4 +217,5 @@ class PrintImageEditorScreenModel(
 private fun ImageEditorTarget.fileName(nowMillis: Long): String = when (this) {
     ImageEditorTarget.Print -> "print-$nowMillis.png"
     is ImageEditorTarget.AvatarCover -> "avatar-cover-$nowMillis.png"
+    is ImageEditorTarget.Gallery -> "${tagType.value}-$nowMillis.png"
 }
