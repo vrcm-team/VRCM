@@ -43,6 +43,7 @@ sealed interface EditorEvent {
 data class PrintImageEditorState(
     val prepared: PreparedImage,
     val transform: CropTransform = CropTransform(),
+    val fillWhiteBorder: Boolean = true,
     val phase: EditorPhase = EditorPhase.Ready,
     val error: EditorError? = null,
 ) {
@@ -91,14 +92,17 @@ class PrintImageEditorScreenModel(
         panX: Float,
         panY: Float,
         zoomChange: Float,
-    ) = edit { current ->
-        calculator.transform(
-            source = current.prepared.originalSize,
-            viewport = viewport,
-            current = current.transform,
-            panX = panX,
-            panY = panY,
-            zoomChange = zoomChange,
+    ) = edit(viewport) { current ->
+        current.constrainToBorderMode(
+            calculator.transform(
+                source = current.prepared.originalSize,
+                viewport = viewport,
+                current = current.transform,
+                panX = panX,
+                panY = panY,
+                zoomChange = zoomChange,
+            ),
+            viewport,
         )
     }
 
@@ -112,29 +116,46 @@ class PrintImageEditorScreenModel(
         )
     }
 
-    fun rotateLeft(viewport: ImageSize) = edit { current ->
-        calculator.rotate(
-            source = current.prepared.originalSize,
-            viewport = viewport,
-            current = current.transform,
-            turns = -1,
-        )
+    fun rotateLeft(viewport: ImageSize) = edit(viewport) { current ->
+        current.rotateForBorderMode(viewport, turns = -1)
     }
 
-    fun rotateRight(viewport: ImageSize) = edit { current ->
-        calculator.rotate(
-            source = current.prepared.originalSize,
-            viewport = viewport,
-            current = current.transform,
-            turns = 1,
-        )
+    fun rotateRight(viewport: ImageSize) = edit(viewport) { current ->
+        current.rotateForBorderMode(viewport, turns = 1)
     }
 
     fun flipHorizontal() = edit { calculator.flipHorizontal(it.transform) }
 
     fun flipVertical() = edit { calculator.flipVertical(it.transform) }
 
-    fun reset() = edit { calculator.reset() }
+    fun reset(viewport: ImageSize) = edit(viewport) { current ->
+        current.constrainToBorderMode(calculator.reset(), viewport)
+    }
+
+    fun setFillWhiteBorder(enabled: Boolean, viewport: ImageSize) {
+        val current = _state.value
+        if (current.isBusy || !viewport.isValid()) return
+        val zoom = if (enabled) {
+            1f
+        } else {
+            calculator.zoomLimits(
+                source = current.prepared.originalSize,
+                viewport = viewport,
+                quarterTurns = current.transform.quarterTurns,
+            ).cover
+        }
+        cachedPng = null
+        cachedFileName = null
+        _state.value = current.copy(
+            transform = current.transform.copy(
+                centerOffsetX = 0f,
+                centerOffsetY = 0f,
+                zoom = zoom,
+            ),
+            fillWhiteBorder = enabled,
+            error = null,
+        )
+    }
 
     fun clearError() {
         _state.update { it.copy(error = null) }
@@ -202,9 +223,12 @@ class PrintImageEditorScreenModel(
     private fun workerContext(): CoroutineContext =
         workerExceptionHandler?.let(workerDispatcher::plus) ?: workerDispatcher
 
-    private inline fun edit(updateTransform: (PrintImageEditorState) -> CropTransform) {
+    private inline fun edit(
+        viewport: ImageSize? = null,
+        updateTransform: (PrintImageEditorState) -> CropTransform,
+    ) {
         val current = _state.value
-        if (current.isBusy) return
+        if (current.isBusy || (viewport != null && !viewport.isValid())) return
         cachedPng = null
         cachedFileName = null
         _state.value = current.copy(
@@ -212,7 +236,66 @@ class PrintImageEditorScreenModel(
             error = null,
         )
     }
+
+    private fun PrintImageEditorState.constrainToBorderMode(
+        candidate: CropTransform,
+        viewport: ImageSize,
+    ): CropTransform {
+        if (fillWhiteBorder) return candidate
+        val cover = calculator.zoomLimits(
+            source = prepared.originalSize,
+            viewport = viewport,
+            quarterTurns = candidate.quarterTurns,
+        ).cover
+        if (candidate.zoom >= cover) return candidate
+        return calculator.transform(
+            source = prepared.originalSize,
+            viewport = viewport,
+            current = candidate.copy(zoom = cover),
+            panX = 0f,
+            panY = 0f,
+            zoomChange = 1f,
+        )
+    }
+
+    private fun PrintImageEditorState.rotateForBorderMode(
+        viewport: ImageSize,
+        turns: Int,
+    ): CropTransform {
+        val rotated = calculator.rotate(
+            source = prepared.originalSize,
+            viewport = viewport,
+            current = transform,
+            turns = turns,
+        )
+        if (fillWhiteBorder) return rotated
+
+        val previousCover = calculator.zoomLimits(
+            source = prepared.originalSize,
+            viewport = viewport,
+            quarterTurns = transform.quarterTurns,
+        ).cover
+        val rotatedLimits = calculator.zoomLimits(
+            source = prepared.originalSize,
+            viewport = viewport,
+            quarterTurns = rotated.quarterTurns,
+        )
+        val relativeZoom = transform.zoom / previousCover
+        return calculator.transform(
+            source = prepared.originalSize,
+            viewport = viewport,
+            current = rotated.copy(
+                zoom = (rotatedLimits.cover * relativeZoom)
+                    .coerceIn(rotatedLimits.cover, rotatedLimits.maximum),
+            ),
+            panX = 0f,
+            panY = 0f,
+            zoomChange = 1f,
+        )
+    }
 }
+
+private fun ImageSize.isValid(): Boolean = width > 0 && height > 0
 
 private fun ImageEditorTarget.fileName(nowMillis: Long): String = when (this) {
     ImageEditorTarget.Print -> "print-$nowMillis.png"

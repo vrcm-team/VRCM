@@ -38,6 +38,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -213,6 +214,7 @@ class PrintImageEditorScreen(
                 onFlipHorizontal = screenModel::flipHorizontal,
                 onFlipVertical = screenModel::flipVertical,
                 onReset = screenModel::reset,
+                onFillWhiteBorderChange = screenModel::setFillWhiteBorder,
                 locale = locale,
                 uploadingText = uploadingText,
                 aspectRatio = session.target.cropAspectRatio,
@@ -234,7 +236,8 @@ private fun PrintEditorContent(
     onRotateRight: (ImageSize) -> Unit,
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
-    onReset: () -> Unit,
+    onReset: (ImageSize) -> Unit,
+    onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
     aspectRatio: Float,
@@ -267,6 +270,7 @@ private fun PrintEditorContent(
             onFlipHorizontal = onFlipHorizontal,
             onFlipVertical = onFlipVertical,
             onReset = onReset,
+            onFillWhiteBorderChange = onFillWhiteBorderChange,
             locale = locale,
             sidePanel = sidePanel,
             modifier = controlsModifier,
@@ -362,7 +366,8 @@ private fun PrintEditorControls(
     onRotateRight: (ImageSize) -> Unit,
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
-    onReset: () -> Unit,
+    onReset: (ImageSize) -> Unit,
+    onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
     sidePanel: Boolean,
     modifier: Modifier = Modifier,
@@ -386,11 +391,16 @@ private fun PrintEditorControls(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 val zoomRange = if (viewport.isValid()) {
-                    calculator.zoomLimits(
+                    val limits = calculator.zoomLimits(
                         source = state.prepared.originalSize,
                         viewport = viewport,
                         quarterTurns = state.transform.quarterTurns,
-                    ).valueRange
+                    )
+                    if (state.fillWhiteBorder) {
+                        limits.valueRange
+                    } else {
+                        limits.cover..limits.maximum
+                    }
                 } else {
                     1f..3f
                 }
@@ -406,6 +416,25 @@ private fun PrintEditorControls(
                     modifier = Modifier.weight(1f),
                     enabled = !state.isBusy && viewport.isValid(),
                     valueRange = zoomRange,
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = locale.printEditorFillWhiteBorder,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = state.fillWhiteBorder,
+                    onCheckedChange = { onFillWhiteBorderChange(it, viewport) },
+                    enabled = !state.isBusy && viewport.isValid(),
                 )
             }
 
@@ -452,8 +481,8 @@ private fun PrintEditorControls(
                 }
                 EditorToolButton(
                     label = locale.printEditorReset,
-                    enabled = !state.isBusy,
-                    onClick = onReset,
+                    enabled = !state.isBusy && viewport.isValid(),
+                    onClick = { if (viewport.isValid()) onReset(viewport) },
                 ) {
                     Icon(Icons.Default.RestartAlt, contentDescription = locale.printEditorReset)
                 }

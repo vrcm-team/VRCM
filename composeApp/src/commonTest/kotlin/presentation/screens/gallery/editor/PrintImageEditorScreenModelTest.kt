@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -172,6 +173,51 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
 
         assertEquals(2, processor.renderCount)
         assertEquals(2, uploader.uploadCount)
+    }
+
+    @Test
+    fun disablingWhiteBorderUsesCoverAsTheMinimumZoom() {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val originalSize = ImageSize(1_080, 1_920)
+        val model = createModel(processor, uploader, originalSize)
+        val cover = CropTransformCalculator().zoomLimits(
+            source = originalSize,
+            viewport = VIEWPORT,
+            quarterTurns = 0,
+        ).cover
+
+        model.setFillWhiteBorder(false, VIEWPORT)
+
+        assertFalse(model.state.value.fillWhiteBorder)
+        assertEquals(cover, model.state.value.transform.zoom, 0.0001f)
+
+        model.setZoom(VIEWPORT, 1f)
+
+        assertEquals(cover, model.state.value.transform.zoom, 0.0001f)
+
+        model.rotateLeft(VIEWPORT)
+        val rotatedCover = CropTransformCalculator().zoomLimits(
+            source = originalSize,
+            viewport = VIEWPORT,
+            quarterTurns = model.state.value.transform.quarterTurns,
+        ).cover
+
+        assertEquals(rotatedCover, model.state.value.transform.zoom, 0.0001f)
+    }
+
+    @Test
+    fun enablingWhiteBorderReturnsToCenteredFit() {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val model = createModel(processor, uploader, ImageSize(1_080, 1_920))
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.panAndZoom(VIEWPORT, panX = 0f, panY = 100f, zoomChange = 1.5f)
+
+        model.setFillWhiteBorder(true, VIEWPORT)
+
+        assertTrue(model.state.value.fillWhiteBorder)
+        assertEquals(CropTransform(), model.state.value.transform)
     }
 
     @Test

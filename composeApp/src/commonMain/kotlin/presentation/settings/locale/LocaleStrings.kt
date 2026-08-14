@@ -248,6 +248,7 @@ sealed class LocaleStrings {
     open val printEditorFlipHorizontal: String = "Flip horizontally"
     open val printEditorFlipVertical: String = "Flip vertically"
     open val printEditorZoom: String = "Zoom"
+    open val printEditorFillWhiteBorder: String = "Fill empty area with white"
     open val printEditorReset: String = "Reset"
     open val printEditorProcessing: String = "Preparing image..."
     open val printEditorUploading: String = "Uploading print..."

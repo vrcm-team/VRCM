@@ -233,6 +233,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val printEditorFlipHorizontal = "左右反転"
     override val printEditorFlipVertical = "上下反転"
     override val printEditorZoom = "ズーム"
+    override val printEditorFillWhiteBorder = "余白を白で埋める"
     override val printEditorReset = "リセット"
     override val printEditorProcessing = "画像を処理中..."
     override val printEditorUploading = "プリントをアップロード中..."
