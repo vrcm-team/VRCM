@@ -232,11 +232,17 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = libs.versions.app.packageName.get()
+            // The Windows DSL has no packageName override, so the global name produces VRCM.exe.
+            // Keep the existing package identifier explicit for macOS and Linux below.
+            packageName = libs.versions.app.name.get()
             packageVersion = libs.versions.app.version.get()
 
             macOS {
+                packageName = libs.versions.app.packageName.get()
                 iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+            }
+            linux {
+                packageName = libs.versions.app.packageName.get()
             }
             description = "VRChat friend and content manager"
             vendor = "VRCM Team"
