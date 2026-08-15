@@ -111,23 +111,26 @@ internal val AvatarCoverCanvasSpec = PrintCanvasSpec(
     contentOffsetY = 0,
 )
 
-internal fun sourceAspectCanvasSpec(sourceSize: ImageSize): PrintCanvasSpec {
-    val outputSize = DecodeSizePlanner.plan(
-        source = sourceSize,
-        request = DecodeRequest(
-            maxDimension = maxOf(sourceSize.width, sourceSize.height),
-            maxPixels = PrintImageLimits.MAX_EDITED_OUTPUT_PIXELS,
-        ),
-    )
-    return PrintCanvasSpec(
-        canvasWidth = outputSize.width,
-        canvasHeight = outputSize.height,
-        contentWidth = outputSize.width,
-        contentHeight = outputSize.height,
-        contentOffsetX = 0,
-        contentOffsetY = 0,
-    )
-}
+internal val GalleryCanvasSpec = PrintCanvasSpec(
+    canvasWidth = 2_048,
+    canvasHeight = 1_536,
+    contentWidth = 2_048,
+    contentHeight = 1_536,
+    contentOffsetX = 0,
+    contentOffsetY = 0,
+)
+
+internal val SquareCanvasSpec = PrintCanvasSpec(
+    canvasWidth = 1_024,
+    canvasHeight = 1_024,
+    contentWidth = 1_024,
+    contentHeight = 1_024,
+    contentOffsetX = 0,
+    contentOffsetY = 0,
+)
+
+internal val PrintCanvasSpec.aspectRatio: Float
+    get() = canvasWidth.toFloat() / canvasHeight
 
 object PrintImageLimits {
     private const val ARGB_BYTES_PER_PIXEL = 4L

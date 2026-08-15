@@ -33,6 +33,17 @@ internal fun ImageEditorTarget.canvasBackground(fillWhiteBorder: Boolean): Canva
     }
 }
 
+/** Maps each gallery upload category to the dimensions required by the product workflow. */
+internal val ImageEditorTarget.Gallery.canvasSpec: PrintCanvasSpec
+    get() = when (tagType) {
+        FileTagType.Gallery -> GalleryCanvasSpec
+        FileTagType.Icon,
+        FileTagType.Emoji,
+        FileTagType.Sticker -> SquareCanvasSpec
+        FileTagType.AvatarImage,
+        FileTagType.Print -> error("Unsupported gallery editor target: $tagType")
+    }
+
 sealed interface ImageEditorSubmission {
     data object Print : ImageEditorSubmission
     data class AvatarCover(val avatar: AvatarData) : ImageEditorSubmission

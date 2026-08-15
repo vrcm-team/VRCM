@@ -216,7 +216,7 @@ class PrintImageEditorScreen(
                 onFillWhiteBorderChange = screenModel::setFillWhiteBorder,
                 locale = locale,
                 uploadingText = uploadingText,
-                aspectRatio = session.target.cropAspectRatio(session.prepared.originalSize),
+                aspectRatio = session.target.cropAspectRatio,
                 canvasBackground = session.target.canvasBackground(state.fillWhiteBorder),
                 modifier = Modifier
                     .fillMaxSize()
@@ -686,9 +686,10 @@ private fun EditorError.localizedMessage(
     }
 }
 
-private fun ImageEditorTarget.cropAspectRatio(originalSize: ImageSize): Float = when (this) {
-    ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
-    is ImageEditorTarget.Gallery -> originalSize.width.toFloat() / originalSize.height
-}
+private val ImageEditorTarget.cropAspectRatio: Float
+    get() = when (this) {
+        ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
+        is ImageEditorTarget.Gallery -> canvasSpec.aspectRatio
+    }
 
 private fun ImageSize.isValid(): Boolean = width > 0 && height > 0

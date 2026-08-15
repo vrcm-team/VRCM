@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.toPixelMap
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -195,14 +196,14 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
-    fun sourceAspectCanvasKeepsTheSelectedImageDimensions() = runBlocking {
-        val originalSize = ImageSize(1_200, 800)
+    fun galleryCanvasUsesTheConfirmedFourByThreeOutput() = runBlocking {
+        val originalSize = ImageSize(1_600, 900)
         val codec = FakePlatformImageCodec(
-            encodedBytes = pngHeader(width = originalSize.width, height = originalSize.height),
+            encodedBytes = pngHeader(width = 2_048, height = 1_536),
         )
         val processor = DefaultPrintImageProcessor(
             codec = codec,
-            spec = sourceAspectCanvasSpec(originalSize),
+            spec = ImageEditorTarget.Gallery(FileTagType.Gallery).canvasSpec,
         )
 
         val result = processor.render(
@@ -218,12 +219,44 @@ abstract class PrintImageProcessorContractTest {
                 CropRenderRequest(
                     originalSize = originalSize,
                     transform = CropTransform(),
-                    outputSize = originalSize,
+                    outputSize = ImageSize(2_048, 1_536),
                 ),
             ),
             codec.cropRequests,
         )
-        assertEquals(originalSize, codec.encodedSize)
+        assertEquals(ImageSize(2_048, 1_536), codec.encodedSize)
+    }
+
+    @Test
+    fun squareGalleryCanvasUsesTheConfirmedSquareOutput() = runBlocking {
+        val originalSize = ImageSize(1_600, 900)
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = 1_024, height = 1_024),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = ImageEditorTarget.Gallery(FileTagType.Icon).canvasSpec,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("icon.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(
+                CropRenderRequest(
+                    originalSize = originalSize,
+                    transform = CropTransform(),
+                    outputSize = ImageSize(1_024, 1_024),
+                ),
+            ),
+            codec.cropRequests,
+        )
+        assertEquals(ImageSize(1_024, 1_024), codec.encodedSize)
     }
 
     @Test
@@ -235,7 +268,14 @@ abstract class PrintImageProcessorContractTest {
         )
         val processor = DefaultPrintImageProcessor(
             codec = codec,
-            spec = sourceAspectCanvasSpec(originalSize),
+            spec = PrintCanvasSpec(
+                canvasWidth = originalSize.width,
+                canvasHeight = originalSize.height,
+                contentWidth = originalSize.width,
+                contentHeight = originalSize.height,
+                contentOffsetX = 0,
+                contentOffsetY = 0,
+            ),
             releaseBitmap = {
                 released += it
                 releasePlatformImageBitmap(it)
@@ -254,19 +294,23 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
-    fun largeGallerySourceIsScaledToTheFinalRenderBudget() {
-        val source = ImageSize(8_000, 6_000)
-
-        val spec = sourceAspectCanvasSpec(source)
-
-        assertTrue(spec.canvasWidth < source.width)
-        assertTrue(spec.canvasHeight < source.height)
-        assertTrue(
-            spec.canvasWidth.toLong() * spec.canvasHeight <=
-                    PrintImageLimits.MAX_EDITED_OUTPUT_PIXELS,
+    fun galleryCategoriesUseTheConfirmedUploadCanvasesWithinTheRenderBudget() {
+        val expected = mapOf(
+            FileTagType.Gallery to ImageSize(2_048, 1_536),
+            FileTagType.Icon to ImageSize(1_024, 1_024),
+            FileTagType.Emoji to ImageSize(1_024, 1_024),
+            FileTagType.Sticker to ImageSize(1_024, 1_024),
         )
-        assertEquals(spec.canvasWidth, spec.contentWidth)
-        assertEquals(spec.canvasHeight, spec.contentHeight)
+
+        expected.forEach { (tagType, size) ->
+            val spec = ImageEditorTarget.Gallery(tagType).canvasSpec
+            assertEquals(size, ImageSize(spec.canvasWidth, spec.canvasHeight), tagType.value)
+            assertTrue(
+                spec.canvasWidth.toLong() * spec.canvasHeight <=
+                        PrintImageLimits.MAX_EDITED_OUTPUT_PIXELS,
+                tagType.value,
+            )
+        }
     }
 
     @Test

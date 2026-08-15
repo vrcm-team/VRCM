@@ -28,7 +28,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageE
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
-import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.sourceAspectCanvasSpec
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
@@ -115,7 +115,7 @@ val presentationModule: Module = module {
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
                 is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
                     codec = get(),
-                    spec = sourceAspectCanvasSpec(session.prepared.originalSize),
+                    spec = session.target.canvasSpec,
                 )
             },
             submitter = get(),
