@@ -177,6 +177,11 @@ class PrintImageEditorScreenModel(
                     source = source,
                     originalSize = current.prepared.originalSize,
                     transform = current.transform,
+                    background = if (current.fillWhiteBorder) {
+                        CanvasBackground.White
+                    } else {
+                        CanvasBackground.Transparent
+                    },
                 )
                     .getOrThrow()
                     .also {

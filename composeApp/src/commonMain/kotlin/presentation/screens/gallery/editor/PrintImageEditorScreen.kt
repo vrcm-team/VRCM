@@ -79,7 +79,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
-import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -217,7 +216,7 @@ class PrintImageEditorScreen(
                 onFillWhiteBorderChange = screenModel::setFillWhiteBorder,
                 locale = locale,
                 uploadingText = uploadingText,
-                aspectRatio = session.target.cropAspectRatio,
+                aspectRatio = session.target.cropAspectRatio(session.prepared.originalSize),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -644,15 +643,9 @@ private fun EditorError.localizedMessage(
     }
 }
 
-private val ImageEditorTarget.cropAspectRatio: Float
-    get() = when (this) {
-        ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
-        is ImageEditorTarget.Gallery -> when (tagType) {
-            FileTagType.Gallery -> 4f / 3f
-            FileTagType.Icon, FileTagType.Emoji, FileTagType.Sticker -> 1f
-            FileTagType.AvatarImage, FileTagType.Print ->
-                error("Unsupported gallery editor target: $tagType")
-        }
-    }
+private fun ImageEditorTarget.cropAspectRatio(originalSize: ImageSize): Float = when (this) {
+    ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
+    is ImageEditorTarget.Gallery -> originalSize.width.toFloat() / originalSize.height
+}
 
 private fun ImageSize.isValid(): Boolean = width > 0 && height > 0

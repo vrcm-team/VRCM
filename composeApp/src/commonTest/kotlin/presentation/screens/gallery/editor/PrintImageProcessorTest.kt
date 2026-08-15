@@ -195,6 +195,38 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
+    fun sourceAspectCanvasKeepsTheSelectedImageDimensions() = runBlocking {
+        val originalSize = ImageSize(1_200, 800)
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = originalSize.width, height = originalSize.height),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = sourceAspectCanvasSpec(originalSize),
+        )
+
+        val result = processor.render(
+            source = SelectedImage("gallery.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(
+                CropRenderRequest(
+                    originalSize = originalSize,
+                    transform = CropTransform(),
+                    outputSize = originalSize,
+                ),
+            ),
+            codec.cropRequests,
+        )
+        assertEquals(originalSize, codec.encodedSize)
+    }
+
+    @Test
     fun invalidPngSignatureIsRejected() = runBlocking {
         val codec = FakePlatformImageCodec(encodedBytes = byteArrayOf(1, 2, 3))
         val processor = DefaultPrintImageProcessor(codec = codec)

@@ -221,6 +221,24 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun whiteBorderModeControlsTheRenderedCanvasBackground() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val model = createModel(processor, uploader, ImageSize(1_080, 1_920))
+
+        model.upload()
+        yield()
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.upload()
+        yield()
+
+        assertEquals(
+            listOf(CanvasBackground.White, CanvasBackground.Transparent),
+            processor.backgrounds,
+        )
+    }
+
+    @Test
     fun successfulUploadUsesPngFileNameAndEmitsCompletion() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
@@ -395,6 +413,7 @@ private class FakePrintImageProcessor(
 ) : PrintImageProcessor {
     var renderCount = 0
     val originalSizes = mutableListOf<ImageSize>()
+    val backgrounds = mutableListOf<CanvasBackground>()
 
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> =
         error("prepare is not used by the editor model")
@@ -403,9 +422,11 @@ private class FakePrintImageProcessor(
         source: SelectedImage,
         originalSize: ImageSize,
         transform: CropTransform,
+        background: CanvasBackground,
     ): Result<ByteArray> {
         renderCount++
         originalSizes += originalSize
+        backgrounds += background
         return renderBlock(source, originalSize, transform)
     }
 }

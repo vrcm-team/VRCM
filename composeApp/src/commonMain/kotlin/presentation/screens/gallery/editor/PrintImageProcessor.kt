@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -16,6 +17,7 @@ interface PrintImageProcessor {
         source: SelectedImage,
         originalSize: ImageSize,
         transform: CropTransform,
+        background: CanvasBackground = CanvasBackground.White,
     ): Result<ByteArray>
 }
 
@@ -51,6 +53,7 @@ class DefaultPrintImageProcessor(
         source: SelectedImage,
         originalSize: ImageSize,
         transform: CropTransform,
+        background: CanvasBackground,
     ): Result<ByteArray> = try {
         validateSource(source)
         validateDimensions(originalSize)
@@ -64,7 +67,7 @@ class DefaultPrintImageProcessor(
                     ),
                 )
             }
-            val output = renderCanvas(content)
+            val output = renderCanvas(content, background)
             useOwnedBitmap(output) {
                 encodePng(output)
             }
@@ -180,17 +183,26 @@ class DefaultPrintImageProcessor(
         throw cause
     }
 
-    private fun renderCanvas(content: ImageBitmap): ImageBitmap = try {
+    private fun renderCanvas(
+        content: ImageBitmap,
+        background: CanvasBackground,
+    ): ImageBitmap = try {
         val output = ImageBitmap(
             width = spec.canvasWidth,
             height = spec.canvasHeight,
-            hasAlpha = false,
+            hasAlpha = background == CanvasBackground.Transparent,
         )
         handoffOwnedBitmap(output) {
             val canvas = Canvas(output)
             canvas.drawRect(
                 rect = Rect(0f, 0f, spec.canvasWidth.toFloat(), spec.canvasHeight.toFloat()),
-                paint = Paint().apply { color = Color.White },
+                paint = Paint().apply {
+                    color = when (background) {
+                        CanvasBackground.Transparent -> Color.Transparent
+                        CanvasBackground.White -> Color.White
+                    }
+                    blendMode = BlendMode.Src
+                },
             )
             canvas.drawImageRect(
                 image = content,

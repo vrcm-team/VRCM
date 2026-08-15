@@ -86,6 +86,51 @@ class PrintImageProcessorTest : PrintImageProcessorContractTest() {
         assertOpaqueWhite(pixels[1_983, 1_149])
     }
 
+    @Test
+    fun galleryRenderPreservesTransparentPixels() = runBlocking {
+        val codec = DesktopPlatformImageCodec()
+        val source = ImageBitmap(width = 16, height = 9, hasAlpha = true)
+        Canvas(source).drawRect(
+            rect = Rect(8f, 0f, 16f, 9f),
+            paint = Paint().apply {
+                color = Color(red = 1f, green = 0f, blue = 0f, alpha = 0.5f)
+            },
+        )
+        val sourceBytes = try {
+            codec.encodePng(source)
+        } finally {
+            releasePlatformImageBitmap(source)
+        }
+        val sourceSpec = PrintCanvasSpec(
+            canvasWidth = 16,
+            canvasHeight = 9,
+            contentWidth = 16,
+            contentHeight = 9,
+            contentOffsetX = 0,
+            contentOffsetY = 0,
+        )
+
+        val rendered = DefaultPrintImageProcessor(codec, sourceSpec).render(
+            source = SelectedImage("transparent.png", sourceBytes),
+            originalSize = ImageSize(16, 9),
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        ).getOrThrow()
+        val decoded = codec.decode(
+            rendered,
+            DecodeRequest(maxDimension = 16, maxPixels = 144L),
+        )
+        val pixels = try {
+            decoded.bitmap.toPixelMap()
+        } finally {
+            releasePlatformImageBitmap(decoded.bitmap)
+        }
+
+        assertEquals(0f, pixels[2, 4].alpha, 0.01f)
+        assertEquals(0.5f, pixels[12, 4].alpha, 0.02f)
+        assertEquals(1f, pixels[12, 4].red, 0.01f)
+    }
+
     private fun assertOpaqueWhite(color: Color) {
         assertEquals(1f, color.alpha, 0.01f)
         assertEquals(1f, color.red, 0.01f)

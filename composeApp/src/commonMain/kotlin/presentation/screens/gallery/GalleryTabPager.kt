@@ -91,9 +91,9 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             }
         }
 
-        // 非 Print 类型同样先进入编辑器，以满足各标签的宽高比契约。
+        // 静态图片进入编辑器；动画格式保留原文件直传，避免丢失帧数据。
         val simpleImagePicker = rememberFilePickerLauncher(
-            type = galleryImagePickerType(EDITOR_IMAGE_EXTENSIONS),
+            type = galleryImagePickerType(GalleryPickerImageExtensions),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
@@ -111,6 +111,18 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                                 )
                             }
                             SharedFlowCentre.toastText.emit(ToastText.Error(message))
+                            return@launch
+                        }
+                        val uploadFormat = GalleryUploadImageFormat.fromFileName(source.fileName)
+                        if (uploadFormat?.preserveOriginal == true) {
+                            galleryScreenModel.uploadImageBytes(
+                                fileBytes = source.bytes,
+                                fileName = source.fileName,
+                                tagType = tagType,
+                                uploadingMessage = locale.galleryTabUploading,
+                                successMessage = locale.galleryTabUploadSuccess,
+                                failedMessagePrefix = locale.galleryTabUploadFailed,
+                            )
                             return@launch
                         }
                         val prepared = printImageProcessor.prepare(source).getOrElse { failure ->
@@ -139,7 +151,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
 
         // Print 类型的图片选择器（经过编辑器）
         val printImagePicker = rememberFilePickerLauncher(
-            type = galleryImagePickerType(EDITOR_IMAGE_EXTENSIONS),
+            type = galleryImagePickerType(GalleryEditorImageExtensions),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
@@ -508,8 +520,6 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
     }
 
     companion object {
-        private val EDITOR_IMAGE_EXTENSIONS = listOf("jpg", "jpeg", "png", "heic", "heif")
-
         data object Icon : GalleryTabPager(FileTagType.Icon)
         data object Emoji : GalleryTabPager(FileTagType.Emoji)
         data object Sticker : GalleryTabPager(FileTagType.Sticker)

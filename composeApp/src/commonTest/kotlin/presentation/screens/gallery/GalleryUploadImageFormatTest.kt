@@ -2,7 +2,9 @@ package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class GalleryUploadImageFormatTest {
     @Test
@@ -23,11 +25,15 @@ class GalleryUploadImageFormatTest {
     }
 
     @Test
-    fun pickerExtensionsComeFromTheSameSupportedFormatDefinition() {
+    fun pickerKeepsAnimatedFormatsAlongsideStaticEditorFormats() {
         assertEquals(
-            listOf("jpg", "jpeg", "png", "gif", "webp"),
-            GalleryUploadImageFormat.allowedExtensions,
+            listOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif"),
+            GalleryPickerImageExtensions,
         )
+        assertTrue(GalleryUploadImageFormat.Gif.preserveOriginal)
+        assertTrue(GalleryUploadImageFormat.WebP.preserveOriginal)
+        assertFalse(GalleryUploadImageFormat.Jpeg.preserveOriginal)
+        assertFalse(GalleryUploadImageFormat.Png.preserveOriginal)
     }
 
     @Test
