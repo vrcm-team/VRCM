@@ -26,6 +26,7 @@ class DefaultPrintImageProcessor(
     private val spec: PrintCanvasSpec = PrintCanvasSpec(),
     private val maxFileBytes: Int = PrintImageLimits.MAX_FILE_BYTES.toInt(),
     private val maxPixels: Long = PrintImageLimits.MAX_PIXELS,
+    private val maxOutputBytes: Int = PrintImageLimits.MAX_ENCODED_OUTPUT_BYTES,
     private val releaseBitmap: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : PrintImageProcessor {
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> = try {
@@ -67,9 +68,14 @@ class DefaultPrintImageProcessor(
                     ),
                 )
             }
-            val output = renderCanvas(content, background)
-            useOwnedBitmap(output) {
-                encodePng(output)
+            if (spec.isFullCanvas()) {
+                compositeBackgroundInPlace(content, background)
+                encodePng(content)
+            } else {
+                val output = renderFramedCanvas(content, background)
+                useOwnedBitmap(output) {
+                    encodePng(output)
+                }
             }
         }
         if (!hasExpectedPngHeader(bytes, spec.canvasWidth, spec.canvasHeight)) {
@@ -89,7 +95,7 @@ class DefaultPrintImageProcessor(
             bytes,
             DecodeRequest(
                 maxDimension = PREVIEW_MAX_DIMENSION,
-                maxPixels = PrintImageLimits.MAX_INTERMEDIATE_DECODE_PIXELS,
+                maxPixels = PrintImageLimits.MAX_PREVIEW_PIXELS,
             ),
         )
     } catch (cause: CancellationException) {
@@ -122,7 +128,11 @@ class DefaultPrintImageProcessor(
     }
 
     private suspend fun encodePng(bitmap: ImageBitmap): ByteArray = try {
-        codec.encodePng(bitmap)
+        codec.encodePng(bitmap, maxOutputBytes).also { bytes ->
+            if (bytes.size > maxOutputBytes) {
+                throw PrintImageFailure.EncodedOutputTooLarge
+            }
+        }
     } catch (cause: CancellationException) {
         throw cause
     } catch (failure: PrintImageFailure) {
@@ -183,7 +193,27 @@ class DefaultPrintImageProcessor(
         throw cause
     }
 
-    private fun renderCanvas(
+    private fun compositeBackgroundInPlace(
+        content: ImageBitmap,
+        background: CanvasBackground,
+    ) {
+        if (background == CanvasBackground.Transparent) return
+        try {
+            Canvas(content).drawRect(
+                rect = Rect(0f, 0f, content.width.toFloat(), content.height.toFloat()),
+                paint = Paint().apply {
+                    color = Color.White
+                    blendMode = BlendMode.DstOver
+                },
+            )
+        } catch (failure: PrintImageFailure) {
+            throw failure
+        } catch (cause: Exception) {
+            throw PrintImageFailure.RenderFailed(cause)
+        }
+    }
+
+    private fun renderFramedCanvas(
         content: ImageBitmap,
         background: CanvasBackground,
     ): ImageBitmap = try {
@@ -232,6 +262,12 @@ class DefaultPrintImageProcessor(
             throw PrintImageFailure.ImageDimensionsTooLarge
         }
     }
+
+    private fun PrintCanvasSpec.isFullCanvas(): Boolean =
+        canvasWidth == contentWidth &&
+                canvasHeight == contentHeight &&
+                contentOffsetX == 0 &&
+                contentOffsetY == 0
 
     private fun hasExpectedPngHeader(bytes: ByteArray, width: Int, height: Int): Boolean {
         if (bytes.size < PNG_HEADER_SIZE) return false

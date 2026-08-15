@@ -239,6 +239,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val printEditorUnsupportedFormat = "不支援此圖片格式。請使用 JPEG 或 PNG；HEIC/HEIF 是否可用取決於系統支援。"
     override val printEditorFileTooLarge = "所選檔案超過 50 MiB。"
     override val printEditorImageTooLarge = "所選圖片超過 1 億像素。"
+    override val printEditorOutputTooLarge = "編輯後的圖片過大，無法安全處理。請改用尺寸較小的原圖。"
     override val printEditorDesktopRegionDecodeUnavailable = "此圖片過大，桌面端無法安全處理此 HEIC/HEIF 圖片。請使用 JPEG 或 PNG。"
     override val printEditorReadFailed = "讀取圖片失敗: %s"
     override val printEditorDecodeFailed = "無法解碼此圖片。"

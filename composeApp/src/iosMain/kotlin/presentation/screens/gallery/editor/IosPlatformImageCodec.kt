@@ -171,16 +171,21 @@ class IosPlatformImageCodec : PlatformImageCodec {
             }
         }
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray =
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray =
         withContext(Dispatchers.Default) {
+            require(maxBytes > 0) { "maxBytes must be positive" }
             try {
-                Image.makeFromBitmap(bitmap.asSkiaBitmap()).use { image ->
+                val bytes = Image.makeFromBitmap(bitmap.asSkiaBitmap()).use { image ->
                     val data = image.encodeToData(EncodedImageFormat.PNG, 100)
                         ?: throw PrintImageFailure.EncodeFailed()
                     data.use {
                         it.bytes
                     }
                 }
+                if (bytes.size > maxBytes) {
+                    throw PrintImageFailure.EncodedOutputTooLarge
+                }
+                bytes
             } catch (cause: CancellationException) {
                 throw cause
             } catch (failure: PrintImageFailure) {

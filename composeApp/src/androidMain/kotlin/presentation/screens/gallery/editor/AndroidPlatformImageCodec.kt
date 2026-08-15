@@ -121,12 +121,16 @@ class AndroidPlatformImageCodec : PlatformImageCodec {
             }
         }
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray =
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray =
         withContext(Dispatchers.IO) {
+            require(maxBytes > 0) { "maxBytes must be positive" }
             val coroutineContext = currentCoroutineContext().also { it.ensureActive() }
             mapAndroidImageFailure(AndroidFailureOperation.ENCODE) {
-                val bytes = ByteArrayOutputStream().use { output ->
+                val bytes = BoundedByteArrayOutputStream(maxBytes).use { output ->
                     if (!bitmap.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        if (output.limitExceeded) {
+                            throw PrintImageFailure.EncodedOutputTooLarge
+                        }
                         throw PrintImageFailure.EncodeFailed()
                     }
                     output.toByteArray()
@@ -449,6 +453,34 @@ class AndroidPlatformImageCodec : PlatformImageCodec {
             "mif1",
             "msf1",
         )
+    }
+}
+
+private class BoundedByteArrayOutputStream(
+    private val maxBytes: Int,
+) : ByteArrayOutputStream(minOf(DEFAULT_ENCODE_BUFFER_BYTES, maxBytes)) {
+    var limitExceeded: Boolean = false
+        private set
+
+    override fun write(value: Int) {
+        ensureCanWrite(1)
+        super.write(value)
+    }
+
+    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+        ensureCanWrite(length)
+        super.write(bytes, offset, length)
+    }
+
+    private fun ensureCanWrite(length: Int) {
+        if (length < 0 || length > maxBytes - count) {
+            limitExceeded = true
+            throw PrintImageFailure.EncodedOutputTooLarge
+        }
+    }
+
+    private companion object {
+        const val DEFAULT_ENCODE_BUFFER_BYTES = 32 * 1024
     }
 }
 

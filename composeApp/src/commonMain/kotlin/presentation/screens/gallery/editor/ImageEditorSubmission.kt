@@ -22,6 +22,17 @@ sealed interface ImageEditorTarget {
     }
 }
 
+/** Print and avatar outputs keep their opaque contract; only Gallery supports transparency. */
+internal fun ImageEditorTarget.canvasBackground(fillWhiteBorder: Boolean): CanvasBackground = when (this) {
+    ImageEditorTarget.Print,
+    is ImageEditorTarget.AvatarCover -> CanvasBackground.White
+    is ImageEditorTarget.Gallery -> if (fillWhiteBorder) {
+        CanvasBackground.White
+    } else {
+        CanvasBackground.Transparent
+    }
+}
+
 sealed interface ImageEditorSubmission {
     data object Print : ImageEditorSubmission
     data class AvatarCover(val avatar: AvatarData) : ImageEditorSubmission

@@ -217,6 +217,7 @@ class PrintImageEditorScreen(
                 locale = locale,
                 uploadingText = uploadingText,
                 aspectRatio = session.target.cropAspectRatio(session.prepared.originalSize),
+                canvasBackground = session.target.canvasBackground(state.fillWhiteBorder),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -240,6 +241,7 @@ private fun PrintEditorContent(
     locale: LocaleStrings,
     uploadingText: String,
     aspectRatio: Float,
+    canvasBackground: CanvasBackground,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
@@ -255,6 +257,7 @@ private fun PrintEditorContent(
             locale = locale,
             uploadingText = uploadingText,
             aspectRatio = aspectRatio,
+            canvasBackground = canvasBackground,
             modifier = previewModifier,
         )
     }
@@ -300,6 +303,7 @@ private fun PrintEditorPreview(
     locale: LocaleStrings,
     uploadingText: String,
     aspectRatio: Float,
+    canvasBackground: CanvasBackground,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -318,9 +322,12 @@ private fun PrintEditorPreview(
             modifier = Modifier
                 .width(cropWidth)
                 .aspectRatio(aspectRatio)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.White),
+                .clip(RoundedCornerShape(4.dp)),
         ) {
+            EditorCanvasBackground(
+                background = canvasBackground,
+                modifier = Modifier.fillMaxSize(),
+            )
             PrintCropPreview(
                 state = state,
                 calculator = calculator,
@@ -351,6 +358,41 @@ private fun PrintEditorPreview(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EditorCanvasBackground(
+    background: CanvasBackground,
+    modifier: Modifier = Modifier,
+) {
+    val lightTile = MaterialTheme.colorScheme.surface
+    val darkTile = MaterialTheme.colorScheme.surfaceVariant
+    Canvas(modifier = modifier) {
+        if (background == CanvasBackground.White) {
+            drawRect(Color.White)
+            return@Canvas
+        }
+
+        val tileSize = 12.dp.toPx()
+        drawRect(lightTile)
+        var row = 0
+        var top = 0f
+        while (top < size.height) {
+            var column = row.mod(2)
+            var left = column * tileSize
+            while (left < size.width) {
+                drawRect(
+                    color = darkTile,
+                    topLeft = Offset(left, top),
+                    size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                )
+                column += 2
+                left = column * tileSize
+            }
+            row++
+            top += tileSize
         }
     }
 }
@@ -614,6 +656,7 @@ private fun EditorToggleButton(
 internal fun PrintImageFailure.localizedMessage(locale: LocaleStrings): String = when (this) {
     PrintImageFailure.FileTooLarge -> locale.printEditorFileTooLarge
     PrintImageFailure.ImageDimensionsTooLarge -> locale.printEditorImageTooLarge
+    PrintImageFailure.EncodedOutputTooLarge -> locale.printEditorOutputTooLarge
     PrintImageFailure.DesktopRegionDecodeUnavailable ->
         locale.printEditorDesktopRegionDecodeUnavailable
     is PrintImageFailure.UnsupportedFormat -> locale.printEditorUnsupportedFormat

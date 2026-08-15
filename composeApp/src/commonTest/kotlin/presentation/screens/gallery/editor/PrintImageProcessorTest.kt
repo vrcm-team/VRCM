@@ -62,7 +62,7 @@ abstract class PrintImageProcessorContractTest {
             listOf(
                 DecodeRequest(
                     maxDimension = 2_048,
-                    maxPixels = PrintImageLimits.MAX_INTERMEDIATE_DECODE_PIXELS,
+                    maxPixels = PrintImageLimits.MAX_PREVIEW_PIXELS,
                 ),
             ),
             codec.decodeRequests,
@@ -227,6 +227,68 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
+    fun fullCanvasRenderCompositesInPlaceWithoutASecondOutputBitmap() = runBlocking {
+        val originalSize = ImageSize(1_200, 800)
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = originalSize.width, height = originalSize.height),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = sourceAspectCanvasSpec(originalSize),
+            releaseBitmap = {
+                released += it
+                releasePlatformImageBitmap(it)
+            },
+        )
+
+        val result = processor.render(
+            source = SelectedImage("gallery.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.White,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(1, released.size)
+    }
+
+    @Test
+    fun largeGallerySourceIsScaledToTheFinalRenderBudget() {
+        val source = ImageSize(8_000, 6_000)
+
+        val spec = sourceAspectCanvasSpec(source)
+
+        assertTrue(spec.canvasWidth < source.width)
+        assertTrue(spec.canvasHeight < source.height)
+        assertTrue(
+            spec.canvasWidth.toLong() * spec.canvasHeight <=
+                    PrintImageLimits.MAX_EDITED_OUTPUT_PIXELS,
+        )
+        assertEquals(spec.canvasWidth, spec.contentWidth)
+        assertEquals(spec.canvasHeight, spec.contentHeight)
+    }
+
+    @Test
+    fun encodedOutputOverTheBoundIsRejectedBeforeSubmission() = runBlocking {
+        val maxOutputBytes = 24
+        val codec = FakePlatformImageCodec(encodedBytes = ByteArray(maxOutputBytes + 1))
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            maxOutputBytes = maxOutputBytes,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("photo.png", byteArrayOf(1)),
+            originalSize = ImageSize(1_920, 1_080),
+            transform = CropTransform(),
+        )
+
+        assertIs<PrintImageFailure.EncodedOutputTooLarge>(result.exceptionOrNull())
+        assertEquals(listOf(maxOutputBytes), codec.encodeLimits)
+    }
+
+    @Test
     fun invalidPngSignatureIsRejected() = runBlocking {
         val codec = FakePlatformImageCodec(encodedBytes = byteArrayOf(1, 2, 3))
         val processor = DefaultPrintImageProcessor(codec = codec)
@@ -375,6 +437,7 @@ private class FakePlatformImageCodec(
 ) : PlatformImageCodec {
     val decodeRequests = mutableListOf<DecodeRequest>()
     val cropRequests = mutableListOf<CropRenderRequest>()
+    val encodeLimits = mutableListOf<Int>()
     var encodedSize: ImageSize? = null
     var encodedPixels: PixelMap? = null
 
@@ -392,7 +455,8 @@ private class FakePlatformImageCodec(
             ?: solidBitmap(request.outputSize.width, request.outputSize.height, renderColor)
     }
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray {
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray {
+        encodeLimits += maxBytes
         encodedSize = ImageSize(bitmap.width, bitmap.height)
         encodedPixels = bitmap.toPixelMap()
         encodeFailure?.let { throw it }

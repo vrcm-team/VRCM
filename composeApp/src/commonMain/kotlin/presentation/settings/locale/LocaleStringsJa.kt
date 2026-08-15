@@ -240,6 +240,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val printEditorUnsupportedFormat = "対応していない画像形式です。JPEG または PNG を使用してください。HEIC/HEIF の対応状況はシステムによって異なります。"
     override val printEditorFileTooLarge = "選択したファイルは 50 MiB を超えています。"
     override val printEditorImageTooLarge = "選択した画像は 1 億画素を超えています。"
+    override val printEditorOutputTooLarge = "編集後の画像が大きすぎて安全に処理できません。より小さい元画像を使用してください。"
     override val printEditorDesktopRegionDecodeUnavailable = "この画像はデスクトップで安全に処理できる HEIC/HEIF のサイズを超えています。JPEG または PNG を使用してください。"
     override val printEditorReadFailed = "画像の読み込みに失敗しました: %s"
     override val printEditorDecodeFailed = "画像をデコードできませんでした。"

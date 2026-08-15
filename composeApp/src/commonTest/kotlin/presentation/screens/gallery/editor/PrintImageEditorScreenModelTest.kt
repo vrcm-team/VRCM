@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -221,10 +222,40 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun whiteBorderModeControlsTheRenderedCanvasBackground() = runBlocking {
+    fun printTargetKeepsWhiteCanvasWhenBorderModeIsDisabled() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
         val model = createModel(processor, uploader, ImageSize(1_080, 1_920))
+
+        model.upload()
+        yield()
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.upload()
+        yield()
+
+        assertEquals(
+            listOf(CanvasBackground.White, CanvasBackground.White),
+            processor.backgrounds,
+        )
+    }
+
+    @Test
+    fun galleryTargetUsesTransparentCanvasWhenBorderModeIsDisabled() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val submitter = FakeImageEditorSubmitter {
+            Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.png", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_080, 1_920)),
+            calculator = CropTransformCalculator(),
+            processor = processor,
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Gallery),
+            sessionId = "test-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
 
         model.upload()
         yield()

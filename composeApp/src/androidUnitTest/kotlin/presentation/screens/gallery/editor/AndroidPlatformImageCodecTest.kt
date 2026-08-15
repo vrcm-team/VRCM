@@ -140,6 +140,19 @@ class AndroidPlatformImageCodecTest {
     }
 
     @Test
+    fun pngEncodingStopsWhenTheOutputLimitIsExceeded() = runBlocking {
+        val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+        try {
+            assertFailsWith<PrintImageFailure.EncodedOutputTooLarge> {
+                codec.encodePng(bitmap.asImageBitmap(), maxBytes = 8)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+        Unit
+    }
+
+    @Test
     fun exifOrientationsNormalizePreviewDimensionsAndPixels() = runBlocking {
         val rawSize = EXIF_ORIENTATION_FIXTURE_SIZE
         val rawJpeg = createFourColorJpeg(rawSize)

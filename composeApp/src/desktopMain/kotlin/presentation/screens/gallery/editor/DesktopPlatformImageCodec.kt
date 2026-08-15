@@ -133,8 +133,9 @@ class DesktopPlatformImageCodec : PlatformImageCodec {
             }
         }
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray =
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray =
         withContext(Dispatchers.Default) {
+            require(maxBytes > 0) { "maxBytes must be positive" }
             mapDesktopImageFailure(DesktopFailureOperation.ENCODE) {
                 currentCoroutineContext().ensureActive()
                 val result = Image.makeFromBitmap(bitmap.asSkiaBitmap()).use { image ->
@@ -143,6 +144,9 @@ class DesktopPlatformImageCodec : PlatformImageCodec {
                     }
                 }
                 currentCoroutineContext().ensureActive()
+                if (result.size > maxBytes) {
+                    throw PrintImageFailure.EncodedOutputTooLarge
+                }
                 result
             }
         }
