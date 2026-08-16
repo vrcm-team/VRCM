@@ -13,6 +13,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Build
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.core.content.ContextCompat
 import coil3.ImageLoader
@@ -27,6 +28,7 @@ import io.github.vrcmteam.vrcm.EXTRA_NOTIFICATION_DESTINATION
 import io.github.vrcmteam.vrcm.EXTRA_NOTIFICATION_TARGET_ID
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.service.NotificationLaunchDestination
+import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 
 private const val SOCIAL_CHANNEL = "friend_activity_alerts_v2"
@@ -64,18 +66,28 @@ class FriendNotificationFactory(private val context: Context) {
         destination: NotificationLaunchDestination,
         targetId: String,
         largeIcon: Bitmap? = null,
+        receivedAtMillis: Long = System.currentTimeMillis(),
+        showAvatarTimestamp: Boolean = false,
     ): Notification {
         val builder = builder(SOCIAL_CHANNEL, id, destination, targetId)
             .setContentTitle(title)
             .setContentText(message)
-            .setWhen(System.currentTimeMillis())
-            .setShowWhen(true)
+            .setWhen(receivedAtMillis)
             .setCategory(Notification.CATEGORY_SOCIAL)
             .setAutoCancel(true)
         if (message.length > LONG_MESSAGE_THRESHOLD) {
             builder.setStyle(Notification.BigTextStyle().bigText(message))
         }
-        largeIcon?.let(builder::setLargeIcon)
+        if (largeIcon == null || !showAvatarTimestamp) {
+            builder.setShowWhen(true)
+            largeIcon?.let(builder::setLargeIcon)
+        } else {
+            // Some OEM templates replace the system timestamp with a large icon.
+            builder
+                .setShowWhen(false)
+                .setSubText(DateFormat.getTimeFormat(context).format(Date(receivedAtMillis)))
+                .setLargeIcon(largeIcon)
+        }
         return builder.build()
     }
     fun serviceStatus(title: String, message: CharSequence): Notification =
@@ -132,6 +144,7 @@ class AndroidFriendOnlineNotifier(
             destination = NotificationLaunchDestination.UserProfile,
             targetId = friend.id,
             iconUrl = friend.iconUrl,
+            showAvatarTimestamp = true,
         )
     }
     override fun notifyOffline(friendId: String, displayName: String, iconUrl: String?) {
@@ -143,6 +156,7 @@ class AndroidFriendOnlineNotifier(
             destination = NotificationLaunchDestination.UserProfile,
             targetId = friendId,
             iconUrl = iconUrl,
+            showAvatarTimestamp = true,
         )
     }
 
@@ -153,8 +167,10 @@ class AndroidFriendOnlineNotifier(
         destination: NotificationLaunchDestination,
         targetId: String,
         iconUrl: String?,
+        showAvatarTimestamp: Boolean = false,
     ) {
         val requestToken = Any()
+        val receivedAtMillis = System.currentTimeMillis()
         latestAvatarRequests[id] = requestToken
         notificationManager.notify(
             id,
@@ -164,6 +180,8 @@ class AndroidFriendOnlineNotifier(
                 message = message,
                 destination = destination,
                 targetId = targetId,
+                receivedAtMillis = receivedAtMillis,
+                showAvatarTimestamp = showAvatarTimestamp,
             ),
         )
         val imageUrl = iconUrl?.trim()?.takeIf(String::isNotEmpty) ?: run {
@@ -193,6 +211,8 @@ class AndroidFriendOnlineNotifier(
                             destination = destination,
                             targetId = targetId,
                             largeIcon = notificationIcon(image.toBitmap()),
+                            receivedAtMillis = receivedAtMillis,
+                            showAvatarTimestamp = showAvatarTimestamp,
                         ),
                     )
                 },
