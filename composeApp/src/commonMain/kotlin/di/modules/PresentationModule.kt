@@ -27,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTa
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLimits
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
@@ -116,6 +117,9 @@ val presentationModule: Module = module {
                 is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
                     codec = get(),
                     spec = session.target.canvasSpec,
+                    maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                    limitOutputToVisibleSource = true,
+                    shrinkOversizedOutput = true,
                 )
             },
             submitter = get(),

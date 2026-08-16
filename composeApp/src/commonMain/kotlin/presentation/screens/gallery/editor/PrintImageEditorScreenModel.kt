@@ -182,7 +182,7 @@ class PrintImageEditorScreenModel(
                     .getOrThrow()
                     .also {
                         cachedPng = it
-                        cachedFileName = target.fileName(nowMillis())
+                        cachedFileName = target.uploadFileName(source.fileName, nowMillis())
                     }
 
                 stage = UploadStage.Uploading
@@ -190,7 +190,8 @@ class PrintImageEditorScreenModel(
                 val submission = submitter.submit(
                     target = target,
                     imageBytes = png,
-                    fileName = cachedFileName ?: target.fileName(nowMillis()),
+                    fileName = cachedFileName
+                        ?: target.uploadFileName(source.fileName, nowMillis()),
                 ).getOrThrow()
 
                 _state.update { it.copy(phase = EditorPhase.Ready, error = null) }
@@ -298,8 +299,8 @@ class PrintImageEditorScreenModel(
 
 private fun ImageSize.isValid(): Boolean = width > 0 && height > 0
 
-private fun ImageEditorTarget.fileName(nowMillis: Long): String = when (this) {
+private fun ImageEditorTarget.uploadFileName(sourceFileName: String, nowMillis: Long): String = when (this) {
     ImageEditorTarget.Print -> "print-$nowMillis.png"
     is ImageEditorTarget.AvatarCover -> "avatar-cover-$nowMillis.png"
-    is ImageEditorTarget.Gallery -> "${tagType.value}-$nowMillis.png"
+    is ImageEditorTarget.Gallery -> sourceFileName.ifBlank { "${tagType.value}-$nowMillis.png" }
 }

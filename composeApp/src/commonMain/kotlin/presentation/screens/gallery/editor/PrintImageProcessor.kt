@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CancellationException
+import kotlin.math.roundToInt
 
 interface PrintImageProcessor {
     suspend fun prepare(source: SelectedImage): Result<PreparedImage>
@@ -27,6 +28,8 @@ class DefaultPrintImageProcessor(
     private val maxFileBytes: Int = PrintImageLimits.MAX_FILE_BYTES.toInt(),
     private val maxPixels: Long = PrintImageLimits.MAX_PIXELS,
     private val maxOutputBytes: Int = PrintImageLimits.MAX_ENCODED_OUTPUT_BYTES,
+    private val limitOutputToVisibleSource: Boolean = false,
+    private val shrinkOversizedOutput: Boolean = false,
     private val releaseBitmap: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : PrintImageProcessor {
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> = try {
@@ -55,39 +58,75 @@ class DefaultPrintImageProcessor(
         originalSize: ImageSize,
         transform: CropTransform,
         background: CanvasBackground,
-    ): Result<ByteArray> = try {
-        validateSource(source)
-        validateDimensions(originalSize)
-        val content = renderCrop(source.bytes, originalSize, transform)
-        val bytes = useOwnedBitmap(content) {
-            if (content.width != spec.contentWidth || content.height != spec.contentHeight) {
+    ): Result<ByteArray> {
+        return try {
+            validateSource(source)
+            validateDimensions(originalSize)
+            var renderSpec = if (limitOutputToVisibleSource) {
+                spec.fitWithinVisibleSource(originalSize, transform)
+            } else {
+                spec
+            }
+            var encodedBytes: ByteArray? = null
+            while (encodedBytes == null) {
+                try {
+                    encodedBytes = renderWithSpec(
+                        source.bytes,
+                        originalSize,
+                        transform,
+                        background,
+                        renderSpec,
+                    )
+                } catch (failure: PrintImageFailure.EncodedOutputTooLarge) {
+                    if (!shrinkOversizedOutput) throw failure
+                    renderSpec = renderSpec.shrinkLikeVrcx()
+                        ?: throw failure
+                }
+            }
+            Result.success(encodedBytes)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (failure: PrintImageFailure) {
+            Result.failure(failure)
+        } catch (cause: Exception) {
+            Result.failure(PrintImageFailure.RenderFailed(cause))
+        }
+    }
+
+    private suspend fun renderWithSpec(
+        bytes: ByteArray,
+        originalSize: ImageSize,
+        transform: CropTransform,
+        background: CanvasBackground,
+        renderSpec: PrintCanvasSpec,
+    ): ByteArray {
+        val content = renderCrop(bytes, originalSize, transform, renderSpec)
+        val encodedBytes = useOwnedBitmap(content) {
+            if (
+                content.width != renderSpec.contentWidth ||
+                content.height != renderSpec.contentHeight
+            ) {
                 throw PrintImageFailure.RenderFailed(
                     IllegalStateException(
                         "Crop renderer returned ${content.width}x${content.height}; expected " +
-                                "${spec.contentWidth}x${spec.contentHeight}",
+                                "${renderSpec.contentWidth}x${renderSpec.contentHeight}",
                     ),
                 )
             }
-            if (spec.isFullCanvas()) {
+            if (renderSpec.isFullCanvas()) {
                 compositeBackgroundInPlace(content, background)
                 encodePng(content)
             } else {
-                val output = renderFramedCanvas(content, background)
+                val output = renderFramedCanvas(content, background, renderSpec)
                 useOwnedBitmap(output) {
                     encodePng(output)
                 }
             }
         }
-        if (!hasExpectedPngHeader(bytes, spec.canvasWidth, spec.canvasHeight)) {
+        if (!hasExpectedPngHeader(encodedBytes, renderSpec.canvasWidth, renderSpec.canvasHeight)) {
             throw PrintImageFailure.EncodeFailed()
         }
-        Result.success(bytes)
-    } catch (cause: CancellationException) {
-        throw cause
-    } catch (failure: PrintImageFailure) {
-        Result.failure(failure)
-    } catch (cause: Exception) {
-        Result.failure(PrintImageFailure.RenderFailed(cause))
+        return encodedBytes
     }
 
     private suspend fun decodePreview(bytes: ByteArray): DecodedImage = try {
@@ -110,13 +149,14 @@ class DefaultPrintImageProcessor(
         bytes: ByteArray,
         originalSize: ImageSize,
         transform: CropTransform,
+        renderSpec: PrintCanvasSpec,
     ): ImageBitmap = try {
         codec.renderCrop(
             bytes,
             CropRenderRequest(
                 originalSize = originalSize,
                 transform = transform,
-                outputSize = ImageSize(spec.contentWidth, spec.contentHeight),
+                outputSize = ImageSize(renderSpec.contentWidth, renderSpec.contentHeight),
             ),
         )
     } catch (cause: CancellationException) {
@@ -216,16 +256,22 @@ class DefaultPrintImageProcessor(
     private fun renderFramedCanvas(
         content: ImageBitmap,
         background: CanvasBackground,
+        renderSpec: PrintCanvasSpec,
     ): ImageBitmap = try {
         val output = ImageBitmap(
-            width = spec.canvasWidth,
-            height = spec.canvasHeight,
+            width = renderSpec.canvasWidth,
+            height = renderSpec.canvasHeight,
             hasAlpha = background == CanvasBackground.Transparent,
         )
         handoffOwnedBitmap(output) {
             val canvas = Canvas(output)
             canvas.drawRect(
-                rect = Rect(0f, 0f, spec.canvasWidth.toFloat(), spec.canvasHeight.toFloat()),
+                rect = Rect(
+                    0f,
+                    0f,
+                    renderSpec.canvasWidth.toFloat(),
+                    renderSpec.canvasHeight.toFloat(),
+                ),
                 paint = Paint().apply {
                     color = when (background) {
                         CanvasBackground.Transparent -> Color.Transparent
@@ -236,8 +282,8 @@ class DefaultPrintImageProcessor(
             )
             canvas.drawImageRect(
                 image = content,
-                dstOffset = IntOffset(spec.contentOffsetX, spec.contentOffsetY),
-                dstSize = IntSize(spec.contentWidth, spec.contentHeight),
+                dstOffset = IntOffset(renderSpec.contentOffsetX, renderSpec.contentOffsetY),
+                dstSize = IntSize(renderSpec.contentWidth, renderSpec.contentHeight),
                 paint = Paint(),
             )
             output
@@ -269,6 +315,64 @@ class DefaultPrintImageProcessor(
                 contentOffsetX == 0 &&
                 contentOffsetY == 0
 
+    private fun PrintCanvasSpec.fitWithinVisibleSource(
+        originalSize: ImageSize,
+        transform: CropTransform,
+    ): PrintCanvasSpec {
+        if (!isFullCanvas()) return this
+        val rotated = if (transform.quarterTurns.mod(2) == 0) {
+            originalSize
+        } else {
+            ImageSize(originalSize.height, originalSize.width)
+        }
+        val targetAspect = canvasWidth.toDouble() / canvasHeight
+        val sourceAspect = rotated.width.toDouble() / rotated.height
+        val cropWidth: Double
+        val cropHeight: Double
+        if (sourceAspect >= targetAspect) {
+            cropHeight = rotated.height.toDouble()
+            cropWidth = cropHeight * targetAspect
+        } else {
+            cropWidth = rotated.width.toDouble()
+            cropHeight = cropWidth / targetAspect
+        }
+        val zoom = transform.zoom.coerceAtLeast(1f).toDouble()
+        val scale = minOf(
+            1.0 / zoom,
+            canvasWidth / cropWidth,
+            canvasHeight / cropHeight,
+        )
+        val width = (cropWidth * scale).roundToInt().coerceAtLeast(1)
+        val height = (cropHeight * scale).roundToInt().coerceAtLeast(1)
+        return copy(
+            canvasWidth = width,
+            canvasHeight = height,
+            contentWidth = width,
+            contentHeight = height,
+        )
+    }
+
+    private fun PrintCanvasSpec.shrinkLikeVrcx(): PrintCanvasSpec? {
+        if (!isFullCanvas() || canvasWidth <= VRCX_RESIZE_STEP || canvasHeight <= VRCX_RESIZE_STEP) {
+            return null
+        }
+        val width: Int
+        val height: Int
+        if (canvasWidth > canvasHeight) {
+            width = canvasWidth - VRCX_RESIZE_STEP
+            height = (canvasHeight / (canvasWidth.toDouble() / width)).roundToInt()
+        } else {
+            height = canvasHeight - VRCX_RESIZE_STEP
+            width = (canvasWidth / (canvasHeight.toDouble() / height)).roundToInt()
+        }
+        return copy(
+            canvasWidth = width,
+            canvasHeight = height,
+            contentWidth = width,
+            contentHeight = height,
+        )
+    }
+
     private fun hasExpectedPngHeader(bytes: ByteArray, width: Int, height: Int): Boolean {
         if (bytes.size < PNG_HEADER_SIZE) return false
         if (!PNG_SIGNATURE.indices.all { bytes[it] == PNG_SIGNATURE[it] }) return false
@@ -289,6 +393,7 @@ class DefaultPrintImageProcessor(
         const val PNG_CHUNK_TYPE_OFFSET = 12
         const val PNG_WIDTH_OFFSET = 16
         const val PNG_HEIGHT_OFFSET = 20
+        const val VRCX_RESIZE_STEP = 25
 
         val PNG_SIGNATURE = byteArrayOf(
             0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,

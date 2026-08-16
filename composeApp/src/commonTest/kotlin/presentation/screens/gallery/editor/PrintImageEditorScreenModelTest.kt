@@ -240,7 +240,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun galleryTargetKeepsWhiteCanvasWhenBorderModeIsDisabled() = runBlocking {
+    fun galleryTargetPreservesTransparentCanvasWhenBorderModeIsDisabled() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val submitter = FakeImageEditorSubmitter {
             Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
@@ -264,7 +264,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         yield()
 
         assertEquals(
-            listOf(CanvasBackground.White, CanvasBackground.White),
+            listOf(CanvasBackground.Transparent, CanvasBackground.Transparent),
             processor.backgrounds,
         )
     }
@@ -282,6 +282,31 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         assertEquals(EditorEvent.Submitted(ImageEditorSubmission.Print), uploaded.await())
         assertTrue(requireNotNull(uploader.lastFileName).startsWith("print-"))
         assertTrue(requireNotNull(uploader.lastFileName).endsWith(".png"))
+    }
+
+    @Test
+    fun emojiUploadKeepsOriginalFileNameForVrcxMetadataParsing() = runBlocking {
+        val sourceFileName =
+            "wave_stopanimationStyle_8frames_24fps_pingpongloopStyle.png"
+        val submitter = FakeImageEditorSubmitter {
+            Result.success(ImageEditorSubmission.Gallery(FileTagType.Emoji))
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage(sourceFileName, byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_000, 1_000)),
+            calculator = CropTransformCalculator(),
+            processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Emoji),
+            sessionId = "emoji-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
+
+        model.upload()
+        yield()
+
+        assertEquals(sourceFileName, submitter.lastFileName)
     }
 
     @Test

@@ -91,7 +91,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             }
         }
 
-        // 所有可选图片都先进入编辑器，以满足各标签的尺寸与白底合同。
+        // 所有可选图片都先进入编辑器，以满足各标签的尺寸与透明度合同。
         val simpleImagePicker = rememberFilePickerLauncher(
             type = galleryImagePickerType(EDITOR_IMAGE_EXTENSIONS),
         ) { image ->

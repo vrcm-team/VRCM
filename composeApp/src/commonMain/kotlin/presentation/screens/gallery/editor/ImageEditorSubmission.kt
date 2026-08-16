@@ -22,9 +22,13 @@ sealed interface ImageEditorTarget {
     }
 }
 
-/** All upload targets use the opaque canvas expected by their consuming product surfaces. */
+/** Gallery uploads preserve PNG alpha; Print and avatar cover surfaces remain opaque. */
 internal val ImageEditorTarget.canvasBackground: CanvasBackground
-    get() = CanvasBackground.White
+    get() = when (this) {
+        ImageEditorTarget.Print,
+        is ImageEditorTarget.AvatarCover -> CanvasBackground.White
+        is ImageEditorTarget.Gallery -> CanvasBackground.Transparent
+    }
 
 /** Maps each gallery upload category to the dimensions required by the product workflow. */
 internal val ImageEditorTarget.Gallery.canvasSpec: PrintCanvasSpec

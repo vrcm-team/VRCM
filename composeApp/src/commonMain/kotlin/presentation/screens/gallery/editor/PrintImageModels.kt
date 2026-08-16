@@ -112,19 +112,19 @@ internal val AvatarCoverCanvasSpec = PrintCanvasSpec(
 )
 
 internal val GalleryCanvasSpec = PrintCanvasSpec(
-    canvasWidth = 2_048,
-    canvasHeight = 1_536,
-    contentWidth = 2_048,
-    contentHeight = 1_536,
+    canvasWidth = 2_000,
+    canvasHeight = 1_500,
+    contentWidth = 2_000,
+    contentHeight = 1_500,
     contentOffsetX = 0,
     contentOffsetY = 0,
 )
 
 internal val SquareCanvasSpec = PrintCanvasSpec(
-    canvasWidth = 1_024,
-    canvasHeight = 1_024,
-    contentWidth = 1_024,
-    contentHeight = 1_024,
+    canvasWidth = 2_000,
+    canvasHeight = 2_000,
+    contentWidth = 2_000,
+    contentHeight = 2_000,
     contentOffsetX = 0,
     contentOffsetY = 0,
 )
@@ -144,15 +144,18 @@ object PrintImageLimits {
 
     /**
      * Crop rendering can temporarily retain a decoded region and the final ARGB raster together.
-     * Keep that two-raster working set within 24 MiB; full-canvas outputs are composited in place.
+     * Keep that two-raster working set within 32 MiB; full-canvas outputs are composited in place.
      */
-    const val MAX_EDITED_RENDER_WORKING_BYTES: Long = 24L * 1024 * 1024
+    const val MAX_EDITED_RENDER_WORKING_BYTES: Long = 32L * 1024 * 1024
     const val MAX_EDITED_OUTPUT_PIXELS: Long =
         MAX_EDITED_RENDER_WORKING_BYTES /
                 (MAX_SIMULTANEOUS_RENDER_RASTERS * ARGB_BYTES_PER_PIXEL)
 
     /** Bounds both the encoder's accumulation buffer and the returned PNG before submission. */
     const val MAX_ENCODED_OUTPUT_BYTES: Int = 16 * 1024 * 1024
+
+    /** Matches the upload limit enforced by VRCX for `/file/image` gallery uploads. */
+    const val MAX_GALLERY_ENCODED_OUTPUT_BYTES: Int = 10_000_000
 }
 
 sealed class PrintImageFailure(

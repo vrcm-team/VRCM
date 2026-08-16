@@ -13,12 +13,16 @@ import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.readRemaining
 import kotlinx.io.readByteArray
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.TimeZone
 import kotlinx.serialization.json.Json
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalTime::class)
 class PrintsApiTest {
     @Test
     fun getUserPrintsSendsClampedPaginationParameters() = runBlocking {
@@ -108,8 +112,19 @@ class PrintsApiTest {
         )
 
         assertTrue(capturedBody.contains("Content-Type: image/png"))
-        assertTrue(capturedBody.contains("name=image; filename=\"print-test.png\""))
+        assertTrue(capturedBody.contains("name=image; filename=\"image\""))
         assertTrue(capturedBody.contains("name=timestamp"))
         client.close()
+    }
+
+    @Test
+    fun printTimestampMatchesVrcLocalWallClockFormat() {
+        assertEquals(
+            "2026-08-17T20:34:56",
+            vrcPrintTimestamp(
+                instant = Instant.parse("2026-08-17T12:34:56.789Z"),
+                timeZone = TimeZone.of("Asia/Shanghai"),
+            ),
+        )
     }
 }
