@@ -177,7 +177,7 @@ class PrintImageEditorScreenModel(
                     source = source,
                     originalSize = current.prepared.originalSize,
                     transform = current.transform,
-                    background = target.canvasBackground(current.fillWhiteBorder),
+                    background = target.canvasBackground,
                 )
                     .getOrThrow()
                     .also {

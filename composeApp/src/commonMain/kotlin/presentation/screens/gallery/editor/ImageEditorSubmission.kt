@@ -22,16 +22,9 @@ sealed interface ImageEditorTarget {
     }
 }
 
-/** Print and avatar outputs keep their opaque contract; only Gallery supports transparency. */
-internal fun ImageEditorTarget.canvasBackground(fillWhiteBorder: Boolean): CanvasBackground = when (this) {
-    ImageEditorTarget.Print,
-    is ImageEditorTarget.AvatarCover -> CanvasBackground.White
-    is ImageEditorTarget.Gallery -> if (fillWhiteBorder) {
-        CanvasBackground.White
-    } else {
-        CanvasBackground.Transparent
-    }
-}
+/** All upload targets use the opaque canvas expected by their consuming product surfaces. */
+internal val ImageEditorTarget.canvasBackground: CanvasBackground
+    get() = CanvasBackground.White
 
 /** Maps each gallery upload category to the dimensions required by the product workflow. */
 internal val ImageEditorTarget.Gallery.canvasSpec: PrintCanvasSpec

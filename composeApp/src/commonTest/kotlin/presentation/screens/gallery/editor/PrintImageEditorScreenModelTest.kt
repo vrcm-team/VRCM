@@ -240,7 +240,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun galleryTargetUsesTransparentCanvasWhenBorderModeIsDisabled() = runBlocking {
+    fun galleryTargetKeepsWhiteCanvasWhenBorderModeIsDisabled() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val submitter = FakeImageEditorSubmitter {
             Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
@@ -264,7 +264,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         yield()
 
         assertEquals(
-            listOf(CanvasBackground.White, CanvasBackground.Transparent),
+            listOf(CanvasBackground.White, CanvasBackground.White),
             processor.backgrounds,
         )
     }

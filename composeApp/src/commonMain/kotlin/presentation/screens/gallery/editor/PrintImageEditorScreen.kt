@@ -217,7 +217,7 @@ class PrintImageEditorScreen(
                 locale = locale,
                 uploadingText = uploadingText,
                 aspectRatio = session.target.cropAspectRatio,
-                canvasBackground = session.target.canvasBackground(state.fillWhiteBorder),
+                canvasBackground = session.target.canvasBackground,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
