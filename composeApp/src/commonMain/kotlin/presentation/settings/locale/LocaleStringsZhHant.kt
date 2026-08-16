@@ -233,6 +233,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val printEditorFlipVertical = "垂直翻轉"
     override val printEditorZoom = "縮放"
     override val printEditorFillWhiteBorder = "自動填充白邊"
+    override val printEditorShowFullImage = "完整顯示圖片"
     override val printEditorReset = "重設"
     override val printEditorProcessing = "正在處理圖片..."
     override val printEditorUploading = "正在上傳拍立得..."

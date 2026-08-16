@@ -218,6 +218,11 @@ class PrintImageEditorScreen(
                 uploadingText = uploadingText,
                 aspectRatio = session.target.cropAspectRatio,
                 canvasBackground = session.target.canvasBackground,
+                fitModeLabel = if (session.target == ImageEditorTarget.Print) {
+                    locale.printEditorFillWhiteBorder
+                } else {
+                    locale.printEditorShowFullImage
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -242,6 +247,7 @@ private fun PrintEditorContent(
     uploadingText: String,
     aspectRatio: Float,
     canvasBackground: CanvasBackground,
+    fitModeLabel: String,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
@@ -274,6 +280,7 @@ private fun PrintEditorContent(
             onReset = onReset,
             onFillWhiteBorderChange = onFillWhiteBorderChange,
             locale = locale,
+            fitModeLabel = fitModeLabel,
             sidePanel = sidePanel,
             modifier = controlsModifier,
         )
@@ -410,6 +417,7 @@ private fun PrintEditorControls(
     onReset: (ImageSize) -> Unit,
     onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
+    fitModeLabel: String,
     sidePanel: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -468,7 +476,7 @@ private fun PrintEditorControls(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = locale.printEditorFillWhiteBorder,
+                    text = fitModeLabel,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.weight(1f),
                 )
