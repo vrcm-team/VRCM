@@ -161,17 +161,19 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             )
                             return@launch
                         }
-                        val prepared = printImageProcessor.prepare(source).getOrElse { failure ->
-                            if (failure is CancellationException) throw failure
-                            val message = (failure as? PrintImageFailure)
-                                ?.localizedMessage(locale)
-                                ?: locale.printEditorDecodeFailed
-                            SharedFlowCentre.toastText.emit(ToastText.Error(message))
-                            return@launch
-                        }
+                        val preparedSource = printImageProcessor
+                            .preparePrint(source)
+                            .getOrElse { failure ->
+                                if (failure is CancellationException) throw failure
+                                val message = (failure as? PrintImageFailure)
+                                    ?.localizedMessage(locale)
+                                    ?: locale.printEditorDecodeFailed
+                                SharedFlowCentre.toastText.emit(ToastText.Error(message))
+                                return@launch
+                            }
                         handoffPreparedImageToEditor(
-                            source = source,
-                            prepared = prepared,
+                            source = preparedSource.source,
+                            prepared = preparedSource.prepared,
                             sessionStore = editorSessionStore,
                             push = { sessionId ->
                                 navigator.push(PrintImageEditorScreen(sessionId))

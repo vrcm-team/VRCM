@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -105,6 +106,74 @@ abstract class PrintImageProcessorContractTest {
 
         assertSame(PreviewOwnershipTestBitmap, prepared.preview)
         assertEquals(emptyList(), released)
+    }
+
+    @Test
+    fun downloadedPrintBorderIsRemovedBeforeEditing() = runBlocking {
+        val source = SelectedImage("downloaded-print.png", byteArrayOf(1))
+        val croppedBytes = pngHeader(width = 1_920, height = 1_080)
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_048, 1_440),
+            encodedBytes = croppedBytes,
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            releaseBitmap = released::add,
+        )
+
+        val preparedSource = processor.preparePrint(source).getOrThrow()
+
+        assertContentEquals(croppedBytes, preparedSource.source.bytes)
+        assertEquals(ImageSize(1_920, 1_080), preparedSource.prepared.originalSize)
+        assertEquals(ImageSize(1_920, 1_080), codec.encodedSize)
+        assertEquals(
+            PixelRect(left = 64, top = 69, right = 1_984, bottom = 1_149),
+            CropRenderPlanner().plan(codec.cropRequests.single()).visibleSourceBounds,
+        )
+        assertEquals(listOf<ImageBitmap>(PreviewOwnershipTestBitmap), released)
+    }
+
+    @Test
+    fun nonPrintDimensionsEnterTheEditorUnchanged() = runBlocking {
+        val source = SelectedImage("regular-photo.png", byteArrayOf(1))
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_047, 1_440),
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+        )
+        val processor = DefaultPrintImageProcessor(codec = codec)
+
+        val preparedSource = processor.preparePrint(source).getOrThrow()
+
+        assertSame(source, preparedSource.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSource.prepared.preview)
+        assertEquals(ImageSize(2_047, 1_440), preparedSource.prepared.originalSize)
+        assertEquals(emptyList(), codec.cropRequests)
+        assertEquals(emptyList(), codec.encodeLimits)
+    }
+
+    @Test
+    fun downloadedPrintCropFailureReleasesDecodedPreview() = runBlocking {
+        val failure = PrintImageFailure.RenderFailed(IllegalStateException("crop"))
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_048, 1_440),
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+            renderFailure = failure,
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            releaseBitmap = released::add,
+        )
+
+        val result = processor.preparePrint(SelectedImage("downloaded-print.png", byteArrayOf(1)))
+
+        assertSame(failure, result.exceptionOrNull())
+        assertEquals(listOf<ImageBitmap>(PreviewOwnershipTestBitmap), released)
     }
 
     @Test
