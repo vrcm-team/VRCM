@@ -316,7 +316,8 @@ class UserProfileScreenModel(
             }
         }
         viewModelScope.launch {
-            // Room 读取是挂起的，缓存会比首帧稍晚一点到；只在网络结果尚未覆盖时回填。
+            // Room 读取是挂起的，缓存会比首帧稍晚一点到；只回填静态资料，
+            // 在线状态一律沿用内存里的实时来源，不被上次运行的历史值压回离线。
             userProfileCacheStore.load(cacheOwnerUserId, userProfileVO.id)
                 ?.let(::restoreCachedProfile)
         }
@@ -351,14 +352,11 @@ class UserProfileScreenModel(
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
         cachedUserData = cache.user
-        val cachedUser = cache.user.asCachedOffline()
-        val profile = UserProfileVo(cachedUser)
-            .withSelfIdentity()
-            .let { restored ->
-                friendService.friendState.value[cache.user.id]
-                    ?.let(restored::withCurrentFriendPresence)
-                    ?: restored
-            }
+        val profile = mergeCachedProfile(
+            cachedUser = cache.user,
+            livePresence = _userState.value,
+            currentFriend = friendService.friendState.value[cache.user.id],
+        ).withSelfIdentity()
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
@@ -868,3 +866,24 @@ internal fun UserProfileVo.withCurrentFriendPresence(friend: FriendData): UserPr
     lastLogin = friend.lastLogin,
     lastPlatform = friend.lastPlatform,
 )
+
+/**
+ * 用缓存回填页面资料：静态信息来自缓存，在线状态只能来自实时来源。
+ *
+ * 缓存里的在线状态是上次运行留下的历史值（[asCachedOffline] 会先抹成离线），
+ * 直接发布就会把页面已有的实时状态压回离线，等网络结果到达后再跳回去。
+ * 因此这里保留 [livePresence]（导航入参 / 当前账号 / 已到达的网络结果）的在线状态，
+ * 好友快照 [currentFriend] 更新则继续覆盖它。
+ */
+internal fun mergeCachedProfile(
+    cachedUser: UserData,
+    livePresence: UserProfileVo,
+    currentFriend: FriendData?,
+): UserProfileVo {
+    val restored = UserProfileVo(cachedUser.asCachedOffline()).copy(
+        status = livePresence.status,
+        statusDescription = livePresence.statusDescription,
+        location = livePresence.location,
+    )
+    return currentFriend?.let(restored::withCurrentFriendPresence) ?: restored
+}
