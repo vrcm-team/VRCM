@@ -314,27 +314,63 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
-    fun vrcGalleryRenderingDoesNotUpscaleTheVisibleSourceCrop() = runBlocking {
-        val codec = FakePlatformImageCodec(
-            encodedBytes = pngHeader(width = 900, height = 900),
-        )
-        val processor = DefaultPrintImageProcessor(
-            codec = codec,
-            spec = SquareCanvasSpec,
-            maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
-            limitOutputToVisibleSource = true,
-            shrinkOversizedOutput = true,
+    fun vrcGalleryRenderingUsesTheVisibleSourceScaleOnlyOnce() = runBlocking {
+        data class Case(
+            val name: String,
+            val originalSize: ImageSize,
+            val transform: CropTransform,
+            val expectedOutput: ImageSize,
         )
 
-        val result = processor.render(
-            source = SelectedImage("icon.png", byteArrayOf(1)),
-            originalSize = ImageSize(1_600, 900),
-            transform = CropTransform(),
-            background = CanvasBackground.Transparent,
+        val cases = listOf(
+            Case(
+                name = "landscape fit",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(),
+                expectedOutput = ImageSize(1_600, 1_600),
+            ),
+            Case(
+                name = "landscape cover",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(zoom = 16f / 9f),
+                expectedOutput = ImageSize(900, 900),
+            ),
+            Case(
+                name = "landscape high zoom",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(zoom = 3f),
+                expectedOutput = ImageSize(534, 534),
+            ),
+            Case(
+                name = "rotated portrait fit",
+                originalSize = ImageSize(900, 1_600),
+                transform = CropTransform(quarterTurns = 1),
+                expectedOutput = ImageSize(1_600, 1_600),
+            ),
         )
 
-        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
-        assertEquals(ImageSize(900, 900), codec.cropRequests.single().outputSize)
+        cases.forEach { case ->
+            val codec = FakePlatformImageCodec(
+                encodedBytes = pngHeader(case.expectedOutput.width, case.expectedOutput.height),
+            )
+            val processor = DefaultPrintImageProcessor(
+                codec = codec,
+                spec = SquareCanvasSpec,
+                maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                limitOutputToVisibleSource = true,
+                shrinkOversizedOutput = true,
+            )
+
+            val result = processor.render(
+                source = SelectedImage("icon.png", byteArrayOf(1)),
+                originalSize = case.originalSize,
+                transform = case.transform,
+                background = CanvasBackground.Transparent,
+            )
+
+            assertTrue(result.isSuccess, "${case.name}: ${result.exceptionOrNull()?.stackTraceToString()}")
+            assertEquals(case.expectedOutput, codec.cropRequests.single().outputSize, case.name)
+        }
     }
 
     @Test

@@ -30,6 +30,7 @@ class DefaultPrintImageProcessor(
     private val maxOutputBytes: Int = PrintImageLimits.MAX_ENCODED_OUTPUT_BYTES,
     private val limitOutputToVisibleSource: Boolean = false,
     private val shrinkOversizedOutput: Boolean = false,
+    private val cropRenderPlanner: CropRenderPlanner = CropRenderPlanner(),
     private val releaseBitmap: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : PrintImageProcessor {
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> = try {
@@ -320,30 +321,41 @@ class DefaultPrintImageProcessor(
         transform: CropTransform,
     ): PrintCanvasSpec {
         if (!isFullCanvas()) return this
-        val rotated = if (transform.quarterTurns.mod(2) == 0) {
-            originalSize
+        // These bounds already include pan, rotation, and zoom; only fit them to the target aspect.
+        val visibleSourceBounds = cropRenderPlanner.plan(
+            CropRenderRequest(
+                originalSize = originalSize,
+                transform = transform,
+                outputSize = ImageSize(canvasWidth, canvasHeight),
+            ),
+        ).visibleSourceBounds
+        val rotatedVisibleWidth: Int
+        val rotatedVisibleHeight: Int
+        if (transform.quarterTurns.mod(2) == 0) {
+            rotatedVisibleWidth = visibleSourceBounds.width
+            rotatedVisibleHeight = visibleSourceBounds.height
         } else {
-            ImageSize(originalSize.height, originalSize.width)
+            rotatedVisibleWidth = visibleSourceBounds.height
+            rotatedVisibleHeight = visibleSourceBounds.width
         }
         val targetAspect = canvasWidth.toDouble() / canvasHeight
-        val sourceAspect = rotated.width.toDouble() / rotated.height
-        val cropWidth: Double
-        val cropHeight: Double
-        if (sourceAspect >= targetAspect) {
-            cropHeight = rotated.height.toDouble()
-            cropWidth = cropHeight * targetAspect
+        val visibleAspect = rotatedVisibleWidth.toDouble() / rotatedVisibleHeight
+        val uncappedWidth: Double
+        val uncappedHeight: Double
+        if (visibleAspect >= targetAspect) {
+            uncappedWidth = rotatedVisibleWidth.toDouble()
+            uncappedHeight = uncappedWidth / targetAspect
         } else {
-            cropWidth = rotated.width.toDouble()
-            cropHeight = cropWidth / targetAspect
+            uncappedHeight = rotatedVisibleHeight.toDouble()
+            uncappedWidth = uncappedHeight * targetAspect
         }
-        val zoom = transform.zoom.coerceAtLeast(1f).toDouble()
         val scale = minOf(
-            1.0 / zoom,
-            canvasWidth / cropWidth,
-            canvasHeight / cropHeight,
+            1.0,
+            canvasWidth / uncappedWidth,
+            canvasHeight / uncappedHeight,
         )
-        val width = (cropWidth * scale).roundToInt().coerceAtLeast(1)
-        val height = (cropHeight * scale).roundToInt().coerceAtLeast(1)
+        val width = (uncappedWidth * scale).roundToInt().coerceIn(1, canvasWidth)
+        val height = (uncappedHeight * scale).roundToInt().coerceIn(1, canvasHeight)
         return copy(
             canvasWidth = width,
             canvasHeight = height,
