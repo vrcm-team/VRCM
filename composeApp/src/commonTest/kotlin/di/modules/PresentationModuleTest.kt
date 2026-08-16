@@ -210,5 +210,5 @@ private data object FakePlatformImageCodec : PlatformImageCodec {
     override suspend fun renderCrop(bytes: ByteArray, request: CropRenderRequest): ImageBitmap =
         error("unused")
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray = error("unused")
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray = error("unused")
 }

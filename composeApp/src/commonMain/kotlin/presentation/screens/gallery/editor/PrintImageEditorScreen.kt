@@ -38,6 +38,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -122,14 +123,17 @@ class PrintImageEditorScreen(
         val title = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorTitle
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val submitLabel = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUpload
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val uploadingText = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUploading
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadingCover
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploading
         }
 
         BlockBackNavigation(blocked = state.isBusy)
@@ -139,10 +143,14 @@ class PrintImageEditorScreen(
                 when (event) {
                     is EditorEvent.Submitted -> {
                         sessionStore.complete(sessionId, event.submission)
-                        if (event.submission == ImageEditorSubmission.Print) {
-                            SharedFlowCentre.toastText.emit(
-                                ToastText.Success(currentLocale.printEditorUploaded)
+                        when (event.submission) {
+                            ImageEditorSubmission.Print -> SharedFlowCentre.toastText.emit(
+                                ToastText.Success(currentLocale.printEditorUploaded),
                             )
+                            is ImageEditorSubmission.Gallery -> SharedFlowCentre.toastText.emit(
+                                ToastText.Success(currentLocale.galleryTabUploadSuccess),
+                            )
+                            is ImageEditorSubmission.AvatarCover -> Unit
                         }
                         navigator.pop()
                     }
@@ -205,8 +213,16 @@ class PrintImageEditorScreen(
                 onFlipHorizontal = screenModel::flipHorizontal,
                 onFlipVertical = screenModel::flipVertical,
                 onReset = screenModel::reset,
+                onFillWhiteBorderChange = screenModel::setFillWhiteBorder,
                 locale = locale,
                 uploadingText = uploadingText,
+                aspectRatio = session.target.cropAspectRatio,
+                canvasBackground = session.target.canvasBackground,
+                fitModeLabel = if (session.target == ImageEditorTarget.Print) {
+                    locale.printEditorFillWhiteBorder
+                } else {
+                    locale.printEditorShowFullImage
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -225,9 +241,13 @@ private fun PrintEditorContent(
     onRotateRight: (ImageSize) -> Unit,
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
-    onReset: () -> Unit,
+    onReset: (ImageSize) -> Unit,
+    onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
+    aspectRatio: Float,
+    canvasBackground: CanvasBackground,
+    fitModeLabel: String,
     modifier: Modifier = Modifier,
 ) {
     var viewport by remember { androidx.compose.runtime.mutableStateOf(ImageSize(0, 0)) }
@@ -242,6 +262,8 @@ private fun PrintEditorContent(
             onPanAndZoom = onPanAndZoom,
             locale = locale,
             uploadingText = uploadingText,
+            aspectRatio = aspectRatio,
+            canvasBackground = canvasBackground,
             modifier = previewModifier,
         )
     }
@@ -256,7 +278,9 @@ private fun PrintEditorContent(
             onFlipHorizontal = onFlipHorizontal,
             onFlipVertical = onFlipVertical,
             onReset = onReset,
+            onFillWhiteBorderChange = onFillWhiteBorderChange,
             locale = locale,
+            fitModeLabel = fitModeLabel,
             sidePanel = sidePanel,
             modifier = controlsModifier,
         )
@@ -285,6 +309,8 @@ private fun PrintEditorPreview(
     onPanAndZoom: (ImageSize, Float, Float, Float) -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
+    aspectRatio: Float,
+    canvasBackground: CanvasBackground,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -293,19 +319,22 @@ private fun PrintEditorPreview(
     ) {
         val availableWidth = (maxWidth - 24.dp).coerceAtLeast(1.dp)
         val availableHeight = (maxHeight - 24.dp).coerceAtLeast(1.dp)
-        val cropWidth = if (availableWidth * 9f / 16f <= availableHeight) {
+        val cropWidth = if (availableWidth / aspectRatio <= availableHeight) {
             availableWidth
         } else {
-            availableHeight * 16f / 9f
+            availableHeight * aspectRatio
         }
 
         Box(
             modifier = Modifier
                 .width(cropWidth)
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.White),
+                .aspectRatio(aspectRatio)
+                .clip(RoundedCornerShape(4.dp)),
         ) {
+            EditorCanvasBackground(
+                background = canvasBackground,
+                modifier = Modifier.fillMaxSize(),
+            )
             PrintCropPreview(
                 state = state,
                 calculator = calculator,
@@ -341,6 +370,41 @@ private fun PrintEditorPreview(
 }
 
 @Composable
+private fun EditorCanvasBackground(
+    background: CanvasBackground,
+    modifier: Modifier = Modifier,
+) {
+    val lightTile = MaterialTheme.colorScheme.surface
+    val darkTile = MaterialTheme.colorScheme.surfaceVariant
+    Canvas(modifier = modifier) {
+        if (background == CanvasBackground.White) {
+            drawRect(Color.White)
+            return@Canvas
+        }
+
+        val tileSize = 12.dp.toPx()
+        drawRect(lightTile)
+        var row = 0
+        var top = 0f
+        while (top < size.height) {
+            var column = row.mod(2)
+            var left = column * tileSize
+            while (left < size.width) {
+                drawRect(
+                    color = darkTile,
+                    topLeft = Offset(left, top),
+                    size = androidx.compose.ui.geometry.Size(tileSize, tileSize),
+                )
+                column += 2
+                left = column * tileSize
+            }
+            row++
+            top += tileSize
+        }
+    }
+}
+
+@Composable
 private fun PrintEditorControls(
     state: PrintImageEditorState,
     calculator: CropTransformCalculator,
@@ -350,8 +414,10 @@ private fun PrintEditorControls(
     onRotateRight: (ImageSize) -> Unit,
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
-    onReset: () -> Unit,
+    onReset: (ImageSize) -> Unit,
+    onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
+    fitModeLabel: String,
     sidePanel: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -374,11 +440,16 @@ private fun PrintEditorControls(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 val zoomRange = if (viewport.isValid()) {
-                    calculator.zoomLimits(
+                    val limits = calculator.zoomLimits(
                         source = state.prepared.originalSize,
                         viewport = viewport,
                         quarterTurns = state.transform.quarterTurns,
-                    ).valueRange
+                    )
+                    if (state.fillWhiteBorder) {
+                        limits.valueRange
+                    } else {
+                        limits.cover..limits.maximum
+                    }
                 } else {
                     1f..3f
                 }
@@ -394,6 +465,25 @@ private fun PrintEditorControls(
                     modifier = Modifier.weight(1f),
                     enabled = !state.isBusy && viewport.isValid(),
                     valueRange = zoomRange,
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = fitModeLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = state.fillWhiteBorder,
+                    onCheckedChange = { onFillWhiteBorderChange(it, viewport) },
+                    enabled = !state.isBusy && viewport.isValid(),
                 )
             }
 
@@ -440,8 +530,8 @@ private fun PrintEditorControls(
                 }
                 EditorToolButton(
                     label = locale.printEditorReset,
-                    enabled = !state.isBusy,
-                    onClick = onReset,
+                    enabled = !state.isBusy && viewport.isValid(),
+                    onClick = { if (viewport.isValid()) onReset(viewport) },
                 ) {
                     Icon(Icons.Default.RestartAlt, contentDescription = locale.printEditorReset)
                 }
@@ -574,6 +664,7 @@ private fun EditorToggleButton(
 internal fun PrintImageFailure.localizedMessage(locale: LocaleStrings): String = when (this) {
     PrintImageFailure.FileTooLarge -> locale.printEditorFileTooLarge
     PrintImageFailure.ImageDimensionsTooLarge -> locale.printEditorImageTooLarge
+    PrintImageFailure.EncodedOutputTooLarge -> locale.printEditorOutputTooLarge
     PrintImageFailure.DesktopRegionDecodeUnavailable ->
         locale.printEditorDesktopRegionDecodeUnavailable
     is PrintImageFailure.UnsupportedFormat -> locale.printEditorUnsupportedFormat
@@ -598,8 +689,15 @@ private fun EditorError.localizedMessage(
         else -> when (target) {
             ImageEditorTarget.Print -> locale.printEditorUploadUnknownFailed
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCoverUploadFailed
+            is ImageEditorTarget.Gallery -> locale.galleryTabUploadFailed
         }
     }
 }
+
+private val ImageEditorTarget.cropAspectRatio: Float
+    get() = when (this) {
+        ImageEditorTarget.Print, is ImageEditorTarget.AvatarCover -> 16f / 9f
+        is ImageEditorTarget.Gallery -> canvasSpec.aspectRatio
+    }
 
 private fun ImageSize.isValid(): Boolean = width > 0 && height > 0

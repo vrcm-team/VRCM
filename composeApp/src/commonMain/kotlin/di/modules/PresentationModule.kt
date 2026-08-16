@@ -27,7 +27,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTa
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLimits
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
@@ -98,7 +100,7 @@ val presentationModule: Module = module {
         )
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get()) }
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -112,6 +114,13 @@ val presentationModule: Module = module {
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
+                    codec = get(),
+                    spec = session.target.canvasSpec,
+                    maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                    limitOutputToVisibleSource = true,
+                    shrinkOversizedOutput = true,
+                )
             },
             submitter = get(),
             target = session.target,

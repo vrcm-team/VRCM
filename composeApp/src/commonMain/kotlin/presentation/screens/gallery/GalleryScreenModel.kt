@@ -203,45 +203,6 @@ class GalleryScreenModel internal constructor(
         }
 
     /**
-     * 通过字节数组上传图片到指定标签类型
-     * @param fileBytes 文件字节数组
-     * @param fileName 文件名
-     * @param tagType 文件标签类型
-     * @param uploadingMessage 上传中提示
-     * @param successMessage 上传成功提示
-     * @param failedMessagePrefix 上传失败提示前缀
-     */
-    fun uploadImageBytes(
-        fileBytes: ByteArray,
-        fileName: String,
-        tagType: FileTagType,
-        uploadingMessage: String,
-        successMessage: String,
-        failedMessagePrefix: String,
-    ) {
-        viewModelScope.launch(workerDispatcher) {
-            SharedFlowCentre.toastText.emit(ToastText.Info(uploadingMessage))
-            val format = GalleryUploadImageFormat.fromFileName(fileName)
-            if (format == null) {
-                val message = "$failedMessagePrefix: Unsupported image format"
-                SharedFlowCentre.toastText.emit(ToastText.Error(message))
-                logger.error(message)
-                return@launch
-            }
-            val result = dataSource.uploadImage(fileBytes, fileName, format.mimeType, tagType)
-            result.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                refreshFiles(tagType)
-            }.onFailure {
-                SharedFlowCentre.toastText.emit(
-                    ToastText.Error("$failedMessagePrefix: ${it.message}")
-                )
-                logger.error("Upload failed: ${it.message}")
-            }
-        }
-    }
-
-    /**
      * 删除选中的文件（非 Print 类型）
      * @param tagType 文件标签类型
      * @param deletingMessage 删除中提示

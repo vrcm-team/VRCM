@@ -248,12 +248,16 @@ sealed class LocaleStrings {
     open val printEditorFlipHorizontal: String = "Flip horizontally"
     open val printEditorFlipVertical: String = "Flip vertically"
     open val printEditorZoom: String = "Zoom"
+    open val printEditorFillWhiteBorder: String = "Fill empty area with white"
+    open val printEditorShowFullImage: String = "Show full image"
     open val printEditorReset: String = "Reset"
     open val printEditorProcessing: String = "Preparing image..."
     open val printEditorUploading: String = "Uploading print..."
     open val printEditorUnsupportedFormat: String = "Unsupported image format. Use JPEG or PNG; HEIC/HEIF support depends on the system."
     open val printEditorFileTooLarge: String = "The selected file exceeds 50 MiB."
     open val printEditorImageTooLarge: String = "The selected image exceeds 100 megapixels."
+    open val printEditorOutputTooLarge: String =
+        "The edited image is too large to prepare safely. Try a smaller source image."
     open val printEditorDesktopRegionDecodeUnavailable: String =
         "This image is too large for safe HEIC/HEIF processing on Desktop. Use JPEG or PNG."
     open val printEditorReadFailed: String = "Failed to read the image: %s"

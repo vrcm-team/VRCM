@@ -7,5 +7,5 @@ interface PlatformImageCodec {
 
     suspend fun renderCrop(bytes: ByteArray, request: CropRenderRequest): ImageBitmap
 
-    suspend fun encodePng(bitmap: ImageBitmap): ByteArray
+    suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int = Int.MAX_VALUE): ByteArray
 }

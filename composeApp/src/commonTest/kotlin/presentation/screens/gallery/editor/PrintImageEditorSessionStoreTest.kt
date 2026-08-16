@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -62,6 +63,22 @@ class PrintImageEditorSessionStoreTest {
         assertEquals(updated, store.avatarCoverUpdates.value[updated.id])
         assertEquals(updated, store.consumeAvatarCoverUpdate(updated.id))
         assertTrue(store.avatarCoverUpdates.value.isEmpty())
+        assertNull(store.get(id))
+    }
+
+    @Test
+    fun galleryCompletionKeepsTheUploadedTagForRefresh() = runBlocking {
+        val store = PrintImageEditorSessionStore()
+        val target = ImageEditorTarget.Gallery(FileTagType.Emoji)
+        val id = store.create(
+            source = SelectedImage("source.png", byteArrayOf(1)),
+            prepared = PreparedImage(SessionTestImageBitmap, ImageSize(16, 16)),
+            target = target,
+        )
+
+        store.complete(id, ImageEditorSubmission.Gallery(FileTagType.Emoji))
+
+        assertEquals(FileTagType.Emoji, store.galleryUploadCompletions.first())
         assertNull(store.get(id))
     }
 }

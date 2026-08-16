@@ -51,6 +51,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEdi
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageFailure
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLimits
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.handoffPreparedImageToEditor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.localizedMessage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
@@ -90,15 +91,15 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             }
         }
 
-        // 非 Print 类型的图片选择器（直接上传）
+        // 所有可选图片都先进入编辑器，以满足各标签的尺寸与透明度合同。
         val simpleImagePicker = rememberFilePickerLauncher(
-            type = galleryImagePickerType(GalleryUploadImageFormat.allowedExtensions),
+            type = galleryImagePickerType(EDITOR_IMAGE_EXTENSIONS),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
                     isPreparing = true
                     try {
-                        val bytes = runGalleryCatching {
+                        val source = readSelectedImage(image.name) {
                             image.readBoundedBytes(PrintImageLimits.MAX_FILE_BYTES)
                         }.getOrElse {
                             val message = if (it is PrintImageFailure.FileTooLarge) {
@@ -112,11 +113,22 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             SharedFlowCentre.toastText.emit(ToastText.Error(message))
                             return@launch
                         }
-                        galleryScreenModel.uploadImageBytes(
-                            bytes, image.name, tagType,
-                            uploadingMessage = locale.galleryTabUploading,
-                            successMessage = locale.galleryTabUploadSuccess,
-                            failedMessagePrefix = locale.galleryTabUploadFailed,
+                        val prepared = printImageProcessor.prepare(source).getOrElse { failure ->
+                            if (failure is CancellationException) throw failure
+                            val message = (failure as? PrintImageFailure)
+                                ?.localizedMessage(locale)
+                                ?: locale.printEditorDecodeFailed
+                            SharedFlowCentre.toastText.emit(ToastText.Error(message))
+                            return@launch
+                        }
+                        handoffPreparedImageToEditor(
+                            source = source,
+                            prepared = prepared,
+                            sessionStore = editorSessionStore,
+                            target = ImageEditorTarget.Gallery(tagType),
+                            push = { sessionId ->
+                                navigator.push(PrintImageEditorScreen(sessionId))
+                            },
                         )
                     } finally {
                         isPreparing = false
@@ -127,7 +139,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
 
         // Print 类型的图片选择器（经过编辑器）
         val printImagePicker = rememberFilePickerLauncher(
-            type = galleryImagePickerType(listOf("jpg", "jpeg", "png", "heic", "heif")),
+            type = galleryImagePickerType(EDITOR_IMAGE_EXTENSIONS),
         ) { image ->
             if (image != null && !isPreparing) {
                 coroutineScope.launch {
@@ -496,6 +508,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
     }
 
     companion object {
+        private val EDITOR_IMAGE_EXTENSIONS = listOf("jpg", "jpeg", "png", "heic", "heif")
+
         data object Icon : GalleryTabPager(FileTagType.Icon)
         data object Emoji : GalleryTabPager(FileTagType.Emoji)
         data object Sticker : GalleryTabPager(FileTagType.Sticker)

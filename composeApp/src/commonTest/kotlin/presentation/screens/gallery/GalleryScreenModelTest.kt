@@ -87,44 +87,6 @@ class GalleryScreenModelTest : MainDispatcherTest() {
         assertFalse(model.hasSelection(FileTagType.Gallery))
     }
 
-    @Test
-    fun successfulByteUploadRefreshesTheUploadedTag() {
-        val dataSource = FakeGalleryDataSource().apply {
-            uploadResult = Result.success(file("file_webp"))
-        }
-        val model = createModel(dataSource)
-
-        model.uploadImageBytes(
-            fileBytes = byteArrayOf(1),
-            fileName = "image.webp",
-            tagType = FileTagType.Emoji,
-            uploadingMessage = "uploading",
-            successMessage = "uploaded",
-            failedMessagePrefix = "failed",
-        )
-
-        assertEquals(listOf(UploadRequest("image.webp", "image/webp", FileTagType.Emoji)), dataSource.uploadRequests)
-        assertEquals(listOf(FileRequest(FileTagType.Emoji, 100, 0)), dataSource.fileRequests)
-    }
-
-    @Test
-    fun unsupportedByteUploadDoesNotCallTheApi() {
-        val dataSource = FakeGalleryDataSource()
-        val model = createModel(dataSource)
-
-        model.uploadImageBytes(
-            fileBytes = byteArrayOf(1),
-            fileName = "image.bmp",
-            tagType = FileTagType.Gallery,
-            uploadingMessage = "uploading",
-            successMessage = "uploaded",
-            failedMessagePrefix = "failed",
-        )
-
-        assertEquals(emptyList(), dataSource.uploadRequests)
-        assertEquals(emptyList(), dataSource.fileRequests)
-    }
-
     private fun createModel(
         dataSource: FakeGalleryDataSource = FakeGalleryDataSource(),
     ) = GalleryScreenModel(
@@ -136,18 +98,10 @@ class GalleryScreenModelTest : MainDispatcherTest() {
 
 private data class FileRequest(val tagType: FileTagType, val n: Int, val offset: Int)
 
-private data class UploadRequest(
-    val fileName: String,
-    val mimeType: String,
-    val tagType: FileTagType,
-)
-
 private class FakeGalleryDataSource : GalleryDataSource {
     val filesByTag = mutableMapOf<FileTagType, List<FileData>>()
     var prints: List<PrintData> = emptyList()
-    var uploadResult: Result<FileData> = Result.failure(IllegalStateException("upload result not configured"))
     val fileRequests = mutableListOf<FileRequest>()
-    val uploadRequests = mutableListOf<UploadRequest>()
     val deletedFileIds = mutableListOf<String>()
     val deletedPrintIds = mutableListOf<String>()
 
@@ -165,10 +119,7 @@ private class FakeGalleryDataSource : GalleryDataSource {
         fileName: String,
         mimeType: String,
         tagType: FileTagType,
-    ): Result<FileData> {
-        uploadRequests += UploadRequest(fileName, mimeType, tagType)
-        return uploadResult
-    }
+    ): Result<FileData> = Result.failure(IllegalStateException("upload result not configured"))
 
     override suspend fun deleteFile(id: String) {
         deletedFileIds += id

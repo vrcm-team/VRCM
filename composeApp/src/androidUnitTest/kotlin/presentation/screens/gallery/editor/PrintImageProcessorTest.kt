@@ -93,7 +93,7 @@ class PrintImageProcessorTest : PrintImageProcessorContractTest() {
         override suspend fun renderCrop(bytes: ByteArray, request: CropRenderRequest): ImageBitmap =
             content.asImageBitmap()
 
-        override suspend fun encodePng(bitmap: ImageBitmap): ByteArray {
+        override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray {
             output = bitmap.asAndroidBitmap()
             outputWasOpenDuringEncode = !requireNotNull(output).isRecycled
             encodeFailure?.let { throw it }
