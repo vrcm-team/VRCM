@@ -23,9 +23,11 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
@@ -50,11 +52,18 @@ fun FavoriteGroupBottomSheet(
     favoriteRecordId: String? = null,
     allowGroupChange: Boolean = true,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val favoriteService: FavoriteService = koinInject()
     val authService: AuthService = koinInject()
     val scope = rememberCoroutineScope()
     val strings = strings
+    var isChanging by remember(favoriteId, favoriteType, favoriteRecordId) { mutableStateOf(false) }
+    val latestIsChanging = rememberUpdatedState(isChanging)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestIsChanging.value
+        },
+    )
 
     // 加载收藏数据
     LaunchedEffect(favoriteId, favoriteType, favoriteRecordId) {
@@ -74,32 +83,32 @@ fun FavoriteGroupBottomSheet(
 
     // 已收藏的组名和ID
     val currentGroupName = existingGroup?.name
-    var isChanging by remember(favoriteId, favoriteType, favoriteRecordId) { mutableStateOf(false) }
     // 添加或移动到新收藏组
-    val onClickGroupItem = { groupName: String ->
+    val onClickGroupItem = onClick@{ groupName: String ->
+        if (isChanging) return@onClick
         isChanging = true
-        scope.launch(Dispatchers.IO) {
-            // 如果已在某个组中，先移除
-            authService.reTryAuth {
-                doChangeFavoriteGroup(
-                    favoriteService,
-                    groupName,
-                    currentGroupName,
-                    strings,
-                    favoriteId,
-                    favoriteType,
-                    existingFavorite = existingFavorite,
-                    allowGroupChange = allowGroupChange,
-                )
-            }.map { groupName }
-                .let { result ->
-                    isChanging = false
-                    onConfirm(result)
-                }
-        }
         scope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    // 如果已在某个组中，先移除
+                    authService.reTryAuth {
+                        doChangeFavoriteGroup(
+                            favoriteService,
+                            groupName,
+                            currentGroupName,
+                            strings,
+                            favoriteId,
+                            favoriteType,
+                            existingFavorite = existingFavorite,
+                            allowGroupChange = allowGroupChange,
+                        )
+                    }.map { groupName }
+                }
+            } finally {
+                isChanging = false
+            }
+            onConfirm(result)
             sheetState.hide()
-        }.invokeOnCompletion {
             onDismiss()
         }
     }
@@ -107,7 +116,7 @@ fun FavoriteGroupBottomSheet(
     ABottomSheet(
         isVisible = isVisible,
         sheetState = sheetState,
-        onDismissRequest = onDismiss
+        onDismissRequest = { if (!isChanging) onDismiss() }
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -231,9 +240,11 @@ internal fun findFavoriteForManagement(
         .flatMap { (group, favorites) -> favorites.asSequence().map { group to it } }
         .toList()
 
-    return favoriteRecordId
-        ?.let { recordId -> entries.firstOrNull { (_, favorite) -> favorite.id == recordId } }
-        ?: entries.firstOrNull { (_, favorite) -> favorite.favoriteId == favoriteId }
+    return if (favoriteRecordId != null) {
+        entries.firstOrNull { (_, favorite) -> favorite.id == favoriteRecordId }
+    } else {
+        entries.firstOrNull { (_, favorite) -> favorite.favoriteId == favoriteId }
+    }
 }
 
 private suspend fun doChangeFavoriteGroup(
@@ -245,22 +256,25 @@ private suspend fun doChangeFavoriteGroup(
     favoriteType: FavoriteType,
     existingFavorite: Pair<FavoriteGroupData, FavoriteData>?,
     allowGroupChange: Boolean,
-): Result<Unit> = runCatching {
+): Result<Unit> = try {
     val favorite = existingFavorite?.second
 
     // 移除旧组
     suspend fun removeFavorite() {
         if (favorite != null) {
-            runCatching {
+            try {
                 favoriteService.removeFavorite(id = favorite.id)
-            }.onSuccess {
-                if (groupName != currentGroupName) return@onSuccess
-                val successMessage = strings.favoriteRemoveSuccess
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure {
-                val errorMessage = "${strings.favoriteRemoveFailed}: ${it.message}"
+                if (groupName == currentGroupName) {
+                    val successMessage = strings.favoriteRemoveSuccess
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                val errorMessage = "${strings.favoriteRemoveFailed}: ${error.message}"
                 SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-            }.getOrThrow()
+                throw error
+            }
         }
     }
 
@@ -268,20 +282,22 @@ private suspend fun doChangeFavoriteGroup(
         // 添加到新组
         if (allowGroupChange && groupName != currentGroupName && groupName != null) {
             val isMove = favorite != null
-            runCatching {
+            try {
                 favoriteService.addFavorite(
                     favoriteId = favoriteId,
                     favoriteType = favoriteType,
                     groupName = groupName,
                 )
-            }.onSuccess {
                 val successMessage = if (isMove) strings.favoriteMoveSuccess else strings.favoriteAddSuccess
                 SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure {
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
                 val errorMessage =
-                    "${if (isMove) strings.favoriteMoveFailed else strings.favoriteAddFailed}: ${it.message}"
+                    "${if (isMove) strings.favoriteMoveFailed else strings.favoriteAddFailed}: ${error.message}"
                 SharedFlowCentre.toastText.emit(ToastText.Error(errorMessage))
-            }.getOrThrow()
+                throw error
+            }
         }
     }
 
@@ -297,4 +313,9 @@ private suspend fun doChangeFavoriteGroup(
     }
 
     favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
+    Result.success(Unit)
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Throwable) {
+    Result.failure(error)
 }

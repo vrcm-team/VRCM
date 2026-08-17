@@ -4,6 +4,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class FavoriteGroupBottomSheetTest {
     @Test
@@ -24,6 +25,20 @@ class FavoriteGroupBottomSheetTest {
 
         assertEquals(secondGroup, result?.first)
         assertEquals(secondFavorite, result?.second)
+    }
+
+    @Test
+    fun missingExplicitRecordIdDoesNotFallBackToHiddenWorldPlaceholder() {
+        val group = group("worlds1")
+        val favorite = favorite("fvrt_hidden_1", group.name)
+
+        val result = findFavoriteForManagement(
+            favoritesByGroup = mapOf(group to listOf(favorite)),
+            favoriteId = "???",
+            favoriteRecordId = "fvrt_missing",
+        )
+
+        assertNull(result)
     }
 
     private fun group(name: String) = FavoriteGroupData(

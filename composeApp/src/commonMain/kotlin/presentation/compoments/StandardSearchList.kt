@@ -79,6 +79,7 @@ fun StandardSearchList(
     val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
     var hiddenWorldToManage by remember { mutableStateOf<WorldData?>(null) }
+    var showHiddenWorldFavoriteSheet by remember { mutableStateOf(false) }
     val onUserClick: (IUser, String) -> Unit = { user, sharedSuffixKey ->
         // 处理用户点击，导航到用户资料页面
         coroutineScope.launch {
@@ -97,6 +98,7 @@ fun StandardSearchList(
                 }
             } else {
                 hiddenWorldToManage = world
+                showHiddenWorldFavoriteSheet = true
             }
         } else {
             // 处理世界点击，导航到世界详情页面
@@ -204,12 +206,15 @@ fun StandardSearchList(
     val worldToManage = hiddenWorldToManage
     if (worldToManage != null) {
         FavoriteGroupBottomSheet(
-            isVisible = true,
+            isVisible = showHiddenWorldFavoriteSheet,
             favoriteId = worldToManage.id,
             favoriteType = FavoriteType.World,
             favoriteRecordId = worldToManage.favoriteId,
             allowGroupChange = false,
-            onDismiss = { hiddenWorldToManage = null },
+            onDismiss = {
+                showHiddenWorldFavoriteSheet = false
+                hiddenWorldToManage = null
+            },
             onConfirm = { result ->
                 if (result.isSuccess) {
                     coroutineScope.launch {
