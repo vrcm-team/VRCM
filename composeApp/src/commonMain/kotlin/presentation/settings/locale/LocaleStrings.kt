@@ -163,6 +163,7 @@ sealed class LocaleStrings {
     open val confirm: String = "Confirm"
     open val cancel: String = "Cancel"
     open val favoriteWorld: String = "Favorite World"
+    open val favoriteAvatar: String = "Favorite Avatar"
     open val favoriteAddSuccess: String = "Add Favorite Success"
     open val favoriteAddFailed: String = "Add Favorite Failed"
     open val favoriteAlreadyExists: String = "it is already in your favorites"

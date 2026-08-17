@@ -14,6 +14,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
@@ -32,6 +34,8 @@ import org.koin.compose.koinInject
  * @param isVisible 是否显示底部表单
  * @param favoriteId 要收藏的目标ID
  * @param favoriteType 收藏类型
+ * @param favoriteRecordId 已存在收藏记录的ID；隐藏世界无法提供目标ID时使用
+ * @param allowGroupChange 是否允许新增或移动到其他收藏组
  * @param onDismiss 关闭回调
  * @param onConfirm 确认选择回调，参数为所选收藏组name的Result
  */
@@ -43,6 +47,8 @@ fun FavoriteGroupBottomSheet(
     favoriteType: FavoriteType,
     onDismiss: () -> Unit,
     onConfirm: (Result<String>) -> Unit = {},
+    favoriteRecordId: String? = null,
+    allowGroupChange: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val favoriteService: FavoriteService = koinInject()
@@ -51,7 +57,7 @@ fun FavoriteGroupBottomSheet(
     val strings = strings
 
     // 加载收藏数据
-    LaunchedEffect(favoriteId, favoriteType) {
+    LaunchedEffect(favoriteId, favoriteType, favoriteRecordId) {
         authService.reTryAuth {
             favoriteService.loadFavoriteByGroup(favoriteType)
         }
@@ -61,15 +67,14 @@ fun FavoriteGroupBottomSheet(
     val favoritesByGroup by favoriteService.favoritesByGroup(favoriteType).collectAsState()
 
     // 查找当前项目在哪个收藏组中
-    val existingGroup = remember(favoritesByGroup, favoriteId) {
-        favoritesByGroup.entries.firstOrNull { (_, favorites) ->
-            favorites.any { it.favoriteId == favoriteId }
-        }?.key
+    val existingFavorite = remember(favoritesByGroup, favoriteId, favoriteRecordId) {
+        findFavoriteForManagement(favoritesByGroup, favoriteId, favoriteRecordId)
     }
+    val existingGroup = existingFavorite?.first
 
     // 已收藏的组名和ID
     val currentGroupName = existingGroup?.name
-    var isChanging by remember(favoriteId, favoriteType) { mutableStateOf(false) }
+    var isChanging by remember(favoriteId, favoriteType, favoriteRecordId) { mutableStateOf(false) }
     // 添加或移动到新收藏组
     val onClickGroupItem = { groupName: String ->
         isChanging = true
@@ -82,7 +87,9 @@ fun FavoriteGroupBottomSheet(
                     currentGroupName,
                     strings,
                     favoriteId,
-                    favoriteType
+                    favoriteType,
+                    existingFavorite = existingFavorite,
+                    allowGroupChange = allowGroupChange,
                 )
             }.map { groupName }
                 .let { result ->
@@ -111,7 +118,11 @@ fun FavoriteGroupBottomSheet(
         ) {
             // 标题
             Text(
-                text = if (currentGroupName != null) strings.favoriteMoveToAnotherGroup else strings.selectFavoriteGroup,
+                text = when {
+                    !allowGroupChange -> strings.remove
+                    currentGroupName != null -> strings.favoriteMoveToAnotherGroup
+                    else -> strings.selectFavoriteGroup
+                },
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.onSurface,
@@ -151,7 +162,10 @@ fun FavoriteGroupBottomSheet(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(backgroundColor)
-                                    .clickable(!isChanging && !isCurrentGroup) { onClickGroupItem(group.name) },
+                                    .clickable(
+                                        enabled = allowGroupChange && !isChanging && !isCurrentGroup,
+                                        onClick = { onClickGroupItem(group.name) },
+                                    ),
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -207,6 +221,21 @@ fun FavoriteGroupBottomSheet(
     }
 }
 
+internal fun findFavoriteForManagement(
+    favoritesByGroup: Map<FavoriteGroupData, List<FavoriteData>>,
+    favoriteId: String,
+    favoriteRecordId: String?,
+): Pair<FavoriteGroupData, FavoriteData>? {
+    val entries = favoritesByGroup.entries
+        .asSequence()
+        .flatMap { (group, favorites) -> favorites.asSequence().map { group to it } }
+        .toList()
+
+    return favoriteRecordId
+        ?.let { recordId -> entries.firstOrNull { (_, favorite) -> favorite.id == recordId } }
+        ?: entries.firstOrNull { (_, favorite) -> favorite.favoriteId == favoriteId }
+}
+
 private suspend fun doChangeFavoriteGroup(
     favoriteService: FavoriteService,
     groupName: String?,
@@ -214,8 +243,10 @@ private suspend fun doChangeFavoriteGroup(
     strings: LocaleStrings,
     favoriteId: String,
     favoriteType: FavoriteType,
+    existingFavorite: Pair<FavoriteGroupData, FavoriteData>?,
+    allowGroupChange: Boolean,
 ): Result<Unit> = runCatching {
-    val favorite = favoriteService.getFavoriteByFavoriteId(favoriteType, favoriteId)
+    val favorite = existingFavorite?.second
 
     // 移除旧组
     suspend fun removeFavorite() {
@@ -235,7 +266,7 @@ private suspend fun doChangeFavoriteGroup(
 
     suspend fun addFavorite() {
         // 添加到新组
-        if (groupName != currentGroupName && groupName != null) {
+        if (allowGroupChange && groupName != currentGroupName && groupName != null) {
             val isMove = favorite != null
             runCatching {
                 favoriteService.addFavorite(
@@ -267,5 +298,3 @@ private suspend fun doChangeFavoriteGroup(
 
     favoriteService.loadFavoriteByGroup(favoriteType).getOrThrow()
 }
-
-

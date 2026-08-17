@@ -147,6 +147,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val confirm = "确认"
     override val cancel = "取消"
     override val favoriteWorld = "收藏世界"
+    override val favoriteAvatar = "收藏模型"
     override val favoriteAddSuccess = "已成功收藏"
     override val favoriteAlreadyExists = "该目标已在您的收藏中"
     override val favoriteGroupSelect = "选择收藏分组"

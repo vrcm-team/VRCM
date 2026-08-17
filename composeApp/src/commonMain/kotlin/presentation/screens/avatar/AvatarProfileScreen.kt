@@ -29,6 +29,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
@@ -47,6 +48,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImagePro
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.handoffPreparedImageToEditor
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -99,6 +101,7 @@ class AvatarProfileScreen(
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
+        var showFavoriteSheet by remember { mutableStateOf(false) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
@@ -143,11 +146,18 @@ class AvatarProfileScreen(
                     contentMinHeight = contentMinHeight,
                     actionState = actionState,
                     onSelectAvatar = screenModel::selectAvatar,
+                    onFavorite = { showFavoriteSheet = true },
                     canEdit = editState.canEdit,
                     onEdit = { showEditSheet = true },
                 )
             }
         }
+        FavoriteGroupBottomSheet(
+            isVisible = showFavoriteSheet,
+            favoriteId = displayedAvatar.avatarId,
+            favoriteType = FavoriteType.Avatar,
+            onDismiss = { showFavoriteSheet = false },
+        )
         if (showEditSheet && editState.canEdit) {
             AvatarEditSheet(
                 avatar = displayedAvatar,
@@ -179,6 +189,7 @@ private fun AvatarProfileContent(
     contentMinHeight: Dp,
     actionState: AvatarActionState,
     onSelectAvatar: () -> Unit,
+    onFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
 ) {
@@ -221,6 +232,19 @@ private fun AvatarProfileContent(
         state = actionState,
         onClick = onSelectAvatar,
     )
+
+    OutlinedButton(
+        onClick = onFavorite,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(
+            imageVector = AppIcons.Favorite,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(strings.favoriteAvatar)
+    }
 
     if (canEdit) {
         FilledTonalButton(
