@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import io.github.vrcmteam.vrcm.core.extensions.saveImageToGallery
 import io.github.vrcmteam.vrcm.core.extensions.shareImage
+import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
@@ -39,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -57,6 +60,8 @@ class ImagePreviewDialog(
     private val fileName: String,
     private val fileExtension: String,
     private val directImageUrl: String? = null,
+    private val printAuthorName: String? = null,
+    private val printTimestamp: String? = null,
 ) : SharedDialog {
 
     override val transitionDurationMillis: Int =
@@ -101,6 +106,8 @@ class ImagePreviewDialog(
                         setDialogContent(null)
                     },
                     printLayoutEnabled = directImageUrl != null,
+                    printAuthorName = printAuthorName,
+                    printTimestamp = printTimestamp,
                 )
             }
 
@@ -219,6 +226,8 @@ fun BoxScope.ZoomableImage(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onDismiss: () -> Unit,
     printLayoutEnabled: Boolean = false,
+    printAuthorName: String? = null,
+    printTimestamp: String? = null,
 ) {
     var targetScale by remember { mutableStateOf(1f) }
     var targetOffset by remember { mutableStateOf(Offset.Zero) }
@@ -375,6 +384,13 @@ fun BoxScope.ZoomableImage(
                         imageUrl = imageUrl,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    if (printAuthorName != null || printTimestamp != null) {
+                        PrintFallbackMetadataOverlay(
+                            authorName = printAuthorName,
+                            timestamp = printTimestamp,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
                 PrintTargetPhotoLayout(modifier = Modifier.fillMaxSize()) {
                     Box(
@@ -414,6 +430,38 @@ fun BoxScope.ZoomableImage(
                     renderInOverlayDuringTransition = true,
                     clipInOverlayDuringTransition = NoOverlayClip,
                 ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrintFallbackMetadataOverlay(
+    authorName: String?,
+    timestamp: String?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        authorName?.let {
+            Text(
+                text = it,
+                modifier = Modifier.weight(1f),
+                color = Color.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        } ?: Spacer(modifier = Modifier.weight(1f))
+        timestamp?.let {
+            Text(
+                text = it.toLocalDateTime()?.ignoredFormat ?: it,
+                color = Color.Black,
+                maxLines = 1,
+                style = MaterialTheme.typography.labelMedium,
             )
         }
     }

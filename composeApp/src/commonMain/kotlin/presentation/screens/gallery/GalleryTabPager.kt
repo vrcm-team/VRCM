@@ -309,6 +309,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         galleryScreenModel: GalleryScreenModel,
     ) {
         val imageUrl = print.files?.image ?: ""
+        val fallbackMetadata = print.fallbackMetadata()
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(FileTagType.Print, print.id)
         val photoPainter = rememberPrintPhotoPainter(imageUrl)
@@ -336,7 +337,16 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                                 if (galleryScreenModel.hasSelection(FileTagType.Print)) {
                                     galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                                 } else {
-                                    setDialogContent(ImagePreviewDialog(print.id, print.id, ".png", imageUrl))
+                                    setDialogContent(
+                                        ImagePreviewDialog(
+                                            fileId = print.id,
+                                            fileName = print.id,
+                                            fileExtension = ".png",
+                                            directImageUrl = imageUrl,
+                                            printAuthorName = fallbackMetadata?.authorName,
+                                            printTimestamp = fallbackMetadata?.timestamp,
+                                        )
+                                    )
                                 }
                             },
                             onLongClick = {
