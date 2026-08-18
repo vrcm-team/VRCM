@@ -8,6 +8,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,15 +17,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.compose.AsyncImage
@@ -49,6 +56,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -441,27 +450,93 @@ private fun PrintFallbackMetadataOverlay(
     timestamp: String?,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Bottom,
+    Layout(
+        content = {
+            PrintFallbackMetadataCell(
+                text = authorName,
+                alignment = Alignment.CenterStart,
+                textAlign = TextAlign.Start,
+            )
+            PrintFallbackMetadataCell(
+                text = timestamp?.let { it.toLocalDateTime()?.ignoredFormat ?: it },
+                alignment = Alignment.CenterEnd,
+                textAlign = TextAlign.End,
+            )
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        require(constraints.hasBoundedWidth && constraints.hasBoundedHeight) {
+            "PrintFallbackMetadataOverlay requires bounded width and height"
+        }
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val bounds = Rect(0f, 0f, width.toFloat(), height.toFloat())
+        // Measure both cells inside the real lower frame so one field cannot starve the other.
+        val canvas = PrintDisplayGeometry.canvasRect(bounds)
+        val photo = PrintDisplayGeometry.targetPhotoRect(bounds)
+        val bandLeft = ceil(photo.left).toInt().coerceIn(0, width)
+        val bandRight = floor(photo.right).toInt().coerceIn(bandLeft, width)
+        val bandTop = ceil(photo.bottom).toInt().coerceIn(0, height)
+        val bandBottom = floor(canvas.bottom).toInt().coerceIn(bandTop, height)
+        val bandWidth = bandRight - bandLeft
+        val bandHeight = bandBottom - bandTop
+        val hasBothFields = authorName != null && timestamp != null
+        val sourceGap = PrintDisplayGeometry.spec.contentInsets.let { it.left + it.right }
+        val canvasScale = canvas.width / PrintDisplayGeometry.spec.canvas.canvasWidth
+        val gapWidth = if (hasBothFields) {
+            (sourceGap * canvasScale).roundToInt().coerceIn(0, bandWidth)
+        } else {
+            0
+        }
+        val availableWidth = bandWidth - gapWidth
+        val authorWidth = when {
+            authorName == null -> 0
+            timestamp == null -> availableWidth
+            else -> availableWidth / 2
+        }
+        val timestampWidth = when {
+            timestamp == null -> 0
+            authorName == null -> availableWidth
+            else -> availableWidth - authorWidth
+        }
+        val authorPlaceable = measurables[0].measure(
+            Constraints.fixed(authorWidth, bandHeight)
+        )
+        val timestampPlaceable = measurables[1].measure(
+            Constraints.fixed(timestampWidth, bandHeight)
+        )
+
+        layout(width, height) {
+            authorPlaceable.place(bandLeft, bandTop)
+            timestampPlaceable.place(
+                x = bandLeft + authorWidth + gapWidth,
+                y = bandTop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrintFallbackMetadataCell(
+    text: String?,
+    alignment: Alignment,
+    textAlign: TextAlign,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = alignment,
     ) {
-        authorName?.let {
-            Text(
-                text = it,
-                modifier = Modifier.weight(1f),
+        text?.let {
+            val textStyle = MaterialTheme.typography.labelMedium.copy(
                 color = Color.Black,
+                textAlign = textAlign,
+            )
+            BasicText(
+                text = it,
+                style = textStyle,
+                autoSize = TextAutoSize.StepBased(8.sp, textStyle.fontSize),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        } ?: Spacer(modifier = Modifier.weight(1f))
-        timestamp?.let {
-            Text(
-                text = it.toLocalDateTime()?.ignoredFormat ?: it,
-                color = Color.Black,
-                maxLines = 1,
-                style = MaterialTheme.typography.labelMedium,
             )
         }
     }
