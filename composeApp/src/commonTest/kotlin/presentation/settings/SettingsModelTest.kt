@@ -9,14 +9,14 @@ import kotlin.test.assertTrue
 
 class SettingsModelTest {
     @Test
-    fun clipboardReadingIsOptInAndPersistsAcrossModelInstances() {
+    fun clipboardReadingIsEnabledByDefaultAndOptOutPersistsAcrossModelInstances() {
         val settings = MapSettings()
         val firstModel = SettingsModel(SettingsDao(settings), listOf(ThemeColor.Default))
 
-        assertFalse(firstModel.settingsVo.clipboardReadingEnabled)
-        firstModel.saveSettings(firstModel.settingsVo.copy(clipboardReadingEnabled = true))
+        assertTrue(firstModel.settingsVo.clipboardReadingEnabled)
+        firstModel.saveSettings(firstModel.settingsVo.copy(clipboardReadingEnabled = false))
 
         val restoredModel = SettingsModel(SettingsDao(settings), listOf(ThemeColor.Default))
-        assertTrue(restoredModel.settingsVo.clipboardReadingEnabled)
+        assertFalse(restoredModel.settingsVo.clipboardReadingEnabled)
     }
 }

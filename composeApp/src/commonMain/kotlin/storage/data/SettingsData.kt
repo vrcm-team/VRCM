@@ -16,5 +16,5 @@ data class SettingsData(
     val vrchatStatusNotificationsEnabled: Boolean = false,
     val friendPresenceFilter: FriendPresenceFilter = FriendPresenceFilter.Default,
     val backgroundFriendMonitoringEnabled: Boolean = false,
-    val clipboardReadingEnabled: Boolean = false,
+    val clipboardReadingEnabled: Boolean = true,
 )

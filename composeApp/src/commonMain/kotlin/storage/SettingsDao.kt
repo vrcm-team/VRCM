@@ -112,6 +112,6 @@ class SettingsDao(
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, value)
 
     var clipboardReadingEnabled: Boolean
-        get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, false)
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, true)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, value)
 }
