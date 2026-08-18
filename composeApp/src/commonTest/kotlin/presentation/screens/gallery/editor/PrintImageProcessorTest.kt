@@ -137,6 +137,33 @@ abstract class PrintImageProcessorContractTest {
     }
 
     @Test
+    fun disabledDownloadedPrintBorderCropKeepsOriginalForEditing() = runBlocking {
+        val source = SelectedImage("downloaded-print.png", byteArrayOf(1))
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_048, 1_440),
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            releaseBitmap = released::add,
+        )
+
+        val preparedSource = processor.preparePrint(
+            source = source,
+            cropDownloadedPrintBorder = false,
+        ).getOrThrow()
+
+        assertSame(source, preparedSource.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSource.prepared.preview)
+        assertEquals(ImageSize(2_048, 1_440), preparedSource.prepared.originalSize)
+        assertEquals(emptyList(), codec.cropRequests)
+        assertEquals(emptyList(), codec.encodeLimits)
+        assertEquals(emptyList(), released)
+    }
+
+    @Test
     fun nonPrintDimensionsEnterTheEditorUnchanged() = runBlocking {
         val source = SelectedImage("regular-photo.png", byteArrayOf(1))
         val codec = FakePlatformImageCodec(

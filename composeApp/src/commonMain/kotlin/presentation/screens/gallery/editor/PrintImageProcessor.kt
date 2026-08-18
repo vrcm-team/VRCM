@@ -15,7 +15,11 @@ import kotlin.math.roundToInt
 interface PrintImageProcessor {
     suspend fun prepare(source: SelectedImage): Result<PreparedImage>
 
-    suspend fun preparePrint(source: SelectedImage): Result<PreparedImageSource> =
+    /** Optionally removes the known frame from a downloaded Print before editing. */
+    suspend fun preparePrint(
+        source: SelectedImage,
+        cropDownloadedPrintBorder: Boolean = true,
+    ): Result<PreparedImageSource> =
         prepare(source).map { PreparedImageSource(source, it) }
 
     suspend fun render(
@@ -40,8 +44,11 @@ class DefaultPrintImageProcessor(
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> =
         prepareSource(source, cropDownloadedPrintBorder = false).map(PreparedImageSource::prepared)
 
-    override suspend fun preparePrint(source: SelectedImage): Result<PreparedImageSource> =
-        prepareSource(source, cropDownloadedPrintBorder = true)
+    override suspend fun preparePrint(
+        source: SelectedImage,
+        cropDownloadedPrintBorder: Boolean,
+    ): Result<PreparedImageSource> =
+        prepareSource(source, cropDownloadedPrintBorder)
 
     private suspend fun prepareSource(
         source: SelectedImage,
