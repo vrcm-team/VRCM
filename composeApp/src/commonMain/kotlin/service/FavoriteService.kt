@@ -12,7 +12,23 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.toCollection
-import kotlinx.coroutines.flow.update
+
+internal class FavoriteGroupCache {
+    private val flows = FavoriteType.entries.associateWith {
+        MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    }
+
+    fun flow(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        flows.getValue(type)
+
+    fun replace(type: FavoriteType, favorites: Map<FavoriteGroupData, List<FavoriteData>>) {
+        flows.getValue(type).value = favorites
+    }
+
+    fun clear() {
+        flows.values.forEach { it.value = emptyMap() }
+    }
+}
 
 /**
  * 收藏服务类
@@ -24,9 +40,7 @@ class FavoriteService(
     private val favoriteLocalDao: FavoriteLocalDao,
 ) {
 
-    // 收藏列表缓存，key为FavoriteGroupData的name
-    private val _favoritesByGroup: MutableMap<FavoriteType, MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>> =
-        mutableMapOf()
+    private val favoritesByGroupCache = FavoriteGroupCache()
 
     // 收藏限制信息缓存
     private var _favoriteLimits: FavoriteLimits? = null
@@ -34,14 +48,14 @@ class FavoriteService(
     init {
         CoroutineScope(Dispatchers.Default).launch {
             SharedFlowCentre.authed.collect {
-                _favoritesByGroup.clear()
+                favoritesByGroupCache.clear()
             }
         }
     }
 
 
     fun favoritesByGroup(favoriteType: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
-        _favoritesByGroup.getOrPut(favoriteType) { MutableStateFlow(mutableMapOf()) }
+        favoritesByGroupCache.flow(favoriteType)
 
 
     init {
@@ -147,11 +161,11 @@ class FavoriteService(
         }
 
         // 合并远程与本地
-        _favoritesByGroup.getOrPut(favoriteType) {
-            MutableStateFlow(mutableMapOf())
-        }.update {
-            remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } + (localGroup to localFavorites)
-        }
+        favoritesByGroupCache.replace(
+            favoriteType,
+            remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } +
+                (localGroup to localFavorites),
+        )
     }.onFailure {
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
     }
@@ -212,4 +226,4 @@ class FavoriteService(
     fun getFavoriteByFavoriteId(favoriteType: FavoriteType, favoriteId: String): FavoriteData? =
         favoritesByGroup(favoriteType).value.values.flatten().firstOrNull { it.favoriteId == favoriteId }
 
-} 
+}
