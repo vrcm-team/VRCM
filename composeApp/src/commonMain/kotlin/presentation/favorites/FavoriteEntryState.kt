@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.favorites
 
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
@@ -90,6 +91,7 @@ internal class FavoriteEntryStateModel(
     private val source: FavoriteEntrySource,
     private val scope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val sessionFlow: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
 ) {
     private enum class LoadState {
         Loading,
@@ -102,11 +104,11 @@ internal class FavoriteEntryStateModel(
     private val loadState = MutableStateFlow(LoadState.Loading)
     private val latestRequestToken = MutableStateFlow(0L)
     private val cachedFavorite = MutableStateFlow<Boolean?>(null)
-    private var observedSessionToken = SharedFlowCentre.currentSession.value?.token
+    private var observedSessionToken = sessionFlow.value?.token
 
     init {
         scope.launch {
-            SharedFlowCentre.currentSession.collect { session ->
+            sessionFlow.collect { session ->
                 val sessionToken = session?.token
                 if (sessionToken != observedSessionToken) {
                     observedSessionToken = sessionToken
@@ -164,13 +166,13 @@ internal class FavoriteEntryStateModel(
             return
         }
 
-        val requestSessionToken = SharedFlowCentre.currentSession.value?.token
+        val requestSessionToken = sessionFlow.value?.token
         cachedFavorite.value = null
         loadState.value = LoadState.Loading
         scope.launch(dispatcher) {
             val cachedMembership = source.cachedFavorite(favoriteType, favoriteId)
             if (requestToken != latestRequestToken.value) return@launch
-            if (requestSessionToken != SharedFlowCentre.currentSession.value?.token) {
+            if (requestSessionToken != sessionFlow.value?.token) {
                 load(favoriteId, allowCurrentGroups = false)
                 return@launch
             }

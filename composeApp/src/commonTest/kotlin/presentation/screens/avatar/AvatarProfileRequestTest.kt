@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
@@ -155,28 +157,37 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
 
     @Test
     fun cachedFavoriteStateReloadsWhenTheAccountSessionChanges() = runBlocking {
-        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_a"))
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = "usr_account_a"),
+                token = AccountSessionToken(userId = "usr_account_a", generation = 1),
+            )
+        )
         val favoriteSource = SessionAwareCachedEntryFavoriteSource(
             memberships = mapOf(
                 "usr_account_a" to true,
                 "usr_account_b" to false,
             ),
+            session = session,
         )
         val model = avatarModel(
             loader = ControlledAvatarProfileLoader(),
             favoriteSource = favoriteSource,
+            favoriteSession = session,
         )
 
         model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
         yield()
         assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
 
-        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_b"))
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = "usr_account_b"),
+            token = AccountSessionToken(userId = "usr_account_b", generation = 2),
+        )
         yield()
 
         assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
         assertEquals(2, favoriteSource.cachedLookupCount)
-        SharedFlowCentre.emitLogout()
     }
 
     @Test
@@ -588,8 +599,16 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         selector: AvatarSelector = FakeAvatarSelector(),
         favoriteSource: FavoriteEntrySource = EmptyFavoriteEntrySource(),
         editor: AvatarEditor? = null,
+        favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
     ): AvatarProfileScreenModel =
-        AvatarProfileScreenModel(loader, selector, favoriteSource, Dispatchers.Unconfined, editor)
+        AvatarProfileScreenModel(
+            loader,
+            selector,
+            favoriteSource,
+            Dispatchers.Unconfined,
+            editor,
+            favoriteSession,
+        )
             .also(models::add)
 }
 
@@ -636,6 +655,7 @@ private class CachedEntryFavoriteSource(
 
 private class SessionAwareCachedEntryFavoriteSource(
     private val memberships: Map<String, Boolean>,
+    private val session: StateFlow<AuthenticatedAccount?>,
 ) : FavoriteEntrySource {
     private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
     var cachedLookupCount = 0
@@ -646,7 +666,7 @@ private class SessionAwareCachedEntryFavoriteSource(
 
     override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean? {
         cachedLookupCount++
-        return SharedFlowCentre.currentSession.value?.token?.userId?.let(memberships::get)
+        return session.value?.token?.userId?.let(memberships::get)
     }
 
     override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)

@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
@@ -167,6 +168,7 @@ class AvatarProfileScreenModel internal constructor(
     favoriteEntrySource: FavoriteEntrySource,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
+    private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -177,6 +179,7 @@ class AvatarProfileScreenModel internal constructor(
         source = favoriteEntrySource,
         scope = viewModelScope,
         dispatcher = requestDispatcher,
+        sessionFlow = favoriteSession,
     )
     internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
 
