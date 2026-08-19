@@ -12,6 +12,56 @@ import kotlin.test.assertEquals
 
 class PrintImageProcessorTest : PrintImageProcessorContractTest() {
     @Test
+    fun downloadedPrintUsesTheInnerPhotoForPreviewAndSourceBytes() = runBlocking {
+        val codec = DesktopPlatformImageCodec()
+        val downloadedPrint = ImageBitmap(width = 2_048, height = 1_440, hasAlpha = false)
+        Canvas(downloadedPrint).apply {
+            drawRect(
+                rect = Rect(0f, 0f, 2_048f, 1_440f),
+                paint = Paint().apply { color = Color.White },
+            )
+            drawRect(
+                rect = Rect(64f, 69f, 1_984f, 1_149f),
+                paint = Paint().apply { color = Color.Red },
+            )
+        }
+        val sourceBytes = try {
+            codec.encodePng(downloadedPrint)
+        } finally {
+            releasePlatformImageBitmap(downloadedPrint)
+        }
+
+        val preparedSources = DefaultPrintImageProcessor(codec)
+            .preparePrint(SelectedImage("downloaded-print.png", sourceBytes))
+            .getOrThrow()
+        val preparedSource = requireNotNull(preparedSources.cropped)
+        val previewPixels = try {
+            preparedSource.prepared.preview.toPixelMap()
+        } finally {
+            releasePlatformImageBitmap(preparedSource.prepared.preview)
+            releasePlatformImageBitmap(preparedSources.original.prepared.preview)
+        }
+        val decodedSource = codec.decode(
+            preparedSource.source.bytes,
+            DecodeRequest(maxDimension = 2_048, maxPixels = 4_000_000L),
+        )
+        val sourcePixels = try {
+            decodedSource.bitmap.toPixelMap()
+        } finally {
+            releasePlatformImageBitmap(decodedSource.bitmap)
+        }
+
+        assertEquals(ImageSize(1_920, 1_080), preparedSource.prepared.originalSize)
+        assertEquals(ImageSize(1_920, 1_080), decodedSource.originalSize)
+        listOf(previewPixels, sourcePixels).forEach { pixels ->
+            assertOpaqueRed(pixels[0, 0])
+            assertOpaqueRed(pixels[1_919, 0])
+            assertOpaqueRed(pixels[0, 1_079])
+            assertOpaqueRed(pixels[1_919, 1_079])
+        }
+    }
+
+    @Test
     fun portraitImageIsCenteredWithOpaqueWhiteSidePadding() = runBlocking {
         val codec = DesktopPlatformImageCodec()
         val source = ImageBitmap(width = 9, height = 16, hasAlpha = false)
@@ -84,6 +134,95 @@ class PrintImageProcessorTest : PrintImageProcessorContractTest() {
         assertOpaqueBlendedRed(pixels[1_983, 1_148])
         assertOpaqueWhite(pixels[1_984, 1_148])
         assertOpaqueWhite(pixels[1_983, 1_149])
+    }
+
+    @Test
+    fun galleryRenderPreservesTransparentPixels() = runBlocking {
+        val codec = DesktopPlatformImageCodec()
+        val source = ImageBitmap(width = 16, height = 9, hasAlpha = true)
+        Canvas(source).drawRect(
+            rect = Rect(8f, 0f, 16f, 9f),
+            paint = Paint().apply {
+                color = Color(red = 1f, green = 0f, blue = 0f, alpha = 0.5f)
+            },
+        )
+        val sourceBytes = try {
+            codec.encodePng(source)
+        } finally {
+            releasePlatformImageBitmap(source)
+        }
+        val sourceSpec = PrintCanvasSpec(
+            canvasWidth = 16,
+            canvasHeight = 9,
+            contentWidth = 16,
+            contentHeight = 9,
+            contentOffsetX = 0,
+            contentOffsetY = 0,
+        )
+
+        val rendered = DefaultPrintImageProcessor(codec, sourceSpec).render(
+            source = SelectedImage("transparent.png", sourceBytes),
+            originalSize = ImageSize(16, 9),
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        ).getOrThrow()
+        val decoded = codec.decode(
+            rendered,
+            DecodeRequest(maxDimension = 16, maxPixels = 144L),
+        )
+        val pixels = try {
+            decoded.bitmap.toPixelMap()
+        } finally {
+            releasePlatformImageBitmap(decoded.bitmap)
+        }
+
+        assertEquals(0f, pixels[2, 4].alpha, 0.01f)
+        assertEquals(0.5f, pixels[12, 4].alpha, 0.02f)
+        assertEquals(1f, pixels[12, 4].red, 0.01f)
+    }
+
+    @Test
+    fun galleryWhiteBackgroundIsCompositedIntoTheCropBitmap() = runBlocking {
+        val codec = DesktopPlatformImageCodec()
+        val source = ImageBitmap(width = 16, height = 9, hasAlpha = true)
+        Canvas(source).drawRect(
+            rect = Rect(8f, 0f, 16f, 9f),
+            paint = Paint().apply {
+                color = Color(red = 1f, green = 0f, blue = 0f, alpha = 0.5f)
+            },
+        )
+        val sourceBytes = try {
+            codec.encodePng(source)
+        } finally {
+            releasePlatformImageBitmap(source)
+        }
+        val sourceSpec = PrintCanvasSpec(
+            canvasWidth = 16,
+            canvasHeight = 9,
+            contentWidth = 16,
+            contentHeight = 9,
+            contentOffsetX = 0,
+            contentOffsetY = 0,
+        )
+
+        val rendered = DefaultPrintImageProcessor(codec, sourceSpec).render(
+            source = SelectedImage("transparent.png", sourceBytes),
+            originalSize = ImageSize(16, 9),
+            transform = CropTransform(),
+            background = CanvasBackground.White,
+        ).getOrThrow()
+        val decoded = codec.decode(
+            rendered,
+            DecodeRequest(maxDimension = 16, maxPixels = 144L),
+        )
+        val pixels = try {
+            decoded.bitmap.toPixelMap()
+        } finally {
+            releasePlatformImageBitmap(decoded.bitmap)
+        }
+
+        assertOpaqueWhite(pixels[2, 4])
+        assertOpaqueBlendedRed(pixels[12, 4])
     }
 
     private fun assertOpaqueWhite(color: Color) {

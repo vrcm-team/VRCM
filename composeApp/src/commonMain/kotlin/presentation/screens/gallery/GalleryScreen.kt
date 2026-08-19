@@ -29,10 +29,12 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 
 @Serializable
 object GalleryScreen : AppRoute {
@@ -52,9 +54,14 @@ object GalleryScreen : AppRoute {
         val pagerState = rememberPagerState { tabPagers.size }
         val coroutineScope = rememberCoroutineScope()
         val navigator = LocalNavigator.currentOrThrow
+        val editorSessionStore: PrintImageEditorSessionStore = koinInject()
 
         LaunchedEffect(Unit) {
             galleryScreenModel.init()
+        }
+
+        LaunchedEffect(editorSessionStore) {
+            editorSessionStore.galleryUploadCompletions.collect(galleryScreenModel::refreshFiles)
         }
 
         Scaffold(

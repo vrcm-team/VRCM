@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.PrintUploadFailure
@@ -22,9 +23,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PrintImageEditorScreenModelTest : MainDispatcherTest() {
@@ -175,6 +179,162 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun downloadedPrintCropSwitchChangesPreviewImmediatelyAndResetsTransform() {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val croppedSource = PreparedImageSource(
+            source = SelectedImage("source.jpg", byteArrayOf(9)),
+            prepared = PreparedImage(CroppedTestImageBitmap, ImageSize(1_920, 1_080)),
+        )
+        val model = createModel(
+            processor,
+            uploader,
+            originalSize = ImageSize(2_048, 1_440),
+            croppedSource = croppedSource,
+        )
+
+        assertTrue(model.state.value.canCropDownloadedPrintBorder)
+        assertTrue(model.state.value.cropDownloadedPrintBorder)
+        assertSame(CroppedTestImageBitmap, model.state.value.prepared.preview)
+
+        model.panAndZoom(VIEWPORT, panX = 40f, panY = 0f, zoomChange = 1.5f)
+        model.setCropDownloadedPrintBorder(false, VIEWPORT)
+
+        assertFalse(model.state.value.cropDownloadedPrintBorder)
+        assertSame(TestImageBitmap, model.state.value.prepared.preview)
+        assertEquals(CropTransform(), model.state.value.transform)
+
+        model.setCropDownloadedPrintBorder(true, VIEWPORT)
+
+        assertTrue(model.state.value.cropDownloadedPrintBorder)
+        assertSame(CroppedTestImageBitmap, model.state.value.prepared.preview)
+        assertEquals(CropTransform(), model.state.value.transform)
+    }
+
+    @Test
+    fun cropSwitchInvalidatesRenderedPngAndUploadsTheSelectedSource() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.failure(IllegalStateException("offline")) }
+        val croppedSource = PreparedImageSource(
+            source = SelectedImage("source.jpg", byteArrayOf(9)),
+            prepared = PreparedImage(CroppedTestImageBitmap, ImageSize(1_920, 1_080)),
+        )
+        val model = createModel(
+            processor,
+            uploader,
+            originalSize = ImageSize(2_048, 1_440),
+            croppedSource = croppedSource,
+        )
+
+        model.upload()
+        yield()
+        model.setCropDownloadedPrintBorder(false, VIEWPORT)
+        model.upload()
+        yield()
+
+        assertEquals(2, processor.renderCount)
+        assertContentEquals(byteArrayOf(9), processor.sources[0].bytes)
+        assertContentEquals(byteArrayOf(1), processor.sources[1].bytes)
+        assertEquals(
+            listOf(ImageSize(1_920, 1_080), ImageSize(2_048, 1_440)),
+            processor.originalSizes,
+        )
+    }
+
+    @Test
+    fun disablingWhiteBorderUsesCoverAsTheMinimumZoom() {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val originalSize = ImageSize(1_080, 1_920)
+        val model = createModel(processor, uploader, originalSize)
+        val cover = CropTransformCalculator().zoomLimits(
+            source = originalSize,
+            viewport = VIEWPORT,
+            quarterTurns = 0,
+        ).cover
+
+        model.setFillWhiteBorder(false, VIEWPORT)
+
+        assertFalse(model.state.value.fillWhiteBorder)
+        assertEquals(cover, model.state.value.transform.zoom, 0.0001f)
+
+        model.setZoom(VIEWPORT, 1f)
+
+        assertEquals(cover, model.state.value.transform.zoom, 0.0001f)
+
+        model.rotateLeft(VIEWPORT)
+        val rotatedCover = CropTransformCalculator().zoomLimits(
+            source = originalSize,
+            viewport = VIEWPORT,
+            quarterTurns = model.state.value.transform.quarterTurns,
+        ).cover
+
+        assertEquals(rotatedCover, model.state.value.transform.zoom, 0.0001f)
+    }
+
+    @Test
+    fun enablingWhiteBorderReturnsToCenteredFit() {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val model = createModel(processor, uploader, ImageSize(1_080, 1_920))
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.panAndZoom(VIEWPORT, panX = 0f, panY = 100f, zoomChange = 1.5f)
+
+        model.setFillWhiteBorder(true, VIEWPORT)
+
+        assertTrue(model.state.value.fillWhiteBorder)
+        assertEquals(CropTransform(), model.state.value.transform)
+    }
+
+    @Test
+    fun printTargetKeepsWhiteCanvasWhenBorderModeIsDisabled() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
+        val model = createModel(processor, uploader, ImageSize(1_080, 1_920))
+
+        model.upload()
+        yield()
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.upload()
+        yield()
+
+        assertEquals(
+            listOf(CanvasBackground.White, CanvasBackground.White),
+            processor.backgrounds,
+        )
+    }
+
+    @Test
+    fun galleryTargetPreservesTransparentCanvasWhenBorderModeIsDisabled() = runBlocking {
+        val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
+        val submitter = FakeImageEditorSubmitter {
+            Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.png", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_080, 1_920)),
+            calculator = CropTransformCalculator(),
+            processor = processor,
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Gallery),
+            sessionId = "test-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
+
+        model.upload()
+        yield()
+        model.setFillWhiteBorder(false, VIEWPORT)
+        model.upload()
+        yield()
+
+        assertEquals(
+            listOf(CanvasBackground.Transparent, CanvasBackground.Transparent),
+            processor.backgrounds,
+        )
+    }
+
+    @Test
     fun successfulUploadUsesPngFileNameAndEmitsCompletion() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         val uploader = FakePrintUploader { _, _ -> Result.success(PrintData("print")) }
@@ -190,15 +350,45 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun emojiUploadKeepsOriginalFileNameForVrcxMetadataParsing() = runBlocking {
+        val sourceFileName =
+            "wave_stopanimationStyle_8frames_24fps_pingpongloopStyle.png"
+        val submitter = FakeImageEditorSubmitter {
+            Result.success(ImageEditorSubmission.Gallery(FileTagType.Emoji))
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage(sourceFileName, byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_000, 1_000)),
+            calculator = CropTransformCalculator(),
+            processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Emoji),
+            sessionId = "emoji-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
+
+        model.upload()
+        yield()
+
+        assertEquals(sourceFileName, submitter.lastFileName)
+    }
+
+    @Test
     fun disposingEditorModelReleasesSessionData() {
         val store = PrintImageEditorSessionStore()
         val source = SelectedImage("source.jpg", byteArrayOf(1))
         val prepared = PreparedImage(TestImageBitmap, ImageSize(1_920, 1_080))
+        val croppedSource = PreparedImageSource(
+            source.copy(bytes = byteArrayOf(9)),
+            PreparedImage(CroppedTestImageBitmap, ImageSize(1_920, 1_080)),
+        )
         val released = mutableListOf<ImageBitmap>()
-        val sessionId = store.create(source, prepared)
+        val sessionId = store.create(source, prepared, croppedSource = croppedSource)
         val model = PrintImageEditorScreenModel(
             source = source,
             prepared = prepared,
+            croppedSource = croppedSource,
             calculator = CropTransformCalculator(),
             processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
             submitter = PrintUploaderSubmitter(
@@ -216,15 +406,20 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         clearViewModel(model)
 
         assertNull(store.get(sessionId))
-        assertEquals(listOf<ImageBitmap>(TestImageBitmap), released)
+        assertEquals(listOf<ImageBitmap>(TestImageBitmap, CroppedTestImageBitmap), released)
     }
 
     @Test
     fun disposingEditorDefersPreviewReleaseUntilExitFrameIsGone() {
         val released = mutableListOf<ImageBitmap>()
+        val croppedSource = PreparedImageSource(
+            SelectedImage("source.jpg", byteArrayOf(9)),
+            PreparedImage(CroppedTestImageBitmap, ImageSize(1_920, 1_080)),
+        )
         val model = PrintImageEditorScreenModel(
             source = SelectedImage("source.jpg", byteArrayOf(1)),
             prepared = PreparedImage(TestImageBitmap, ImageSize(1_920, 1_080)),
+            croppedSource = croppedSource,
             calculator = CropTransformCalculator(),
             processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
             submitter = PrintUploaderSubmitter(
@@ -242,7 +437,7 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
 
         assertEquals(emptyList(), released)
         model.releasePreviewDisplayLease()
-        assertEquals(listOf<ImageBitmap>(TestImageBitmap), released)
+        assertEquals(listOf<ImageBitmap>(TestImageBitmap, CroppedTestImageBitmap), released)
     }
 
     @Test
@@ -294,11 +489,13 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
         processor: PrintImageProcessor,
         uploader: PrintUploader,
         originalSize: ImageSize = ImageSize(1_920, 1_080),
+        croppedSource: PreparedImageSource? = null,
         workerDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
         workerExceptionHandler: CoroutineExceptionHandler? = null,
     ) = PrintImageEditorScreenModel(
         source = SelectedImage("source.jpg", byteArrayOf(1)),
         prepared = PreparedImage(TestImageBitmap, originalSize),
+        croppedSource = croppedSource,
         calculator = CropTransformCalculator(),
         processor = processor,
         submitter = PrintUploaderSubmitter(uploader),
@@ -344,11 +541,33 @@ private data object TestImageBitmap : ImageBitmap {
     override fun prepareToDraw() = Unit
 }
 
+private data object CroppedTestImageBitmap : ImageBitmap {
+    override val width: Int = 16
+    override val height: Int = 9
+    override val colorSpace: ColorSpace = ColorSpaces.Srgb
+    override val hasAlpha: Boolean = true
+    override val config: ImageBitmapConfig = ImageBitmapConfig.Argb8888
+
+    override fun readPixels(
+        buffer: IntArray,
+        startX: Int,
+        startY: Int,
+        width: Int,
+        height: Int,
+        bufferOffset: Int,
+        stride: Int,
+    ) = error("The editor state-machine tests do not read preview pixels")
+
+    override fun prepareToDraw() = Unit
+}
+
 private class FakePrintImageProcessor(
     private val renderBlock: suspend (SelectedImage, ImageSize, CropTransform) -> Result<ByteArray>,
 ) : PrintImageProcessor {
     var renderCount = 0
+    val sources = mutableListOf<SelectedImage>()
     val originalSizes = mutableListOf<ImageSize>()
+    val backgrounds = mutableListOf<CanvasBackground>()
 
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> =
         error("prepare is not used by the editor model")
@@ -357,9 +576,12 @@ private class FakePrintImageProcessor(
         source: SelectedImage,
         originalSize: ImageSize,
         transform: CropTransform,
+        background: CanvasBackground,
     ): Result<ByteArray> {
         renderCount++
+        sources += source
         originalSizes += originalSize
+        backgrounds += background
         return renderBlock(source, originalSize, transform)
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -40,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.OfficialLinkContent
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
@@ -49,10 +52,13 @@ import io.github.vrcmteam.vrcm.service.OfficialLinkTarget
 import io.github.vrcmteam.vrcm.service.OfficialLinkType
 import org.koin.compose.koinInject
 
+internal val LocalOfficialLinkInspectionMarker = staticCompositionLocalOf<(String) -> Unit> { {} }
+
 @Composable
 internal fun OfficialLinkPrompt(
     navigator: AppNavigator,
     inbox: OfficialLinkInbox,
+    content: @Composable () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     val service: OfficialLinkService = koinInject()
@@ -62,7 +68,9 @@ internal fun OfficialLinkPrompt(
     val clipboardInspectionGate = remember { OfficialLinkClipboardInspectionGate() }
     val isAuthenticated = navigator.items.any { it is HomeScreen }
     val controller = rememberOfficialLinkPromptController(service, navigator, inbox)
+    val markClipboardInspected = remember(controller) { controller::markClipboardInspected }
     val promptState by controller.state.collectAsState()
+    val clipboardReadingEnabled = LocalSettingsState.current.value.clipboardReadingEnabled
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         foregroundGeneration++
@@ -77,12 +85,14 @@ internal fun OfficialLinkPrompt(
         foregroundGeneration,
         isAuthenticated,
         incomingRequest?.id,
+        clipboardReadingEnabled,
     ) {
         if (
             !clipboardInspectionGate.shouldInspect(
                 foregroundGeneration = foregroundGeneration,
                 isAuthenticated = isAuthenticated,
                 hasExternalRequest = incomingRequest != null,
+                clipboardReadingEnabled = clipboardReadingEnabled,
             )
         ) {
             return@LaunchedEffect
@@ -96,6 +106,11 @@ internal fun OfficialLinkPrompt(
         if (!isAuthenticated) return@LaunchedEffect
         controller.openExternal(request)
     }
+
+    CompositionLocalProvider(
+        LocalOfficialLinkInspectionMarker provides markClipboardInspected,
+        content = content,
+    )
 
     when (val state = promptState) {
         OfficialLinkPromptState.Idle -> Unit
@@ -118,12 +133,17 @@ internal fun OfficialLinkPrompt(
 /** Prevents an external link and a clipboard link from being handled in the same foreground event. */
 internal class OfficialLinkClipboardInspectionGate {
     private var handledForegroundGeneration = 0
+    private var wasClipboardReadingEnabled = false
 
     fun shouldInspect(
         foregroundGeneration: Int,
         isAuthenticated: Boolean,
         hasExternalRequest: Boolean,
+        clipboardReadingEnabled: Boolean,
     ): Boolean {
+        val wasJustEnabled = clipboardReadingEnabled && !wasClipboardReadingEnabled
+        wasClipboardReadingEnabled = clipboardReadingEnabled
+        if (!clipboardReadingEnabled) return false
         if (hasExternalRequest) {
             handledForegroundGeneration = foregroundGeneration
             return false
@@ -131,7 +151,7 @@ internal class OfficialLinkClipboardInspectionGate {
         if (
             foregroundGeneration == 0 ||
             !isAuthenticated ||
-            handledForegroundGeneration == foregroundGeneration
+            (!wasJustEnabled && handledForegroundGeneration == foregroundGeneration)
         ) {
             return false
         }

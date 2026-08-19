@@ -62,6 +62,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.*
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
@@ -876,6 +877,7 @@ private fun AppRoute.RenderBottomSheetContent(
     onExpanded: () -> Unit,
 ) {
     val screenModel = koinViewModel<WorldProfileScreenModel>()
+    val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
 
     // 对话框状态管理
     var showCreateInstanceDialog by remember { mutableStateOf(false) }
@@ -1015,10 +1017,26 @@ private fun AppRoute.RenderBottomSheetContent(
             }
 
             OutlinedButton(
-                onClick = { showFavoriteGroupBottomSheet = true },
+                onClick = {
+                    if (favoriteEntryState == FavoriteEntryState.LoadFailed) {
+                        screenModel.retryFavoriteEntryLoad()
+                    } else {
+                        showFavoriteGroupBottomSheet = true
+                    }
+                },
+                enabled = favoriteEntryState != FavoriteEntryState.Loading &&
+                    favoriteEntryState != FavoriteEntryState.Unavailable,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(strings.favoriteWorld)
+                Text(
+                    when (favoriteEntryState) {
+                        FavoriteEntryState.Loading -> strings.loading
+                        FavoriteEntryState.Favorited -> strings.editFavorite
+                        FavoriteEntryState.NotFavorited -> strings.favoriteWorld
+                        FavoriteEntryState.LoadFailed -> strings.retry
+                        FavoriteEntryState.Unavailable -> strings.favoriteWorld
+                    }
+                )
             }
         }
 

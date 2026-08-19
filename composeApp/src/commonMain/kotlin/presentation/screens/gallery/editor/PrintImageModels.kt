@@ -87,6 +87,24 @@ data class PreparedImage(
     val originalSize: ImageSize,
 )
 
+/** Source bytes and preview that use the same editable pixel coordinate space. */
+data class PreparedImageSource(
+    val source: SelectedImage,
+    val prepared: PreparedImage,
+)
+
+/** Original Print image plus an optional border-cropped editing source. */
+data class PreparedPrintImageSources(
+    val original: PreparedImageSource,
+    val cropped: PreparedImageSource?,
+)
+
+/** Controls whether transparent pixels are preserved or composited onto white. */
+enum class CanvasBackground {
+    Transparent,
+    White,
+}
+
 data class PrintCanvasSpec(
     val canvasWidth: Int = 2_048,
     val canvasHeight: Int = 1_440,
@@ -105,10 +123,51 @@ internal val AvatarCoverCanvasSpec = PrintCanvasSpec(
     contentOffsetY = 0,
 )
 
+internal val GalleryCanvasSpec = PrintCanvasSpec(
+    canvasWidth = 2_000,
+    canvasHeight = 1_500,
+    contentWidth = 2_000,
+    contentHeight = 1_500,
+    contentOffsetX = 0,
+    contentOffsetY = 0,
+)
+
+internal val SquareCanvasSpec = PrintCanvasSpec(
+    canvasWidth = 2_000,
+    canvasHeight = 2_000,
+    contentWidth = 2_000,
+    contentHeight = 2_000,
+    contentOffsetX = 0,
+    contentOffsetY = 0,
+)
+
+internal val PrintCanvasSpec.aspectRatio: Float
+    get() = canvasWidth.toFloat() / canvasHeight
+
 object PrintImageLimits {
+    private const val ARGB_BYTES_PER_PIXEL = 4L
+    private const val MAX_SIMULTANEOUS_RENDER_RASTERS = 2L
+
     const val MAX_FILE_BYTES: Long = 50L * 1024 * 1024
     const val MAX_PIXELS: Long = 100_000_000L
     const val MAX_INTERMEDIATE_DECODE_PIXELS: Long = 16_000_000L
+    const val MAX_PREVIEW_RASTER_BYTES: Long = 8L * 1024 * 1024
+    const val MAX_PREVIEW_PIXELS: Long = MAX_PREVIEW_RASTER_BYTES / ARGB_BYTES_PER_PIXEL
+
+    /**
+     * Crop rendering can temporarily retain a decoded region and the final ARGB raster together.
+     * Keep that two-raster working set within 32 MiB; full-canvas outputs are composited in place.
+     */
+    const val MAX_EDITED_RENDER_WORKING_BYTES: Long = 32L * 1024 * 1024
+    const val MAX_EDITED_OUTPUT_PIXELS: Long =
+        MAX_EDITED_RENDER_WORKING_BYTES /
+                (MAX_SIMULTANEOUS_RENDER_RASTERS * ARGB_BYTES_PER_PIXEL)
+
+    /** Bounds both the encoder's accumulation buffer and the returned PNG before submission. */
+    const val MAX_ENCODED_OUTPUT_BYTES: Int = 16 * 1024 * 1024
+
+    /** Matches the upload limit enforced by VRCX for `/file/image` gallery uploads. */
+    const val MAX_GALLERY_ENCODED_OUTPUT_BYTES: Int = 10_000_000
 }
 
 sealed class PrintImageFailure(
@@ -117,6 +176,9 @@ sealed class PrintImageFailure(
 ) : Exception(message, cause) {
     data object FileTooLarge : PrintImageFailure("Selected image exceeds 50 MiB")
     data object ImageDimensionsTooLarge : PrintImageFailure("Selected image exceeds 100 megapixels")
+    data object EncodedOutputTooLarge : PrintImageFailure(
+        "Encoded image exceeds the safe output size",
+    )
     data object DesktopRegionDecodeUnavailable : PrintImageFailure(
         "Desktop cannot safely region-decode this large image format",
     )

@@ -2,14 +2,22 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsEn
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +62,193 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             LocaleStringsEn.avatarProfileActionSwitch,
             AvatarActionAvailability.Copyable.localizedButtonText(LocaleStringsEn),
         )
+    }
+
+    @Test
+    fun directEntryLoadsFavoritedStateWithoutVisitingFavoritesFirst() = runBlocking {
+        val favoriteSource = DirectEntryFavoriteSource(favoriteId = "avtr_saved")
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+    }
+
+    @Test
+    fun persistedFavoriteCacheShowsEntryStateWithoutRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = true)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun loadedFavoriteGroupsShowEntryStateWithoutRemoteLoading() = runBlocking {
+        val group = FavoriteGroupData(
+            id = "group_avatars1",
+            ownerId = "usr_owner",
+            type = FavoriteType.Avatar.value,
+            visibility = "private",
+            displayName = "Avatars 1",
+            name = "avatars1",
+            ownerDisplayName = "Owner",
+            tags = emptyList(),
+        )
+        val favoriteSource = LoadedGroupsFavoriteSource(
+            group = group,
+            favorite = FavoriteData(
+                favoriteId = "avtr_saved",
+                id = "fvrt_saved",
+                tags = listOf(group.name),
+                type = FavoriteType.Avatar.value,
+            ),
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun completeFavoriteCacheShowsNotFavoritedWithoutRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = false)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_missing", avatarName = "Missing"))
+        yield()
+
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun missingAvatarCacheFallsBackToRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = null)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+
+        assertEquals(1, favoriteSource.loadCount)
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+    }
+
+    @Test
+    fun cachedFavoriteStateReloadsWhenTheAccountSessionChanges() = runBlocking {
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = "usr_account_a"),
+                token = AccountSessionToken(userId = "usr_account_a", generation = 1),
+            )
+        )
+        val favoriteSource = SessionAwareCachedEntryFavoriteSource(
+            memberships = mapOf(
+                "usr_account_a" to true,
+                "usr_account_b" to false,
+            ),
+            session = session,
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+            favoriteSession = session,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = "usr_account_b"),
+            token = AccountSessionToken(userId = "usr_account_b", generation = 2),
+        )
+        yield()
+
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+        assertEquals(2, favoriteSource.cachedLookupCount)
+    }
+
+    @Test
+    fun failedFavoriteEntryLoadCanRetryWithoutLeavingTheProfile() = runBlocking {
+        val favoriteSource = DirectEntryFavoriteSource(
+            favoriteId = "avtr_saved",
+            failuresBeforeSuccess = 1,
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+        assertEquals(FavoriteEntryState.LoadFailed, model.favoriteEntryState.value)
+
+        model.retryFavoriteEntryLoad()
+        yield()
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+    }
+
+    @Test
+    fun blankAvatarIdMakesFavoriteEntryUnavailableWithoutLoading() = runBlocking {
+        val favoriteSource = CountingFavoriteEntrySource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "", avatarName = "Unavailable"))
+        yield()
+
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun pendingFavoriteLoadCannotReviveTheEntryAfterSwitchingToABlankAvatar() = runBlocking {
+        val pendingLoad = CompletableDeferred<Unit>()
+        val favoriteSource = DirectEntryFavoriteSource(
+            favoriteId = "avtr_saved",
+            pendingLoad = pendingLoad,
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+        assertEquals(FavoriteEntryState.Loading, model.favoriteEntryState.value)
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "", avatarName = "Unavailable"))
+        yield()
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
+
+        pendingLoad.complete(Unit)
+        yield()
+
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
     }
 
     @Test
@@ -327,7 +522,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         val loader = ControlledAvatarProfileLoader()
         val selector = FakeAvatarSelector()
         val editor = FakeAvatarEditor()
-        val model = avatarModel(loader, selector, editor)
+        val model = avatarModel(loader, selector, editor = editor)
         val notices = mutableListOf<AvatarProfileNotice>()
         val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
             model.notices.collect(notices::add)
@@ -402,10 +597,136 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     private fun avatarModel(
         loader: AvatarProfileLoader,
         selector: AvatarSelector = FakeAvatarSelector(),
+        favoriteSource: FavoriteEntrySource = EmptyFavoriteEntrySource(),
         editor: AvatarEditor? = null,
+        favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
     ): AvatarProfileScreenModel =
-        AvatarProfileScreenModel(loader, selector, Dispatchers.Unconfined, editor)
+        AvatarProfileScreenModel(
+            loader,
+            selector,
+            favoriteSource,
+            Dispatchers.Unconfined,
+            editor,
+            favoriteSession,
+        )
             .also(models::add)
+}
+
+private class EmptyFavoriteEntrySource : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
+}
+
+private class CountingFavoriteEntrySource : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
+}
+
+private class CachedEntryFavoriteSource(
+    private val cachedMembership: Boolean?,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean? = cachedMembership
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
+}
+
+private class SessionAwareCachedEntryFavoriteSource(
+    private val memberships: Map<String, Boolean>,
+    private val session: StateFlow<AuthenticatedAccount?>,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var cachedLookupCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean? {
+        cachedLookupCount++
+        return session.value?.token?.userId?.let(memberships::get)
+    }
+
+    override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
+}
+
+private class LoadedGroupsFavoriteSource(
+    group: FavoriteGroupData,
+    favorite: FavoriteData,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow(mapOf(group to listOf(favorite)))
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
+}
+
+private class DirectEntryFavoriteSource(
+    private val favoriteId: String,
+    private val failuresBeforeSuccess: Int = 0,
+    private val pendingLoad: CompletableDeferred<Unit>? = null,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    private var attempts = 0
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        pendingLoad?.await()
+        if (attempts++ < failuresBeforeSuccess) {
+            return Result.failure(IllegalStateException("favorite groups unavailable"))
+        }
+        val group = FavoriteGroupData(
+            id = "group_avatars1",
+            ownerId = "usr_owner",
+            type = type.value,
+            visibility = "private",
+            displayName = "Avatars 1",
+            name = "avatars1",
+            ownerDisplayName = "Owner",
+            tags = emptyList(),
+        )
+        favorites.value = mapOf(
+            group to listOf(
+                FavoriteData(
+                    favoriteId = favoriteId,
+                    id = "fvrt_saved",
+                    tags = listOf(group.name),
+                    type = type.value,
+                )
+            )
+        )
+        return Result.success(Unit)
+    }
 }
 
 private fun clearViewModel(viewModel: ViewModel) {

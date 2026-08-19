@@ -9,6 +9,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -73,6 +77,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
+                    single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
             )
         }
@@ -134,6 +139,15 @@ class PresentationModuleTest : MainDispatcherTest() {
         assertNotSame(first, second)
         application.close()
     }
+}
+
+private data object EmptyFavoriteEntrySource : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
 }
 
 private data object FakeMeetupCardRepository : MeetupCardRepository {
@@ -210,5 +224,5 @@ private data object FakePlatformImageCodec : PlatformImageCodec {
     override suspend fun renderCrop(bytes: ByteArray, request: CropRenderRequest): ImageBitmap =
         error("unused")
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray = error("unused")
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray = error("unused")
 }

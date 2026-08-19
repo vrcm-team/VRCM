@@ -32,6 +32,7 @@ fun OfficialUrlShareButton(
     val platform = getAppPlatform()
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val markClipboardInspected = LocalOfficialLinkInspectionMarker.current
     val usesSystemShare = platform.supportsSystemShare
     val actionDescription = if (usesSystemShare) strings.shareOfficialUrl else strings.copyOfficialUrl
     val copiedMessage = strings.officialUrlCopied
@@ -47,7 +48,9 @@ fun OfficialUrlShareButton(
             colors = colors,
             onClick = {
                 if (usesSystemShare) {
-                    if (!runCatching { platform.shareUrl(url) }.getOrDefault(false)) {
+                    if (runCatching { platform.shareUrl(url) }.getOrDefault(false)) {
+                        markClipboardInspected(url)
+                    } else {
                         scope.launch {
                             SharedFlowCentre.toastText.emit(ToastText.Error(failedMessage))
                         }
@@ -56,6 +59,9 @@ fun OfficialUrlShareButton(
                     val copied = runCatching {
                         clipboard.setText(AnnotatedString(url))
                     }.isSuccess
+                    if (copied) {
+                        markClipboardInspected(url)
+                    }
                     scope.launch {
                         SharedFlowCentre.toastText.emit(
                             if (copied) {

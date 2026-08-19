@@ -75,6 +75,7 @@ object DaoKeys{
         const val LAST_VRCHAT_STATUS_INDICATOR_KEY = "${PREFIX}.lastVrchatStatusIndicator"
         const val PRESENCE_FILTER_KEY = "${PREFIX}.friendPresenceFilter"
         const val BACKGROUND_FRIEND_MONITORING_ENABLED_KEY = "${PREFIX}.backgroundFriendMonitoringEnabled"
+        const val CLIPBOARD_READING_ENABLED_KEY = "${PREFIX}.clipboardReadingEnabled"
 
     }
 

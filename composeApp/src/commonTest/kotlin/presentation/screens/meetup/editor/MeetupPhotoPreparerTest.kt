@@ -98,7 +98,7 @@ class MeetupPhotoPreparerTest {
         override suspend fun renderCrop(bytes: ByteArray, request: CropRenderRequest): ImageBitmap =
             error("renderCrop must not be used by the meetup preparer")
 
-        override suspend fun encodePng(bitmap: ImageBitmap): ByteArray =
+        override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray =
             error("encodePng must not be used by the meetup preparer")
     }
 }

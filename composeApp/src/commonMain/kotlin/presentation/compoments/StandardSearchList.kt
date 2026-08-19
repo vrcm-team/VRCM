@@ -14,11 +14,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
@@ -31,6 +36,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import kotlinx.coroutines.launch
@@ -70,8 +76,11 @@ fun StandardSearchList(
     }
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
-    val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
+    var hiddenWorldToManage by remember { mutableStateOf<WorldData?>(null) }
+    var showHiddenWorldFavoriteSheet by remember { mutableStateOf(false) }
+    var hiddenAvatarToManage by remember { mutableStateOf<AvatarData?>(null) }
+    var showHiddenAvatarFavoriteSheet by remember { mutableStateOf(false) }
     val onUserClick: (IUser, String) -> Unit = { user, sharedSuffixKey ->
         // 处理用户点击，导航到用户资料页面
         coroutineScope.launch {
@@ -84,8 +93,13 @@ fun StandardSearchList(
     val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
     val onWorldClick: (WorldData, String) -> Unit = { world, sharedSuffixKey ->
         if (world.isHiddenWorld()) {
-            coroutineScope.launch {
-                SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+            if (world.favoriteId.isNullOrBlank()) {
+                coroutineScope.launch {
+                    SharedFlowCentre.toastText.emit(ToastText.Info(hiddenWorldCannotViewText))
+                }
+            } else {
+                hiddenWorldToManage = world
+                showHiddenWorldFavoriteSheet = true
             }
         } else {
             // 处理世界点击，导航到世界详情页面
@@ -101,9 +115,8 @@ fun StandardSearchList(
     val onAvatarClick: (AvatarData, String) -> Unit = { avatar, sharedSuffixKey ->
         // 处理模型点击，导航到模型详情页面
         if (avatar.releaseStatus == "hidden") {
-            coroutineScope.launch {
-                SharedFlowCentre.toastText.emit(ToastText.Info(hiddenModelCannotViewText))
-            }
+            hiddenAvatarToManage = avatar
+            showHiddenAvatarFavoriteSheet = true
         } else {
             coroutineScope.launch {
                 currentNavigator push AvatarProfileScreen(
@@ -188,5 +201,48 @@ fun StandardSearchList(
                 }
             }
         }
+    }
+
+    val worldToManage = hiddenWorldToManage
+    if (worldToManage != null) {
+        FavoriteGroupBottomSheet(
+            isVisible = showHiddenWorldFavoriteSheet,
+            favoriteId = worldToManage.id,
+            favoriteType = FavoriteType.World,
+            favoriteRecordId = worldToManage.favoriteId,
+            allowGroupChange = false,
+            onDismiss = {
+                showHiddenWorldFavoriteSheet = false
+                hiddenWorldToManage = null
+            },
+            onConfirm = { result ->
+                if (result.isSuccess) {
+                    coroutineScope.launch {
+                        doRefresh?.invoke()
+                    }
+                }
+            },
+        )
+    }
+
+    val avatarToManage = hiddenAvatarToManage
+    if (avatarToManage != null) {
+        FavoriteGroupBottomSheet(
+            isVisible = showHiddenAvatarFavoriteSheet,
+            favoriteId = avatarToManage.id,
+            favoriteType = FavoriteType.Avatar,
+            allowGroupChange = false,
+            onDismiss = {
+                showHiddenAvatarFavoriteSheet = false
+                hiddenAvatarToManage = null
+            },
+            onConfirm = { result ->
+                if (result.isSuccess) {
+                    coroutineScope.launch {
+                        doRefresh?.invoke()
+                    }
+                }
+            },
+        )
     }
 }

@@ -7,6 +7,8 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
@@ -27,7 +29,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTa
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.NetworkImageEditorSubmitter
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLimits
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
@@ -98,7 +102,7 @@ val presentationModule: Module = module {
         )
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get()) }
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -108,10 +112,18 @@ val presentationModule: Module = module {
         PrintImageEditorScreenModel(
             source = session.source,
             prepared = session.prepared,
+            croppedSource = session.croppedSource,
             calculator = get(),
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
+                    codec = get(),
+                    spec = session.target.canvasSpec,
+                    maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                    limitOutputToVisibleSource = true,
+                    shrinkOversizedOutput = true,
+                )
             },
             submitter = get(),
             target = session.target,
@@ -124,10 +136,11 @@ val presentationModule: Module = module {
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)
+    singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
-    viewModel { AvatarProfileScreenModel(get(), get(), avatarEditor = get()) }
+    viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()

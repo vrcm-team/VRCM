@@ -41,6 +41,49 @@ class UserProfileCachedPresenceTest {
         assertEquals("android", profile.lastPlatform)
     }
 
+    @Test
+    fun cachedRestoreKeepsLivePresenceWhenUserIsNotInFriendMap() {
+        // 自己的资料页在好友表里没有条目，缓存回填不能把页面上的实时状态压回离线。
+        val livePresence = UserProfileVo(
+            id = "usr_friend",
+            status = UserStatus.Active,
+            statusDescription = "Live status",
+            location = LocationType.Offline.value,
+        )
+
+        val profile = mergeCachedProfile(
+            cachedUser = onlineUser(),
+            livePresence = livePresence,
+            currentFriend = null,
+        )
+
+        assertEquals(UserStatus.Active, profile.status)
+        assertEquals("Live status", profile.statusDescription)
+        assertEquals(LocationType.Offline.value, profile.location)
+        // 静态资料仍然由缓存回填。
+        assertEquals("Bio", profile.bio)
+    }
+
+    @Test
+    fun cachedRestorePrefersFriendSnapshotOverNavigationPresence() {
+        val livePresence = UserProfileVo(
+            id = "usr_friend",
+            status = UserStatus.Active,
+            statusDescription = "Stale status",
+            location = LocationType.Offline.value,
+        )
+
+        val profile = mergeCachedProfile(
+            cachedUser = onlineUser(),
+            livePresence = livePresence,
+            currentFriend = friend(location = "wrld_current:2"),
+        )
+
+        assertEquals(UserStatus.JoinMe, profile.status)
+        assertEquals("Current status", profile.statusDescription)
+        assertEquals("wrld_current:2", profile.location)
+    }
+
     private fun onlineUser() = UserData(
         ageVerificationStatus = AgeVerificationStatus.Verified,
         allowAvatarCopying = true,

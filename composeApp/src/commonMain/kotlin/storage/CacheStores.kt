@@ -1,10 +1,28 @@
 package io.github.vrcmteam.vrcm.storage
 
+import io.github.vrcmteam.vrcm.storage.data.FavoriteListCache
+import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
 import io.github.vrcmteam.vrcm.storage.data.FriendNetworkCache
 import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** 收藏页列表缓存：按当前账号存取世界分组和模型列表。 */
+interface FavoriteListCacheStore {
+    suspend fun load(userId: String): FavoriteListCache?
+
+    suspend fun saveWorlds(userId: String, worlds: List<FavoritedWorldGroup>)
+
+    suspend fun saveAvatars(userId: String, avatars: List<AvatarData>)
+
+    suspend fun clear(userId: String)
+
+    suspend fun clearAll()
+}
 
 /** 资料页缓存：按“当前账号 × 被查看用户”存取。 */
 interface UserProfileCacheStore {
@@ -105,6 +123,60 @@ internal class RoomFriendListCacheStore(
     override suspend fun load(userId: String): FriendListCache? = cache.load(userId)
 
     override suspend fun save(userId: String, cache: FriendListCache) = this.cache.save(userId, cache)
+
+    override suspend fun clear(userId: String) = cache.delete(userId)
+
+    override suspend fun clearAll() = cache.clear()
+}
+
+internal class RoomFavoriteListCacheStore(
+    dao: CachedBlobDao,
+    nowMillis: () -> Long,
+    retained: Int = 8,
+) : FavoriteListCacheStore {
+    private val mutationMutex = Mutex()
+    private val cache = JsonBlobCache(
+        dao = dao,
+        scope = CacheScopes.FAVORITE_LIST,
+        serializer = FavoriteListCache.serializer(),
+        nowMillis = nowMillis,
+        retained = retained,
+        prune = { favoriteCache ->
+            favoriteCache.copy(
+                favoritedWorlds = favoriteCache.favoritedWorlds.map { group ->
+                    group.copy(worlds = group.worlds.map { it.prunedForCache() })
+                },
+            )
+        },
+    )
+
+    override suspend fun load(userId: String): FavoriteListCache? = cache.load(userId)
+
+    override suspend fun saveWorlds(userId: String, worlds: List<FavoritedWorldGroup>) {
+        mutationMutex.withLock {
+            val current = cache.load(userId) ?: FavoriteListCache()
+            cache.save(
+                userId,
+                current.copy(
+                    favoritedWorlds = worlds,
+                    worldsLoaded = true,
+                ),
+            )
+        }
+    }
+
+    override suspend fun saveAvatars(userId: String, avatars: List<AvatarData>) {
+        mutationMutex.withLock {
+            val current = cache.load(userId) ?: FavoriteListCache()
+            cache.save(
+                userId,
+                current.copy(
+                    favoritedAvatars = avatars,
+                    avatarsLoaded = true,
+                ),
+            )
+        }
+    }
 
     override suspend fun clear(userId: String) = cache.delete(userId)
 

@@ -122,14 +122,21 @@ class FileApi(private val client: HttpClient) {
         mimeType: String,
         tagType: FileTagType
     ): Result<FileData> {
+        val parameters = vrcxImageUploadParameters(tagType, fileName)
+        val uploadFileName = if (tagType == FileTagType.AvatarImage) fileName else "blob"
         return client.submitFormWithBinaryData(
             url = "${FILE_API_PREFIX}/image",
             formData = formData {
                 append("file", fileBytes, Headers.build {
                     append(HttpHeaders.ContentType, mimeType)
-                    append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                    append(HttpHeaders.ContentDisposition, "filename=\"$uploadFileName\"")
                 })
-                append("tag", tagType.value)
+                append("tag", parameters.tag)
+                parameters.animationStyle?.let { append("animationStyle", it) }
+                parameters.maskTag?.let { append("maskTag", it) }
+                parameters.frames?.let { append("frames", it.toString()) }
+                parameters.framesOverTime?.let { append("framesOverTime", it.toString()) }
+                parameters.loopStyle?.let { append("loopStyle", it) }
             }
         ).checkSuccessResult<FileData>()
     }
@@ -150,3 +157,78 @@ class FileApi(private val client: HttpClient) {
         client.delete("$FILE_API_PREFIX/$fileId").checkSuccess<Unit>()
     }
 }
+
+internal data class FileImageUploadParameters(
+    val tag: String,
+    val animationStyle: String? = null,
+    val maskTag: String? = null,
+    val frames: Int? = null,
+    val framesOverTime: Int? = null,
+    val loopStyle: String? = null,
+)
+
+internal fun vrcxImageUploadParameters(
+    tagType: FileTagType,
+    sourceFileName: String,
+): FileImageUploadParameters = when (tagType) {
+    FileTagType.Gallery,
+    FileTagType.Icon,
+    FileTagType.AvatarImage -> FileImageUploadParameters(tag = tagType.value)
+
+    FileTagType.Sticker -> FileImageUploadParameters(
+        tag = tagType.value,
+        maskTag = "square",
+    )
+
+    FileTagType.Emoji -> parseVrcxEmojiUploadParameters(sourceFileName)
+    FileTagType.Print -> error("Unsupported /file/image upload tag: $tagType")
+}
+
+private fun parseVrcxEmojiUploadParameters(fileName: String): FileImageUploadParameters {
+    var isAnimated = false
+    var animationStyle = "stop"
+    var frames = 4
+    var framesOverTime = 15
+    var loopStyle: String? = null
+
+    fileName.substringBeforeLast('.').split('_').forEach { token ->
+        when {
+            token.endsWith(ANIMATION_STYLE_SUFFIX) -> {
+                isAnimated = false
+                animationStyle = token.removeSuffix(ANIMATION_STYLE_SUFFIX).lowercase()
+            }
+            token.endsWith(FRAMES_SUFFIX) -> {
+                token.removeSuffix(FRAMES_SUFFIX).toIntOrNull()?.let { parsed ->
+                    if (parsed > 0) {
+                        isAnimated = true
+                        frames = parsed
+                    }
+                }
+            }
+            token.endsWith(FPS_SUFFIX) -> {
+                token.removeSuffix(FPS_SUFFIX).toIntOrNull()?.let { parsed ->
+                    if (parsed > 0) framesOverTime = parsed
+                }
+            }
+            token.endsWith(LOOP_STYLE_SUFFIX) -> {
+                if (token.removeSuffix(LOOP_STYLE_SUFFIX).isNotBlank()) {
+                    loopStyle = "pingpong"
+                }
+            }
+        }
+    }
+
+    return FileImageUploadParameters(
+        tag = if (isAnimated) "emojianimated" else FileTagType.Emoji.value,
+        animationStyle = animationStyle,
+        maskTag = "square",
+        frames = frames.takeIf { isAnimated },
+        framesOverTime = framesOverTime.takeIf { isAnimated },
+        loopStyle = loopStyle,
+    )
+}
+
+private const val ANIMATION_STYLE_SUFFIX = "animationStyle"
+private const val FRAMES_SUFFIX = "frames"
+private const val FPS_SUFFIX = "fps"
+private const val LOOP_STYLE_SUFFIX = "loopStyle"

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,15 +14,18 @@ data class PrintImageEditorSession(
     val source: SelectedImage,
     val prepared: PreparedImage,
     val target: ImageEditorTarget,
+    val croppedSource: PreparedImageSource? = null,
 )
 
 class PrintImageEditorSessionStore {
     private val sessions = mutableMapOf<String, PrintImageEditorSession>()
     private val completionChannel = Channel<Unit>(capacity = Channel.BUFFERED)
+    private val galleryCompletionChannel = Channel<FileTagType>(capacity = Channel.BUFFERED)
     private val _avatarCoverUpdates = MutableStateFlow<Map<String, AvatarData>>(emptyMap())
     private var nextSessionId = 0L
 
     val uploadCompletions: Flow<Unit> = completionChannel.receiveAsFlow()
+    val galleryUploadCompletions: Flow<FileTagType> = galleryCompletionChannel.receiveAsFlow()
     val avatarCoverUpdates: StateFlow<Map<String, AvatarData>> =
         _avatarCoverUpdates.asStateFlow()
 
@@ -29,9 +33,13 @@ class PrintImageEditorSessionStore {
         source: SelectedImage,
         prepared: PreparedImage,
         target: ImageEditorTarget = ImageEditorTarget.Print,
+        croppedSource: PreparedImageSource? = null,
     ): String {
+        require(croppedSource == null || target == ImageEditorTarget.Print) {
+            "Only Print editor sessions can provide a cropped source"
+        }
         val id = "image-editor-${nextSessionId++}"
-        sessions[id] = PrintImageEditorSession(source, prepared, target)
+        sessions[id] = PrintImageEditorSession(source, prepared, target, croppedSource)
         return id
     }
 
@@ -57,6 +65,12 @@ class PrintImageEditorSessionStore {
                     ?: error("Avatar cover result completed a non-avatar editor session")
                 check(target.avatarId == submission.avatar.id)
                 _avatarCoverUpdates.update { it + (submission.avatar.id to submission.avatar) }
+            }
+            is ImageEditorSubmission.Gallery -> {
+                val target = session.target as? ImageEditorTarget.Gallery
+                    ?: error("Gallery result completed a non-gallery editor session")
+                check(target.tagType == submission.tagType)
+                galleryCompletionChannel.trySend(submission.tagType)
             }
         }
     }

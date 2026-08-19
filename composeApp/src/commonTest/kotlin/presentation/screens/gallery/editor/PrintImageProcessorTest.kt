@@ -10,12 +10,15 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.toPixelMap
+import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -62,7 +65,7 @@ abstract class PrintImageProcessorContractTest {
             listOf(
                 DecodeRequest(
                     maxDimension = 2_048,
-                    maxPixels = PrintImageLimits.MAX_INTERMEDIATE_DECODE_PIXELS,
+                    maxPixels = PrintImageLimits.MAX_PREVIEW_PIXELS,
                 ),
             ),
             codec.decodeRequests,
@@ -104,6 +107,79 @@ abstract class PrintImageProcessorContractTest {
 
         assertSame(PreviewOwnershipTestBitmap, prepared.preview)
         assertEquals(emptyList(), released)
+    }
+
+    @Test
+    fun downloadedPrintBorderIsRemovedBeforeEditing() = runBlocking {
+        val source = SelectedImage("downloaded-print.png", byteArrayOf(1))
+        val croppedBytes = pngHeader(width = 1_920, height = 1_080)
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_048, 1_440),
+            encodedBytes = croppedBytes,
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            releaseBitmap = released::add,
+        )
+
+        val preparedSources = processor.preparePrint(source).getOrThrow()
+        val cropped = requireNotNull(preparedSources.cropped)
+
+        assertSame(source, preparedSources.original.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSources.original.prepared.preview)
+        assertEquals(ImageSize(2_048, 1_440), preparedSources.original.prepared.originalSize)
+        assertContentEquals(croppedBytes, cropped.source.bytes)
+        assertEquals(ImageSize(1_920, 1_080), cropped.prepared.originalSize)
+        assertEquals(ImageSize(1_920, 1_080), codec.encodedSize)
+        assertEquals(
+            PixelRect(left = 64, top = 69, right = 1_984, bottom = 1_149),
+            CropRenderPlanner().plan(codec.cropRequests.single()).visibleSourceBounds,
+        )
+        assertEquals(emptyList(), released)
+    }
+
+    @Test
+    fun nonPrintDimensionsEnterTheEditorUnchanged() = runBlocking {
+        val source = SelectedImage("regular-photo.png", byteArrayOf(1))
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_047, 1_440),
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+        )
+        val processor = DefaultPrintImageProcessor(codec = codec)
+
+        val preparedSources = processor.preparePrint(source).getOrThrow()
+
+        assertSame(source, preparedSources.original.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSources.original.prepared.preview)
+        assertEquals(ImageSize(2_047, 1_440), preparedSources.original.prepared.originalSize)
+        assertNull(preparedSources.cropped)
+        assertEquals(emptyList(), codec.cropRequests)
+        assertEquals(emptyList(), codec.encodeLimits)
+    }
+
+    @Test
+    fun downloadedPrintCropFailureReleasesDecodedPreview() = runBlocking {
+        val failure = PrintImageFailure.RenderFailed(IllegalStateException("crop"))
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            originalSize = ImageSize(2_048, 1_440),
+            allowDecode = true,
+            decodedBitmap = PreviewOwnershipTestBitmap,
+            renderFailure = failure,
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            releaseBitmap = released::add,
+        )
+
+        val result = processor.preparePrint(SelectedImage("downloaded-print.png", byteArrayOf(1)))
+
+        assertSame(failure, result.exceptionOrNull())
+        assertEquals(listOf<ImageBitmap>(PreviewOwnershipTestBitmap), released)
     }
 
     @Test
@@ -192,6 +268,235 @@ abstract class PrintImageProcessorContractTest {
             codec.cropRequests,
         )
         assertEquals(ImageSize(1_920, 1_080), codec.encodedSize)
+    }
+
+    @Test
+    fun galleryCanvasUsesTheConfirmedFourByThreeOutput() = runBlocking {
+        val originalSize = ImageSize(1_600, 900)
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = 2_000, height = 1_500),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = ImageEditorTarget.Gallery(FileTagType.Gallery).canvasSpec,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("gallery.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(
+                CropRenderRequest(
+                    originalSize = originalSize,
+                    transform = CropTransform(),
+                    outputSize = ImageSize(2_000, 1_500),
+                ),
+            ),
+            codec.cropRequests,
+        )
+        assertEquals(ImageSize(2_000, 1_500), codec.encodedSize)
+    }
+
+    @Test
+    fun squareGalleryCanvasUsesTheConfirmedSquareOutput() = runBlocking {
+        val originalSize = ImageSize(1_600, 900)
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = 2_000, height = 2_000),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = ImageEditorTarget.Gallery(FileTagType.Icon).canvasSpec,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("icon.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(
+                CropRenderRequest(
+                    originalSize = originalSize,
+                    transform = CropTransform(),
+                    outputSize = ImageSize(2_000, 2_000),
+                ),
+            ),
+            codec.cropRequests,
+        )
+        assertEquals(ImageSize(2_000, 2_000), codec.encodedSize)
+    }
+
+    @Test
+    fun fullCanvasRenderCompositesInPlaceWithoutASecondOutputBitmap() = runBlocking {
+        val originalSize = ImageSize(1_200, 800)
+        val released = mutableListOf<ImageBitmap>()
+        val codec = FakePlatformImageCodec(
+            encodedBytes = pngHeader(width = originalSize.width, height = originalSize.height),
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = PrintCanvasSpec(
+                canvasWidth = originalSize.width,
+                canvasHeight = originalSize.height,
+                contentWidth = originalSize.width,
+                contentHeight = originalSize.height,
+                contentOffsetX = 0,
+                contentOffsetY = 0,
+            ),
+            releaseBitmap = {
+                released += it
+                releasePlatformImageBitmap(it)
+            },
+        )
+
+        val result = processor.render(
+            source = SelectedImage("gallery.png", byteArrayOf(1)),
+            originalSize = originalSize,
+            transform = CropTransform(),
+            background = CanvasBackground.White,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(1, released.size)
+    }
+
+    @Test
+    fun galleryCategoriesUseTheConfirmedUploadCanvasesWithinTheRenderBudget() {
+        val expected = mapOf(
+            FileTagType.Gallery to ImageSize(2_000, 1_500),
+            FileTagType.Icon to ImageSize(2_000, 2_000),
+            FileTagType.Emoji to ImageSize(2_000, 2_000),
+            FileTagType.Sticker to ImageSize(2_000, 2_000),
+        )
+
+        expected.forEach { (tagType, size) ->
+            val spec = ImageEditorTarget.Gallery(tagType).canvasSpec
+            assertEquals(size, ImageSize(spec.canvasWidth, spec.canvasHeight), tagType.value)
+            assertTrue(
+                spec.canvasWidth.toLong() * spec.canvasHeight <=
+                        PrintImageLimits.MAX_EDITED_OUTPUT_PIXELS,
+                tagType.value,
+            )
+        }
+    }
+
+    @Test
+    fun vrcGalleryRenderingUsesTheVisibleSourceScaleOnlyOnce() = runBlocking {
+        data class Case(
+            val name: String,
+            val originalSize: ImageSize,
+            val transform: CropTransform,
+            val expectedOutput: ImageSize,
+        )
+
+        val cases = listOf(
+            Case(
+                name = "landscape fit",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(),
+                expectedOutput = ImageSize(1_600, 1_600),
+            ),
+            Case(
+                name = "landscape cover",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(zoom = 16f / 9f),
+                expectedOutput = ImageSize(900, 900),
+            ),
+            Case(
+                name = "landscape high zoom",
+                originalSize = ImageSize(1_600, 900),
+                transform = CropTransform(zoom = 3f),
+                expectedOutput = ImageSize(534, 534),
+            ),
+            Case(
+                name = "rotated portrait fit",
+                originalSize = ImageSize(900, 1_600),
+                transform = CropTransform(quarterTurns = 1),
+                expectedOutput = ImageSize(1_600, 1_600),
+            ),
+        )
+
+        cases.forEach { case ->
+            val codec = FakePlatformImageCodec(
+                encodedBytes = pngHeader(case.expectedOutput.width, case.expectedOutput.height),
+            )
+            val processor = DefaultPrintImageProcessor(
+                codec = codec,
+                spec = SquareCanvasSpec,
+                maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                limitOutputToVisibleSource = true,
+                shrinkOversizedOutput = true,
+            )
+
+            val result = processor.render(
+                source = SelectedImage("icon.png", byteArrayOf(1)),
+                originalSize = case.originalSize,
+                transform = case.transform,
+                background = CanvasBackground.Transparent,
+            )
+
+            assertTrue(result.isSuccess, "${case.name}: ${result.exceptionOrNull()?.stackTraceToString()}")
+            assertEquals(case.expectedOutput, codec.cropRequests.single().outputSize, case.name)
+        }
+    }
+
+    @Test
+    fun vrcGalleryRenderingShrinksByTwentyFivePixelsWhenPngIsTooLarge() = runBlocking {
+        var encodeAttempt = 0
+        val codec = FakePlatformImageCodec(
+            encode = { bitmap, _ ->
+                encodeAttempt++
+                if (encodeAttempt == 1) throw PrintImageFailure.EncodedOutputTooLarge
+                pngHeader(bitmap.width, bitmap.height)
+            },
+        )
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            spec = SquareCanvasSpec,
+            maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+            limitOutputToVisibleSource = true,
+            shrinkOversizedOutput = true,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("emoji.png", byteArrayOf(1)),
+            originalSize = ImageSize(3_000, 3_000),
+            transform = CropTransform(),
+            background = CanvasBackground.Transparent,
+        )
+
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
+        assertEquals(
+            listOf(ImageSize(2_000, 2_000), ImageSize(1_975, 1_975)),
+            codec.cropRequests.map(CropRenderRequest::outputSize),
+        )
+    }
+
+    @Test
+    fun encodedOutputOverTheBoundIsRejectedBeforeSubmission() = runBlocking {
+        val maxOutputBytes = 24
+        val codec = FakePlatformImageCodec(encodedBytes = ByteArray(maxOutputBytes + 1))
+        val processor = DefaultPrintImageProcessor(
+            codec = codec,
+            maxOutputBytes = maxOutputBytes,
+        )
+
+        val result = processor.render(
+            source = SelectedImage("photo.png", byteArrayOf(1)),
+            originalSize = ImageSize(1_920, 1_080),
+            transform = CropTransform(),
+        )
+
+        assertIs<PrintImageFailure.EncodedOutputTooLarge>(result.exceptionOrNull())
+        assertEquals(listOf(maxOutputBytes), codec.encodeLimits)
     }
 
     @Test
@@ -340,9 +645,11 @@ private class FakePlatformImageCodec(
     private val renderedBitmap: ImageBitmap? = null,
     private val renderColor: Color = Color.Red,
     private val encodeFailure: Throwable? = null,
+    private val encode: ((ImageBitmap, Int) -> ByteArray)? = null,
 ) : PlatformImageCodec {
     val decodeRequests = mutableListOf<DecodeRequest>()
     val cropRequests = mutableListOf<CropRenderRequest>()
+    val encodeLimits = mutableListOf<Int>()
     var encodedSize: ImageSize? = null
     var encodedPixels: PixelMap? = null
 
@@ -360,11 +667,12 @@ private class FakePlatformImageCodec(
             ?: solidBitmap(request.outputSize.width, request.outputSize.height, renderColor)
     }
 
-    override suspend fun encodePng(bitmap: ImageBitmap): ByteArray {
+    override suspend fun encodePng(bitmap: ImageBitmap, maxBytes: Int): ByteArray {
+        encodeLimits += maxBytes
         encodedSize = ImageSize(bitmap.width, bitmap.height)
         encodedPixels = bitmap.toPixelMap()
         encodeFailure?.let { throw it }
-        return encodedBytes
+        return encode?.invoke(bitmap, maxBytes) ?: encodedBytes
     }
 }
 

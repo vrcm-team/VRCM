@@ -7,8 +7,11 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @OptIn(ExperimentalTime::class)
 class PrintsApi(private val client: HttpClient) {
@@ -41,10 +44,10 @@ class PrintsApi(private val client: HttpClient) {
             formData = formData {
                 append("image", imageBytes, Headers.build {
                     append(HttpHeaders.ContentType, ContentType.Image.PNG.toString())
-                    append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                    append(HttpHeaders.ContentDisposition, "filename=\"image\"")
                 })
                 append("note", note)
-                append("timestamp", Clock.System.now().toString())
+                append("timestamp", vrcPrintTimestamp())
                 worldId?.let { append("worldId", it) }
                 worldName?.let { append("worldName", it) }
             }
@@ -68,3 +71,11 @@ class PrintsApi(private val client: HttpClient) {
         )
     }
 }
+
+@OptIn(ExperimentalTime::class)
+internal fun vrcPrintTimestamp(
+    instant: Instant = Clock.System.now(),
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
+): String = instant.toLocalDateTime(timeZone).toString().take(VRCX_TIMESTAMP_LENGTH)
+
+private const val VRCX_TIMESTAMP_LENGTH = 19

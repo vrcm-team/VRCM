@@ -149,13 +149,6 @@ private inline fun ColumnScope.CustomBlock() {
 }
 
 @Composable
-private fun ToggleSettingsRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-@Composable
 private fun AboutBlock(onDismissRequest: () -> Unit) {
     val versionService = koinInject<VersionService>()
     val imageLoader = koinInject<ImageLoader>()
@@ -191,30 +184,31 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
     }
     Column {
         val platform = koinInject<AppPlatform>()
-        // 通知相关的开关全部收进独立页面，设置面板里只留一个入口；不能投递通知的平台不显示。
-        if (platform.supportsFriendActivityNotifications) {
-            val navigator = LocalNavigator.currentOrThrow
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clickable {
-                        navigator push NotificationSettingsScreen
-                        // 设置面板是盖在内容之上的弹窗，不收起来会把刚推进去的页面挡住。
-                        onDismissRequest()
-                    }
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(text = "${strings.stettingMoreSettings}:")
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = strings.notificationSettingsTitle,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        val navigator = LocalNavigator.currentOrThrow
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    navigator push NotificationSettingsScreen
+                    // 设置面板是盖在内容之上的弹窗，不收起来会把刚推进去的页面挡住。
+                    onDismissRequest()
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "${strings.stettingMoreSettings}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = if (platform.supportsFriendActivityNotifications) {
+                    strings.notificationSettingsTitle
+                } else {
+                    strings.stettingClipboardReading
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         val diskCache = imageLoader.diskCache
         var size by remember(diskCache) { mutableStateOf(diskCache?.size ?: 0L) }
         var isClearingCache by remember { mutableStateOf(false) }

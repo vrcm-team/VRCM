@@ -52,11 +52,10 @@ fun LocationCard(
         tonalElevation = (-2).dp,
         shape = MaterialTheme.shapes.large
     ) {
-        Box(modifier = Modifier.animateContentSize()) {
+        Box {
             Column(
                 modifier = Modifier.padding(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
             Row(
                 modifier = Modifier
@@ -143,7 +142,13 @@ fun LocationCard(
                 }
             }
             AnimatedVisibility(isSelected) {
-                content(friendList)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                ) {
+                    content(friendList)
+                }
             }
             }
             if (isCurrentUserLocation) {

@@ -13,8 +13,10 @@ class GitHubApi(
     suspend fun latestRelease(releaseUrl: String): Result<ReleaseData> =
         runCatching {
             client.get(releaseUrl) {
-                githubAuthToken()?.let { token ->
-                    header(HttpHeaders.Authorization, "Bearer $token")
+                if (url.host == "api.github.com") {
+                    githubAuthToken()?.let { token ->
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                    }
                 }
             }.checkSuccess<ReleaseData>()
         }
