@@ -18,6 +18,7 @@ import io.ktor.client.request.header
 import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.Channel
@@ -32,34 +33,49 @@ internal suspend fun downloadAndInstallAppUpdate(
     tagName: String,
     downloadUrls: List<String>,
     onProgress: (Float?) -> Unit,
-): Result<Unit> = runCatching {
-    val source = downloadUrls.firstOrNull { it.endsWith(".apk", ignoreCase = true) }
-        ?: error("This release has no Android APK")
-    onProgress(null)
-    val fastestMirror = findFastestMirror(source) ?: error("No available APK download source")
-    val appContext = context.applicationContext
-    val fileName = "VRCM-${tagName.replace(Regex("[^A-Za-z0-9._-]"), "_")}.apk"
-    val downloadDirectory = requireNotNull(appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)) {
-        "External download directory is unavailable"
+): Result<Unit> {
+    var appContext: Context? = null
+    var manager: DownloadManager? = null
+    var downloadId: Long? = null
+    var target: File? = null
+    return try {
+        val source = downloadUrls.firstOrNull { it.endsWith(".apk", ignoreCase = true) }
+            ?: error("This release has no Android APK")
+        onProgress(null)
+        val fastestMirror = findFastestMirror(source) ?: error("No available APK download source")
+        appContext = context.applicationContext
+        val fileName = "VRCM-${tagName.replace(Regex("[^A-Za-z0-9._-]"), "_")}.apk"
+        val downloadDirectory = requireNotNull(appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)) {
+            "External download directory is unavailable"
+        }
+        target = File(downloadDirectory, fileName)
+        check(!target.exists() || target.delete()) { "Unable to replace the previous APK" }
+        val downloadManager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        manager = downloadManager
+        val request = DownloadManager.Request(Uri.parse(mirrorUrl(fastestMirror, source)))
+            .setTitle("VRCM $tagName")
+            .setMimeType(APK_MIME_TYPE)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(false)
+            .setDestinationInExternalFilesDir(appContext, Environment.DIRECTORY_DOWNLOADS, fileName)
+        val id = downloadManager.enqueue(request)
+        downloadId = id
+        appContext.getSharedPreferences(UPDATE_PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(DOWNLOAD_ID, id)
+            .putString(DOWNLOAD_FILE, target.path)
+            .apply()
+        awaitDownload(downloadManager, id, onProgress)
+        verifyApk(appContext, target)
+        openInstaller(appContext, target)
+        Result.success(Unit)
+    } catch (cause: CancellationException) {
+        cleanupDownload(appContext, manager, downloadId, target, cause)
+        throw cause
+    } catch (cause: Throwable) {
+        cleanupDownload(appContext, manager, downloadId, target, cause)
+        Result.failure(cause)
     }
-    val target = File(downloadDirectory, fileName)
-    check(!target.exists() || target.delete()) { "Unable to replace the previous APK" }
-    val manager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-    val request = DownloadManager.Request(Uri.parse(mirrorUrl(fastestMirror, source)))
-        .setTitle("VRCM $tagName")
-        .setMimeType(APK_MIME_TYPE)
-        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setAllowedOverMetered(true)
-        .setAllowedOverRoaming(false)
-        .setDestinationInExternalFilesDir(appContext, Environment.DIRECTORY_DOWNLOADS, fileName)
-    val downloadId = manager.enqueue(request)
-    appContext.getSharedPreferences(UPDATE_PREFS, Context.MODE_PRIVATE).edit()
-        .putLong(DOWNLOAD_ID, downloadId)
-        .putString(DOWNLOAD_FILE, target.path)
-        .apply()
-    awaitDownload(manager, downloadId, onProgress)
-    verifyApk(appContext, target)
-    openInstaller(appContext, target)
 }
 
 private suspend fun findFastestMirror(source: String): String? {
@@ -76,11 +92,16 @@ private suspend fun findFastestMirror(source: String): String? {
             val winners = Channel<String>(Channel.UNLIMITED)
             downloadMirrors.forEach { prefix ->
                 launch(Dispatchers.IO) {
-                    runCatching {
+                    val response = try {
                         client.head(mirrorUrl(prefix, source)) {
                             header(HttpHeaders.UserAgent, "VRCM/${AppConst.APP_VERSION}")
                         }
-                    }.getOrNull()?.takeIf { it.status.isSuccess() }?.let { winners.send(prefix) }
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    response?.takeIf { it.status.isSuccess() }?.let { winners.send(prefix) }
                 }
             }
             val winner = withTimeoutOrNull(8_000) { winners.receive() }
@@ -98,23 +119,49 @@ private suspend fun awaitDownload(
     downloadId: Long,
     onProgress: (Float?) -> Unit,
 ) {
-    while (true) {
-        val state = withContext(Dispatchers.IO) {
-            manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
-                check(cursor.moveToFirst()) { "Download task disappeared" }
-                Triple(
-                    cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
-                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
-                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
-                )
+    withTimeoutOrNull(DOWNLOAD_TIMEOUT_MILLIS) {
+        while (true) {
+            val state = withContext(Dispatchers.IO) {
+                manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
+                    check(cursor.moveToFirst()) { "Download task disappeared" }
+                    Triple(
+                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
+                        cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                        cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
+                    )
+                }
             }
+            onProgress(if (state.third > 0) (state.second.toFloat() / state.third).coerceIn(0f, 1f) else null)
+            when (state.first) {
+                DownloadManager.STATUS_SUCCESSFUL -> return@withTimeoutOrNull
+                DownloadManager.STATUS_FAILED -> error("APK download failed")
+                DownloadManager.STATUS_PENDING,
+                DownloadManager.STATUS_PAUSED,
+                DownloadManager.STATUS_RUNNING,
+                -> Unit
+                else -> error("APK download entered an unexpected state: ${state.first}")
+            }
+            delay(DOWNLOAD_POLL_INTERVAL_MILLIS)
         }
-        onProgress(if (state.third > 0) (state.second.toFloat() / state.third).coerceIn(0f, 1f) else null)
-        when (state.first) {
-            DownloadManager.STATUS_SUCCESSFUL -> return
-            DownloadManager.STATUS_FAILED -> error("APK download failed")
-        }
-        delay(500)
+    } ?: error("APK download timed out")
+}
+
+private fun cleanupDownload(
+    context: Context?,
+    manager: DownloadManager?,
+    downloadId: Long?,
+    target: File?,
+    cause: Throwable,
+) {
+    try {
+        if (downloadId != null) manager?.remove(downloadId)
+        target?.delete()
+        context?.getSharedPreferences(UPDATE_PREFS, Context.MODE_PRIVATE)?.edit()
+            ?.remove(DOWNLOAD_ID)
+            ?.remove(DOWNLOAD_FILE)
+            ?.apply()
+    } catch (cleanupFailure: Throwable) {
+        cause.addSuppressed(cleanupFailure)
     }
 }
 
@@ -182,3 +229,5 @@ private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 private const val UPDATE_PREFS = "vrcm_update"
 private const val DOWNLOAD_ID = "download_id"
 private const val DOWNLOAD_FILE = "download_file"
+private const val DOWNLOAD_POLL_INTERVAL_MILLIS = 500L
+private const val DOWNLOAD_TIMEOUT_MILLIS = 15 * 60 * 1000L
