@@ -76,10 +76,11 @@ fun StandardSearchList(
     }
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
-    val hiddenModelCannotViewText = strings.hiddenModelCannotView
     val retryLoadMore = onRetryLoadMore
     var hiddenWorldToManage by remember { mutableStateOf<WorldData?>(null) }
     var showHiddenWorldFavoriteSheet by remember { mutableStateOf(false) }
+    var hiddenAvatarToManage by remember { mutableStateOf<AvatarData?>(null) }
+    var showHiddenAvatarFavoriteSheet by remember { mutableStateOf(false) }
     val onUserClick: (IUser, String) -> Unit = { user, sharedSuffixKey ->
         // 处理用户点击，导航到用户资料页面
         coroutineScope.launch {
@@ -114,9 +115,8 @@ fun StandardSearchList(
     val onAvatarClick: (AvatarData, String) -> Unit = { avatar, sharedSuffixKey ->
         // 处理模型点击，导航到模型详情页面
         if (avatar.releaseStatus == "hidden") {
-            coroutineScope.launch {
-                SharedFlowCentre.toastText.emit(ToastText.Info(hiddenModelCannotViewText))
-            }
+            hiddenAvatarToManage = avatar
+            showHiddenAvatarFavoriteSheet = true
         } else {
             coroutineScope.launch {
                 currentNavigator push AvatarProfileScreen(
@@ -214,6 +214,27 @@ fun StandardSearchList(
             onDismiss = {
                 showHiddenWorldFavoriteSheet = false
                 hiddenWorldToManage = null
+            },
+            onConfirm = { result ->
+                if (result.isSuccess) {
+                    coroutineScope.launch {
+                        doRefresh?.invoke()
+                    }
+                }
+            },
+        )
+    }
+
+    val avatarToManage = hiddenAvatarToManage
+    if (avatarToManage != null) {
+        FavoriteGroupBottomSheet(
+            isVisible = showHiddenAvatarFavoriteSheet,
+            favoriteId = avatarToManage.id,
+            favoriteType = FavoriteType.Avatar,
+            allowGroupChange = false,
+            onDismiss = {
+                showHiddenAvatarFavoriteSheet = false
+                hiddenAvatarToManage = null
             },
             onConfirm = { result ->
                 if (result.isSuccess) {
