@@ -72,9 +72,9 @@ import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
 /**
- * 通知设置详情页。
+ * 更多设置详情页。
  *
- * 设置面板里只留一个入口，具体开关都收在这里；页面本身只在能真正投递通知的平台可达。
+ * Android 在这里显示通知设置，其余平台只显示可用的跨平台设置。
  */
 @Serializable
 object NotificationSettingsScreen : AppDetailRoute {
@@ -84,14 +84,23 @@ object NotificationSettingsScreen : AppDetailRoute {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val platform = koinInject<AppPlatform>()
-        val favoriteService = koinInject<FavoriteService>()
-        val friendService = koinInject<FriendService>()
+        val supportsNotifications = platform.supportsFriendActivityNotifications
+        val favoriteService = if (supportsNotifications) koinInject<FavoriteService>() else null
+        val friendService = if (supportsNotifications) koinInject<FriendService>() else null
         var currentSettings by LocalSettingsState.current
         var showFriendOverrides by remember { mutableStateOf(false) }
 
-        LaunchedEffect(Unit) { favoriteService.loadFavoriteByGroup(FavoriteType.Friend) }
-        val favoriteGroups by favoriteService.favoritesByGroup(FavoriteType.Friend).collectAsState()
-        val friends by friendService.friendState.collectAsState()
+        LaunchedEffect(favoriteService) { favoriteService?.loadFavoriteByGroup(FavoriteType.Friend) }
+        val favoriteGroups = if (favoriteService != null) {
+            favoriteService.favoritesByGroup(FavoriteType.Friend).collectAsState().value
+        } else {
+            emptyMap()
+        }
+        val friends = if (friendService != null) {
+            friendService.friendState.collectAsState().value
+        } else {
+            emptyMap()
+        }
         val favoriteUserIds = remember(favoriteGroups) {
             favoriteGroups.values.flatten().map { it.favoriteId }.distinct()
         }
@@ -103,7 +112,7 @@ object NotificationSettingsScreen : AppDetailRoute {
             }
         }
 
-        if (showFriendOverrides) {
+        if (supportsNotifications && showFriendOverrides) {
             FriendOverridesBottomSheet(
                 friends = friendOverrideItems,
                 overrides = currentSettings.friendPresenceFilter.userOverrides,
@@ -123,7 +132,7 @@ object NotificationSettingsScreen : AppDetailRoute {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(strings.notificationSettingsTitle) },
+                    title = { Text(strings.stettingMoreSettings) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(
@@ -141,6 +150,18 @@ object NotificationSettingsScreen : AppDetailRoute {
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (!supportsNotifications) {
+                    item {
+                        SettingsSwitchRow(
+                            title = strings.stettingClipboardReading,
+                            description = null,
+                            checked = currentSettings.clipboardReadingEnabled,
+                        ) { enabled ->
+                            currentSettings = currentSettings.copy(clipboardReadingEnabled = enabled)
+                        }
+                    }
+                    return@LazyColumn
+                }
                 item {
                     SectionTitle(strings.notificationSectionFriendPresence)
                 }
@@ -272,6 +293,16 @@ object NotificationSettingsScreen : AppDetailRoute {
                 if (platform.supportsBackgroundFriendMonitoring) {
                     item { HorizontalDivider() }
                     item { BackgroundMonitoringSection(platform) }
+                }
+                item { HorizontalDivider() }
+                item {
+                    SettingsSwitchRow(
+                        title = strings.stettingClipboardReading,
+                        description = null,
+                        checked = currentSettings.clipboardReadingEnabled,
+                    ) { enabled ->
+                        currentSettings = currentSettings.copy(clipboardReadingEnabled = enabled)
+                    }
                 }
             }
         }

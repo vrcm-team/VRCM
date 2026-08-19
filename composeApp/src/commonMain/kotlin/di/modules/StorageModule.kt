@@ -6,8 +6,10 @@ import io.github.vrcmteam.vrcm.storage.AccountDao
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.DaoKeys
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
+import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.FriendActivityCacheStore
 import io.github.vrcmteam.vrcm.storage.RoomFriendActivityStore
+import io.github.vrcmteam.vrcm.storage.RoomFavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.SettingsDao
 import io.github.vrcmteam.vrcm.storage.SecureStorage
 import io.github.vrcmteam.vrcm.storage.FriendListCacheStore
@@ -67,11 +69,12 @@ internal val storageModule: Module = module {
     single { get<io.github.vrcmteam.vrcm.storage.VrcmDatabase>().friendActivityDao() }
     single { get<io.github.vrcmteam.vrcm.storage.VrcmDatabase>().cachedBlobDao() }
     single<UserProfileCacheStore> { RoomUserProfileCacheStore(get(), appClock) }
+    single<FavoriteListCacheStore> { RoomFavoriteListCacheStore(get(), appClock) }
     single<FriendListCacheStore> { RoomFriendListCacheStore(get(), appClock) }
     single<FriendNetworkCacheStore> { RoomFriendNetworkCacheStore(get(), appClock) }
     single<WorldProfileCacheStore> { RoomWorldProfileCacheStore(get(), appClock) }
     single<GroupProfileCacheStore> { RoomGroupProfileCacheStore(get(), appClock) }
     singleOf(::RoomFriendActivityStore) bind FriendActivityCacheStore::class
-    single { AccountCacheManager(get(), get(), get(), get(), get()).also { purgeLegacySettingsCaches() } }
+    single { AccountCacheManager(get(), get(), get(), get(), get(), get()).also { purgeLegacySettingsCaches() } }
     singleOf(::PersistentCookiesStorage) bind CookiesStorage::class
 }

@@ -14,6 +14,7 @@ data class PrintImageEditorSession(
     val source: SelectedImage,
     val prepared: PreparedImage,
     val target: ImageEditorTarget,
+    val croppedSource: PreparedImageSource? = null,
 )
 
 class PrintImageEditorSessionStore {
@@ -32,9 +33,13 @@ class PrintImageEditorSessionStore {
         source: SelectedImage,
         prepared: PreparedImage,
         target: ImageEditorTarget = ImageEditorTarget.Print,
+        croppedSource: PreparedImageSource? = null,
     ): String {
+        require(croppedSource == null || target == ImageEditorTarget.Print) {
+            "Only Print editor sessions can provide a cropped source"
+        }
         val id = "image-editor-${nextSessionId++}"
-        sessions[id] = PrintImageEditorSession(source, prepared, target)
+        sessions[id] = PrintImageEditorSession(source, prepared, target, croppedSource)
         return id
     }
 

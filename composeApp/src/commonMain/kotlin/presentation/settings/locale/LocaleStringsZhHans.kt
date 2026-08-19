@@ -38,6 +38,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val stettingLightThemeMode = "明亮主题"
     override val stettingDarkThemeMode = "深色主题"
     override val stettingThemeColor = "主题颜色"
+    override val stettingClipboardReading = "读取剪贴板"
     override val stettingLogout = "登出"
     override val stettingAbout = "关于APP"
     override val stettingVersion = "版本"
@@ -225,6 +226,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val galleryTabDeleting = "正在删除..."
     override val galleryTabDeleteSuccess = "删除成功"
     override val galleryTabDeleteFailed = "删除失败"
+    override val galleryTabCropPrintBorder = "裁剪拍立得白边"
     // Print image editor
     override val printEditorTitle = "编辑拍立得"
     override val printEditorBack = "返回"

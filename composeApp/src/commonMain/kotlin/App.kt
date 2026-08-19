@@ -130,15 +130,16 @@ fun App(
                                 .padding(vertical = 76.dp, horizontal = 12.dp)
                         ) {
                             VersionDialog()
-                            OfficialLinkPrompt(navigator, activeOfficialLinkInbox)
-                            NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
-                            SharedTransitionScreen(
-                                navigator = navigator,
-                                transitionSpec = { selectTransition(isPop = false) },
-                                popTransitionSpec = { selectTransition(isPop = true) },
-                            ) { screen ->
-                                SharedTransitionDialog(key = screen.key) {
-                                    screen.Content()
+                            OfficialLinkPrompt(navigator, activeOfficialLinkInbox) {
+                                NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
+                                SharedTransitionScreen(
+                                    navigator = navigator,
+                                    transitionSpec = { selectTransition(isPop = false) },
+                                    popTransitionSpec = { selectTransition(isPop = true) },
+                                ) { screen ->
+                                    SharedTransitionDialog(key = screen.key) {
+                                        screen.Content()
+                                    }
                                 }
                             }
                         }

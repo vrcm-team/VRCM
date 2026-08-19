@@ -19,11 +19,16 @@ class PrintImageEditorSessionStoreTest {
         val store = PrintImageEditorSessionStore()
         val source = SelectedImage("source.jpg", byteArrayOf(1, 2, 3))
         val prepared = PreparedImage(SessionTestImageBitmap, ImageSize(16, 9))
+        val croppedSource = PreparedImageSource(
+            source.copy(bytes = byteArrayOf(4, 5, 6)),
+            PreparedImage(CroppedSessionTestImageBitmap, ImageSize(12, 9)),
+        )
 
-        val id = store.create(source, prepared)
+        val id = store.create(source, prepared, croppedSource = croppedSource)
 
         assertEquals(source, store.get(id)?.source)
         assertEquals(prepared, store.get(id)?.prepared)
+        assertEquals(croppedSource, store.get(id)?.croppedSource)
         store.discard(id)
         assertNull(store.get(id))
     }
@@ -85,6 +90,26 @@ class PrintImageEditorSessionStoreTest {
 
 private data object SessionTestImageBitmap : ImageBitmap {
     override val width: Int = 16
+    override val height: Int = 9
+    override val colorSpace: ColorSpace = ColorSpaces.Srgb
+    override val hasAlpha: Boolean = true
+    override val config: ImageBitmapConfig = ImageBitmapConfig.Argb8888
+
+    override fun readPixels(
+        buffer: IntArray,
+        startX: Int,
+        startY: Int,
+        width: Int,
+        height: Int,
+        bufferOffset: Int,
+        stride: Int,
+    ) = error("Session store tests do not read preview pixels")
+
+    override fun prepareToDraw() = Unit
+}
+
+private data object CroppedSessionTestImageBitmap : ImageBitmap {
+    override val width: Int = 12
     override val height: Int = 9
     override val colorSpace: ColorSpace = ColorSpaces.Srgb
     override val hasAlpha: Boolean = true

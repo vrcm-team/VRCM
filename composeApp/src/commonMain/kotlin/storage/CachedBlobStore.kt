@@ -111,6 +111,7 @@ internal class JsonBlobCache<T>(
 
 internal object CacheScopes {
     const val USER_PROFILE = "user_profile"
+    const val FAVORITE_LIST = "favorite_list"
     const val FRIEND_LIST = "friend_list"
     const val FRIEND_NETWORK = "friend_network"
     const val WORLD_PROFILE = "world_profile"

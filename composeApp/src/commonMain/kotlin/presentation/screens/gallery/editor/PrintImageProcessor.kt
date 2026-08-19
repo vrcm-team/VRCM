@@ -9,10 +9,20 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CancellationException
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 interface PrintImageProcessor {
     suspend fun prepare(source: SelectedImage): Result<PreparedImage>
+
+    /** Prepares the original Print and, when recognized, a border-cropped editing source. */
+    suspend fun preparePrint(source: SelectedImage): Result<PreparedPrintImageSources> =
+        prepare(source).map {
+            PreparedPrintImageSources(
+                original = PreparedImageSource(source, it),
+                cropped = null,
+            )
+        }
 
     suspend fun render(
         source: SelectedImage,
@@ -33,25 +43,113 @@ class DefaultPrintImageProcessor(
     private val cropRenderPlanner: CropRenderPlanner = CropRenderPlanner(),
     private val releaseBitmap: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : PrintImageProcessor {
-    override suspend fun prepare(source: SelectedImage): Result<PreparedImage> = try {
-        validateSource(source)
-        val decoded = decodePreview(source.bytes)
-        val prepared = handoffOwnedBitmap(decoded.bitmap) {
-            validateDimensions(decoded.originalSize)
-            PreparedImage(
-                preview = decoded.bitmap,
-                originalSize = decoded.originalSize,
+    override suspend fun prepare(source: SelectedImage): Result<PreparedImage> =
+        prepareOriginalSource(source).map(PreparedImageSource::prepared)
+
+    override suspend fun preparePrint(source: SelectedImage): Result<PreparedPrintImageSources> {
+        val original = prepareOriginalSource(source).getOrElse { failure ->
+            if (failure is CancellationException) throw failure
+            return Result.failure(failure)
+        }
+        if (original.prepared.originalSize != DownloadedPrintCanvasSize) {
+            return Result.success(
+                PreparedPrintImageSources(
+                    original = original,
+                    cropped = null,
+                ),
             )
         }
-        Result.success(
-            prepared,
-        )
+
+        return try {
+            Result.success(
+                PreparedPrintImageSources(
+                    original = original,
+                    cropped = cropDownloadedPrint(source, original.prepared.originalSize),
+                ),
+            )
+        } catch (cause: CancellationException) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            throw cause
+        } catch (failure: PrintImageFailure) {
+            releaseAfterFailure(original.prepared.preview, failure)
+            Result.failure(failure)
+        } catch (cause: Exception) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            Result.failure(PrintImageFailure.DecodeFailed(cause))
+        } catch (cause: Error) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            throw cause
+        }
+    }
+
+    private suspend fun prepareOriginalSource(
+        source: SelectedImage,
+    ): Result<PreparedImageSource> = try {
+        validateSource(source)
+        val decoded = decodePreview(source.bytes)
+        try {
+            validateDimensions(decoded.originalSize)
+        } catch (cause: CancellationException) {
+            releaseAfterFailure(decoded.bitmap, cause)
+            throw cause
+        } catch (cause: Exception) {
+            releaseAfterFailure(decoded.bitmap, cause)
+            throw cause
+        } catch (cause: Error) {
+            releaseAfterFailure(decoded.bitmap, cause)
+            throw cause
+        }
+
+        val preparedSource = handoffOwnedBitmap(decoded.bitmap) {
+            PreparedImageSource(
+                source = source,
+                prepared = PreparedImage(
+                    preview = decoded.bitmap,
+                    originalSize = decoded.originalSize,
+                ),
+            )
+        }
+        Result.success(preparedSource)
     } catch (cause: CancellationException) {
         throw cause
     } catch (failure: PrintImageFailure) {
         Result.failure(failure)
     } catch (cause: Exception) {
         Result.failure(PrintImageFailure.DecodeFailed(cause))
+    }
+
+    private suspend fun cropDownloadedPrint(
+        source: SelectedImage,
+        originalSize: ImageSize,
+    ): PreparedImageSource {
+        val cropped = renderCrop(
+            bytes = source.bytes,
+            originalSize = originalSize,
+            transform = DownloadedPrintCanvasSpec.cropToContentTransform(),
+            renderSpec = DownloadedPrintCanvasSpec,
+        )
+        return handoffOwnedBitmap(cropped) {
+            val contentSize = DownloadedPrintCanvasSpec.contentSize
+            if (ImageSize(cropped.width, cropped.height) != contentSize) {
+                throw PrintImageFailure.RenderFailed(
+                    IllegalStateException(
+                        "Downloaded Print crop returned ${cropped.width}x${cropped.height}; " +
+                                "expected ${contentSize.width}x${contentSize.height}",
+                    ),
+                )
+            }
+            val croppedBytes = encodePng(cropped)
+            if (!hasExpectedPngHeader(croppedBytes, contentSize.width, contentSize.height)) {
+                throw PrintImageFailure.EncodeFailed()
+            }
+            PreparedImageSource(
+                source = source.copy(bytes = croppedBytes),
+                prepared = PreparedImage(
+                    preview = cropped,
+                    originalSize = contentSize,
+                ),
+            )
+        }
     }
 
     override suspend fun render(
@@ -412,4 +510,30 @@ class DefaultPrintImageProcessor(
         )
         val IHDR = byteArrayOf(0x49, 0x48, 0x44, 0x52)
     }
+}
+
+private val DownloadedPrintCanvasSpec = PrintCanvasSpec()
+private val DownloadedPrintCanvasSize = ImageSize(
+    width = DownloadedPrintCanvasSpec.canvasWidth,
+    height = DownloadedPrintCanvasSpec.canvasHeight,
+)
+
+private val PrintCanvasSpec.contentSize: ImageSize
+    get() = ImageSize(contentWidth, contentHeight)
+
+private fun PrintCanvasSpec.cropToContentTransform(): CropTransform {
+    // Map the known inner photo rectangle onto the crop output without duplicating its offsets.
+    val fitScale = min(
+        contentWidth.toFloat() / canvasWidth,
+        contentHeight.toFloat() / canvasHeight,
+    )
+    val sourceCenterX = canvasWidth / 2f
+    val sourceCenterY = canvasHeight / 2f
+    val contentCenterX = contentOffsetX + contentWidth / 2f
+    val contentCenterY = contentOffsetY + contentHeight / 2f
+    return CropTransform(
+        centerOffsetX = (sourceCenterX - contentCenterX) / contentWidth,
+        centerOffsetY = (sourceCenterY - contentCenterY) / contentHeight,
+        zoom = 1f / fitScale,
+    )
 }

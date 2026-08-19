@@ -13,8 +13,16 @@ data class UserProfileCache(
     val groups: List<LimitedUserGroup> = emptyList(),
     val mutualGroups: List<LimitedUserGroup> = emptyList(),
     val createdWorlds: List<WorldData> = emptyList(),
+    val createdWorldDetailRevisions: Map<String, WorldDetailRevision> = emptyMap(),
     val createdAvatars: List<AvatarData> = emptyList(),
     val favoritedWorlds: List<FavoritedWorldGroup> = emptyList(),
+)
+
+/** List-summary revision captured after the corresponding cached details were refreshed. */
+@Serializable
+data class WorldDetailRevision(
+    val updatedAt: String?,
+    val version: Int?,
 )
 
 @Serializable

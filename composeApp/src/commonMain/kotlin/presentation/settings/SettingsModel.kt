@@ -48,6 +48,7 @@ class SettingsModel(
                 vrchatStatusNotificationsEnabled = it.vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = it.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = it.backgroundFriendMonitoringEnabled,
+                clipboardReadingEnabled = it.clipboardReadingEnabled,
             )
         }
     }
@@ -70,6 +71,7 @@ class SettingsModel(
                 vrchatStatusNotificationsEnabled = settings.vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = settings.friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = settings.backgroundFriendMonitoringEnabled,
+                clipboardReadingEnabled = settings.clipboardReadingEnabled,
             )
         }
 }

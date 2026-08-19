@@ -48,6 +48,51 @@ class UserProfileFavoriteWorldMergeTest {
         assertTrue(merged.single().worlds.isEmpty())
     }
 
+    @Test
+    fun selfProfileRefreshKeepsTheLocalWorldGroupFromTheSharedCache() {
+        val local = group(
+            "__local_world__",
+            "Local",
+            world("wrld_local", favoriteId = "local|world|wrld_local"),
+        )
+
+        val merged = mergeFavoritedWorldGroups(
+            cachedGroups = listOf(
+                group("worlds1", "Group one", world("wrld_old")),
+                local,
+            ),
+            loads = listOf(
+                load("worlds1", "Group one", Result.success(listOf(world("wrld_new")))),
+            ),
+        )
+
+        assertEquals(listOf("worlds1", "__local_world__"), merged.map { it.groupKey })
+        assertEquals("wrld_local", merged.last().worlds.single().id)
+    }
+
+    @Test
+    fun failedSelfMigrationKeepsLegacyFavoriteWorldsForTheNextSave() {
+        val legacy = listOf(group("worlds1", "Group one", world("wrld_old")))
+
+        assertEquals(
+            legacy,
+            profileFavoritedWorldsForCache(
+                userId = "usr_owner",
+                cacheOwnerUserId = "usr_owner",
+                migrationSucceeded = false,
+                favoritedWorldGroups = legacy,
+            ),
+        )
+        assertTrue(
+            profileFavoritedWorldsForCache(
+                userId = "usr_owner",
+                cacheOwnerUserId = "usr_owner",
+                migrationSucceeded = true,
+                favoritedWorldGroups = legacy,
+            ).isEmpty(),
+        )
+    }
+
     private fun load(
         groupKey: String,
         displayName: String,
@@ -57,10 +102,10 @@ class UserProfileFavoriteWorldMergeTest {
     private fun group(groupKey: String, name: String, vararg worlds: FavoritedWorld) =
         FavoritedWorldGroup(name = name, worlds = worlds.toList(), groupKey = groupKey)
 
-    private fun world(id: String) = FavoritedWorld(
+    private fun world(id: String, favoriteId: String = "fvrt_$id") = FavoritedWorld(
         id = id,
         name = id,
-        favoriteId = "fvrt_$id",
+        favoriteId = favoriteId,
         favoriteGroup = "worlds1",
     )
 }

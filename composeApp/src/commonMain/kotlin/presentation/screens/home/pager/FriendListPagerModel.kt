@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
@@ -26,6 +27,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
+import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
+import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
+import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -65,6 +70,8 @@ class FriendListPagerModel(
     private val favoriteService: FavoriteService,
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
+    private val favoriteListCacheStore: FavoriteListCacheStore,
+    private val accountCacheManager: AccountCacheManager,
 ) : ViewModel() {
 
     // 当前选中的标签页索引
@@ -177,23 +184,68 @@ class FriendListPagerModel(
                     }
 
                     World -> {
+                        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return@launch
+                        restoreFavoriteListCache(World, sessionToken)
+                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
                         // 加载收藏组信息，用于分组过滤
                         favoriteService.loadFavoriteByGroup(World)
+                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
                         // 直接从API获取收藏世界列表
-                        doRefreshWorldList()
+                        doRefreshWorldList(sessionToken)
                     }
 
                     Avatar -> {
+                        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return@launch
+                        restoreFavoriteListCache(Avatar, sessionToken)
+                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
                         favoriteService.loadFavoriteByGroup(Avatar)
-                        doRefreshAvatarList()
+                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
+                        doRefreshAvatarList(sessionToken)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
             } finally {
                 _isRefreshing.value = false
             }
         }
+
+    private suspend fun restoreFavoriteListCache(
+        favoriteType: FavoriteType,
+        sessionToken: AccountSessionToken,
+    ) {
+        val cached = try {
+            favoriteListCacheStore.load(sessionToken.userId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            SharedFlowCentre.toastText.emit(ToastText.Error("读取收藏缓存失败: ${error.message}"))
+            null
+        } ?: return
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return
+
+        when (favoriteType) {
+            World -> {
+                replaceFavoritedWorldCache(
+                    cache = favoritedWorldMap,
+                    worlds = cached.favoritedWorlds.flatMap { it.worlds },
+                )
+                _worldTotal.value = favoritedWorldMap.size
+                findWorldList(_searchText.value)
+            }
+
+            Avatar -> {
+                favoritedAvatarMap.clear()
+                favoritedAvatarMap.putAll(cached.favoritedAvatars.associateBy { it.id })
+                _avatarTotal.value = favoritedAvatarMap.size
+                findAvatarList(_searchText.value)
+            }
+
+            Friend -> Unit
+        }
+    }
 
     private suspend fun doRefreshFriendList() {
         friendService.refreshFriendList()
@@ -455,7 +507,8 @@ class FriendListPagerModel(
     /**
      * 刷新收藏的模型列表
      */
-    private suspend fun doRefreshAvatarList() {
+    private suspend fun doRefreshAvatarList(sessionToken: AccountSessionToken) {
+        val cacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId)
         authService.reTryAuthCatching {
             // /avatars/favorites 默认只返回默认收藏组，必须按组 tag 分别请求。
             val remoteTags = remoteAvatarFavoriteTags(avatarFavoriteGroupsFlow.value).let { tags ->
@@ -471,11 +524,14 @@ class FriendListPagerModel(
             }
             mergeFavoritedAvatars(remoteAvatars, localAvatars)
         }.onSuccess { avatars ->
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@onSuccess
             favoritedAvatarMap.clear()
             favoritedAvatarMap.putAll(avatars.associateBy { it.id })
             _avatarTotal.value = favoritedAvatarMap.size
             findAvatarList(_searchText.value)
+            persistFavoritedAvatars(cacheWriteToken, avatars)
         }.onFailure {
+            if (it is CancellationException) throw it
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
         }
     }
@@ -500,7 +556,8 @@ class FriendListPagerModel(
      * 刷新收藏的世界列表
      * 使用流式分页API获取全部收藏世界列表
      */
-    private suspend fun doRefreshWorldList() {
+    private suspend fun doRefreshWorldList(sessionToken: AccountSessionToken) {
+        val cacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId)
         try {
             val localEntry = worldFavoriteGroupsFlow.value.entries.firstOrNull { (group, _) ->
                 group.ownerId == "local" && group.type == World.value
@@ -518,16 +575,45 @@ class FriendListPagerModel(
                 .toList()
                 .flatten()
 
-            replaceFavoritedWorldCache(
-                cache = favoritedWorldMap,
-                worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds),
-            )
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return
+            val worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds)
+            replaceFavoritedWorldCache(cache = favoritedWorldMap, worlds = worlds)
             _worldTotal.value = favoritedWorldMap.size
             findWorldList(_searchText.value)
+            persistFavoritedWorlds(
+                cacheWriteToken,
+                groupFavoritedWorlds(worlds, worldFavoriteGroupsFlow.value),
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+        }
+    }
+
+    private suspend fun persistFavoritedWorlds(
+        token: AccountCacheWriteToken,
+        worlds: List<FavoritedWorldGroup>,
+    ) {
+        try {
+            accountCacheManager.saveFavoriteWorldsIfCurrent(token, worlds)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            SharedFlowCentre.toastText.emit(ToastText.Error("保存收藏世界缓存失败: ${error.message}"))
+        }
+    }
+
+    private suspend fun persistFavoritedAvatars(
+        token: AccountCacheWriteToken,
+        avatars: List<AvatarData>,
+    ) {
+        try {
+            accountCacheManager.saveFavoriteAvatarsIfCurrent(token, avatars)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            SharedFlowCentre.toastText.emit(ToastText.Error("保存收藏模型缓存失败: ${error.message}"))
         }
     }
 }
@@ -644,6 +730,32 @@ internal fun mergeFavoritedWorlds(
     remoteWorlds: List<FavoritedWorld>,
     localWorlds: List<FavoritedWorld>,
 ): List<FavoritedWorld> = (remoteWorlds + localWorlds).distinctBy(::favoritedWorldCacheKey)
+
+internal fun groupFavoritedWorlds(
+    worlds: List<FavoritedWorld>,
+    favoriteGroups: Map<FavoriteGroupData, List<FavoriteData>>,
+): List<FavoritedWorldGroup> {
+    val worldsByGroup = worlds.groupBy { it.favoriteGroup }
+    val groups = favoriteGroups.keys
+        .filter { it.type == World.value }
+        .distinctBy { it.name }
+    val knownGroupKeys = groups.mapTo(mutableSetOf()) { it.name }
+    return groups.map { group ->
+        FavoritedWorldGroup(
+            name = group.displayName,
+            worlds = worldsByGroup[group.name].orEmpty(),
+            groupKey = group.name,
+        )
+    } + worldsByGroup
+        .filterKeys { it !in knownGroupKeys }
+        .map { (groupKey, groupedWorlds) ->
+            FavoritedWorldGroup(
+                name = groupKey,
+                worlds = groupedWorlds,
+                groupKey = groupKey,
+            )
+        }
+}
 
 internal fun replaceFavoritedWorldCache(
     cache: MutableMap<String, FavoritedWorld>,

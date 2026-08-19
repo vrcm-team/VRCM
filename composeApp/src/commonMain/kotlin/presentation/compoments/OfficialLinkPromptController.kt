@@ -68,6 +68,11 @@ internal class OfficialLinkPromptController<T>(
         }
     }
 
+    fun markClipboardInspected(value: String) {
+        val target = parseOfficialId(value) ?: parseOfficialLink(value) ?: return
+        markInspected(target.key())
+    }
+
     fun inspectClipboard(value: String) {
         if (!isAuthenticated) return
         val target = parseOfficialId(value) ?: parseOfficialLink(value) ?: return
