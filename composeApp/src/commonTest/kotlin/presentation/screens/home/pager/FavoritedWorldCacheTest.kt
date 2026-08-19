@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -51,10 +53,39 @@ class FavoritedWorldCacheTest {
         )
     }
 
+    @Test
+    fun sharedCacheKeepsGroupNamesAndSuccessfulEmptyGroups() {
+        val groups: Map<FavoriteGroupData, List<FavoriteData>> = linkedMapOf(
+            group("worlds1", "First group") to emptyList(),
+            group("worlds2", "Second group") to emptyList(),
+        )
+        val worlds = listOf(
+            world(id = "wrld_one", favoriteId = "fvrt_one", group = "worlds1"),
+        )
+
+        val cachedGroups = groupFavoritedWorlds(worlds, groups)
+
+        assertEquals(listOf("worlds1", "worlds2"), cachedGroups.map { it.groupKey })
+        assertEquals(listOf("First group", "Second group"), cachedGroups.map { it.name })
+        assertEquals(listOf("wrld_one"), cachedGroups.first().worlds.map { it.id })
+        assertEquals(emptyList(), cachedGroups.last().worlds)
+    }
+
     private fun world(id: String, favoriteId: String, group: String) = FavoritedWorld(
         id = id,
         name = id,
         favoriteId = favoriteId,
         favoriteGroup = group,
+    )
+
+    private fun group(name: String, displayName: String) = FavoriteGroupData(
+        id = "group-$name",
+        ownerId = "usr_owner",
+        type = "world",
+        visibility = "private",
+        displayName = displayName,
+        name = name,
+        ownerDisplayName = "Owner",
+        tags = emptyList(),
     )
 }

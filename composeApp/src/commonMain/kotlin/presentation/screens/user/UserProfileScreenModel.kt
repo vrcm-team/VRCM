@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.pretty
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -40,12 +41,15 @@ import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
+import io.github.vrcmteam.vrcm.storage.AccountCacheManager
+import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
@@ -204,19 +208,29 @@ internal data class FavoritedWorldGroupLoad(
 internal fun mergeFavoritedWorldGroups(
     cachedGroups: List<FavoritedWorldGroup>,
     loads: List<FavoritedWorldGroupLoad>,
-): List<FavoritedWorldGroup> = loads.mapNotNull { load ->
-    if (load.result.isSuccess) {
-        FavoritedWorldGroup(
-            name = load.displayName,
-            worlds = load.result.getOrThrow(),
-            groupKey = load.groupKey,
-        )
-    } else {
-        cachedGroups.firstOrNull { cached ->
-            cached.groupKey == load.groupKey || cached.name == load.displayName
-        }?.copy(name = load.displayName, groupKey = load.groupKey)
+): List<FavoritedWorldGroup> {
+    val remoteGroups = loads.mapNotNull { load ->
+        if (load.result.isSuccess) {
+            FavoritedWorldGroup(
+                name = load.displayName,
+                worlds = load.result.getOrThrow(),
+                groupKey = load.groupKey,
+            )
+        } else {
+            cachedGroups.firstOrNull { cached ->
+                cached.groupKey == load.groupKey || cached.name == load.displayName
+            }?.copy(name = load.displayName, groupKey = load.groupKey)
+        }
     }
+    val loadedKeys = loads.mapTo(mutableSetOf()) { it.groupKey }
+    val localGroups = cachedGroups.filter { cached ->
+        cached.groupKey !in loadedKeys && cached.isLocalWorldGroup()
+    }
+    return remoteGroups + localGroups
 }
+
+private fun FavoritedWorldGroup.isLocalWorldGroup(): Boolean =
+    groupKey == "__local_world__" || worlds.any { it.favoriteId.startsWith("local|world|") }
 
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
@@ -232,12 +246,16 @@ class UserProfileScreenModel(
     private val favoriteApi: FavoriteApi,
     private val inviteApi: InviteApi,
     private val userProfileCacheStore: UserProfileCacheStore,
+    private val favoriteListCacheStore: FavoriteListCacheStore,
+    private val accountCacheManager: AccountCacheManager,
     private val friendLocationPagerModel: FriendLocationPagerModel,
     friendActivityService: FriendActivityService,
     private val boopService: BoopService,
 ) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
+    private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
+    private val favoriteCacheWriteToken = accountCacheManager.captureWriteToken(cacheOwnerUserId)
     private val _userState = mutableStateOf(userProfileVO.withSelfIdentity())
     val userState by _userState
 
@@ -286,6 +304,7 @@ class UserProfileScreenModel(
 
     private val loadCoordinator = UserProfileLoadCoordinator()
     private val cacheMutex = Mutex()
+    private val cacheRestoreCompleted = CompletableDeferred<Unit>()
     private var cachedUserData: UserData? = null
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
@@ -318,8 +337,15 @@ class UserProfileScreenModel(
         viewModelScope.launch {
             // Room 读取是挂起的，缓存会比首帧稍晚一点到；只回填静态资料，
             // 在线状态一律沿用内存里的实时来源，不被上次运行的历史值压回离线。
-            userProfileCacheStore.load(cacheOwnerUserId, userProfileVO.id)
-                ?.let(::restoreCachedProfile)
+            try {
+                val profileCache = userProfileCacheStore.load(cacheOwnerUserId, userProfileVO.id)
+                profileCache?.let(::restoreCachedProfile)
+                if (userProfileVO.id == cacheOwnerUserId) {
+                    restoreSelfFavoriteWorldCache(profileCache)
+                }
+            } finally {
+                cacheRestoreCompleted.complete(Unit)
+            }
         }
         if (userProfileVO.id == cacheOwnerUserId) {
             viewModelScope.launch {
@@ -366,6 +392,34 @@ class UserProfileScreenModel(
         setFavoritedWorldGroups(cache.favoritedWorlds)
     }
 
+    private suspend fun restoreSelfFavoriteWorldCache(profileCache: UserProfileCache?) {
+        if (!isProfileSessionCurrent()) return
+        val sharedCache = try {
+            favoriteListCacheStore.load(cacheOwnerUserId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            handleError(error)
+            return
+        }
+        if (!isProfileSessionCurrent()) return
+
+        if (sharedCache != null) {
+            setFavoritedWorldGroups(sharedCache.favoritedWorlds)
+        } else {
+            val legacyWorlds = profileCache?.favoritedWorlds.orEmpty()
+            if (legacyWorlds.isNotEmpty()) {
+                accountCacheManager.saveFavoriteWorldsIfCurrent(
+                    favoriteCacheWriteToken,
+                    legacyWorlds,
+                )
+            }
+        }
+    }
+
+    private fun isProfileSessionCurrent(): Boolean =
+        profileSessionToken?.let(SharedFlowCentre::isCurrentSession) == true
+
     private suspend fun saveCache(user: UserData? = null) {
         cacheMutex.withLock {
             user?.let { cachedUserData = it }
@@ -379,7 +433,11 @@ class UserProfileScreenModel(
                     mutualGroups = _mutualGroups.value,
                     createdWorlds = _createdWorlds.value,
                     createdAvatars = _createdAvatars.value,
-                    favoritedWorlds = favoritedWorldGroups,
+                    favoritedWorlds = if (cachedUser.id == cacheOwnerUserId) {
+                        emptyList()
+                    } else {
+                        favoritedWorldGroups
+                    },
                 ),
             )
         }
@@ -653,6 +711,7 @@ class UserProfileScreenModel(
         _isLoadingFavoritedWorlds.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                cacheRestoreCompleted.await()
                 val groups = authService.reTryAuthCatching {
                     favoriteApi.getFavoriteGroupsByType(
                         favoriteType = FavoriteType.World,
@@ -660,7 +719,6 @@ class UserProfileScreenModel(
                         n = 100
                     )
                 }.getOrNull() ?: run {
-                    _isLoadingFavoritedWorlds.value = false
                     return@launch
                 }
 
@@ -685,9 +743,20 @@ class UserProfileScreenModel(
                     loads = deferreds.map { it.await() },
                 )
                 setFavoritedWorldGroups(mergedGroups)
+                if (userId == cacheOwnerUserId && isProfileSessionCurrent()) {
+                    accountCacheManager.saveFavoriteWorldsIfCurrent(
+                        favoriteCacheWriteToken,
+                        mergedGroups,
+                    )
+                }
                 saveCache()
-            } catch (_: Exception) {}
-            _isLoadingFavoritedWorlds.value = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                handleError(error)
+            } finally {
+                _isLoadingFavoritedWorlds.value = false
+            }
         }
     }
 
