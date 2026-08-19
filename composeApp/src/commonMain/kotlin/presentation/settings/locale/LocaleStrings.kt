@@ -49,6 +49,7 @@ sealed class LocaleStrings {
     open val stettingLightThemeMode: String = "Light"
     open val stettingDarkThemeMode: String = "Dark"
     open val stettingThemeColor: String = "ThemeColor"
+    open val stettingClipboardReading: String = "Read clipboard"
     open val stettingLogout: String = "Logout"
     open val stettingAbout: String = "About Application"
     open val stettingVersion: String = "Version"

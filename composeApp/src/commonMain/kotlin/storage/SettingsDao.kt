@@ -25,6 +25,7 @@ class SettingsDao(
                 vrchatStatusNotificationsEnabled = vrchatStatusNotificationsEnabled,
                 friendPresenceFilter = friendPresenceFilter,
                 backgroundFriendMonitoringEnabled = backgroundFriendMonitoringEnabled,
+                clipboardReadingEnabled = clipboardReadingEnabled,
             )
         }
         set(value) {
@@ -47,6 +48,7 @@ class SettingsDao(
             vrchatStatusNotificationsEnabled = value.vrchatStatusNotificationsEnabled
             friendPresenceFilter = value.friendPresenceFilter
             backgroundFriendMonitoringEnabled = value.backgroundFriendMonitoringEnabled
+            clipboardReadingEnabled = value.clipboardReadingEnabled
         }
 
     var rememberVersion: String?
@@ -108,4 +110,8 @@ class SettingsDao(
     var backgroundFriendMonitoringEnabled: Boolean
         get() = settingsSettings.getBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, false)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, value)
+
+    var clipboardReadingEnabled: Boolean
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, true)
+        set(value) = settingsSettings.putBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, value)
 }

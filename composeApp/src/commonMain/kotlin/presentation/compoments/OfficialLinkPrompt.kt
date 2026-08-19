@@ -42,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.OfficialLinkContent
 import io.github.vrcmteam.vrcm.service.OfficialLinkInbox
@@ -69,6 +70,7 @@ internal fun OfficialLinkPrompt(
     val controller = rememberOfficialLinkPromptController(service, navigator, inbox)
     val markClipboardInspected = remember(controller) { controller::markClipboardInspected }
     val promptState by controller.state.collectAsState()
+    val clipboardReadingEnabled = LocalSettingsState.current.value.clipboardReadingEnabled
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         foregroundGeneration++
@@ -83,12 +85,14 @@ internal fun OfficialLinkPrompt(
         foregroundGeneration,
         isAuthenticated,
         incomingRequest?.id,
+        clipboardReadingEnabled,
     ) {
         if (
             !clipboardInspectionGate.shouldInspect(
                 foregroundGeneration = foregroundGeneration,
                 isAuthenticated = isAuthenticated,
                 hasExternalRequest = incomingRequest != null,
+                clipboardReadingEnabled = clipboardReadingEnabled,
             )
         ) {
             return@LaunchedEffect
@@ -129,12 +133,17 @@ internal fun OfficialLinkPrompt(
 /** Prevents an external link and a clipboard link from being handled in the same foreground event. */
 internal class OfficialLinkClipboardInspectionGate {
     private var handledForegroundGeneration = 0
+    private var wasClipboardReadingEnabled = false
 
     fun shouldInspect(
         foregroundGeneration: Int,
         isAuthenticated: Boolean,
         hasExternalRequest: Boolean,
+        clipboardReadingEnabled: Boolean,
     ): Boolean {
+        val wasJustEnabled = clipboardReadingEnabled && !wasClipboardReadingEnabled
+        wasClipboardReadingEnabled = clipboardReadingEnabled
+        if (!clipboardReadingEnabled) return false
         if (hasExternalRequest) {
             handledForegroundGeneration = foregroundGeneration
             return false
@@ -142,7 +151,7 @@ internal class OfficialLinkClipboardInspectionGate {
         if (
             foregroundGeneration == 0 ||
             !isAuthenticated ||
-            handledForegroundGeneration == foregroundGeneration
+            (!wasJustEnabled && handledForegroundGeneration == foregroundGeneration)
         ) {
             return false
         }

@@ -50,6 +50,7 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 1,
                 isAuthenticated = true,
                 hasExternalRequest = true,
+                clipboardReadingEnabled = true,
             ),
         )
         assertFalse(
@@ -57,6 +58,7 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 1,
                 isAuthenticated = true,
                 hasExternalRequest = false,
+                clipboardReadingEnabled = true,
             ),
         )
         assertTrue(
@@ -64,6 +66,7 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 2,
                 isAuthenticated = true,
                 hasExternalRequest = false,
+                clipboardReadingEnabled = true,
             ),
         )
     }
@@ -77,6 +80,7 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 1,
                 isAuthenticated = false,
                 hasExternalRequest = false,
+                clipboardReadingEnabled = true,
             ),
         )
         assertTrue(
@@ -84,6 +88,7 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 1,
                 isAuthenticated = true,
                 hasExternalRequest = false,
+                clipboardReadingEnabled = true,
             ),
         )
         assertFalse(
@@ -91,6 +96,45 @@ class OfficialLinkPromptControllerTest {
                 foregroundGeneration = 1,
                 isAuthenticated = true,
                 hasExternalRequest = false,
+                clipboardReadingEnabled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun enablingClipboardReadingInspectsImmediatelyAndCanBeRepeatedInOneForeground() {
+        val gate = OfficialLinkClipboardInspectionGate()
+
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+                clipboardReadingEnabled = false,
+            ),
+        )
+        assertTrue(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+                clipboardReadingEnabled = true,
+            ),
+        )
+        assertFalse(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+                clipboardReadingEnabled = false,
+            ),
+        )
+        assertTrue(
+            gate.shouldInspect(
+                foregroundGeneration = 1,
+                isAuthenticated = true,
+                hasExternalRequest = false,
+                clipboardReadingEnabled = true,
             ),
         )
     }

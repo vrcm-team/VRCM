@@ -38,6 +38,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val stettingLightThemeMode = "明亮主題"
     override val stettingDarkThemeMode = "深色主題"
     override val stettingThemeColor = "主題顏色"
+    override val stettingClipboardReading = "讀取剪貼簿"
     override val stettingLogout = "登出"
     override val stettingAbout = "關於應用程序"
     override val stettingVersion = "版本"
