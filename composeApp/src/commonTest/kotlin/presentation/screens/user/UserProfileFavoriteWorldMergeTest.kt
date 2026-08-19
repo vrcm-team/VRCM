@@ -70,6 +70,29 @@ class UserProfileFavoriteWorldMergeTest {
         assertEquals("wrld_local", merged.last().worlds.single().id)
     }
 
+    @Test
+    fun failedSelfMigrationKeepsLegacyFavoriteWorldsForTheNextSave() {
+        val legacy = listOf(group("worlds1", "Group one", world("wrld_old")))
+
+        assertEquals(
+            legacy,
+            profileFavoritedWorldsForCache(
+                userId = "usr_owner",
+                cacheOwnerUserId = "usr_owner",
+                migrationSucceeded = false,
+                favoritedWorldGroups = legacy,
+            ),
+        )
+        assertTrue(
+            profileFavoritedWorldsForCache(
+                userId = "usr_owner",
+                cacheOwnerUserId = "usr_owner",
+                migrationSucceeded = true,
+                favoritedWorldGroups = legacy,
+            ).isEmpty(),
+        )
+    }
+
     private fun load(
         groupKey: String,
         displayName: String,
