@@ -225,6 +225,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val galleryTabDeleting = "削除中..."
     override val galleryTabDeleteSuccess = "削除しました"
     override val galleryTabDeleteFailed = "削除に失敗しました"
+    override val galleryTabCropPrintBorder = "プリントの外枠をトリミング"
     // Print image editor
     override val printEditorTitle = "プリントを編集"
     override val printEditorBack = "戻る"

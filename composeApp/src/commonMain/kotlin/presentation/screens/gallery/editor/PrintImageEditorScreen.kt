@@ -213,6 +213,7 @@ class PrintImageEditorScreen(
                 onFlipHorizontal = screenModel::flipHorizontal,
                 onFlipVertical = screenModel::flipVertical,
                 onReset = screenModel::reset,
+                onCropDownloadedPrintBorderChange = screenModel::setCropDownloadedPrintBorder,
                 onFillWhiteBorderChange = screenModel::setFillWhiteBorder,
                 locale = locale,
                 uploadingText = uploadingText,
@@ -242,6 +243,7 @@ private fun PrintEditorContent(
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
     onReset: (ImageSize) -> Unit,
+    onCropDownloadedPrintBorderChange: (Boolean, ImageSize) -> Unit,
     onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
     uploadingText: String,
@@ -278,6 +280,7 @@ private fun PrintEditorContent(
             onFlipHorizontal = onFlipHorizontal,
             onFlipVertical = onFlipVertical,
             onReset = onReset,
+            onCropDownloadedPrintBorderChange = onCropDownloadedPrintBorderChange,
             onFillWhiteBorderChange = onFillWhiteBorderChange,
             locale = locale,
             fitModeLabel = fitModeLabel,
@@ -415,6 +418,7 @@ private fun PrintEditorControls(
     onFlipHorizontal: () -> Unit,
     onFlipVertical: () -> Unit,
     onReset: (ImageSize) -> Unit,
+    onCropDownloadedPrintBorderChange: (Boolean, ImageSize) -> Unit,
     onFillWhiteBorderChange: (Boolean, ImageSize) -> Unit,
     locale: LocaleStrings,
     fitModeLabel: String,
@@ -485,6 +489,29 @@ private fun PrintEditorControls(
                     onCheckedChange = { onFillWhiteBorderChange(it, viewport) },
                     enabled = !state.isBusy && viewport.isValid(),
                 )
+            }
+
+            if (state.canCropDownloadedPrintBorder) {
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = 720.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = locale.galleryTabCropPrintBorder,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = state.cropDownloadedPrintBorder,
+                        onCheckedChange = {
+                            onCropDownloadedPrintBorderChange(it, viewport)
+                        },
+                        enabled = !state.isBusy && viewport.isValid(),
+                    )
+                }
             }
 
             FlowRow(

@@ -8,42 +8,78 @@ internal fun handoffPreparedImageToEditor(
     prepared: PreparedImage,
     sessionStore: PrintImageEditorSessionStore,
     target: ImageEditorTarget = ImageEditorTarget.Print,
+    croppedSource: PreparedImageSource? = null,
     releasePreview: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
     push: (String) -> Unit,
 ) {
     var sessionId: String? = null
     try {
-        val createdSessionId = sessionStore.create(source, prepared, target)
+        val createdSessionId = sessionStore.create(
+            source = source,
+            prepared = prepared,
+            target = target,
+            croppedSource = croppedSource,
+        )
         sessionId = createdSessionId
         push(createdSessionId)
     } catch (cause: CancellationException) {
-        releaseFailedNavigationPreview(prepared, sessionId, sessionStore, cause, releasePreview)
+        releaseFailedNavigationPreviews(
+            prepared,
+            croppedSource,
+            sessionId,
+            sessionStore,
+            cause,
+            releasePreview,
+        )
         throw cause
     } catch (cause: Exception) {
-        releaseFailedNavigationPreview(prepared, sessionId, sessionStore, cause, releasePreview)
+        releaseFailedNavigationPreviews(
+            prepared,
+            croppedSource,
+            sessionId,
+            sessionStore,
+            cause,
+            releasePreview,
+        )
         throw cause
     } catch (cause: Error) {
-        releaseFailedNavigationPreview(prepared, sessionId, sessionStore, cause, releasePreview)
+        releaseFailedNavigationPreviews(
+            prepared,
+            croppedSource,
+            sessionId,
+            sessionStore,
+            cause,
+            releasePreview,
+        )
         throw cause
     }
 }
 
-private fun releaseFailedNavigationPreview(
+private fun releaseFailedNavigationPreviews(
     prepared: PreparedImage,
+    croppedSource: PreparedImageSource?,
     sessionId: String?,
     sessionStore: PrintImageEditorSessionStore,
     primaryFailure: Throwable,
     releasePreview: (ImageBitmap) -> Unit,
 ) {
     sessionId?.let(sessionStore::discard)
-    try {
-        releasePreview(prepared.preview)
-    } catch (releaseFailure: CancellationException) {
-        primaryFailure.addNavigationReleaseFailure(releaseFailure)
-    } catch (releaseFailure: Exception) {
-        primaryFailure.addNavigationReleaseFailure(releaseFailure)
-    } catch (releaseFailure: Error) {
-        primaryFailure.addNavigationReleaseFailure(releaseFailure)
+    val previews = buildList {
+        add(prepared.preview)
+        croppedSource?.prepared?.preview
+            ?.takeIf { it !== prepared.preview }
+            ?.let(::add)
+    }
+    previews.forEach { preview ->
+        try {
+            releasePreview(preview)
+        } catch (releaseFailure: CancellationException) {
+            primaryFailure.addNavigationReleaseFailure(releaseFailure)
+        } catch (releaseFailure: Exception) {
+            primaryFailure.addNavigationReleaseFailure(releaseFailure)
+        } catch (releaseFailure: Error) {
+            primaryFailure.addNavigationReleaseFailure(releaseFailure)
+        }
     }
 }
 

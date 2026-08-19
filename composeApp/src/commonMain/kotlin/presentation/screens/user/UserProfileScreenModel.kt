@@ -46,6 +46,7 @@ import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
+import io.github.vrcmteam.vrcm.storage.data.WorldDetailRevision
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.CancellationException
@@ -245,6 +246,75 @@ internal fun profileFavoritedWorldsForCache(
         favoritedWorldGroups
     }
 
+internal data class CreatedWorldRefreshPlan(
+    val worlds: List<WorldData>,
+    val worldIdsToRefresh: List<String>,
+    val detailRevisions: Map<String, WorldDetailRevision>,
+    val summaryRevisions: Map<String, WorldDetailRevision>,
+)
+
+internal data class CreatedWorldRefreshResult(
+    val worlds: List<WorldData>,
+    val detailRevisions: Map<String, WorldDetailRevision>,
+)
+
+/** Keeps cached descriptions visible while identifying only stale world details for refresh. */
+internal fun planCreatedWorldRefresh(
+    summaries: List<WorldData>,
+    cachedWorlds: List<WorldData>,
+    cachedDetailRevisions: Map<String, WorldDetailRevision>,
+): CreatedWorldRefreshPlan {
+    val cachedById = cachedWorlds.associateBy(WorldData::id)
+    val currentIds = summaries.mapTo(mutableSetOf(), WorldData::id)
+    val retainedRevisions = cachedDetailRevisions.filterKeys { it in currentIds }
+    val summaryRevisions = summaries.associate { it.id to it.detailRevision() }
+    val worlds = summaries.map { summary ->
+        val cachedDescription = cachedById[summary.id]?.description
+        if (cachedDescription != null && summary.description == null) {
+            summary.copy(description = cachedDescription)
+        } else {
+            summary
+        }
+    }
+    val worldIdsToRefresh = summaries.mapNotNull { summary ->
+        val cachedRevision = retainedRevisions[summary.id]
+        summary.id.takeUnless { cachedRevision?.matches(summary) == true }
+    }
+    return CreatedWorldRefreshPlan(
+        worlds = worlds,
+        worldIdsToRefresh = worldIdsToRefresh,
+        detailRevisions = retainedRevisions,
+        summaryRevisions = summaryRevisions,
+    )
+}
+
+/** Applies successful detail responses without marking failed requests as current. */
+internal fun mergeCreatedWorldDetails(
+    plan: CreatedWorldRefreshPlan,
+    refreshedWorlds: List<WorldData>,
+): CreatedWorldRefreshResult {
+    val visibleIds = plan.worlds.mapTo(mutableSetOf(), WorldData::id)
+    val refreshedById = refreshedWorlds
+        .filter { it.id in visibleIds }
+        .associateBy(WorldData::id)
+    val revisions = plan.detailRevisions.toMutableMap()
+    refreshedById.forEach { (id, _) ->
+        revisions[id] = plan.summaryRevisions.getValue(id)
+    }
+    return CreatedWorldRefreshResult(
+        worlds = plan.worlds.map { refreshedById[it.id] ?: it },
+        detailRevisions = revisions,
+    )
+}
+
+internal fun WorldData.detailRevision() = WorldDetailRevision(
+    updatedAt = updatedAt,
+    version = version,
+)
+
+private fun WorldDetailRevision.matches(world: WorldData): Boolean =
+    (updatedAt != null || version != null) && updatedAt == world.updatedAt && version == world.version
+
 class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
@@ -321,6 +391,8 @@ class UserProfileScreenModel(
     /** 本人资料的旧收藏世界只有迁移成功后才能从旧缓存字段移除。 */
     private val selfFavoriteWorldMigration = CompletableDeferred<Boolean>()
     private var cachedUserData: UserData? = null
+    private var createdWorldDetailRevisions = emptyMap<String, WorldDetailRevision>()
+    private val profileCacheRestored = CompletableDeferred<Unit>()
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
@@ -366,6 +438,7 @@ class UserProfileScreenModel(
             } finally {
                 selfFavoriteWorldMigration.complete(migrationSucceeded)
                 cacheRestoreCompleted.complete(Unit)
+                profileCacheRestored.complete(Unit)
             }
         }
         if (userProfileVO.id == cacheOwnerUserId) {
@@ -409,6 +482,7 @@ class UserProfileScreenModel(
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
         _mutualGroups.value = cache.mutualGroups
         _createdWorlds.value = cache.createdWorlds
+        createdWorldDetailRevisions = cache.createdWorldDetailRevisions
         _createdAvatars.value = cache.createdAvatars
         setFavoritedWorldGroups(cache.favoritedWorlds)
     }
@@ -454,6 +528,7 @@ class UserProfileScreenModel(
                     groups = _userGroups.value,
                     mutualGroups = _mutualGroups.value,
                     createdWorlds = _createdWorlds.value,
+                    createdWorldDetailRevisions = createdWorldDetailRevisions,
                     createdAvatars = _createdAvatars.value,
                     favoritedWorlds = profileFavoritedWorldsForCache(
                         userId = cachedUser.id,
@@ -662,6 +737,7 @@ class UserProfileScreenModel(
         _isLoadingWorlds.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                profileCacheRestored.await()
                 val isSelf = userState.isSelf
                 val allWorlds = mutableListOf<WorldData>()
                 worldsApi.userWorldsFlow(
@@ -674,20 +750,29 @@ class UserProfileScreenModel(
                 ).collect { worldList ->
                     allWorlds.addAll(worldList)
                 }
-                // 展示列表
-                if (_createdWorlds.value != allWorlds) _createdWorlds.value = allWorlds
+                val refreshPlan = planCreatedWorldRefresh(
+                    summaries = allWorlds,
+                    cachedWorlds = _createdWorlds.value,
+                    cachedDetailRevisions = createdWorldDetailRevisions,
+                )
+                if (_createdWorlds.value != refreshPlan.worlds) {
+                    _createdWorlds.value = refreshPlan.worlds
+                }
                 _isLoadingWorlds.value = false
 
-                // 逐批获取完整详情以填充description
-                val worldIds = allWorlds.map { it.id }
-                if (worldIds.isNotEmpty()) {
-                    val fullWorlds = worldsApi.fetchWorldsByIds(worldIds)
-                    val fullMap = fullWorlds.associateBy { it.id }
-                    val completeWorlds = allWorlds.map { world ->
-                        fullMap[world.id] ?: world
-                    }
-                    if (_createdWorlds.value != completeWorlds) _createdWorlds.value = completeWorlds
+                val result = if (refreshPlan.worldIdsToRefresh.isNotEmpty()) {
+                    mergeCreatedWorldDetails(
+                        plan = refreshPlan,
+                        refreshedWorlds = worldsApi.fetchWorldsByIds(refreshPlan.worldIdsToRefresh),
+                    )
+                } else {
+                    CreatedWorldRefreshResult(
+                        worlds = refreshPlan.worlds,
+                        detailRevisions = refreshPlan.detailRevisions,
+                    )
                 }
+                if (_createdWorlds.value != result.worlds) _createdWorlds.value = result.worlds
+                createdWorldDetailRevisions = result.detailRevisions
                 saveCache()
             } catch (e: Exception) {
                 handleError(e)
