@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -80,6 +81,7 @@ fun SettingsBottomSheet(
 @Composable
 private inline fun ColumnScope.CustomBlock() {
     var currentSettings by LocalSettingsState.current
+    val isDarkTheme = LocalResolvedDarkTheme.current
     Column(
         modifier = Modifier.fillMaxWidth()
             .padding(12.dp),
@@ -123,14 +125,15 @@ private inline fun ColumnScope.CustomBlock() {
         val themeColors: List<ThemeColor> = with(currentKoinScope()) { remember(::getAll) }
         SettingsItem("${strings.stettingThemeColor}:") {
             themeColors.forEach {
+                val colorScheme = it.colorScheme(isDarkTheme)
                 TextButton(
                     enabled = it.name != currentSettings.themeColor.name,
                     onClick = {
                         currentSettings = currentSettings.copy(themeColor = it)
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = it.colorScheme.primaryContainer,
-                        contentColor = it.colorScheme.onPrimaryContainer
+                        containerColor = colorScheme.primaryContainer,
+                        contentColor = colorScheme.onPrimaryContainer
                     )
                 ) {
                     Text(

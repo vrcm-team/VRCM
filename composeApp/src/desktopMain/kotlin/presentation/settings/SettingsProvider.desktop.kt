@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.settings
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import com.sun.jna.Memory
@@ -9,6 +10,9 @@ import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.WinDef.HWND
 import com.sun.jna.win32.StdCallLibrary
 import java.awt.Window
+
+@Composable
+actual fun rememberSystemInDarkTheme(): Boolean = isSystemInDarkTheme()
 
 @Composable
 actual fun ChangeStatusBarDarkTheme(isDark: Boolean) {

@@ -3,13 +3,11 @@ package io.github.vrcmteam.vrcm.presentation.settings.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 
 
 open class ThemeColor(
@@ -18,25 +16,18 @@ open class ThemeColor(
     private val darkColorScheme: ColorScheme = lightColorScheme
 ) {
 
-    val colorScheme: ColorScheme
-        @Composable
-        get(){
-            val isDarkTheme = LocalSettingsState.current.value.isDarkTheme
-            return if (isDarkTheme == null){
-                if (isSystemInDarkTheme()) darkColorScheme else lightColorScheme
-            }else{
-                if (isDarkTheme) darkColorScheme else lightColorScheme
-            }
-        }
-
     companion object {
         val Default: ThemeColor = ThemeColor("Default", lightColorScheme(), darkColorScheme())
     }
 
+    fun colorScheme(isDarkTheme: Boolean): ColorScheme =
+        if (isDarkTheme) darkColorScheme else lightColorScheme
+
     @Composable
     fun asAnimateColorScheme(
+        isDarkTheme: Boolean,
         animationSpec: AnimationSpec<Color> = tween(600)
-    ): ColorScheme = colorScheme.let {
+    ): ColorScheme = colorScheme(isDarkTheme).let {
         ColorScheme(
             primary = animateColorAsState(it.primary, animationSpec = animationSpec).value,
             onPrimary = animateColorAsState(
@@ -168,5 +159,3 @@ open class ThemeColor(
     }
 
 }
-
-

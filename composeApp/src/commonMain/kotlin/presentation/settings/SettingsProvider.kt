@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.settings
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -42,16 +41,22 @@ fun SettingsProvider(
             }
         }
 
-        val isDark = currentSettings.isDarkTheme?:isSystemInDarkTheme()
+        val systemDark = rememberSystemInDarkTheme()
+        val isDark = currentSettings.isDarkTheme ?: systemDark
         ChangeStatusBarDarkTheme(isDark)
 
-        MaterialTheme(
-            colorScheme = currentSettings.themeColor.asAnimateColorScheme(colorAnimationSpec),
-            shapes = MaterialTheme.shapes,
-            typography = MaterialTheme.typography
-        ){
-            Box(Modifier.background(MaterialTheme.colorScheme.background)) {
-                content()
+        CompositionLocalProvider(LocalResolvedDarkTheme provides isDark) {
+            MaterialTheme(
+                colorScheme = currentSettings.themeColor.asAnimateColorScheme(
+                    isDarkTheme = isDark,
+                    animationSpec = colorAnimationSpec,
+                ),
+                shapes = MaterialTheme.shapes,
+                typography = MaterialTheme.typography
+            ) {
+                Box(Modifier.background(MaterialTheme.colorScheme.background)) {
+                    content()
+                }
             }
         }
     }
@@ -62,9 +67,15 @@ fun SettingsProvider(
 @Composable
 expect fun ChangeStatusBarDarkTheme(isDark: Boolean)
 
+/** Returns the current platform appearance while handling transient lifecycle values. */
+@Composable
+expect fun rememberSystemInDarkTheme(): Boolean
+
 /** Requests Android notification permission without retaining an Activity globally. */
 @Composable
 expect fun rememberNotificationPermissionRequester(onResult: (Boolean) -> Unit): () -> Unit
+
+internal val LocalResolvedDarkTheme = compositionLocalOf { false }
 
 val LocalSettingsState: ProvidableCompositionLocal<MutableState<SettingsVo>> =
     compositionLocalOf {

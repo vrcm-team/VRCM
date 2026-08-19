@@ -6,12 +6,16 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import io.github.vrcmteam.vrcm.presentation.extensions.findActivity
+
+@Composable
+actual fun rememberSystemInDarkTheme(): Boolean = isSystemInDarkTheme()
 
 @Composable
 actual fun ChangeStatusBarDarkTheme(isDark: Boolean) {
