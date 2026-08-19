@@ -18,6 +18,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -124,42 +125,19 @@ abstract class PrintImageProcessorContractTest {
             releaseBitmap = released::add,
         )
 
-        val preparedSource = processor.preparePrint(source).getOrThrow()
+        val preparedSources = processor.preparePrint(source).getOrThrow()
+        val cropped = requireNotNull(preparedSources.cropped)
 
-        assertContentEquals(croppedBytes, preparedSource.source.bytes)
-        assertEquals(ImageSize(1_920, 1_080), preparedSource.prepared.originalSize)
+        assertSame(source, preparedSources.original.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSources.original.prepared.preview)
+        assertEquals(ImageSize(2_048, 1_440), preparedSources.original.prepared.originalSize)
+        assertContentEquals(croppedBytes, cropped.source.bytes)
+        assertEquals(ImageSize(1_920, 1_080), cropped.prepared.originalSize)
         assertEquals(ImageSize(1_920, 1_080), codec.encodedSize)
         assertEquals(
             PixelRect(left = 64, top = 69, right = 1_984, bottom = 1_149),
             CropRenderPlanner().plan(codec.cropRequests.single()).visibleSourceBounds,
         )
-        assertEquals(listOf<ImageBitmap>(PreviewOwnershipTestBitmap), released)
-    }
-
-    @Test
-    fun disabledDownloadedPrintBorderCropKeepsOriginalForEditing() = runBlocking {
-        val source = SelectedImage("downloaded-print.png", byteArrayOf(1))
-        val released = mutableListOf<ImageBitmap>()
-        val codec = FakePlatformImageCodec(
-            originalSize = ImageSize(2_048, 1_440),
-            allowDecode = true,
-            decodedBitmap = PreviewOwnershipTestBitmap,
-        )
-        val processor = DefaultPrintImageProcessor(
-            codec = codec,
-            releaseBitmap = released::add,
-        )
-
-        val preparedSource = processor.preparePrint(
-            source = source,
-            cropDownloadedPrintBorder = false,
-        ).getOrThrow()
-
-        assertSame(source, preparedSource.source)
-        assertSame(PreviewOwnershipTestBitmap, preparedSource.prepared.preview)
-        assertEquals(ImageSize(2_048, 1_440), preparedSource.prepared.originalSize)
-        assertEquals(emptyList(), codec.cropRequests)
-        assertEquals(emptyList(), codec.encodeLimits)
         assertEquals(emptyList(), released)
     }
 
@@ -173,11 +151,12 @@ abstract class PrintImageProcessorContractTest {
         )
         val processor = DefaultPrintImageProcessor(codec = codec)
 
-        val preparedSource = processor.preparePrint(source).getOrThrow()
+        val preparedSources = processor.preparePrint(source).getOrThrow()
 
-        assertSame(source, preparedSource.source)
-        assertSame(PreviewOwnershipTestBitmap, preparedSource.prepared.preview)
-        assertEquals(ImageSize(2_047, 1_440), preparedSource.prepared.originalSize)
+        assertSame(source, preparedSources.original.source)
+        assertSame(PreviewOwnershipTestBitmap, preparedSources.original.prepared.preview)
+        assertEquals(ImageSize(2_047, 1_440), preparedSources.original.prepared.originalSize)
+        assertNull(preparedSources.cropped)
         assertEquals(emptyList(), codec.cropRequests)
         assertEquals(emptyList(), codec.encodeLimits)
     }

@@ -19,8 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,8 +82,6 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         val isVrcPlus = galleryScreenModel.isVrcPlus
         val coroutineScope = rememberCoroutineScope()
         var isPreparing by remember { mutableStateOf(false) }
-        var cropDownloadedPrintBorder by remember { mutableStateOf(true) }
-        val currentCropDownloadedPrintBorder by rememberUpdatedState(cropDownloadedPrintBorder)
 
         LaunchedEffect(isPrint, editorSessionStore) {
             if (isPrint) {
@@ -166,11 +161,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             )
                             return@launch
                         }
-                        val preparedSource = printImageProcessor
-                            .preparePrint(
-                                source = source,
-                                cropDownloadedPrintBorder = currentCropDownloadedPrintBorder,
-                            )
+                        val preparedSources = printImageProcessor
+                            .preparePrint(source)
                             .getOrElse { failure ->
                                 if (failure is CancellationException) throw failure
                                 val message = (failure as? PrintImageFailure)
@@ -180,8 +172,9 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                                 return@launch
                             }
                         handoffPreparedImageToEditor(
-                            source = preparedSource.source,
-                            prepared = preparedSource.prepared,
+                            source = preparedSources.original.source,
+                            prepared = preparedSources.original.prepared,
+                            croppedSource = preparedSources.cropped,
                             sessionStore = editorSessionStore,
                             push = { sessionId ->
                                 navigator.push(PrintImageEditorScreen(sessionId))
@@ -215,33 +208,6 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (isPrint && !hasSelection) {
-                    Surface(
-                        modifier = Modifier.weight(1f, fill = false),
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = 6.dp,
-                        shadowElevation = 3.dp,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(start = 12.dp, end = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = locale.galleryTabCropPrintBorder,
-                                modifier = Modifier.weight(1f, fill = false),
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                            Switch(
-                                checked = cropDownloadedPrintBorder,
-                                onCheckedChange = { cropDownloadedPrintBorder = it },
-                                enabled = isVrcPlus && !isPreparing,
-                            )
-                        }
-                    }
-                }
-
                 FloatingActionButton(
                     onClick = {
                         if (hasSelection) {

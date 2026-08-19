@@ -15,12 +15,14 @@ import kotlin.math.roundToInt
 interface PrintImageProcessor {
     suspend fun prepare(source: SelectedImage): Result<PreparedImage>
 
-    /** Optionally removes the known frame from a downloaded Print before editing. */
-    suspend fun preparePrint(
-        source: SelectedImage,
-        cropDownloadedPrintBorder: Boolean = true,
-    ): Result<PreparedImageSource> =
-        prepare(source).map { PreparedImageSource(source, it) }
+    /** Prepares the original Print and, when recognized, a border-cropped editing source. */
+    suspend fun preparePrint(source: SelectedImage): Result<PreparedPrintImageSources> =
+        prepare(source).map {
+            PreparedPrintImageSources(
+                original = PreparedImageSource(source, it),
+                cropped = null,
+            )
+        }
 
     suspend fun render(
         source: SelectedImage,
@@ -42,17 +44,46 @@ class DefaultPrintImageProcessor(
     private val releaseBitmap: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : PrintImageProcessor {
     override suspend fun prepare(source: SelectedImage): Result<PreparedImage> =
-        prepareSource(source, cropDownloadedPrintBorder = false).map(PreparedImageSource::prepared)
+        prepareOriginalSource(source).map(PreparedImageSource::prepared)
 
-    override suspend fun preparePrint(
-        source: SelectedImage,
-        cropDownloadedPrintBorder: Boolean,
-    ): Result<PreparedImageSource> =
-        prepareSource(source, cropDownloadedPrintBorder)
+    override suspend fun preparePrint(source: SelectedImage): Result<PreparedPrintImageSources> {
+        val original = prepareOriginalSource(source).getOrElse { failure ->
+            if (failure is CancellationException) throw failure
+            return Result.failure(failure)
+        }
+        if (original.prepared.originalSize != DownloadedPrintCanvasSize) {
+            return Result.success(
+                PreparedPrintImageSources(
+                    original = original,
+                    cropped = null,
+                ),
+            )
+        }
 
-    private suspend fun prepareSource(
+        return try {
+            Result.success(
+                PreparedPrintImageSources(
+                    original = original,
+                    cropped = cropDownloadedPrint(source, original.prepared.originalSize),
+                ),
+            )
+        } catch (cause: CancellationException) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            throw cause
+        } catch (failure: PrintImageFailure) {
+            releaseAfterFailure(original.prepared.preview, failure)
+            Result.failure(failure)
+        } catch (cause: Exception) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            Result.failure(PrintImageFailure.DecodeFailed(cause))
+        } catch (cause: Error) {
+            releaseAfterFailure(original.prepared.preview, cause)
+            throw cause
+        }
+    }
+
+    private suspend fun prepareOriginalSource(
         source: SelectedImage,
-        cropDownloadedPrintBorder: Boolean,
     ): Result<PreparedImageSource> = try {
         validateSource(source)
         val decoded = decodePreview(source.bytes)
@@ -69,22 +100,14 @@ class DefaultPrintImageProcessor(
             throw cause
         }
 
-        val preparedSource = if (
-            cropDownloadedPrintBorder &&
-            decoded.originalSize == DownloadedPrintCanvasSize
-        ) {
-            releaseBitmap(decoded.bitmap)
-            cropDownloadedPrint(source, decoded.originalSize)
-        } else {
-            handoffOwnedBitmap(decoded.bitmap) {
-                PreparedImageSource(
-                    source = source,
-                    prepared = PreparedImage(
-                        preview = decoded.bitmap,
-                        originalSize = decoded.originalSize,
-                    ),
-                )
-            }
+        val preparedSource = handoffOwnedBitmap(decoded.bitmap) {
+            PreparedImageSource(
+                source = source,
+                prepared = PreparedImage(
+                    preview = decoded.bitmap,
+                    originalSize = decoded.originalSize,
+                ),
+            )
         }
         Result.success(preparedSource)
     } catch (cause: CancellationException) {

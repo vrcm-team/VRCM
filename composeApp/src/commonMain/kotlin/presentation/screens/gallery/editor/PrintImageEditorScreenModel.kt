@@ -43,6 +43,8 @@ sealed interface EditorEvent {
 data class PrintImageEditorState(
     val prepared: PreparedImage,
     val transform: CropTransform = CropTransform(),
+    val canCropDownloadedPrintBorder: Boolean = false,
+    val cropDownloadedPrintBorder: Boolean = false,
     val fillWhiteBorder: Boolean = true,
     val phase: EditorPhase = EditorPhase.Ready,
     val error: EditorError? = null,
@@ -52,8 +54,9 @@ data class PrintImageEditorState(
 
 @OptIn(ExperimentalTime::class)
 class PrintImageEditorScreenModel(
-    private val source: SelectedImage,
+    source: SelectedImage,
     prepared: PreparedImage,
+    private val croppedSource: PreparedImageSource? = null,
     private val calculator: CropTransformCalculator,
     private val processor: PrintImageProcessor,
     private val submitter: ImageEditorSubmitter,
@@ -65,7 +68,15 @@ class PrintImageEditorScreenModel(
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val releasePreview: (ImageBitmap) -> Unit = ::releasePlatformImageBitmap,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(PrintImageEditorState(prepared = prepared))
+    private val originalSource = PreparedImageSource(source, prepared)
+    private val initialSource = croppedSource ?: originalSource
+    private val _state = MutableStateFlow(
+        PrintImageEditorState(
+            prepared = initialSource.prepared,
+            canCropDownloadedPrintBorder = croppedSource != null,
+            cropDownloadedPrintBorder = croppedSource != null,
+        ),
+    )
     val state: StateFlow<PrintImageEditorState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<EditorEvent>(extraBufferCapacity = 1)
@@ -74,9 +85,15 @@ class PrintImageEditorScreenModel(
     private var cachedPng: ByteArray? = null
     private var cachedFileName: String? = null
     private val previewReleaseController = PreviewBitmapReleaseController(
-        bitmap = prepared.preview,
+        bitmaps = listOfNotNull(prepared.preview, croppedSource?.prepared?.preview),
         releaseBitmap = releasePreview,
     )
+
+    init {
+        require(croppedSource == null || target == ImageEditorTarget.Print) {
+            "Only Print editor sessions can provide a cropped source"
+        }
+    }
 
     override fun onCleared() {
         sessionStore.discard(sessionId)
@@ -132,6 +149,37 @@ class PrintImageEditorScreenModel(
         current.constrainToBorderMode(calculator.reset(), viewport)
     }
 
+    fun setCropDownloadedPrintBorder(enabled: Boolean, viewport: ImageSize) {
+        val current = _state.value
+        if (
+            current.isBusy ||
+            !current.canCropDownloadedPrintBorder ||
+            current.cropDownloadedPrintBorder == enabled ||
+            !viewport.isValid()
+        ) {
+            return
+        }
+
+        val nextSource = if (enabled) requireNotNull(croppedSource) else originalSource
+        val zoom = if (current.fillWhiteBorder) {
+            1f
+        } else {
+            calculator.zoomLimits(
+                source = nextSource.prepared.originalSize,
+                viewport = viewport,
+                quarterTurns = 0,
+            ).cover
+        }
+        cachedPng = null
+        cachedFileName = null
+        _state.value = current.copy(
+            prepared = nextSource.prepared,
+            transform = CropTransform(zoom = zoom),
+            cropDownloadedPrintBorder = enabled,
+            error = null,
+        )
+    }
+
     fun setFillWhiteBorder(enabled: Boolean, viewport: ImageSize) {
         val current = _state.value
         if (current.isBusy || !viewport.isValid()) return
@@ -164,6 +212,7 @@ class PrintImageEditorScreenModel(
     fun upload() {
         val current = _state.value
         if (current.isBusy) return
+        val currentSource = current.selectedSource()
 
         val existingPng = cachedPng
         _state.value = current.copy(
@@ -174,7 +223,7 @@ class PrintImageEditorScreenModel(
             var stage = if (existingPng == null) UploadStage.Processing else UploadStage.Uploading
             try {
                 val png = existingPng ?: processor.render(
-                    source = source,
+                    source = currentSource.source,
                     originalSize = current.prepared.originalSize,
                     transform = current.transform,
                     background = target.canvasBackground,
@@ -182,7 +231,10 @@ class PrintImageEditorScreenModel(
                     .getOrThrow()
                     .also {
                         cachedPng = it
-                        cachedFileName = target.uploadFileName(source.fileName, nowMillis())
+                        cachedFileName = target.uploadFileName(
+                            currentSource.source.fileName,
+                            nowMillis(),
+                        )
                     }
 
                 stage = UploadStage.Uploading
@@ -191,7 +243,7 @@ class PrintImageEditorScreenModel(
                     target = target,
                     imageBytes = png,
                     fileName = cachedFileName
-                        ?: target.uploadFileName(source.fileName, nowMillis()),
+                        ?: target.uploadFileName(currentSource.source.fileName, nowMillis()),
                 ).getOrThrow()
 
                 _state.update { it.copy(phase = EditorPhase.Ready, error = null) }
@@ -224,6 +276,9 @@ class PrintImageEditorScreenModel(
 
     private fun workerContext(): CoroutineContext =
         workerExceptionHandler?.let(workerDispatcher::plus) ?: workerDispatcher
+
+    private fun PrintImageEditorState.selectedSource(): PreparedImageSource =
+        if (cropDownloadedPrintBorder) requireNotNull(croppedSource) else originalSource
 
     private inline fun edit(
         viewport: ImageSize? = null,

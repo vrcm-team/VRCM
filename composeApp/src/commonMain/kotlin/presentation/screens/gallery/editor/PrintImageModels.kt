@@ -93,6 +93,12 @@ data class PreparedImageSource(
     val prepared: PreparedImage,
 )
 
+/** Original Print image plus an optional border-cropped editing source. */
+data class PreparedPrintImageSources(
+    val original: PreparedImageSource,
+    val cropped: PreparedImageSource?,
+)
+
 /** Controls whether transparent pixels are preserved or composited onto white. */
 enum class CanvasBackground {
     Transparent,

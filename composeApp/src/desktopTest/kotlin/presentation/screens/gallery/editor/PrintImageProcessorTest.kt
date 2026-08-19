@@ -31,13 +31,15 @@ class PrintImageProcessorTest : PrintImageProcessorContractTest() {
             releasePlatformImageBitmap(downloadedPrint)
         }
 
-        val preparedSource = DefaultPrintImageProcessor(codec)
+        val preparedSources = DefaultPrintImageProcessor(codec)
             .preparePrint(SelectedImage("downloaded-print.png", sourceBytes))
             .getOrThrow()
+        val preparedSource = requireNotNull(preparedSources.cropped)
         val previewPixels = try {
             preparedSource.prepared.preview.toPixelMap()
         } finally {
             releasePlatformImageBitmap(preparedSource.prepared.preview)
+            releasePlatformImageBitmap(preparedSources.original.prepared.preview)
         }
         val decodedSource = codec.decode(
             preparedSource.source.bytes,
