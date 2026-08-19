@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsEn
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +136,47 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
 
         assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
         assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun missingAvatarCacheFallsBackToRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = null)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+
+        assertEquals(1, favoriteSource.loadCount)
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+    }
+
+    @Test
+    fun cachedFavoriteStateReloadsWhenTheAccountSessionChanges() = runBlocking {
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_a"))
+        val favoriteSource = SessionAwareCachedEntryFavoriteSource(
+            memberships = mapOf(
+                "usr_account_a" to true,
+                "usr_account_b" to false,
+            ),
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_b"))
+        yield()
+
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+        assertEquals(2, favoriteSource.cachedLookupCount)
+        SharedFlowCentre.emitLogout()
     }
 
     @Test
@@ -575,7 +617,7 @@ private class CountingFavoriteEntrySource : FavoriteEntrySource {
 }
 
 private class CachedEntryFavoriteSource(
-    private val cachedMembership: Boolean,
+    private val cachedMembership: Boolean?,
 ) : FavoriteEntrySource {
     private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
     var loadCount = 0
@@ -584,12 +626,30 @@ private class CachedEntryFavoriteSource(
     override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
         favorites
 
-    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean = cachedMembership
+    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean? = cachedMembership
 
     override suspend fun load(type: FavoriteType): Result<Unit> {
         loadCount++
         return Result.success(Unit)
     }
+}
+
+private class SessionAwareCachedEntryFavoriteSource(
+    private val memberships: Map<String, Boolean>,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var cachedLookupCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean? {
+        cachedLookupCount++
+        return SharedFlowCentre.currentSession.value?.token?.userId?.let(memberships::get)
+    }
+
+    override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
 }
 
 private class LoadedGroupsFavoriteSource(

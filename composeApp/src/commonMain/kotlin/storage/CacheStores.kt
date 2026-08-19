@@ -155,14 +155,26 @@ internal class RoomFavoriteListCacheStore(
     override suspend fun saveWorlds(userId: String, worlds: List<FavoritedWorldGroup>) {
         mutationMutex.withLock {
             val current = cache.load(userId) ?: FavoriteListCache()
-            cache.save(userId, current.copy(favoritedWorlds = worlds))
+            cache.save(
+                userId,
+                current.copy(
+                    favoritedWorlds = worlds,
+                    worldsLoaded = true,
+                ),
+            )
         }
     }
 
     override suspend fun saveAvatars(userId: String, avatars: List<AvatarData>) {
         mutationMutex.withLock {
             val current = cache.load(userId) ?: FavoriteListCache()
-            cache.save(userId, current.copy(favoritedAvatars = avatars))
+            cache.save(
+                userId,
+                current.copy(
+                    favoritedAvatars = avatars,
+                    avatarsLoaded = true,
+                ),
+            )
         }
     }
 

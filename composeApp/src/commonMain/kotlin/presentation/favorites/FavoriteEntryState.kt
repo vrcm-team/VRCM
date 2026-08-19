@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
@@ -53,12 +54,20 @@ internal class AuthenticatedFavoriteEntrySource(
         } ?: return null
 
         return when (type) {
-            FavoriteType.World -> cache.favoritedWorlds
-                .asSequence()
-                .flatMap { it.worlds.asSequence() }
-                .any { it.id == favoriteId }
+            FavoriteType.World -> if (!cache.worldsLoaded) {
+                null
+            } else {
+                cache.favoritedWorlds
+                    .asSequence()
+                    .flatMap { it.worlds.asSequence() }
+                    .any { it.id == favoriteId }
+            }
 
-            FavoriteType.Avatar -> cache.favoritedAvatars.any { it.id == favoriteId }
+            FavoriteType.Avatar -> if (!cache.avatarsLoaded) {
+                null
+            } else {
+                cache.favoritedAvatars.any { it.id == favoriteId }
+            }
             FavoriteType.Friend -> null
         }
     }
@@ -93,6 +102,21 @@ internal class FavoriteEntryStateModel(
     private val loadState = MutableStateFlow(LoadState.Loading)
     private val latestRequestToken = MutableStateFlow(0L)
     private val cachedFavorite = MutableStateFlow<Boolean?>(null)
+    private var observedSessionToken = SharedFlowCentre.currentSession.value?.token
+
+    init {
+        scope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                val sessionToken = session?.token
+                if (sessionToken != observedSessionToken) {
+                    observedSessionToken = sessionToken
+                    targetId.value.takeIf { it.isNotBlank() }?.let { favoriteId ->
+                        load(favoriteId, allowCurrentGroups = false)
+                    }
+                }
+            }
+        }
+    }
 
     val state: StateFlow<FavoriteEntryState> = combine(
         targetId,
@@ -121,7 +145,9 @@ internal class FavoriteEntryStateModel(
         initialValue = FavoriteEntryState.Loading,
     )
 
-    fun load(favoriteId: String) {
+    fun load(favoriteId: String) = load(favoriteId, allowCurrentGroups = true)
+
+    private fun load(favoriteId: String, allowCurrentGroups: Boolean) {
         targetId.value = favoriteId
         // 每次切换目标都提升请求代次，之前发出的加载结果不能再改写新目标的状态。
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
@@ -132,17 +158,22 @@ internal class FavoriteEntryStateModel(
         }
 
         val currentFavorites = source.favoritesByGroup(favoriteType).value
-        if (currentFavorites.isNotEmpty()) {
+        if (allowCurrentGroups && currentFavorites.isNotEmpty()) {
             cachedFavorite.value = null
             loadState.value = LoadState.Ready
             return
         }
 
+        val requestSessionToken = SharedFlowCentre.currentSession.value?.token
         cachedFavorite.value = null
         loadState.value = LoadState.Loading
         scope.launch(dispatcher) {
             val cachedMembership = source.cachedFavorite(favoriteType, favoriteId)
             if (requestToken != latestRequestToken.value) return@launch
+            if (requestSessionToken != SharedFlowCentre.currentSession.value?.token) {
+                load(favoriteId, allowCurrentGroups = false)
+                return@launch
+            }
             if (cachedMembership != null) {
                 cachedFavorite.value = cachedMembership
                 loadState.value = LoadState.Ready

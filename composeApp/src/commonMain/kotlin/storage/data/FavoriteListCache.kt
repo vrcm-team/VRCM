@@ -8,4 +8,6 @@ import kotlinx.serialization.Serializable
 data class FavoriteListCache(
     val favoritedWorlds: List<FavoritedWorldGroup> = emptyList(),
     val favoritedAvatars: List<AvatarData> = emptyList(),
+    val worldsLoaded: Boolean = false,
+    val avatarsLoaded: Boolean = false,
 )
