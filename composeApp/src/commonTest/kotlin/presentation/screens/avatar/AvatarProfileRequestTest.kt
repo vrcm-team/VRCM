@@ -76,6 +76,68 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun persistedFavoriteCacheShowsEntryStateWithoutRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = true)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun loadedFavoriteGroupsShowEntryStateWithoutRemoteLoading() = runBlocking {
+        val group = FavoriteGroupData(
+            id = "group_avatars1",
+            ownerId = "usr_owner",
+            type = FavoriteType.Avatar.value,
+            visibility = "private",
+            displayName = "Avatars 1",
+            name = "avatars1",
+            ownerDisplayName = "Owner",
+            tags = emptyList(),
+        )
+        val favoriteSource = LoadedGroupsFavoriteSource(
+            group = group,
+            favorite = FavoriteData(
+                favoriteId = "avtr_saved",
+                id = "fvrt_saved",
+                tags = listOf(group.name),
+                type = FavoriteType.Avatar.value,
+            ),
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+
+        assertEquals(FavoriteEntryState.Favorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun completeFavoriteCacheShowsNotFavoritedWithoutRemoteLoading() = runBlocking {
+        val favoriteSource = CachedEntryFavoriteSource(cachedMembership = false)
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_missing", avatarName = "Missing"))
+        yield()
+
+        assertEquals(FavoriteEntryState.NotFavorited, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
     fun failedFavoriteEntryLoadCanRetryWithoutLeavingTheProfile() = runBlocking {
         val favoriteSource = DirectEntryFavoriteSource(
             favoriteId = "avtr_saved",
@@ -500,6 +562,41 @@ private class EmptyFavoriteEntrySource : FavoriteEntrySource {
 
 private class CountingFavoriteEntrySource : FavoriteEntrySource {
     private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
+}
+
+private class CachedEntryFavoriteSource(
+    private val cachedMembership: Boolean,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun cachedFavorite(type: FavoriteType, favoriteId: String): Boolean = cachedMembership
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
+}
+
+private class LoadedGroupsFavoriteSource(
+    group: FavoriteGroupData,
+    favorite: FavoriteData,
+) : FavoriteEntrySource {
+    private val favorites = MutableStateFlow(mapOf(group to listOf(favorite)))
     var loadCount = 0
         private set
 
