@@ -86,12 +86,13 @@ internal class FavoriteEntryStateModel(
 
     fun load(favoriteId: String) {
         targetId.value = favoriteId
+        // 每次切换目标都提升请求代次，之前发出的加载结果不能再改写新目标的状态。
+        val requestToken = latestRequestToken.updateAndGet { it + 1 }
         if (favoriteId.isBlank()) {
             loadState.value = LoadState.Unavailable
             return
         }
 
-        val requestToken = latestRequestToken.updateAndGet { it + 1 }
         loadState.value = LoadState.Loading
         scope.launch(dispatcher) {
             val result = source.load(favoriteType)

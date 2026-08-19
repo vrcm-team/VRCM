@@ -111,6 +111,32 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun pendingFavoriteLoadCannotReviveTheEntryAfterSwitchingToABlankAvatar() = runBlocking {
+        val pendingLoad = CompletableDeferred<Unit>()
+        val favoriteSource = DirectEntryFavoriteSource(
+            favoriteId = "avtr_saved",
+            pendingLoad = pendingLoad,
+        )
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_saved", avatarName = "Saved"))
+        yield()
+        assertEquals(FavoriteEntryState.Loading, model.favoriteEntryState.value)
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "", avatarName = "Unavailable"))
+        yield()
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
+
+        pendingLoad.complete(Unit)
+        yield()
+
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
+    }
+
+    @Test
     fun olderSuccessCannotOverwriteTheLatestAvatar() = runBlocking {
         val loader = ControlledAvatarProfileLoader()
         val model = avatarModel(loader)
@@ -489,6 +515,7 @@ private class CountingFavoriteEntrySource : FavoriteEntrySource {
 private class DirectEntryFavoriteSource(
     private val favoriteId: String,
     private val failuresBeforeSuccess: Int = 0,
+    private val pendingLoad: CompletableDeferred<Unit>? = null,
 ) : FavoriteEntrySource {
     private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
     private var attempts = 0
@@ -497,6 +524,7 @@ private class DirectEntryFavoriteSource(
         favorites
 
     override suspend fun load(type: FavoriteType): Result<Unit> {
+        pendingLoad?.await()
         if (attempts++ < failuresBeforeSuccess) {
             return Result.failure(IllegalStateException("favorite groups unavailable"))
         }
