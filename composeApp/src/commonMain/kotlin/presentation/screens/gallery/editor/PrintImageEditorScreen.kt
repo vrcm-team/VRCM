@@ -436,29 +436,6 @@ private fun PrintEditorControls(
                 Arrangement.spacedBy(10.dp)
             },
         ) {
-            if (state.canCropDownloadedPrintBorder) {
-                Row(
-                    modifier = Modifier
-                        .widthIn(max = 720.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = locale.galleryTabCropPrintBorder,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(
-                        checked = state.cropDownloadedPrintBorder,
-                        onCheckedChange = {
-                            onCropDownloadedPrintBorderChange(it, viewport)
-                        },
-                        enabled = !state.isBusy && viewport.isValid(),
-                    )
-                }
-            }
-
             Row(
                 modifier = Modifier
                     .widthIn(max = 720.dp)
@@ -512,6 +489,29 @@ private fun PrintEditorControls(
                     onCheckedChange = { onFillWhiteBorderChange(it, viewport) },
                     enabled = !state.isBusy && viewport.isValid(),
                 )
+            }
+
+            if (state.canCropDownloadedPrintBorder) {
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = 720.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = locale.galleryTabCropPrintBorder,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = state.cropDownloadedPrintBorder,
+                        onCheckedChange = {
+                            onCropDownloadedPrintBorderChange(it, viewport)
+                        },
+                        enabled = !state.isBusy && viewport.isValid(),
+                    )
+                }
             }
 
             FlowRow(
