@@ -96,6 +96,21 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun blankAvatarIdMakesFavoriteEntryUnavailableWithoutLoading() = runBlocking {
+        val favoriteSource = CountingFavoriteEntrySource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            favoriteSource = favoriteSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "", avatarName = "Unavailable"))
+        yield()
+
+        assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
+        assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
     fun olderSuccessCannotOverwriteTheLatestAvatar() = runBlocking {
         val loader = ControlledAvatarProfileLoader()
         val model = avatarModel(loader)
@@ -455,6 +470,20 @@ private class EmptyFavoriteEntrySource : FavoriteEntrySource {
         favorites
 
     override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
+}
+
+private class CountingFavoriteEntrySource : FavoriteEntrySource {
+    private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
+    var loadCount = 0
+        private set
+
+    override fun favoritesByGroup(type: FavoriteType): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> =
+        favorites
+
+    override suspend fun load(type: FavoriteType): Result<Unit> {
+        loadCount++
+        return Result.success(Unit)
+    }
 }
 
 private class DirectEntryFavoriteSource(

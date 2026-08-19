@@ -246,7 +246,8 @@ private fun AvatarProfileContent(
                 onFavorite()
             }
         },
-        enabled = favoriteEntryState != FavoriteEntryState.Loading,
+        enabled = favoriteEntryState != FavoriteEntryState.Loading &&
+            favoriteEntryState != FavoriteEntryState.Unavailable,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(
@@ -261,6 +262,7 @@ private fun AvatarProfileContent(
                 FavoriteEntryState.Favorited -> strings.editFavorite
                 FavoriteEntryState.NotFavorited -> strings.favoriteAvatar
                 FavoriteEntryState.LoadFailed -> strings.retry
+                FavoriteEntryState.Unavailable -> strings.favoriteAvatar
             }
         )
     }

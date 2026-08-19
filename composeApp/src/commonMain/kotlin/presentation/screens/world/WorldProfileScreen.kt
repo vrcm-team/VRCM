@@ -1024,7 +1024,8 @@ private fun AppRoute.RenderBottomSheetContent(
                         showFavoriteGroupBottomSheet = true
                     }
                 },
-                enabled = favoriteEntryState != FavoriteEntryState.Loading,
+                enabled = favoriteEntryState != FavoriteEntryState.Loading &&
+                    favoriteEntryState != FavoriteEntryState.Unavailable,
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
@@ -1033,6 +1034,7 @@ private fun AppRoute.RenderBottomSheetContent(
                         FavoriteEntryState.Favorited -> strings.editFavorite
                         FavoriteEntryState.NotFavorited -> strings.favoriteWorld
                         FavoriteEntryState.LoadFailed -> strings.retry
+                        FavoriteEntryState.Unavailable -> strings.favoriteWorld
                     }
                 )
             }

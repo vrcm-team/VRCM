@@ -38,6 +38,7 @@ internal sealed interface FavoriteEntryState {
     data object Favorited : FavoriteEntryState
     data object NotFavorited : FavoriteEntryState
     data object LoadFailed : FavoriteEntryState
+    data object Unavailable : FavoriteEntryState
 }
 
 /**
@@ -54,6 +55,7 @@ internal class FavoriteEntryStateModel(
         Loading,
         Ready,
         Failed,
+        Unavailable,
     }
 
     private val targetId = MutableStateFlow("")
@@ -68,6 +70,7 @@ internal class FavoriteEntryStateModel(
         when (currentLoadState) {
             LoadState.Loading -> FavoriteEntryState.Loading
             LoadState.Failed -> FavoriteEntryState.LoadFailed
+            LoadState.Unavailable -> FavoriteEntryState.Unavailable
             LoadState.Ready -> {
                 val isFavorite = favoritesByGroup.values.any { favorites ->
                     favorites.any { favorite -> favorite.favoriteId == currentTargetId }
@@ -84,7 +87,7 @@ internal class FavoriteEntryStateModel(
     fun load(favoriteId: String) {
         targetId.value = favoriteId
         if (favoriteId.isBlank()) {
-            loadState.value = LoadState.Failed
+            loadState.value = LoadState.Unavailable
             return
         }
 
