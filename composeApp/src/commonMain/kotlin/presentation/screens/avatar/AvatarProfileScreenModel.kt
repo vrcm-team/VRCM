@@ -2,12 +2,17 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.CoroutineDispatcher
@@ -160,12 +165,27 @@ private enum class AvatarSelectionKind {
 class AvatarProfileScreenModel internal constructor(
     private val avatarProfileLoader: AvatarProfileLoader,
     private val avatarSelector: AvatarSelector,
+    favoriteEntrySource: FavoriteEntrySource,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
+    private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
     val avatarProfileState: StateFlow<AvatarProfileVo?> = _avatarProfileState.asStateFlow()
+
+    private val favoriteEntry = FavoriteEntryStateModel(
+        favoriteType = FavoriteType.Avatar,
+        source = favoriteEntrySource,
+        scope = viewModelScope,
+        dispatcher = requestDispatcher,
+        sessionFlow = favoriteSession,
+    )
+    internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
+
+    internal fun retryFavoriteEntryLoad() {
+        favoriteEntry.retry()
+    }
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -222,6 +242,7 @@ class AvatarProfileScreenModel internal constructor(
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
+        favoriteEntry.load(avatarId)
         if (avatarId.isBlank()) {
             _isLoading.value = false
             validation.value = AvatarValidation.Failed

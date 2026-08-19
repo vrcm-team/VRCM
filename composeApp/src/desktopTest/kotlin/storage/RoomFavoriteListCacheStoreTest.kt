@@ -37,12 +37,31 @@ class RoomFavoriteListCacheStoreTest {
         val cached = assertNotNull(store.load("usr_owner"))
         assertEquals(worlds, cached.favoritedWorlds)
         assertEquals(avatars, cached.favoritedAvatars)
+        assertEquals(true, cached.worldsLoaded)
+        assertEquals(true, cached.avatarsLoaded)
 
         store.saveWorlds("usr_owner", emptyList())
 
         val afterEmptyRefresh = assertNotNull(store.load("usr_owner"))
         assertEquals(emptyList(), afterEmptyRefresh.favoritedWorlds)
         assertEquals(avatars, afterEmptyRefresh.favoritedAvatars)
+        assertEquals(true, afterEmptyRefresh.worldsLoaded)
+        assertEquals(true, afterEmptyRefresh.avatarsLoaded)
+    }
+
+    @Test
+    fun refreshingOneTypeDoesNotMarkTheOtherTypeComplete() = withStore { store ->
+        store.saveWorlds("usr_owner", emptyList())
+
+        val worldsOnly = assertNotNull(store.load("usr_owner"))
+        assertEquals(true, worldsOnly.worldsLoaded)
+        assertEquals(false, worldsOnly.avatarsLoaded)
+
+        store.saveAvatars("usr_owner", emptyList())
+
+        val bothTypes = assertNotNull(store.load("usr_owner"))
+        assertEquals(true, bothTypes.worldsLoaded)
+        assertEquals(true, bothTypes.avatarsLoaded)
     }
 
     @Test

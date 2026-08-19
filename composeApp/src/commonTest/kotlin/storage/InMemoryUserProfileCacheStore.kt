@@ -31,11 +31,17 @@ class InMemoryFavoriteListCacheStore : FavoriteListCacheStore {
     override suspend fun load(userId: String): FavoriteListCache? = entries[userId]
 
     override suspend fun saveWorlds(userId: String, worlds: List<FavoritedWorldGroup>) {
-        entries[userId] = (entries[userId] ?: FavoriteListCache()).copy(favoritedWorlds = worlds)
+        entries[userId] = (entries[userId] ?: FavoriteListCache()).copy(
+            favoritedWorlds = worlds,
+            worldsLoaded = true,
+        )
     }
 
     override suspend fun saveAvatars(userId: String, avatars: List<AvatarData>) {
-        entries[userId] = (entries[userId] ?: FavoriteListCache()).copy(favoritedAvatars = avatars)
+        entries[userId] = (entries[userId] ?: FavoriteListCache()).copy(
+            favoritedAvatars = avatars,
+            avatarsLoaded = true,
+        )
     }
 
     override suspend fun clear(userId: String) {
