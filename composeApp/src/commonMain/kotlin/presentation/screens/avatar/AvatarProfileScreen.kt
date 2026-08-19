@@ -39,6 +39,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleFormat
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarPlatformInfo
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
@@ -52,7 +53,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGro
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.service.FavoriteService
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -96,12 +96,11 @@ class AvatarProfileScreen(
         val screenModel: AvatarProfileScreenModel = koinViewModel()
         val imageProcessor: PrintImageProcessor = koinInject()
         val editorSessionStore: PrintImageEditorSessionStore = koinInject()
-        val favoriteService: FavoriteService = koinInject()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
-        val avatarFavoritesByGroup by favoriteService.favoritesByGroup(FavoriteType.Avatar).collectAsState()
+        val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
@@ -121,10 +120,6 @@ class AvatarProfileScreen(
         }
 
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
-        val isFavorite = avatarFavoritesByGroup.values.any { favorites ->
-            favorites.any { favorite -> favorite.favoriteId == displayedAvatar.avatarId }
-        }
-
         LaunchedEffect(displayedAvatar.avatarId, avatarCoverUpdates) {
             val updated = avatarCoverUpdates[displayedAvatar.avatarId]
                 ?: return@LaunchedEffect
@@ -153,7 +148,8 @@ class AvatarProfileScreen(
                     actionState = actionState,
                     onSelectAvatar = screenModel::selectAvatar,
                     onFavorite = { showFavoriteSheet = true },
-                    isFavorite = isFavorite,
+                    favoriteEntryState = favoriteEntryState,
+                    onRetryFavorite = screenModel::retryFavoriteEntryLoad,
                     canEdit = editState.canEdit,
                     onEdit = { showEditSheet = true },
                 )
@@ -197,7 +193,8 @@ private fun AvatarProfileContent(
     actionState: AvatarActionState,
     onSelectAvatar: () -> Unit,
     onFavorite: () -> Unit,
-    isFavorite: Boolean,
+    favoriteEntryState: FavoriteEntryState,
+    onRetryFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
 ) {
@@ -242,7 +239,14 @@ private fun AvatarProfileContent(
     )
 
     OutlinedButton(
-        onClick = onFavorite,
+        onClick = {
+            if (favoriteEntryState == FavoriteEntryState.LoadFailed) {
+                onRetryFavorite()
+            } else {
+                onFavorite()
+            }
+        },
+        enabled = favoriteEntryState != FavoriteEntryState.Loading,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(
@@ -251,7 +255,14 @@ private fun AvatarProfileContent(
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(8.dp))
-        Text(if (isFavorite) strings.editFavorite else strings.favoriteAvatar)
+        Text(
+            when (favoriteEntryState) {
+                FavoriteEntryState.Loading -> strings.loading
+                FavoriteEntryState.Favorited -> strings.editFavorite
+                FavoriteEntryState.NotFavorited -> strings.favoriteAvatar
+                FavoriteEntryState.LoadFailed -> strings.retry
+            }
+        )
     }
 
     if (canEdit) {

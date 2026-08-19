@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
@@ -13,6 +14,9 @@ import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
+import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo.Owner
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
@@ -33,12 +37,13 @@ import kotlin.time.ExperimentalTime
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
  */
 @OptIn(ExperimentalTime::class)
-class WorldProfileScreenModel(
+class WorldProfileScreenModel internal constructor(
     private val worldsApi: WorldsApi,
     private val instancesApi: InstancesApi,
     private val usersApi: UsersApi,
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
+    favoriteEntrySource: FavoriteEntrySource,
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
     private val worldProfileCacheStore: WorldProfileCacheStore,
@@ -51,9 +56,16 @@ class WorldProfileScreenModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // 是否已收藏状态
-    private val _isFavorite = MutableStateFlow(false)
-    val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
+    private val favoriteEntry = FavoriteEntryStateModel(
+        favoriteType = FavoriteType.World,
+        source = favoriteEntrySource,
+        scope = viewModelScope,
+    )
+    internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
+
+    internal fun retryFavoriteEntryLoad() {
+        favoriteEntry.retry()
+    }
 
     /**
      * 刷新世界数据
@@ -61,6 +73,7 @@ class WorldProfileScreenModel(
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
+        favoriteEntry.load(worldId)
         if (worldId.isBlank()) return
         // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。
         viewModelScope.launch { applyCachedWorld(worldId, worldProfileVO) }

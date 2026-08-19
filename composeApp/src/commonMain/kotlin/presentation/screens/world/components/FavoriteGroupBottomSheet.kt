@@ -66,7 +66,8 @@ fun FavoriteGroupBottomSheet(
     )
 
     // 加载收藏数据
-    LaunchedEffect(favoriteId, favoriteType, favoriteRecordId) {
+    LaunchedEffect(isVisible, favoriteId, favoriteType, favoriteRecordId) {
+        if (!isVisible) return@LaunchedEffect
         authService.reTryAuth {
             favoriteService.loadFavoriteByGroup(favoriteType)
         }
