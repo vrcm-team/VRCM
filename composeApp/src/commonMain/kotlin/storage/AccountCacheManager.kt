@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.storage
 
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupAssetRef
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
@@ -36,6 +38,7 @@ class AccountCacheManager(
     private val friendActivityStore: FriendActivityCacheStore,
     private val meetupCardConfigDao: MeetupCardConfigDao,
     private val meetupCardAssetStore: MeetupCardAssetStore,
+    private val favoriteListCacheStore: FavoriteListCacheStore = NoOpFavoriteListCacheStore,
 ) {
     private val lock = SynchronizedObject()
     private var globalGeneration = 0L
@@ -174,6 +177,20 @@ class AccountCacheManager(
         friendListCacheStore.save(token.userId, cache)
     }
 
+    internal suspend fun saveFavoriteWorldsIfCurrent(
+        token: AccountCacheWriteToken,
+        worlds: List<FavoritedWorldGroup>,
+    ): Boolean = mutateIfCurrent(token) {
+        favoriteListCacheStore.saveWorlds(token.userId, worlds)
+    }
+
+    internal suspend fun saveFavoriteAvatarsIfCurrent(
+        token: AccountCacheWriteToken,
+        avatars: List<AvatarData>,
+    ): Boolean = mutateIfCurrent(token) {
+        favoriteListCacheStore.saveAvatars(token.userId, avatars)
+    }
+
     suspend fun clearAccount(userId: String) {
         var invalidation: AccountCacheInvalidation? = null
         accountMutationMutex.lock()
@@ -186,6 +203,7 @@ class AccountCacheManager(
             }
             // Room 的清理是挂起调用，只能放在 synchronized 之外。
             friendListCacheStore.clear(userId)
+            favoriteListCacheStore.clear(userId)
             userProfileCacheStore.clearOwner(userId)
             meetupCardAssetStore.deleteAccount(userId)
             friendActivityStore.clearAccount(userId)
@@ -207,6 +225,7 @@ class AccountCacheManager(
                 invalidation = AccountCacheInvalidation(null, invalidationEpoch)
             }
             friendListCacheStore.clearAll()
+            favoriteListCacheStore.clearAll()
             userProfileCacheStore.clearAll()
             friendActivityStore.clearAll()
         } finally {
@@ -247,4 +266,16 @@ class AccountCacheManager(
         val ownerId: String,
         val assets: MutableSet<MeetupAssetRef> = mutableSetOf(),
     )
+}
+
+private object NoOpFavoriteListCacheStore : FavoriteListCacheStore {
+    override suspend fun load(userId: String) = null
+
+    override suspend fun saveWorlds(userId: String, worlds: List<FavoritedWorldGroup>) = Unit
+
+    override suspend fun saveAvatars(userId: String, avatars: List<AvatarData>) = Unit
+
+    override suspend fun clear(userId: String) = Unit
+
+    override suspend fun clearAll() = Unit
 }
