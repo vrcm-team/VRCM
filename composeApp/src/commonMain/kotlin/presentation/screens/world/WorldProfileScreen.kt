@@ -73,6 +73,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.FavoriteService
+import org.koin.compose.koinInject
 import presentation.compoments.TopMenuBar
 import kotlin.math.abs
 
@@ -876,6 +878,11 @@ private fun AppRoute.RenderBottomSheetContent(
     onExpanded: () -> Unit,
 ) {
     val screenModel = koinViewModel<WorldProfileScreenModel>()
+    val favoriteService: FavoriteService = koinInject()
+    val worldFavoritesByGroup by favoriteService.favoritesByGroup(FavoriteType.World).collectAsState()
+    val isFavorite = worldFavoritesByGroup.values.any { favorites ->
+        favorites.any { favorite -> favorite.favoriteId == worldProfileVo.worldId }
+    }
 
     // 对话框状态管理
     var showCreateInstanceDialog by remember { mutableStateOf(false) }
@@ -1018,7 +1025,7 @@ private fun AppRoute.RenderBottomSheetContent(
                 onClick = { showFavoriteGroupBottomSheet = true },
                 modifier = Modifier.weight(1f)
             ) {
-                Text(strings.favoriteWorld)
+                Text(if (isFavorite) strings.editFavorite else strings.favoriteWorld)
             }
         }
 

@@ -149,6 +149,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val cancel = "キャンセル"
     override val favoriteWorld = "お気に入り追加"
     override val favoriteAvatar = "モデルをお気に入りに追加"
+    override val editFavorite = "お気に入りを編集"
     override val favoriteAddSuccess = "お気に入りに追加しました"
     override val favoriteAlreadyExists = "既にお気に入りです"
     override val favoriteGroupSelect = "お気に入りグループを選択"
