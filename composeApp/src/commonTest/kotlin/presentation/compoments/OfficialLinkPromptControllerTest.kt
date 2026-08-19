@@ -96,6 +96,28 @@ class OfficialLinkPromptControllerTest {
     }
 
     @Test
+    fun appSharedLinkIsAlreadyInspectedButAnotherClipboardLinkStillPrompts() = runTest {
+        val controller = OfficialLinkPromptController<String>(
+            scope = this,
+            resolve = { Result.success("resolved") },
+            onResolved = {},
+            onExternalConsumed = {},
+        )
+        controller.updateAuthentication(true)
+        controller.markClipboardInspected("https://vrchat.com/home/user/usr_shared")
+
+        controller.inspectClipboard("https://www.vrchat.com/home/user/usr_shared?ref=share")
+        assertEquals(OfficialLinkPromptState.Idle, controller.state.value)
+
+        controller.inspectClipboard("https://vrchat.com/home/world/wrld_external")
+        val confirmation = assertIs<OfficialLinkPromptState.ClipboardConfirmation>(
+            controller.state.value,
+        )
+        assertEquals(OfficialLinkType.World, confirmation.operation.target.type)
+        assertEquals("wrld_external", confirmation.operation.target.id)
+    }
+
+    @Test
     fun recreatedControllerKeepsTheClipboardConfirmation() = runTest {
         val firstController = OfficialLinkPromptController<String>(
             scope = this,
