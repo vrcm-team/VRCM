@@ -11,34 +11,43 @@ class VersionService(
 ) {
 
     /**
-     * 获取最新的版本号,和版本链接
-     * @param checkRemember 是否检查记住版本
-     * @return 最新版本号和最新版本链接
+     * 获取最新版本信息。GitHub 直连失败时会依次尝试镜像。
+     *
+     * @param checkRemember 是否忽略用户已记住的版本
      */
-    suspend fun checkVersion(checkRemember: Boolean): Result<VersionDto> =
-        gitHubApi.latestRelease(AppConst.APP_GITHUB_LATEST_RELEASE_URL).let { it ->
-            when {
-                it.isSuccess -> {
-                    val releaseData = it.getOrNull()!!
-                    val tagName = releaseData.tagName
-                    val downloadUrl = releaseData.assets.map { asset -> asset.browserDownloadUrl }
-                    if (AppConst.APP_VERSION == tagName
-                        || (checkRemember && settingsDao.rememberVersion == tagName)
-                    ) {
-                        // 当前版本是最新版本
-                        Result.success(VersionDto(tagName, releaseData.htmlUrl, releaseData.body, false,downloadUrl))
-                    } else {
-                        // 当前版本不是最新版本
-                        Result.success(VersionDto(tagName, releaseData.htmlUrl, releaseData.body, true,downloadUrl))
-                    }
-                }
-
-                else -> Result.failure(it.exceptionOrNull()!!)
+    suspend fun checkVersion(checkRemember: Boolean): Result<VersionDto> {
+        var lastFailure: Throwable? = null
+        for (releaseUrl in releaseUrls) {
+            val result = gitHubApi.latestRelease(releaseUrl)
+            val releaseData = result.getOrNull()
+            if (releaseData == null) {
+                lastFailure = result.exceptionOrNull()
+                continue
             }
+
+            val tagName = releaseData.tagName
+            val hasNewVersion = AppConst.APP_VERSION != tagName &&
+                (!checkRemember || settingsDao.rememberVersion != tagName)
+            return Result.success(
+                VersionDto(
+                    tagName = tagName,
+                    htmlUrl = releaseData.htmlUrl,
+                    body = releaseData.body,
+                    hasNewVersion = hasNewVersion,
+                    downloadUrl = releaseData.assets.map { it.browserDownloadUrl },
+                ),
+            )
         }
+        return Result.failure(lastFailure ?: IllegalStateException("Unable to reach GitHub release service"))
+    }
 
     fun rememberVersion(version: String?) {
         settingsDao.rememberVersion = version
     }
-
 }
+
+private val releaseUrls = listOf(
+    AppConst.APP_GITHUB_LATEST_RELEASE_URL,
+    "https://ghfast.top/${AppConst.APP_GITHUB_LATEST_RELEASE_URL}",
+    "https://gh-proxy.com/${AppConst.APP_GITHUB_LATEST_RELEASE_URL}",
+)

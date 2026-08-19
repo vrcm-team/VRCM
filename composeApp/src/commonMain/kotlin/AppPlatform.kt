@@ -22,6 +22,12 @@ interface AppPlatform : KoinComponent {
     val supportsBatteryOptimizationSettings: Boolean get() = false
     fun isIgnoringBatteryOptimizations(): Boolean = true
     fun openBatteryOptimizationSettings() = Unit
+
+    suspend fun installAppUpdate(
+        tagName: String,
+        downloadUrls: List<String>,
+        onProgress: (Float?) -> Unit,
+    ): Result<Unit> = Result.failure(UnsupportedOperationException("In-app updates are not supported on $name"))
 }
 
 enum class BackgroundFriendMonitoringResult { Started, Stopped, PermissionRequired, Unsupported }

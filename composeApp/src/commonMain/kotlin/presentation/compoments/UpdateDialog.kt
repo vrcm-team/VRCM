@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.coroutines.launch
 import presentation.screens.auth.data.VersionVo
 
 @Composable
@@ -24,7 +25,10 @@ fun UpdateDialog(
 ) {
     if (version.hasNewVersion) {
         val appPlatform = getAppPlatform()
+        val scope = rememberCoroutineScope()
         var rememberVersionChecked by remember { mutableStateOf(false) }
+        var isUpdating by remember { mutableStateOf(false) }
+        var updateProgress by remember { mutableStateOf<Float?>(null) }
         val url = remember {
             when (appPlatform.type) {
                 AppPlatformType.Android -> version.downloadUrl.firstOrNull {
@@ -68,24 +72,56 @@ fun UpdateDialog(
                     }
                 }
             },
-            onDismissRequest = onDismissRequest,
+            onDismissRequest = { if (!isUpdating) onDismissRequest() },
             confirmButton = {
                 FilledTonalButton(
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
+                    enabled = !isUpdating,
                     onClick = {
-                        appPlatform.openUrl(url)
+                        val hasApk = version.downloadUrl.any { it.endsWith(".apk", ignoreCase = true) }
+                        if (appPlatform.type != AppPlatformType.Android || !hasApk) {
+                            appPlatform.openUrl(url)
+                        } else {
+                            isUpdating = true
+                            scope.launch {
+                                appPlatform.installAppUpdate(
+                                    tagName = version.tagName,
+                                    downloadUrls = version.downloadUrl,
+                                    onProgress = { updateProgress = it },
+                                )
+                                    .onSuccess { onDismissRequest() }
+                                    .onFailure {
+                                        appPlatform.openUrl(version.htmlUrl)
+                                        onDismissRequest()
+                                    }
+                                isUpdating = false
+                                updateProgress = null
+                            }
+                        }
                     }
                 ) {
-                    Text(strings.startupDialogUpdate)
+                    if (isUpdating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        updateProgress?.let { progress ->
+                            Spacer(Modifier.width(8.dp))
+                            Text("${(progress * 100).toInt()}%")
+                        }
+                    } else {
+                        Text(strings.startupDialogUpdate)
+                    }
                 }
                 FilledTonalButton(
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     ),
+                    enabled = !isUpdating,
                     onClick = {
                         // 关闭弹窗
                         onDismissRequest()
@@ -101,6 +137,7 @@ fun UpdateDialog(
                 ) {
                     Checkbox(
                         checked = rememberVersionChecked,
+                        enabled = !isUpdating,
                         onCheckedChange = {
                             rememberVersionChecked = it
                             // 记住或清除此版本更新提示

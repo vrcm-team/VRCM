@@ -75,4 +75,10 @@ class AndroidAppPlatform(val context: Context, private val logger: Logger) : App
             )
         }.onFailure { logger.error("Failed to open battery optimization settings: ${it.message.orEmpty()}") }
     }
+
+    override suspend fun installAppUpdate(
+        tagName: String,
+        downloadUrls: List<String>,
+        onProgress: (Float?) -> Unit,
+    ): Result<Unit> = downloadAndInstallAppUpdate(context, tagName, downloadUrls, onProgress)
 }
