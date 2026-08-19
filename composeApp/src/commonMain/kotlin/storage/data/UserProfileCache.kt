@@ -18,6 +18,7 @@ data class UserProfileCache(
     val favoritedWorlds: List<FavoritedWorldGroup> = emptyList(),
 )
 
+/** List-summary revision captured after the corresponding cached details were refreshed. */
 @Serializable
 data class WorldDetailRevision(
     val updatedAt: String?,

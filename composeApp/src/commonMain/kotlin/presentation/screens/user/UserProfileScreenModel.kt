@@ -224,6 +224,7 @@ internal data class CreatedWorldRefreshPlan(
     val worlds: List<WorldData>,
     val worldIdsToRefresh: List<String>,
     val detailRevisions: Map<String, WorldDetailRevision>,
+    val summaryRevisions: Map<String, WorldDetailRevision>,
 )
 
 internal data class CreatedWorldRefreshResult(
@@ -240,6 +241,7 @@ internal fun planCreatedWorldRefresh(
     val cachedById = cachedWorlds.associateBy(WorldData::id)
     val currentIds = summaries.mapTo(mutableSetOf(), WorldData::id)
     val retainedRevisions = cachedDetailRevisions.filterKeys { it in currentIds }
+    val summaryRevisions = summaries.associate { it.id to it.detailRevision() }
     val worlds = summaries.map { summary ->
         val cachedDescription = cachedById[summary.id]?.description
         if (cachedDescription != null && summary.description == null) {
@@ -256,6 +258,7 @@ internal fun planCreatedWorldRefresh(
         worlds = worlds,
         worldIdsToRefresh = worldIdsToRefresh,
         detailRevisions = retainedRevisions,
+        summaryRevisions = summaryRevisions,
     )
 }
 
@@ -269,8 +272,8 @@ internal fun mergeCreatedWorldDetails(
         .filter { it.id in visibleIds }
         .associateBy(WorldData::id)
     val revisions = plan.detailRevisions.toMutableMap()
-    refreshedById.forEach { (id, world) ->
-        revisions[id] = world.detailRevision()
+    refreshedById.forEach { (id, _) ->
+        revisions[id] = plan.summaryRevisions.getValue(id)
     }
     return CreatedWorldRefreshResult(
         worlds = plan.worlds.map { refreshedById[it.id] ?: it },
@@ -436,11 +439,7 @@ class UserProfileScreenModel(
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
         _mutualGroups.value = cache.mutualGroups
         _createdWorlds.value = cache.createdWorlds
-        createdWorldDetailRevisions = cache.createdWorldDetailRevisions.ifEmpty {
-            cache.createdWorlds
-                .filter { it.description != null }
-                .associate { it.id to it.detailRevision() }
-        }
+        createdWorldDetailRevisions = cache.createdWorldDetailRevisions
         _createdAvatars.value = cache.createdAvatars
         setFavoritedWorldGroups(cache.favoritedWorlds)
     }

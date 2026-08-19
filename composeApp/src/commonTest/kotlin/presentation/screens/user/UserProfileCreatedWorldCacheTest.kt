@@ -69,6 +69,31 @@ class UserProfileCreatedWorldCacheTest {
         assertEquals(WorldDetailRevision("2026-08-02", 2), successfulResult.detailRevisions.getValue(cached.id))
     }
 
+    @Test
+    fun successfulRefreshUsesSummaryRevisionForTheNextComparison() {
+        val cached = world(id = "wrld_changed", description = "Stale", updatedAt = "2026-08-01", version = 4)
+        val summary = cached.copy(description = null, updatedAt = "2026-08-02", version = null)
+        val initialPlan = planCreatedWorldRefresh(
+            summaries = listOf(summary),
+            cachedWorlds = listOf(cached),
+            cachedDetailRevisions = mapOf(cached.id to cached.detailRevision()),
+        )
+
+        val refreshed = mergeCreatedWorldDetails(
+            plan = initialPlan,
+            refreshedWorlds = listOf(summary.copy(description = "Fresh", version = 5)),
+        )
+        val nextPlan = planCreatedWorldRefresh(
+            summaries = listOf(summary.copy(visits = 200)),
+            cachedWorlds = refreshed.worlds,
+            cachedDetailRevisions = refreshed.detailRevisions,
+        )
+
+        assertEquals(WorldDetailRevision("2026-08-02", null), refreshed.detailRevisions.getValue(cached.id))
+        assertEquals("Fresh", nextPlan.worlds.single().description)
+        assertEquals(emptyList(), nextPlan.worldIdsToRefresh)
+    }
+
     private fun world(
         id: String,
         description: String?,
