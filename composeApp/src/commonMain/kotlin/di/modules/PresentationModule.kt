@@ -110,6 +110,7 @@ val presentationModule: Module = module {
         PrintImageEditorScreenModel(
             source = session.source,
             prepared = session.prepared,
+            croppedSource = session.croppedSource,
             calculator = get(),
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()

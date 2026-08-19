@@ -224,6 +224,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val galleryTabDeleting = "正在刪除..."
     override val galleryTabDeleteSuccess = "刪除成功"
     override val galleryTabDeleteFailed = "刪除失敗"
+    override val galleryTabCropPrintBorder = "裁剪拍立得白邊"
     // Print image editor
     override val printEditorTitle = "編輯拍立得"
     override val printEditorBack = "返回"

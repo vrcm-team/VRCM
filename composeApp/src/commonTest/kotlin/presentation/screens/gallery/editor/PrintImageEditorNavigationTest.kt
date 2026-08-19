@@ -24,6 +24,10 @@ class PrintImageEditorNavigationTest {
             handoffPreparedImageToEditor(
                 source = SelectedImage("photo.png", byteArrayOf(1)),
                 prepared = PreparedImage(NavigationTestBitmap, ImageSize(16, 9)),
+                croppedSource = PreparedImageSource(
+                    SelectedImage("photo.png", byteArrayOf(2)),
+                    PreparedImage(CroppedNavigationTestBitmap, ImageSize(16, 9)),
+                ),
                 sessionStore = store,
                 releasePreview = {
                     released += it
@@ -35,7 +39,10 @@ class PrintImageEditorNavigationTest {
 
         assertSame(failure, thrown)
         assertTrue(releaseFailure in thrown.suppressedExceptions)
-        assertEquals(listOf<ImageBitmap>(NavigationTestBitmap), released)
+        assertEquals(
+            listOf<ImageBitmap>(NavigationTestBitmap, CroppedNavigationTestBitmap),
+            released,
+        )
         assertNull(store.get("image-editor-0"))
     }
 
@@ -69,6 +76,10 @@ class PrintImageEditorNavigationTest {
         handoffPreparedImageToEditor(
             source = SelectedImage("photo.png", byteArrayOf(1)),
             prepared = PreparedImage(NavigationTestBitmap, ImageSize(16, 9)),
+            croppedSource = PreparedImageSource(
+                SelectedImage("photo.png", byteArrayOf(2)),
+                PreparedImage(CroppedNavigationTestBitmap, ImageSize(16, 9)),
+            ),
             sessionStore = store,
             releasePreview = released::add,
             push = { pushedSessionId = it },
@@ -76,10 +87,34 @@ class PrintImageEditorNavigationTest {
 
         assertEquals(emptyList(), released)
         assertSame(NavigationTestBitmap, store.get(requireNotNull(pushedSessionId))?.prepared?.preview)
+        assertSame(
+            CroppedNavigationTestBitmap,
+            store.get(requireNotNull(pushedSessionId))?.croppedSource?.prepared?.preview,
+        )
     }
 }
 
 private data object NavigationTestBitmap : ImageBitmap {
+    override val width: Int = 16
+    override val height: Int = 9
+    override val colorSpace: ColorSpace = ColorSpaces.Srgb
+    override val hasAlpha: Boolean = true
+    override val config: ImageBitmapConfig = ImageBitmapConfig.Argb8888
+
+    override fun readPixels(
+        buffer: IntArray,
+        startX: Int,
+        startY: Int,
+        width: Int,
+        height: Int,
+        bufferOffset: Int,
+        stride: Int,
+    ) = Unit
+
+    override fun prepareToDraw() = Unit
+}
+
+private data object CroppedNavigationTestBitmap : ImageBitmap {
     override val width: Int = 16
     override val height: Int = 9
     override val colorSpace: ColorSpace = ColorSpaces.Srgb

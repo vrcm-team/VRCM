@@ -161,17 +161,20 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             )
                             return@launch
                         }
-                        val prepared = printImageProcessor.prepare(source).getOrElse { failure ->
-                            if (failure is CancellationException) throw failure
-                            val message = (failure as? PrintImageFailure)
-                                ?.localizedMessage(locale)
-                                ?: locale.printEditorDecodeFailed
-                            SharedFlowCentre.toastText.emit(ToastText.Error(message))
-                            return@launch
-                        }
+                        val preparedSources = printImageProcessor
+                            .preparePrint(source)
+                            .getOrElse { failure ->
+                                if (failure is CancellationException) throw failure
+                                val message = (failure as? PrintImageFailure)
+                                    ?.localizedMessage(locale)
+                                    ?: locale.printEditorDecodeFailed
+                                SharedFlowCentre.toastText.emit(ToastText.Error(message))
+                                return@launch
+                            }
                         handoffPreparedImageToEditor(
-                            source = source,
-                            prepared = prepared,
+                            source = preparedSources.original.source,
+                            prepared = preparedSources.original.prepared,
+                            croppedSource = preparedSources.cropped,
                             sessionStore = editorSessionStore,
                             push = { sessionId ->
                                 navigator.push(PrintImageEditorScreen(sessionId))
@@ -198,61 +201,66 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
 
             // 选中时为红色删除按钮，否则为上传按钮
             val hasSelection = galleryScreenModel.hasSelection(tagType)
-            FloatingActionButton(
-                onClick = {
-                    if (hasSelection) {
-                        // 删除选中项
-                        if (isPrint) {
-                            galleryScreenModel.deleteSelectedPrints(
-                                deletingMessage = locale.galleryTabDeleting,
-                                successMessage = locale.galleryTabDeleteSuccess,
-                                failedMessagePrefix = locale.galleryTabDeleteFailed,
-                            )
-                        } else {
-                            galleryScreenModel.deleteSelectedFiles(
-                                tagType = tagType,
-                                deletingMessage = locale.galleryTabDeleting,
-                                successMessage = locale.galleryTabDeleteSuccess,
-                                failedMessagePrefix = locale.galleryTabDeleteFailed,
-                            )
-                        }
-                    } else if (!isPreparing && isVrcPlus) {
-                        if (isPrint) printImagePicker.launch() else simpleImagePicker.launch()
-                    }
-                },
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp),
-                containerColor = when {
-                    hasSelection -> MaterialTheme.colorScheme.error
-                    isVrcPlus -> MaterialTheme.colorScheme.primaryContainer
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                },
-                contentColor = when {
-                    hasSelection -> MaterialTheme.colorScheme.onError
-                    isVrcPlus -> MaterialTheme.colorScheme.onPrimaryContainer
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (isPreparing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else if (hasSelection) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = locale.galleryTabDelete,
-                    )
-                } else {
-                    Icon(
-                        imageVector = AppIcons.Publish,
-                        contentDescription = if (isVrcPlus) {
-                            locale.galleryTabUploadImage
-                        } else {
-                            locale.galleryTabVrcPlusRequired
-                        },
-                    )
+                FloatingActionButton(
+                    onClick = {
+                        if (hasSelection) {
+                            // 删除选中项
+                            if (isPrint) {
+                                galleryScreenModel.deleteSelectedPrints(
+                                    deletingMessage = locale.galleryTabDeleting,
+                                    successMessage = locale.galleryTabDeleteSuccess,
+                                    failedMessagePrefix = locale.galleryTabDeleteFailed,
+                                )
+                            } else {
+                                galleryScreenModel.deleteSelectedFiles(
+                                    tagType = tagType,
+                                    deletingMessage = locale.galleryTabDeleting,
+                                    successMessage = locale.galleryTabDeleteSuccess,
+                                    failedMessagePrefix = locale.galleryTabDeleteFailed,
+                                )
+                            }
+                        } else if (!isPreparing && isVrcPlus) {
+                            if (isPrint) printImagePicker.launch() else simpleImagePicker.launch()
+                        }
+                    },
+                    containerColor = when {
+                        hasSelection -> MaterialTheme.colorScheme.error
+                        isVrcPlus -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    contentColor = when {
+                        hasSelection -> MaterialTheme.colorScheme.onError
+                        isVrcPlus -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    },
+                ) {
+                    if (isPreparing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else if (hasSelection) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = locale.galleryTabDelete,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = AppIcons.Publish,
+                            contentDescription = if (isVrcPlus) {
+                                locale.galleryTabUploadImage
+                            } else {
+                                locale.galleryTabVrcPlusRequired
+                            },
+                        )
+                    }
                 }
             }
         }

@@ -240,6 +240,7 @@ sealed class LocaleStrings {
     open val galleryTabDeleting: String = "Deleting..."
     open val galleryTabDeleteSuccess: String = "Deleted successfully"
     open val galleryTabDeleteFailed: String = "Delete failed"
+    open val galleryTabCropPrintBorder: String = "Crop Print border"
     // Print image editor
     open val printEditorTitle: String = "Edit Print"
     open val printEditorBack: String = "Back"
