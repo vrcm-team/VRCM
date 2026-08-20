@@ -2,6 +2,9 @@ package io.github.vrcmteam.vrcm.network.websocket.data
 
 import kotlinx.serialization.Serializable
 
+private const val SESSION_REJECTED_ERROR =
+    "authToken doesn't correspond with an active session"
+
 @Serializable
 data class WebSocketEvent(
     val type: String,
@@ -15,7 +18,10 @@ internal data class WebSocketMessage(
     val err: String? = null,
 ) {
     fun requireEvent(): WebSocketEvent {
-        if (err != null) throw WebSocketSessionRejectedException()
+        err?.let { error ->
+            if (error == SESSION_REJECTED_ERROR) throw WebSocketSessionRejectedException()
+            throw WebSocketPipelineException(error)
+        }
         return WebSocketEvent(
             type = requireNotNull(type) { "Pipeline message did not contain an event type" },
             content = requireNotNull(content) { "Pipeline message did not contain event content" },
@@ -25,3 +31,6 @@ internal data class WebSocketMessage(
 
 internal class WebSocketSessionRejectedException :
     Exception("Pipeline rejected the authenticated session")
+
+internal class WebSocketPipelineException(error: String) :
+    Exception("Pipeline error: $error")

@@ -21,4 +21,24 @@ class WebSocketMessageTest {
         assertEquals("Pipeline rejected the authenticated session", error.message)
         assertFalse(error.message.orEmpty().contains(credential))
     }
+
+    @Test
+    fun otherPipelineErrorsDoNotTriggerSessionRecovery() {
+        val errors = listOf(
+            "Error finding user usr_example",
+            "Pipeline: authToken doesn't correspond with an active session",
+        )
+
+        errors.forEach { errorText ->
+            val message = Json.decodeFromString<WebSocketMessage>(
+                """{"err":"$errorText"}"""
+            )
+
+            val error = assertFailsWith<WebSocketPipelineException> {
+                message.requireEvent()
+            }
+
+            assertEquals("Pipeline error: $errorText", error.message)
+        }
+    }
 }
