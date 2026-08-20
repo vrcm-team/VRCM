@@ -19,6 +19,7 @@ private const val RATE_LIMIT_MAX_DELAY_MILLIS = 60_000L
  */
 internal fun HttpClientConfig<*>.configureApiClient(
     apiNoticeCenter: ApiNoticeCenter,
+    webSocketJson: Json = Json,
     retryDelay: (suspend (Long) -> Unit)? = null,
 ) {
     defaultRequest { url.takeFrom(VRC_API_URL) }
@@ -60,11 +61,10 @@ internal fun HttpClientConfig<*>.configureApiClient(
     // websocket
     install(WebSockets){
         // json 序列化配置
-        contentConverter = KotlinxWebsocketSerializationConverter(Json)
+        contentConverter = KotlinxWebsocketSerializationConverter(webSocketJson)
         // ping间隔（保持连接活跃，必须小于 socketTimeoutMillis）
         pingInterval = 30.seconds
     }
     // user agent用户代理信息 (就是添加一个header)
     install(UserAgent)
 }
-

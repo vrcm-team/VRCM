@@ -386,6 +386,37 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun expiredRealtimeSessionReauthenticatesSavedAccount() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val expiredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        fixture.service.recoverExpiredSession(expiredSession.token)
+
+        val recoveredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        assertEquals(expiredSession.account.userId, recoveredSession.account.userId)
+        assertFalse(expiredSession.token == recoveredSession.token)
+        fixture.client.close()
+    }
+
+    @Test
+    fun expiredRealtimeSessionWithoutSavedPasswordInvalidatesSession() = runTest {
+        val accountWithoutPassword = cachedAccount().copy(password = null)
+        val fixture = fixture(accountWithoutPassword) {
+            jsonResponse(currentUserJson(accountWithoutPassword))
+        }
+        fixture.service.restoreAuth()
+        val expiredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        fixture.service.recoverExpiredSession(expiredSession.token)
+
+        assertNull(SharedFlowCentre.currentSession.value)
+        fixture.client.close()
+    }
+
+    @Test
     fun failedAccountSwitchInvalidatesPreviousSession() = runTest {
         val secondAccount = AccountDto(
             userId = "usr_second",
@@ -490,7 +521,10 @@ class AuthServiceTest : MainDispatcherTest() {
         val client: HttpClient,
     )
 
-    private fun fixture(handler: MockRequestHandler): Fixture {
+    private fun fixture(
+        account: AccountDto = cachedAccount(),
+        handler: MockRequestHandler,
+    ): Fixture {
         val cookies = PersistentCookiesStorage(EmptyLogger())
         val client = HttpClient(MockEngine) {
             engine { addHandler(handler) }
@@ -498,7 +532,9 @@ class AuthServiceTest : MainDispatcherTest() {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             install(HttpCookies) { storage = cookies }
         }
-        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { it.saveAccountInfo(cachedAccount()) }
+        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+            it.saveAccountInfo(account)
+        }
         val service = AuthService(
             authApi = AuthApi(client),
             accountDao = accountDao,

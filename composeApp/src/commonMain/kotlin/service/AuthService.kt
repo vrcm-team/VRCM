@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
+import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -47,7 +48,7 @@ class AuthService(
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
     private val accountCacheManager: AccountCacheManager,
-) {
+) : WebSocketSessionRecovery {
     private var scope = CoroutineScope(Job())
     private val authMutex = Mutex()
     private val currentUserLock = SynchronizedObject()
@@ -339,6 +340,14 @@ class AuthService(
         if (expectedUserId != null && accountInfo.userId != expectedUserId) return false
         val password = accountInfo.password ?: return false
         return loginLocked(accountInfo.username, password) is AuthState.Authed
+    }
+
+    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock
+        val recovered = doReTryAuthLocked(sessionToken.userId)
+        if (!recovered && SharedFlowCentre.isCurrentSession(sessionToken)) {
+            invalidateCurrentSessionLocked()
+        }
     }
 
     internal suspend fun <T> runSessionBoundCatching(

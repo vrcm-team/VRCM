@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.service.*
+import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.service.meetup.DecorationResolver
 import io.github.vrcmteam.vrcm.service.meetup.DecorationTemplateSource
 import io.github.vrcmteam.vrcm.service.meetup.DefaultMeetupCardRemoteDataSource
@@ -24,7 +25,7 @@ import org.koin.dsl.module
 
 val serviceModule: Module = module {
     singleOf(::VersionService)
-    singleOf(::AuthService)
+    singleOf(::AuthService) bind WebSocketSessionRecovery::class
     singleOf(::FavoriteService)
     singleOf(::FriendService)
     singleOf(::FriendActivityService)

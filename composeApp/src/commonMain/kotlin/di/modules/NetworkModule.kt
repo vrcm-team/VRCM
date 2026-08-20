@@ -61,7 +61,10 @@ internal fun createNetworkJson() = Json {
 
 private val apiClientDefinition: Definition<HttpClient> = {
     HttpClient {
-        configureApiClient(get())
+        configureApiClient(
+            apiNoticeCenter = get(),
+            webSocketJson = get(),
+        )
         // api的json序列化器
         install(ContentNegotiation) {
             json(get())
