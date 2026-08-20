@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
@@ -387,8 +388,22 @@ class AuthServiceTest : MainDispatcherTest() {
 
     @Test
     fun expiredRealtimeSessionReauthenticatesSavedAccount() = runTest {
-        val fixture = fixture {
-            jsonResponse(currentUserJson(cachedAccount()))
+        val requests = mutableListOf<Pair<String?, String?>>()
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            requests += request.headers[HttpHeaders.Cookie] to request.headers[HttpHeaders.Authorization]
+            when (requestCount) {
+                2 -> respond(
+                    content = currentUserJson(cachedAccount()),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.SetCookie to listOf("auth=new-auth; Path=/"),
+                    ),
+                )
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
         }
         fixture.service.restoreAuth()
         val expiredSession = assertNotNull(SharedFlowCentre.currentSession.value)
@@ -398,13 +413,20 @@ class AuthServiceTest : MainDispatcherTest() {
         val recoveredSession = assertNotNull(SharedFlowCentre.currentSession.value)
         assertEquals(expiredSession.account.userId, recoveredSession.account.userId)
         assertFalse(expiredSession.token == recoveredSession.token)
+        assertFalse(requests[1].first.orEmpty().contains("auth=cached-auth"))
+        assertTrue(requests[1].first.orEmpty().contains("twoFactorAuth=cached-2fa"))
+        assertTrue(requests[1].second.orEmpty().startsWith("Basic "))
+        assertTrue(requests[2].first.orEmpty().contains("auth=new-auth"))
+        assertEquals("new-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
         fixture.client.close()
     }
 
     @Test
     fun expiredRealtimeSessionWithoutSavedPasswordInvalidatesSession() = runTest {
         val accountWithoutPassword = cachedAccount().copy(password = null)
+        var requestCount = 0
         val fixture = fixture(accountWithoutPassword) {
+            requestCount++
             jsonResponse(currentUserJson(accountWithoutPassword))
         }
         fixture.service.restoreAuth()
@@ -413,6 +435,36 @@ class AuthServiceTest : MainDispatcherTest() {
         fixture.service.recoverExpiredSession(expiredSession.token)
 
         assertNull(SharedFlowCentre.currentSession.value)
+        assertNull(fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        assertNull(fixture.service.restoreAuth())
+        assertEquals(1, requestCount)
+        fixture.client.close()
+    }
+
+    @Test
+    fun temporaryRealtimeReauthenticationFailureKeepsSessionAndStoredCookie() = runTest {
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            if (requestCount == 2) {
+                respond(
+                    content = "temporarily unavailable",
+                    status = HttpStatusCode.ServiceUnavailable,
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertFailsWith<VRCApiException> {
+            fixture.service.recoverExpiredSession(session.token)
+        }
+
+        assertTrue(SharedFlowCentre.isCurrentSession(session.token))
+        assertEquals("cached-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        assertEquals("cached-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
         fixture.client.close()
     }
 
@@ -518,6 +570,7 @@ class AuthServiceTest : MainDispatcherTest() {
     private data class Fixture(
         val service: AuthService,
         val accountDao: AccountDao,
+        val cookies: PersistentCookiesStorage,
         val client: HttpClient,
     )
 
@@ -550,7 +603,7 @@ class AuthServiceTest : MainDispatcherTest() {
                 ),
             ),
         )
-        return Fixture(service, accountDao, client)
+        return Fixture(service, accountDao, cookies, client)
     }
 
     private fun cachedAccount() = AccountDto(
