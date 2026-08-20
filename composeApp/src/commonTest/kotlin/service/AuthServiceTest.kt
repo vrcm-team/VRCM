@@ -33,8 +33,11 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
@@ -465,6 +468,51 @@ class AuthServiceTest : MainDispatcherTest() {
         assertTrue(SharedFlowCentre.isCurrentSession(session.token))
         assertEquals("cached-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
         assertEquals("cached-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
+        fixture.client.close()
+    }
+
+    @Test
+    fun successfulRealtimeReauthenticationCancellationKeepsNewCookie() = runTest {
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            when (requestCount) {
+                2 -> respond(
+                    content = currentUserJson(cachedAccount()),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.SetCookie to listOf("auth=new-auth; Path=/"),
+                    ),
+                )
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val authenticated = CompletableDeferred<Unit>()
+        lateinit var recoveryJob: Job
+        val cancellationCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            SharedFlowCentre.authed.collect {
+                if (!authenticated.isCompleted) {
+                    authenticated.complete(Unit)
+                    recoveryJob.cancel()
+                }
+            }
+        }
+
+        recoveryJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.recoverExpiredSession(previousSession.token)
+        }
+        authenticated.await()
+        recoveryJob.join()
+
+        val currentSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        assertFalse(currentSession.token == previousSession.token)
+        assertEquals("new-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
+        assertEquals("new-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+
+        cancellationCollector.cancelAndJoin()
         fixture.client.close()
     }
 

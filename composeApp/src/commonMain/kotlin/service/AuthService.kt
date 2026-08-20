@@ -370,10 +370,19 @@ class AuthService(
                 restoreStoredCookies = false,
                 invalidateOnIncompleteAuth = false,
             )
+        } catch (cancellation: CancellationException) {
+            // Successful auth publishes a new session before the old connection job is
+            // cancelled. Do not roll the rejected cookie back after that session change.
+            if (SharedFlowCentre.isCurrentSession(sessionToken)) {
+                rejectedAuthCookie?.let { cookiesStorage.addCookie(AUTH_COOKIE, it) }
+            }
+            throw cancellation
         } catch (error: Throwable) {
             // A temporary HTTP or I/O failure must leave the current session intact and
             // allow the next WebSocket attempt to use the existing authenticated state.
-            rejectedAuthCookie?.let { cookiesStorage.addCookie(AUTH_COOKIE, it) }
+            if (SharedFlowCentre.isCurrentSession(sessionToken)) {
+                rejectedAuthCookie?.let { cookiesStorage.addCookie(AUTH_COOKIE, it) }
+            }
             throw error
         }
 
