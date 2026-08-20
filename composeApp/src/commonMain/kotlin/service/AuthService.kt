@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
+import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthCardPage
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -47,7 +48,7 @@ class AuthService(
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
     private val accountCacheManager: AccountCacheManager,
-) {
+) : WebSocketSessionRecovery {
     private var scope = CoroutineScope(Job())
     private val authMutex = Mutex()
     private val currentUserLock = SynchronizedObject()
@@ -288,16 +289,21 @@ class AuthService(
         loginLocked(username, password)
     }
 
-    private suspend fun loginLocked(username: String, password: String): AuthState {
+    private suspend fun loginLocked(
+        username: String,
+        password: String,
+        restoreStoredCookies: Boolean = true,
+        invalidateOnIncompleteAuth: Boolean = true,
+    ): AuthState {
         val activeUserId = SharedFlowCentre.currentSession.value?.account?.userId
         val targetUserId = accountDao.accountDtoByUserName(username)?.userId
         val isAccountSwitch = activeUserId != null && activeUserId != targetUserId
-        applyAuthCookie(username)
+        if (restoreStoredCookies) applyAuthCookie(username)
         return try {
             authApi.login(username, password).also {
                 if (it is AuthState.Authed) {
                     emitAuthed(password).getOrThrow()
-                } else {
+                } else if (invalidateOnIncompleteAuth) {
                     invalidateCurrentSessionLocked()
                 }
             }
@@ -339,6 +345,51 @@ class AuthService(
         if (expectedUserId != null && accountInfo.userId != expectedUserId) return false
         val password = accountInfo.password ?: return false
         return loginLocked(accountInfo.username, password) is AuthState.Authed
+    }
+
+    override suspend fun recoverExpiredSession(sessionToken: AccountSessionToken) = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock
+
+        val account = accountDao.currentAccountDtoOrNull()
+            ?.takeIf { it.userId == sessionToken.userId }
+        val password = account?.password
+        if (account == null || password == null) {
+            clearAuthCookie(sessionToken.userId)
+            invalidateCurrentSessionLocked()
+            return@withLock
+        }
+
+        // Pipeline rejected this cookie. Keep the two-factor cookie available for the
+        // credential request, but do not send the rejected auth cookie again.
+        val rejectedAuthCookie = cookiesStorage.cookieValue(AUTH_COOKIE)
+        cookiesStorage.removeCookie(AUTH_COOKIE)
+        val authState = try {
+            loginLocked(
+                username = account.username,
+                password = password,
+                restoreStoredCookies = false,
+                invalidateOnIncompleteAuth = false,
+            )
+        } catch (cancellation: CancellationException) {
+            // Successful auth publishes a new session before the old connection job is
+            // cancelled. Do not roll the rejected cookie back after that session change.
+            if (SharedFlowCentre.isCurrentSession(sessionToken)) {
+                rejectedAuthCookie?.let { cookiesStorage.addCookie(AUTH_COOKIE, it) }
+            }
+            throw cancellation
+        } catch (error: Throwable) {
+            // A temporary HTTP or I/O failure must leave the current session intact and
+            // allow the next WebSocket attempt to use the existing authenticated state.
+            if (SharedFlowCentre.isCurrentSession(sessionToken)) {
+                rejectedAuthCookie?.let { cookiesStorage.addCookie(AUTH_COOKIE, it) }
+            }
+            throw error
+        }
+
+        if (authState !is AuthState.Authed && SharedFlowCentre.isCurrentSession(sessionToken)) {
+            clearAuthCookie(account.userId)
+            invalidateCurrentSessionLocked()
+        }
     }
 
     internal suspend fun <T> runSessionBoundCatching(

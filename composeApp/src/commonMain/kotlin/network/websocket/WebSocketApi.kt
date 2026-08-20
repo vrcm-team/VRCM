@@ -6,7 +6,8 @@ import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_WSS_URL
 import io.github.vrcmteam.vrcm.network.api.auth.data.AuthData
-import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
+import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketMessage
+import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketSessionRejectedException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
@@ -21,6 +22,7 @@ import org.koin.core.logger.Logger
 
 class WebSocketApi(
     private val apiClient: HttpClient,
+    private val sessionRecovery: WebSocketSessionRecovery,
     private val logger: Logger,
 ) {
 
@@ -80,7 +82,9 @@ class WebSocketApi(
     private suspend fun startWebSocket(sessionToken: AccountSessionToken) {
         retryWebSocketConnection(
             maxRetryDelayMillis = MAX_RETRY_DELAY_MILLIS,
-            onFailure = ::reportConnectionFailure,
+            onFailure = { error, consecutiveFailures ->
+                handleConnectionFailure(sessionToken, error, consecutiveFailures)
+            },
         ) { markConnected ->
             val authResponse = apiClient.get(AUTH_API_PREFIX)
             check(authResponse.status == HttpStatusCode.OK) {
@@ -98,7 +102,7 @@ class WebSocketApi(
                 markConnected()
                 try {
                     while (true) {
-                        val othersMessage = receiveDeserialized<WebSocketEvent>()
+                        val othersMessage = receiveDeserialized<WebSocketMessage>().requireEvent()
                         SharedFlowCentre.emitWebSocket(
                             AccountWebSocketEvent(sessionToken, othersMessage)
                         )
@@ -107,6 +111,26 @@ class WebSocketApi(
                     connectedSessionToken.value = null
                 }
             }
+        }
+    }
+
+    private suspend fun handleConnectionFailure(
+        sessionToken: AccountSessionToken,
+        error: Exception,
+        consecutiveFailures: Int,
+    ) {
+        if (error !is WebSocketSessionRejectedException) {
+            reportConnectionFailure(error, consecutiveFailures)
+            return
+        }
+
+        logger.warn("Pipeline rejected the current session; attempting authentication recovery")
+        try {
+            sessionRecovery.recoverExpiredSession(sessionToken)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (recoveryError: Exception) {
+            reportConnectionFailure(recoveryError, consecutiveFailures)
         }
     }
 

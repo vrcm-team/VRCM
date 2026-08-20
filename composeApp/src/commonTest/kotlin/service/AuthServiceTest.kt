@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
+import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
@@ -32,8 +33,11 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.koin.core.logger.EmptyLogger
@@ -386,6 +390,133 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun expiredRealtimeSessionReauthenticatesSavedAccount() = runTest {
+        val requests = mutableListOf<Pair<String?, String?>>()
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            requests += request.headers[HttpHeaders.Cookie] to request.headers[HttpHeaders.Authorization]
+            when (requestCount) {
+                2 -> respond(
+                    content = currentUserJson(cachedAccount()),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.SetCookie to listOf("auth=new-auth; Path=/"),
+                    ),
+                )
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val expiredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        fixture.service.recoverExpiredSession(expiredSession.token)
+
+        val recoveredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        assertEquals(expiredSession.account.userId, recoveredSession.account.userId)
+        assertFalse(expiredSession.token == recoveredSession.token)
+        assertFalse(requests[1].first.orEmpty().contains("auth=cached-auth"))
+        assertTrue(requests[1].first.orEmpty().contains("twoFactorAuth=cached-2fa"))
+        assertTrue(requests[1].second.orEmpty().startsWith("Basic "))
+        assertTrue(requests[2].first.orEmpty().contains("auth=new-auth"))
+        assertEquals("new-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        fixture.client.close()
+    }
+
+    @Test
+    fun expiredRealtimeSessionWithoutSavedPasswordInvalidatesSession() = runTest {
+        val accountWithoutPassword = cachedAccount().copy(password = null)
+        var requestCount = 0
+        val fixture = fixture(accountWithoutPassword) {
+            requestCount++
+            jsonResponse(currentUserJson(accountWithoutPassword))
+        }
+        fixture.service.restoreAuth()
+        val expiredSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        fixture.service.recoverExpiredSession(expiredSession.token)
+
+        assertNull(SharedFlowCentre.currentSession.value)
+        assertNull(fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        assertNull(fixture.service.restoreAuth())
+        assertEquals(1, requestCount)
+        fixture.client.close()
+    }
+
+    @Test
+    fun temporaryRealtimeReauthenticationFailureKeepsSessionAndStoredCookie() = runTest {
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            if (requestCount == 2) {
+                respond(
+                    content = "temporarily unavailable",
+                    status = HttpStatusCode.ServiceUnavailable,
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertFailsWith<VRCApiException> {
+            fixture.service.recoverExpiredSession(session.token)
+        }
+
+        assertTrue(SharedFlowCentre.isCurrentSession(session.token))
+        assertEquals("cached-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+        assertEquals("cached-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
+        fixture.client.close()
+    }
+
+    @Test
+    fun successfulRealtimeReauthenticationCancellationKeepsNewCookie() = runTest {
+        var requestCount = 0
+        val fixture = fixture { request ->
+            requestCount++
+            when (requestCount) {
+                2 -> respond(
+                    content = currentUserJson(cachedAccount()),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.SetCookie to listOf("auth=new-auth; Path=/"),
+                    ),
+                )
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val authenticated = CompletableDeferred<Unit>()
+        lateinit var recoveryJob: Job
+        val cancellationCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            SharedFlowCentre.authed.collect {
+                if (!authenticated.isCompleted) {
+                    authenticated.complete(Unit)
+                    recoveryJob.cancel()
+                }
+            }
+        }
+
+        recoveryJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.recoverExpiredSession(previousSession.token)
+        }
+        authenticated.await()
+        recoveryJob.join()
+
+        val currentSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        assertFalse(currentSession.token == previousSession.token)
+        assertEquals("new-auth", fixture.cookies.cookieValue(AUTH_COOKIE))
+        assertEquals("new-auth", fixture.accountDao.currentAccountDtoOrNull()?.authCookie)
+
+        cancellationCollector.cancelAndJoin()
+        fixture.client.close()
+    }
+
+    @Test
     fun failedAccountSwitchInvalidatesPreviousSession() = runTest {
         val secondAccount = AccountDto(
             userId = "usr_second",
@@ -487,10 +618,14 @@ class AuthServiceTest : MainDispatcherTest() {
     private data class Fixture(
         val service: AuthService,
         val accountDao: AccountDao,
+        val cookies: PersistentCookiesStorage,
         val client: HttpClient,
     )
 
-    private fun fixture(handler: MockRequestHandler): Fixture {
+    private fun fixture(
+        account: AccountDto = cachedAccount(),
+        handler: MockRequestHandler,
+    ): Fixture {
         val cookies = PersistentCookiesStorage(EmptyLogger())
         val client = HttpClient(MockEngine) {
             engine { addHandler(handler) }
@@ -498,7 +633,9 @@ class AuthServiceTest : MainDispatcherTest() {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
             install(HttpCookies) { storage = cookies }
         }
-        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also { it.saveAccountInfo(cachedAccount()) }
+        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+            it.saveAccountInfo(account)
+        }
         val service = AuthService(
             authApi = AuthApi(client),
             accountDao = accountDao,
@@ -514,7 +651,7 @@ class AuthServiceTest : MainDispatcherTest() {
                 ),
             ),
         )
-        return Fixture(service, accountDao, client)
+        return Fixture(service, accountDao, cookies, client)
     }
 
     private fun cachedAccount() = AccountDto(
