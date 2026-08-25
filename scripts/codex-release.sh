@@ -249,7 +249,7 @@ generate_notes() {
     printf '%s\n' '- Improved cache refresh, account-switch isolation, foreground/background recovery, and cross-platform distribution.'
     printf '\n## Bug Fixes\n'
     printf '%s\n' '- Fixed the issues listed above across authentication, realtime sessions, favorites, Gallery, notifications, and platform behavior.'
-    printf '\n详情 / Details: https://github.com/%s/blob/main/docs/releases/%s.md\n' "$REPOSITORY" "$VERSION"
+    printf '\n详情 / Details: <%s>\n' "https://github.com/$REPOSITORY/tree/main/docs/releases/$VERSION.md"
   } > "$NOTES_PATH"
   log "已生成 Release 文案：$NOTES_PATH"
 }
