@@ -61,7 +61,10 @@ jobs:
           android="$(asset_size '\.apk$')"
           ios="$(asset_size '\.ipa$')"
           desktop="$(asset_size '\.(dmg|deb)$')"
-          windows="$(asset_size '\.msi$')"
+          windows="$(asset_size '\.exe$')"
+          if [ -z "${windows}" ]; then
+            windows="$(asset_size '\.msi$')"
+          fi
 
           if [ -z "${android}" ] || [ -z "${ios}" ] || [ -z "${desktop}" ]; then
             echo "The latest release is missing an APK, IPA, DMG, or DEB asset." >&2
@@ -81,7 +84,7 @@ jobs:
             IFS=$'\t' read -r windows_asset windows_size <<< "${windows}"
             write_badge badge-data/windows-installer-size.json Windows 0078d4 windows "${windows_size}"
           else
-            echo "No Windows MSI in the latest release; keeping the Windows badge placeholder."
+            echo "No Windows EXE or MSI in the latest release; keeping the Windows badge placeholder."
           fi
 
       - name: Commit updated badge data
