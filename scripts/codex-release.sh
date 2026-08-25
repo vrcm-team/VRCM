@@ -296,15 +296,16 @@ resolve_github_token() {
 
 publish_release() {
   local token="${GITHUB_TOKEN_VALUE:-}" release_json release_id upload_url release_body request_file asset_name asset
-  local existing_release=0 publish_request asset_id existing_assets existing_prerelease
+  local existing_release=0 publish_request asset_id existing_assets existing_prerelease prerelease_json=false
   [[ "$PUBLISH" -eq 1 ]] || return 0
   [[ "$DRY_RUN" -eq 0 ]] || { log "dry-run：跳过 GitHub API 发布"; return 0; }
   require_command curl; require_command jq
   [[ -n "$token" ]] || fail "--publish 无法获取 GitHub Token；请设置 GH_TOKEN/GITHUB_TOKEN，或先执行 gh auth login"
+  [[ "$PREVIEW" -eq 1 ]] && prerelease_json=true
   release_body="$(cat "$NOTES_PATH")"
   request_file="$RELEASE_DIR/release-request.json"
   jq -n --arg tag "$VERSION" --arg name "VRCM v$VERSION" --arg body "$release_body" \
-    --argjson draft true --argjson prerelease "$PREVIEW" \
+    --argjson draft true --argjson prerelease "$prerelease_json" \
     '{tag_name: $tag, target_commitish: "main", name: $name, body: $body, draft: $draft, prerelease: $prerelease, generate_release_notes: false}' \
     > "$request_file"
   release_json="$(curl --silent --show-error -H 'Accept: application/vnd.github+json' \
