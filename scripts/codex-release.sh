@@ -304,7 +304,7 @@ publish_release() {
   [[ "$PREVIEW" -eq 1 ]] && prerelease_json=true
   release_body="$(cat "$NOTES_PATH")"
   request_file="$RELEASE_DIR/release-request.json"
-  jq -n --arg tag "$VERSION" --arg name "VRCM v$VERSION" --arg body "$release_body" \
+  jq -n --arg tag "$VERSION" --arg name "v$VERSION" --arg body "$release_body" \
     --argjson draft true --argjson prerelease "$prerelease_json" \
     '{tag_name: $tag, target_commitish: "main", name: $name, body: $body, draft: $draft, prerelease: $prerelease, generate_release_notes: false}' \
     > "$request_file"
