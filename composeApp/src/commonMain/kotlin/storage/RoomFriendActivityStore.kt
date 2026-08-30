@@ -106,14 +106,21 @@ internal class RoomFriendActivityStore(
         types: Set<FriendActivityEventType> = emptySet(),
         oldestOccurredAtMillis: Long,
         oldestId: Long,
+        limit: Int,
     ): Flow<List<FriendActivityEventEntity>> = if (types.isEmpty()) {
-        dao.observeAllEventsThrough(ownerUserId, oldestOccurredAtMillis, oldestId)
+        dao.observeAllEventsThrough(
+            ownerUserId = ownerUserId,
+            oldestOccurredAtMillis = oldestOccurredAtMillis,
+            oldestId = oldestId,
+            limit = limit.coerceAtLeast(0),
+        )
     } else {
         dao.observeAllEventsByTypesThrough(
             ownerUserId = ownerUserId,
             types = types.map(FriendActivityEventType::name),
             oldestOccurredAtMillis = oldestOccurredAtMillis,
             oldestId = oldestId,
+            limit = limit.coerceAtLeast(0),
         )
     }
 

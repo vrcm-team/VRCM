@@ -342,12 +342,14 @@ class FriendActivityService internal constructor(
         types: Set<FriendActivityEventType> = emptySet(),
         oldestOccurredAtMillis: Long,
         oldestId: Long,
+        limit: Int,
     ): Flow<List<FriendActivityEvent>> =
         store.observeAllEventsThrough(
             ownerUserId = token.userId,
             types = types,
             oldestOccurredAtMillis = oldestOccurredAtMillis,
             oldestId = oldestId,
+            limit = limit,
         ).onEach { events ->
             if (SharedFlowCentre.isCurrentSession(token)) {
                 events.asSequence()

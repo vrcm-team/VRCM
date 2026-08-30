@@ -44,6 +44,122 @@ import kotlin.test.assertTrue
 
 class FriendActivityRoomStoreTest {
     @Test
+    fun filteredKeysetTimelineStaysCompleteAcrossDeepSameTimestampPagesAndHeadUpdates() = runTest {
+        withStore { store ->
+            val token = store.activateAccount("usr_owner")
+            val friend = observation()
+            val eventCount = 240
+            val pageSize = 17
+            val filterTypes = setOf(FriendActivityEventType.Online, FriendActivityEventType.Offline)
+            store.record(
+                token = token,
+                observations = listOf(friend),
+                batch = FriendActivityBatch(
+                    events = (1L..eventCount.toLong()).map { sequence ->
+                        FriendActivityEventDraft(
+                            userId = friend.userId,
+                            displayName = friend.displayName,
+                            profileImageUrl = friend.profileImageUrl,
+                            type = when ((sequence % 3L).toInt()) {
+                                0 -> FriendActivityEventType.Online
+                                1 -> FriendActivityEventType.Offline
+                                else -> FriendActivityEventType.LocationChanged
+                            },
+                            occurredAtMillis = sequence / 13L * 1_000L,
+                        )
+                    },
+                ),
+                nowMillis = 20_000L,
+            )
+
+            val expected = store.observeAllEvents(
+                ownerUserId = "usr_owner",
+                types = filterTypes,
+                limit = eventCount,
+            ).first()
+            val paged = mutableListOf<FriendActivityEventEntity>()
+            var cursor: FriendActivityEventEntity? = null
+            while (true) {
+                val page = cursor?.let { currentCursor ->
+                    store.observeAllEventsBefore(
+                        ownerUserId = "usr_owner",
+                        types = filterTypes,
+                        beforeOccurredAtMillis = currentCursor.occurredAtMillis,
+                        beforeId = currentCursor.id,
+                        limit = pageSize,
+                    ).first()
+                } ?: store.observeAllEvents(
+                    ownerUserId = "usr_owner",
+                    types = filterTypes,
+                    limit = pageSize,
+                ).first()
+                if (page.isEmpty()) break
+                paged += page
+                assertTrue(paged.size <= expected.size)
+                cursor = page.last()
+            }
+
+            assertEquals(expected.map { it.id }, paged.map { it.id })
+            assertEquals(paged.size, paged.map { it.id }.distinct().size)
+            assertTrue(paged.chunked(pageSize).zipWithNext().any { (newerPage, olderPage) ->
+                newerPage.last().occurredAtMillis == olderPage.first().occurredAtMillis
+            })
+
+            val loadedCount = pageSize * 6
+            val loaded = expected.take(loadedCount)
+            val oldest = loaded.last()
+            val snapshots = mutableListOf<List<FriendActivityEventEntity>>()
+            val initialSnapshotReceived = CompletableDeferred<Unit>()
+            val observationJob = launch {
+                store.observeAllEventsThrough(
+                    ownerUserId = "usr_owner",
+                    types = filterTypes,
+                    oldestOccurredAtMillis = oldest.occurredAtMillis,
+                    oldestId = oldest.id,
+                    limit = loadedCount,
+                ).onEach { initialSnapshotReceived.complete(Unit) }
+                    .take(2)
+                    .toList(snapshots)
+            }
+            initialSnapshotReceived.await()
+
+            store.record(
+                token = token,
+                observations = listOf(friend),
+                batch = FriendActivityBatch(
+                    events = listOf(
+                        FriendActivityEventDraft(
+                            userId = friend.userId,
+                            displayName = friend.displayName,
+                            profileImageUrl = friend.profileImageUrl,
+                            type = FriendActivityEventType.LocationChanged,
+                            occurredAtMillis = 99_000L,
+                        ),
+                        FriendActivityEventDraft(
+                            userId = friend.userId,
+                            displayName = friend.displayName,
+                            profileImageUrl = friend.profileImageUrl,
+                            type = FriendActivityEventType.Online,
+                            occurredAtMillis = 100_000L,
+                        ),
+                    ),
+                ),
+                nowMillis = 100_000L,
+            )
+            observationJob.join()
+
+            assertEquals(loaded.map { it.id }, snapshots.first().map { it.id })
+            assertEquals(loadedCount, snapshots.last().size)
+            assertEquals(100_000L, snapshots.last().first().occurredAtMillis)
+            assertTrue(snapshots.last().all { it.type in filterTypes.map(FriendActivityEventType::name) })
+            assertEquals(
+                snapshots.first().take(loadedCount - 1).map { it.id },
+                snapshots.last().drop(1).map { it.id },
+            )
+        }
+    }
+
+    @Test
     fun globalTimelineIsAccountScopedStablySortedAndFilterable() = runTest {
         withStore { store ->
             val ownerA = store.activateAccount("usr_owner_a")
@@ -169,6 +285,7 @@ class FriendActivityRoomStoreTest {
                     ownerUserId = "usr_owner_a",
                     oldestOccurredAtMillis = pageCursor.occurredAtMillis,
                     oldestId = pageCursor.id,
+                    limit = 3,
                 ).onEach { firstRangeObserved.complete(Unit) }
                     .take(2)
                     .toList(loadedRangeSnapshots)
