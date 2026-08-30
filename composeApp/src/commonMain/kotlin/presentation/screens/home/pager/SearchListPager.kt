@@ -3,19 +3,29 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,20 +36,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.AdvancedOptionsPanel
-import io.github.vrcmteam.vrcm.presentation.compoments.GenericSearchList
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
+import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
 import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderUserItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
+import io.github.vrcmteam.vrcm.presentation.compoments.shouldLoadNextPage
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.WorldSearchOptionsUI
@@ -51,6 +69,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.compose.viewmodel.koinViewModel
 
 object SearchListPager : Pager {
@@ -77,6 +96,7 @@ fun PublicSearchContent(
     val navigator = currentNavigator
     val searchType by model.searchType.collectAsState()
     val searchText by model.searchText.collectAsState()
+    val queriesByType by model.queriesByType.collectAsState()
     val loadStates by model.loadStates.collectAsState()
     val users by model.userSearchList.collectAsState()
     val worlds by model.worldSearchList.collectAsState()
@@ -86,12 +106,6 @@ fun PublicSearchContent(
     val isLoadingGroups by model.isLoadingGroups.collectAsState()
     val groupLoadMoreFailed by model.groupLoadMoreFailed.collectAsState()
     val selectedTab = PublicSearchTab.fromSearchType(searchType)
-    val selectedResultsCount = when (selectedTab) {
-        PublicSearchTab.User -> users.size
-        PublicSearchTab.World -> worlds.size
-        PublicSearchTab.Group -> groups.size
-    }
-    val loadState = loadStates.getValue(searchType)
     val promptText = strings.publicSearchPrompt
     val noResultsText = strings.publicSearchNoResults
     val failedText = strings.publicSearchFailed
@@ -100,104 +114,232 @@ fun PublicSearchContent(
     val userListState = rememberLazyListState()
     val worldListState = rememberLazyListState()
     val groupListState = rememberLazyListState()
-    val selectedListState = when (selectedTab) {
-        PublicSearchTab.User -> userListState
-        PublicSearchTab.World -> worldListState
-        PublicSearchTab.Group -> groupListState
-    }
+    val pagerState = rememberPagerState(
+        initialPage = selectedTab.tabIndex,
+        pageCount = { PublicSearchTab.entries.size },
+    )
     var showAdvancedOptions by remember { mutableStateOf(false) }
     val bottomNavigationPadding = if (
         LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
     ) 80.dp else 0.dp
 
+    LaunchedEffect(pagerState, model) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                model.setSearchType(PublicSearchTab.fromTabIndex(page).searchType)
+            }
+    }
     LaunchedEffect(searchType, searchText) {
         model.loadSearchListIfNeeded()
     }
+    LaunchedEffect(pagerState, userListState, worldListState, groupListState) {
+        SharedFlowCentre.toPagerTop.collect {
+            val listState = when (pagerState.currentPage) {
+                PublicSearchTab.World.tabIndex -> worldListState
+                PublicSearchTab.Group.tabIndex -> groupListState
+                else -> userListState
+            }
+            runCatching { listState.animateScrollToFirst() }
+        }
+    }
+    LaunchedEffect(
+        groupListState,
+        groups.size,
+        groupHasMore,
+        isLoadingGroups,
+        groupLoadMoreFailed,
+        searchType,
+    ) {
+        snapshotFlow {
+            groupListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }.distinctUntilChanged().collect { lastVisibleIndex ->
+            if (
+                searchType == PublicSearchTab.Group.searchType &&
+                !groupLoadMoreFailed &&
+                shouldEnableGroupLoadMore(
+                    searchType = PublicSearchTab.Group.searchType,
+                    hasMore = groupHasMore,
+                    isLoading = isLoadingGroups,
+                    itemCount = groups.size,
+                ) &&
+                shouldLoadNextPage(lastVisibleIndex, groups.size)
+            ) {
+                model.loadMoreGroups()
+            }
+        }
+    }
 
-    GenericSearchList(
-        key = "PublicSearchContent",
-        searchText = searchText,
-        updateSearchText = model::setSearchText,
-        tabs = listOf(strings.users, strings.worlds, strings.groups),
-        selectedTabIndex = selectedTab.tabIndex,
-        onTabSelected = { model.setSearchType(PublicSearchTab.fromTabIndex(it).searchType) },
-        advancedOptionsContent = {
-            if (selectedTab == PublicSearchTab.World) {
-                AdvancedOptionsPanel(
-                    title = strings.worldSearchAdvancedOptions,
-                    expanded = showAdvancedOptions,
-                    onExpandToggle = { showAdvancedOptions = !showAdvancedOptions },
-                ) {
-                    WorldSearchOptionsUI(
-                        options = worldSearchOptions,
-                        onOptionsChanged = { options ->
-                            coroutineScope.launch { model.updateWorldSearchOptions(options) }
-                        },
-                    )
+    Column(Modifier.fillMaxSize()) {
+        SearchTextField(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 16.dp),
+            value = searchText,
+            onValueChange = model::setSearchText,
+        )
+        PublicSearchTabRow(
+            pagerState = pagerState,
+            tabs = listOf(strings.users, strings.worlds, strings.groups),
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f),
+            key = { PublicSearchTab.fromTabIndex(it).name },
+        ) { page ->
+            val tab = PublicSearchTab.fromTabIndex(page)
+            val query = queriesByType.getValue(tab.searchType)
+            val loadState = loadStates.getValue(tab.searchType)
+            val resultCount = when (tab) {
+                PublicSearchTab.User -> users.size
+                PublicSearchTab.World -> worlds.size
+                PublicSearchTab.Group -> groups.size
+            }
+            val listState = when (tab) {
+                PublicSearchTab.User -> userListState
+                PublicSearchTab.World -> worldListState
+                PublicSearchTab.Group -> groupListState
+            }
+            PublicSearchPage(
+                query = query,
+                loadState = loadState,
+                resultCount = resultCount,
+                lazyListState = listState,
+                bottomNavigationPadding = bottomNavigationPadding,
+                promptText = promptText,
+                noResultsText = noResultsText,
+                failedText = failedText,
+                refreshFailedText = refreshFailedText,
+                retryText = retryText,
+                retry = { coroutineScope.launch { model.refreshSearchList(tab.searchType) } },
+                advancedOptionsContent = if (tab == PublicSearchTab.World) {
+                    {
+                        AdvancedOptionsPanel(
+                            title = strings.worldSearchAdvancedOptions,
+                            expanded = showAdvancedOptions,
+                            onExpandToggle = { showAdvancedOptions = !showAdvancedOptions },
+                        ) {
+                            WorldSearchOptionsUI(
+                                options = worldSearchOptions,
+                                onOptionsChanged = { options ->
+                                    coroutineScope.launch { model.updateWorldSearchOptions(options) }
+                                },
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+            ) {
+                when (tab) {
+                    PublicSearchTab.User -> renderUserItems(users) { user, suffix ->
+                        coroutineScope.launch {
+                            navigator push UserProfileScreen(
+                                userProfileVO = UserProfileVo(user),
+                                sharedSuffixKey = suffix,
+                            )
+                        }
+                    }
+                    PublicSearchTab.World -> renderWorldItems(worlds) { world, suffix ->
+                        coroutineScope.launch {
+                            navigator push WorldProfileScreen(
+                                worldProfileVO = WorldProfileVo(world),
+                                sharedSuffixKey = suffix,
+                                sharedImageCacheKey = world.safeImageUrl(),
+                            )
+                        }
+                    }
+                    PublicSearchTab.Group -> {
+                        renderGroupItems(groups) { group, suffix ->
+                            coroutineScope.launch {
+                                navigator push GroupProfileScreen(
+                                    groupProfileVo = GroupProfileVo(group),
+                                    sharedSuffixKey = suffix,
+                                )
+                            }
+                        }
+                        renderGroupPagingStatus(
+                            isLoading = groups.isNotEmpty() && isLoadingGroups &&
+                                loadState.phase != SearchLoadPhase.Loading,
+                            failed = shouldShowGroupLoadMoreRetry(
+                                searchType = tab.searchType,
+                                loadMoreFailed = groupLoadMoreFailed,
+                                itemCount = groups.size,
+                            ),
+                            retryText = retryText,
+                            retry = { model.retryLoadMoreGroups() },
+                        )
+                    }
                 }
             }
-        },
-        onLoadMore = if (
-            shouldEnableGroupLoadMore(searchType, groupHasMore, isLoadingGroups, groups.size)
-        ) {
-            { model.loadMoreGroups() }
-        } else {
-            null
-        },
-        totalItemsCount = groups.size.takeIf { selectedTab == PublicSearchTab.Group } ?: 0,
-        lazyListState = selectedListState,
-        topContentPadding = 12.dp,
-        bottomNavigationPadding = bottomNavigationPadding,
+        }
+    }
+}
+
+@Composable
+private fun PublicSearchTabRow(
+    pagerState: PagerState,
+    tabs: List<String>,
+) {
+    val scope = rememberCoroutineScope()
+    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        tabs.forEachIndexed { index, title ->
+            Tab(
+                selected = index == pagerState.currentPage,
+                onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
+                text = {
+                    Text(
+                        text = title,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PublicSearchPage(
+    query: String,
+    loadState: PublicSearchLoadState,
+    resultCount: Int,
+    lazyListState: LazyListState,
+    bottomNavigationPadding: Dp,
+    promptText: String,
+    noResultsText: String,
+    failedText: String,
+    refreshFailedText: String,
+    retryText: String,
+    retry: () -> Unit,
+    advancedOptionsContent: (@Composable () -> Unit)?,
+    itemContent: LazyListScope.() -> Unit,
+) {
+    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = lazyListState,
+        contentPadding = PaddingValues(
+            top = 8.dp,
+            bottom = bottomPadding,
+        ),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        if (advancedOptionsContent != null) {
+            item(key = "public-search-advanced-options") {
+                advancedOptionsContent()
+            }
+        }
         renderPublicSearchStatus(
-            query = searchText,
+            query = query,
             loadState = loadState,
-            resultCount = selectedResultsCount,
+            resultCount = resultCount,
             promptText = promptText,
             noResultsText = noResultsText,
             failedText = failedText,
             refreshFailedText = refreshFailedText,
             retryText = retryText,
-            retry = { coroutineScope.launch { model.refreshSearchList() } },
+            retry = retry,
         )
-        if (searchText.isNotBlank()) {
-            when (selectedTab) {
-                PublicSearchTab.User -> renderUserItems(users) { user, suffix ->
-                    coroutineScope.launch {
-                        navigator push UserProfileScreen(
-                            userProfileVO = UserProfileVo(user),
-                            sharedSuffixKey = suffix,
-                        )
-                    }
-                }
-                PublicSearchTab.World -> renderWorldItems(worlds) { world, suffix ->
-                    coroutineScope.launch {
-                        navigator push WorldProfileScreen(
-                            worldProfileVO = WorldProfileVo(world),
-                            sharedSuffixKey = suffix,
-                            sharedImageCacheKey = world.safeImageUrl(),
-                        )
-                    }
-                }
-                PublicSearchTab.Group -> {
-                    renderGroupItems(groups) { group, suffix ->
-                        coroutineScope.launch {
-                            navigator push GroupProfileScreen(
-                                groupProfileVo = GroupProfileVo(group),
-                                sharedSuffixKey = suffix,
-                            )
-                        }
-                    }
-                    renderGroupPagingStatus(
-                        isLoading = groups.isNotEmpty() && isLoadingGroups &&
-                            loadState.phase != SearchLoadPhase.Loading,
-                        failed = shouldShowGroupLoadMoreRetry(searchType, groupLoadMoreFailed, groups.size),
-                        retryText = retryText,
-                        retry = { model.retryLoadMoreGroups() },
-                    )
-                }
-            }
-        }
+        if (query.isNotBlank()) itemContent()
     }
 }
 
