@@ -102,13 +102,14 @@ class SearchListPagerModel(
         PublicSearchTab.entries.associate { it.searchType to 0L },
     )
     private val successfulRequestKeysByType = MutableStateFlow<Map<Int, SearchRequestKey>>(emptyMap())
-    private var authenticatedUserId: String? = authService.accountDtoOrNull()?.userId
+    private var authenticatedUserId: String? = SharedFlowCentre.currentSession.value?.account?.userId
 
     init {
         viewModelScope.launch {
-            SharedFlowCentre.authed.collect { session ->
-                val accountChanged = authenticatedUserId != session.account.userId
-                authenticatedUserId = session.account.userId
+            SharedFlowCentre.currentSession.collect { session ->
+                val nextUserId = session?.account?.userId
+                val accountChanged = authenticatedUserId != nextUserId
+                authenticatedUserId = nextUserId
                 if (accountChanged) resetForAccountChange()
             }
         }
@@ -129,7 +130,14 @@ class SearchListPagerModel(
         _searchText.value = text
         successfulRequestKeysByType.update { it - type }
         updateLoadState(type, PublicSearchLoadState())
-        if (type == PublicSearchTab.Group.searchType) invalidateGroupPaging()
+        when (type) {
+            PublicSearchTab.User.searchType -> _userSearchList.value = emptyList()
+            PublicSearchTab.World.searchType -> _worldSearchList.value = emptyList()
+            PublicSearchTab.Group.searchType -> {
+                _groupSearchList.value = emptyList()
+                invalidateGroupPaging()
+            }
+        }
     }
 
     suspend fun updateWorldSearchOptions(options: WorldSearchOptions) {
@@ -138,6 +146,7 @@ class SearchListPagerModel(
         advanceRequestGeneration(type)
         successfulRequestKeysByType.update { it - type }
         _worldSearchOptions.value = options
+        _worldSearchList.value = emptyList()
         if (queryFor(type).isNotBlank()) refreshSearchList(type)
     }
 
@@ -323,6 +332,8 @@ class SearchListPagerModel(
         _userSearchList.value = emptyList()
         _worldSearchList.value = emptyList()
         _groupSearchList.value = emptyList()
+        _queriesByType.value = PublicSearchTab.entries.associate { it.searchType to "" }
+        _searchText.value = ""
         _loadStates.value = PublicSearchTab.entries.associate { it.searchType to PublicSearchLoadState() }
         invalidateGroupPaging()
     }

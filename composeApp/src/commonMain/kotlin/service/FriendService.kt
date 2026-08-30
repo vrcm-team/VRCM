@@ -165,7 +165,10 @@ class FriendService(
                 // 新账号要重新完成一次完整刷新，才能把在线状态当作可信读数。
                 _initialRefreshCompleted.value = false
             }
-            accountTracker.onAuthenticated(session.account.userId)
+            if (accountTracker.onAuthenticated(session.account.userId)) {
+                friendStore.clear()
+                publishFriendState()
+            }
             publishFriendActivitySource()
             true
         }

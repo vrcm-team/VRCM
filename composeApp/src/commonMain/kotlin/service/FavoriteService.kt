@@ -41,14 +41,17 @@ class FavoriteService(
 ) {
 
     private val favoritesByGroupCache = FavoriteGroupCache()
+    private var favoritesOwnerUserId: String? = SharedFlowCentre.currentSession.value?.token?.userId
 
     // 收藏限制信息缓存
     private var _favoriteLimits: FavoriteLimits? = null
 
     init {
         CoroutineScope(Dispatchers.Default).launch {
-            SharedFlowCentre.authed.collect {
-                favoritesByGroupCache.clear()
+            SharedFlowCentre.currentSession.collect { session ->
+                val nextUserId = session?.token?.userId
+                if (favoritesOwnerUserId != nextUserId) favoritesByGroupCache.clear()
+                favoritesOwnerUserId = nextUserId
             }
         }
     }
@@ -131,6 +134,8 @@ class FavoriteService(
     }
 
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType) = runCatching {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token
+            ?: error("No authenticated session")
         val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
         // 尝试加载远程收藏
         favoriteApi.fetchFavorite(favoriteType)
@@ -161,11 +166,13 @@ class FavoriteService(
         }
 
         // 合并远程与本地
-        favoritesByGroupCache.replace(
-            favoriteType,
-            remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } +
-                (localGroup to localFavorites),
-        )
+        if (SharedFlowCentre.currentSession.value?.token?.userId == sessionToken.userId) {
+            favoritesByGroupCache.replace(
+                favoriteType,
+                remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } +
+                    (localGroup to localFavorites),
+            )
+        }
     }.onFailure {
         SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Load Favorite By Group Failed"))
     }

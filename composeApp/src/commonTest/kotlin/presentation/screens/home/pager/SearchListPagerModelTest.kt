@@ -156,6 +156,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         SharedFlowCentre.emitAuthenticated(
             AccountDto(userId = "usr_new", username = "new-user"),
         )
+        fixture.model.setSearchText("account")
         fixture.model.loadSearchListIfNeeded()
 
         assertEquals(2, requestCount)
@@ -218,11 +219,12 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         )
 
         assertTrue(fixture.model.groupSearchList.value.isEmpty())
+        assertEquals("", fixture.model.searchText.value)
         fixture.close()
     }
 
     @Test
-    fun clearingGroupQueryKeepsCachedResultsAndRejectsLateResponse() = runBlocking {
+    fun clearingGroupQueryClearsResultsAndRejectsLateResponse() = runBlocking {
         val lateRequestStarted = CompletableDeferred<Unit>()
         val releaseLateRequest = CompletableDeferred<Unit>()
         var requestCount = 0
@@ -246,10 +248,10 @@ class SearchListPagerModelTest : MainDispatcherTest() {
 
         fixture.model.setSearchText("")
 
-        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
+        assertTrue(fixture.model.groupSearchList.value.isEmpty())
         releaseLateRequest.complete(Unit)
         lateSearch.await()
-        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
+        assertTrue(fixture.model.groupSearchList.value.isEmpty())
         fixture.close()
     }
 
@@ -347,7 +349,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun failedReplacementQueryKeepsPreviousResultsAndReportsError() = runBlocking {
+    fun replacementQueryClearsPreviousResultsBeforeFailure() = runBlocking {
         val fixture = createFixture { request ->
             when (request.url.parameters["query"]) {
                 "existing" -> jsonResponse(groupJson("grp_existing"))
@@ -363,13 +365,39 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         assertTrue(fixture.model.refreshSearchList())
 
         fixture.model.setSearchText("replacement")
+        assertTrue(fixture.model.groupSearchList.value.isEmpty())
         assertEquals(false, fixture.model.refreshSearchList())
 
-        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
+        assertTrue(fixture.model.groupSearchList.value.isEmpty())
         assertEquals(
             SearchLoadPhase.Error,
             fixture.model.loadStates.value.getValue(3).phase,
         )
+        fixture.close()
+    }
+
+    @Test
+    fun failedManualRefreshKeepsResultsForTheSameQuery() = runBlocking {
+        var requestCount = 0
+        val fixture = createFixture {
+            requestCount++
+            if (requestCount == 1) {
+                jsonResponse(groupJson("grp_existing"))
+            } else {
+                respond(
+                    content = "refresh failed",
+                    status = HttpStatusCode.InternalServerError,
+                )
+            }
+        }
+        fixture.model.setSearchType(3)
+        fixture.model.setSearchText("same-query")
+        assertTrue(fixture.model.refreshSearchList())
+
+        assertEquals(false, fixture.model.refreshSearchList())
+
+        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
+        assertEquals(SearchLoadPhase.Error, fixture.model.loadStates.value.getValue(3).phase)
         fixture.close()
     }
 
@@ -641,10 +669,15 @@ private fun clearViewModel(viewModel: ViewModel) {
     }
 }
 
-private fun createFixture(
+private suspend fun createFixture(
     account: AccountDto? = null,
     handler: MockRequestHandler,
 ): SearchModelFixture {
+    if (account == null) {
+        SharedFlowCentre.emitLogout()
+    } else {
+        SharedFlowCentre.emitAuthenticated(account)
+    }
     val logger = EmptyLogger()
     val client = HttpClient(MockEngine) {
         engine { addHandler(handler) }

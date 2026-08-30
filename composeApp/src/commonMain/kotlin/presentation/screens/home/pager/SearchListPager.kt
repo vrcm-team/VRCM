@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -258,7 +256,7 @@ private fun LazyListScope.searchMessageItem(
             if (retry != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = retry) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Icon(AppIcons.Update, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(retryText)
                 }
@@ -283,7 +281,7 @@ private fun LazyListScope.renderGroupPagingStatus(
                 CircularProgressIndicator(Modifier.size(24.dp))
             } else {
                 TextButton(onClick = retry) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Icon(AppIcons.Update, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(retryText)
                 }

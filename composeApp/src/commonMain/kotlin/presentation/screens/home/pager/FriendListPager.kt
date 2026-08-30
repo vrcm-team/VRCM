@@ -134,6 +134,12 @@ fun FriendsDirectoryContent(
             val isEmpty = groups.isEmpty()
             if (refreshing && isEmpty) {
                 CircularProgressIndicator(Modifier.align(Alignment.Center))
+            } else if (isEmpty && refreshFailed) {
+                DirectoryMessage(
+                    message = strings.friendDirectoryLoadFailed,
+                    retry = true,
+                    onRetry = model::refreshFriendDirectory,
+                )
             } else if (isEmpty) {
                 DirectoryMessage(
                     message = if (searchText.isBlank() && options.selectedGroup == null) {
@@ -141,7 +147,7 @@ fun FriendsDirectoryContent(
                     } else {
                         strings.friendDirectoryNoMatches
                     },
-                    retry = refreshFailed,
+                    retry = false,
                     onRetry = model::refreshFriendDirectory,
                 )
             } else if (refreshFailed) {

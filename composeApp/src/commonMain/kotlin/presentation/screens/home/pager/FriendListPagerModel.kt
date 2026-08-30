@@ -175,9 +175,12 @@ class FriendListPagerModel(
     private val _directoryRefreshFailed = MutableStateFlow(false)
     val directoryRefreshFailed = _directoryRefreshFailed.asStateFlow()
     private var directoryRefreshJob: Job? = null
+    private val refreshJobsByTab = mutableMapOf<Int, Job>()
+    private var activeSessionToken: AccountSessionToken? = null
+    private var accountGeneration = 0L
 
     val friendDirectoryGroups: StateFlow<List<FriendDirectoryGroup>> = combine(
-        friendService.friendState,
+        _friendList,
         _searchText,
         _friendGroupOptions,
         friendFavoriteGroupsFlow,
@@ -185,97 +188,159 @@ class FriendListPagerModel(
         val favoriteIds = options.selectedGroup?.let { selectedGroup ->
             favoriteGroups[selectedGroup]?.mapTo(mutableSetOf()) { it.favoriteId }.orEmpty()
         }
-        buildFriendDirectoryGroups(friends.values, query, favoriteIds)
+        buildFriendDirectoryGroups(friends, query, favoriteIds)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = buildFriendDirectoryGroups(friendService.friendState.value.values, "", null),
+        initialValue = emptyList(),
     )
 
     init {
-        // 监听登录状态,用于重新登录后更新刷新状态
         viewModelScope.launch {
-            SharedFlowCentre.authed.collect {
-                favoritedWorldMap.clear()
-                favoritedAvatarMap.clear()
-                offlineStatusDescriptions.clear()
-                _refreshingTabs.value = setOf(0, 1, 2)
-                _refreshErrors.value = emptyMap()
-                _friendGroupOptions.value = FriendGroupOptions()
-                _directoryRefreshing.value = true
-                _directoryRefreshFailed.value = false
-                directoryRefreshJob?.cancel()
-                directoryRefreshJob = null
-                refreshFriendDirectory()
+            SharedFlowCentre.currentSession.collect { session ->
+                val nextToken = session?.token
+                if (activeSessionToken?.userId == nextToken?.userId) {
+                    activeSessionToken = nextToken
+                } else {
+                    activateAccount(nextToken)
+                }
             }
         }
         viewModelScope.launch {
             friendService.friendState.collect { friends ->
+                val token = activeSessionToken ?: return@collect
+                if (SharedFlowCentre.currentSession.value?.token?.userId != token.userId) return@collect
                 _friendTotal.value = friends.size
                 findFriendList(searchTexts[0])
             }
         }
     }
 
+    private fun activateAccount(sessionToken: AccountSessionToken?) {
+        accountGeneration++
+        activeSessionToken = sessionToken
+        refreshJobsByTab.values.forEach(Job::cancel)
+        refreshJobsByTab.clear()
+        directoryRefreshJob?.cancel()
+        directoryRefreshJob = null
+        friendFilterJob?.cancel()
+        friendFilterJob = null
+        favoritedWorldMap.clear()
+        favoritedAvatarMap.clear()
+        offlineStatusDescriptions.clear()
+        _friendList.value = emptyList()
+        _friendTotal.value = 0
+        _worldList.value = emptyList()
+        _worldTotal.value = 0
+        _avatarList.value = emptyList()
+        _avatarTotal.value = 0
+        _friendGroupOptions.value = FriendGroupOptions()
+        _worldGroupOptions.value = WorldGroupOptions()
+        _avatarGroupOptions.value = AvatarGroupOptions()
+        searchTexts.indices.forEach { searchTexts[it] = "" }
+        _searchText.value = ""
+        _refreshErrors.value = emptyMap()
+        _refreshingTabs.value = if (sessionToken == null) emptySet() else setOf(0, 1, 2)
+        _directoryRefreshing.value = sessionToken != null
+        _directoryRefreshFailed.value = false
+        if (sessionToken != null) refreshFriendDirectory()
+    }
+
     /**
      * 加载收藏组信息
      */
-    private fun doRefreshCache(favoriteType: FavoriteType, showRefreshing: Boolean = true) =
-        viewModelScope.launch(Dispatchers.IO) {
+    private fun doRefreshCache(favoriteType: FavoriteType, showRefreshing: Boolean = true): Job? {
+        val sessionToken = activeSessionToken ?: return null
+        val generation = accountGeneration
+        val tabIndex = favoriteType.tabIndex
+        refreshJobsByTab.remove(tabIndex)?.cancel()
+        return viewModelScope.launch(Dispatchers.IO) {
             try {
-                val tabIndex = favoriteType.tabIndex
+                if (!acceptsAccount(sessionToken, generation)) return@launch
                 if (showRefreshing) _refreshingTabs.update { it + tabIndex }
                 _refreshErrors.update { it - tabIndex }
                 when (favoriteType) {
                     Friend -> {
-                        // 加载收藏组信息，用于分组过滤
-                        favoriteService.loadFavoriteByGroup(Friend)
+                        recordFavoriteGroupFailure(
+                            favoriteType = Friend,
+                            result = favoriteService.loadFavoriteByGroup(Friend),
+                            sessionToken = sessionToken,
+                            generation = generation,
+                        )
+                        if (!acceptsAccount(sessionToken, generation)) return@launch
                         doRefreshFriendList()
                     }
 
                     World -> {
-                        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return@launch
-                        restoreFavoriteListCache(World, sessionToken)
-                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
-                        // 加载收藏组信息，用于分组过滤
-                        favoriteService.loadFavoriteByGroup(World)
-                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
-                        // 直接从API获取收藏世界列表
-                        doRefreshWorldList(sessionToken)
+                        restoreFavoriteListCache(World, sessionToken, generation)
+                        if (!acceptsAccount(sessionToken, generation)) return@launch
+                        recordFavoriteGroupFailure(
+                            favoriteType = World,
+                            result = favoriteService.loadFavoriteByGroup(World),
+                            sessionToken = sessionToken,
+                            generation = generation,
+                        )
+                        if (!acceptsAccount(sessionToken, generation)) return@launch
+                        doRefreshWorldList(sessionToken, generation)
                     }
 
                     Avatar -> {
-                        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return@launch
-                        restoreFavoriteListCache(Avatar, sessionToken)
-                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
-                        favoriteService.loadFavoriteByGroup(Avatar)
-                        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
-                        doRefreshAvatarList(sessionToken)
+                        restoreFavoriteListCache(Avatar, sessionToken, generation)
+                        if (!acceptsAccount(sessionToken, generation)) return@launch
+                        recordFavoriteGroupFailure(
+                            favoriteType = Avatar,
+                            result = favoriteService.loadFavoriteByGroup(Avatar),
+                            sessionToken = sessionToken,
+                            generation = generation,
+                        )
+                        if (!acceptsAccount(sessionToken, generation)) return@launch
+                        doRefreshAvatarList(sessionToken, generation)
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
-                _refreshErrors.update { it + (favoriteType.tabIndex to e.message.orEmpty()) }
-                SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
+                if (acceptsAccount(sessionToken, generation)) {
+                    _refreshErrors.update { it + (tabIndex to e.message.orEmpty()) }
+                    SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
+                }
             } finally {
-                _refreshingTabs.update { it - favoriteType.tabIndex }
+                if (acceptsAccount(sessionToken, generation)) {
+                    _refreshingTabs.update { it - tabIndex }
+                }
             }
         }
+            .also { refreshJobsByTab[tabIndex] = it }
+    }
+
+    private fun recordFavoriteGroupFailure(
+        favoriteType: FavoriteType,
+        result: Result<Unit>,
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ) {
+        val error = result.exceptionOrNull() ?: return
+        if (acceptsAccount(sessionToken, generation)) {
+            _refreshErrors.update { it + (favoriteType.tabIndex to error.message.orEmpty()) }
+        }
+    }
 
     private suspend fun restoreFavoriteListCache(
         favoriteType: FavoriteType,
         sessionToken: AccountSessionToken,
+        generation: Long,
     ) {
         val cached = try {
             favoriteListCacheStore.load(sessionToken.userId)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            SharedFlowCentre.toastText.emit(ToastText.Error("读取收藏缓存失败: ${error.message}"))
+            if (acceptsAccount(sessionToken, generation)) {
+                SharedFlowCentre.toastText.emit(ToastText.Error("读取收藏缓存失败: ${error.message}"))
+            }
             null
         } ?: return
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return
+        if (!acceptsAccount(sessionToken, generation)) return
 
         when (favoriteType) {
             World -> {
@@ -305,7 +370,10 @@ class FriendListPagerModel(
     /** Refreshes only the friend snapshot and VRChat friend favorite groups. */
     fun refreshFriendDirectory() {
         if (directoryRefreshJob?.isActive == true) return
+        val sessionToken = activeSessionToken ?: return
+        val generation = accountGeneration
         directoryRefreshJob = viewModelScope.launch(Dispatchers.IO) {
+            if (!acceptsAccount(sessionToken, generation)) return@launch
             _directoryRefreshing.value = true
             _directoryRefreshFailed.value = false
             var failed = false
@@ -316,6 +384,7 @@ class FriendListPagerModel(
             } catch (_: Exception) {
                 failed = true
             }
+            if (!acceptsAccount(sessionToken, generation)) return@launch
             try {
                 if (!friendService.refreshFriendList()) failed = true
             } catch (cancelled: CancellationException) {
@@ -323,8 +392,10 @@ class FriendListPagerModel(
             } catch (_: Exception) {
                 failed = true
             } finally {
-                _directoryRefreshFailed.value = failed
-                _directoryRefreshing.value = false
+                if (acceptsAccount(sessionToken, generation)) {
+                    _directoryRefreshFailed.value = failed
+                    _directoryRefreshing.value = false
+                }
             }
         }
     }
@@ -427,6 +498,11 @@ class FriendListPagerModel(
      * 使用FriendService提供的方法
      */
     private fun findFriendList(name: String) {
+        val sessionToken = activeSessionToken ?: run {
+            _friendList.value = emptyList()
+            return
+        }
+        val generation = accountGeneration
         val favoriteIds = if (friendGroupOptions.value.selectedGroup != null) {
             // 获取选中好友组的favoriteId列表
             friendFavoriteGroupsFlow.value[friendGroupOptions.value.selectedGroup]
@@ -437,7 +513,8 @@ class FriendListPagerModel(
         }
         friendFilterJob?.cancel()
         friendFilterJob = viewModelScope.launch {
-            _friendList.value = findFriendsByName(name, favoriteIds)
+            val friends = findFriendsByName(name, favoriteIds, sessionToken, generation)
+            if (acceptsAccount(sessionToken, generation)) _friendList.value = friends
         }
     }
 
@@ -472,7 +549,12 @@ class FriendListPagerModel(
      *
      * @param favoriteIds 为 null 时返回所有好友， 代表没有选择好友组
      */
-    suspend fun findFriendsByName(name: String, favoriteIds: Set<String>?): List<FriendData> {
+    private suspend fun findFriendsByName(
+        name: String,
+        favoriteIds: Set<String>?,
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ): List<FriendData> {
 
         val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
             withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
@@ -490,7 +572,7 @@ class FriendListPagerModel(
             if (favoriteIds != null) nameFilteredList.filter { friend -> favoriteIds.contains(friend.id) }
             else nameFilteredList
 
-        return enrichOfflineStatusDescriptions(result).sortedUserByStatus()
+        return enrichOfflineStatusDescriptions(result, sessionToken, generation).sortedUserByStatus()
     }
 
     /**
@@ -498,7 +580,11 @@ class FriendListPagerModel(
      * Fetch it from the user profile only for those rows, and cache the result
      * so presence updates do not turn the favorites page into a request storm.
      */
-    private suspend fun enrichOfflineStatusDescriptions(friends: List<FriendData>): List<FriendData> {
+    private suspend fun enrichOfflineStatusDescriptions(
+        friends: List<FriendData>,
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ): List<FriendData> {
         val candidates = friends.filter {
             it.status == UserStatus.Offline && it.statusDescription.isBlank()
         }
@@ -517,8 +603,10 @@ class FriendListPagerModel(
                     }
                 }.awaitAll()
             }
-            fetched.forEach { (id, description) ->
-                offlineStatusDescriptions[id] = description
+            if (acceptsAccount(sessionToken, generation)) {
+                fetched.forEach { (id, description) ->
+                    offlineStatusDescriptions[id] = description
+                }
             }
         }
 
@@ -596,7 +684,10 @@ class FriendListPagerModel(
     /**
      * 刷新收藏的模型列表
      */
-    private suspend fun doRefreshAvatarList(sessionToken: AccountSessionToken) {
+    private suspend fun doRefreshAvatarList(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ) {
         val cacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId)
         authService.reTryAuthCatching {
             // /avatars/favorites 默认只返回默认收藏组，必须按组 tag 分别请求。
@@ -613,7 +704,7 @@ class FriendListPagerModel(
             }
             mergeFavoritedAvatars(remoteAvatars, localAvatars)
         }.onSuccess { avatars ->
-            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@onSuccess
+            if (!acceptsAccount(sessionToken, generation)) return@onSuccess
             favoritedAvatarMap.clear()
             favoritedAvatarMap.putAll(avatars.associateBy { it.id })
             _avatarTotal.value = favoritedAvatarMap.size
@@ -621,8 +712,10 @@ class FriendListPagerModel(
             persistFavoritedAvatars(cacheWriteToken, avatars)
         }.onFailure {
             if (it is CancellationException) throw it
-            _refreshErrors.update { errors -> errors + (2 to it.message.orEmpty()) }
-            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
+            if (acceptsAccount(sessionToken, generation)) {
+                _refreshErrors.update { errors -> errors + (2 to it.message.orEmpty()) }
+                SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
+            }
         }
     }
 
@@ -646,7 +739,10 @@ class FriendListPagerModel(
      * 刷新收藏的世界列表
      * 使用流式分页API获取全部收藏世界列表
      */
-    private suspend fun doRefreshWorldList(sessionToken: AccountSessionToken) {
+    private suspend fun doRefreshWorldList(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ) {
         val cacheWriteToken = accountCacheManager.captureWriteToken(sessionToken.userId)
         try {
             val localEntry = worldFavoriteGroupsFlow.value.entries.firstOrNull { (group, _) ->
@@ -665,7 +761,7 @@ class FriendListPagerModel(
                 .toList()
                 .flatten()
 
-            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return
+            if (!acceptsAccount(sessionToken, generation)) return
             val worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds)
             replaceFavoritedWorldCache(cache = favoritedWorldMap, worlds = worlds)
             _worldTotal.value = favoritedWorldMap.size
@@ -677,10 +773,16 @@ class FriendListPagerModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _refreshErrors.update { errors -> errors + (1 to e.message.orEmpty()) }
-            SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+            if (acceptsAccount(sessionToken, generation)) {
+                _refreshErrors.update { errors -> errors + (1 to e.message.orEmpty()) }
+                SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+            }
         }
     }
+
+    private fun acceptsAccount(sessionToken: AccountSessionToken, generation: Long): Boolean =
+        accountGeneration == generation && activeSessionToken?.userId == sessionToken.userId &&
+            SharedFlowCentre.currentSession.value?.token?.userId == sessionToken.userId
 
     private suspend fun persistFavoritedWorlds(
         token: AccountCacheWriteToken,
