@@ -1,9 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -134,55 +131,60 @@ object HomeScreen : AppListRoute {
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .enableIf(supportBlur) { hazeSource(hazeState!!) },
-                tonalElevation = 2.dp,
-            ) {
-                Row {
-                    if (useRail && showMainNavigation) {
-                        MainNavigationRail(
-                            selectedDestination,
-                            notificationModel.hasUnread,
-                            onDestinationSelected,
+            Scaffold(
+                contentColor = MaterialTheme.colorScheme.primary,
+                bottomBar = {
+                    if (!useRail && showMainNavigation) {
+                        MainNavigationBar(
+                            selected = selectedDestination,
+                            hasUnread = notificationModel.hasUnread,
+                            hazeState = hazeState,
+                            onSelect = onDestinationSelected,
                         )
                     }
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
-                        stateHolder.SaveableStateProvider(selectedDestination.name) {
-                            when (selectedDestination) {
-                                HomeDestination.Home -> HomeDestinationContent(
-                                    model,
-                                    timelineModel,
-                                    timelineState,
-                                    timelineFilter,
-                                    hasBottomNavigation = !useRail && showMainNavigation,
-                                )
-                                HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) {
-                                    SearchListPager.Content()
-                                }
-                                HomeDestination.Notifications -> NotificationCenterContent(
-                                    modifier = if (useRail || !showMainNavigation) {
-                                        Modifier
-                                    } else {
-                                        Modifier.padding(bottom = 80.dp)
-                                    },
-                                    showBackButton = false,
-                                    navigationIcon = { RootAvatarButton(model) },
-                                )
-                                HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) {
-                                    FriendListPager.Content()
+                },
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .enableIf(supportBlur) { hazeSource(hazeState!!) },
+                    tonalElevation = 2.dp,
+                ) {
+                    Row {
+                        if (useRail && showMainNavigation) {
+                            MainNavigationRail(
+                                selectedDestination,
+                                notificationModel.hasUnread,
+                                onDestinationSelected,
+                            )
+                        }
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            stateHolder.SaveableStateProvider(selectedDestination.name) {
+                                when (selectedDestination) {
+                                    HomeDestination.Home -> HomeDestinationContent(
+                                        model,
+                                        timelineModel,
+                                        timelineState,
+                                        timelineFilter,
+                                        hasBottomNavigation = !useRail && showMainNavigation,
+                                    )
+                                    HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) {
+                                        SearchListPager.Content()
+                                    }
+                                    HomeDestination.Notifications -> NotificationCenterContent(
+                                        modifier = if (useRail || !showMainNavigation) {
+                                            Modifier
+                                        } else {
+                                            Modifier.padding(bottom = 80.dp)
+                                        },
+                                        showBackButton = false,
+                                        navigationIcon = { RootAvatarButton(model) },
+                                    )
+                                    HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) {
+                                        FriendListPager.Content()
+                                    }
                                 }
                             }
-                        }
-                        if (!useRail && showMainNavigation) {
-                            MainNavigationBar(
-                                modifier = Modifier.align(Alignment.BottomCenter),
-                                selected = selectedDestination,
-                                hasUnread = notificationModel.hasUnread,
-                                hazeState = hazeState,
-                                onSelect = onDestinationSelected,
-                            )
                         }
                     }
                 }
@@ -425,7 +427,6 @@ private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
 
 @Composable
 private fun MainNavigationBar(
-    modifier: Modifier,
     selected: HomeDestination,
     hasUnread: Boolean,
     hazeState: HazeState?,
@@ -433,18 +434,14 @@ private fun MainNavigationBar(
 ) {
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    BoxWithConstraints(
-        modifier = modifier
+    Box(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = bottomPadding),
+            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
         contentAlignment = Alignment.Center,
     ) {
-        val horizontalPadding = if (maxWidth < 320.dp) 12.dp else 28.dp
         Surface(
             modifier = Modifier
-                .padding(horizontal = horizontalPadding)
-                .widthIn(max = 360.dp)
-                .fillMaxWidth()
                 .height(64.dp)
                 .run {
                     if (hazeState != null) {
@@ -459,8 +456,8 @@ private fun MainNavigationBar(
             color = if (hazeState != null) Color.Transparent else backgroundColor,
         ) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 HomeDestination.entries.forEach { destination ->
                     val presentation = destination.presentation()
@@ -477,34 +474,26 @@ private fun MainNavigationBar(
 }
 
 @Composable
-private fun RowScope.MainNavigationItem(
+private fun MainNavigationItem(
     presentation: MainDestinationPresentation,
     selected: Boolean,
     unread: Boolean,
     onClick: () -> Unit,
 ) {
-    val tint by animateColorAsState(
-        targetValue = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "Main navigation icon tint",
-    )
     Box(
         modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
             .clip(CircleShape)
             .simpleClickable(onClick),
-        contentAlignment = Alignment.Center,
     ) {
         MainDestinationIcon(
             presentation = presentation,
             unread = unread,
             modifier = Modifier.size(40.dp),
-            tint = tint,
+            tint = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
     }
 }
