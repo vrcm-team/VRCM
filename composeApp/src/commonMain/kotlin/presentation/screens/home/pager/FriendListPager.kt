@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -23,6 +24,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -48,10 +51,12 @@ object FriendListPager : Pager {
 
     @Composable
     override fun Content() {
-        val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
+        val bottomNavigationPadding = if (
+            LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
+        ) 80.dp else 0.dp
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
         FriendsDirectoryContent(
-            contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding),
+            contentPadding = PaddingValues(top = 12.dp, bottom = bottomPadding),
         )
     }
 }
@@ -151,7 +156,10 @@ fun FriendsDirectoryContent(
                     onRetry = model::refreshFriendDirectory,
                 )
             } else if (refreshFailed) {
-                DirectoryErrorBanner(model::refreshFriendDirectory)
+                DirectoryErrorBanner(
+                    bottomPadding = contentPadding.calculateBottomPadding(),
+                    onRetry = model::refreshFriendDirectory,
+                )
             }
         }
     }
@@ -218,9 +226,12 @@ private fun BoxScope.DirectoryMessage(message: String, retry: Boolean, onRetry: 
 }
 
 @Composable
-private fun BoxScope.DirectoryErrorBanner(onRetry: () -> Unit) {
+private fun BoxScope.DirectoryErrorBanner(bottomPadding: Dp, onRetry: () -> Unit) {
     Surface(
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = bottomPadding),
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = MaterialTheme.shapes.medium,

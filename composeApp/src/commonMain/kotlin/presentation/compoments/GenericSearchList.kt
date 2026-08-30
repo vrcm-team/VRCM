@@ -16,6 +16,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
@@ -44,6 +46,8 @@ fun GenericSearchList(
     onLoadMore: (() -> Unit)? = null,
     totalItemsCount: Int = 0,
     lazyListState: LazyListState = rememberLazyListState(),
+    topContentPadding: Dp? = null,
+    bottomNavigationPadding: Dp = 80.dp,
     itemContent:  LazyListScope.(Int) -> Unit
 ) {
     // 监听返回顶部事件
@@ -69,8 +73,8 @@ fun GenericSearchList(
         }
     }
 
-    val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
-    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
+    val topPadding = topContentPadding ?: (getInsetPadding(WindowInsets::getTop) + 80.dp)
+    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
 
     val contentLazyColumn = @Composable {
         LazyColumn(
@@ -127,6 +131,8 @@ fun GenericSearchList(
                                 text = {
                                     Text(
                                         text = title,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontWeight = if (index == selectedTabIndex) FontWeight.Bold
                                                         else FontWeight.Normal

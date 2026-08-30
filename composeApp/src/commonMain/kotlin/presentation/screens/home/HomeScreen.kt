@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
+import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUser
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
@@ -45,6 +46,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -63,6 +65,8 @@ object HomeScreen : AppListRoute {
         val timelineFilter by timelineModel.filter.collectAsState()
         val stateHolder = rememberSaveableStateHolder()
         val scope = rememberCoroutineScope()
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val drawerCoordinator = remember { HomeDrawerStateCoordinator() }
         val useRail = LocalAppWindowWidthClass.current != AppWindowWidthClass.Compact
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
         val showMainNavigation = navigator.lastItem == HomeScreen
@@ -86,56 +90,89 @@ object HomeScreen : AppListRoute {
         LaunchedEffect(Unit) {
             SharedFlowCentre.currentSession.collect { model.clearOverlays() }
         }
-        HandleBackNavigation(model.drawerVisible, model::hideDrawer)
-
-        Surface(Modifier.fillMaxSize(), tonalElevation = 2.dp) {
-            Row {
-                if (useRail && showMainNavigation) {
-                    MainNavigationRail(
-                        selectedDestination,
-                        notificationModel.hasUnread,
-                        onDestinationSelected,
-                    )
-                }
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    stateHolder.SaveableStateProvider(selectedDestination.name) {
-                        when (selectedDestination) {
-                            HomeDestination.Home -> HomeDestinationContent(model, timelineModel, timelineState, timelineFilter)
-                            HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) { SearchListPager.Content() }
-                            HomeDestination.Notifications -> NotificationCenterContent(
-                                modifier = if (useRail || !showMainNavigation) {
-                                    Modifier
-                                } else {
-                                    Modifier.padding(bottom = 80.dp)
-                                },
-                                showBackButton = false,
-                                navigationIcon = { RootAvatarButton(model) },
-                            )
-                            HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) { FriendListPager.Content() }
-                        }
+        LaunchedEffect(model.drawerVisible) {
+            if (model.drawerVisible) drawerState.open() else drawerState.close()
+        }
+        LaunchedEffect(drawerState) {
+            snapshotFlow { drawerState.currentValue }
+                .distinctUntilChanged()
+                .collect { value ->
+                    if (drawerCoordinator.shouldHide(value) && model.drawerVisible) {
+                        model.hideDrawer()
                     }
-                    if (!useRail && showMainNavigation) {
-                        MainNavigationBar(
-                            modifier = Modifier.align(Alignment.BottomCenter),
-                            selected = selectedDestination,
-                            hasUnread = notificationModel.hasUnread,
-                            onSelect = onDestinationSelected,
+                }
+        }
+        val closeDrawer: () -> Unit = {
+            scope.launch {
+                drawerState.close()
+                model.hideDrawer()
+            }
+        }
+        HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
+
+        HomePersonalDrawer(
+            model = model,
+            drawerState = drawerState,
+            gesturesEnabled = model.drawerVisible || drawerState.isOpen,
+        ) {
+            Surface(Modifier.fillMaxSize(), tonalElevation = 2.dp) {
+                Row {
+                    if (useRail && showMainNavigation) {
+                        MainNavigationRail(
+                            selectedDestination,
+                            notificationModel.hasUnread,
+                            onDestinationSelected,
                         )
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        stateHolder.SaveableStateProvider(selectedDestination.name) {
+                            when (selectedDestination) {
+                                HomeDestination.Home -> HomeDestinationContent(
+                                    model,
+                                    timelineModel,
+                                    timelineState,
+                                    timelineFilter,
+                                    hasBottomNavigation = !useRail && showMainNavigation,
+                                )
+                                HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) {
+                                    SearchListPager.Content()
+                                }
+                                HomeDestination.Notifications -> NotificationCenterContent(
+                                    modifier = if (useRail || !showMainNavigation) {
+                                        Modifier
+                                    } else {
+                                        Modifier.padding(bottom = 80.dp)
+                                    },
+                                    showBackButton = false,
+                                    navigationIcon = { RootAvatarButton(model) },
+                                )
+                                HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) {
+                                    FriendListPager.Content()
+                                }
+                            }
+                        }
+                        if (!useRail && showMainNavigation) {
+                            MainNavigationBar(
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                                selected = selectedDestination,
+                                hasUnread = notificationModel.hasUnread,
+                                onSelect = onDestinationSelected,
+                            )
+                        }
                     }
                 }
             }
         }
 
-        HomePersonalDrawer(model)
         SettingsBottomSheet(model.settingsVisible, model::hideSettings)
     }
 }
 
 @Composable
 private fun RootPagerContent(title: String, content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize()) {
-        content()
+    Column(Modifier.fillMaxSize()) {
         RootTopBar(title)
+        Box(Modifier.weight(1f)) { content() }
     }
 }
 
@@ -146,6 +183,7 @@ private fun HomeDestinationContent(
     timelineModel: FriendActivityTimelineModel,
     timelineState: FriendActivityTimelineState,
     timelineFilter: FriendActivityTimelineFilter,
+    hasBottomNavigation: Boolean,
 ) {
     val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
     val stateHolder = rememberSaveableStateHolder()
@@ -161,60 +199,62 @@ private fun HomeDestinationContent(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        stateHolder.SaveableStateProvider(selectedTab.name) {
-            when (selectedTab) {
-                HomeTab.Location -> Box(Modifier.fillMaxSize().padding(top = 48.dp)) {
-                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                        FriendLocationPager.Content()
-                    }
-                }
-                HomeTab.Activity -> FriendActivityTimelineContent(
-                    state = timelineState,
-                    filter = timelineFilter,
-                    onFilterSelected = timelineModel::selectFilter,
-                    onRetry = timelineModel::retry,
-                    onLoadMore = timelineModel::loadMore,
-                    onRetryLoadMore = timelineModel::retryLoadMore,
-                    onUserClick = { event ->
-                        navigator push UserProfileScreen(
-                            UserProfileVo(
-                                id = event.friendUserId,
-                                displayName = event.displayName,
-                                profileImageUrl = event.profileImageUrl,
-                            )
+    Column(Modifier.fillMaxSize()) {
+        RootTopBar(strings.mainNavigationHome)
+        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+            HomeTab.entries.forEach { tab ->
+                Tab(
+                    selected = tab == selectedTab,
+                    onClick = {
+                        if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
+                        else model.selectHomeTab(tab)
+                    },
+                    text = {
+                        Text(
+                            if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     },
-                    onWorldClick = { event ->
-                        val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
-                        navigator push WorldProfileScreen(
-                            WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
-                        )
-                    },
-                    listState = timelineListState,
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                        .padding(top = 112.dp, bottom = 80.dp),
                 )
             }
         }
-        Column {
-            RootTopBar(strings.mainNavigationHome)
-            PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-                HomeTab.entries.forEach { tab ->
-                    Tab(
-                        selected = tab == selectedTab,
-                        onClick = {
-                            if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
-                            else model.selectHomeTab(tab)
-                        },
-                        text = {
-                            Text(
-                                if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
+        Box(Modifier.weight(1f)) {
+            stateHolder.SaveableStateProvider(selectedTab.name) {
+                when (selectedTab) {
+                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                            FriendLocationPager.Content()
+                        }
+                    }
+                    HomeTab.Activity -> FriendActivityTimelineContent(
+                        state = timelineState,
+                        filter = timelineFilter,
+                        onFilterSelected = timelineModel::selectFilter,
+                        onLoadMore = timelineModel::loadMore,
+                        onRetry = timelineModel::retry,
+                        onRetryLoadMore = timelineModel::retryLoadMore,
+                        onUserClick = { event ->
+                            navigator push UserProfileScreen(
+                                UserProfileVo(
+                                    id = event.friendUserId,
+                                    displayName = event.displayName,
+                                    profileImageUrl = event.profileImageUrl,
+                                )
                             )
                         },
+                        onWorldClick = { event ->
+                            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
+                            navigator push WorldProfileScreen(
+                                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+                            )
+                        },
+                        listState = timelineListState,
+                        modifier = Modifier
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                            )
+                            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
                     )
                 }
             }
@@ -278,29 +318,45 @@ private fun RootAvatarButton(model: HomeScreenModel) {
 }
 
 @Composable
-private fun HomePersonalDrawer(model: HomeScreenModel) {
+private fun HomePersonalDrawer(
+    model: HomeScreenModel,
+    drawerState: DrawerState,
+    gesturesEnabled: Boolean,
+    content: @Composable () -> Unit,
+) {
     val navigator = currentNavigator
     val currentUser = model.currentUser
     var currentDialog by LocationDialogContent.current
+    var showLogoutConfirmation by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val suffix = rememberContainerTransformToken("home-user:${model.userId}") ?: LocalSharedSuffixKey.current
     fun closeAndNavigate(route: AppRoute) {
-        model.hideDrawer()
-        navigator push route
+        scope.launch {
+            drawerState.close()
+            model.hideDrawer()
+            navigator push route
+        }
     }
     PersonalNavigationDrawer(
-        visible = model.drawerVisible,
+        drawerState = drawerState,
+        gesturesEnabled = gesturesEnabled,
         user = currentUser?.toPersonalDrawerUser(),
-        onDismissRequest = model::hideDrawer,
         onProfileClick = {
             currentUser?.let {
-                model.hideDrawer()
-                navigator push UserProfileScreen(UserProfileVo(it), suffix)
+                scope.launch {
+                    drawerState.close()
+                    model.hideDrawer()
+                    navigator push UserProfileScreen(UserProfileVo(it), suffix)
+                }
             }
         },
         onStatusClick = {
             currentUser?.let { user ->
-                model.hideDrawer()
-                currentDialog = UserStatusDialog(user) { currentDialog = null }
+                scope.launch {
+                    drawerState.close()
+                    model.hideDrawer()
+                    currentDialog = UserStatusDialog(user) { currentDialog = null }
+                }
             }
         },
         onFriendNetworkClick = { closeAndNavigate(FriendNetworkScreen) },
@@ -308,9 +364,29 @@ private fun HomePersonalDrawer(model: HomeScreenModel) {
         onFavoritesClick = { closeAndNavigate(FavoritesScreen) },
         onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
         onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
-        onSettingsClick = model::showSettings,
-        onLogoutClick = model::logout,
+        onSettingsClick = {
+            scope.launch {
+                drawerState.close()
+                model.hideDrawer()
+                model.showSettings()
+            }
+        },
+        onLogoutClick = { showLogoutConfirmation = true },
+        content = content,
     )
+    if (showLogoutConfirmation) {
+        LogoutConfirmationDialog(
+            onDismissRequest = { showLogoutConfirmation = false },
+            onConfirm = {
+                showLogoutConfirmation = false
+                scope.launch {
+                    drawerState.close()
+                    model.hideDrawer()
+                    model.logout()
+                }
+            },
+        )
+    }
 }
 
 private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
@@ -373,6 +449,22 @@ private fun MainDestinationIcon(presentation: MainDestinationPresentation, unrea
 }
 
 private data class MainDestinationPresentation(val label: String, val icon: ImageVector)
+
+internal class HomeDrawerStateCoordinator {
+    private var hasSettledOpen = false
+
+    fun shouldHide(value: DrawerValue): Boolean = when (value) {
+        DrawerValue.Open -> {
+            hasSettledOpen = true
+            false
+        }
+        DrawerValue.Closed -> {
+            val shouldHide = hasSettledOpen
+            hasSettledOpen = false
+            shouldHide
+        }
+    }
+}
 
 @Composable
 private fun HomeDestination.presentation(): MainDestinationPresentation = when (this) {

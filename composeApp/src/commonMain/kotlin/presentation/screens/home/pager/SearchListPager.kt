@@ -37,6 +37,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderUserItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -104,6 +106,9 @@ fun PublicSearchContent(
         PublicSearchTab.Group -> groupListState
     }
     var showAdvancedOptions by remember { mutableStateOf(false) }
+    val bottomNavigationPadding = if (
+        LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
+    ) 80.dp else 0.dp
 
     LaunchedEffect(searchType, searchText) {
         model.loadSearchListIfNeeded()
@@ -141,6 +146,8 @@ fun PublicSearchContent(
         },
         totalItemsCount = groups.size.takeIf { selectedTab == PublicSearchTab.Group } ?: 0,
         lazyListState = selectedListState,
+        topContentPadding = 12.dp,
+        bottomNavigationPadding = bottomNavigationPadding,
     ) {
         renderPublicSearchStatus(
             query = searchText,

@@ -404,12 +404,19 @@ class FriendListPagerModel(
      * 设置当前选中的标签页索引
      */
     fun setSelectedTabIndex(index: Int) {
-        if (_selectedTabIndex.value != index) {
-            _selectedTabIndex.value = index
-            _searchText.value = searchTexts[index]
+        if (syncSelectedTabIndex(index)) {
             // 切换标签页时刷新对应数据
             refreshCurrentTabCacheData(showRefreshing = false)
         }
+    }
+
+    /** 同步恢复的标签页选择，不触发额外网络刷新。 */
+    fun syncSelectedTabIndex(index: Int): Boolean {
+        require(index in searchTexts.indices) { "Unsupported favorites tab index: $index" }
+        if (_selectedTabIndex.value == index) return false
+        _selectedTabIndex.value = index
+        _searchText.value = searchTexts[index]
+        return true
     }
 
     fun setSearchText(text: String) {

@@ -415,6 +415,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val homeTabActivity = "アクティビティ"
     override val drawerMyProfile = "マイプロフィール"
     override val drawerSettings = "設定"
+    override val logoutConfirmTitle = "ログアウトしますか？"
+    override val logoutConfirmMessage = "VRCMを利用するには、再度ログインする必要があります。"
     override val back = "戻る"
     override val refresh = "更新"
     override val close = "閉じる"

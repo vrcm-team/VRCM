@@ -414,6 +414,8 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val homeTabActivity = "动态"
     override val drawerMyProfile = "我的资料"
     override val drawerSettings = "设置"
+    override val logoutConfirmTitle = "退出登录？"
+    override val logoutConfirmMessage = "再次使用 VRCM 时需要重新登录。"
     override val back = "返回"
     override val refresh = "刷新"
     override val close = "关闭"

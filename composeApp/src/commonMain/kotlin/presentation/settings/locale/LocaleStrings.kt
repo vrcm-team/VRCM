@@ -432,6 +432,8 @@ sealed class LocaleStrings {
     open val homeTabActivity: String = "Activity"
     open val drawerMyProfile: String = "My profile"
     open val drawerSettings: String = "Settings"
+    open val logoutConfirmTitle: String = "Log out?"
+    open val logoutConfirmMessage: String = "You will need to sign in again to use VRCM."
     open val back: String = "Back"
     open val refresh: String = "Refresh"
     open val close: String = "Close"

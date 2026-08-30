@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
@@ -69,7 +70,11 @@ private fun FavoritesScreenContent(
         (0..2).forEach { favoritesModel.refreshCurrentTabCacheData(tabIndex = it) }
     }
     LaunchedEffect(selectedTab) {
-        if (selectedTab == 3) groupsModel.loadIfNeeded()
+        if (selectedTab < 3) {
+            favoritesModel.syncSelectedTabIndex(selectedTab)
+        } else {
+            groupsModel.loadIfNeeded()
+        }
     }
 
     Scaffold(
@@ -103,7 +108,14 @@ private fun FavoritesScreenContent(
                             selectedTab = index
                             if (index < 3) favoritesModel.setSelectedTabIndex(index)
                         },
-                        text = { Text(title, maxLines = 2, textAlign = TextAlign.Center) },
+                        text = {
+                            Text(
+                                title,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                            )
+                        },
                     )
                 }
             }

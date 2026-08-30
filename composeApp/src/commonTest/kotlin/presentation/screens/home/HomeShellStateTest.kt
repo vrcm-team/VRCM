@@ -1,11 +1,22 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.material3.DrawerValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class HomeShellStateTest {
+    @Test
+    fun initialClosedDrawerStateDoesNotCancelOpeningIntent() {
+        val coordinator = HomeDrawerStateCoordinator()
+
+        assertFalse(coordinator.shouldHide(DrawerValue.Closed))
+        assertFalse(coordinator.shouldHide(DrawerValue.Open))
+        assertTrue(coordinator.shouldHide(DrawerValue.Closed))
+        assertFalse(coordinator.shouldHide(DrawerValue.Closed))
+    }
+
     @Test
     fun rootDestinationSwitchKeepsHomeTabAndReportsReselection() {
         val state = HomeShellState()
