@@ -222,12 +222,18 @@ private fun ActivityTimelineList(
 
         when (state) {
             FriendActivityTimelineState.Loading -> item(key = "activity-loading") {
-                TimelineMessage(Modifier.fillParentMaxHeight()) {
+                TimelineMessage(
+                    if (includeControls) Modifier.padding(vertical = 48.dp)
+                    else Modifier.fillParentMaxHeight(),
+                ) {
                     CircularProgressIndicator()
                 }
             }
             FriendActivityTimelineState.Error -> item(key = "activity-error") {
-                TimelineMessage(Modifier.fillParentMaxHeight()) {
+                TimelineMessage(
+                    if (includeControls) Modifier.padding(vertical = 48.dp)
+                    else Modifier.fillParentMaxHeight(),
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(strings.friendActivityTimelineError)
                         TextButton(onClick = onRetry) { Text(strings.retry) }
@@ -236,7 +242,10 @@ private fun ActivityTimelineList(
             }
             is FriendActivityTimelineState.Content -> if (state.events.isEmpty()) {
                 item(key = "activity-empty") {
-                    TimelineMessage(Modifier.fillParentMaxHeight()) {
+                    TimelineMessage(
+                        if (includeControls) Modifier.padding(vertical = 48.dp)
+                        else Modifier.fillParentMaxHeight(),
+                    ) {
                         Text(strings.friendActivityTimelineEmpty)
                     }
                 }

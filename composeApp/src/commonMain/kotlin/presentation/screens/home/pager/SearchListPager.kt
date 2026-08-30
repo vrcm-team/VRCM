@@ -124,7 +124,7 @@ fun PublicSearchContent(
     ) 80.dp else 0.dp
 
     LaunchedEffect(pagerState, model) {
-        snapshotFlow { pagerState.currentPage }
+        snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { page ->
                 model.setSearchType(PublicSearchTab.fromTabIndex(page).searchType)
@@ -135,12 +135,12 @@ fun PublicSearchContent(
     }
     LaunchedEffect(pagerState, userListState, worldListState, groupListState) {
         SharedFlowCentre.toPagerTop.collect {
-            val listState = when (pagerState.currentPage) {
+            val listState = when (pagerState.settledPage) {
                 PublicSearchTab.World.tabIndex -> worldListState
                 PublicSearchTab.Group.tabIndex -> groupListState
                 else -> userListState
             }
-            runCatching { listState.animateScrollToFirst() }
+            launch { listState.animateScrollToFirst() }
         }
     }
     LaunchedEffect(

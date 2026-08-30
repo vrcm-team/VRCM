@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 
@@ -77,10 +78,8 @@ object FriendLocationPager : Pager {
         }
         LaunchedEffect(Unit) {
             SharedFlowCentre.toPagerTop.collect {
-                // 防止滑动时手动阻止滑动动画导致任务取消,监听失效的bug
-                if (currentIsActive()) kotlin.runCatching {
-                    lazyListState.animateScrollToFirst()
-                }
+                // 子任务承接手势取消，避免终止长期 Flow 监听。
+                if (currentIsActive()) launch { lazyListState.animateScrollToFirst() }
             }
         }
 

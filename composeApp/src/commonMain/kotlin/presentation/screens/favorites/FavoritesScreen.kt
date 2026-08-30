@@ -61,7 +61,8 @@ private fun FavoritesScreenContent(
     val avatarOptions by favoritesModel.avatarGroupOptions.collectAsState()
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
-    val modelTabIndex = pagerState.currentPage + 1
+    val settledPage = pagerState.settledPage
+    val modelTabIndex = settledPage + 1
 
     SideEffect {
         favoritesModel.updateFavoriteLocale(favoriteLocale)
@@ -70,7 +71,7 @@ private fun FavoritesScreenContent(
         favoritesModel.activateFavoritesPage()
     }
     LaunchedEffect(pagerState, favoritesModel) {
-        snapshotFlow { pagerState.currentPage }
+        snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { page -> favoritesModel.syncSelectedTabIndex(page + 1) }
     }
@@ -129,7 +130,7 @@ private fun FavoritesScreenContent(
                 value = searchText,
                 onValueChange = favoritesModel::setSearchText,
             )
-            when (pagerState.currentPage) {
+            when (settledPage) {
                 0 -> GroupOptionsUI(worldOptions, FavoriteType.World, worldGroups, worldTotal, strings.friendListPagerAllWorlds, favoritesModel::updateWorldGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
                 1 -> GroupOptionsUI(avatarOptions, FavoriteType.Avatar, avatarGroups, avatarTotal, strings.friendListPagerAllAvatars, favoritesModel::updateAvatarGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
             }

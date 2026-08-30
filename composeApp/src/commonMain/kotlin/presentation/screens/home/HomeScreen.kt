@@ -235,8 +235,8 @@ private fun HomeDestinationContent(
     }
     LaunchedEffect(timelineListState) {
         SharedFlowCentre.toPagerTop.collect {
-            if (pagerState.currentPage == HomeTab.Activity.ordinal) {
-                runCatching { timelineListState.animateScrollToItem(0) }
+            if (pagerState.settledPage == HomeTab.Activity.ordinal) {
+                launch { timelineListState.animateScrollToItem(0) }
             }
         }
     }
@@ -258,7 +258,7 @@ private fun HomeDestinationContent(
                     CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
                         FriendLocationPager.Content(
                             headerContent = tabRow,
-                            isActive = { pagerState.currentPage == HomeTab.Location.ordinal },
+                            isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
                         )
                     }
                 }
