@@ -75,6 +75,7 @@ class SearchListPagerModel(
     private val _queriesByType = MutableStateFlow(
         PublicSearchTab.entries.associate { it.searchType to "" },
     )
+    internal val queriesByType = _queriesByType.asStateFlow()
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
@@ -163,7 +164,7 @@ class SearchListPagerModel(
 
     suspend fun refreshSearchList(): Boolean = refreshSearchList(_searchType.value)
 
-    private suspend fun refreshSearchList(type: Int): Boolean {
+    internal suspend fun refreshSearchList(type: Int): Boolean {
         val requestKey = requestKeyFor(type)
         if (requestKey.searchText.isBlank()) {
             updateLoadState(type, PublicSearchLoadState())

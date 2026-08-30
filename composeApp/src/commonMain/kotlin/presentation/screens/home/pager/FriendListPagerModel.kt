@@ -266,6 +266,17 @@ class FriendListPagerModel(
         val sessionToken = activeSessionToken ?: return null
         val generation = accountGeneration
         val tabIndex = favoriteType.tabIndex
+        refreshJobsByTab[tabIndex]?.takeIf { it.isActive }?.let { activeJob ->
+            if (showRefreshing) {
+                _refreshingTabs.update { tabs -> tabs + tabIndex }
+                activeJob.invokeOnCompletion {
+                    if (acceptsAccount(sessionToken, generation)) {
+                        _refreshingTabs.update { tabs -> tabs - tabIndex }
+                    }
+                }
+            }
+            return activeJob
+        }
         refreshJobsByTab.remove(tabIndex)?.cancel()
         return viewModelScope.launch(Dispatchers.IO) {
             try {
