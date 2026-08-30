@@ -41,6 +41,34 @@ class NotificationApiTest {
         client.close()
     }
 
+    @Test
+    fun pipelineMarkAsReadUsesPostSeeEndpoint() = runBlocking {
+        val requests = mutableListOf<Pair<HttpMethod, String>>()
+        val client = notificationClient { method, path -> requests += method to path }
+
+        NotificationApi(client).markPipelineNotificationAsRead("not_unread")
+
+        assertEquals(
+            listOf(HttpMethod.Post to "/api/1/notifications/not_unread/see"),
+            requests,
+        )
+        client.close()
+    }
+
+    @Test
+    fun legacyMarkAsReadKeepsPutSeeEndpoint() = runBlocking {
+        val requests = mutableListOf<Pair<HttpMethod, String>>()
+        val client = notificationClient { method, path -> requests += method to path }
+
+        NotificationApi(client).markLegacyNotificationAsRead("not_friend_request")
+
+        assertEquals(
+            listOf(HttpMethod.Put to "/api/1/auth/user/notifications/not_friend_request/see"),
+            requests,
+        )
+        client.close()
+    }
+
     private fun notificationClient(onRequest: (HttpMethod, String) -> Unit) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->

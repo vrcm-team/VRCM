@@ -7,6 +7,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineModel
 import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
@@ -18,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
@@ -54,6 +56,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
+import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.ktor.client.*
 import okio.FileSystem
 import org.koin.core.definition.Definition
@@ -73,6 +76,7 @@ val presentationModule: Module = module {
     // background monitoring report; it only holds the settings DAO and the theme color list.
     single { SettingsModel(get(), getAll()) }
     viewModelOf(::AuthScreenModel)
+    viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
     singleOf(::NotificationCenterModel)
     viewModelOf(::UserProfileScreenModel)
@@ -133,6 +137,7 @@ val presentationModule: Module = module {
     }
     singleOf (::FriendLocationPagerModel)
     viewModelOf(::FriendListPagerModel)
+    viewModelOf(::FavoritesGroupsModel)
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)

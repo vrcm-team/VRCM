@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LanguageTag
@@ -294,15 +295,10 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
 }
 
 @Composable
-private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
+private fun LogoutButton(onDismissRequest: () -> Unit) {
     val authService = koinInject<AuthService>()
     val scope = rememberCoroutineScope()
-    val logoutCall: () -> Unit = {
-            scope.launch {
-                authService.logout()
-                onDismissRequest()
-            }
-        }
+    var showConfirmation by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center
@@ -310,7 +306,7 @@ private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
         Spacer(modifier = Modifier.weight(0.25f))
         TextButton(
             modifier = Modifier.weight(0.5f),
-            onClick = logoutCall,
+            onClick = { showConfirmation = true },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.error
@@ -323,6 +319,18 @@ private inline fun LogoutButton(crossinline onDismissRequest: () -> Unit) {
             )
         }
         Spacer(modifier = Modifier.weight(0.25f))
+    }
+    if (showConfirmation) {
+        LogoutConfirmationDialog(
+            onDismissRequest = { showConfirmation = false },
+            onConfirm = {
+                showConfirmation = false
+                scope.launch {
+                    authService.logout()
+                    onDismissRequest()
+                }
+            },
+        )
     }
 }
 

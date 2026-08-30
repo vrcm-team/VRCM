@@ -378,6 +378,7 @@ class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
             }
             SharedFlowCentre.emitAuthenticated(accountB)
             withTimeout(3_000L) { cacheStore.blockedLoadStarted.await() }
+            assertTrue(friendService.friendState.value.isEmpty())
             val refresh = async { friendService.refreshFriendList() }
             accountBRefresh = refresh
 

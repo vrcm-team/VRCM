@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -154,9 +155,10 @@ private fun RecentActivityBottomSheet(
 }
 
 @Composable
-private fun ActivityEventRow(
+internal fun ActivityEventRow(
     event: FriendActivityEvent,
     modifier: Modifier = Modifier,
+    onWorldClick: (() -> Unit)? = null,
 ) {
     val detail = event.activityDetail()
     val bioDiff = remember(event.id, event.previousValue, event.currentValue) {
@@ -189,8 +191,16 @@ private fun ActivityEventRow(
             if (bioDiff.isNotEmpty()) {
                 BioDiffLines(bioDiff)
             } else if (detail != null) {
+                val hasWorld = event.worldId?.isNotBlank() == true
                 Text(
                     text = detail,
+                    modifier = Modifier.then(
+                        if (hasWorld && onWorldClick != null) {
+                            Modifier.clickable(onClick = onWorldClick)
+                        } else {
+                            Modifier
+                        }
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -282,7 +292,7 @@ private fun Long.asActivityDuration(): String {
 }
 
 @Composable
-private fun FriendActivityEvent.activityLabel(): String = when (type) {
+internal fun FriendActivityEvent.activityLabel(): String = when (type) {
     FriendActivityEventType.Online -> strings.friendActivityEventOnline
     FriendActivityEventType.Offline -> strings.friendActivityEventOffline
     FriendActivityEventType.LocationChanged -> strings.friendActivityEventLocation
@@ -293,7 +303,7 @@ private fun FriendActivityEvent.activityLabel(): String = when (type) {
 }
 
 @Composable
-private fun FriendActivityEvent.activityDetail(): String? {
+internal fun FriendActivityEvent.activityDetail(): String? {
     val location = worldName?.takeIf(String::isNotBlank)
         ?: worldId?.takeIf(String::isNotBlank)
     val access = accessType?.activityLabel()
