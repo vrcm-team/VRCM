@@ -400,6 +400,17 @@ sealed class LocaleStrings {
     open val retry: String = "Retry"
     open val avatars: String = "Avatars"
     open val friendListPagerAllAvatars: String = "All Avatars"
+    open val favoritesTitle: String = "Favorites"
+    open val favoritesFriends: String = "Friends"
+    open val myGroups: String = "My Groups"
+    open val favoritesEmpty: String = "Nothing here yet"
+    open val favoritesLoadFailed: String = "Couldn't load this collection"
+    open val personalDrawerTitle: String = "Personal navigation"
+    open val drawerMyProfile: String = "My profile"
+    open val drawerSettings: String = "Settings"
+    open val back: String = "Back"
+    open val refresh: String = "Refresh"
+    open val close: String = "Close"
 
     // User Created Worlds & Avatars
     open val userCreatedWorlds: String = "Created Worlds"

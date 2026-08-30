@@ -382,6 +382,17 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val retry = "重試"
     override val avatars = "模型"
     override val friendListPagerAllAvatars = "全部模型"
+    override val favoritesTitle = "收藏"
+    override val favoritesFriends = "好友"
+    override val myGroups = "我的群組"
+    override val favoritesEmpty = "這裡還沒有內容"
+    override val favoritesLoadFailed = "無法載入此收藏內容"
+    override val personalDrawerTitle = "個人導覽"
+    override val drawerMyProfile = "我的資料"
+    override val drawerSettings = "設定"
+    override val back = "返回"
+    override val refresh = "重新整理"
+    override val close = "關閉"
 
     // User Created Worlds & Avatars
     override val userCreatedWorlds = "建立的世界"

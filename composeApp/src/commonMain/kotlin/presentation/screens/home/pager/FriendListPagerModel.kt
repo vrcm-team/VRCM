@@ -141,10 +141,15 @@ class FriendListPagerModel(
     /**
      * 刷新状态,一次登录成功后只会自动刷新一次
      */
-    private val _isRefreshing = MutableStateFlow(true)
-    var isRefreshing = _isRefreshing.asStateFlow()
+    private val _refreshingTabs = MutableStateFlow(setOf(0, 1, 2))
+    val refreshingTabs = _refreshingTabs.asStateFlow()
+    private val _refreshErrors = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val refreshErrors = _refreshErrors.asStateFlow()
+    val isRefreshing: StateFlow<Boolean> = refreshingTabs
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    // 搜索文本 - 两个页面共享
+    private val searchTexts = MutableList(3) { "" }
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
@@ -158,13 +163,14 @@ class FriendListPagerModel(
                 favoritedWorldMap.clear()
                 favoritedAvatarMap.clear()
                 offlineStatusDescriptions.clear()
-                _isRefreshing.value = true
+                _refreshingTabs.value = setOf(0, 1, 2)
+                _refreshErrors.value = emptyMap()
             }
         }
         viewModelScope.launch {
             friendService.friendState.collect { friends ->
                 _friendTotal.value = friends.size
-                findFriendList(_searchText.value)
+                findFriendList(searchTexts[0])
             }
         }
     }
@@ -175,7 +181,9 @@ class FriendListPagerModel(
     private fun doRefreshCache(favoriteType: FavoriteType, showRefreshing: Boolean = true) =
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (showRefreshing) _isRefreshing.value = true
+                val tabIndex = favoriteType.tabIndex
+                if (showRefreshing) _refreshingTabs.update { it + tabIndex }
+                _refreshErrors.update { it - tabIndex }
                 when (favoriteType) {
                     Friend -> {
                         // 加载收藏组信息，用于分组过滤
@@ -206,9 +214,10 @@ class FriendListPagerModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
+                _refreshErrors.update { it + (favoriteType.tabIndex to e.message.orEmpty()) }
                 SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
             } finally {
-                _isRefreshing.value = false
+                _refreshingTabs.update { it - favoriteType.tabIndex }
             }
         }
 
@@ -233,14 +242,14 @@ class FriendListPagerModel(
                     worlds = cached.favoritedWorlds.flatMap { it.worlds },
                 )
                 _worldTotal.value = favoritedWorldMap.size
-                findWorldList(_searchText.value)
+                findWorldList(searchTexts[1])
             }
 
             Avatar -> {
                 favoritedAvatarMap.clear()
                 favoritedAvatarMap.putAll(cached.favoritedAvatars.associateBy { it.id })
                 _avatarTotal.value = favoritedAvatarMap.size
-                findAvatarList(_searchText.value)
+                findAvatarList(searchTexts[2])
             }
 
             Friend -> Unit
@@ -257,6 +266,7 @@ class FriendListPagerModel(
     fun setSelectedTabIndex(index: Int) {
         if (_selectedTabIndex.value != index) {
             _selectedTabIndex.value = index
+            _searchText.value = searchTexts[index]
             // 切换标签页时刷新对应数据
             refreshCurrentTabCacheData(showRefreshing = false)
         }
@@ -264,6 +274,7 @@ class FriendListPagerModel(
 
     fun setSearchText(text: String) {
         _searchText.value = text
+        searchTexts[_selectedTabIndex.value] = text
         // 当搜索文本改变时，根据当前标签页刷新对应数据
         refreshCurrentTabListData()
     }
@@ -275,17 +286,17 @@ class FriendListPagerModel(
         when (_selectedTabIndex.value) {
             0 -> {
                 // 好友标签页
-                findFriendList(_searchText.value)
+                findFriendList(searchTexts[0])
             }
 
             1 -> {
                 // 世界标签页
-                findWorldList(_searchText.value)
+                findWorldList(searchTexts[1])
             }
 
             2 -> {
                 // 模型标签页
-                findAvatarList(_searchText.value)
+                findAvatarList(searchTexts[2])
             }
         }
     }
@@ -528,10 +539,11 @@ class FriendListPagerModel(
             favoritedAvatarMap.clear()
             favoritedAvatarMap.putAll(avatars.associateBy { it.id })
             _avatarTotal.value = favoritedAvatarMap.size
-            findAvatarList(_searchText.value)
+            findAvatarList(searchTexts[2])
             persistFavoritedAvatars(cacheWriteToken, avatars)
         }.onFailure {
             if (it is CancellationException) throw it
+            _refreshErrors.update { errors -> errors + (2 to it.message.orEmpty()) }
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
         }
     }
@@ -579,7 +591,7 @@ class FriendListPagerModel(
             val worlds = mergeFavoritedWorlds(remoteFavoritedWorlds, localFavoritedWorlds)
             replaceFavoritedWorldCache(cache = favoritedWorldMap, worlds = worlds)
             _worldTotal.value = favoritedWorldMap.size
-            findWorldList(_searchText.value)
+            findWorldList(searchTexts[1])
             persistFavoritedWorlds(
                 cacheWriteToken,
                 groupFavoritedWorlds(worlds, worldFavoriteGroupsFlow.value),
@@ -587,6 +599,7 @@ class FriendListPagerModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            _refreshErrors.update { errors -> errors + (1 to e.message.orEmpty()) }
             SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
         }
     }
@@ -617,6 +630,13 @@ class FriendListPagerModel(
         }
     }
 }
+
+private val FavoriteType.tabIndex: Int
+    get() = when (this) {
+        Friend -> 0
+        World -> 1
+        Avatar -> 2
+    }
 
 internal fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
     val isOffline = it.status == UserStatus.Offline

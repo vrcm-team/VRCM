@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.NetworkGalleryDataSource
@@ -135,6 +136,7 @@ val presentationModule: Module = module {
     }
     singleOf (::FriendLocationPagerModel)
     viewModelOf(::FriendListPagerModel)
+    viewModelOf(::FavoritesGroupsModel)
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)

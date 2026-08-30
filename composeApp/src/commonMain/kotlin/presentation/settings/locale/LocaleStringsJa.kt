@@ -383,6 +383,17 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val retry = "再試行"
     override val avatars = "アバター"
     override val friendListPagerAllAvatars = "すべてのアバター"
+    override val favoritesTitle = "お気に入り"
+    override val favoritesFriends = "フレンド"
+    override val myGroups = "マイグループ"
+    override val favoritesEmpty = "まだ項目がありません"
+    override val favoritesLoadFailed = "このコレクションを読み込めませんでした"
+    override val personalDrawerTitle = "個人ナビゲーション"
+    override val drawerMyProfile = "マイプロフィール"
+    override val drawerSettings = "設定"
+    override val back = "戻る"
+    override val refresh = "更新"
+    override val close = "閉じる"
 
     // User Created Worlds & Avatars
     override val userCreatedWorlds = "作成したワールド"

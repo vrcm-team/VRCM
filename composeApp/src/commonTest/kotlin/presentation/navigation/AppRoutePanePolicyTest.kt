@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -55,6 +56,7 @@ class AppRoutePanePolicyTest {
     fun independentTasksUseTheFullWindow() {
         val routes = listOf(
             GalleryScreen,
+            FavoritesScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
             StartupAnimeScreen,
@@ -74,6 +76,7 @@ class AppRoutePanePolicyTest {
                 .isNotEmpty()
         )
         assertTrue(GalleryScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(FavoritesScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FriendNetworkScreen.adaptivePaneMetadata().isEmpty())
     }
 }
