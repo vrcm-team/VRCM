@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -114,6 +116,7 @@ fun FriendActivityTimelineContent(
     onUserClick: (FriendActivityEvent) -> Unit,
     onWorldClick: (FriendActivityEvent) -> Unit,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         LazyRow(
@@ -152,6 +155,7 @@ fun FriendActivityTimelineContent(
             } else {
                 ActivityTimelineList(
                     events = state.events,
+                    listState = listState,
                     onUserClick = onUserClick,
                     onWorldClick = onWorldClick,
                 )
@@ -168,12 +172,14 @@ private fun TimelineMessage(content: @Composable () -> Unit) {
 @Composable
 private fun ActivityTimelineList(
     events: List<FriendActivityEvent>,
+    listState: LazyListState,
     onUserClick: (FriendActivityEvent) -> Unit,
     onWorldClick: (FriendActivityEvent) -> Unit,
 ) {
     val groups = events.groupBy(FriendActivityEvent::activityDate)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

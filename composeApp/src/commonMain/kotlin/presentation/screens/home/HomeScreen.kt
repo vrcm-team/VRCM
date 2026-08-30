@@ -1,452 +1,381 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
-import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
-import org.koin.compose.viewmodel.koinViewModel
-import dev.chrisbanes.haze.HazeDefaults.style
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.getAppPlatform
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
-import androidx.compose.ui.platform.testTag
-import io.github.vrcmteam.vrcm.presentation.extensions.*
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
-import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardSharedKey
+import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleCombinedClickable
+import io.github.vrcmteam.vrcm.presentation.navigation.*
+import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
-import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
-import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
+import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUser
+import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
+import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
+import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
+import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.presentation.supports.Pager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
-
+import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
 object HomeScreen : AppListRoute {
-
-    private val pagerList = listOf(
-        FriendLocationPager,
-        FriendListPager,
-        SearchListPager,
-    )
-
-    @ExperimentalSharedTransitionApi
+    @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content() {
-        val currentNavigator = currentNavigator
-        val homeScreenModel: HomeScreenModel = koinViewModel()
+        val navigator = currentNavigator
+        val model: HomeScreenModel = koinViewModel()
+        val notificationModel = koinInject<NotificationCenterModel>()
+        val timelineModel: FriendActivityTimelineModel = koinViewModel()
+        val timelineState by timelineModel.state.collectAsState()
+        val timelineFilter by timelineModel.filter.collectAsState()
+        val stateHolder = rememberSaveableStateHolder()
+        val scope = rememberCoroutineScope()
+        val useRail = LocalAppWindowWidthClass.current != AppWindowWidthClass.Compact
+        val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
+        val showMainNavigation = navigator.lastItem == HomeScreen
+        val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
+            if (model.selectDestination(destination)) {
+                if (destination == HomeDestination.Notifications) {
+                    notificationModel.refreshAllNotification()
+                } else {
+                    scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
+                }
+            }
+        }
 
         LaunchedEffect(Unit) {
-            // 登出时跳到验证页面
             SharedFlowCentre.logout.collect {
-                // 为了切换头像的共享元素动画
-                homeScreenModel.currentUser = null
-                currentNavigator replaceAll AuthAnimeScreen(false)
+                model.clearOverlays()
+                model.currentUser = null
+                navigator replaceAll AuthAnimeScreen(false)
             }
         }
-        // 适配不支持模糊效果的设备，比如低于Android 12的安卓设备
-        val supportBlur = getAppPlatform().isSupportBlur
-        val hazeState = if (supportBlur) remember { HazeState() } else null
-        val windowWidthClass = LocalAppWindowWidthClass.current
-        val pagerState = rememberPagerState(
-            initialPage = homeScreenModel.selectedPagerIndex,
-        ) { pagerList.size }
-        val useNavigationRail = windowWidthClass != AppWindowWidthClass.Compact
-
-        LaunchedEffect(pagerState, windowWidthClass) {
-            pagerState.scrollToPage(homeScreenModel.selectedPagerIndex)
-            snapshotFlow { pagerState.settledPage }.collect { page ->
-                homeScreenModel.onPagerSettled(page)
-            }
+        LaunchedEffect(Unit) {
+            SharedFlowCentre.currentSession.collect { model.clearOverlays() }
         }
+        HandleBackNavigation(model.drawerVisible, model::hideDrawer)
 
-        Scaffold(
-            contentColor = MaterialTheme.colorScheme.primary,
-            topBar = { HomeTopAppBar(hazeState) },
-            bottomBar = {
-                if (!useNavigationRail) {
-                    HomeBottomBar(pagerList, pagerState, hazeState)
+        Surface(Modifier.fillMaxSize(), tonalElevation = 2.dp) {
+            Row {
+                if (useRail && showMainNavigation) {
+                    MainNavigationRail(
+                        selectedDestination,
+                        notificationModel.hasUnread,
+                        onDestinationSelected,
+                    )
                 }
-            },
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .enableIf(supportBlur) { hazeSource(state = hazeState!!) },
-                tonalElevation = 2.dp
-            ) {
-                Row {
-                    if (useNavigationRail) {
-                        HomeNavigationRail(pagerList, pagerState)
-                    }
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        val pager = pagerList[it]
-                        CompositionLocalProvider(LocalSharedSuffixKey provides pager.title) {
-                            pager.Content()
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    stateHolder.SaveableStateProvider(selectedDestination.name) {
+                        when (selectedDestination) {
+                            HomeDestination.Home -> HomeDestinationContent(model, timelineModel, timelineState, timelineFilter)
+                            HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) { SearchListPager.Content() }
+                            HomeDestination.Notifications -> NotificationCenterContent(
+                                modifier = if (useRail || !showMainNavigation) {
+                                    Modifier
+                                } else {
+                                    Modifier.padding(bottom = 80.dp)
+                                },
+                                showBackButton = false,
+                                navigationIcon = { RootAvatarButton(model) },
+                            )
+                            HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) { FriendListPager.Content() }
                         }
                     }
+                    if (!useRail && showMainNavigation) {
+                        MainNavigationBar(
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                            selected = selectedDestination,
+                            hasUnread = notificationModel.hasUnread,
+                            onSelect = onDestinationSelected,
+                        )
+                    }
                 }
             }
         }
 
+        HomePersonalDrawer(model)
+        SettingsBottomSheet(model.settingsVisible, model::hideSettings)
     }
 }
 
+@Composable
+private fun RootPagerContent(title: String, content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        content()
+        RootTopBar(title)
+    }
+}
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private inline fun AppListRoute.HomeTopAppBar(
-    hazeState: HazeState?,
+private fun HomeDestinationContent(
+    model: HomeScreenModel,
+    timelineModel: FriendActivityTimelineModel,
+    timelineState: FriendActivityTimelineState,
+    timelineFilter: FriendActivityTimelineFilter,
 ) {
-    val homeScreenModel: HomeScreenModel = koinViewModel()
-    val currentUser = homeScreenModel.currentUser
-    val notificationCenter = koinInject<NotificationCenterModel>()
-    val hasNotifications by remember {
-        derivedStateOf {
-            (notificationCenter.friendRequestNotifications + notificationCenter.notifications).isNotEmpty()
+    val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
+    val stateHolder = rememberSaveableStateHolder()
+    val timelineListState = rememberLazyListState()
+    val navigator = currentNavigator
+    val scope = rememberCoroutineScope()
+
+    if (selectedTab == HomeTab.Activity) {
+        LaunchedEffect(timelineListState) {
+            SharedFlowCentre.toPagerTop.collect {
+                runCatching { timelineListState.animateScrollToItem(0) }
+            }
         }
     }
-    // to ProfileScreen
-    val currentNavigator = currentNavigator
-    val homeUserId = homeScreenModel.userId
-    val sharedSuffixKey = rememberContainerTransformToken(
-        "home-user:$homeUserId",
-    ) ?: LocalSharedSuffixKey.current
-    var currentDialog by LocationDialogContent.current
-    val onClickUserIcon = { user: IUser ->
-        currentNavigator push UserProfileScreen(UserProfileVo(user), sharedSuffixKey)
-    }
-    // 长按进入身份牌；当前已在同一 owner 的身份牌路由时忽略，防重复入栈。
-    val onLongClickUserIcon = onLongClickUserIcon@{
-        val last = currentNavigator.lastItem
-        val alreadyOpen = (last as? MeetupCardDisplayRoute)?.ownerUserId == homeUserId ||
-            (last as? MeetupCardEditorRoute)?.ownerUserId == homeUserId
-        if (alreadyOpen) return@onLongClickUserIcon
-        currentNavigator push homeScreenModel.meetupCardStartRoute()
-    }
-    var statusVisibility by remember { mutableStateOf(true) }
-    val onClickShowStatusDialog: (CurrentUserData) -> Unit = {
-        statusVisibility = false
-        currentDialog = UserStatusDialog(it) {
-            currentDialog = null
-            statusVisibility = true
-        }
-    }
-    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    val modifier = if (hazeState != null) {
-        Modifier.hazeEffect(
-            state = hazeState,
-            style = style(
-                backgroundColor = backgroundColor,
-            )
-        )
-    } else {
-        Modifier.shadow(2.dp)
-    }
-    Surface(
-        modifier = modifier,
-        color = if (hazeState != null) Color.Transparent else backgroundColor,
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(top = getInsetPadding(WindowInsets::getTop))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 头像+名字这一组就是"我的身份"，铭牌是它的全屏版：以整组作为
-            // 共享主体，形变比从 54dp 头像炸开更平缓，也不必额外包一层节点。
-            Row(
-                modifier = Modifier
-                    .sharedBoundsBy(
-                        key = meetupCardSharedKey(homeUserId),
-                        useSuffixKey = false,
-                        resizeMode = MeetupCardResizeMode,
-                    )
-                    .clip(MaterialTheme.shapes.medium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
+
+    Box(Modifier.fillMaxSize()) {
+        stateHolder.SaveableStateProvider(selectedTab.name) {
+            when (selectedTab) {
+                HomeTab.Location -> Box(Modifier.fillMaxSize().padding(top = 48.dp)) {
+                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                        FriendLocationPager.Content()
+                    }
+                }
+                HomeTab.Activity -> FriendActivityTimelineContent(
+                    state = timelineState,
+                    filter = timelineFilter,
+                    onFilterSelected = timelineModel::selectFilter,
+                    onRetry = timelineModel::retry,
+                    onUserClick = { event ->
+                        navigator push UserProfileScreen(
+                            UserProfileVo(
+                                id = event.friendUserId,
+                                displayName = event.displayName,
+                                profileImageUrl = event.profileImageUrl,
+                            )
+                        )
+                    },
+                    onWorldClick = { event ->
+                        val worldId = event.worldId ?: return@FriendActivityTimelineContent
+                        navigator push WorldProfileScreen(
+                            WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+                        )
+                    },
+                    listState = timelineListState,
                     modifier = Modifier
-                        .simpleCombinedClickable(
-                            onLongClick = { currentUser?.let { onLongClickUserIcon() } },
-                            onClick = { currentUser?.let { onClickUserIcon(it) } },
-                        )
-                        .testTag("home-user-avatar")
-                        .sharedBoundsBy(
-                            key = "${homeUserId}UserIcon",
-                            suffixKey = AuthHomeSharedSuffixKey,
-                            boundsTransform = IconBoundsTransform,
-                        )
-                        .size(54.dp),
-                ) {
-                    UserStateIcon(
-                        modifier = Modifier
-                            .sharedBoundsBy(
-                                key = "${homeUserId}UserIcon",
-                                suffixKey = sharedSuffixKey,
-                                boundsTransform = if (currentUser != null) {
-                                    DefaultBoundsTransform
-                                } else {
-                                    IconBoundsTransform
-                                },
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(top = 112.dp, bottom = 80.dp),
+                )
+            }
+        }
+        Column {
+            RootTopBar(strings.mainNavigationHome)
+            PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
+                HomeTab.entries.forEach { tab ->
+                    Tab(
+                        selected = tab == selectedTab,
+                        onClick = {
+                            if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
+                            else model.selectHomeTab(tab)
+                        },
+                        text = {
+                            Text(
+                                if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            .fillMaxSize(),
-                        iconUrl = currentUser?.iconUrl ?: homeScreenModel.iconUrl,
-                        cachedPlaceholderKey = homeScreenModel.iconUrl,
+                        },
                     )
-                }
-                Column(
-                    modifier = Modifier.widthIn(max = 220.dp)
-                        .simpleClickable { currentUser?.let { onClickShowStatusDialog(currentUser) } },
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    UserInfoRow(
-                        iconSize = 16.dp,
-                        style = MaterialTheme.typography.titleMedium,
-                        user = currentUser,
-                        sharedUserId = homeUserId,
-                        sharedSuffixKey = sharedSuffixKey,
-                        pronouns = currentUser?.pronouns
-                    )
-                    AnimatedVisibility(statusVisibility){
-                        UserStatusRow(
-                            iconSize = 8.dp,
-                            style = MaterialTheme.typography.labelMedium,
-                            user = currentUser,
-                            animatedVisibilityScope = this,
-                            sharedUserId = homeUserId,
-                            sharedSuffixKey = sharedSuffixKey,
-                        )
-                    }
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            NotificationActionButton(hasNotifications)
-            SettingsActionButton()
         }
     }
-
 }
 
 @Composable
-private fun HomeNavigationRail(
-    pagerList: List<Pager>,
-    pagerState: PagerState,
-) {
-    val scope = rememberCoroutineScope()
-    NavigationRail(
-        modifier = Modifier.fillMaxHeight(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-    ) {
-        Spacer(Modifier.weight(1f))
-        pagerList.forEach { pager ->
-            val selected = pagerState.currentPage == pager.index
-            NavigationRailItem(
-                selected = selected,
-                onClick = { scope.selectPager(pager, pagerState, selected) },
-                icon = {
-                    Icon(
-                        modifier = Modifier.size(24.dp),
-                        painter = pager.icon!!,
-                        contentDescription = pager.title,
-                    )
-                },
-            )
-        }
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-
-@Composable
-private inline fun HomeBottomBar(
-    pagerList: List<Pager>,
-    pagerState: PagerState,
-    hazeState: HazeState?,
-) {
-    // 如果没有底部系统手势条，则加12dp
-    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
-    val scope = rememberCoroutineScope()
-    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-
-    val pagerNavigationItems: @Composable RowScope.() -> Unit = {
-        pagerList.forEach { pager ->
-            val selected = pagerState.currentPage == pager.index
-            PagerNavigationItem(
-                provider = pager,
-                selected = selected,
-                onClick = { scope.selectPager(pager, pagerState, selected) }
-            )
-        }
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            modifier = Modifier
-                .height(64.dp)
-                .run {
-                    if (hazeState != null) {
-                        clip(CircleShape)
-                            .hazeEffect(
-                                state = hazeState,
-                                style = style(
-                                    backgroundColor = backgroundColor
-                                )
-                            )
-                    } else {
-                        shadow(
-                            elevation = 2.dp,
-                            shape = CircleShape,
-                        )
-                    }
-                },
-            color = if (hazeState != null) Color.Transparent else backgroundColor,
+private fun RootTopBar(title: String) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shadowElevation = 2.dp) {
+        Row(
+            Modifier.fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                pagerNavigationItems()
-            }
-        }
-    }
-
-}
-
-private fun CoroutineScope.selectPager(
-    pager: Pager,
-    pagerState: PagerState,
-    selected: Boolean,
-) {
-    launch {
-        if (selected) {
-            SharedFlowCentre.toPagerTop.emit(Unit)
-        } else {
-            pagerState.animateScrollToPage(
-                page = pager.index,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-            )
+            val model: HomeScreenModel = koinViewModel()
+            RootAvatarButton(model)
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun RowScope.PagerNavigationItem(
-    provider: Pager,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
+private fun RootAvatarButton(model: HomeScreenModel) {
+    val userId = model.userId
+    val currentUser = model.currentUser
+    val navigator = currentNavigator
+    val suffix = rememberContainerTransformToken("home-user:$userId") ?: LocalSharedSuffixKey.current
+    val onLongClick = {
+        val last = navigator.lastItem
+        val alreadyOpen = (last as? MeetupCardDisplayRoute)?.ownerUserId == userId ||
+            (last as? MeetupCardEditorRoute)?.ownerUserId == userId
+        if (!alreadyOpen && currentUser != null) navigator push model.meetupCardStartRoute()
+    }
     Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .simpleClickable(onClick)
+        Modifier
+            .testTag("home-user-avatar")
+            .sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
+            .sharedBoundsBy(
+                key = "${userId}UserIcon",
+                suffixKey = AuthHomeSharedSuffixKey,
+                boundsTransform = IconBoundsTransform,
+            )
+            .size(48.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .simpleCombinedClickable(onClick = model::showDrawer, onLongClick = onLongClick),
     ) {
-        Icon(
-            modifier = Modifier
-                .size(40.dp),
-            painter = provider.icon!!,
-            contentDescription = provider.title,
-            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        UserStateIcon(
+            modifier = Modifier.fillMaxSize().sharedBoundsBy(
+                key = "${userId}UserIcon",
+                suffixKey = suffix,
+                boundsTransform = if (currentUser != null) DefaultBoundsTransform else IconBoundsTransform,
+            ),
+            iconUrl = currentUser?.iconUrl ?: model.iconUrl,
+            cachedPlaceholderKey = model.iconUrl,
         )
     }
 }
 
 @Composable
-fun SettingsActionButton(
-    modifier: Modifier = Modifier,
-) {
-    var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    IconButton(
-        modifier = modifier,
-        colors = IconButtonDefaults.iconButtonColors(
-            contentColor = MaterialTheme.colorScheme.tertiary
-        ),
-        onClick = { bottomSheetIsVisible = !bottomSheetIsVisible }
-    ) {
-        Icon(
-            painter = rememberVectorPainter(image = AppIcons.Settings),
-            contentDescription = "Settings",
-        )
-
+private fun HomePersonalDrawer(model: HomeScreenModel) {
+    val navigator = currentNavigator
+    val currentUser = model.currentUser
+    var currentDialog by LocationDialogContent.current
+    val suffix = rememberContainerTransformToken("home-user:${model.userId}") ?: LocalSharedSuffixKey.current
+    fun closeAndNavigate(route: AppRoute) {
+        model.hideDrawer()
+        navigator push route
     }
-    SettingsBottomSheet(
-        isVisible = bottomSheetIsVisible,
-        onDismissRequest = { bottomSheetIsVisible = false }
+    PersonalNavigationDrawer(
+        visible = model.drawerVisible,
+        user = currentUser?.toPersonalDrawerUser(),
+        onDismissRequest = model::hideDrawer,
+        onProfileClick = {
+            currentUser?.let {
+                model.hideDrawer()
+                navigator push UserProfileScreen(UserProfileVo(it), suffix)
+            }
+        },
+        onStatusClick = {
+            currentUser?.let { user ->
+                model.hideDrawer()
+                currentDialog = UserStatusDialog(user) { currentDialog = null }
+            }
+        },
+        onFriendNetworkClick = { closeAndNavigate(FriendNetworkScreen) },
+        onGalleryClick = { closeAndNavigate(GalleryScreen) },
+        onFavoritesClick = { closeAndNavigate(FavoritesScreen) },
+        onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
+        onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
+        onSettingsClick = model::showSettings,
+        onLogoutClick = model::logout,
     )
 }
 
+private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
+    avatarUrl = iconUrl,
+    displayName = displayName,
+    username = username,
+    status = status,
+    statusDescription = statusDescription,
+)
+
 @Composable
-fun NotificationActionButton(
-    hasNotifications: Boolean,
+private fun MainNavigationBar(
+    modifier: Modifier,
+    selected: HomeDestination,
+    hasUnread: Boolean,
+    onSelect: (HomeDestination) -> Unit,
 ) {
-    val navigator = currentNavigator
-    IconButton(
-        onClick = { navigator push NotificationScreen() },
-        colors = IconButtonDefaults.iconButtonColors(
-            contentColor = MaterialTheme.colorScheme.tertiary
-        ),
-    ) {
-        BadgedBox(
-            badge = {
-                val primaryColor = MaterialTheme.colorScheme.tertiary
-                if (hasNotifications) {
-                    Canvas(modifier = Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
-                        drawCircle(color = primaryColor, radius = 4.dp.toPx())
-                    }
-                }
-            }
-        ) {
-            Icon(
-                imageVector = AppIcons.Notifications,
-                contentDescription = "NotificationIcon"
+    NavigationBar(modifier) {
+        HomeDestination.entries.forEach { destination ->
+            val presentation = destination.presentation()
+            NavigationBarItem(
+                selected = selected == destination,
+                onClick = { onSelect(destination) },
+                icon = { MainDestinationIcon(presentation, destination == HomeDestination.Notifications && hasUnread) },
+                label = { Text(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             )
         }
     }
+}
+
+@Composable
+private fun MainNavigationRail(
+    selected: HomeDestination,
+    hasUnread: Boolean,
+    onSelect: (HomeDestination) -> Unit,
+) {
+    NavigationRail(
+        Modifier.fillMaxHeight(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ) {
+        Spacer(Modifier.weight(1f))
+        HomeDestination.entries.forEach { destination ->
+            val presentation = destination.presentation()
+            NavigationRailItem(
+                selected = selected == destination,
+                onClick = { onSelect(destination) },
+                icon = { MainDestinationIcon(presentation, destination == HomeDestination.Notifications && hasUnread) },
+                label = { Text(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            )
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun MainDestinationIcon(presentation: MainDestinationPresentation, unread: Boolean) {
+    BadgedBox(badge = { if (unread) Badge() }) {
+        Icon(presentation.icon, contentDescription = presentation.label, Modifier.size(24.dp))
+    }
+}
+
+private data class MainDestinationPresentation(val label: String, val icon: ImageVector)
+
+@Composable
+private fun HomeDestination.presentation(): MainDestinationPresentation = when (this) {
+    HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Dashboard)
+    HomeDestination.Search -> MainDestinationPresentation(strings.mainNavigationSearch, AppIcons.Search)
+    HomeDestination.Notifications -> MainDestinationPresentation(strings.mainNavigationNotifications, AppIcons.Notifications)
+    HomeDestination.Friends -> MainDestinationPresentation(strings.mainNavigationFriends, AppIcons.Person)
 }

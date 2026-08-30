@@ -62,6 +62,7 @@ fun NotificationCenterContent(
     modifier: Modifier = Modifier,
     targetNotificationId: String? = null,
     showBackButton: Boolean = false,
+    navigationIcon: @Composable () -> Unit = {},
 ) {
     val model = koinInject<NotificationCenterModel>()
     val navigator = LocalNavigator.currentOrThrow
@@ -108,6 +109,8 @@ fun NotificationCenterContent(
                         IconButton(onClick = { navigator.pop() }) {
                             Icon(AppIcons.ArrowBackIosNew, strings.notificationBack)
                         }
+                    } else {
+                        navigationIcon()
                     }
                 },
                 actions = {
