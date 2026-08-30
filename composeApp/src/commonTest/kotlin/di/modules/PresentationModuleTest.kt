@@ -64,14 +64,18 @@ class PresentationModuleTest : MainDispatcherTest() {
             )
         }
 
-        val first = application.koin.get<GalleryScreenModel>()
-        val second = application.koin.get<GalleryScreenModel>()
-
+        val models = mutableListOf<ViewModel>()
         try {
+            val first = application.koin.get<GalleryScreenModel>().also { models += it }
+            val second = application.koin.get<GalleryScreenModel>().also { models += it }
+
             assertNotSame(first, second)
         } finally {
-            clearViewModels(first, second)
-            application.close()
+            try {
+                clearViewModels(models)
+            } finally {
+                application.close()
+            }
         }
     }
 
@@ -91,14 +95,18 @@ class PresentationModuleTest : MainDispatcherTest() {
             )
         }
 
-        val first = application.koin.get<AvatarProfileScreenModel>()
-        val second = application.koin.get<AvatarProfileScreenModel>()
-
+        val models = mutableListOf<ViewModel>()
         try {
+            val first = application.koin.get<AvatarProfileScreenModel>().also { models += it }
+            val second = application.koin.get<AvatarProfileScreenModel>().also { models += it }
+
             assertNotSame(first, second)
         } finally {
-            clearViewModels(first, second)
-            application.close()
+            try {
+                clearViewModels(models)
+            } finally {
+                application.close()
+            }
         }
     }
 
@@ -146,19 +154,27 @@ class PresentationModuleTest : MainDispatcherTest() {
             )
         }
 
-        val first = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
-        val second = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
-
+        val models = mutableListOf<ViewModel>()
         try {
+            val first = application.koin.get<MeetupCardScreenModel> {
+                parametersOf("usr_a")
+            }.also { models += it }
+            val second = application.koin.get<MeetupCardScreenModel> {
+                parametersOf("usr_a")
+            }.also { models += it }
+
             assertNotSame(first, second)
         } finally {
-            clearViewModels(first, second)
-            application.close()
+            try {
+                clearViewModels(models)
+            } finally {
+                application.close()
+            }
         }
     }
 }
 
-private suspend fun clearViewModels(vararg models: ViewModel) {
+private suspend fun clearViewModels(models: List<ViewModel>) {
     val jobs = models.mapNotNull { it.viewModelScope.coroutineContext[Job] }
     ViewModelStore().apply {
         models.forEachIndexed { index, model -> put(index.toString(), model) }
