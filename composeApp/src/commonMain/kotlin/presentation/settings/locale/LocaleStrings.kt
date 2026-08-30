@@ -217,6 +217,19 @@ sealed class LocaleStrings {
     // FriendListPager
     open val friendListPagerAllFriends: String = "All Friends"
     open val friendListPagerAllWorlds: String = "All Worlds"
+    open val friendDirectoryTitle: String = "Friends"
+    open val friendDirectoryInGame: String = "In VRChat"
+    open val friendDirectoryWeb: String = "Online on Web"
+    open val friendDirectoryPrivate: String = "Private or unavailable"
+    open val friendDirectoryOffline: String = "Offline"
+    open val friendDirectoryTraveling: String = "Traveling"
+    open val friendDirectoryPublicWorld: String = "Public world"
+    open val friendDirectoryFriendsWorld: String = "Friends-only world"
+    open val friendDirectoryInviteWorld: String = "Invite-only world"
+    open val friendDirectoryLastActive: String = "Last active"
+    open val friendDirectoryEmpty: String = "No friends yet"
+    open val friendDirectoryNoMatches: String = "No friends match this filter"
+    open val friendDirectoryLoadFailed: String = "Couldn't refresh friends"
 
     // WorldProfileScreen
     open val worldProfileDescription: String = "World Description"

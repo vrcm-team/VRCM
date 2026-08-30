@@ -201,6 +201,19 @@ internal object LocaleStringsJa : LocaleStrings() {
 
     // FriendListPager
     override val friendListPagerAllFriends = "すべてのフレンド"
+    override val friendDirectoryTitle = "フレンド"
+    override val friendDirectoryInGame = "VRChatでオンライン"
+    override val friendDirectoryWeb = "Webでオンライン"
+    override val friendDirectoryPrivate = "プライベートまたは非表示"
+    override val friendDirectoryOffline = "オフライン"
+    override val friendDirectoryTraveling = "移動中"
+    override val friendDirectoryPublicWorld = "パブリックワールド"
+    override val friendDirectoryFriendsWorld = "フレンド限定ワールド"
+    override val friendDirectoryInviteWorld = "招待限定ワールド"
+    override val friendDirectoryLastActive = "最終アクティブ"
+    override val friendDirectoryEmpty = "フレンドがいません"
+    override val friendDirectoryNoMatches = "条件に一致するフレンドはいません"
+    override val friendDirectoryLoadFailed = "フレンド一覧を更新できませんでした"
     override val friendListPagerAllWorlds = "すべてのワールド"
 
     // WorldProfileScreen

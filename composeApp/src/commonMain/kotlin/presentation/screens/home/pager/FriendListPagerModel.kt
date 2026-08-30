@@ -49,6 +49,20 @@ data class FriendGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
 
+/** Stable presence buckets used by the friend-only directory. */
+enum class FriendDirectorySection {
+    InGame,
+    Web,
+    Private,
+    Offline,
+}
+
+/** A visible directory section derived from the current friend snapshot. */
+data class FriendDirectoryGroup(
+    val section: FriendDirectorySection,
+    val friends: List<FriendData>,
+)
+
 /**
  * 世界分组选项数据类
  */
@@ -156,6 +170,28 @@ class FriendListPagerModel(
     private var friendFilterJob: Job? = null
     private val offlineStatusDescriptions = mutableMapOf<String, String>()
 
+    private val _directoryRefreshing = MutableStateFlow(true)
+    val directoryRefreshing = _directoryRefreshing.asStateFlow()
+    private val _directoryRefreshFailed = MutableStateFlow(false)
+    val directoryRefreshFailed = _directoryRefreshFailed.asStateFlow()
+    private var directoryRefreshJob: Job? = null
+
+    val friendDirectoryGroups: StateFlow<List<FriendDirectoryGroup>> = combine(
+        friendService.friendState,
+        _searchText,
+        _friendGroupOptions,
+        friendFavoriteGroupsFlow,
+    ) { friends, query, options, favoriteGroups ->
+        val favoriteIds = options.selectedGroup?.let { selectedGroup ->
+            favoriteGroups[selectedGroup]?.mapTo(mutableSetOf()) { it.favoriteId }.orEmpty()
+        }
+        buildFriendDirectoryGroups(friends.values, query, favoriteIds)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = buildFriendDirectoryGroups(friendService.friendState.value.values, "", null),
+    )
+
     init {
         // 监听登录状态,用于重新登录后更新刷新状态
         viewModelScope.launch {
@@ -165,6 +201,12 @@ class FriendListPagerModel(
                 offlineStatusDescriptions.clear()
                 _refreshingTabs.value = setOf(0, 1, 2)
                 _refreshErrors.value = emptyMap()
+                _friendGroupOptions.value = FriendGroupOptions()
+                _directoryRefreshing.value = true
+                _directoryRefreshFailed.value = false
+                directoryRefreshJob?.cancel()
+                directoryRefreshJob = null
+                refreshFriendDirectory()
             }
         }
         viewModelScope.launch {
@@ -260,6 +302,33 @@ class FriendListPagerModel(
         friendService.refreshFriendList()
     }
 
+    /** Refreshes only the friend snapshot and VRChat friend favorite groups. */
+    fun refreshFriendDirectory() {
+        if (directoryRefreshJob?.isActive == true) return
+        directoryRefreshJob = viewModelScope.launch(Dispatchers.IO) {
+            _directoryRefreshing.value = true
+            _directoryRefreshFailed.value = false
+            var failed = false
+            try {
+                if (favoriteService.loadFavoriteByGroup(Friend).isFailure) failed = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                failed = true
+            }
+            try {
+                if (!friendService.refreshFriendList()) failed = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                failed = true
+            } finally {
+                _directoryRefreshFailed.value = failed
+                _directoryRefreshing.value = false
+            }
+        }
+    }
+
     /**
      * 设置当前选中的标签页索引
      */
@@ -277,6 +346,11 @@ class FriendListPagerModel(
         searchTexts[_selectedTabIndex.value] = text
         // 当搜索文本改变时，根据当前标签页刷新对应数据
         refreshCurrentTabListData()
+    }
+
+    fun setFriendDirectorySearchText(text: String) {
+        _searchText.value = text
+        searchTexts[0] = text
     }
 
     /**
@@ -326,6 +400,10 @@ class FriendListPagerModel(
     fun updateFriendGroupOptions(options: FriendGroupOptions) {
         _friendGroupOptions.value = options
         refreshCurrentTabListData()
+    }
+
+    fun updateFriendDirectoryGroupOptions(options: FriendGroupOptions) {
+        _friendGroupOptions.value = options
     }
 
     /**
@@ -666,6 +744,39 @@ internal fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
         append('-')
         append(it.displayName)
     }
+}
+
+internal fun buildFriendDirectoryGroups(
+    friends: Collection<FriendData>,
+    query: String,
+    favoriteIds: Set<String>?,
+): List<FriendDirectoryGroup> {
+    val normalizedQuery = query.trim()
+    val visibleFriends = friends.asSequence()
+        .filter { favoriteIds == null || it.id in favoriteIds }
+        .filter { normalizedQuery.isEmpty() || it.displayName.contains(normalizedQuery, ignoreCase = true) }
+        .groupBy(FriendData::directorySection)
+
+    return FriendDirectorySection.entries.mapNotNull { section ->
+        visibleFriends[section]
+            ?.sortedWith(
+                compareByDescending<FriendData> {
+                    if (section == FriendDirectorySection.Offline) it.lastSeenAt().orEmpty() else ""
+                }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName }
+                    .thenBy { it.id }
+            )
+            ?.takeIf(List<FriendData>::isNotEmpty)
+            ?.let { FriendDirectoryGroup(section, it) }
+    }
+}
+
+private fun FriendData.directorySection(): FriendDirectorySection = when {
+    status == UserStatus.Offline -> FriendDirectorySection.Offline
+    location.startsWith(LocationType.Instance.value) || location == LocationType.Traveling.value ->
+        FriendDirectorySection.InGame
+    location == LocationType.Web.value || location == LocationType.Offline.value ->
+        FriendDirectorySection.Web
+    else -> FriendDirectorySection.Private
 }
 
 internal fun FavoritedWorld.toSearchWorldData(): WorldData = WorldData(

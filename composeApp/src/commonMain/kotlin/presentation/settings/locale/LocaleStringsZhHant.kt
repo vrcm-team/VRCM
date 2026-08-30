@@ -200,6 +200,19 @@ internal object LocaleStringsZhHant : LocaleStrings() {
 
     // FriendListPager
     override val friendListPagerAllFriends = "全部好友"
+    override val friendDirectoryTitle = "好友"
+    override val friendDirectoryInGame = "VRChat 線上"
+    override val friendDirectoryWeb = "網頁上線"
+    override val friendDirectoryPrivate = "私人或不可見"
+    override val friendDirectoryOffline = "離線"
+    override val friendDirectoryTraveling = "正在移動"
+    override val friendDirectoryPublicWorld = "公開世界"
+    override val friendDirectoryFriendsWorld = "僅好友世界"
+    override val friendDirectoryInviteWorld = "僅邀請世界"
+    override val friendDirectoryLastActive = "最近活動"
+    override val friendDirectoryEmpty = "暫無好友"
+    override val friendDirectoryNoMatches = "沒有符合篩選條件的好友"
+    override val friendDirectoryLoadFailed = "無法重新整理好友列表"
     override val friendListPagerAllWorlds = "全部世界"
 
     // WorldProfileScreen
