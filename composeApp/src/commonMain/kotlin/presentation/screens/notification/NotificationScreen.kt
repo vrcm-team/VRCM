@@ -260,7 +260,7 @@ private fun LazyItemScope.NotificationItem(
             },
     ) {
         Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth().height(80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AImage(
                     modifier = Modifier
                         .enableIf(senderId.isNotEmpty() || groupId.isNotEmpty()) {
