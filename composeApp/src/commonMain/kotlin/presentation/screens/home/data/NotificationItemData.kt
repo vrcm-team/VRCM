@@ -212,17 +212,22 @@ internal fun NotificationItemData.actionTarget(
     action: NotificationItemData.ActionData,
 ): NotificationActionTarget? {
     if (!action.type.equals("link", ignoreCase = true)) return null
-    val value = action.data.ifBlank { link.orEmpty() }.trim()
-    val prefixedTarget = value.substringBefore(':').lowercase().let { prefix ->
-        val id = value.substringAfter(':', missingDelimiterValue = "")
-        when (prefix) {
-            "user" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.User }
-            "group" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.Group }
-            "world" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.World }
-            else -> null
+    val target = sequenceOf(action.data, link.orEmpty())
+        .mapNotNull { candidate ->
+            val value = candidate.trim()
+            if (value.isEmpty()) return@mapNotNull null
+            val prefixedTarget = value.substringBefore(':').lowercase().let { prefix ->
+                val id = value.substringAfter(':', missingDelimiterValue = "")
+                when (prefix) {
+                    "user" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.User }
+                    "group" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.Group }
+                    "world" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.World }
+                    else -> null
+                }
+            }
+            prefixedTarget ?: parseOfficialLink(value)
         }
-    }
-    val target = prefixedTarget ?: parseOfficialLink(value) ?: return null
+        .firstOrNull() ?: return null
     return when (target.type) {
         OfficialLinkType.User -> NotificationActionTarget.User(target.id)
         OfficialLinkType.Group -> NotificationActionTarget.Group(target.id)

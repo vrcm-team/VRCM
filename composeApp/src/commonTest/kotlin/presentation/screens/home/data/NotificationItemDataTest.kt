@@ -108,6 +108,11 @@ class NotificationItemDataTest {
                 ),
             ),
         )
+        assertEquals(
+            NotificationActionTarget.Group("grp_fallback"),
+            item.copy(link = "https://vrchat.com/home/group/grp_fallback")
+                .actionTarget(NotificationItemData.ActionData("unsupported:value", "link")),
+        )
         assertNull(item.actionTarget(NotificationItemData.ActionData("https://example.com/group/grp_bad", "link")))
         assertNull(item.actionTarget(NotificationItemData.ActionData("group:not-a-group", "link")))
         assertNull(item.actionTarget(NotificationItemData.ActionData("user:grp_mismatch", "link")))

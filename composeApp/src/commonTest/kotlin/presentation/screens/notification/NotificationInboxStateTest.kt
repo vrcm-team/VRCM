@@ -14,6 +14,13 @@ import kotlin.test.assertNull
 
 class NotificationInboxStateTest {
     @Test
+    fun deepLinkIndexAccountsForRefreshErrorBanner() {
+        assertEquals(0, notificationListIndex(0, hasRefreshError = false))
+        assertEquals(1, notificationListIndex(0, hasRefreshError = true))
+        assertEquals(4, notificationListIndex(3, hasRefreshError = true))
+    }
+
+    @Test
     fun successfulActionConsumesOnlyItsSourceAndRejectsStaleRefreshEntry() {
         val pipeline = notification("not_shared", NotificationSource.PIPELINE)
         val legacy = notification("not_shared", NotificationSource.LEGACY)

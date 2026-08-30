@@ -75,12 +75,13 @@ fun NotificationCenterContent(
         }
     }
     val listState = rememberLazyListState()
-    var lastTargetIndex by remember(targetNotificationId) { mutableIntStateOf(-1) }
-    LaunchedEffect(targetNotificationId, notifications) {
+    var lastTargetListIndex by remember(targetNotificationId) { mutableIntStateOf(-1) }
+    LaunchedEffect(targetNotificationId, notifications, model.hasRefreshError) {
         val targetIndex = notifications.indexOfNotificationTarget(targetNotificationId)
-        if (targetIndex < 0 || targetIndex == lastTargetIndex) return@LaunchedEffect
-        listState.animateScrollToItem(targetIndex)
-        lastTargetIndex = targetIndex
+        val targetListIndex = notificationListIndex(targetIndex, model.hasRefreshError)
+        if (targetIndex < 0 || targetListIndex == lastTargetListIndex) return@LaunchedEffect
+        listState.animateScrollToItem(targetListIndex)
+        lastTargetListIndex = targetListIndex
         notifications.getOrNull(targetIndex)?.let(model::markNotificationAsRead)
     }
 
@@ -189,6 +190,9 @@ fun NotificationCenterContent(
         },
     )
 }
+
+internal fun notificationListIndex(notificationIndex: Int, hasRefreshError: Boolean): Int =
+    notificationIndex + if (hasRefreshError) 1 else 0
 
 @Composable
 private fun CenterState(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
