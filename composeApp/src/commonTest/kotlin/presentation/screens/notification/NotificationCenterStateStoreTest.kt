@@ -1,26 +1,105 @@
 package io.github.vrcmteam.vrcm.presentation.screens.notification
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationInboxState
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationSource
-import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.CompletableDeferred
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.identity
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class NotificationCenterStateStoreTest {
     @Test
-    fun staleRefreshCannotRevertNotificationMarkedReadByEarlierMutation() = runBlocking {
+    fun queuedReservationsCannotStartMultipleMutationTypesForSameNotification() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val token = AccountSessionToken(userId = "usr_test", generation = 1)
+        val store = NotificationCenterStateStore(
+            scope = scope,
+            initialState = NotificationCenterUiState(sessionToken = token),
+            reducerDispatcher = dispatcher,
+        )
         val target = notification("not_target")
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val action = NotificationItemData.ActionData(data = "", type = "Accept")
+
+        try {
+            val accepted = listOf(
+                async {
+                    store.reserveMutation(
+                        token,
+                        target.identity,
+                        PendingNotificationMutation.Action(action),
+                    )
+                },
+                async {
+                    store.reserveMutation(
+                        token,
+                        target.identity,
+                        PendingNotificationMutation.Read,
+                    )
+                },
+                async {
+                    store.reserveMutation(
+                        token,
+                        target.identity,
+                        PendingNotificationMutation.Delete,
+                    )
+                },
+            ).awaitAll()
+
+            assertEquals(1, accepted.count { it })
+        } finally {
+            store.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun cancelledReservationCannotLeavePendingMutation() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val token = AccountSessionToken(userId = "usr_test", generation = 1)
+        val store = NotificationCenterStateStore(
+            scope = scope,
+            initialState = NotificationCenterUiState(sessionToken = token),
+            reducerDispatcher = dispatcher,
+        )
+        val target = notification("not_target")
+
+        try {
+            val reservation = launch(start = CoroutineStart.UNDISPATCHED) {
+                store.reserveMutation(
+                    token,
+                    target.identity,
+                    PendingNotificationMutation.Delete,
+                )
+            }
+            reservation.cancelAndJoin()
+            store.reduce { it }.join()
+
+            assertEquals(false, target.identity in store.value.pendingMutations)
+        } finally {
+            store.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun staleRefreshCannotRevertNotificationMarkedReadByEarlierMutation() = runTest {
+        val target = notification("not_target")
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val store = NotificationCenterStateStore(
             scope = scope,
             initialState = NotificationCenterUiState(
@@ -29,7 +108,7 @@ class NotificationCenterStateStoreTest {
                     listOf(target),
                 ),
             ),
-            reducerDispatcher = Dispatchers.Default,
+            reducerDispatcher = dispatcher,
         )
 
         try {
@@ -53,9 +132,10 @@ class NotificationCenterStateStoreTest {
     }
 
     @Test
-    fun staleRefreshCannotRestoreNotificationConsumedByConcurrentMutation() = runBlocking {
+    fun staleRefreshCannotRestoreNotificationConsumedByConcurrentMutation() = runTest {
         val target = notification("not_target")
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val store = NotificationCenterStateStore(
             scope = scope,
             initialState = NotificationCenterUiState(
@@ -64,20 +144,14 @@ class NotificationCenterStateStoreTest {
                     listOf(target),
                 ),
             ),
-            reducerDispatcher = Dispatchers.Default,
+            reducerDispatcher = dispatcher,
         )
-        val gate = ConcurrentReductionGate(participants = 2)
-        val mutationJob = CompletableDeferred<Job>()
 
         try {
             val mutation = store.reduce { state ->
-                gate.awaitPeers()
                 state.copy(inboxState = state.inboxState.consume(target))
             }
-            mutationJob.complete(mutation)
             val refresh = store.reduce { state ->
-                gate.awaitPeers()
-                runBlocking { mutationJob.await().join() }
                 state.copy(
                     inboxState = state.inboxState.replace(
                         NotificationSource.PIPELINE,
@@ -95,10 +169,11 @@ class NotificationCenterStateStoreTest {
     }
 
     @Test
-    fun concurrentMutationsConsumeBothNotificationsWithoutLostUpdate() = runBlocking {
+    fun concurrentMutationsConsumeBothNotificationsWithoutLostUpdate() = runTest {
         val first = notification("not_first")
         val second = notification("not_second")
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
         val store = NotificationCenterStateStore(
             scope = scope,
             initialState = NotificationCenterUiState(
@@ -107,20 +182,14 @@ class NotificationCenterStateStoreTest {
                     listOf(first, second),
                 ),
             ),
-            reducerDispatcher = Dispatchers.Default,
+            reducerDispatcher = dispatcher,
         )
-        val gate = ConcurrentReductionGate(participants = 2)
-        val firstMutationJob = CompletableDeferred<Job>()
 
         try {
             val firstMutation = store.reduce { state ->
-                gate.awaitPeers()
                 state.copy(inboxState = state.inboxState.consume(first))
             }
-            firstMutationJob.complete(firstMutation)
             val secondMutation = store.reduce { state ->
-                gate.awaitPeers()
-                runBlocking { firstMutationJob.await().join() }
                 state.copy(inboxState = state.inboxState.consume(second))
             }
             joinAll(firstMutation, secondMutation)
@@ -144,14 +213,4 @@ class NotificationCenterStateStoreTest {
         type = "boop",
         actions = emptyList(),
     )
-}
-
-private class ConcurrentReductionGate(private val participants: Int) {
-    private val entered = atomic(0)
-    private val release = CompletableDeferred<Unit>()
-
-    fun awaitPeers() = runBlocking {
-        if (entered.incrementAndGet() == participants) release.complete(Unit)
-        withTimeoutOrNull(1_000) { release.await() }
-    }
 }
