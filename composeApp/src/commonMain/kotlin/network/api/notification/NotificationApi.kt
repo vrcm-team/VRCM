@@ -64,7 +64,15 @@ class NotificationApi(
 
 
 
-    suspend fun markNotificationAsRead(notificationId: String): VRChatResponse =
+    /** Marks a current Pipeline `/notifications` item as seen. */
+    suspend fun markPipelineNotificationAsRead(notificationId: String) {
+        client.post {
+            url { path(NOTIFICATIONS_API_PREFIX, notificationId, "see") }
+        }.checkSuccess<Unit>()
+    }
+
+    /** Marks a legacy `/auth/user/notifications` item as seen. */
+    suspend fun markLegacyNotificationAsRead(notificationId: String): VRChatResponse =
         client.put {
             url {
                 path(

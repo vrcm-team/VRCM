@@ -2,9 +2,20 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.notification.data.resolveNotificationGroupId
+import io.github.vrcmteam.vrcm.service.OfficialLinkType
+import io.github.vrcmteam.vrcm.service.parseOfficialId
+import io.github.vrcmteam.vrcm.service.parseOfficialLink
+
+/** API family that owns a notification and all mutations performed on it. */
+enum class NotificationSource {
+    PIPELINE,
+    LEGACY,
+}
 
 data class NotificationItemData(
     val id: String,
+    val source: NotificationSource,
     val imageUrl: String,
     val title: String?,
     val message: String,
@@ -43,6 +54,7 @@ data class NotificationItemData(
 
     constructor(n: NotificationData) : this(
         id = n.id,
+        source = NotificationSource.PIPELINE,
         imageUrl = (n.imageUrl ?: n.details?.imageUrl ?: n.data.imageUrl).orEmpty(),
         title = n.title,
         message = n.message,
@@ -60,7 +72,14 @@ data class NotificationItemData(
         },
         seen = n.seen,
         canDelete = n.canDelete,
-        groupId = n.groupId ?: n.details?.groupId ?: n.data.groupId,
+        groupId = resolveNotificationGroupId(
+            n.link,
+            n.groupId,
+            n.details?.groupId,
+            n.data.groupId,
+            n.details?.ownerId,
+            n.data.ownerId,
+        ),
         groupName = n.details?.groupName ?: n.data.groupName,
         announcementTitle = n.details?.announcementTitle ?: n.data.announcementTitle,
         relatedNotificationId = n.relatedNotificationsId,
@@ -74,6 +93,7 @@ data class NotificationItemData(
         actions: List<ActionData>,
     ) : this(
         id = n.id,
+        source = NotificationSource.LEGACY,
         imageUrl = imageUrl,
         title = title,
         message = n.message,
@@ -103,13 +123,105 @@ internal fun List<NotificationItemData>.indexOfNotificationTarget(targetId: Stri
 internal enum class NotificationResponseTarget {
     BOOP_USER_API,
     NOTIFICATION_API,
+    NAVIGATION_LINK,
 }
+
+internal enum class NotificationReadTarget {
+    PIPELINE_SEE,
+    LEGACY_SEE,
+}
+
+internal val NotificationItemData.readTarget: NotificationReadTarget
+    get() = when (source) {
+        NotificationSource.PIPELINE -> NotificationReadTarget.PIPELINE_SEE
+        NotificationSource.LEGACY -> NotificationReadTarget.LEGACY_SEE
+    }
+
+internal data class NotificationInboxState(
+    val pipeline: List<NotificationItemData> = emptyList(),
+    val legacy: List<NotificationItemData> = emptyList(),
+    private val consumed: Set<NotificationIdentity> = emptySet(),
+) {
+    fun replace(source: NotificationSource, items: List<NotificationItemData>): NotificationInboxState {
+        val visible = items.filterNot { it.identity in consumed }
+        return when (source) {
+            NotificationSource.PIPELINE -> copy(pipeline = visible)
+            NotificationSource.LEGACY -> copy(legacy = visible)
+        }
+    }
+
+    fun consume(item: NotificationItemData): NotificationInboxState {
+        val identity = item.identity
+        return when (item.source) {
+            NotificationSource.PIPELINE -> copy(
+                pipeline = pipeline.filterNot { it.identity == identity },
+                consumed = consumed + identity,
+            )
+            NotificationSource.LEGACY -> copy(
+                legacy = legacy.filterNot { it.identity == identity },
+                consumed = consumed + identity,
+            )
+        }
+    }
+
+    fun markSeen(item: NotificationItemData): NotificationInboxState = when (item.source) {
+        NotificationSource.PIPELINE -> copy(
+            pipeline = pipeline.map { current ->
+                if (current.identity == item.identity) current.copy(seen = true) else current
+            },
+        )
+        NotificationSource.LEGACY -> copy(
+            legacy = legacy.map { current ->
+                if (current.identity == item.identity) current.copy(seen = true) else current
+            },
+        )
+    }
+}
+
+internal data class NotificationIdentity(
+    val source: NotificationSource,
+    val id: String,
+)
+
+private val NotificationItemData.identity: NotificationIdentity
+    get() = NotificationIdentity(source, id)
 
 internal fun NotificationItemData.responseTarget(
     action: NotificationItemData.ActionData,
 ): NotificationResponseTarget =
-    if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
+    if (action.type.equals("link", ignoreCase = true)) {
+        NotificationResponseTarget.NAVIGATION_LINK
+    } else if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
         NotificationResponseTarget.BOOP_USER_API
     } else {
         NotificationResponseTarget.NOTIFICATION_API
     }
+
+internal sealed interface NotificationActionTarget {
+    data class User(val id: String) : NotificationActionTarget
+    data class Group(val id: String) : NotificationActionTarget
+    data class World(val id: String) : NotificationActionTarget
+}
+
+internal fun NotificationItemData.actionTarget(
+    action: NotificationItemData.ActionData,
+): NotificationActionTarget? {
+    if (!action.type.equals("link", ignoreCase = true)) return null
+    val value = action.data.ifBlank { link.orEmpty() }.trim()
+    val prefixedTarget = value.substringBefore(':').lowercase().let { prefix ->
+        val id = value.substringAfter(':', missingDelimiterValue = "")
+        when (prefix) {
+            "user" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.User }
+            "group" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.Group }
+            "world" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.World }
+            else -> null
+        }
+    }
+    val target = prefixedTarget ?: parseOfficialLink(value) ?: return null
+    return when (target.type) {
+        OfficialLinkType.User -> NotificationActionTarget.User(target.id)
+        OfficialLinkType.Group -> NotificationActionTarget.Group(target.id)
+        OfficialLinkType.World -> NotificationActionTarget.World(target.id)
+        OfficialLinkType.Avatar -> null
+    }
+}

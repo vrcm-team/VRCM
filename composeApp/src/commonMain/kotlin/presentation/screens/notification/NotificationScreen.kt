@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,8 +34,11 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.isGroupNotificationType
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -118,7 +120,7 @@ fun NotificationCenterContent(
                         if (model.isRefreshing) {
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Refresh, strings.notificationRefresh)
+                            Icon(AppIcons.Update, strings.notificationRefresh)
                         }
                     }
                 },
@@ -160,7 +162,7 @@ fun NotificationCenterContent(
                         TextButton(onClick = model::refreshAllNotification) { Text(strings.retry) }
                     }
                 }
-                items(notifications, key = { it.id }) { item ->
+                items(notifications, key = { "${it.source}:${it.id}" }) { item ->
                     NotificationItem(
                         item = item,
                         loadingAction = model.pendingNotificationActions[item.id],
@@ -213,10 +215,9 @@ private fun LazyItemScope.NotificationItem(
     onDelete: () -> Unit,
     onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
 ) {
-    var expanded by remember(item.id) { mutableStateOf(false) }
+    var expanded by remember(item.source, item.id) { mutableStateOf(false) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
     val senderId = item.senderId.orEmpty()
-    val linkedUserId = item.linkedUserId.orEmpty()
     val groupId = item.groupId.orEmpty()
     val groupName = item.groupName.orEmpty()
     val navigator = LocalNavigator.currentOrThrow
@@ -308,11 +309,21 @@ private fun LazyItemScope.NotificationItem(
                     val loading = loadingAction == action
                     FilledTonalButton(
                         onClick = {
-                            if (action.type.equals("link", true) && linkedUserId.isNotEmpty()) {
-                                navigator push UserProfileScreen(
-                                    UserProfileVo(id = linkedUserId, profileImageUrl = item.imageUrl),
-                                    sharedSuffixKey,
-                                )
+                            if (action.type.equals("link", true)) {
+                                if (!item.seen) onRead()
+                                when (val target = item.actionTarget(action)) {
+                                    is NotificationActionTarget.User -> navigator push UserProfileScreen(
+                                        UserProfileVo(id = target.id, profileImageUrl = item.imageUrl),
+                                        sharedSuffixKey,
+                                    )
+                                    is NotificationActionTarget.Group -> navigator push GroupProfileScreen(
+                                        GroupProfileVo(groupId = target.id),
+                                    )
+                                    is NotificationActionTarget.World -> navigator push WorldProfileScreen(
+                                        WorldProfileVo(worldId = target.id),
+                                    )
+                                    null -> Unit
+                                }
                             } else onResponse(item, action)
                         },
                         enabled = !pending,
@@ -362,7 +373,14 @@ private fun NotificationTypeLabel(item: NotificationItemData) {
     ) {
         Icon(boopIcon(item.boopEmojiId), strings.profileBoop, Modifier.size(16.dp))
         Text(strings.profileBoop, style = MaterialTheme.typography.labelSmall)
-    } else Text(item.type, style = MaterialTheme.typography.labelSmall)
+    } else Text(
+        when {
+            item.type == NotificationType.FriendRequest.value -> strings.notificationFriendRequestAlert
+            isGroupNotificationType(item.type) -> strings.notificationGroupAnnouncement
+            else -> item.type
+        },
+        style = MaterialTheme.typography.labelSmall,
+    )
 }
 
 @Composable

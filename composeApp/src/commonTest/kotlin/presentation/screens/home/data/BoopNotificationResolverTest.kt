@@ -129,6 +129,7 @@ class BoopNotificationResolverTest {
         link: String? = null,
     ) = NotificationItemData(
         id = id,
+        source = NotificationSource.PIPELINE,
         imageUrl = "",
         title = null,
         message = "sent you a boop",
