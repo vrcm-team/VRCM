@@ -38,6 +38,7 @@ import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FriendActivityRoomStoreTest {
     @Test
@@ -116,6 +117,36 @@ class FriendActivityRoomStoreTest {
                 ownerEvents.take(2).map { it.id }.sortedDescending(),
                 ownerEvents.take(2).map { it.id },
             )
+
+            val firstPage = store.observeAllEvents(
+                ownerUserId = "usr_owner_a",
+                limit = 2,
+            ).first()
+            val pageCursor = firstPage.last()
+            store.record(
+                token = ownerA,
+                observations = listOf(friendA),
+                batch = FriendActivityBatch(
+                    events = listOf(
+                        FriendActivityEventDraft(
+                            userId = friendA.userId,
+                            displayName = "New head event",
+                            profileImageUrl = friendA.profileImageUrl,
+                            type = FriendActivityEventType.LocationChanged,
+                            occurredAtMillis = 3_000L,
+                        )
+                    )
+                ),
+                nowMillis = 3_000L,
+            )
+            val nextPage = store.observeAllEventsBefore(
+                ownerUserId = "usr_owner_a",
+                beforeOccurredAtMillis = pageCursor.occurredAtMillis,
+                beforeId = pageCursor.id,
+                limit = 2,
+            ).first()
+            assertEquals(listOf(1_000L), nextPage.map { it.occurredAtMillis })
+            assertTrue(nextPage.none { event -> event.id in firstPage.map { it.id } })
 
             val filteredPage = store.observeAllEvents(
                 ownerUserId = "usr_owner_a",

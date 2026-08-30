@@ -368,6 +368,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val friendActivityTimelineTitle = "好友動態"
     override val friendActivityTimelineEmpty = "暫無觀察到的好友動態"
     override val friendActivityTimelineError = "無法載入好友動態"
+    override val friendActivityLoadMoreError = "無法載入更多好友動態"
     override val friendActivityFilterAll = "全部"
     override val friendActivityFilterPresence = "上下線"
     override val friendActivityFilterLocation = "位置"

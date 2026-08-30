@@ -174,6 +174,8 @@ private fun HomeDestinationContent(
                     filter = timelineFilter,
                     onFilterSelected = timelineModel::selectFilter,
                     onRetry = timelineModel::retry,
+                    onLoadMore = timelineModel::loadMore,
+                    onRetryLoadMore = timelineModel::retryLoadMore,
                     onUserClick = { event ->
                         navigator push UserProfileScreen(
                             UserProfileVo(
@@ -184,7 +186,7 @@ private fun HomeDestinationContent(
                         )
                     },
                     onWorldClick = { event ->
-                        val worldId = event.worldId ?: return@FriendActivityTimelineContent
+                        val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
                         navigator push WorldProfileScreen(
                             WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
                         )

@@ -56,6 +56,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
+import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.ktor.client.*
 import okio.FileSystem
 import org.koin.core.definition.Definition
@@ -75,7 +76,7 @@ val presentationModule: Module = module {
     // background monitoring report; it only holds the settings DAO and the theme color list.
     single { SettingsModel(get(), getAll()) }
     viewModelOf(::AuthScreenModel)
-    viewModelOf(::FriendActivityTimelineModel)
+    viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
     singleOf(::NotificationCenterModel)
     viewModelOf(::UserProfileScreenModel)

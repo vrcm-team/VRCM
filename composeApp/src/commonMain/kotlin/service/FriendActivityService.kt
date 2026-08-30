@@ -311,6 +311,31 @@ class FriendActivityService internal constructor(
         }
     }
 
+    fun observeAllEventsBefore(
+        types: Set<FriendActivityEventType> = emptySet(),
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int = 200,
+    ): Flow<List<FriendActivityEvent>> = SharedFlowCentre.currentSession.flatMapLatest { session ->
+        if (session == null) {
+            flowOf(emptyList())
+        } else {
+            store.observeAllEventsBefore(
+                ownerUserId = session.account.userId,
+                types = types,
+                beforeOccurredAtMillis = beforeOccurredAtMillis,
+                beforeId = beforeId,
+                limit = limit,
+            ).onEach { events ->
+                events.asSequence()
+                    .filter { it.worldName == null }
+                    .mapNotNull(FriendActivityEventEntity::worldId)
+                    .distinct()
+                    .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
+            }.map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
+        }
+    }
+
     fun observeRecentTogether(
         sinceMillis: Long,
         limit: Int = 20,

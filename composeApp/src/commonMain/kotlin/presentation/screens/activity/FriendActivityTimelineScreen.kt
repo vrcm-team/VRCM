@@ -29,8 +29,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +51,11 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
+import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
+import io.github.vrcmteam.vrcm.service.OfficialLinkType
+import io.github.vrcmteam.vrcm.service.parseOfficialId
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -86,6 +93,8 @@ object FriendActivityTimelineScreen : AppDetailRoute {
                 filter = filter,
                 onFilterSelected = model::selectFilter,
                 onRetry = model::retry,
+                onLoadMore = model::loadMore,
+                onRetryLoadMore = model::retryLoadMore,
                 onUserClick = { event ->
                     navigator push UserProfileScreen(
                         UserProfileVo(
@@ -96,7 +105,7 @@ object FriendActivityTimelineScreen : AppDetailRoute {
                     )
                 },
                 onWorldClick = { event ->
-                    val worldId = event.worldId ?: return@FriendActivityTimelineContent
+                    val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
                     navigator push WorldProfileScreen(
                         WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
                     )
@@ -113,6 +122,8 @@ fun FriendActivityTimelineContent(
     filter: FriendActivityTimelineFilter,
     onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
     onUserClick: (FriendActivityEvent) -> Unit,
     onWorldClick: (FriendActivityEvent) -> Unit,
     modifier: Modifier = Modifier,
@@ -154,10 +165,12 @@ fun FriendActivityTimelineContent(
                 TimelineMessage { Text(strings.friendActivityTimelineEmpty) }
             } else {
                 ActivityTimelineList(
-                    events = state.events,
+                    state = state,
                     listState = listState,
                     onUserClick = onUserClick,
                     onWorldClick = onWorldClick,
+                    onLoadMore = onLoadMore,
+                    onRetryLoadMore = onRetryLoadMore,
                 )
             }
         }
@@ -171,12 +184,25 @@ private fun TimelineMessage(content: @Composable () -> Unit) {
 
 @Composable
 private fun ActivityTimelineList(
-    events: List<FriendActivityEvent>,
+    state: FriendActivityTimelineState.Content,
     listState: LazyListState,
     onUserClick: (FriendActivityEvent) -> Unit,
     onWorldClick: (FriendActivityEvent) -> Unit,
+    onLoadMore: () -> Unit,
+    onRetryLoadMore: () -> Unit,
 ) {
+    val events = state.events
     val groups = events.groupBy(FriendActivityEvent::activityDate)
+    LaunchedEffect(listState, state.hasMore, state.isLoadingMore, state.loadMoreError) {
+        if (!state.hasMore || state.isLoadingMore || state.loadMoreError) return@LaunchedEffect
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            layoutInfo.totalItemsCount > 0 &&
+                lastVisibleIndex >= layoutInfo.totalItemsCount - LOAD_MORE_THRESHOLD
+        }.filter { it }.first()
+        onLoadMore()
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = listState,
@@ -196,12 +222,35 @@ private fun ActivityTimelineList(
                 FriendTimelineEvent(
                     event = event,
                     onUserClick = { onUserClick(event) },
-                    onWorldClick = if (event.worldId?.startsWith("wrld_") == true) {
+                    onWorldClick = if (event.navigableWorldId() != null) {
                         { onWorldClick(event) }
                     } else {
                         null
                     },
                 )
+            }
+        }
+        if (state.isLoadingMore) {
+            item(key = "activity-load-more") {
+                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
+        } else if (state.loadMoreError) {
+            item(key = "activity-load-more-error") {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        strings.friendActivityLoadMoreError,
+                        Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = onRetryLoadMore) { Text(strings.retry) }
+                }
             }
         }
     }
@@ -264,3 +313,11 @@ private fun FriendActivityEvent.activityDate(): String =
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date
         .toString()
+
+internal fun FriendActivityEvent.navigableWorldId(): String? {
+    if (accessType != FriendActivityAccessType.Public) return null
+    val target = parseOfficialId(worldId.orEmpty()) ?: return null
+    return target.id.takeIf { target.type == OfficialLinkType.World }
+}
+
+private const val LOAD_MORE_THRESHOLD = 6

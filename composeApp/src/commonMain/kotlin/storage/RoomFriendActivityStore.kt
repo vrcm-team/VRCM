@@ -75,6 +75,32 @@ internal class RoomFriendActivityStore(
         }
     }
 
+    fun observeAllEventsBefore(
+        ownerUserId: String,
+        types: Set<FriendActivityEventType> = emptySet(),
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int = 200,
+    ): Flow<List<FriendActivityEventEntity>> {
+        val safeLimit = limit.coerceAtLeast(0)
+        return if (types.isEmpty()) {
+            dao.observeAllEventsBefore(
+                ownerUserId = ownerUserId,
+                beforeOccurredAtMillis = beforeOccurredAtMillis,
+                beforeId = beforeId,
+                limit = safeLimit,
+            )
+        } else {
+            dao.observeAllEventsByTypesBefore(
+                ownerUserId = ownerUserId,
+                types = types.map(FriendActivityEventType::name),
+                beforeOccurredAtMillis = beforeOccurredAtMillis,
+                beforeId = beforeId,
+                limit = safeLimit,
+            )
+        }
+    }
+
     suspend fun cachedWorldName(ownerUserId: String, worldId: String): String? =
         dao.cachedWorldName(ownerUserId, worldId)
 
