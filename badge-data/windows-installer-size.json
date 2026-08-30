@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "label": "Windows",
-  "message": "pending",
+  "message": "99.94 MB",
   "color": "0078d4",
   "labelColor": "6e6e73",
+  "cacheSeconds": 300,
   "namedLogo": "windows",
-  "logoColor": "white",
-  "cacheSeconds": 300
+  "logoColor": "white"
 }
