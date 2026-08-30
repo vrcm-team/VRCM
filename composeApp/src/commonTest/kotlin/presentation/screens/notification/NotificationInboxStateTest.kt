@@ -29,6 +29,69 @@ class NotificationInboxStateTest {
     }
 
     @Test
+    fun consumedAggregateRejectsStaleRelationButShowsNewUnderlyingEvent() {
+        val oldEvent = notification(
+            id = "not_aggregate",
+            source = NotificationSource.PIPELINE,
+            relatedNotificationId = "not_event_a",
+        )
+        val newEvent = notification(
+            id = "not_aggregate",
+            source = NotificationSource.PIPELINE,
+            relatedNotificationId = "not_event_b",
+        )
+        val consumed = NotificationInboxState()
+            .replace(NotificationSource.PIPELINE, listOf(oldEvent))
+            .consume(oldEvent)
+
+        val refreshed = consumed.replace(
+            NotificationSource.PIPELINE,
+            listOf(oldEvent, newEvent),
+        )
+
+        assertEquals(listOf(newEvent), refreshed.pipeline)
+    }
+
+    @Test
+    fun blankAndMissingRelationShareStableIdentity() {
+        val missingRelation = notification("not_without_relation", NotificationSource.PIPELINE)
+        val blankRelation = notification(
+            id = "not_without_relation",
+            source = NotificationSource.PIPELINE,
+            relatedNotificationId = "   ",
+        )
+        val consumed = NotificationInboxState()
+            .replace(NotificationSource.PIPELINE, listOf(missingRelation))
+            .consume(missingRelation)
+
+        val refreshed = consumed.replace(NotificationSource.PIPELINE, listOf(blankRelation))
+
+        assertEquals(emptyList(), refreshed.pipeline)
+    }
+
+    @Test
+    fun markSeenChangesOnlyTheMatchingUnderlyingEvent() {
+        val oldEvent = notification(
+            id = "not_aggregate",
+            source = NotificationSource.PIPELINE,
+            relatedNotificationId = "not_event_a",
+        )
+        val newEvent = notification(
+            id = "not_aggregate",
+            source = NotificationSource.PIPELINE,
+            relatedNotificationId = "not_event_b",
+        )
+        val initial = NotificationInboxState().replace(
+            NotificationSource.PIPELINE,
+            listOf(oldEvent, newEvent),
+        )
+
+        val seen = initial.markSeen(oldEvent)
+
+        assertEquals(listOf(true, false), seen.pipeline.map { it.seen })
+    }
+
+    @Test
     fun failedActionPreservesCurrentNotification() {
         val item = notification("not_failed", NotificationSource.PIPELINE)
         val initial = NotificationInboxState().replace(NotificationSource.PIPELINE, listOf(item))
@@ -98,7 +161,11 @@ class NotificationInboxStateTest {
         }
     }
 
-    private fun notification(id: String, source: NotificationSource) = NotificationItemData(
+    private fun notification(
+        id: String,
+        source: NotificationSource,
+        relatedNotificationId: String? = null,
+    ) = NotificationItemData(
         id = id,
         source = source,
         imageUrl = "",
@@ -109,5 +176,6 @@ class NotificationInboxStateTest {
         link = null,
         type = "boop",
         actions = emptyList(),
+        relatedNotificationId = relatedNotificationId,
     )
 }

@@ -181,10 +181,15 @@ internal data class NotificationInboxState(
 internal data class NotificationIdentity(
     val source: NotificationSource,
     val id: String,
+    val relatedNotificationId: String?,
 )
 
 private val NotificationItemData.identity: NotificationIdentity
-    get() = NotificationIdentity(source, id)
+    get() = NotificationIdentity(
+        source = source,
+        id = id,
+        relatedNotificationId = relatedNotificationId?.takeIf(String::isNotBlank),
+    )
 
 internal fun NotificationItemData.responseTarget(
     action: NotificationItemData.ActionData,
