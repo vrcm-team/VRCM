@@ -73,12 +73,16 @@ class SearchListPagerModelTest : MainDispatcherTest() {
             }
         }
 
+        fixture.model.setSearchText("user")
         fixture.model.loadSearchListIfNeeded()
         fixture.model.setSearchType(1)
+        fixture.model.setSearchText("world")
         fixture.model.loadSearchListIfNeeded()
         fixture.model.setSearchType(0)
+        assertEquals("user", fixture.model.searchText.value)
         fixture.model.loadSearchListIfNeeded()
         fixture.model.setSearchType(1)
+        assertEquals("world", fixture.model.searchText.value)
         fixture.model.loadSearchListIfNeeded()
 
         assertEquals(1, userRequestCount)
@@ -101,6 +105,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
             }
         }
 
+        fixture.model.setSearchText("retry")
         fixture.model.loadSearchListIfNeeded()
         fixture.model.loadSearchListIfNeeded()
 
@@ -146,6 +151,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
             jsonResponse("[]")
         }
 
+        fixture.model.setSearchText("account")
         fixture.model.loadSearchListIfNeeded()
         SharedFlowCentre.emitAuthenticated(
             AccountDto(userId = "usr_new", username = "new-user"),
@@ -216,7 +222,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun clearingGroupQueryClearsResultsAndRejectsLateResponse() = runBlocking {
+    fun clearingGroupQueryKeepsCachedResultsAndRejectsLateResponse() = runBlocking {
         val lateRequestStarted = CompletableDeferred<Unit>()
         val releaseLateRequest = CompletableDeferred<Unit>()
         var requestCount = 0
@@ -240,10 +246,10 @@ class SearchListPagerModelTest : MainDispatcherTest() {
 
         fixture.model.setSearchText("")
 
-        assertTrue(fixture.model.groupSearchList.value.isEmpty())
+        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
         releaseLateRequest.complete(Unit)
         lateSearch.await()
-        assertTrue(fixture.model.groupSearchList.value.isEmpty())
+        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
         fixture.close()
     }
 
@@ -341,6 +347,33 @@ class SearchListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun failedReplacementQueryKeepsPreviousResultsAndReportsError() = runBlocking {
+        val fixture = createFixture { request ->
+            when (request.url.parameters["query"]) {
+                "existing" -> jsonResponse(groupJson("grp_existing"))
+                "replacement" -> respond(
+                    content = "replacement failed",
+                    status = HttpStatusCode.InternalServerError,
+                )
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+        fixture.model.setSearchType(3)
+        fixture.model.setSearchText("existing")
+        assertTrue(fixture.model.refreshSearchList())
+
+        fixture.model.setSearchText("replacement")
+        assertEquals(false, fixture.model.refreshSearchList())
+
+        assertEquals(listOf("grp_existing"), fixture.model.groupSearchList.value.map { it.id })
+        assertEquals(
+            SearchLoadPhase.Error,
+            fixture.model.loadStates.value.getValue(3).phase,
+        )
+        fixture.close()
+    }
+
+    @Test
     fun cancellingRefreshCancelsTheApiRequest() = runBlocking {
         val requestStarted = CompletableDeferred<Unit>()
         val requestCancelled = CompletableDeferred<Unit>()
@@ -368,7 +401,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun resultFromPreviouslySelectedTabIsDiscarded() = runBlocking {
+    fun validResultFromAnInactiveTabIsRetained() = runBlocking {
         val groupStarted = CompletableDeferred<Unit>()
         val releaseGroup = CompletableDeferred<Unit>()
         val fixture = createFixture { request ->
@@ -393,7 +426,9 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         releaseGroup.complete(Unit)
         groupSearch.await()
 
-        assertTrue(fixture.model.groupSearchList.value.isEmpty())
+        assertEquals(listOf("grp_stale"), fixture.model.groupSearchList.value.map { it.id })
+        fixture.model.setSearchType(3)
+        assertEquals("group", fixture.model.searchText.value)
         fixture.close()
     }
 

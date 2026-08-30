@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,12 +43,11 @@ fun GenericSearchList(
     advancedOptionsContent: @Composable (() -> Unit)? = null,
     onLoadMore: (() -> Unit)? = null,
     totalItemsCount: Int = 0,
+    lazyListState: LazyListState = rememberLazyListState(),
     itemContent:  LazyListScope.(Int) -> Unit
 ) {
-    val lazyListState = rememberLazyListState()
-
     // 监听返回顶部事件
-    LaunchedEffect(key) {
+    LaunchedEffect(key, lazyListState) {
         SharedFlowCentre.toPagerTop.collect {
             runCatching {
                 lazyListState.animateScrollToFirst()

@@ -16,8 +16,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -27,28 +27,64 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
 
-/**
- * 搜索页面的ViewModel
- */
+internal enum class PublicSearchTab(val searchType: Int, val tabIndex: Int) {
+    User(searchType = 0, tabIndex = 0),
+    World(searchType = 1, tabIndex = 1),
+    Group(searchType = 3, tabIndex = 2);
+
+    companion object {
+        fun fromSearchType(searchType: Int): PublicSearchTab =
+            entries.firstOrNull { it.searchType == searchType } ?: User
+
+        fun fromTabIndex(tabIndex: Int): PublicSearchTab =
+            entries.firstOrNull { it.tabIndex == tabIndex } ?: User
+    }
+}
+
+internal enum class SearchLoadPhase {
+    AwaitingQuery,
+    Loading,
+    Success,
+    Error,
+}
+
+internal data class PublicSearchLoadState(
+    val phase: SearchLoadPhase = SearchLoadPhase.AwaitingQuery,
+)
+
+/** 公开搜索页面状态，查询、结果和请求代次均按标签隔离。 */
 class SearchListPagerModel(
     private val usersApi: UsersApi,
     private val worldsApi: WorldsApi,
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
-    private val logger: Logger
+    private val logger: Logger,
 ) : ViewModel() {
+    private val _userSearchList = MutableStateFlow(emptyList<SearchUserData>())
+    val userSearchList = _userSearchList.asStateFlow()
 
-    // 用户搜索列表
-    private val _userSearchList =  MutableStateFlow(emptyList<SearchUserData>())
-    var userSearchList = _userSearchList.asStateFlow()
+    private val _worldSearchList = MutableStateFlow(emptyList<WorldData>())
+    val worldSearchList = _worldSearchList.asStateFlow()
 
-    // 世界搜索列表
-    private val _worldSearchList =  MutableStateFlow(emptyList<WorldData>())
-    var worldSearchList = _worldSearchList.asStateFlow()
-
-    // 群组搜索列表
     private val _groupSearchList = MutableStateFlow(emptyList<LimitedGroup>())
     val groupSearchList: StateFlow<List<LimitedGroup>> = _groupSearchList.asStateFlow()
+
+    private val _searchType = MutableStateFlow(PublicSearchTab.User.searchType)
+    val searchType = _searchType.asStateFlow()
+
+    private val _queriesByType = MutableStateFlow(
+        PublicSearchTab.entries.associate { it.searchType to "" },
+    )
+    private val _searchText = MutableStateFlow("")
+    val searchText: StateFlow<String> = _searchText.asStateFlow()
+
+    private val _loadStates = MutableStateFlow(
+        PublicSearchTab.entries.associate { it.searchType to PublicSearchLoadState() },
+    )
+    internal val loadStates = _loadStates.asStateFlow()
+
+    private val _worldSearchOptions = MutableStateFlow(WorldSearchOptions())
+    val worldSearchOptions: StateFlow<WorldSearchOptions> = _worldSearchOptions.asStateFlow()
 
     private val _groupHasMore = MutableStateFlow(false)
     val groupHasMore: StateFlow<Boolean> = _groupHasMore.asStateFlow()
@@ -62,109 +98,84 @@ class SearchListPagerModel(
     val groupLoadMoreFailed: StateFlow<Boolean> = _groupLoadMoreFailed.asStateFlow()
 
     private val groupPagingState = MutableStateFlow(GroupPagingState())
-
-    // 当前搜索类型：0表示用户，1表示世界，3表示群组
-    private val _searchType = MutableStateFlow(0)
-    val searchType = _searchType.asStateFlow()
-
-    // 世界搜索选项
-    private val _worldSearchOptions = MutableStateFlow(WorldSearchOptions())
-    val worldSearchOptions: StateFlow<WorldSearchOptions> = _worldSearchOptions.asStateFlow()
-
-    private val requestGeneration = MutableStateFlow(0L)
-
-    // 搜索文本 - 两个页面共享
-    private val _searchText = MutableStateFlow("")
-    val searchText: StateFlow<String> = _searchText.asStateFlow()
-
+    private val requestGenerations = MutableStateFlow(
+        PublicSearchTab.entries.associate { it.searchType to 0L },
+    )
     private val successfulRequestKeysByType = MutableStateFlow<Map<Int, SearchRequestKey>>(emptyMap())
-
     private var authenticatedUserId: String? = authService.accountDtoOrNull()?.userId
 
     init {
-        // 监听登录状态,用于重新登录后更新刷新状态
         viewModelScope.launch {
             SharedFlowCentre.authed.collect { session ->
-                val account = session.account
-                val accountChanged = authenticatedUserId != account.userId
-                authenticatedUserId = account.userId
-                if (accountChanged) {
-                    successfulRequestKeysByType.value = emptyMap()
-                    _userSearchList.value = emptyList()
-                    _worldSearchList.value = emptyList()
-                    _groupSearchList.value = emptyList()
-                    resetGroupPaging()
-                }
+                val accountChanged = authenticatedUserId != session.account.userId
+                authenticatedUserId = session.account.userId
+                if (accountChanged) resetForAccountChange()
             }
         }
     }
 
-    /**
-     * 设置搜索类型
-     * @param type 0: 用户搜索, 1: 世界搜索, 3: 群组搜索
-     */
     fun setSearchType(type: Int) {
-        if (!(type in 0..3 && type != searchType.value)) return
-        advanceRequestGeneration()
-        _searchType.value = type
-        groupLoadingGate.invalidate()
+        val tab = PublicSearchTab.fromSearchType(type)
+        if (tab.searchType == _searchType.value) return
+        _searchType.value = tab.searchType
+        _searchText.value = _queriesByType.value.getValue(tab.searchType)
     }
 
     fun setSearchText(text: String) {
-        if (_searchText.value == text) return
-        advanceRequestGeneration()
+        val type = _searchType.value
+        if (_queriesByType.value[type] == text) return
+        advanceRequestGeneration(type)
+        _queriesByType.update { it + (type to text) }
         _searchText.value = text
-        invalidateGroupPaging()
-        if (text.isEmpty()) {
-            _groupSearchList.value = emptyList()
-        }
+        successfulRequestKeysByType.update { it - type }
+        updateLoadState(type, PublicSearchLoadState())
+        if (type == PublicSearchTab.Group.searchType) invalidateGroupPaging()
     }
 
-    /**
-     * 更新世界搜索选项
-     */
     suspend fun updateWorldSearchOptions(options: WorldSearchOptions) {
         if (_worldSearchOptions.value == options) return
-        advanceRequestGeneration()
+        val type = PublicSearchTab.World.searchType
+        advanceRequestGeneration(type)
+        successfulRequestKeysByType.update { it - type }
         _worldSearchOptions.value = options
-        // 如果已经有搜索文本，则刷新搜索
-        if (searchText.value.isNotEmpty() && searchType.value == 1) {
-            refreshSearchList()
-        }
+        if (queryFor(type).isNotBlank()) refreshSearchList(type)
     }
 
-    /**
-     * 当前搜索类型已成功加载相同请求条件时复用现有结果。
-     */
     suspend fun loadSearchListIfNeeded() {
-        val requestKey = currentRequestKey()
-        if (successfulRequestKeysByType.value[requestKey.searchType] == requestKey) return
-        refreshSearchList()
+        val type = _searchType.value
+        val requestKey = requestKeyFor(type)
+        if (requestKey.searchText.isBlank()) {
+            updateLoadState(type, PublicSearchLoadState())
+            return
+        }
+        if (successfulRequestKeysByType.value[type] == requestKey) return
+        refreshSearchList(type)
     }
 
-    /**
-     * 强制刷新当前搜索列表。
-     * @return 是否成功获取新的搜索结果
-     */
-    suspend fun refreshSearchList(): Boolean {
-        val requestKey = currentRequestKey()
-        val generation = requestGeneration.value
+    suspend fun refreshSearchList(): Boolean = refreshSearchList(_searchType.value)
 
+    private suspend fun refreshSearchList(type: Int): Boolean {
+        val requestKey = requestKeyFor(type)
+        if (requestKey.searchText.isBlank()) {
+            updateLoadState(type, PublicSearchLoadState())
+            return false
+        }
+        val generation = generationFor(type)
+        updateLoadState(type, PublicSearchLoadState(SearchLoadPhase.Loading))
         val success = withContext(Dispatchers.IO) {
-            when (requestKey.searchType) {
-                0 -> searchUsers(requestKey.searchText, requestKey, generation)
-                1 -> searchWorlds(requestKey, generation)
-                3 -> if (requestKey.searchText.isNotEmpty()) {
-                    searchFirstGroupPage(requestKey, generation)
-                } else {
-                    false
-                }
+            when (type) {
+                PublicSearchTab.User.searchType -> searchUsers(requestKey, generation)
+                PublicSearchTab.World.searchType -> searchWorlds(requestKey, generation)
+                PublicSearchTab.Group.searchType -> searchFirstGroupPage(requestKey, generation)
                 else -> false
             }
         }
-        if (success && isCurrentRequest(requestKey, generation)) {
-            successfulRequestKeysByType.update { keys ->
-                keys + (requestKey.searchType to requestKey)
+        if (isCurrentRequest(requestKey, generation)) {
+            if (success) {
+                successfulRequestKeysByType.update { it + (type to requestKey) }
+                updateLoadState(type, PublicSearchLoadState(SearchLoadPhase.Success))
+            } else {
+                updateLoadState(type, PublicSearchLoadState(SearchLoadPhase.Error))
             }
         }
         return success
@@ -175,102 +186,50 @@ class SearchListPagerModel(
     fun retryLoadMoreGroups(): Job? = startGroupPage(retryFailed = true)
 
     private fun startGroupPage(retryFailed: Boolean): Job? {
-        val requestKey = currentRequestKey()
-        val generation = requestGeneration.value
+        val type = PublicSearchTab.Group.searchType
+        val requestKey = requestKeyFor(type)
+        val generation = generationFor(type)
         val pagingState = groupPagingState.value
         val pageFailed = pagingState.failedOffset == pagingState.nextOffset
         if (
-            requestKey.searchType != GROUP_SEARCH_TYPE ||
-            requestKey.searchText.isEmpty() ||
-            !groupHasMore.value ||
-            pagingState.query != requestKey.searchText ||
-            retryFailed != pageFailed
-        ) {
-            return null
-        }
-        val loadToken = GroupLoadToken(
-            generation = generation,
-            offset = pagingState.nextOffset,
-            append = true,
-        )
+            requestKey.searchText.isBlank() || !groupHasMore.value ||
+            pagingState.query != requestKey.searchText || retryFailed != pageFailed
+        ) return null
+
+        val loadToken = GroupLoadToken(generation, pagingState.nextOffset, append = true)
         if (!groupLoadingGate.tryAcquire(loadToken)) return null
-        if (
-            !isCurrentRequest(requestKey, generation) ||
-            groupPagingState.value != pagingState
-        ) {
+        if (!isCurrentRequest(requestKey, generation) || groupPagingState.value != pagingState) {
             groupLoadingGate.release(loadToken)
             return null
         }
-        if (
-            retryFailed &&
-            !groupPagingState.compareAndSet(pagingState, pagingState.copy(failedOffset = null))
+        if (retryFailed && !groupPagingState.compareAndSet(
+                pagingState,
+                pagingState.copy(failedOffset = null),
+            )
         ) {
             groupLoadingGate.release(loadToken)
             return null
         }
         if (retryFailed) _groupLoadMoreFailed.value = false
-
-        val offset = pagingState.nextOffset
         return viewModelScope.launch(Dispatchers.IO) {
-            searchGroups(
-                requestKey = requestKey,
-                generation = generation,
-                offset = offset,
-                append = true,
-                loadToken = loadToken,
-            )
+            searchGroups(requestKey, generation, pagingState.nextOffset, append = true, loadToken)
         }
     }
 
-    private suspend fun searchFirstGroupPage(
-        requestKey: SearchRequestKey,
-        generation: Long,
-    ): Boolean {
-        val loadToken = GroupLoadToken(
-            generation = generation,
-            offset = 0,
-            append = false,
-        )
+    private suspend fun searchFirstGroupPage(requestKey: SearchRequestKey, generation: Long): Boolean {
+        val loadToken = GroupLoadToken(generation, offset = 0, append = false)
         if (!groupLoadingGate.tryAcquire(loadToken)) return false
-        return searchGroups(
-            requestKey = requestKey,
-            generation = generation,
-            offset = 0,
-            append = false,
-            loadToken = loadToken,
-        )
+        return searchGroups(requestKey, generation, offset = 0, append = false, loadToken)
     }
 
-    /**
-     * 搜索用户
-     * @param name 用户名
-     * @return 是否搜索成功
-     */
-    private suspend fun searchUsers(
-        name: String,
-        requestKey: SearchRequestKey,
-        generation: Long,
-    ): Boolean {
-        return authService.reTryAuthCatching {
-            usersApi.searchUser(name)
+    private suspend fun searchUsers(requestKey: SearchRequestKey, generation: Long): Boolean =
+        authService.reTryAuthCatching {
+            usersApi.searchUser(requestKey.searchText)
         }.onSuccess {
-            if (isCurrentRequest(requestKey, generation)) {
-                _userSearchList.value = it
-            }
-        }.rethrowCancellationOrError().onApiFailure("UserSearch") {
-            logger.error(it)
-        }.isSuccess
-    }
+            if (isCurrentRequest(requestKey, generation)) _userSearchList.value = it
+        }.rethrowCancellationOrError().onApiFailure("UserSearch") { logger.error(it) }.isSuccess
 
-    /**
-     * 搜索世界
-     * @param name 世界名称
-     * @return 是否搜索成功
-     */
-    private suspend fun searchWorlds(
-        requestKey: SearchRequestKey,
-        generation: Long,
-    ): Boolean {
+    private suspend fun searchWorlds(requestKey: SearchRequestKey, generation: Long): Boolean {
         val options = requireNotNull(requestKey.worldSearchOptions)
         return authService.reTryAuthCatching {
             worldsApi.searchWorld(
@@ -284,22 +243,13 @@ class SearchListPagerModel(
                 offset = options.offset,
                 releaseStatus = options.releaseStatus,
                 tag = options.tag,
-                notag = options.notag
+                notag = options.notag,
             )
         }.onSuccess {
-            if (isCurrentRequest(requestKey, generation)) {
-                _worldSearchList.value = it
-            }
-        }.rethrowCancellationOrError().onApiFailure("WorldSearch") {
-            logger.error(it)
-        }.isSuccess
+            if (isCurrentRequest(requestKey, generation)) _worldSearchList.value = it
+        }.rethrowCancellationOrError().onApiFailure("WorldSearch") { logger.error(it) }.isSuccess
     }
 
-    /**
-     * 搜索群组
-     * @param query 搜索关键词
-     * @return 是否搜索成功
-     */
     private suspend fun searchGroups(
         requestKey: SearchRequestKey,
         generation: Long,
@@ -309,11 +259,7 @@ class SearchListPagerModel(
     ): Boolean {
         try {
             return authService.reTryAuthCatching {
-                groupsApi.searchGroups(
-                    query = requestKey.searchText,
-                    n = GROUP_PAGE_SIZE,
-                    offset = offset,
-                )
+                groupsApi.searchGroups(requestKey.searchText, GROUP_PAGE_SIZE, offset)
             }.onSuccess { page ->
                 if (isCurrentRequest(requestKey, generation) && canApplyGroupPage(requestKey, offset, append)) {
                     _groupSearchList.value = if (append) {
@@ -329,57 +275,55 @@ class SearchListPagerModel(
                     _groupLoadMoreFailed.value = false
                 }
             }.rethrowCancellationOrError().onFailure {
-                if (
-                    append &&
-                    isCurrentRequest(requestKey, generation) &&
-                    canApplyGroupPage(requestKey, offset, append = true)
-                ) {
-                    groupPagingState.update { state -> state.copy(failedOffset = offset) }
+                if (append && isCurrentRequest(requestKey, generation) && canApplyGroupPage(requestKey, offset, true)) {
+                    groupPagingState.update { it.copy(failedOffset = offset) }
                     _groupLoadMoreFailed.value = true
                 }
-            }.onApiFailure("GroupSearch") {
-                logger.error(it)
-            }.isSuccess
+            }.onApiFailure("GroupSearch") { logger.error(it) }.isSuccess
         } finally {
             groupLoadingGate.release(loadToken)
         }
     }
 
-    private fun canApplyGroupPage(
-        requestKey: SearchRequestKey,
-        offset: Int,
-        append: Boolean,
-    ): Boolean = !append || (
-        groupPagingState.value.query == requestKey.searchText &&
-            groupPagingState.value.nextOffset == offset
-        )
+    private fun canApplyGroupPage(requestKey: SearchRequestKey, offset: Int, append: Boolean) =
+        !append || (groupPagingState.value.query == requestKey.searchText &&
+            groupPagingState.value.nextOffset == offset)
 
-    private fun currentRequestKey(): SearchRequestKey {
-        val type = searchType.value
-        return SearchRequestKey(
-            searchText = searchText.value,
-            searchType = type,
-            worldSearchOptions = worldSearchOptions.value.takeIf { type == 1 },
-        )
-    }
+    private fun requestKeyFor(type: Int) = SearchRequestKey(
+        searchText = queryFor(type),
+        searchType = type,
+        worldSearchOptions = _worldSearchOptions.value.takeIf { type == PublicSearchTab.World.searchType },
+    )
+
+    private fun queryFor(type: Int): String = _queriesByType.value[type].orEmpty()
 
     private fun isCurrentRequest(requestKey: SearchRequestKey, generation: Long): Boolean =
-        requestGeneration.value == generation && currentRequestKey() == requestKey
+        generationFor(requestKey.searchType) == generation && requestKeyFor(requestKey.searchType) == requestKey
 
-    private fun advanceRequestGeneration() {
-        requestGeneration.update { it + 1 }
+    private fun generationFor(type: Int): Long = requestGenerations.value[type] ?: 0L
+
+    private fun advanceRequestGeneration(type: Int) {
+        requestGenerations.update { it + (type to (generationFor(type) + 1)) }
+    }
+
+    private fun updateLoadState(type: Int, state: PublicSearchLoadState) {
+        _loadStates.update { it + (type to state) }
     }
 
     private fun invalidateGroupPaging() {
-        successfulRequestKeysByType.update { it - GROUP_SEARCH_TYPE }
         groupPagingState.value = GroupPagingState()
         _groupHasMore.value = false
         groupLoadingGate.invalidate()
         _groupLoadMoreFailed.value = false
     }
 
-    private fun resetGroupPaging() {
-        advanceRequestGeneration()
+    private fun resetForAccountChange() {
+        PublicSearchTab.entries.forEach { advanceRequestGeneration(it.searchType) }
+        successfulRequestKeysByType.value = emptyMap()
+        _userSearchList.value = emptyList()
+        _worldSearchList.value = emptyList()
+        _groupSearchList.value = emptyList()
+        _loadStates.value = PublicSearchTab.entries.associate { it.searchType to PublicSearchLoadState() }
         invalidateGroupPaging()
     }
 
@@ -391,7 +335,6 @@ class SearchListPagerModel(
     }
 
     private companion object {
-        const val GROUP_SEARCH_TYPE = 3
         const val GROUP_PAGE_SIZE = 20
     }
 }
@@ -418,11 +361,10 @@ internal class GroupLoadingGate {
     private val _owner = MutableStateFlow<GroupLoadToken?>(null)
     val owner: StateFlow<GroupLoadToken?> = _owner.asStateFlow()
 
-    fun tryAcquire(token: GroupLoadToken): Boolean =
-        _owner.compareAndSet(expect = null, update = token)
+    fun tryAcquire(token: GroupLoadToken): Boolean = _owner.compareAndSet(null, token)
 
     fun release(token: GroupLoadToken) {
-        _owner.compareAndSet(expect = token, update = null)
+        _owner.compareAndSet(token, null)
     }
 
     fun invalidate() {
