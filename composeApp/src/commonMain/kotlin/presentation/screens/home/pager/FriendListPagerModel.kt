@@ -178,6 +178,7 @@ class FriendListPagerModel(
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
+    private var favoritesPageActivated = false
 
     val friendDirectoryGroups: StateFlow<List<FriendDirectoryGroup>> = combine(
         _friendList,
@@ -240,10 +241,23 @@ class FriendListPagerModel(
         searchTexts.indices.forEach { searchTexts[it] = "" }
         _searchText.value = ""
         _refreshErrors.value = emptyMap()
-        _refreshingTabs.value = if (sessionToken == null) emptySet() else setOf(0, 1, 2)
+        _refreshingTabs.value = emptySet()
         _directoryRefreshing.value = sessionToken != null
         _directoryRefreshFailed.value = false
         if (sessionToken != null) refreshFriendDirectory()
+        if (sessionToken != null && favoritesPageActivated) refreshFavoritesTabs()
+    }
+
+    /** Marks the Favorites page as active and refreshes all three personal-content tabs. */
+    fun activateFavoritesPage() {
+        favoritesPageActivated = true
+        if (activeSessionToken != null) refreshFavoritesTabs()
+    }
+
+    private fun refreshFavoritesTabs() {
+        (0..2).forEach { tabIndex ->
+            refreshCurrentTabCacheData(tabIndex = tabIndex)
+        }
     }
 
     /**
@@ -274,12 +288,14 @@ class FriendListPagerModel(
                     World -> {
                         restoreFavoriteListCache(World, sessionToken, generation)
                         if (!acceptsAccount(sessionToken, generation)) return@launch
+                        val groupsResult = favoriteService.loadFavoriteByGroup(World)
                         recordFavoriteGroupFailure(
                             favoriteType = World,
-                            result = favoriteService.loadFavoriteByGroup(World),
+                            result = groupsResult,
                             sessionToken = sessionToken,
                             generation = generation,
                         )
+                        if (groupsResult.isFailure) return@launch
                         if (!acceptsAccount(sessionToken, generation)) return@launch
                         doRefreshWorldList(sessionToken, generation)
                     }
@@ -287,12 +303,14 @@ class FriendListPagerModel(
                     Avatar -> {
                         restoreFavoriteListCache(Avatar, sessionToken, generation)
                         if (!acceptsAccount(sessionToken, generation)) return@launch
+                        val groupsResult = favoriteService.loadFavoriteByGroup(Avatar)
                         recordFavoriteGroupFailure(
                             favoriteType = Avatar,
-                            result = favoriteService.loadFavoriteByGroup(Avatar),
+                            result = groupsResult,
                             sessionToken = sessionToken,
                             generation = generation,
                         )
+                        if (groupsResult.isFailure) return@launch
                         if (!acceptsAccount(sessionToken, generation)) return@launch
                         doRefreshAvatarList(sessionToken, generation)
                     }

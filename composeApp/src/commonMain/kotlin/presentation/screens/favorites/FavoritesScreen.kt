@@ -67,7 +67,7 @@ private fun FavoritesScreenContent(
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
 
     LaunchedEffect(Unit) {
-        (0..2).forEach { favoritesModel.refreshCurrentTabCacheData(tabIndex = it) }
+        favoritesModel.activateFavoritesPage()
     }
     LaunchedEffect(selectedTab) {
         if (selectedTab < 3) {
