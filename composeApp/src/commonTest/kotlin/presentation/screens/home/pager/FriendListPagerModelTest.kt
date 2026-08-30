@@ -112,6 +112,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteListCacheStore = favoriteListCacheStore,
             accountCacheManager = accountCacheManager,
         )
+        model.activateFriendDirectory()
 
         try {
             awaitUntil {
