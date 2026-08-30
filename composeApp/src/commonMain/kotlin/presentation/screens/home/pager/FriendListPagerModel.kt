@@ -16,7 +16,6 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
-import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
@@ -28,6 +27,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
@@ -36,9 +36,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,7 +62,7 @@ data class AvatarGroupOptions(
 )
 
 class FriendListPagerModel(
-    private val usersApi: UsersApi,
+    private val userProfileEnrichmentService: UserProfileEnrichmentService,
     private val friendService: FriendService,
     private val authService: AuthService,
     private val favoriteService: FavoriteService,
@@ -581,10 +578,13 @@ class FriendListPagerModel(
         generation: Long,
     ): List<FriendData> {
 
-        val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
-            withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
-                .toFriendData()
-        } ?: emptyList()
+        val unFriendIds = favoriteIds
+            ?.filterNot { friendService.friendMap.contains(it) }
+            .orEmpty()
+        val unFriendProfiles = userProfileEnrichmentService.fetchProfiles(sessionToken, unFriendIds)
+        val unFriendData = unFriendIds.mapNotNull { userId ->
+            unFriendProfiles[userId]?.toFriendData()
+        }
 
         // 先按名称过滤
         val nameFilteredList = (friendService.friendMap.values + unFriendData).let { friends ->
@@ -616,22 +616,13 @@ class FriendListPagerModel(
         if (candidates.isEmpty()) return friends
 
         val missing = candidates.filterNot { offlineStatusDescriptions.containsKey(it.id) }
-        missing.chunked(8).forEach { batch ->
-            val fetched = coroutineScope {
-                batch.map { friend ->
-                    async {
-                        friend.id to runCatching {
-                            withContext(Dispatchers.IO) {
-                                usersApi.fetchUser(friend.id).statusDescription.trim()
-                            }
-                        }.getOrDefault("")
-                    }
-                }.awaitAll()
-            }
-            if (acceptsAccount(sessionToken, generation)) {
-                fetched.forEach { (id, description) ->
-                    offlineStatusDescriptions[id] = description
-                }
+        val profiles = userProfileEnrichmentService.fetchProfiles(
+            sessionToken = sessionToken,
+            userIds = missing.map { it.id },
+        )
+        if (acceptsAccount(sessionToken, generation)) {
+            profiles.forEach { (id, user) ->
+                offlineStatusDescriptions[id] = user.statusDescription.trim()
             }
         }
 
