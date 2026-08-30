@@ -650,7 +650,7 @@ internal class HomeDrawerStateCoordinator {
 
 @Composable
 private fun HomeDestination.presentation(): MainDestinationPresentation = when (this) {
-    HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Dashboard)
+    HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Explore)
     HomeDestination.Search -> MainDestinationPresentation(strings.mainNavigationSearch, AppIcons.Search)
     HomeDestination.Notifications -> MainDestinationPresentation(strings.mainNavigationNotifications, AppIcons.Notifications)
     HomeDestination.Friends -> MainDestinationPresentation(strings.mainNavigationFriends, AppIcons.Person)
