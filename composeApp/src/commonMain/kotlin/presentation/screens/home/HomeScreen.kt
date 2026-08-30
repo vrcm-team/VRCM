@@ -220,6 +220,7 @@ private fun HomeDestinationContent(
     hasBottomNavigation: Boolean,
 ) {
     val timelineListState = rememberLazyListState()
+    val stateHolder = rememberSaveableStateHolder()
     val navigator = currentNavigator
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(
@@ -245,51 +246,53 @@ private fun HomeDestinationContent(
         modifier = Modifier.fillMaxSize(),
         key = { HomeTab.entries[it].name },
     ) { page ->
-        val tabRow: @Composable () -> Unit = {
-            HomeTabRow(
-                pagerState = pagerState,
-                onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
-            )
-        }
-        when (HomeTab.entries[page]) {
-            HomeTab.Location -> Box(Modifier.fillMaxSize()) {
-                CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                    FriendLocationPager.Content(
-                        headerContent = tabRow,
-                        isActive = { pagerState.currentPage == HomeTab.Location.ordinal },
-                    )
-                }
+        stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
+            val tabRow: @Composable () -> Unit = {
+                HomeTabRow(
+                    pagerState = pagerState,
+                    onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
+                )
             }
-            HomeTab.Activity -> FriendActivityTimelineContent(
-                state = timelineState,
-                filter = timelineFilter,
-                onFilterSelected = timelineModel::selectFilter,
-                onLoadMore = timelineModel::loadMore,
-                onRetry = timelineModel::retry,
-                onRetryLoadMore = timelineModel::retryLoadMore,
-                onUserClick = { event ->
-                    navigator push UserProfileScreen(
-                        UserProfileVo(
-                            id = event.friendUserId,
-                            displayName = event.displayName,
-                            profileImageUrl = event.profileImageUrl,
+            when (HomeTab.entries[page]) {
+                HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                        FriendLocationPager.Content(
+                            headerContent = tabRow,
+                            isActive = { pagerState.currentPage == HomeTab.Location.ordinal },
                         )
-                    )
-                },
-                onWorldClick = { event ->
-                    val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
-                    navigator push WorldProfileScreen(
-                        WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
-                    )
-                },
-                listState = timelineListState,
-                headerContent = tabRow,
-                modifier = Modifier
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                    )
-                    .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
-            )
+                    }
+                }
+                HomeTab.Activity -> FriendActivityTimelineContent(
+                    state = timelineState,
+                    filter = timelineFilter,
+                    onFilterSelected = timelineModel::selectFilter,
+                    onLoadMore = timelineModel::loadMore,
+                    onRetry = timelineModel::retry,
+                    onRetryLoadMore = timelineModel::retryLoadMore,
+                    onUserClick = { event ->
+                        navigator push UserProfileScreen(
+                            UserProfileVo(
+                                id = event.friendUserId,
+                                displayName = event.displayName,
+                                profileImageUrl = event.profileImageUrl,
+                            )
+                        )
+                    },
+                    onWorldClick = { event ->
+                        val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
+                        navigator push WorldProfileScreen(
+                            WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+                        )
+                    },
+                    listState = timelineListState,
+                    headerContent = tabRow,
+                    modifier = Modifier
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                        )
+                        .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
+                )
+            }
         }
     }
 }
