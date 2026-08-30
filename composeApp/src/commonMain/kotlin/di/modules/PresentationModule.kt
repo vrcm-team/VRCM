@@ -62,6 +62,7 @@ import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -78,7 +79,9 @@ val presentationModule: Module = module {
     viewModelOf(::AuthScreenModel)
     viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
-    singleOf(::NotificationCenterModel)
+    singleOf(::NotificationCenterModel) {
+        onClose { it?.close() }
+    }
     viewModelOf(::UserProfileScreenModel)
     viewModelOf(::MutualFriendsScreenModel)
     viewModelOf(::FriendNetworkScreenModel)
