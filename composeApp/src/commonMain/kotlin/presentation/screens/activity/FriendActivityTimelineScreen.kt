@@ -149,10 +149,61 @@ fun FriendActivityTimelineContent(
         onLoadMore()
     }
 
+    if (headerContent == null) {
+        Column(modifier = modifier.fillMaxSize()) {
+            ActivityTimelineFilters(filter, onFilterSelected)
+            ActivityTimelineObservedHint()
+            ActivityTimelineList(
+                state = state,
+                filter = filter,
+                onFilterSelected = onFilterSelected,
+                onRetry = onRetry,
+                onRetryLoadMore = onRetryLoadMore,
+                onUserClick = onUserClick,
+                onWorldClick = onWorldClick,
+                listState = listState,
+                modifier = Modifier.weight(1f),
+                includeControls = false,
+            )
+        }
+    } else {
+        ActivityTimelineList(
+            state = state,
+            filter = filter,
+            onFilterSelected = onFilterSelected,
+            onRetry = onRetry,
+            onRetryLoadMore = onRetryLoadMore,
+            onUserClick = onUserClick,
+            onWorldClick = onWorldClick,
+            listState = listState,
+            modifier = modifier,
+            headerContent = headerContent,
+            includeControls = true,
+        )
+    }
+}
+
+@Composable
+private fun ActivityTimelineList(
+    state: FriendActivityTimelineState,
+    filter: FriendActivityTimelineFilter,
+    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+    onRetry: () -> Unit,
+    onRetryLoadMore: () -> Unit,
+    onUserClick: (FriendActivityEvent) -> Unit,
+    onWorldClick: (FriendActivityEvent) -> Unit,
+    listState: LazyListState,
+    modifier: Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
+    includeControls: Boolean,
+) {
     LazyColumn(
         modifier = modifier.fillMaxSize().navigationBarsPadding(),
         state = listState,
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(
+            top = if (includeControls) 0.dp else 16.dp,
+            bottom = 16.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (headerContent != null) {
@@ -160,28 +211,13 @@ fun FriendActivityTimelineContent(
                 headerContent()
             }
         }
-        item(key = "activity-filters") {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
-                    FilterChip(
-                        selected = option == filter,
-                        onClick = { onFilterSelected(option) },
-                        label = { Text(option.label()) },
-                    )
-                }
+        if (includeControls) {
+            item(key = "activity-filters") {
+                ActivityTimelineFilters(filter, onFilterSelected)
             }
-        }
-        item(key = "activity-observed-hint") {
-            Text(
-                text = strings.friendActivityObservedHint,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            item(key = "activity-observed-hint") {
+                ActivityTimelineObservedHint()
+            }
         }
 
         when (state) {
@@ -261,6 +297,36 @@ fun FriendActivityTimelineContent(
             }
         }
     }
+}
+
+@Composable
+private fun ActivityTimelineFilters(
+    filter: FriendActivityTimelineFilter,
+    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
+            FilterChip(
+                selected = option == filter,
+                onClick = { onFilterSelected(option) },
+                label = { Text(option.label()) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityTimelineObservedHint() {
+    Text(
+        text = strings.friendActivityObservedHint,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
