@@ -75,9 +75,6 @@ object HomeScreen : AppListRoute {
         val navigator = currentNavigator
         val model: HomeScreenModel = koinViewModel()
         val notificationModel = koinInject<NotificationCenterModel>()
-        val timelineModel: FriendActivityTimelineModel = koinViewModel()
-        val timelineState by timelineModel.state.collectAsState()
-        val timelineFilter by timelineModel.filter.collectAsState()
         val stateHolder = rememberSaveableStateHolder()
         val scope = rememberCoroutineScope()
         val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -184,9 +181,6 @@ object HomeScreen : AppListRoute {
                                 when (selectedDestination) {
                                     HomeDestination.Home -> HomeDestinationContent(
                                         model,
-                                        timelineModel,
-                                        timelineState,
-                                        timelineFilter,
                                         hasBottomNavigation = !useRail && showMainNavigation,
                                     )
                                     HomeDestination.Search -> SearchListPager.Content()
@@ -211,24 +205,11 @@ object HomeScreen : AppListRoute {
 @Composable
 private fun HomeDestinationContent(
     model: HomeScreenModel,
-    timelineModel: FriendActivityTimelineModel,
-    timelineState: FriendActivityTimelineState,
-    timelineFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
     val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
     val stateHolder = rememberSaveableStateHolder()
-    val timelineListState = rememberLazyListState()
-    val navigator = currentNavigator
     val scope = rememberCoroutineScope()
-
-    if (selectedTab == HomeTab.Activity) {
-        LaunchedEffect(timelineListState) {
-            SharedFlowCentre.toPagerTop.collect {
-                runCatching { timelineListState.animateScrollToItem(0) }
-            }
-        }
-    }
 
     Column(Modifier.fillMaxSize()) {
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
@@ -257,39 +238,56 @@ private fun HomeDestinationContent(
                             FriendLocationPager.Content()
                         }
                     }
-                    HomeTab.Activity -> FriendActivityTimelineContent(
-                        state = timelineState,
-                        filter = timelineFilter,
-                        onFilterSelected = timelineModel::selectFilter,
-                        onLoadMore = timelineModel::loadMore,
-                        onRetry = timelineModel::retry,
-                        onRetryLoadMore = timelineModel::retryLoadMore,
-                        onUserClick = { event ->
-                            navigator push UserProfileScreen(
-                                UserProfileVo(
-                                    id = event.friendUserId,
-                                    displayName = event.displayName,
-                                    profileImageUrl = event.profileImageUrl,
-                                )
-                            )
-                        },
-                        onWorldClick = { event ->
-                            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
-                            navigator push WorldProfileScreen(
-                                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
-                            )
-                        },
-                        listState = timelineListState,
-                        modifier = Modifier
-                            .windowInsetsPadding(
-                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                            )
-                            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
-                    )
+                    HomeTab.Activity -> FriendActivityTimelineDestination(hasBottomNavigation)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun FriendActivityTimelineDestination(hasBottomNavigation: Boolean) {
+    val model: FriendActivityTimelineModel = koinViewModel()
+    val state by model.state.collectAsState()
+    val filter by model.filter.collectAsState()
+    val listState = rememberLazyListState()
+    val navigator = currentNavigator
+
+    LaunchedEffect(listState) {
+        SharedFlowCentre.toPagerTop.collect {
+            runCatching { listState.animateScrollToItem(0) }
+        }
+    }
+
+    FriendActivityTimelineContent(
+        state = state,
+        filter = filter,
+        onFilterSelected = model::selectFilter,
+        onLoadMore = model::loadMore,
+        onRetry = model::retry,
+        onRetryLoadMore = model::retryLoadMore,
+        onUserClick = { event ->
+            navigator push UserProfileScreen(
+                UserProfileVo(
+                    id = event.friendUserId,
+                    displayName = event.displayName,
+                    profileImageUrl = event.profileImageUrl,
+                )
+            )
+        },
+        onWorldClick = { event ->
+            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
+            navigator push WorldProfileScreen(
+                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+            )
+        },
+        listState = listState,
+        modifier = Modifier
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+            )
+            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
+    )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
