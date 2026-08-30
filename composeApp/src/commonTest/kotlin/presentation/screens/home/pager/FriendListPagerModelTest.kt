@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -40,7 +41,13 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import kotlinx.serialization.encodeToString
@@ -91,14 +98,15 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             accountCacheManager = accountCacheManager,
             logger = EmptyLogger(),
         )
+        val favoriteService = FavoriteService(
+            favoriteApi = FavoriteApi(client),
+            favoriteLocalDao = FavoriteLocalDao(MapSettings()),
+        )
         val model = FriendListPagerModel(
             usersApi = UsersApi(client),
             friendService = friendService,
             authService = authService,
-            favoriteService = FavoriteService(
-                favoriteApi = FavoriteApi(client),
-                favoriteLocalDao = FavoriteLocalDao(MapSettings()),
-            ),
+            favoriteService = favoriteService,
             worldsApi = WorldsApi(client),
             avatarsApi = AvatarsApi(client),
             favoriteListCacheStore = favoriteListCacheStore,
@@ -157,6 +165,124 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                 clear()
             }
             friendService.dispose()
+            favoriteService.dispose()
+            SharedFlowCentre.emitLogout()
+            client.close()
+        }
+    }
+
+    @Test
+    fun lateOfflineProfileFromPreviousAccountCannotReplaceCurrentFriendSnapshot() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val accountA = AccountDto(userId = "usr_directory_owner_a", username = "directory-owner-a")
+        val accountB = AccountDto(userId = "usr_directory_owner_b", username = "directory-owner-b")
+        SharedFlowCentre.emitAuthenticated(accountA)
+        val sessionA = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val accountAProfileStarted = CompletableDeferred<Unit>()
+        val releaseAccountAProfile = CompletableDeferred<Unit>()
+        val accountAProfileJob = CompletableDeferred<Job>()
+        val client = accountSwitchClient(
+            json = json,
+            accountAProfileStarted = accountAProfileStarted,
+            releaseAccountAProfile = releaseAccountAProfile,
+            accountAProfileJob = accountAProfileJob,
+        )
+        val friendListCacheStore = InMemoryFriendListCacheStore()
+        val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
+        val accountCacheManager = AccountCacheManager(
+            friendListCacheStore = friendListCacheStore,
+            userProfileCacheStore = InMemoryUserProfileCacheStore(),
+            friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+            meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+            meetupCardAssetStore = MeetupCardAssetStore(
+                FakeFileSystem(),
+                "/meetup-assets".toPath(),
+            ),
+            favoriteListCacheStore = favoriteListCacheStore,
+        )
+        val authService = AuthService(
+            authApi = AuthApi(client),
+            accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+                it.saveAccountInfo(accountA)
+            },
+            cookiesStorage = PersistentCookiesStorage(EmptyLogger()),
+            accountCacheManager = accountCacheManager,
+        )
+        val friendService = FriendService(
+            friendsApi = FriendsApi(client),
+            authService = authService,
+            json = json,
+            friendListCacheStore = friendListCacheStore,
+            accountCacheManager = accountCacheManager,
+            logger = EmptyLogger(),
+        )
+        val favoriteService = FavoriteService(
+            favoriteApi = FavoriteApi(client),
+            favoriteLocalDao = FavoriteLocalDao(MapSettings()),
+        )
+        val model = FriendListPagerModel(
+            usersApi = UsersApi(client),
+            friendService = friendService,
+            authService = authService,
+            favoriteService = favoriteService,
+            worldsApi = WorldsApi(client),
+            avatarsApi = AvatarsApi(client),
+            favoriteListCacheStore = favoriteListCacheStore,
+            accountCacheManager = accountCacheManager,
+        )
+
+        try {
+            awaitUntil {
+                friendService.initialRefreshCompleted.value && !model.directoryRefreshing.value
+            }
+            emitFriendUntilObserved(
+                friendService,
+                sessionA,
+                userId = "usr_account_a_friend",
+                event = activeFriendEvent(json, "usr_account_a_friend", "Account A Friend"),
+            )
+            awaitFriendIds(model, setOf("usr_account_a_friend"))
+
+            SharedFlowCentre.emitWebSocket(
+                AccountWebSocketEvent(
+                    sessionA.token,
+                    offlineFriendEvent(json, "usr_account_a_friend"),
+                )
+            )
+            withTimeout(3_000) { accountAProfileStarted.await() }
+            val oldProfileJob = withTimeout(3_000) { accountAProfileJob.await() }
+
+            SharedFlowCentre.emitAuthenticated(accountB)
+            val sessionB = assertNotNull(SharedFlowCentre.currentSession.value)
+            awaitUntil {
+                friendService.friendState.value.isEmpty() &&
+                    model.friendDirectoryFriends.value.isEmpty()
+            }
+            emitFriendUntilObserved(
+                friendService,
+                sessionB,
+                userId = "usr_account_b_friend",
+                event = activeFriendEvent(json, "usr_account_b_friend", "Account B Friend"),
+            )
+            awaitFriendIds(model, setOf("usr_account_b_friend"))
+
+            releaseAccountAProfile.complete(Unit)
+            withTimeout(3_000) { oldProfileJob.join() }
+
+            assertEquals(
+                listOf("usr_account_b_friend"),
+                model.friendDirectoryFriends.value.map { it.id },
+            )
+            assertEquals("", model.friendDirectoryFriends.value.single().statusDescription)
+        } finally {
+            releaseAccountAProfile.complete(Unit)
+            ViewModelStore().apply {
+                put("friend-list-pager", model)
+                clear()
+            }
+            friendService.dispose()
+            favoriteService.dispose()
             SharedFlowCentre.emitLogout()
             client.close()
         }
@@ -247,6 +373,36 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             )
         ),
     )
+
+    private fun offlineFriendEvent(json: Json, userId: String) = WebSocketEvent(
+        type = FriendEvents.FriendOffline.typeName,
+        content = json.encodeToString(FriendOfflineContent(userId = userId)),
+    )
+}
+
+private fun accountSwitchClient(
+    json: Json,
+    accountAProfileStarted: CompletableDeferred<Unit>,
+    releaseAccountAProfile: CompletableDeferred<Unit>,
+    accountAProfileJob: CompletableDeferred<Job>,
+) = HttpClient(MockEngine) {
+    engine {
+        addHandler { request ->
+            when (request.url.encodedPath) {
+                "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                "/auth/user/friends", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                "/users/usr_account_a_friend" -> {
+                    accountAProfileJob.complete(currentCoroutineContext().job)
+                    accountAProfileStarted.complete(Unit)
+                    withContext(NonCancellable) { releaseAccountAProfile.await() }
+                    jsonResponse(accountAProfileJson())
+                }
+                "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+    }
+    install(ContentNegotiation) { json(json) }
 }
 
 private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
@@ -290,6 +446,22 @@ private fun nonFriendUserJson() = """
       "last_platform":"web","location":"offline","note":"",
       "profilePicOverride":"","state":"offline","status":"offline",
       "statusDescription":"","tags":[],"travelingToInstance":null,
+      "travelingToLocation":null,"travelingToWorld":null,"userIcon":"",
+      "worldId":"","pronouns":null
+    }
+""".trimIndent()
+
+private fun accountAProfileJson() = """
+    {
+      "ageVerificationStatus":"verified","allowAvatarCopying":true,
+      "bio":"","bioLinks":[],"currentAvatarImageUrl":"",
+      "currentAvatarTags":[],"currentAvatarThumbnailImageUrl":"",
+      "date_joined":"","developerType":"none","displayName":"Account A Friend",
+      "friendKey":"","friendRequestStatus":"null","id":"usr_account_a_friend",
+      "instanceId":"","isFriend":true,"last_activity":"","last_login":"",
+      "last_platform":"web","location":"offline","note":"",
+      "profilePicOverride":"","state":"offline","status":"offline",
+      "statusDescription":"Account A private status","tags":[],"travelingToInstance":null,
       "travelingToLocation":null,"travelingToWorld":null,"userIcon":"",
       "worldId":"","pronouns":null
     }
