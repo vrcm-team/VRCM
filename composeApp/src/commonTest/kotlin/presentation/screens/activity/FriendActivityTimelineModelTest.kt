@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -36,13 +38,56 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
 
         model.loadMore()
         advanceUntilIdle()
-        source.head.value = listOf(event(6), event(5), event(4), event(3))
+        source.database.value = listOf(event(6)) + source.database.value
         advanceUntilIdle()
 
         val loaded = assertIs<FriendActivityTimelineState.Content>(model.state.value)
         assertEquals(listOf(6L, 5L, 4L, 3L, 2L, 1L), loaded.events.map(FriendActivityEvent::id))
         assertFalse(loaded.hasMore)
         assertEquals(FriendActivityTimelineCursor(3_000L, 3L), source.requestedCursors.single())
+    }
+
+    @Test
+    fun loadedSnapshotDropsItemsDeletedByRetention() = runTest {
+        val source = FakeTimelineSource(listOf(event(5), event(4), event(3), event(2)))
+        source.appendResponses += flowOf(listOf(event(2), event(1)))
+        val model = FriendActivityTimelineModel(source, pageSize = 3)
+        advanceUntilIdle()
+        model.loadMore()
+        advanceUntilIdle()
+        assertEquals(
+            listOf(5L, 4L, 3L, 2L, 1L),
+            assertIs<FriendActivityTimelineState.Content>(model.state.value)
+                .events.map(FriendActivityEvent::id),
+        )
+
+        source.database.value = source.database.value.filterNot { it.id == 2L }
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(5L, 4L, 3L, 1L),
+            assertIs<FriendActivityTimelineState.Content>(model.state.value)
+                .events.map(FriendActivityEvent::id),
+        )
+    }
+
+    @Test
+    fun lateOldAccountSnapshotCannotOverwriteTheNewAccount() = runTest {
+        val tokenA = AccountSessionToken("usr_a", 1L)
+        val tokenB = AccountSessionToken("usr_b", 2L)
+        val source = FakeTimelineSource(listOf(event(10)), initialToken = tokenA)
+        val accountB = MutableStateFlow(listOf(event(20)))
+        source.accountDatabases[tokenB] = accountB
+        val model = FriendActivityTimelineModel(source, pageSize = 2)
+        advanceUntilIdle()
+
+        source.sessionTokens.value = tokenB
+        source.accountDatabases.getValue(tokenA).value = listOf(event(99))
+        advanceUntilIdle()
+
+        val current = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(20L), current.events.map(FriendActivityEvent::id))
+        assertTrue(source.requestedTokens.containsAll(listOf(tokenA, tokenB)))
     }
 
     @Test
@@ -65,7 +110,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         model.retryLoadMore()
         advanceUntilIdle()
         val recovered = assertIs<FriendActivityTimelineState.Content>(model.state.value)
-        assertEquals(listOf(4L, 3L, 1L), recovered.events.map(FriendActivityEvent::id))
+        assertEquals(listOf(4L, 3L, 2L, 1L), recovered.events.map(FriendActivityEvent::id))
         assertFalse(recovered.loadMoreError)
         assertFalse(recovered.hasMore)
         assertEquals(2, source.requestedCursors.size)
@@ -142,25 +187,67 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
 
     private class FakeTimelineSource(
         initialHead: List<FriendActivityEvent>,
+        initialToken: AccountSessionToken = AccountSessionToken("usr_owner", 1L),
     ) : FriendActivityTimelineSource {
-        override val sessionTokens = MutableStateFlow<AccountSessionToken?>(
-            AccountSessionToken("usr_owner", 1L)
-        )
-        val head = MutableStateFlow(initialHead)
+        override val sessionTokens = MutableStateFlow<AccountSessionToken?>(initialToken)
+        val database = MutableStateFlow(initialHead)
+        val accountDatabases = mutableMapOf(initialToken to database)
         val filteredHeads = mutableMapOf<Set<FriendActivityEventType>, Flow<List<FriendActivityEvent>>>()
         val appendResponses = ArrayDeque<Flow<List<FriendActivityEvent>>>()
         val requestedCursors = mutableListOf<FriendActivityTimelineCursor>()
+        val requestedTokens = mutableListOf<AccountSessionToken>()
 
-        override fun observeHead(types: Set<FriendActivityEventType>, limit: Int) =
-            filteredHeads[types] ?: head
+        override fun observeHead(
+            token: AccountSessionToken,
+            types: Set<FriendActivityEventType>,
+            limit: Int,
+        ): Flow<List<FriendActivityEvent>> {
+            requestedTokens += token
+            val accountDatabase = accountDatabases.getValue(token)
+            val overridden = filteredHeads[types]
+            return if (overridden != null) {
+                overridden.onEach { page ->
+                    accountDatabase.value = if (types.isEmpty()) {
+                        page
+                    } else {
+                        (accountDatabase.value.filterNot { it.type in types } + page)
+                            .normalizeActivityEvents()
+                    }
+                }
+            } else {
+                accountDatabase.map { events ->
+                    events.filter { types.isEmpty() || it.type in types }.take(limit)
+                }
+            }
+        }
 
         override fun observeBefore(
+            token: AccountSessionToken,
             types: Set<FriendActivityEventType>,
             cursor: FriendActivityTimelineCursor,
             limit: Int,
         ): Flow<List<FriendActivityEvent>> {
+            requestedTokens += token
             requestedCursors += cursor
-            return appendResponses.removeFirst()
+            return appendResponses.removeFirst().onEach { page ->
+                val accountDatabase = accountDatabases.getValue(token)
+                accountDatabase.value = (accountDatabase.value + page).normalizeActivityEvents()
+            }
+        }
+
+        override fun observeThrough(
+            token: AccountSessionToken,
+            types: Set<FriendActivityEventType>,
+            cursor: FriendActivityTimelineCursor,
+        ): Flow<List<FriendActivityEvent>> {
+            requestedTokens += token
+            return accountDatabases.getValue(token).map { events ->
+                events.filter { event ->
+                    (types.isEmpty() || event.type in types) &&
+                        (event.occurredAtMillis > cursor.occurredAtMillis ||
+                            (event.occurredAtMillis == cursor.occurredAtMillis && event.id >= cursor.id))
+                }
+            }
         }
     }
 

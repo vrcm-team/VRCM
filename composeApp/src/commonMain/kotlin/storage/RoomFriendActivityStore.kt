@@ -101,6 +101,22 @@ internal class RoomFriendActivityStore(
         }
     }
 
+    fun observeAllEventsThrough(
+        ownerUserId: String,
+        types: Set<FriendActivityEventType> = emptySet(),
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEventEntity>> = if (types.isEmpty()) {
+        dao.observeAllEventsThrough(ownerUserId, oldestOccurredAtMillis, oldestId)
+    } else {
+        dao.observeAllEventsByTypesThrough(
+            ownerUserId = ownerUserId,
+            types = types.map(FriendActivityEventType::name),
+            oldestOccurredAtMillis = oldestOccurredAtMillis,
+            oldestId = oldestId,
+        )
+    }
+
     suspend fun cachedWorldName(ownerUserId: String, worldId: String): String? =
         dao.cachedWorldName(ownerUserId, worldId)
 

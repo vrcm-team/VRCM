@@ -292,49 +292,74 @@ class FriendActivityService internal constructor(
     }
 
     fun observeAllEvents(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType> = emptySet(),
         limit: Int = 200,
         offset: Int = 0,
-    ): Flow<List<FriendActivityEvent>> = SharedFlowCentre.currentSession.flatMapLatest { session ->
-        if (session == null) {
-            flowOf(emptyList())
-        } else {
-            store.observeAllEvents(session.account.userId, types, limit, offset)
-                .onEach { events ->
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEvents(token.userId, types, limit, offset)
+            .onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
                     events.asSequence()
                         .filter { it.worldName == null }
                         .mapNotNull(FriendActivityEventEntity::worldId)
                         .distinct()
-                        .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
                 }
-                .map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
-        }
-    }
+            }.mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+            }
 
     fun observeAllEventsBefore(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType> = emptySet(),
         beforeOccurredAtMillis: Long,
         beforeId: Long,
         limit: Int = 200,
-    ): Flow<List<FriendActivityEvent>> = SharedFlowCentre.currentSession.flatMapLatest { session ->
-        if (session == null) {
-            flowOf(emptyList())
-        } else {
-            store.observeAllEventsBefore(
-                ownerUserId = session.account.userId,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsBefore(
+                ownerUserId = token.userId,
                 types = types,
                 beforeOccurredAtMillis = beforeOccurredAtMillis,
                 beforeId = beforeId,
                 limit = limit,
             ).onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+                }
+            }.mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+            }
+
+    fun observeAllEventsThrough(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsThrough(
+            ownerUserId = token.userId,
+            types = types,
+            oldestOccurredAtMillis = oldestOccurredAtMillis,
+            oldestId = oldestId,
+        ).onEach { events ->
+            if (SharedFlowCentre.isCurrentSession(token)) {
                 events.asSequence()
                     .filter { it.worldName == null }
                     .mapNotNull(FriendActivityEventEntity::worldId)
                     .distinct()
-                    .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
-            }.map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
+                    .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+            }
+        }.mapNotNull { events ->
+            events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
         }
-    }
 
     fun observeRecentTogether(
         sinceMillis: Long,

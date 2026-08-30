@@ -122,6 +122,33 @@ internal interface FriendActivityDao {
     ): Flow<List<FriendActivityEventEntity>>
 
     @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND " +
+            "(occurredAtMillis > :oldestOccurredAtMillis OR " +
+            "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC"
+    )
+    fun observeAllEventsThrough(
+        ownerUserId: String,
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND type IN (:types) AND " +
+            "(occurredAtMillis > :oldestOccurredAtMillis OR " +
+            "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC"
+    )
+    fun observeAllEventsByTypesThrough(
+        ownerUserId: String,
+        types: List<String>,
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
         "SELECT worldName FROM friend_activity_events " +
             "WHERE ownerUserId = :ownerUserId AND worldId = :worldId AND worldName IS NOT NULL " +
             "ORDER BY id DESC LIMIT 1"

@@ -30,7 +30,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import okio.Path.Companion.toPath
@@ -159,6 +161,23 @@ class FriendActivityRoomStoreTest {
                 listOf("Other account friend"),
                 store.observeAllEvents("usr_owner_b").first().map { it.displayName },
             )
+
+            val loadedRangeSnapshots = mutableListOf<List<FriendActivityEventEntity>>()
+            val firstRangeObserved = CompletableDeferred<Unit>()
+            val rangeJob = launch {
+                store.observeAllEventsThrough(
+                    ownerUserId = "usr_owner_a",
+                    oldestOccurredAtMillis = pageCursor.occurredAtMillis,
+                    oldestId = pageCursor.id,
+                ).onEach { firstRangeObserved.complete(Unit) }
+                    .take(2)
+                    .toList(loadedRangeSnapshots)
+            }
+            firstRangeObserved.await()
+            store.clearAccount("usr_owner_a")
+            rangeJob.join()
+            assertTrue(loadedRangeSnapshots.first().isNotEmpty())
+            assertTrue(loadedRangeSnapshots.last().isEmpty())
         }
     }
 

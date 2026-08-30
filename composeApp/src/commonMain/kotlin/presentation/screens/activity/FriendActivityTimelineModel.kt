@@ -49,14 +49,22 @@ internal interface FriendActivityTimelineSource {
     val sessionTokens: Flow<AccountSessionToken?>
 
     fun observeHead(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         limit: Int,
     ): Flow<List<FriendActivityEvent>>
 
     fun observeBefore(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         cursor: FriendActivityTimelineCursor,
         limit: Int,
+    ): Flow<List<FriendActivityEvent>>
+
+    fun observeThrough(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType>,
+        cursor: FriendActivityTimelineCursor,
     ): Flow<List<FriendActivityEvent>>
 }
 
@@ -68,19 +76,33 @@ private class ServiceFriendActivityTimelineSource(
         .distinctUntilChanged()
 
     override fun observeHead(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         limit: Int,
-    ) = service.observeAllEvents(types = types, limit = limit)
+    ) = service.observeAllEvents(token = token, types = types, limit = limit)
 
     override fun observeBefore(
+        token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         cursor: FriendActivityTimelineCursor,
         limit: Int,
     ) = service.observeAllEventsBefore(
+        token = token,
         types = types,
         beforeOccurredAtMillis = cursor.occurredAtMillis,
         beforeId = cursor.id,
         limit = limit,
+    )
+
+    override fun observeThrough(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType>,
+        cursor: FriendActivityTimelineCursor,
+    ) = service.observeAllEventsThrough(
+        token = token,
+        types = types,
+        oldestOccurredAtMillis = cursor.occurredAtMillis,
+        oldestId = cursor.id,
     )
 }
 
@@ -98,7 +120,10 @@ class FriendActivityTimelineModel internal constructor(
     val state = _state.asStateFlow()
 
     private var generation = 0L
-    private var accumulator = TimelineAccumulator(pageSize)
+    private var activeToken: AccountSessionToken? = null
+    private var oldestCursor: FriendActivityTimelineCursor? = null
+    private var hasMore = false
+    private var snapshotJob: Job? = null
     private var loadMoreJob: Job? = null
 
     init {
@@ -108,8 +133,11 @@ class FriendActivityTimelineModel internal constructor(
                 token to filter
             }.collectLatest { (token, filter) ->
                 val currentGeneration = ++generation
+                activeToken = token
+                oldestCursor = null
+                hasMore = false
+                snapshotJob?.cancel()
                 loadMoreJob?.cancel()
-                accumulator = TimelineAccumulator(pageSize)
                 if (token == null) {
                     _state.value = FriendActivityTimelineState.Content(emptyList(), hasMore = false)
                     return@collectLatest
@@ -118,25 +146,28 @@ class FriendActivityTimelineModel internal constructor(
                 _state.value = FriendActivityTimelineState.Loading
                 var emittedContent = false
                 try {
-                    source.observeHead(filter.eventTypes, pageSize + 1).collect { page ->
-                        if (currentGeneration != generation) return@collect
-                        if (page.isEmpty()) loadMoreJob?.cancel()
+                    source.observeHead(token, filter.eventTypes, pageSize + 1).collect { page ->
+                        if (!isCurrent(currentGeneration, token, filter)) return@collect
+                        if (oldestCursor != null) return@collect
                         emittedContent = true
-                        val current = _state.value as? FriendActivityTimelineState.Content
-                        val next = accumulator.applyHead(page)
-                        _state.value = if (page.isEmpty()) {
-                            next
-                        } else {
-                            next.copy(
-                                isLoadingMore = current?.isLoadingMore == true,
-                                loadMoreError = current?.loadMoreError == true,
-                            )
+                        if (page.isEmpty()) {
+                            _state.value = FriendActivityTimelineState.Content(emptyList(), hasMore = false)
+                            return@collect
                         }
+
+                        val loaded = page.take(pageSize)
+                        oldestCursor = loaded.last().toCursor()
+                        hasMore = page.size > pageSize
+                        _state.value = FriendActivityTimelineState.Content(
+                            events = loaded.normalizeActivityEvents(),
+                            hasMore = hasMore,
+                        )
+                        observeLoadedSnapshot(currentGeneration, token, filter)
                     }
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Throwable) {
-                    if (currentGeneration == generation && !emittedContent) {
+                    if (isCurrent(currentGeneration, token, filter) && !emittedContent) {
                         _state.value = FriendActivityTimelineState.Error
                     }
                 }
@@ -154,26 +185,43 @@ class FriendActivityTimelineModel internal constructor(
 
     fun loadMore() {
         val content = _state.value as? FriendActivityTimelineState.Content ?: return
-        val cursor = accumulator.cursor ?: return
+        val cursor = oldestCursor ?: return
+        val token = activeToken ?: return
+        val currentFilter = selectedFilter.value
+        val currentGeneration = generation
         if (!content.hasMore || content.isLoadingMore || content.loadMoreError) return
 
-        val currentGeneration = generation
-        val currentFilter = selectedFilter.value
         _state.value = content.copy(isLoadingMore = true, loadMoreError = false)
         loadMoreJob = viewModelScope.launch {
             try {
                 val page = source.observeBefore(
+                    token = token,
                     types = currentFilter.eventTypes,
                     cursor = cursor,
                     limit = pageSize + 1,
                 ).first()
-                if (currentGeneration == generation && currentFilter == selectedFilter.value) {
-                    _state.value = accumulator.applyAppend(page)
+                if (!isCurrent(currentGeneration, token, currentFilter)) return@launch
+                val loaded = page.take(pageSize)
+                hasMore = page.size > pageSize
+                if (loaded.isEmpty()) {
+                    _state.value = content.copy(
+                        hasMore = false,
+                        isLoadingMore = false,
+                        loadMoreError = false,
+                    )
+                } else {
+                    oldestCursor = loaded.last().toCursor()
+                    observeLoadedSnapshot(
+                        currentGeneration,
+                        token,
+                        currentFilter,
+                        completesLoadMore = true,
+                    )
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
-                if (currentGeneration == generation && currentFilter == selectedFilter.value) {
+                if (isCurrent(currentGeneration, token, currentFilter)) {
                     val latest = _state.value as? FriendActivityTimelineState.Content ?: return@launch
                     _state.value = latest.copy(isLoadingMore = false, loadMoreError = true)
                 }
@@ -188,53 +236,55 @@ class FriendActivityTimelineModel internal constructor(
         loadMore()
     }
 
+    private fun observeLoadedSnapshot(
+        currentGeneration: Long,
+        token: AccountSessionToken,
+        filter: FriendActivityTimelineFilter,
+        completesLoadMore: Boolean = false,
+    ) {
+        val cursor = oldestCursor ?: return
+        snapshotJob?.cancel()
+        snapshotJob = viewModelScope.launch {
+            var firstSnapshot = true
+            try {
+                source.observeThrough(token, filter.eventTypes, cursor).collect { snapshot ->
+                    if (!isCurrent(currentGeneration, token, filter) || cursor != oldestCursor) {
+                        return@collect
+                    }
+                    val current = _state.value as? FriendActivityTimelineState.Content
+                    if (snapshot.isEmpty()) hasMore = false
+                    _state.value = FriendActivityTimelineState.Content(
+                        events = snapshot.normalizeActivityEvents(),
+                        hasMore = hasMore,
+                        isLoadingMore = if (completesLoadMore && firstSnapshot) false else {
+                            current?.isLoadingMore == true
+                        },
+                        loadMoreError = current?.loadMoreError == true,
+                    )
+                    firstSnapshot = false
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                if (completesLoadMore && isCurrent(currentGeneration, token, filter)) {
+                    val current = _state.value as? FriendActivityTimelineState.Content ?: return@launch
+                    _state.value = current.copy(isLoadingMore = false, loadMoreError = true)
+                }
+            }
+        }
+    }
+
+    private fun isCurrent(
+        expectedGeneration: Long,
+        expectedToken: AccountSessionToken,
+        expectedFilter: FriendActivityTimelineFilter,
+    ): Boolean = generation == expectedGeneration &&
+        activeToken == expectedToken &&
+        selectedFilter.value == expectedFilter
+
     private companion object {
         const val DEFAULT_PAGE_SIZE = 50
     }
-}
-
-internal class TimelineAccumulator(
-    private val pageSize: Int,
-) {
-    private val eventsById = linkedMapOf<Long, FriendActivityEvent>()
-    private var hasLoadedMore = false
-
-    var cursor: FriendActivityTimelineCursor? = null
-        private set
-
-    private var hasMore = false
-
-    fun applyHead(page: List<FriendActivityEvent>): FriendActivityTimelineState.Content {
-        if (page.isEmpty()) {
-            eventsById.clear()
-            cursor = null
-            hasLoadedMore = false
-            hasMore = false
-            return content()
-        }
-
-        val loaded = page.take(pageSize)
-        loaded.forEach { eventsById[it.id] = it }
-        if (!hasLoadedMore) {
-            cursor = loaded.lastOrNull()?.toCursor()
-            hasMore = page.size > pageSize
-        }
-        return content()
-    }
-
-    fun applyAppend(page: List<FriendActivityEvent>): FriendActivityTimelineState.Content {
-        val loaded = page.take(pageSize)
-        loaded.forEach { eventsById[it.id] = it }
-        hasLoadedMore = true
-        cursor = loaded.lastOrNull()?.toCursor() ?: cursor
-        hasMore = page.size > pageSize
-        return content()
-    }
-
-    private fun content() = FriendActivityTimelineState.Content(
-        events = eventsById.values.normalizeActivityEvents(),
-        hasMore = hasMore,
-    )
 }
 
 private fun FriendActivityEvent.toCursor() = FriendActivityTimelineCursor(
