@@ -1,19 +1,31 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeDefaults.style
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
@@ -21,7 +33,11 @@ import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.extensions.isSupportBlur
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleCombinedClickable
+import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.navigation.*
 import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
@@ -68,6 +84,8 @@ object HomeScreen : AppListRoute {
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val drawerCoordinator = remember { HomeDrawerStateCoordinator() }
         val useRail = LocalAppWindowWidthClass.current != AppWindowWidthClass.Compact
+        val supportBlur = getAppPlatform().isSupportBlur
+        val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
         val showMainNavigation = navigator.lastItem == HomeScreen
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
@@ -115,7 +133,12 @@ object HomeScreen : AppListRoute {
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
         ) {
-            Surface(Modifier.fillMaxSize(), tonalElevation = 2.dp) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .enableIf(supportBlur) { hazeSource(hazeState!!) },
+                tonalElevation = 2.dp,
+            ) {
                 Row {
                     if (useRail && showMainNavigation) {
                         MainNavigationRail(
@@ -156,6 +179,7 @@ object HomeScreen : AppListRoute {
                                 modifier = Modifier.align(Alignment.BottomCenter),
                                 selected = selectedDestination,
                                 hasUnread = notificationModel.hasUnread,
+                                hazeState = hazeState,
                                 onSelect = onDestinationSelected,
                             )
                         }
@@ -402,18 +426,84 @@ private fun MainNavigationBar(
     modifier: Modifier,
     selected: HomeDestination,
     hasUnread: Boolean,
+    hazeState: HazeState?,
     onSelect: (HomeDestination) -> Unit,
 ) {
-    NavigationBar(modifier) {
-        HomeDestination.entries.forEach { destination ->
-            val presentation = destination.presentation()
-            NavigationBarItem(
-                selected = selected == destination,
-                onClick = { onSelect(destination) },
-                icon = { MainDestinationIcon(presentation, destination == HomeDestination.Notifications && hasUnread) },
-                label = { Text(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            )
+    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
+    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = bottomPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        val horizontalPadding = if (maxWidth < 320.dp) 12.dp else 28.dp
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = horizontalPadding)
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .height(64.dp)
+                .run {
+                    if (hazeState != null) {
+                        clip(CircleShape).hazeEffect(
+                            state = hazeState,
+                            style = style(backgroundColor = backgroundColor),
+                        )
+                    } else {
+                        shadow(elevation = 2.dp, shape = CircleShape)
+                    }
+                },
+            color = if (hazeState != null) Color.Transparent else backgroundColor,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HomeDestination.entries.forEach { destination ->
+                    val presentation = destination.presentation()
+                    MainNavigationItem(
+                        presentation = presentation,
+                        selected = selected == destination,
+                        unread = destination == HomeDestination.Notifications && hasUnread,
+                        onClick = { onSelect(destination) },
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun RowScope.MainNavigationItem(
+    presentation: MainDestinationPresentation,
+    selected: Boolean,
+    unread: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "Main navigation icon tint",
+    )
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clip(CircleShape)
+            .simpleClickable(onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        MainDestinationIcon(
+            presentation = presentation,
+            unread = unread,
+            modifier = Modifier.size(40.dp),
+            tint = tint,
+        )
     }
 }
 
@@ -443,8 +533,37 @@ private fun MainNavigationRail(
 
 @Composable
 private fun MainDestinationIcon(presentation: MainDestinationPresentation, unread: Boolean) {
-    BadgedBox(badge = { if (unread) Badge() }) {
-        Icon(presentation.icon, contentDescription = presentation.label, Modifier.size(24.dp))
+    MainDestinationIcon(
+        presentation = presentation,
+        unread = unread,
+        modifier = Modifier.size(24.dp),
+        tint = LocalContentColor.current,
+    )
+}
+
+@Composable
+private fun MainDestinationIcon(
+    presentation: MainDestinationPresentation,
+    unread: Boolean,
+    modifier: Modifier,
+    tint: Color,
+) {
+    BadgedBox(
+        badge = {
+            if (unread) {
+                val badgeColor = MaterialTheme.colorScheme.tertiary
+                Canvas(Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
+                    drawCircle(color = badgeColor, radius = 4.dp.toPx())
+                }
+            }
+        },
+    ) {
+        Icon(
+            imageVector = presentation.icon,
+            contentDescription = presentation.label,
+            modifier = modifier,
+            tint = tint,
+        )
     }
 }
 
