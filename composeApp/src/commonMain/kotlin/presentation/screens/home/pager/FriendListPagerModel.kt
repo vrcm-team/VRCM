@@ -50,20 +50,6 @@ data class FriendGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
 
-/** Stable presence buckets used by the friend-only directory. */
-enum class FriendDirectorySection {
-    InGame,
-    Web,
-    Private,
-    Offline,
-}
-
-/** A visible directory section derived from the current friend snapshot. */
-data class FriendDirectoryGroup(
-    val section: FriendDirectorySection,
-    val friends: List<FriendData>,
-)
-
 /**
  * 世界分组选项数据类
  */
@@ -182,7 +168,7 @@ class FriendListPagerModel(
     private var favoritesPageActivated = false
     private var favoriteLocale: LocaleStrings? = null
 
-    val friendDirectoryGroups: StateFlow<List<FriendDirectoryGroup>> = combine(
+    val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendList,
         _searchText,
         _friendGroupOptions,
@@ -191,7 +177,15 @@ class FriendListPagerModel(
         val favoriteIds = options.selectedGroup?.let { selectedGroup ->
             favoriteGroups[selectedGroup]?.mapTo(mutableSetOf()) { it.favoriteId }.orEmpty()
         }
-        buildFriendDirectoryGroups(friends, query, favoriteIds)
+        val normalizedQuery = query.trim()
+        friends.asSequence()
+            .filter { favoriteIds == null || it.id in favoriteIds }
+            .filter {
+                normalizedQuery.isEmpty() ||
+                    it.displayName.contains(normalizedQuery, ignoreCase = true)
+            }
+            .toList()
+            .sortedUserByStatus()
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -894,39 +888,6 @@ internal fun Iterable<FriendData>.sortedUserByStatus() = sortedByDescending {
         append('-')
         append(it.displayName)
     }
-}
-
-internal fun buildFriendDirectoryGroups(
-    friends: Collection<FriendData>,
-    query: String,
-    favoriteIds: Set<String>?,
-): List<FriendDirectoryGroup> {
-    val normalizedQuery = query.trim()
-    val visibleFriends = friends.asSequence()
-        .filter { favoriteIds == null || it.id in favoriteIds }
-        .filter { normalizedQuery.isEmpty() || it.displayName.contains(normalizedQuery, ignoreCase = true) }
-        .groupBy(FriendData::directorySection)
-
-    return FriendDirectorySection.entries.mapNotNull { section ->
-        visibleFriends[section]
-            ?.sortedWith(
-                compareByDescending<FriendData> {
-                    if (section == FriendDirectorySection.Offline) it.lastSeenAt().orEmpty() else ""
-                }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayName }
-                    .thenBy { it.id }
-            )
-            ?.takeIf(List<FriendData>::isNotEmpty)
-            ?.let { FriendDirectoryGroup(section, it) }
-    }
-}
-
-private fun FriendData.directorySection(): FriendDirectorySection = when {
-    status == UserStatus.Offline -> FriendDirectorySection.Offline
-    location.startsWith(LocationType.Instance.value) || location == LocationType.Traveling.value ->
-        FriendDirectorySection.InGame
-    location == LocationType.Web.value || location == LocationType.Offline.value ->
-        FriendDirectorySection.Web
-    else -> FriendDirectorySection.Private
 }
 
 internal fun FavoritedWorld.toSearchWorldData(): WorldData = WorldData(
