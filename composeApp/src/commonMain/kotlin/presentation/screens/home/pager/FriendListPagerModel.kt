@@ -17,7 +17,6 @@ import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
-import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -91,9 +90,6 @@ class FriendListPagerModel(
     private val _worldGroupOptions = MutableStateFlow(WorldGroupOptions())
     var worldGroupOptions = _worldGroupOptions.asStateFlow()
 
-    private val _friendList = MutableStateFlow(friendService.friendMap.values.toList().sortedUserByStatus())
-    val friendList: StateFlow<List<FriendData>> = _friendList.asStateFlow()
-
     // Directory filters derive from this account-bound source and never write back to it.
     private val _friendSnapshot = MutableStateFlow(
         friendService.friendMap.values.toList()
@@ -159,7 +155,7 @@ class FriendListPagerModel(
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
 
-    private var friendFilterJob: Job? = null
+    private var friendSnapshotJob: Job? = null
     private val offlineStatusDescriptions = mutableMapOf<String, String>()
 
     private val _directoryRefreshing = MutableStateFlow(true)
@@ -196,6 +192,7 @@ class FriendListPagerModel(
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
+    val friendList: StateFlow<List<FriendData>> = friendDirectoryFriends
 
     init {
         viewModelScope.launch {
@@ -209,7 +206,7 @@ class FriendListPagerModel(
                 val token = activeSessionToken ?: return@collect
                 if (SharedFlowCentre.currentSession.value?.token?.userId != token.userId) return@collect
                 _friendTotal.value = friends.size
-                findFriendList(searchTexts[0], friends.values.toList())
+                updateFriendSnapshot(friends.values.toList())
             }
         }
     }
@@ -222,13 +219,12 @@ class FriendListPagerModel(
         refreshJobsByTab.clear()
         directoryRefreshJob?.cancel()
         directoryRefreshJob = null
-        friendFilterJob?.cancel()
-        friendFilterJob = null
+        friendSnapshotJob?.cancel()
+        friendSnapshotJob = null
         if (userChanged) {
             favoritedWorldMap.clear()
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()
-            _friendList.value = emptyList()
             _friendSnapshot.value = emptyList()
             _friendTotal.value = 0
             _worldList.value = emptyList()
@@ -446,8 +442,7 @@ class FriendListPagerModel(
     fun setSearchText(text: String) {
         _searchText.value = text
         searchTexts[_selectedTabIndex.value] = text
-        // 当搜索文本改变时，根据当前标签页刷新对应数据
-        refreshCurrentTabListData()
+        if (_selectedTabIndex.value != 0) refreshCurrentTabListData()
     }
 
     fun setFriendDirectorySearchText(text: String) {
@@ -460,10 +455,7 @@ class FriendListPagerModel(
      */
     private fun refreshCurrentTabListData() {
         when (_selectedTabIndex.value) {
-            0 -> {
-                // 好友标签页
-                findFriendList(searchTexts[0])
-            }
+            0 -> Unit
 
             1 -> {
                 // 世界标签页
@@ -501,7 +493,6 @@ class FriendListPagerModel(
      */
     fun updateFriendGroupOptions(options: FriendGroupOptions) {
         _friendGroupOptions.value = options
-        refreshCurrentTabListData()
     }
 
     fun updateFriendDirectoryGroupOptions(options: FriendGroupOptions) {
@@ -524,30 +515,12 @@ class FriendListPagerModel(
         refreshCurrentTabListData()
     }
 
-    /**
-     * 基于搜索文本和当前选择的好友组过滤好友列表
-     * 使用FriendService提供的方法
-     */
-    private fun findFriendList(
-        name: String,
-        sourceFriends: List<FriendData> = friendService.friendMap.values.toList(),
-    ) {
-        val sessionToken = activeSessionToken ?: run {
-            _friendList.value = emptyList()
-            _friendSnapshot.value = emptyList()
-            return
-        }
+    /** Updates the account-bound source snapshot without applying UI filters. */
+    private fun updateFriendSnapshot(sourceFriends: List<FriendData>) {
+        val sessionToken = activeSessionToken ?: return
         val generation = accountGeneration
-        val favoriteIds = if (friendGroupOptions.value.selectedGroup != null) {
-            // 获取选中好友组的favoriteId列表
-            friendFavoriteGroupsFlow.value[friendGroupOptions.value.selectedGroup]
-                ?.map { it.favoriteId }
-                ?.toSet()
-        } else {
-            null
-        }
-        friendFilterJob?.cancel()
-        friendFilterJob = viewModelScope.launch {
+        friendSnapshotJob?.cancel()
+        friendSnapshotJob = viewModelScope.launch {
             val friendSnapshot = enrichOfflineStatusDescriptions(
                 friends = sourceFriends,
                 sessionToken = sessionToken,
@@ -555,74 +528,7 @@ class FriendListPagerModel(
             )
             if (!acceptsAccount(sessionToken, generation)) return@launch
             _friendSnapshot.value = friendSnapshot
-
-            val friends = findFriendsByName(
-                name = name,
-                favoriteIds = favoriteIds,
-                friendSnapshot = friendSnapshot,
-                sessionToken = sessionToken,
-                generation = generation,
-            )
-            if (acceptsAccount(sessionToken, generation)) _friendList.value = friends
         }
-    }
-
-    private fun UserData.toFriendData(): FriendData {
-        return  FriendData(
-            id = id,
-            displayName = displayName,
-            status = status,
-            lastLogin = lastLogin,
-            lastActivity = lastActivity,
-            lastPlatform = lastPlatform,
-            bio = bio,
-            bioLinks = bioLinks,
-            currentAvatarImageUrl = currentAvatarImageUrl,
-            currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
-            currentAvatarTags = currentAvatarTags,
-            developerType = developerType,
-            tags = tags,
-            isFriend = false,
-            profilePicOverride = profilePicOverride,
-            friendKey = "",
-            imageUrl = profileImageUrl,
-            location = LocationType.Offline.value,
-            statusDescription = statusDescription,
-            userIcon = userIcon,
-            pronouns = pronouns,
-        )
-    }
-
-    /**
-     * 基于搜索文本和当前选择的世界组过滤世界列表
-     *
-     * @param favoriteIds 为 null 时返回所有好友， 代表没有选择好友组
-     */
-    private suspend fun findFriendsByName(
-        name: String,
-        favoriteIds: Set<String>?,
-        friendSnapshot: List<FriendData>,
-        sessionToken: AccountSessionToken,
-        generation: Long,
-    ): List<FriendData> {
-
-        val unFriendData = favoriteIds?.filterNot { friendService.friendMap.contains(it) }?.map {
-            withContext(Dispatchers.IO) { usersApi.fetchUser(it) }
-                .toFriendData()
-        } ?: emptyList()
-
-        // 先按名称过滤
-        val nameFilteredList = (friendSnapshot + unFriendData).let { friends ->
-            if (name.isEmpty()) friends
-            else friends.filter { name.isEmpty() || it.displayName.lowercase().contains(name.lowercase()) }
-        }
-
-        // 再按好友组过滤
-        val result =
-            if (favoriteIds != null) nameFilteredList.filter { friend -> favoriteIds.contains(friend.id) }
-            else nameFilteredList
-
-        return enrichOfflineStatusDescriptions(result, sessionToken, generation).sortedUserByStatus()
     }
 
     /**

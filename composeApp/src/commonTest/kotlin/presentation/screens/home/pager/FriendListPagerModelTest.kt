@@ -60,7 +60,8 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         SharedFlowCentre.emitAuthenticated(account)
         val session = assertNotNull(SharedFlowCentre.currentSession.value)
         val json = Json { ignoreUnknownKeys = true }
-        val client = testClient(json)
+        var nonFriendProfileRequests = 0
+        val client = testClient(json) { nonFriendProfileRequests++ }
         val friendListCacheStore = InMemoryFriendListCacheStore()
         val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
         val accountCacheManager = AccountCacheManager(
@@ -141,6 +142,15 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                 expectedIds,
                 model.friendDirectoryFriends.value.mapTo(mutableSetOf()) { it.id },
             )
+
+            val remoteGroup = model.friendFavoriteGroupsFlow.value.keys.single {
+                it.ownerId != "local"
+            }
+            model.updateFriendGroupOptions(FriendGroupOptions(remoteGroup))
+            model.setSearchText("No matching friend")
+            awaitUntil { model.friendList.value.isEmpty() }
+
+            assertEquals(0, nonFriendProfileRequests)
         } finally {
             ViewModelStore().apply {
                 put("friend-list-pager", model)
@@ -178,12 +188,25 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         }
     }
 
-    private fun testClient(json: Json) = HttpClient(MockEngine) {
+    private fun testClient(
+        json: Json,
+        onNonFriendProfileRequest: () -> Unit,
+    ) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->
                 when (request.url.encodedPath) {
                     "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
-                    "/auth/user/friends", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                    "/auth/user/friends" -> jsonResponse("[]")
+                    "/favorites" -> jsonResponse(
+                        if (request.url.parameters["offset"] == "0") friendFavoritesJson() else "[]"
+                    )
+                    "/favorite/groups" -> jsonResponse(
+                        if (request.url.parameters["offset"] == "0") friendFavoriteGroupsJson() else "[]"
+                    )
+                    "/users/usr_non_friend" -> {
+                        onNonFriendProfileRequest()
+                        jsonResponse(nonFriendUserJson())
+                    }
                     "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
                     else -> error("Unexpected request: ${request.url}")
                 }
@@ -238,5 +261,36 @@ private fun favoriteLimitsJson() = """
       "maxFavoritesPerGroup":{"avatar":100,"friend":100,"world":100},
       "defaultMaxFavoriteGroups":1,
       "defaultMaxFavoritesPerGroup":100
+    }
+""".trimIndent()
+
+private fun friendFavoritesJson() = """
+    [{
+      "favoriteId":"usr_non_friend","id":"fvrt_non_friend",
+      "tags":["group_0"],"type":"friend"
+    }]
+""".trimIndent()
+
+private fun friendFavoriteGroupsJson() = """
+    [{
+      "id":"grp_friend","ownerId":"usr_directory_owner","type":"friend",
+      "visibility":"private","displayName":"Friends","name":"group_0",
+      "ownerDisplayName":"directory-owner","tags":[]
+    }]
+""".trimIndent()
+
+private fun nonFriendUserJson() = """
+    {
+      "ageVerificationStatus":"verified","allowAvatarCopying":true,
+      "bio":"","bioLinks":[],"currentAvatarImageUrl":"",
+      "currentAvatarTags":[],"currentAvatarThumbnailImageUrl":"",
+      "date_joined":"","developerType":"none","displayName":"Former Friend",
+      "friendKey":"","friendRequestStatus":"null","id":"usr_non_friend",
+      "instanceId":"","isFriend":false,"last_activity":"","last_login":"",
+      "last_platform":"web","location":"offline","note":"",
+      "profilePicOverride":"","state":"offline","status":"offline",
+      "statusDescription":"","tags":[],"travelingToInstance":null,
+      "travelingToLocation":null,"travelingToWorld":null,"userIcon":"",
+      "worldId":"","pronouns":null
     }
 """.trimIndent()
