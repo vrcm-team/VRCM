@@ -64,7 +64,7 @@ fun NotificationCenterContent(
     modifier: Modifier = Modifier,
     targetNotificationId: String? = null,
     showBackButton: Boolean = false,
-    navigationIcon: @Composable () -> Unit = {},
+    showTopBar: Boolean = true,
 ) {
     val model = koinInject<NotificationCenterModel>()
     val navigator = LocalNavigator.currentOrThrow
@@ -104,28 +104,33 @@ fun NotificationCenterContent(
 
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = if (showTopBar) {
+            ScaffoldDefaults.contentWindowInsets
+        } else {
+            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+        },
         topBar = {
-            TopAppBar(
-                title = { Text(strings.notificationSectionInbox) },
-                navigationIcon = {
-                    if (showBackButton) {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(AppIcons.ArrowBackIosNew, strings.notificationBack)
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text(strings.notificationSectionInbox) },
+                    navigationIcon = {
+                        if (showBackButton) {
+                            IconButton(onClick = { navigator.pop() }) {
+                                Icon(AppIcons.ArrowBackIosNew, strings.notificationBack)
+                            }
                         }
-                    } else {
-                        navigationIcon()
-                    }
-                },
-                actions = {
-                    IconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
-                        if (model.isRefreshing) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(AppIcons.Update, strings.notificationRefresh)
+                    },
+                    actions = {
+                        IconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
+                            if (model.isRefreshing) {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(AppIcons.Update, strings.notificationRefresh)
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
     ) { padding ->
         when {

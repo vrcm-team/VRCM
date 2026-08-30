@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
@@ -86,6 +87,7 @@ object HomeScreen : AppListRoute {
         val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
         val showMainNavigation = navigator.lastItem == HomeScreen
+        var statusVisible by remember { mutableStateOf(true) }
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
             if (model.selectDestination(destination)) {
                 if (destination == HomeDestination.Notifications) {
@@ -130,9 +132,23 @@ object HomeScreen : AppListRoute {
             model = model,
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
+            onStatusVisibilityChanged = { statusVisible = it },
         ) {
             Scaffold(
                 contentColor = MaterialTheme.colorScheme.primary,
+                topBar = {
+                    if (showMainNavigation) {
+                        HomeIdentityTopBar(
+                            model = model,
+                            hazeState = hazeState,
+                            statusVisible = statusVisible,
+                        ) {
+                            if (selectedDestination == HomeDestination.Notifications) {
+                                NotificationRefreshAction(notificationModel)
+                            }
+                        }
+                    }
+                },
                 bottomBar = {
                     if (!useRail && showMainNavigation) {
                         MainNavigationBar(
@@ -143,7 +159,7 @@ object HomeScreen : AppListRoute {
                         )
                     }
                 },
-            ) {
+            ) { contentPadding ->
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -158,7 +174,12 @@ object HomeScreen : AppListRoute {
                                 onDestinationSelected,
                             )
                         }
-                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(top = contentPadding.calculateTopPadding()),
+                        ) {
                             stateHolder.SaveableStateProvider(selectedDestination.name) {
                                 when (selectedDestination) {
                                     HomeDestination.Home -> HomeDestinationContent(
@@ -168,21 +189,16 @@ object HomeScreen : AppListRoute {
                                         timelineFilter,
                                         hasBottomNavigation = !useRail && showMainNavigation,
                                     )
-                                    HomeDestination.Search -> RootPagerContent(strings.mainNavigationSearch) {
-                                        SearchListPager.Content()
-                                    }
+                                    HomeDestination.Search -> SearchListPager.Content()
                                     HomeDestination.Notifications -> NotificationCenterContent(
                                         modifier = if (useRail || !showMainNavigation) {
                                             Modifier
                                         } else {
                                             Modifier.padding(bottom = 80.dp)
                                         },
-                                        showBackButton = false,
-                                        navigationIcon = { RootAvatarButton(model) },
+                                        showTopBar = false,
                                     )
-                                    HomeDestination.Friends -> RootPagerContent(strings.mainNavigationFriends) {
-                                        FriendListPager.Content()
-                                    }
+                                    HomeDestination.Friends -> FriendListPager.Content()
                                 }
                             }
                         }
@@ -192,14 +208,6 @@ object HomeScreen : AppListRoute {
         }
 
         SettingsBottomSheet(model.settingsVisible, model::hideSettings)
-    }
-}
-
-@Composable
-private fun RootPagerContent(title: String, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize()) {
-        RootTopBar(title)
-        Box(Modifier.weight(1f)) { content() }
     }
 }
 
@@ -227,7 +235,6 @@ private fun HomeDestinationContent(
     }
 
     Column(Modifier.fillMaxSize()) {
-        RootTopBar(strings.mainNavigationHome)
         PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
             HomeTab.entries.forEach { tab ->
                 Tab(
@@ -289,26 +296,52 @@ private fun HomeDestinationContent(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun RootTopBar(title: String) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shadowElevation = 2.dp) {
+private fun HomeIdentityTopBar(
+    model: HomeScreenModel,
+    hazeState: HazeState?,
+    statusVisible: Boolean,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val modifier = if (hazeState != null) {
+        Modifier.hazeEffect(
+            state = hazeState,
+            style = style(backgroundColor = backgroundColor),
+        )
+    } else {
+        Modifier.shadow(2.dp)
+    }
+    Surface(
+        modifier = modifier,
+        color = if (hazeState != null) Color.Transparent else backgroundColor,
+    ) {
         Row(
             Modifier.fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(top = getInsetPadding(WindowInsets::getTop))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val model: HomeScreenModel = koinViewModel()
-            RootAvatarButton(model)
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.weight(1f)) {
+                HomeIdentity(
+                    model = model,
+                    statusVisible = statusVisible,
+                    modifier = Modifier.widthIn(max = 286.dp),
+                )
+            }
+            actions()
         }
     }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun RootAvatarButton(model: HomeScreenModel) {
+private fun HomeIdentity(
+    model: HomeScreenModel,
+    statusVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val userId = model.userId
     val currentUser = model.currentUser
     val navigator = currentNavigator
@@ -319,28 +352,68 @@ private fun RootAvatarButton(model: HomeScreenModel) {
             (last as? MeetupCardEditorRoute)?.ownerUserId == userId
         if (!alreadyOpen && currentUser != null) navigator push model.meetupCardStartRoute()
     }
-    Box(
-        Modifier
+    Row(
+        modifier
             .testTag("home-user-avatar")
             .sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
-            .sharedBoundsBy(
-                key = "${userId}UserIcon",
-                suffixKey = AuthHomeSharedSuffixKey,
-                boundsTransform = IconBoundsTransform,
-            )
-            .size(48.dp)
             .clip(MaterialTheme.shapes.medium)
             .simpleCombinedClickable(onClick = model::showDrawer, onLongClick = onLongClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        UserStateIcon(
-            modifier = Modifier.fillMaxSize().sharedBoundsBy(
-                key = "${userId}UserIcon",
-                suffixKey = suffix,
-                boundsTransform = if (currentUser != null) DefaultBoundsTransform else IconBoundsTransform,
-            ),
-            iconUrl = currentUser?.iconUrl ?: model.iconUrl,
-            cachedPlaceholderKey = model.iconUrl,
-        )
+        Box(
+            Modifier
+                .sharedBoundsBy(
+                    key = "${userId}UserIcon",
+                    suffixKey = AuthHomeSharedSuffixKey,
+                    boundsTransform = IconBoundsTransform,
+                )
+                .size(54.dp),
+        ) {
+            UserStateIcon(
+                modifier = Modifier.fillMaxSize().sharedBoundsBy(
+                    key = "${userId}UserIcon",
+                    suffixKey = suffix,
+                    boundsTransform = if (currentUser != null) DefaultBoundsTransform else IconBoundsTransform,
+                ),
+                iconUrl = currentUser?.iconUrl ?: model.iconUrl,
+                cachedPlaceholderKey = model.iconUrl,
+            )
+        }
+        Column(
+            modifier = Modifier.widthIn(max = 220.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
+            UserInfoRow(
+                iconSize = 16.dp,
+                style = MaterialTheme.typography.titleMedium,
+                user = currentUser,
+                sharedUserId = userId,
+                sharedSuffixKey = suffix,
+                pronouns = currentUser?.pronouns,
+            )
+            AnimatedVisibility(statusVisible) {
+                UserStatusRow(
+                    iconSize = 8.dp,
+                    style = MaterialTheme.typography.labelMedium,
+                    user = currentUser,
+                    animatedVisibilityScope = this,
+                    sharedUserId = userId,
+                    sharedSuffixKey = suffix,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationRefreshAction(model: NotificationCenterModel) {
+    IconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
+        if (model.isRefreshing) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(AppIcons.Update, strings.notificationRefresh)
+        }
     }
 }
 
@@ -349,6 +422,7 @@ private fun HomePersonalDrawer(
     model: HomeScreenModel,
     drawerState: DrawerState,
     gesturesEnabled: Boolean,
+    onStatusVisibilityChanged: (Boolean) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val navigator = currentNavigator
@@ -382,7 +456,11 @@ private fun HomePersonalDrawer(
                 scope.launch {
                     drawerState.close()
                     model.hideDrawer()
-                    currentDialog = UserStatusDialog(user) { currentDialog = null }
+                    onStatusVisibilityChanged(false)
+                    currentDialog = UserStatusDialog(user) {
+                        currentDialog = null
+                        onStatusVisibilityChanged(true)
+                    }
                 }
             }
         },
