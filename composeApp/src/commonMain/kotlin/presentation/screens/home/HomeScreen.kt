@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -212,6 +213,7 @@ private fun HomeDestinationContent(
 ) {
     val stateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
+    var activityActivated by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(
         initialPage = model.selectedHomeTabIndex,
         pageCount = { HomeTab.entries.size },
@@ -220,7 +222,10 @@ private fun HomeDestinationContent(
     LaunchedEffect(pagerState, model) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
-            .collect { page -> model.selectHomeTab(HomeTab.entries[page]) }
+            .collect { page ->
+                model.selectHomeTab(HomeTab.entries[page])
+                if (page == HomeTab.Activity.ordinal) activityActivated = true
+            }
     }
     HorizontalPager(
         state = pagerState,
@@ -243,10 +248,15 @@ private fun HomeDestinationContent(
                         )
                     }
                 }
-                HomeTab.Activity -> FriendActivityTimelineDestination(
-                    hasBottomNavigation = hasBottomNavigation,
-                    headerContent = tabRow,
-                )
+                HomeTab.Activity -> if (activityActivated) {
+                    FriendActivityTimelineDestination(
+                        hasBottomNavigation = hasBottomNavigation,
+                        headerContent = tabRow,
+                        isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
+                    )
+                } else {
+                    ActivityTimelinePreview(headerContent = tabRow)
+                }
             }
         }
     }
@@ -285,16 +295,20 @@ private fun HomeTabRow(
 private fun FriendActivityTimelineDestination(
     hasBottomNavigation: Boolean,
     headerContent: @Composable () -> Unit,
+    isActive: () -> Boolean,
 ) {
     val model: FriendActivityTimelineModel = koinViewModel()
     val state by model.state.collectAsState()
     val filter by model.filter.collectAsState()
     val listState = rememberLazyListState()
     val navigator = currentNavigator
+    val currentIsActive by rememberUpdatedState(isActive)
 
     LaunchedEffect(listState) {
         SharedFlowCentre.toPagerTop.collect {
-            runCatching { listState.animateScrollToItem(0) }
+            if (currentIsActive()) {
+                launch { runCatching { listState.animateScrollToItem(0) } }
+            }
         }
     }
 
@@ -328,6 +342,13 @@ private fun FriendActivityTimelineDestination(
             )
             .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
     )
+}
+
+@Composable
+private fun ActivityTimelinePreview(headerContent: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        headerContent()
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
