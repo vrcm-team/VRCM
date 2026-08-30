@@ -555,9 +555,7 @@ private fun MainNavigationItem(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .simpleClickable(onClick),
+        modifier = Modifier.simpleClickable(onClick),
     ) {
         MainDestinationIcon(
             presentation = presentation,
