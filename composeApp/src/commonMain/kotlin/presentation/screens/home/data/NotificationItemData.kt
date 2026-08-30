@@ -182,9 +182,13 @@ internal data class NotificationIdentity(
     val source: NotificationSource,
     val id: String,
     val relatedNotificationId: String?,
-)
+) {
+    val stableKey: String
+        get() = "${source.name}:$id:${relatedNotificationId.orEmpty()}"
+}
 
-private val NotificationItemData.identity: NotificationIdentity
+/** Stable identity shared by inbox state, pending mutations, and rendered item state. */
+internal val NotificationItemData.identity: NotificationIdentity
     get() = NotificationIdentity(
         source = source,
         id = id,

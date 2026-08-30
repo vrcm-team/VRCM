@@ -14,11 +14,13 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.BoopNotificationResolver
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationInboxState
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationIdentity
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationReadTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationSource
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPresentation
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.identity
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.readTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.unreadCount
@@ -61,15 +63,12 @@ class NotificationCenterModel(
     val friendRequestNotifications: List<NotificationItemData>
         get() = inboxState.legacy
 
-    var pendingNotificationActions by
-        mutableStateOf<Map<String, NotificationItemData.ActionData>>(emptyMap())
-        private set
+    private var pendingNotificationActions by
+        mutableStateOf<Map<NotificationIdentity, NotificationItemData.ActionData>>(emptyMap())
 
-    var pendingReadNotificationIds by mutableStateOf<Set<String>>(emptySet())
-        private set
+    private var pendingReadNotifications by mutableStateOf<Set<NotificationIdentity>>(emptySet())
 
-    var pendingDeleteNotificationIds by mutableStateOf<Set<String>>(emptySet())
-        private set
+    private var pendingDeleteNotifications by mutableStateOf<Set<NotificationIdentity>>(emptySet())
 
     var isRefreshing by mutableStateOf(false)
         private set
@@ -95,8 +94,8 @@ class NotificationCenterModel(
                 refreshJob?.cancel()
                 inboxState = NotificationInboxState()
                 pendingNotificationActions = emptyMap()
-                pendingReadNotificationIds = emptySet()
-                pendingDeleteNotificationIds = emptySet()
+                pendingReadNotifications = emptySet()
+                pendingDeleteNotifications = emptySet()
                 isRefreshing = false
                 hasRefreshError = false
                 session?.token?.let(::queueNotificationRefresh)
@@ -196,7 +195,7 @@ class NotificationCenterModel(
         boopAlreadySentMessage: String,
         boopDisabledMessage: String,
     ) {
-        if (isNotificationPending(item.id)) return
+        if (isNotificationPending(item)) return
         val responseTarget = item.responseTarget(action)
         if (responseTarget == NotificationResponseTarget.NAVIGATION_LINK) return
         if (
@@ -206,10 +205,10 @@ class NotificationCenterModel(
             deleteNotification(item)
             return
         }
-        pendingNotificationActions += item.id to action
+        pendingNotificationActions += item.identity to action
         val token = SharedFlowCentre.currentSession.value?.token
         if (token == null) {
-            finishNotificationAction(item.id)
+            finishNotificationAction(item)
             return
         }
 
@@ -217,7 +216,7 @@ class NotificationCenterModel(
             NotificationResponseTarget.BOOP_USER_API -> {
                 val senderId = item.senderId
                 if (senderId == null) {
-                    finishNotificationAction(item.id)
+                    finishNotificationAction(item)
                     return
                 }
                 boopUser(
@@ -244,9 +243,9 @@ class NotificationCenterModel(
     }
 
     fun markNotificationAsRead(item: NotificationItemData) {
-        if (item.seen || isNotificationPending(item.id)) return
+        if (item.seen || isNotificationPending(item)) return
         val token = SharedFlowCentre.currentSession.value?.token ?: return
-        pendingReadNotificationIds += item.id
+        pendingReadNotifications += item.identity
         modelScope.launch(Dispatchers.IO) {
             try {
                 val result = runNotificationMutation(token) {
@@ -266,16 +265,16 @@ class NotificationCenterModel(
                     }
             } finally {
                 if (SharedFlowCentre.isCurrentSession(token)) {
-                    pendingReadNotificationIds -= item.id
+                    pendingReadNotifications -= item.identity
                 }
             }
         }
     }
 
     fun deleteNotification(item: NotificationItemData) {
-        if (isNotificationPending(item.id)) return
+        if (isNotificationPending(item)) return
         val token = SharedFlowCentre.currentSession.value?.token ?: return
-        pendingDeleteNotificationIds += item.id
+        pendingDeleteNotifications += item.identity
         modelScope.launch(Dispatchers.IO) {
             try {
                 val result = runNotificationMutation(token) {
@@ -287,16 +286,19 @@ class NotificationCenterModel(
                 result.onNotificationFailure()
             } finally {
                 if (SharedFlowCentre.isCurrentSession(token)) {
-                    pendingDeleteNotificationIds -= item.id
+                    pendingDeleteNotifications -= item.identity
                 }
             }
         }
     }
 
-    fun isNotificationPending(notificationId: String): Boolean =
-        notificationId in pendingNotificationActions ||
-            notificationId in pendingReadNotificationIds ||
-            notificationId in pendingDeleteNotificationIds
+    internal fun pendingAction(item: NotificationItemData): NotificationItemData.ActionData? =
+        pendingNotificationActions[item.identity]
+
+    internal fun isNotificationPending(item: NotificationItemData): Boolean =
+        item.identity in pendingNotificationActions ||
+            item.identity in pendingReadNotifications ||
+            item.identity in pendingDeleteNotifications
 
     private fun boopUser(
         item: NotificationItemData,
@@ -325,7 +327,7 @@ class NotificationCenterModel(
                     BoopResult.InFlight, BoopResult.SessionChanged -> Unit
                 }
             } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item.id)
+                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item)
             }
         }
     }
@@ -349,7 +351,7 @@ class NotificationCenterModel(
                         }
                     }
             } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item.id)
+                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item)
             }
         }
     }
@@ -369,8 +371,8 @@ class NotificationCenterModel(
         return response.result.takeIf { SharedFlowCentre.isCurrentSession(response.sessionToken) }
     }
 
-    private fun finishNotificationAction(notificationId: String) {
-        pendingNotificationActions -= notificationId
+    private fun finishNotificationAction(item: NotificationItemData) {
+        pendingNotificationActions -= item.identity
     }
 
     private inline fun <T> Result<T>.onNotificationFailure() =

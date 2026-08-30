@@ -100,9 +100,9 @@ fun NotificationCenterContent(
         }
     }
     val reply = boopReply
-    val replySending = reply?.let { model.pendingNotificationActions[it.item.id] == it.action } == true
-    LaunchedEffect(reply?.item?.id, notifications) {
-        if (reply != null && notifications.none { it.id == reply.item.id }) boopReply = null
+    val replySending = reply?.let { model.pendingAction(it.item) == it.action } == true
+    LaunchedEffect(reply?.item?.identity, notifications) {
+        if (reply != null && notifications.none { it.identity == reply.item.identity }) boopReply = null
     }
 
     Scaffold(
@@ -177,11 +177,11 @@ fun NotificationCenterContent(
                         TextButton(onClick = model::refreshAllNotification) { Text(strings.retry) }
                     }
                 }
-                items(notifications, key = { "${it.source}:${it.id}" }) { item ->
+                items(notifications, key = { it.identity.stableKey }) { item ->
                     NotificationItem(
                         item = item,
-                        loadingAction = model.pendingNotificationActions[item.id],
-                        pending = model.isNotificationPending(item.id),
+                        loadingAction = model.pendingAction(item),
+                        pending = model.isNotificationPending(item),
                         onRead = { model.markNotificationAsRead(item) },
                         onDelete = { model.deleteNotification(item) },
                         onResponse = onResponse,
@@ -233,13 +233,14 @@ private fun LazyItemScope.NotificationItem(
     onDelete: () -> Unit,
     onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
 ) {
-    var expanded by remember(item.source, item.id) { mutableStateOf(false) }
+    val identity = item.identity
+    var expanded by remember(identity.stableKey) { mutableStateOf(false) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
     val senderId = item.senderId.orEmpty()
     val groupId = item.groupId.orEmpty()
     val groupName = item.groupName.orEmpty()
     val navigator = LocalNavigator.currentOrThrow
-    val sharedSuffixKey = rememberContainerTransformToken("notification:${item.id}:user:$senderId")
+    val sharedSuffixKey = rememberContainerTransformToken("notification:${identity.stableKey}:user:$senderId")
         ?: LocalSharedSuffixKey.current
     val openGroup = {
         if (groupId.isNotEmpty()) {
