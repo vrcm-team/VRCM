@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -23,6 +22,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
+import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -101,7 +101,7 @@ fun GenericSearchList(
                     headerContent()
 
                     // 标签栏
-                    TabRow(
+                    PrimaryTabRow(
                         selectedTabIndex = selectedTabIndex,
                         modifier = Modifier
                             .fillMaxWidth(),
@@ -115,7 +115,7 @@ fun GenericSearchList(
                         indicator = {
                             TabRowDefaults.PrimaryIndicator(
                                 modifier = Modifier
-                                    .tabIndicatorOffset(it[selectedTabIndex]),
+                                    .tabIndicatorOffset(selectedTabIndex),
                                 width = 32.dp,
                                 shape = RoundedCornerShape(4.dp)
                             )
@@ -184,7 +184,7 @@ fun <T> SearchResultItem(
     ListItem(
         modifier = modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .heightIn(min = 68.dp)
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
             .clickable { onClick(item) },
@@ -232,7 +232,11 @@ fun AdvancedOptionsPanel(
             }
             Icon(
                 imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
-                contentDescription = if (expanded) "收起" else "展开"
+                contentDescription = if (expanded) {
+                    strings.notificationCollapse
+                } else {
+                    strings.notificationExpand
+                }
             )
         }
 

@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.Pager
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 
@@ -49,7 +50,26 @@ object FriendLocationPager : Pager {
     @ExperimentalSharedTransitionApi
     @Composable
     override fun Content() {
+        ContentInternal(headerContent = null, isActive = { true })
+    }
+
+    @ExperimentalSharedTransitionApi
+    @Composable
+    fun Content(
+        headerContent: @Composable () -> Unit,
+        isActive: () -> Boolean,
+    ) {
+        ContentInternal(headerContent = headerContent, isActive = isActive)
+    }
+
+    @ExperimentalSharedTransitionApi
+    @Composable
+    private fun ContentInternal(
+        headerContent: (@Composable () -> Unit)?,
+        isActive: () -> Boolean,
+    ) {
         val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
+        val currentIsActive by rememberUpdatedState(isActive)
         // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
         LaunchedEffect(Unit) {
@@ -58,10 +78,8 @@ object FriendLocationPager : Pager {
         }
         LaunchedEffect(Unit) {
             SharedFlowCentre.toPagerTop.collect {
-                // 防止滑动时手动阻止滑动动画导致任务取消,监听失效的bug
-                kotlin.runCatching {
-                    lazyListState.animateScrollToFirst()
-                }
+                // 子任务承接手势取消，避免终止长期 Flow 监听。
+                if (currentIsActive()) launch { lazyListState.animateScrollToFirst() }
             }
         }
 
@@ -71,6 +89,7 @@ object FriendLocationPager : Pager {
             isRefreshing = friendLocationPagerModel.isRefreshing,
             lazyListState = lazyListState,
             doRefresh = friendLocationPagerModel::refreshFriendLocation,
+            headerContent = headerContent,
         )
 
     }
@@ -87,6 +106,7 @@ fun Pager.FriendLocationPager(
     isRefreshing: Boolean,
     lazyListState: LazyListState = rememberLazyListState(),
     doRefresh: suspend () -> Unit,
+    headerContent: (@Composable () -> Unit)? = null,
 ) {
     val navigator = currentNavigator
     // 只会有一个实例被打开
@@ -114,7 +134,7 @@ fun Pager.FriendLocationPager(
             sharedImageCacheKey = currentLocation.worldImageUrl,
         )
     }
-    val topPadding = 12.dp
+    val topPadding = if (headerContent == null) 12.dp else 0.dp
     val onClickUserIcon = { user: FriendData, sharedSuffixKey: String ->
         navigator push UserProfileScreen(
             userProfileVO = UserProfileVo(user),
@@ -146,6 +166,12 @@ fun Pager.FriendLocationPager(
                 bottom = bottomPadding
             )
         ) {
+
+            if (headerContent != null) {
+                item(key = "friend-location-header") {
+                    headerContent()
+                }
+            }
 
             if (!instanceFriendLocations.isNullOrEmpty()) {
                 item(key = LocationType.Instance) {

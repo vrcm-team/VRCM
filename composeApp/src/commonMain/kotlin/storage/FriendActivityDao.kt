@@ -126,12 +126,13 @@ internal interface FriendActivityDao {
             "WHERE ownerUserId = :ownerUserId AND " +
             "(occurredAtMillis > :oldestOccurredAtMillis OR " +
             "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
-            "ORDER BY occurredAtMillis DESC, id DESC"
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit"
     )
     fun observeAllEventsThrough(
         ownerUserId: String,
         oldestOccurredAtMillis: Long,
         oldestId: Long,
+        limit: Int,
     ): Flow<List<FriendActivityEventEntity>>
 
     @Query(
@@ -139,13 +140,14 @@ internal interface FriendActivityDao {
             "WHERE ownerUserId = :ownerUserId AND type IN (:types) AND " +
             "(occurredAtMillis > :oldestOccurredAtMillis OR " +
             "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
-            "ORDER BY occurredAtMillis DESC, id DESC"
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit"
     )
     fun observeAllEventsByTypesThrough(
         ownerUserId: String,
         types: List<String>,
         oldestOccurredAtMillis: Long,
         oldestId: Long,
+        limit: Int,
     ): Flow<List<FriendActivityEventEntity>>
 
     @Query(

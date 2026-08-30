@@ -5,6 +5,9 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -216,78 +219,109 @@ private fun HomeDestinationContent(
     timelineFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
-    val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
-    val stateHolder = rememberSaveableStateHolder()
     val timelineListState = rememberLazyListState()
+    val stateHolder = rememberSaveableStateHolder()
     val navigator = currentNavigator
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = model.selectedHomeTabIndex,
+        pageCount = { HomeTab.entries.size },
+    )
 
-    if (selectedTab == HomeTab.Activity) {
-        LaunchedEffect(timelineListState) {
-            SharedFlowCentre.toPagerTop.collect {
-                runCatching { timelineListState.animateScrollToItem(0) }
+    LaunchedEffect(pagerState, model) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page -> model.selectHomeTab(HomeTab.entries[page]) }
+    }
+    LaunchedEffect(timelineListState) {
+        SharedFlowCentre.toPagerTop.collect {
+            if (pagerState.settledPage == HomeTab.Activity.ordinal) {
+                launch { timelineListState.animateScrollToItem(0) }
             }
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-            HomeTab.entries.forEach { tab ->
-                Tab(
-                    selected = tab == selectedTab,
-                    onClick = {
-                        if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
-                        else model.selectHomeTab(tab)
-                    },
-                    text = {
-                        Text(
-                            if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        key = { HomeTab.entries[it].name },
+    ) { page ->
+        stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
+            val tabRow: @Composable () -> Unit = {
+                HomeTabRow(
+                    pagerState = pagerState,
+                    onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
+                )
+            }
+            when (HomeTab.entries[page]) {
+                HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                        FriendLocationPager.Content(
+                            headerContent = tabRow,
+                            isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
+                        )
+                    }
+                }
+                HomeTab.Activity -> FriendActivityTimelineContent(
+                    state = timelineState,
+                    filter = timelineFilter,
+                    onFilterSelected = timelineModel::selectFilter,
+                    onLoadMore = timelineModel::loadMore,
+                    onRetry = timelineModel::retry,
+                    onRetryLoadMore = timelineModel::retryLoadMore,
+                    onUserClick = { event ->
+                        navigator push UserProfileScreen(
+                            UserProfileVo(
+                                id = event.friendUserId,
+                                displayName = event.displayName,
+                                profileImageUrl = event.profileImageUrl,
+                            )
                         )
                     },
+                    onWorldClick = { event ->
+                        val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
+                        navigator push WorldProfileScreen(
+                            WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+                        )
+                    },
+                    listState = timelineListState,
+                    headerContent = tabRow,
+                    modifier = Modifier
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                        )
+                        .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
                 )
             }
         }
-        Box(Modifier.weight(1f)) {
-            stateHolder.SaveableStateProvider(selectedTab.name) {
-                when (selectedTab) {
-                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
-                        CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            FriendLocationPager.Content()
-                        }
+    }
+}
+
+@Composable
+private fun HomeTabRow(
+    pagerState: PagerState,
+    onReselect: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        HomeTab.entries.forEachIndexed { index, tab ->
+            Tab(
+                selected = index == pagerState.currentPage,
+                onClick = {
+                    if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                        onReselect()
+                    } else {
+                        scope.launch { pagerState.animateScrollToTab(index) }
                     }
-                    HomeTab.Activity -> FriendActivityTimelineContent(
-                        state = timelineState,
-                        filter = timelineFilter,
-                        onFilterSelected = timelineModel::selectFilter,
-                        onLoadMore = timelineModel::loadMore,
-                        onRetry = timelineModel::retry,
-                        onRetryLoadMore = timelineModel::retryLoadMore,
-                        onUserClick = { event ->
-                            navigator push UserProfileScreen(
-                                UserProfileVo(
-                                    id = event.friendUserId,
-                                    displayName = event.displayName,
-                                    profileImageUrl = event.profileImageUrl,
-                                )
-                            )
-                        },
-                        onWorldClick = { event ->
-                            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
-                            navigator push WorldProfileScreen(
-                                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
-                            )
-                        },
-                        listState = timelineListState,
-                        modifier = Modifier
-                            .windowInsetsPadding(
-                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                            )
-                            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
+                },
+                text = {
+                    Text(
+                        if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                }
-            }
+                },
+            )
         }
     }
 }

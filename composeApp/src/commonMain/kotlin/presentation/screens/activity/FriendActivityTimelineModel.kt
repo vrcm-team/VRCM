@@ -65,6 +65,7 @@ internal interface FriendActivityTimelineSource {
         token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         cursor: FriendActivityTimelineCursor,
+        limit: Int,
     ): Flow<List<FriendActivityEvent>>
 }
 
@@ -98,11 +99,13 @@ private class ServiceFriendActivityTimelineSource(
         token: AccountSessionToken,
         types: Set<FriendActivityEventType>,
         cursor: FriendActivityTimelineCursor,
+        limit: Int,
     ) = service.observeAllEventsThrough(
         token = token,
         types = types,
         oldestOccurredAtMillis = cursor.occurredAtMillis,
         oldestId = cursor.id,
+        limit = limit,
     )
 }
 
@@ -122,7 +125,9 @@ class FriendActivityTimelineModel internal constructor(
     private var generation = 0L
     private var activeToken: AccountSessionToken? = null
     private var oldestCursor: FriendActivityTimelineCursor? = null
+    private var loadedRowCount = 0
     private var hasMore = false
+    private var snapshotRevision = 0L
     private var snapshotJob: Job? = null
     private var loadMoreJob: Job? = null
 
@@ -135,7 +140,9 @@ class FriendActivityTimelineModel internal constructor(
                 val currentGeneration = ++generation
                 activeToken = token
                 oldestCursor = null
+                loadedRowCount = 0
                 hasMore = false
+                snapshotRevision++
                 snapshotJob?.cancel()
                 loadMoreJob?.cancel()
                 if (token == null) {
@@ -155,6 +162,7 @@ class FriendActivityTimelineModel internal constructor(
                         }
 
                         val loaded = page.take(pageSize)
+                        loadedRowCount = loaded.size
                         oldestCursor = loaded.last().toCursor()
                         hasMore = page.size > pageSize
                         _state.value = FriendActivityTimelineState.Content(
@@ -202,15 +210,17 @@ class FriendActivityTimelineModel internal constructor(
                 ).first()
                 if (!isCurrent(currentGeneration, token, currentFilter)) return@launch
                 val loaded = page.take(pageSize)
-                hasMore = page.size > pageSize
                 if (loaded.isEmpty()) {
                     val latest = _state.value as? FriendActivityTimelineState.Content ?: return@launch
+                    if (cursor == oldestCursor) hasMore = false
                     _state.value = latest.copy(
-                        hasMore = false,
+                        hasMore = hasMore,
                         isLoadingMore = false,
                         loadMoreError = false,
                     )
                 } else {
+                    hasMore = page.size > pageSize
+                    loadedRowCount += loaded.size
                     oldestCursor = loaded.last().toCursor()
                     observeLoadedSnapshot(
                         currentGeneration,
@@ -244,18 +254,32 @@ class FriendActivityTimelineModel internal constructor(
         completesLoadMore: Boolean = false,
     ) {
         val cursor = oldestCursor ?: return
+        val visibleRowLimit = loadedRowCount
+        if (visibleRowLimit <= 0) return
+        val currentSnapshotRevision = ++snapshotRevision
         snapshotJob?.cancel()
         snapshotJob = viewModelScope.launch {
             var firstSnapshot = true
             try {
-                source.observeThrough(token, filter.eventTypes, cursor).collect { snapshot ->
-                    if (!isCurrent(currentGeneration, token, filter) || cursor != oldestCursor) {
+                // The extra raw row detects a head insertion that displaced the loaded tail before deduplication.
+                source.observeThrough(
+                    token = token,
+                    types = filter.eventTypes,
+                    cursor = cursor,
+                    limit = visibleRowLimit + 1,
+                ).collect { snapshot ->
+                    if (!isCurrent(currentGeneration, token, filter) ||
+                        currentSnapshotRevision != snapshotRevision
+                    ) {
                         return@collect
                     }
+                    val visibleRows = snapshot.take(visibleRowLimit)
                     val current = _state.value as? FriendActivityTimelineState.Content
                     if (snapshot.isEmpty()) hasMore = false
+                    if (snapshot.size > visibleRowLimit) hasMore = true
+                    oldestCursor = visibleRows.lastOrNull()?.toCursor()
                     _state.value = FriendActivityTimelineState.Content(
-                        events = snapshot.normalizeActivityEvents(),
+                        events = visibleRows.normalizeActivityEvents(),
                         hasMore = hasMore,
                         isLoadingMore = if (completesLoadMore && firstSnapshot) false else {
                             current?.isLoadingMore == true
