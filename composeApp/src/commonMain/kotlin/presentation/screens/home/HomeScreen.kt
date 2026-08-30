@@ -5,6 +5,9 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -207,46 +210,82 @@ private fun HomeDestinationContent(
     model: HomeScreenModel,
     hasBottomNavigation: Boolean,
 ) {
-    val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
     val stateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = model.selectedHomeTabIndex,
+        pageCount = { HomeTab.entries.size },
+    )
 
-    Column(Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-            HomeTab.entries.forEach { tab ->
-                Tab(
-                    selected = tab == selectedTab,
-                    onClick = {
-                        if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
-                        else model.selectHomeTab(tab)
-                    },
-                    text = {
-                        Text(
-                            if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
+    LaunchedEffect(pagerState, model) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page -> model.selectHomeTab(HomeTab.entries[page]) }
+    }
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        key = { HomeTab.entries[it].name },
+    ) { page ->
+        stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
+            val tabRow: @Composable () -> Unit = {
+                HomeTabRow(
+                    pagerState = pagerState,
+                    onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
                 )
             }
-        }
-        Box(Modifier.weight(1f)) {
-            stateHolder.SaveableStateProvider(selectedTab.name) {
-                when (selectedTab) {
-                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
-                        CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            FriendLocationPager.Content()
-                        }
+            when (HomeTab.entries[page]) {
+                HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                        FriendLocationPager.Content(
+                            headerContent = tabRow,
+                            isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
+                        )
                     }
-                    HomeTab.Activity -> FriendActivityTimelineDestination(hasBottomNavigation)
                 }
+                HomeTab.Activity -> FriendActivityTimelineDestination(
+                    hasBottomNavigation = hasBottomNavigation,
+                    headerContent = tabRow,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FriendActivityTimelineDestination(hasBottomNavigation: Boolean) {
+private fun HomeTabRow(
+    pagerState: PagerState,
+    onReselect: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        HomeTab.entries.forEachIndexed { index, tab ->
+            Tab(
+                selected = index == pagerState.currentPage,
+                onClick = {
+                    if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                        onReselect()
+                    } else {
+                        scope.launch { pagerState.animateScrollToTab(index) }
+                    }
+                },
+                text = {
+                    Text(
+                        if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendActivityTimelineDestination(
+    hasBottomNavigation: Boolean,
+    headerContent: @Composable () -> Unit,
+) {
     val model: FriendActivityTimelineModel = koinViewModel()
     val state by model.state.collectAsState()
     val filter by model.filter.collectAsState()
@@ -282,6 +321,7 @@ private fun FriendActivityTimelineDestination(hasBottomNavigation: Boolean) {
             )
         },
         listState = listState,
+        headerContent = headerContent,
         modifier = Modifier
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),

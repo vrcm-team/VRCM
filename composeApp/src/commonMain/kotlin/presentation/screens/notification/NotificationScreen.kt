@@ -41,12 +41,12 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.isGroupNotificationType
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 @Serializable
 data class NotificationScreen(val targetNotificationId: String? = null) : AppDetailRoute {

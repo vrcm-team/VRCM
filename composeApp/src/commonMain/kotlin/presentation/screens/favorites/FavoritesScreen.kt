@@ -3,9 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.favorites
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -24,6 +25,9 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
@@ -41,11 +45,13 @@ private fun FavoritesScreenContent(
 ) {
     val navigator = currentNavigator
     val favoriteLocale = strings
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
     val searchText by favoritesModel.searchText.collectAsState()
     val refreshingTabs by favoritesModel.refreshingTabs.collectAsState()
     val refreshErrors by favoritesModel.refreshErrors.collectAsState()
-    val listStates = List(2) { rememberLazyListState() }
+    val worldListState = rememberLazyListState()
+    val avatarListState = rememberLazyListState()
 
     val worlds by favoritesModel.worldList.collectAsState()
     val avatars by favoritesModel.avatarList.collectAsState()
@@ -55,7 +61,8 @@ private fun FavoritesScreenContent(
     val avatarOptions by favoritesModel.avatarGroupOptions.collectAsState()
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
-    val modelTabIndex = selectedTab + 1
+    val settledPage = pagerState.settledPage
+    val modelTabIndex = settledPage + 1
 
     SideEffect {
         favoritesModel.updateFavoriteLocale(favoriteLocale)
@@ -63,8 +70,21 @@ private fun FavoritesScreenContent(
     LaunchedEffect(Unit) {
         favoritesModel.activateFavoritesPage()
     }
-    LaunchedEffect(selectedTab) {
-        favoritesModel.syncSelectedTabIndex(modelTabIndex)
+    LaunchedEffect(pagerState, favoritesModel) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page -> favoritesModel.syncSelectedTabIndex(page + 1) }
+    }
+    LaunchedEffect(pagerState, favoritesModel) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .drop(1)
+            .collect { page ->
+                favoritesModel.refreshCurrentTabCacheData(
+                    showRefreshing = false,
+                    tabIndex = page + 1,
+                )
+            }
     }
 
     Scaffold(
@@ -87,13 +107,12 @@ private fun FavoritesScreenContent(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             val tabs = listOf(strings.worlds, strings.avatars)
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
+            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedTab == index,
+                        selected = pagerState.currentPage == index,
                         onClick = {
-                            selectedTab = index
-                            favoritesModel.setSelectedTabIndex(index + 1)
+                            coroutineScope.launch { pagerState.animateScrollToTab(index) }
                         },
                         text = {
                             Text(
@@ -111,36 +130,60 @@ private fun FavoritesScreenContent(
                 value = searchText,
                 onValueChange = favoritesModel::setSearchText,
             )
-            when (selectedTab) {
+            when (settledPage) {
                 0 -> GroupOptionsUI(worldOptions, FavoriteType.World, worldGroups, worldTotal, strings.friendListPagerAllWorlds, favoritesModel::updateWorldGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
                 1 -> GroupOptionsUI(avatarOptions, FavoriteType.Avatar, avatarGroups, avatarTotal, strings.friendListPagerAllAvatars, favoritesModel::updateAvatarGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
             }
             val loading = modelTabIndex in refreshingTabs
-            val error = refreshErrors[modelTabIndex]
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Box(Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    state = listStates[selectedTab],
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    when (selectedTab) {
-                        0 -> renderWorldItems(worlds) { world, suffix -> if (!world.isHiddenWorld()) navigator push WorldProfileScreen(WorldProfileVo(world), suffix, world.safeImageUrl().orEmpty()) }
-                        1 -> renderAvatarItems(avatars) { avatar, suffix -> if (avatar.releaseStatus != "hidden") navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix) }
+            Box(Modifier.fillMaxWidth().height(4.dp)) {
+                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                key = { if (it == 0) "favorites-worlds" else "favorites-avatars" },
+            ) { page ->
+                val pageModelTabIndex = page + 1
+                val pageLoading = pageModelTabIndex in refreshingTabs
+                val pageError = refreshErrors[pageModelTabIndex]
+                val pageItemsEmpty = if (page == 0) worlds.isEmpty() else avatars.isEmpty()
+                Box(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = if (page == 0) worldListState else avatarListState,
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        when (page) {
+                            0 -> renderWorldItems(worlds) { world, suffix ->
+                                if (!world.isHiddenWorld()) {
+                                    navigator push WorldProfileScreen(
+                                        WorldProfileVo(world),
+                                        suffix,
+                                        world.safeImageUrl().orEmpty(),
+                                    )
+                                }
+                            }
+                            1 -> renderAvatarItems(avatars) { avatar, suffix ->
+                                if (avatar.releaseStatus != "hidden") {
+                                    navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
+                                }
+                            }
+                        }
                     }
-                }
-                val empty = when (selectedTab) {
-                    0 -> worlds.isEmpty()
-                    else -> avatars.isEmpty()
-                }
-                if (loading && empty) CircularProgressIndicator(Modifier.align(Alignment.Center))
-                else if (error != null && empty) StateMessage(strings.favoritesLoadFailed, strings.retry) {
-                    favoritesModel.refreshCurrentTabCacheData(tabIndex = modelTabIndex)
-                }
-                else if (empty) StateMessage(strings.favoritesEmpty, null, null)
-                else if (error != null) ErrorBanner(strings.favoritesLoadFailed) {
-                    favoritesModel.refreshCurrentTabCacheData(tabIndex = modelTabIndex)
+                    if (pageLoading && pageItemsEmpty) {
+                        CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    } else if (pageError != null && pageItemsEmpty) {
+                        StateMessage(strings.favoritesLoadFailed, strings.retry) {
+                            favoritesModel.refreshCurrentTabCacheData(tabIndex = pageModelTabIndex)
+                        }
+                    } else if (pageItemsEmpty) {
+                        StateMessage(strings.favoritesEmpty, null, null)
+                    } else if (pageError != null) {
+                        ErrorBanner(strings.favoritesLoadFailed) {
+                            favoritesModel.refreshCurrentTabCacheData(tabIndex = pageModelTabIndex)
+                        }
+                    }
                 }
             }
         }
