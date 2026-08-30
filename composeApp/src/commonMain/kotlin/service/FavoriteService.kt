@@ -41,6 +41,7 @@ class FavoriteService(
     private val favoriteLocalDao: FavoriteLocalDao,
 ) {
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val favoritesByGroupCache = FavoriteGroupCache()
     private var favoritesOwnerUserId: String? = SharedFlowCentre.currentSession.value?.token?.userId
     private var favoritesOwnerToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken? =
@@ -52,7 +53,7 @@ class FavoriteService(
     private var _favoriteLimits: FavoriteLimits? = null
 
     init {
-        CoroutineScope(Dispatchers.Default).launch {
+        serviceScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 val nextUserId = session?.token?.userId
                 cacheMutex.withLock {
@@ -76,7 +77,7 @@ class FavoriteService(
 
 
     init {
-        CoroutineScope(Job()).launch(Dispatchers.IO) {
+        serviceScope.launch(Dispatchers.IO) {
             loadFavoriteLimits()
         }
     }
@@ -259,4 +260,7 @@ class FavoriteService(
     fun getFavoriteByFavoriteId(favoriteType: FavoriteType, favoriteId: String): FavoriteData? =
         favoritesByGroup(favoriteType).value.values.flatten().firstOrNull { it.favoriteId == favoriteId }
 
+    internal fun dispose() {
+        serviceScope.cancel()
+    }
 }

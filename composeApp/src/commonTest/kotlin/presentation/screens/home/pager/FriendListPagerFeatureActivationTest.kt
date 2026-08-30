@@ -123,6 +123,7 @@ private class FeatureActivationFixture(
     val requests: FeatureRequestRecorder,
     val friendListsBeforeFeatures: Int,
     private val friendService: FriendService,
+    private val favoriteService: FavoriteService,
     private val client: HttpClient,
 ) {
     suspend fun awaitFavoritesRefresh() {
@@ -148,6 +149,7 @@ private class FeatureActivationFixture(
             clear()
         }
         friendService.dispose()
+        favoriteService.dispose()
         SharedFlowCentre.emitLogout()
         client.close()
     }
@@ -208,6 +210,7 @@ private suspend fun createFixture(): FeatureActivationFixture {
         requests = requests,
         friendListsBeforeFeatures = friendListsBeforeFeatures,
         friendService = friendService,
+        favoriteService = favoriteService,
         client = client,
     )
 }
