@@ -35,6 +35,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -116,6 +117,25 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
             fixture.close()
         }
     }
+
+    @Test
+    fun repeatedDirectoryActivationKeepsSingleRefreshInFlight() = runBlocking {
+        val fixture = createFixture(blockFirstFriendFavoriteGroupRequest = true)
+        try {
+            fixture.model.activateFriendDirectory()
+            fixture.awaitFriendFavoriteGroupRequest()
+            val friendListsBeforeDirectoryRefresh = fixture.requests.friendLists
+
+            fixture.model.activateFriendDirectory()
+            fixture.releaseFriendFavoriteGroupRequest()
+            fixture.awaitFriendDirectoryRefresh()
+
+            assertEquals(1, fixture.requests.favoriteGroups(FavoriteType.Friend))
+            assertTrue(fixture.requests.friendLists > friendListsBeforeDirectoryRefresh)
+        } finally {
+            fixture.close()
+        }
+    }
 }
 
 private class FeatureActivationFixture(
@@ -143,7 +163,16 @@ private class FeatureActivationFixture(
         }
     }
 
+    suspend fun awaitFriendFavoriteGroupRequest() {
+        requests.awaitFriendFavoriteGroupRequest()
+    }
+
+    fun releaseFriendFavoriteGroupRequest() {
+        requests.releaseFriendFavoriteGroupRequest()
+    }
+
     suspend fun close() {
+        requests.releaseFriendFavoriteGroupRequest()
         ViewModelStore().apply {
             put("feature-activation", model)
             clear()
@@ -155,11 +184,13 @@ private class FeatureActivationFixture(
     }
 }
 
-private suspend fun createFixture(): FeatureActivationFixture {
+private suspend fun createFixture(
+    blockFirstFriendFavoriteGroupRequest: Boolean = false,
+): FeatureActivationFixture {
     SharedFlowCentre.emitLogout()
     val account = AccountDto(userId = "usr_a", username = "a")
     SharedFlowCentre.emitAuthenticated(account)
-    val requests = FeatureRequestRecorder()
+    val requests = FeatureRequestRecorder(blockFirstFriendFavoriteGroupRequest)
     val json = Json { ignoreUnknownKeys = true }
     val client = featureActivationClient(requests, json)
     val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
@@ -215,24 +246,42 @@ private suspend fun createFixture(): FeatureActivationFixture {
     )
 }
 
-private class FeatureRequestRecorder {
+private class FeatureRequestRecorder(
+    private val blockFirstFriendFavoriteGroupRequest: Boolean,
+) {
     private val friendFavoriteGroups = atomic(0)
     private val worldFavoriteGroups = atomic(0)
     private val avatarFavoriteGroups = atomic(0)
     private val friendListRequests = atomic(0)
     private val worldListRequests = atomic(0)
     private val avatarListRequests = atomic(0)
+    private val firstFriendFavoriteGroupRequestStarted = CompletableDeferred<Unit>()
+    private val releaseFirstFriendFavoriteGroupRequest = CompletableDeferred<Unit>()
 
     val friendLists: Int get() = friendListRequests.value
     val worldLists: Int get() = worldListRequests.value
     val avatarLists: Int get() = avatarListRequests.value
 
-    fun recordFavoriteGroup(type: FavoriteType) {
+    suspend fun recordFavoriteGroup(type: FavoriteType) {
         when (type) {
-            FavoriteType.Friend -> friendFavoriteGroups.incrementAndGet()
+            FavoriteType.Friend -> {
+                val requestNumber = friendFavoriteGroups.incrementAndGet()
+                if (blockFirstFriendFavoriteGroupRequest && requestNumber == 1) {
+                    firstFriendFavoriteGroupRequestStarted.complete(Unit)
+                    releaseFirstFriendFavoriteGroupRequest.await()
+                }
+            }
             FavoriteType.World -> worldFavoriteGroups.incrementAndGet()
             FavoriteType.Avatar -> avatarFavoriteGroups.incrementAndGet()
         }
+    }
+
+    suspend fun awaitFriendFavoriteGroupRequest() {
+        withTimeout(3_000) { firstFriendFavoriteGroupRequestStarted.await() }
+    }
+
+    fun releaseFriendFavoriteGroupRequest() {
+        releaseFirstFriendFavoriteGroupRequest.complete(Unit)
     }
 
     fun recordFriendList() {
