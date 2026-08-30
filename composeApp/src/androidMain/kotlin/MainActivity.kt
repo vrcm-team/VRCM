@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm
 
-import android.graphics.Color
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -18,6 +20,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
+        updateRequestedOrientation(resources.configuration)
         if (savedInstanceState == null) {
             submitOfficialLink(intent)
             intent.submitNotificationLaunch(notificationLaunchInbox)
@@ -36,6 +39,11 @@ class MainActivity : ComponentActivity() {
                 notificationLaunchInbox = notificationLaunchInbox,
             )
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        updateRequestedOrientation(newConfig)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -61,7 +69,23 @@ class MainActivity : ComponentActivity() {
         intent.dataString?.let(officialLinkInbox::submit)
     }
 
+    private fun updateRequestedOrientation(configuration: Configuration) {
+        val smallestWidthDp = configuration.smallestScreenWidthDp
+        val targetOrientation = if (
+            smallestWidthDp != Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED &&
+            smallestWidthDp < WIDE_SCREEN_MIN_WIDTH_DP
+        ) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        if (requestedOrientation != targetOrientation) {
+            requestedOrientation = targetOrientation
+        }
+    }
+
     private companion object {
+        const val WIDE_SCREEN_MIN_WIDTH_DP = 600
         const val PENDING_OFFICIAL_LINK_KEY = "pending-official-link"
         const val PENDING_NOTIFICATION_DESTINATION_KEY = "pending-notification-destination"
         const val PENDING_NOTIFICATION_TARGET_ID_KEY = "pending-notification-target-id"
