@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.data
 
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
+import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
 
 data class NotificationItemData(
     val id: String,
@@ -12,6 +13,11 @@ data class NotificationItemData(
     val link: String?,
     val type: String,
     val actions: List<ActionData>,
+    val seen: Boolean = false,
+    val canDelete: Boolean = false,
+    val groupId: String? = null,
+    val groupName: String? = null,
+    val announcementTitle: String? = null,
     /** The selected default or custom Boop emoji identifier, when VRChat supplies it. */
     val boopEmojiId: String? = null,
     /** Pipeline events can reference this inbox item through a different notification ID. */
@@ -32,11 +38,12 @@ data class NotificationItemData(
         val data: String,
         val type: String,
         val icon: String = "",
+        val label: String = "",
     )
 
     constructor(n: NotificationData) : this(
         id = n.id,
-        imageUrl = n.imageUrl.orEmpty(),
+        imageUrl = (n.imageUrl ?: n.details?.imageUrl ?: n.data.imageUrl).orEmpty(),
         title = n.title,
         message = n.message,
         createdAt = n.createdAt,
@@ -48,13 +55,42 @@ data class NotificationItemData(
                 data = responses.responseData,
                 type = responses.type,
                 icon = responses.icon,
+                label = responses.text,
             )
         },
+        seen = n.seen,
+        canDelete = n.canDelete,
+        groupId = n.groupId ?: n.details?.groupId ?: n.data.groupId,
+        groupName = n.details?.groupName ?: n.data.groupName,
+        announcementTitle = n.details?.announcementTitle ?: n.data.announcementTitle,
         relatedNotificationId = n.relatedNotificationsId,
         boopEmojiId = n.details?.emojiId ?: n.data.emojiId,
     )
 
+    constructor(
+        n: NotificationDataV2,
+        imageUrl: String,
+        title: String,
+        actions: List<ActionData>,
+    ) : this(
+        id = n.id,
+        imageUrl = imageUrl,
+        title = title,
+        message = n.message,
+        createdAt = n.createdAt,
+        senderUserId = n.senderUserId,
+        link = "user:${n.senderUserId}",
+        type = n.type.value,
+        actions = actions,
+        seen = n.seen,
+        canDelete = true,
+    )
+
 }
+
+/** Number of notifications that still need the user's attention. */
+val List<NotificationItemData>.unreadCount: Int
+    get() = count { !it.seen }
 
 /** Resolves either the inbox ID or the related Pipeline event ID to its rendered item. */
 internal fun List<NotificationItemData>.indexOfNotificationTarget(targetId: String?): Int {

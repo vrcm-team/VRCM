@@ -41,6 +41,20 @@ class NotificationApiTest {
         client.close()
     }
 
+    @Test
+    fun markAsReadUsesSeeEndpointWithoutDeleting() = runBlocking {
+        val requests = mutableListOf<Pair<HttpMethod, String>>()
+        val client = notificationClient { method, path -> requests += method to path }
+
+        NotificationApi(client).markNotificationAsRead("not_unread")
+
+        assertEquals(
+            listOf(HttpMethod.Put to "/api/1/auth/user/notifications/not_unread/see"),
+            requests,
+        )
+        client.close()
+    }
+
     private fun notificationClient(onRequest: (HttpMethod, String) -> Unit) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->
