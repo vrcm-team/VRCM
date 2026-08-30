@@ -191,11 +191,7 @@ object HomeScreen : AppListRoute {
                                     )
                                     HomeDestination.Search -> SearchListPager.Content()
                                     HomeDestination.Notifications -> NotificationCenterContent(
-                                        modifier = if (useRail || !showMainNavigation) {
-                                            Modifier
-                                        } else {
-                                            Modifier.padding(bottom = 80.dp)
-                                        },
+                                        bottomNavigationPadding = if (!useRail && showMainNavigation) 80.dp else 0.dp,
                                         showTopBar = false,
                                     )
                                     HomeDestination.Friends -> FriendListPager.Content()

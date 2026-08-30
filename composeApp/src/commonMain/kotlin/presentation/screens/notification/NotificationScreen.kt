@@ -17,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
@@ -65,6 +67,7 @@ fun NotificationCenterContent(
     targetNotificationId: String? = null,
     showBackButton: Boolean = false,
     showTopBar: Boolean = true,
+    bottomNavigationPadding: Dp = 0.dp,
 ) {
     val model = koinInject<NotificationCenterModel>()
     val navigator = LocalNavigator.currentOrThrow
@@ -104,6 +107,8 @@ fun NotificationCenterContent(
 
     Scaffold(
         modifier = modifier,
+        containerColor = if (showTopBar) MaterialTheme.colorScheme.background else Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = if (showTopBar) {
             ScaffoldDefaults.contentWindowInsets
         } else {
@@ -133,17 +138,21 @@ fun NotificationCenterContent(
             }
         },
     ) { padding ->
+        val centerStateModifier = Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .padding(bottom = bottomNavigationPadding)
         when {
             model.isRefreshing && notifications.isEmpty() -> CenterState(
-                Modifier.fillMaxSize().padding(padding),
+                centerStateModifier,
             ) { CircularProgressIndicator() }
             model.hasRefreshError && notifications.isEmpty() -> CenterState(
-                Modifier.fillMaxSize().padding(padding),
+                centerStateModifier,
             ) {
                 Text(strings.notificationRefreshFailed, textAlign = TextAlign.Center)
                 TextButton(onClick = model::refreshAllNotification) { Text(strings.retry) }
             }
-            notifications.isEmpty() -> CenterState(Modifier.fillMaxSize().padding(padding)) {
+            notifications.isEmpty() -> CenterState(centerStateModifier) {
                 Text(strings.homeNotificationEmpty, textAlign = TextAlign.Center)
             }
             else -> LazyColumn(
@@ -153,7 +162,7 @@ fun NotificationCenterContent(
                     start = 12.dp,
                     top = padding.calculateTopPadding() + 12.dp,
                     end = 12.dp,
-                    bottom = padding.calculateBottomPadding() + 12.dp,
+                    bottom = padding.calculateBottomPadding() + bottomNavigationPadding + 12.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
