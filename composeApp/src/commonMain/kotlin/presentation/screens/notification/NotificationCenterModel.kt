@@ -1,8 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.notification
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -14,7 +11,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.BoopNotificationResolver
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationInboxState
-import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationIdentity
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationReadTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationResponseTarget
@@ -35,6 +31,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -49,32 +46,32 @@ class NotificationCenterModel(
     private val friendService: FriendService,
     private val logger: Logger,
     private val boopService: BoopService,
-) {
-    private val modelScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+) : AutoCloseable {
+    private val modelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val boopNotificationResolver = BoopNotificationResolver()
     private val refreshRequests = Channel<AccountSessionToken>(Channel.CONFLATED)
     private var refreshJob: Job? = null
-
-    private var inboxState by mutableStateOf(NotificationInboxState())
+    private val stateStore = NotificationCenterStateStore(
+        scope = modelScope,
+        initialState = NotificationCenterUiState(
+            sessionToken = SharedFlowCentre.currentSession.value?.token,
+        ),
+        reducerDispatcher = Dispatchers.Main.immediate,
+    )
+    private val state: NotificationCenterUiState
+        get() = stateStore.value
 
     val notifications: List<NotificationItemData>
-        get() = inboxState.pipeline
+        get() = state.inboxState.pipeline
 
     val friendRequestNotifications: List<NotificationItemData>
-        get() = inboxState.legacy
+        get() = state.inboxState.legacy
 
-    private var pendingNotificationActions by
-        mutableStateOf<Map<NotificationIdentity, NotificationItemData.ActionData>>(emptyMap())
+    val isRefreshing: Boolean
+        get() = state.isRefreshing
 
-    private var pendingReadNotifications by mutableStateOf<Set<NotificationIdentity>>(emptySet())
-
-    private var pendingDeleteNotifications by mutableStateOf<Set<NotificationIdentity>>(emptySet())
-
-    var isRefreshing by mutableStateOf(false)
-        private set
-
-    var hasRefreshError by mutableStateOf(false)
-        private set
+    val hasRefreshError: Boolean
+        get() = state.hasRefreshError
 
     val unreadCount: Int
         get() = (friendRequestNotifications + notifications).unreadCount
@@ -92,12 +89,7 @@ class NotificationCenterModel(
         modelScope.launch {
             SharedFlowCentre.currentSession.collectLatest { session ->
                 refreshJob?.cancel()
-                inboxState = NotificationInboxState()
-                pendingNotificationActions = emptyMap()
-                pendingReadNotifications = emptySet()
-                pendingDeleteNotifications = emptySet()
-                isRefreshing = false
-                hasRefreshError = false
+                reduceState { NotificationCenterUiState(sessionToken = session?.token) }
                 session?.token?.let(::queueNotificationRefresh)
             }
         }
@@ -119,8 +111,7 @@ class NotificationCenterModel(
 
     private suspend fun refreshAllNotification(token: AccountSessionToken) {
         if (!SharedFlowCentre.isCurrentSession(token)) return
-        isRefreshing = true
-        hasRefreshError = false
+        reduceForSession(token) { it.copy(isRefreshing = true, hasRefreshError = false) }
         try {
             val (friendRequestsResult, notificationsResult) = supervisorScope {
                 async { loadFriendRequests() } to async { loadNotifications() }
@@ -132,18 +123,40 @@ class NotificationCenterModel(
             friendRequestsResult
                 .onFailure { if (it is CancellationException) throw it }
                 .onNotificationFailure()
-                .onSuccess {
-                    inboxState = inboxState.replace(NotificationSource.LEGACY, it)
-                }
             notificationsResult
                 .onFailure { if (it is CancellationException) throw it }
                 .onNotificationFailure()
-                .onSuccess {
-                    inboxState = inboxState.replace(NotificationSource.PIPELINE, it)
-                }
-            hasRefreshError = friendRequestsResult.isFailure || notificationsResult.isFailure
+            reduceForSession(token) { current ->
+                val withFriendRequests = friendRequestsResult.getOrNull()?.let { notifications ->
+                    current.inboxState.replace(NotificationSource.LEGACY, notifications)
+                } ?: current.inboxState
+                val refreshedInbox = notificationsResult.getOrNull()?.let { notifications ->
+                    withFriendRequests.replace(NotificationSource.PIPELINE, notifications)
+                } ?: withFriendRequests
+                current.copy(
+                    inboxState = refreshedInbox,
+                    hasRefreshError = friendRequestsResult.isFailure || notificationsResult.isFailure,
+                )
+            }
         } finally {
-            if (SharedFlowCentre.isCurrentSession(token)) isRefreshing = false
+            if (SharedFlowCentre.isCurrentSession(token)) {
+                reduceForSession(token) { it.copy(isRefreshing = false) }
+            }
+        }
+    }
+
+    private fun reduceState(
+        reducer: (NotificationCenterUiState) -> NotificationCenterUiState,
+    ) {
+        stateStore.reduce(reducer)
+    }
+
+    private fun reduceForSession(
+        token: AccountSessionToken,
+        reducer: (NotificationCenterUiState) -> NotificationCenterUiState,
+    ) {
+        reduceState { current ->
+            if (current.sessionToken == token) reducer(current) else current
         }
     }
 
@@ -195,7 +208,6 @@ class NotificationCenterModel(
         boopAlreadySentMessage: String,
         boopDisabledMessage: String,
     ) {
-        if (isNotificationPending(item)) return
         val responseTarget = item.responseTarget(action)
         if (responseTarget == NotificationResponseTarget.NAVIGATION_LINK) return
         if (
@@ -205,102 +217,96 @@ class NotificationCenterModel(
             deleteNotification(item)
             return
         }
-        pendingNotificationActions += item.identity to action
-        val token = SharedFlowCentre.currentSession.value?.token
-        if (token == null) {
-            finishNotificationAction(item)
-            return
-        }
-
-        when (responseTarget) {
-            NotificationResponseTarget.BOOP_USER_API -> {
-                val senderId = item.senderId
-                if (senderId == null) {
-                    finishNotificationAction(item)
-                    return
+        launchReservedMutation(item, PendingNotificationMutation.Action(action)) { token ->
+            when (responseTarget) {
+                NotificationResponseTarget.BOOP_USER_API -> {
+                    val senderId = item.senderId ?: return@launchReservedMutation
+                    boopUser(
+                        item = item,
+                        token = token,
+                        userId = senderId,
+                        emojiId = boopEmojiId,
+                        successMessage = boopSuccessMessage,
+                        alreadySentMessage = boopAlreadySentMessage,
+                        disabledMessage = boopDisabledMessage,
+                    )
                 }
-                boopUser(
-                    item = item,
-                    token = token,
-                    userId = senderId,
-                    emojiId = boopEmojiId,
-                    successMessage = boopSuccessMessage,
-                    alreadySentMessage = boopAlreadySentMessage,
-                    disabledMessage = boopDisabledMessage,
-                )
-                return
+
+                NotificationResponseTarget.NOTIFICATION_API -> {
+                    if (item.type == NotificationType.FriendRequest.value) {
+                        notificationAction(item, token) { notificationApi.acceptFriendRequest(item.id) }
+                    } else {
+                        notificationAction(item, token) {
+                            notificationApi.responseNotification(item.id, action)
+                        }
+                    }
+                }
+
+                NotificationResponseTarget.NAVIGATION_LINK -> Unit
             }
-
-            NotificationResponseTarget.NOTIFICATION_API -> Unit
-            NotificationResponseTarget.NAVIGATION_LINK -> return
-        }
-
-        if (item.type == NotificationType.FriendRequest.value) {
-            notificationAction(item, token) { notificationApi.acceptFriendRequest(item.id) }
-        } else {
-            notificationAction(item, token) { notificationApi.responseNotification(item.id, action) }
         }
     }
 
     fun markNotificationAsRead(item: NotificationItemData) {
-        if (item.seen || isNotificationPending(item)) return
-        val token = SharedFlowCentre.currentSession.value?.token ?: return
-        pendingReadNotifications += item.identity
-        modelScope.launch(Dispatchers.IO) {
-            try {
-                val result = runNotificationMutation(token) {
-                    when (item.readTarget) {
-                        NotificationReadTarget.PIPELINE_SEE ->
-                            notificationApi.markPipelineNotificationAsRead(item.id)
-                        NotificationReadTarget.LEGACY_SEE ->
-                            notificationApi.markLegacyNotificationAsRead(item.id)
-                    }
-                } ?: return@launch
-                result
-                    .onNotificationFailure()
-                    .onSuccess {
-                        if (SharedFlowCentre.isCurrentSession(token)) {
-                            inboxState = inboxState.markSeen(item)
-                        }
-                    }
-            } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) {
-                    pendingReadNotifications -= item.identity
+        if (item.seen) return
+        launchReservedMutation(item, PendingNotificationMutation.Read) { token ->
+            val result = runNotificationMutation(token) {
+                when (item.readTarget) {
+                    NotificationReadTarget.PIPELINE_SEE ->
+                        notificationApi.markPipelineNotificationAsRead(item.id)
+                    NotificationReadTarget.LEGACY_SEE ->
+                        notificationApi.markLegacyNotificationAsRead(item.id)
                 }
-            }
+            } ?: return@launchReservedMutation
+            result
+                .onNotificationFailure()
+                .onSuccess {
+                    reduceForSession(token) { current ->
+                        current.copy(inboxState = current.inboxState.markSeen(item))
+                    }
+                }
         }
     }
 
     fun deleteNotification(item: NotificationItemData) {
-        if (isNotificationPending(item)) return
+        launchReservedMutation(item, PendingNotificationMutation.Delete) { token ->
+            val result = runNotificationMutation(token) {
+                deleteRemoteNotification(item)
+            } ?: return@launchReservedMutation
+            reduceForSession(token) { current ->
+                current.copy(
+                    inboxState = current.inboxState.afterNotificationAction(item, result),
+                )
+            }
+            result.onNotificationFailure()
+        }
+    }
+
+    internal fun pendingAction(item: NotificationItemData): NotificationItemData.ActionData? =
+        (state.pendingMutations[item.identity] as? PendingNotificationMutation.Action)?.action
+
+    internal fun isNotificationPending(item: NotificationItemData): Boolean =
+        item.identity in state.pendingMutations
+
+    private fun launchReservedMutation(
+        item: NotificationItemData,
+        mutation: PendingNotificationMutation,
+        block: suspend (AccountSessionToken) -> Unit,
+    ) {
         val token = SharedFlowCentre.currentSession.value?.token ?: return
-        pendingDeleteNotifications += item.identity
-        modelScope.launch(Dispatchers.IO) {
-            try {
-                val result = runNotificationMutation(token) {
-                    deleteRemoteNotification(item)
-                } ?: return@launch
-                if (SharedFlowCentre.isCurrentSession(token)) {
-                    inboxState = inboxState.afterNotificationAction(item, result)
-                }
-                result.onNotificationFailure()
-            } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) {
-                    pendingDeleteNotifications -= item.identity
+        modelScope.launch {
+            if (!stateStore.reserveMutation(token, item.identity, mutation)) return@launch
+            modelScope.launch(Dispatchers.IO) {
+                try {
+                    block(token)
+                } finally {
+                    finishNotificationMutation(item, token)
                 }
             }
         }
     }
 
-    internal fun pendingAction(item: NotificationItemData): NotificationItemData.ActionData? =
-        pendingNotificationActions[item.identity]
-
-    internal fun isNotificationPending(item: NotificationItemData): Boolean =
-        item.identity in pendingNotificationActions ||
-            item.identity in pendingReadNotifications ||
-            item.identity in pendingDeleteNotifications
-
-    private fun boopUser(
+    private suspend fun boopUser(
         item: NotificationItemData,
         token: AccountSessionToken,
         userId: String,
@@ -309,51 +315,43 @@ class NotificationCenterModel(
         alreadySentMessage: String,
         disabledMessage: String,
     ) {
-        modelScope.launch(Dispatchers.IO) {
-            try {
-                val result = boopService.send(userId, emojiId)
-                if (!SharedFlowCentre.isCurrentSession(token)) return@launch
-                inboxState = inboxState.afterBoopResult(item, result)
-                when (result) {
-                    BoopResult.Sent -> {
-                        SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                        runNotificationMutation(token) { deleteRemoteNotification(item) }
-                            ?.onNotificationFailure()
-                    }
-
-                    BoopResult.Cooldown -> SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
-                    BoopResult.Disabled -> SharedFlowCentre.toastText.emit(ToastText.Error(disabledMessage))
-                    is BoopResult.Failed -> Result.failure<Unit>(result.error).onNotificationFailure()
-                    BoopResult.InFlight, BoopResult.SessionChanged -> Unit
-                }
-            } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item)
+        val result = boopService.send(userId, emojiId)
+        if (!SharedFlowCentre.isCurrentSession(token)) return
+        reduceForSession(token) { current ->
+            current.copy(inboxState = current.inboxState.afterBoopResult(item, result))
+        }
+        when (result) {
+            BoopResult.Sent -> {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                runNotificationMutation(token) { deleteRemoteNotification(item) }
+                    ?.onNotificationFailure()
             }
+
+            BoopResult.Cooldown -> SharedFlowCentre.toastText.emit(ToastText.Info(alreadySentMessage))
+            BoopResult.Disabled -> SharedFlowCentre.toastText.emit(ToastText.Error(disabledMessage))
+            is BoopResult.Failed -> Result.failure<Unit>(result.error).onNotificationFailure()
+            BoopResult.InFlight, BoopResult.SessionChanged -> Unit
         }
     }
 
-    private fun notificationAction(
+    private suspend fun notificationAction(
         item: NotificationItemData,
         token: AccountSessionToken,
         action: suspend () -> Unit,
     ) {
-        modelScope.launch(Dispatchers.IO) {
-            try {
-                val result = runNotificationMutation(token) { action() } ?: return@launch
-                if (SharedFlowCentre.isCurrentSession(token)) {
-                    inboxState = inboxState.afterNotificationAction(item, result)
-                }
-                result
-                    .onNotificationFailure()
-                    .onSuccess {
-                        if (SharedFlowCentre.isCurrentSession(token)) {
-                            queueNotificationRefresh(token)
-                        }
-                    }
-            } finally {
-                if (SharedFlowCentre.isCurrentSession(token)) finishNotificationAction(item)
-            }
+        val result = runNotificationMutation(token) { action() } ?: return
+        reduceForSession(token) { current ->
+            current.copy(
+                inboxState = current.inboxState.afterNotificationAction(item, result),
+            )
         }
+        result
+            .onNotificationFailure()
+            .onSuccess {
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    queueNotificationRefresh(token)
+                }
+            }
     }
 
     private suspend fun deleteRemoteNotification(item: NotificationItemData) {
@@ -371,8 +369,21 @@ class NotificationCenterModel(
         return response.result.takeIf { SharedFlowCentre.isCurrentSession(response.sessionToken) }
     }
 
-    private fun finishNotificationAction(item: NotificationItemData) {
-        pendingNotificationActions -= item.identity
+    private fun finishNotificationMutation(
+        item: NotificationItemData,
+        token: AccountSessionToken,
+    ) {
+        reduceForSession(token) { current ->
+            current.copy(
+                pendingMutations = current.pendingMutations - item.identity,
+            )
+        }
+    }
+
+    override fun close() {
+        refreshRequests.close()
+        stateStore.close()
+        modelScope.cancel()
     }
 
     private inline fun <T> Result<T>.onNotificationFailure() =

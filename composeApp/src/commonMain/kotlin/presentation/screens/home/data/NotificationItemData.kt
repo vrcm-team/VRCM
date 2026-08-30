@@ -141,12 +141,19 @@ internal data class NotificationInboxState(
     val pipeline: List<NotificationItemData> = emptyList(),
     val legacy: List<NotificationItemData> = emptyList(),
     private val consumed: Set<NotificationIdentity> = emptySet(),
+    private val seenNotifications: Set<NotificationIdentity> = emptySet(),
 ) {
     fun replace(source: NotificationSource, items: List<NotificationItemData>): NotificationInboxState {
-        val visible = items.filterNot { it.identity in consumed }
+        // Seen is monotonic within a session, so a stale refresh cannot undo a read mutation.
+        val mergedSeen = seenNotifications + items.filter { it.seen }.map { it.identity }
+        val visible = items
+            .filterNot { it.identity in consumed }
+            .map { item ->
+                if (!item.seen && item.identity in mergedSeen) item.copy(seen = true) else item
+            }
         return when (source) {
-            NotificationSource.PIPELINE -> copy(pipeline = visible)
-            NotificationSource.LEGACY -> copy(legacy = visible)
+            NotificationSource.PIPELINE -> copy(pipeline = visible, seenNotifications = mergedSeen)
+            NotificationSource.LEGACY -> copy(legacy = visible, seenNotifications = mergedSeen)
         }
     }
 
@@ -164,17 +171,22 @@ internal data class NotificationInboxState(
         }
     }
 
-    fun markSeen(item: NotificationItemData): NotificationInboxState = when (item.source) {
-        NotificationSource.PIPELINE -> copy(
-            pipeline = pipeline.map { current ->
-                if (current.identity == item.identity) current.copy(seen = true) else current
-            },
-        )
-        NotificationSource.LEGACY -> copy(
-            legacy = legacy.map { current ->
-                if (current.identity == item.identity) current.copy(seen = true) else current
-            },
-        )
+    fun markSeen(item: NotificationItemData): NotificationInboxState {
+        val identity = item.identity
+        return when (item.source) {
+            NotificationSource.PIPELINE -> copy(
+                pipeline = pipeline.map { current ->
+                    if (current.identity == identity) current.copy(seen = true) else current
+                },
+                seenNotifications = seenNotifications + identity,
+            )
+            NotificationSource.LEGACY -> copy(
+                legacy = legacy.map { current ->
+                    if (current.identity == identity) current.copy(seen = true) else current
+                },
+                seenNotifications = seenNotifications + identity,
+            )
+        }
     }
 }
 
