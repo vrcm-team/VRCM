@@ -204,7 +204,8 @@ class FriendActivityTimelineModel internal constructor(
                 val loaded = page.take(pageSize)
                 hasMore = page.size > pageSize
                 if (loaded.isEmpty()) {
-                    _state.value = content.copy(
+                    val latest = _state.value as? FriendActivityTimelineState.Content ?: return@launch
+                    _state.value = latest.copy(
                         hasMore = false,
                         isLoadingMore = false,
                         loadMoreError = false,

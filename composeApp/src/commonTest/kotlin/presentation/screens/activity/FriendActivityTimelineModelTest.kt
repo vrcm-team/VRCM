@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -69,6 +70,33 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             assertIs<FriendActivityTimelineState.Content>(model.state.value)
                 .events.map(FriendActivityEvent::id),
         )
+    }
+
+    @Test
+    fun emptyAppendCompletionKeepsHeadEventsReceivedWhileLoading() = runTest {
+        val source = FakeTimelineSource(listOf(event(4), event(3), event(2)))
+        val appendStarted = CompletableDeferred<Unit>()
+        val releaseAppend = CompletableDeferred<Unit>()
+        source.appendResponses += flow {
+            appendStarted.complete(Unit)
+            releaseAppend.await()
+            emit(emptyList())
+        }
+        val model = FriendActivityTimelineModel(source, pageSize = 2)
+        advanceUntilIdle()
+
+        model.loadMore()
+        appendStarted.await()
+        source.database.value = listOf(event(5)) + source.database.value
+        advanceUntilIdle()
+        releaseAppend.complete(Unit)
+        advanceUntilIdle()
+
+        val completed = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(5L, 4L, 3L), completed.events.map(FriendActivityEvent::id))
+        assertFalse(completed.hasMore)
+        assertFalse(completed.isLoadingMore)
+        assertFalse(completed.loadMoreError)
     }
 
     @Test
