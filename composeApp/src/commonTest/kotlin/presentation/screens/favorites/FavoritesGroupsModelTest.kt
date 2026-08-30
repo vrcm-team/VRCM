@@ -106,6 +106,42 @@ class FavoritesGroupsModelTest : MainDispatcherTest() {
             SharedFlowCentre.emitLogout()
         }
     }
+
+    @Test
+    fun sameUserNewSessionCancelsOldRequestAndKeepsNewGenerationResult() = runBlocking {
+        val account = AccountDto(userId = "usr_same", username = "same")
+        val oldRequestStarted = CompletableDeferred<Unit>()
+        val releaseOldRequest = CompletableDeferred<Unit>()
+        var requestCount = 0
+        SharedFlowCentre.emitAuthenticated(account)
+        val fixture = createFixture(account) { request ->
+            check(request.url.encodedPath == "/users/usr_same/groups")
+            requestCount++
+            if (requestCount == 1) {
+                oldRequestStarted.complete(Unit)
+                releaseOldRequest.await()
+                jsonResponse(userGroupsJson("grp_old"))
+            } else {
+                jsonResponse(userGroupsJson("grp_current"))
+            }
+        }
+        try {
+            fixture.model.loadIfNeeded()
+            oldRequestStarted.await()
+
+            SharedFlowCentre.emitAuthenticated(account)
+            awaitUntil { fixture.model.state.value.groups.singleOrNull()?.groupId == "grp_current" }
+            releaseOldRequest.complete(Unit)
+            yield()
+
+            assertEquals(listOf("grp_current"), fixture.model.state.value.groups.map { it.groupId })
+            assertTrue(requestCount >= 2)
+        } finally {
+            releaseOldRequest.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
 }
 
 private class FavoritesGroupsFixture(

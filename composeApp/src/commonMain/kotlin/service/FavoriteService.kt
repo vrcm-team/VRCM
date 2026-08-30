@@ -6,7 +6,6 @@ import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteLimits
-import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -149,7 +148,7 @@ class FavoriteService(
     }
 
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType): Result<Unit> {
-        return runCatching {
+        val result = runCatching {
             val sessionToken = cacheMutex.withLock {
                 val currentToken = SharedFlowCentre.currentSession.value?.token
                     ?: error("No authenticated session")
@@ -197,10 +196,11 @@ class FavoriteService(
                     )
                 }
             }
-        }.onFailure { error ->
-            if (error is CancellationException) throw error
-            SharedFlowCentre.toastText.emit(ToastText.Error(error.message ?: "Load Favorite By Group Failed"))
         }
+        result.exceptionOrNull()?.let { error ->
+            if (error is CancellationException) throw error
+        }
+        return result
     }
 
 

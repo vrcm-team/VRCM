@@ -46,6 +46,7 @@ private fun FavoritesScreenContent(
     groupsModel: FavoritesGroupsModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
+    val favoriteLocale = strings
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val searchText by favoritesModel.searchText.collectAsState()
     val refreshingTabs by favoritesModel.refreshingTabs.collectAsState()
@@ -66,6 +67,9 @@ private fun FavoritesScreenContent(
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
 
+    SideEffect {
+        favoritesModel.updateFavoriteLocale(favoriteLocale)
+    }
     LaunchedEffect(Unit) {
         favoritesModel.activateFavoritesPage()
     }

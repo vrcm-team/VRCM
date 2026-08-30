@@ -44,19 +44,18 @@ class FavoritesGroupsModel(
     init {
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
-                val previousUserId = activeSessionToken?.userId
                 val nextToken = session?.token
-                if (previousUserId == nextToken?.userId) {
-                    activeSessionToken = nextToken
-                    return@collect
-                }
+                if (activeSessionToken == nextToken) return@collect
 
                 val shouldReload = _state.value.hasLoaded || refreshJob?.isActive == true
+                val userChanged = activeSessionToken?.userId != nextToken?.userId
                 requestGeneration++
                 activeSessionToken = nextToken
                 refreshJob?.cancel()
                 refreshJob = null
-                _state.value = MyGroupsState()
+                _state.value = if (userChanged) MyGroupsState() else {
+                    _state.value.copy(isLoading = false, error = null)
+                }
                 if (nextToken != null && shouldReload) refresh()
             }
         }
@@ -81,7 +80,7 @@ class FavoritesGroupsModel(
                 val result = authService.reTryAuthCatching {
                     usersApi.getUserGroups(sessionToken.userId)
                 }
-                if (!acceptsUser(sessionToken.userId, generation)) return@launch
+                if (!accepts(sessionToken, generation)) return@launch
                 result.onSuccess { groups ->
                     _state.value = _state.value.copy(
                         groups = groups
@@ -102,7 +101,7 @@ class FavoritesGroupsModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                if (acceptsUser(sessionToken.userId, generation)) {
+                if (accepts(sessionToken, generation)) {
                     _state.value = _state.value.copy(
                         isLoading = false,
                         hasLoaded = true,
@@ -117,7 +116,4 @@ class FavoritesGroupsModel(
         requestGeneration == generation && activeSessionToken == token &&
             SharedFlowCentre.isCurrentSession(token)
 
-    private fun acceptsUser(userId: String, generation: Long): Boolean =
-        requestGeneration == generation &&
-            SharedFlowCentre.currentSession.value?.token?.userId == userId
 }

@@ -23,6 +23,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
@@ -179,6 +180,7 @@ class FriendListPagerModel(
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
     private var favoritesPageActivated = false
+    private var favoriteLocale: LocaleStrings? = null
 
     val friendDirectoryGroups: StateFlow<List<FriendDirectoryGroup>> = combine(
         _friendList,
@@ -200,11 +202,7 @@ class FriendListPagerModel(
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 val nextToken = session?.token
-                if (activeSessionToken?.userId == nextToken?.userId) {
-                    activeSessionToken = nextToken
-                } else {
-                    activateAccount(nextToken)
-                }
+                if (activeSessionToken != nextToken) activateAccount(nextToken)
             }
         }
         viewModelScope.launch {
@@ -218,6 +216,7 @@ class FriendListPagerModel(
     }
 
     private fun activateAccount(sessionToken: AccountSessionToken?) {
+        val userChanged = activeSessionToken?.userId != sessionToken?.userId
         accountGeneration++
         activeSessionToken = sessionToken
         refreshJobsByTab.values.forEach(Job::cancel)
@@ -226,26 +225,32 @@ class FriendListPagerModel(
         directoryRefreshJob = null
         friendFilterJob?.cancel()
         friendFilterJob = null
-        favoritedWorldMap.clear()
-        favoritedAvatarMap.clear()
-        offlineStatusDescriptions.clear()
-        _friendList.value = emptyList()
-        _friendTotal.value = 0
-        _worldList.value = emptyList()
-        _worldTotal.value = 0
-        _avatarList.value = emptyList()
-        _avatarTotal.value = 0
-        _friendGroupOptions.value = FriendGroupOptions()
-        _worldGroupOptions.value = WorldGroupOptions()
-        _avatarGroupOptions.value = AvatarGroupOptions()
-        searchTexts.indices.forEach { searchTexts[it] = "" }
-        _searchText.value = ""
+        if (userChanged) {
+            favoritedWorldMap.clear()
+            favoritedAvatarMap.clear()
+            offlineStatusDescriptions.clear()
+            _friendList.value = emptyList()
+            _friendTotal.value = 0
+            _worldList.value = emptyList()
+            _worldTotal.value = 0
+            _avatarList.value = emptyList()
+            _avatarTotal.value = 0
+            _friendGroupOptions.value = FriendGroupOptions()
+            _worldGroupOptions.value = WorldGroupOptions()
+            _avatarGroupOptions.value = AvatarGroupOptions()
+            searchTexts.indices.forEach { searchTexts[it] = "" }
+            _searchText.value = ""
+        }
         _refreshErrors.value = emptyMap()
         _refreshingTabs.value = emptySet()
         _directoryRefreshing.value = sessionToken != null
         _directoryRefreshFailed.value = false
         if (sessionToken != null) refreshFriendDirectory()
         if (sessionToken != null && favoritesPageActivated) refreshFavoritesTabs()
+    }
+
+    fun updateFavoriteLocale(locale: LocaleStrings) {
+        favoriteLocale = locale
     }
 
     /** Marks the Favorites page as active and refreshes all three personal-content tabs. */
@@ -320,7 +325,7 @@ class FriendListPagerModel(
             } catch (e: Exception) {
                 if (acceptsAccount(sessionToken, generation)) {
                     _refreshErrors.update { it + (tabIndex to e.message.orEmpty()) }
-                    SharedFlowCentre.toastText.emit(ToastText.Error("加载收藏组信息失败: ${e.message}"))
+                    showFavoriteError(favoriteLocale?.favoritesGroupLoadFailed, e)
                 }
             } finally {
                 if (acceptsAccount(sessionToken, generation)) {
@@ -331,7 +336,7 @@ class FriendListPagerModel(
             .also { refreshJobsByTab[tabIndex] = it }
     }
 
-    private fun recordFavoriteGroupFailure(
+    private suspend fun recordFavoriteGroupFailure(
         favoriteType: FavoriteType,
         result: Result<Unit>,
         sessionToken: AccountSessionToken,
@@ -340,6 +345,7 @@ class FriendListPagerModel(
         val error = result.exceptionOrNull() ?: return
         if (acceptsAccount(sessionToken, generation)) {
             _refreshErrors.update { it + (favoriteType.tabIndex to error.message.orEmpty()) }
+            showFavoriteError(favoriteLocale?.favoritesGroupLoadFailed, error)
         }
     }
 
@@ -354,7 +360,7 @@ class FriendListPagerModel(
             throw cancelled
         } catch (error: Exception) {
             if (acceptsAccount(sessionToken, generation)) {
-                SharedFlowCentre.toastText.emit(ToastText.Error("读取收藏缓存失败: ${error.message}"))
+                showFavoriteError(favoriteLocale?.favoritesCacheReadFailed, error)
             }
             null
         } ?: return
@@ -734,12 +740,12 @@ class FriendListPagerModel(
             favoritedAvatarMap.putAll(avatars.associateBy { it.id })
             _avatarTotal.value = favoritedAvatarMap.size
             findAvatarList(searchTexts[2])
-            persistFavoritedAvatars(cacheWriteToken, avatars)
+            persistFavoritedAvatars(cacheWriteToken, sessionToken, generation, avatars)
         }.onFailure {
             if (it is CancellationException) throw it
             if (acceptsAccount(sessionToken, generation)) {
                 _refreshErrors.update { errors -> errors + (2 to it.message.orEmpty()) }
-                SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏模型失败: ${it.message}"))
+                showFavoriteError(favoriteLocale?.favoriteAvatarsLoadFailed, it)
             }
         }
     }
@@ -793,6 +799,8 @@ class FriendListPagerModel(
             findWorldList(searchTexts[1])
             persistFavoritedWorlds(
                 cacheWriteToken,
+                sessionToken,
+                generation,
                 groupFavoritedWorlds(worlds, worldFavoriteGroupsFlow.value),
             )
         } catch (e: CancellationException) {
@@ -800,39 +808,54 @@ class FriendListPagerModel(
         } catch (e: Exception) {
             if (acceptsAccount(sessionToken, generation)) {
                 _refreshErrors.update { errors -> errors + (1 to e.message.orEmpty()) }
-                SharedFlowCentre.toastText.emit(ToastText.Error("获取收藏世界失败: ${e.message}"))
+                showFavoriteError(favoriteLocale?.favoriteWorldsLoadFailed, e)
             }
         }
     }
 
     private fun acceptsAccount(sessionToken: AccountSessionToken, generation: Long): Boolean =
-        accountGeneration == generation && activeSessionToken?.userId == sessionToken.userId &&
-            SharedFlowCentre.currentSession.value?.token?.userId == sessionToken.userId
+        accountGeneration == generation && activeSessionToken == sessionToken &&
+            SharedFlowCentre.isCurrentSession(sessionToken)
 
     private suspend fun persistFavoritedWorlds(
         token: AccountCacheWriteToken,
+        sessionToken: AccountSessionToken,
+        generation: Long,
         worlds: List<FavoritedWorldGroup>,
     ) {
+        if (!acceptsAccount(sessionToken, generation)) return
         try {
             accountCacheManager.saveFavoriteWorldsIfCurrent(token, worlds)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            SharedFlowCentre.toastText.emit(ToastText.Error("保存收藏世界缓存失败: ${error.message}"))
+            if (acceptsAccount(sessionToken, generation)) {
+                showFavoriteError(favoriteLocale?.favoriteWorldCacheSaveFailed, error)
+            }
         }
     }
 
     private suspend fun persistFavoritedAvatars(
         token: AccountCacheWriteToken,
+        sessionToken: AccountSessionToken,
+        generation: Long,
         avatars: List<AvatarData>,
     ) {
+        if (!acceptsAccount(sessionToken, generation)) return
         try {
             accountCacheManager.saveFavoriteAvatarsIfCurrent(token, avatars)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            SharedFlowCentre.toastText.emit(ToastText.Error("保存收藏模型缓存失败: ${error.message}"))
+            if (acceptsAccount(sessionToken, generation)) {
+                showFavoriteError(favoriteLocale?.favoriteAvatarCacheSaveFailed, error)
+            }
         }
+    }
+
+    private suspend fun showFavoriteError(message: String?, error: Throwable) {
+        val localized = message ?: return
+        SharedFlowCentre.toastText.emit(ToastText.Error("$localized: ${error.message.orEmpty()}"))
     }
 }
 

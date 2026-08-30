@@ -68,8 +68,14 @@ fun FavoriteGroupBottomSheet(
     // 加载收藏数据
     LaunchedEffect(isVisible, favoriteId, favoriteType, favoriteRecordId) {
         if (!isVisible) return@LaunchedEffect
-        authService.reTryAuth {
+        val result = authService.reTryAuth {
             favoriteService.loadFavoriteByGroup(favoriteType)
+        }
+        result.exceptionOrNull()?.let { error ->
+            if (error is CancellationException) throw error
+            SharedFlowCentre.toastText.emit(
+                ToastText.Error("${strings.favoritesGroupLoadFailed}: ${error.message.orEmpty()}"),
+            )
         }
     }
 
