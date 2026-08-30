@@ -5,6 +5,7 @@ import androidx.savedstate.serialization.SavedStateConfiguration
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
@@ -32,6 +33,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(AuthScreen::class, AuthScreen.serializer())
             subclass(AuthAnimeScreen::class, AuthAnimeScreen.serializer())
             subclass(HomeScreen::class, HomeScreen.serializer())
+            subclass(FriendActivityTimelineScreen::class, FriendActivityTimelineScreen.serializer())
             subclass(GalleryScreen::class, GalleryScreen.serializer())
             subclass(GalleryPickerScreen::class, GalleryPickerScreen.serializer())
             subclass(PrintImageEditorScreen::class, PrintImageEditorScreen.serializer())

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.storage
 
 import io.github.vrcmteam.vrcm.service.FriendActivityBatch
+import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import io.github.vrcmteam.vrcm.service.FriendActivityObservation
 import kotlinx.coroutines.flow.Flow
 
@@ -53,6 +54,26 @@ internal class RoomFriendActivityStore(
         friendUserId: String,
         limit: Int = 50,
     ): Flow<List<FriendActivityEventEntity>> = dao.observeEvents(ownerUserId, friendUserId, limit)
+
+    fun observeAllEvents(
+        ownerUserId: String,
+        types: Set<FriendActivityEventType> = emptySet(),
+        limit: Int = 200,
+        offset: Int = 0,
+    ): Flow<List<FriendActivityEventEntity>> {
+        val safeLimit = limit.coerceAtLeast(0)
+        val safeOffset = offset.coerceAtLeast(0)
+        return if (types.isEmpty()) {
+            dao.observeAllEvents(ownerUserId, safeLimit, safeOffset)
+        } else {
+            dao.observeAllEventsByTypes(
+                ownerUserId = ownerUserId,
+                types = types.map(FriendActivityEventType::name),
+                limit = safeLimit,
+                offset = safeOffset,
+            )
+        }
+    }
 
     suspend fun cachedWorldName(ownerUserId: String, worldId: String): String? =
         dao.cachedWorldName(ownerUserId, worldId)

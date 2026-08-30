@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreen
 import io.github.vrcmteam.vrcm.presentation.screens.auth.StartupAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
@@ -37,6 +38,7 @@ class AppNavKeySerializationTest {
             AuthScreen,
             AuthAnimeScreen(isAuthed = true),
             HomeScreen,
+            FriendActivityTimelineScreen,
             GalleryScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,

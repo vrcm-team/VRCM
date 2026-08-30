@@ -56,6 +56,8 @@ data class FriendActivitySummary(
 data class FriendActivityEvent(
     val id: Long,
     val friendUserId: String,
+    val displayName: String,
+    val profileImageUrl: String,
     val type: FriendActivityEventType,
     val occurredAtMillis: Long,
     val previousValue: String?,
@@ -289,6 +291,26 @@ class FriendActivityService internal constructor(
         }
     }
 
+    fun observeAllEvents(
+        types: Set<FriendActivityEventType> = emptySet(),
+        limit: Int = 200,
+        offset: Int = 0,
+    ): Flow<List<FriendActivityEvent>> = SharedFlowCentre.currentSession.flatMapLatest { session ->
+        if (session == null) {
+            flowOf(emptyList())
+        } else {
+            store.observeAllEvents(session.account.userId, types, limit, offset)
+                .onEach { events ->
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
+                }
+                .map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
+        }
+    }
+
     fun observeRecentTogether(
         sinceMillis: Long,
         limit: Int = 20,
@@ -499,6 +521,8 @@ private fun FriendActivityEventEntity.toEventOrNull(): FriendActivityEvent? {
     return FriendActivityEvent(
         id = id,
         friendUserId = friendUserId,
+        displayName = displayName,
+        profileImageUrl = profileImageUrl,
         type = eventType,
         occurredAtMillis = occurredAtMillis,
         previousValue = previousValue,

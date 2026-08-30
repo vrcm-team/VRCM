@@ -7,6 +7,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import coil3.util.DebugLogger
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineModel
 import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
@@ -73,6 +74,7 @@ val presentationModule: Module = module {
     // background monitoring report; it only holds the settings DAO and the theme color list.
     single { SettingsModel(get(), getAll()) }
     viewModelOf(::AuthScreenModel)
+    viewModelOf(::FriendActivityTimelineModel)
     viewModelOf(::HomeScreenModel)
     singleOf(::NotificationCenterModel)
     viewModelOf(::UserProfileScreenModel)

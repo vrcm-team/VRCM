@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.service.FriendActivityAccessType
 import io.github.vrcmteam.vrcm.service.FriendActivityBatch
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
+import io.github.vrcmteam.vrcm.service.FriendActivityEventDraft
 import io.github.vrcmteam.vrcm.service.FriendActivityInputSnapshot
 import io.github.vrcmteam.vrcm.service.FriendActivityObservation
 import io.github.vrcmteam.vrcm.service.FriendActivitySourceSnapshot
@@ -39,6 +40,97 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class FriendActivityRoomStoreTest {
+    @Test
+    fun globalTimelineIsAccountScopedStablySortedAndFilterable() = runTest {
+        withStore { store ->
+            val ownerA = store.activateAccount("usr_owner_a")
+            val ownerB = store.activateAccount("usr_owner_b")
+            val friendA = observation().copy(userId = "usr_friend_a", displayName = "Friend A")
+            val friendB = observation().copy(userId = "usr_friend_b", displayName = "Friend B")
+
+            store.record(
+                token = ownerA,
+                observations = listOf(friendA),
+                batch = FriendActivityBatch(
+                    events = listOf(
+                        FriendActivityEventDraft(
+                            userId = friendA.userId,
+                            displayName = friendA.displayName,
+                            profileImageUrl = friendA.profileImageUrl,
+                            type = FriendActivityEventType.Online,
+                            occurredAtMillis = 2_000L,
+                        )
+                    )
+                ),
+                nowMillis = 2_000L,
+            )
+            store.record(
+                token = ownerA,
+                observations = listOf(friendB),
+                batch = FriendActivityBatch(
+                    events = listOf(
+                        FriendActivityEventDraft(
+                            userId = friendB.userId,
+                            displayName = friendB.displayName,
+                            profileImageUrl = friendB.profileImageUrl,
+                            type = FriendActivityEventType.BioChanged,
+                            occurredAtMillis = 2_000L,
+                            previousValue = "Old",
+                            currentValue = "New",
+                        ),
+                        FriendActivityEventDraft(
+                            userId = friendB.userId,
+                            displayName = friendB.displayName,
+                            profileImageUrl = friendB.profileImageUrl,
+                            type = FriendActivityEventType.Offline,
+                            occurredAtMillis = 1_000L,
+                        ),
+                    )
+                ),
+                nowMillis = 2_000L,
+            )
+            store.record(
+                token = ownerB,
+                observations = listOf(friendA),
+                batch = FriendActivityBatch(
+                    events = listOf(
+                        FriendActivityEventDraft(
+                            userId = friendA.userId,
+                            displayName = "Other account friend",
+                            profileImageUrl = friendA.profileImageUrl,
+                            type = FriendActivityEventType.LocationChanged,
+                            occurredAtMillis = 3_000L,
+                        )
+                    )
+                ),
+                nowMillis = 3_000L,
+            )
+
+            val ownerEvents = store.observeAllEvents("usr_owner_a").first()
+            assertEquals(
+                listOf("Friend B", "Friend A", "Friend B"),
+                ownerEvents.map { it.displayName },
+            )
+            assertEquals(listOf(2_000L, 2_000L, 1_000L), ownerEvents.map { it.occurredAtMillis })
+            assertEquals(
+                ownerEvents.take(2).map { it.id }.sortedDescending(),
+                ownerEvents.take(2).map { it.id },
+            )
+
+            val filteredPage = store.observeAllEvents(
+                ownerUserId = "usr_owner_a",
+                types = setOf(FriendActivityEventType.Online, FriendActivityEventType.Offline),
+                limit = 1,
+                offset = 1,
+            ).first()
+            assertEquals(listOf(FriendActivityEventType.Offline.name), filteredPage.map { it.type })
+            assertEquals(
+                listOf("Other account friend"),
+                store.observeAllEvents("usr_owner_b").first().map { it.displayName },
+            )
+        }
+    }
+
     @Test
     fun restoreFinalizesIncompleteSessionAtLastCheckpoint() = runTest {
         withStore { store ->
