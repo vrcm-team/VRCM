@@ -94,6 +94,11 @@ class FriendListPagerModel(
     private val _friendList = MutableStateFlow(friendService.friendMap.values.toList().sortedUserByStatus())
     val friendList: StateFlow<List<FriendData>> = _friendList.asStateFlow()
 
+    // Directory filters derive from this account-bound source and never write back to it.
+    private val _friendSnapshot = MutableStateFlow(
+        friendService.friendMap.values.toList()
+    )
+
     private val _friendTotal = MutableStateFlow(friendService.friendMap.size)
     val friendTotal: StateFlow<Int> = _friendTotal.asStateFlow()
 
@@ -169,7 +174,7 @@ class FriendListPagerModel(
     private var favoriteLocale: LocaleStrings? = null
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
-        _friendList,
+        _friendSnapshot,
         _searchText,
         _friendGroupOptions,
         friendFavoriteGroupsFlow,
@@ -204,7 +209,7 @@ class FriendListPagerModel(
                 val token = activeSessionToken ?: return@collect
                 if (SharedFlowCentre.currentSession.value?.token?.userId != token.userId) return@collect
                 _friendTotal.value = friends.size
-                findFriendList(searchTexts[0])
+                findFriendList(searchTexts[0], friends.values.toList())
             }
         }
     }
@@ -224,6 +229,7 @@ class FriendListPagerModel(
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()
             _friendList.value = emptyList()
+            _friendSnapshot.value = emptyList()
             _friendTotal.value = 0
             _worldList.value = emptyList()
             _worldTotal.value = 0
@@ -522,9 +528,13 @@ class FriendListPagerModel(
      * 基于搜索文本和当前选择的好友组过滤好友列表
      * 使用FriendService提供的方法
      */
-    private fun findFriendList(name: String) {
+    private fun findFriendList(
+        name: String,
+        sourceFriends: List<FriendData> = friendService.friendMap.values.toList(),
+    ) {
         val sessionToken = activeSessionToken ?: run {
             _friendList.value = emptyList()
+            _friendSnapshot.value = emptyList()
             return
         }
         val generation = accountGeneration
@@ -538,7 +548,21 @@ class FriendListPagerModel(
         }
         friendFilterJob?.cancel()
         friendFilterJob = viewModelScope.launch {
-            val friends = findFriendsByName(name, favoriteIds, sessionToken, generation)
+            val friendSnapshot = enrichOfflineStatusDescriptions(
+                friends = sourceFriends,
+                sessionToken = sessionToken,
+                generation = generation,
+            )
+            if (!acceptsAccount(sessionToken, generation)) return@launch
+            _friendSnapshot.value = friendSnapshot
+
+            val friends = findFriendsByName(
+                name = name,
+                favoriteIds = favoriteIds,
+                friendSnapshot = friendSnapshot,
+                sessionToken = sessionToken,
+                generation = generation,
+            )
             if (acceptsAccount(sessionToken, generation)) _friendList.value = friends
         }
     }
@@ -577,6 +601,7 @@ class FriendListPagerModel(
     private suspend fun findFriendsByName(
         name: String,
         favoriteIds: Set<String>?,
+        friendSnapshot: List<FriendData>,
         sessionToken: AccountSessionToken,
         generation: Long,
     ): List<FriendData> {
@@ -587,7 +612,7 @@ class FriendListPagerModel(
         } ?: emptyList()
 
         // 先按名称过滤
-        val nameFilteredList = (friendService.friendMap.values + unFriendData).let { friends ->
+        val nameFilteredList = (friendSnapshot + unFriendData).let { friends ->
             if (name.isEmpty()) friends
             else friends.filter { name.isEmpty() || it.displayName.lowercase().contains(name.lowercase()) }
         }
