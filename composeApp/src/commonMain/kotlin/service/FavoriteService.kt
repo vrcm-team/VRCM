@@ -149,60 +149,54 @@ class FavoriteService(
     }
 
     suspend fun loadFavoriteByGroup(favoriteType: FavoriteType): Result<Unit> {
-        val sessionToken = cacheMutex.withLock {
-            val currentToken = SharedFlowCentre.currentSession.value?.token
-                ?: error("No authenticated session")
-            if (favoritesOwnerToken?.userId != currentToken.userId) {
-                favoritesByGroupCache.clear()
-            }
-            favoritesOwnerUserId = currentToken.userId
-            favoritesOwnerToken = currentToken
-            requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
-            currentToken to requestGenerations.getValue(favoriteType)
-        }
-        val token = sessionToken.first
-        val generation = sessionToken.second
         return runCatching {
-        val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
-        // 尝试加载远程收藏
-        favoriteApi.fetchFavorite(favoriteType)
-            .toCollection(mutableListOf())
-            .flatten()
-            .forEach { favoriteData ->
-                val tag = favoriteData.tags.firstOrNull() ?: return@forEach
-                newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+            val sessionToken = cacheMutex.withLock {
+                val currentToken = SharedFlowCentre.currentSession.value?.token
+                    ?: error("No authenticated session")
+                if (favoritesOwnerToken?.userId != currentToken.userId) {
+                    favoritesByGroupCache.clear()
+                }
+                favoritesOwnerUserId = currentToken.userId
+                favoritesOwnerToken = currentToken
+                requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
+                currentToken to requestGenerations.getValue(favoriteType)
+            }
+            val token = sessionToken.first
+            val generation = sessionToken.second
+            val newFavoritesMap = mutableMapOf<String, MutableList<FavoriteData>>()
+            favoriteApi.fetchFavorite(favoriteType)
+                .toCollection(mutableListOf())
+                .flatten()
+                .forEach { favoriteData ->
+                    val tag = favoriteData.tags.firstOrNull() ?: return@forEach
+                    newFavoritesMap.getOrPut(tag) { mutableListOf() }.add(favoriteData)
+                }
+
+            val remoteGroups = favoriteApi.getFavoriteGroupsByType(favoriteType)
+
+            val localGroup = localGroupOf(favoriteType)
+            val localIds = favoriteLocalDao.load(favoriteType)
+            val localFavorites = localIds.map { fid ->
+                FavoriteData(
+                    favoriteId = fid,
+                    id = toLocalFavoriteId(favoriteType, fid),
+                    tags = listOf(localGroup.name),
+                    type = favoriteType.value
+                )
             }
 
-
-        val remoteGroups = favoriteApi.getFavoriteGroupsByType(favoriteType)
-
-        // 本地收藏
-        val localGroup = localGroupOf(favoriteType)
-        val localIds = favoriteLocalDao.load(favoriteType)
-        val localFavorites = localIds.map { fid ->
-            FavoriteData(
-                favoriteId = fid,
-                id = toLocalFavoriteId(favoriteType, fid),
-                tags = listOf(localGroup.name),
-                type = favoriteType.value
-            )
-        }
-
-        // 合并远程与本地
-        cacheMutex.withLock {
-            val currentToken = SharedFlowCentre.currentSession.value?.token
-            if (currentToken == token && favoritesOwnerToken == token &&
-                requestGenerations[favoriteType] == generation
-            ) {
-            favoritesByGroupCache.replace(
-                favoriteType,
-                remoteGroups.associateWith { (newFavoritesMap[it.name] ?: listOf()) } +
-                    (localGroup to localFavorites),
-            )
-            } else {
-                return@withLock
+            cacheMutex.withLock {
+                val currentToken = SharedFlowCentre.currentSession.value?.token
+                if (currentToken == token && favoritesOwnerToken == token &&
+                    requestGenerations[favoriteType] == generation
+                ) {
+                    favoritesByGroupCache.replace(
+                        favoriteType,
+                        remoteGroups.associateWith { newFavoritesMap[it.name] ?: listOf() } +
+                            (localGroup to localFavorites),
+                    )
+                }
             }
-        }
         }.onFailure { error ->
             if (error is CancellationException) throw error
             SharedFlowCentre.toastText.emit(ToastText.Error(error.message ?: "Load Favorite By Group Failed"))
