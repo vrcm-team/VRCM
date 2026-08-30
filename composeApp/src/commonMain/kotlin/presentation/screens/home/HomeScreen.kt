@@ -42,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.*
 import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
@@ -386,6 +387,7 @@ private fun HomePersonalDrawer(
         onFriendNetworkClick = { closeAndNavigate(FriendNetworkScreen) },
         onGalleryClick = { closeAndNavigate(GalleryScreen) },
         onFavoritesClick = { closeAndNavigate(FavoritesScreen) },
+        onMyGroupsClick = { closeAndNavigate(MyGroupsScreen) },
         onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
         onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
         onSettingsClick = {

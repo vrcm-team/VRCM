@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
@@ -41,6 +42,7 @@ class AppNavKeySerializationTest {
             HomeScreen,
             FriendActivityTimelineScreen,
             FavoritesScreen,
+            MyGroupsScreen,
             GalleryScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,

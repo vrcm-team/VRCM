@@ -421,6 +421,8 @@ sealed class LocaleStrings {
     open val favoritesTitle: String = "Favorites"
     open val favoritesFriends: String = "Friends"
     open val myGroups: String = "My Groups"
+    open val myGroupsEmpty: String = "You haven't joined any groups yet"
+    open val myGroupsLoadFailed: String = "Couldn't load your groups"
     open val favoritesEmpty: String = "Nothing here yet"
     open val favoritesLoadFailed: String = "Couldn't load this collection"
     open val favoritesGroupLoadFailed: String = "Couldn't load favorite groups"

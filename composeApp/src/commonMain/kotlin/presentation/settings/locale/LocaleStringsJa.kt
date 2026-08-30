@@ -404,6 +404,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val favoritesTitle = "お気に入り"
     override val favoritesFriends = "フレンド"
     override val myGroups = "マイグループ"
+    override val myGroupsEmpty = "参加しているグループはまだありません"
+    override val myGroupsLoadFailed = "マイグループを読み込めませんでした"
     override val favoritesEmpty = "まだ項目がありません"
     override val favoritesLoadFailed = "このコレクションを読み込めませんでした"
     override val favoritesGroupLoadFailed = "お気に入りグループを読み込めませんでした"

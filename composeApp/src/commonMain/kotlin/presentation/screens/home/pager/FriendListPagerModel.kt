@@ -253,14 +253,14 @@ class FriendListPagerModel(
         favoriteLocale = locale
     }
 
-    /** Marks the Favorites page as active and refreshes all three personal-content tabs. */
+    /** Marks the Favorites page as active and refreshes its world and avatar tabs. */
     fun activateFavoritesPage() {
         favoritesPageActivated = true
         if (activeSessionToken != null) refreshFavoritesTabs()
     }
 
     private fun refreshFavoritesTabs() {
-        (0..2).forEach { tabIndex ->
+        (1..2).forEach { tabIndex ->
             refreshCurrentTabCacheData(tabIndex = tabIndex)
         }
     }

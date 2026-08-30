@@ -403,6 +403,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val favoritesTitle = "收藏"
     override val favoritesFriends = "好友"
     override val myGroups = "我的群組"
+    override val myGroupsEmpty = "你還沒有加入任何群組"
+    override val myGroupsLoadFailed = "無法載入你的群組"
     override val favoritesEmpty = "這裡還沒有內容"
     override val favoritesLoadFailed = "無法載入此收藏內容"
     override val favoritesGroupLoadFailed = "載入收藏群組失敗"

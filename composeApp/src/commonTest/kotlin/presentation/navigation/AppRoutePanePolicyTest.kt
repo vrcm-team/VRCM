@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -57,6 +58,7 @@ class AppRoutePanePolicyTest {
         val routes = listOf(
             GalleryScreen,
             FavoritesScreen,
+            MyGroupsScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
             StartupAnimeScreen,
@@ -77,6 +79,7 @@ class AppRoutePanePolicyTest {
         )
         assertTrue(GalleryScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FavoritesScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(MyGroupsScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FriendNetworkScreen.adaptivePaneMetadata().isEmpty())
     }
 }
