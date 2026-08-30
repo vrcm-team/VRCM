@@ -25,7 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 data class PersonalDrawerUser(
     val avatarUrl: String?,
     val displayName: String,
-    val username: String,
+    val pronouns: String?,
     val status: UserStatus,
     val statusDescription: String,
 )
@@ -117,9 +117,9 @@ private fun PersonalHeader(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (user != null) {
+            user?.pronouns?.takeIf { it.isNotBlank() }?.let { pronouns ->
                 Text(
-                    "@${user.username}",
+                    pronouns,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

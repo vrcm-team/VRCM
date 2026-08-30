@@ -416,7 +416,7 @@ private fun HomePersonalDrawer(
 private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
     avatarUrl = iconUrl,
     displayName = displayName,
-    username = username,
+    pronouns = pronouns,
     status = status,
     statusDescription = statusDescription,
 )
