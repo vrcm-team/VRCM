@@ -8,10 +8,12 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 GRADLEW="$ROOT_DIR/gradlew"
 VERSION_FILE="$ROOT_DIR/gradle/libs.versions.toml"
+APP_CONST_FILE="$ROOT_DIR/composeApp/src/commonMain/kotlin/core/shared/AppConst.kt"
 INSTALLER_FILE="$ROOT_DIR/installer/VRCM.iss"
 IOS_PROJECT_FILE="$ROOT_DIR/iosApp/iosApp.xcodeproj/project.pbxproj"
 IOS_PLIST_FILE="$ROOT_DIR/iosApp/iosApp/Info.plist"
 IPA_SCRIPT="$ROOT_DIR/iosApp/package-ipa.sh"
+RELEASE_CONTENT_SCHEMA="$SCRIPT_DIR/release-content.schema.json"
 
 REPOSITORY="${GITHUB_REPOSITORY:-vrcm-team/VRCM}"
 GITHUB_API="${GITHUB_API_URL:-https://api.github.com}"
@@ -43,13 +45,13 @@ usage() {
 选项：
   --code <整数>              覆盖 Android/iOS 的 version code；省略时仅在版本变化时自动 +1
   --platforms <列表>         all、android、desktop、ios 的逗号列表，默认 all
-  --notes-file <文件>        使用指定 Markdown 文案，不自动生成文案
+  --notes-file <文件>        使用指定 Markdown 文案，跳过 Codex 文案与详解生成
   --publish                  上传产物并发布 GitHub Release（自动读取环境变量或本地 GitHub 凭据）
   --preview                 发布为 GitHub 预览版（prerelease），默认发布正式版
   --prerelease              `--preview` 的兼容别名
   --allow-existing           允许更新已有同名 tag 的 Release；默认发现已有 Release 即停止
   --skip-version-update      使用工作区已有版本，不写入版本字段（适合提交版本后再次发布）
-  --dry-run                  只检查配置并生成文案，不写版本、不构建、不调用 GitHub API
+  --dry-run                  只生成文案预览，不写版本、不构建、不调用 GitHub 写入 API
   -h, --help                 显示帮助
 
 环境变量：
@@ -70,6 +72,10 @@ read_version() {
 
 read_version_code() {
   sed -nE 's/^app-code[[:space:]]*=[[:space:]]*"([0-9]+)"/\1/p' "$VERSION_FILE" | head -n 1
+}
+
+read_runtime_version() {
+  sed -nE 's/^[[:space:]]*const val APP_VERSION[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$APP_CONST_FILE" | head -n 1
 }
 
 validate_version() {
@@ -95,11 +101,16 @@ has_platform() {
   return 1
 }
 
+has_han_text() {
+  printf '%s' "$1" | perl -CSD -e '$text = <>; exit($text =~ /\p{Han}/ ? 0 : 1)'
+}
+
 replace_versions() {
-  local old_version old_code new_code
+  local old_version old_app_version old_code new_code
   old_version="$(read_version)"
+  old_app_version="$(read_runtime_version)"
   old_code="$(read_version_code)"
-  [[ -n "$old_version" && -n "$old_code" ]] || fail "无法从 $VERSION_FILE 读取当前版本"
+  [[ -n "$old_version" && -n "$old_app_version" && -n "$old_code" ]] || fail "无法读取当前版本字段"
 
   if [[ -n "$VERSION_CODE" ]]; then
     [[ "$VERSION_CODE" =~ ^[0-9]+$ && "$VERSION_CODE" -gt 0 ]] || fail "--code 必须是正整数"
@@ -112,6 +123,8 @@ replace_versions() {
 
   OLD_VERSION="$old_version" NEW_VERSION="$VERSION" perl -0pi -e \
     's/^app-version\s*=\s*"\Q$ENV{OLD_VERSION}\E"/app-version = "$ENV{NEW_VERSION}"/m' "$VERSION_FILE"
+  OLD_APP_VERSION="$old_app_version" NEW_VERSION="$VERSION" perl -0pi -e \
+    's/^(\s*const val APP_VERSION\s*=\s*")\Q$ENV{OLD_APP_VERSION}\E("\s*)$/$1$ENV{NEW_VERSION}$2/m' "$APP_CONST_FILE"
   OLD_CODE="$old_code" NEW_CODE="$new_code" perl -0pi -e \
     's/^app-code\s*=\s*"\Q$ENV{OLD_CODE}\E"/app-code = "$ENV{NEW_CODE}"/m' "$VERSION_FILE"
   OLD_VERSION="$old_version" NEW_VERSION="$VERSION" perl -0pi -e \
@@ -126,6 +139,7 @@ replace_versions() {
     's/(<key>CFBundleVersion<\/key>\s*<string>)[^<]+(<\/string>)/$1$ENV{NEW_CODE}$2/' "$IOS_PLIST_FILE"
 
   [[ "$(read_version)" == "$VERSION" ]] || fail "Version Catalog 版本同步失败"
+  [[ "$(read_runtime_version)" == "$VERSION" ]] || fail "运行时 APP_VERSION 同步失败"
   grep -q "^#define AppVersion \"$VERSION\"" "$INSTALLER_FILE" || fail "Inno Setup 版本同步失败"
   grep -q "MARKETING_VERSION = $VERSION;" "$IOS_PROJECT_FILE" || fail "Xcode 工程版本同步失败"
   grep -q "CURRENT_PROJECT_VERSION = $new_code;" "$IOS_PROJECT_FILE" || fail "Xcode 工程 version code 同步失败"
@@ -133,7 +147,7 @@ replace_versions() {
   grep -A1 -q "<string>$VERSION</string>" "$IOS_PLIST_FILE" || fail "iOS plist 版本同步失败"
   grep -A1 -q '<key>CFBundleVersion</key>' "$IOS_PLIST_FILE" || fail "iOS plist version code 字段缺失"
   grep -A1 -q "<string>$new_code</string>" "$IOS_PLIST_FILE" || fail "iOS plist version code 同步失败"
-  log "版本已同步：$old_version/$old_code -> $VERSION/$new_code"
+  log "版本已同步：$old_version/$old_app_version/$old_code -> $VERSION/$VERSION/$new_code"
 }
 
 run_gradle() {
@@ -208,50 +222,130 @@ generate_notes() {
   NOTES_PATH="$RELEASE_DIR/VRCM-v$VERSION-release-notes.md"
   if [[ -n "$NOTES_FILE" ]]; then
     [[ -f "$NOTES_FILE" ]] || fail "文案文件不存在：$NOTES_FILE"
-    cp -f "$NOTES_FILE" "$NOTES_PATH"
+    if [[ "$NOTES_FILE" != "$NOTES_PATH" ]]; then
+      cp -f "$NOTES_FILE" "$NOTES_PATH"
+    fi
     return 0
   fi
-  local base_tag commits subject type commit_type feature_lines optimization_lines fix_lines
+  require_command codex
+  require_command curl
+  require_command jq
+
+  local base_tag commits previous_release_body artifact_names details_url content_output generated_docs_dir codex_log doc
   base_tag="$(git -C "$ROOT_DIR" describe --tags --abbrev=0 2>/dev/null || true)"
+  if [[ "$base_tag" == "$VERSION" ]]; then
+    base_tag="$(git -C "$ROOT_DIR" describe --tags --abbrev=0 "${base_tag}^" 2>/dev/null || true)"
+  fi
   if [[ -n "$base_tag" ]]; then commits="$(git -C "$ROOT_DIR" log --format='%s' "$base_tag..HEAD")"; else commits="$(git -C "$ROOT_DIR" log -30 --format='%s')"; fi
-  feature_lines="$(printf '%s\n' "$commits" | while IFS= read -r subject; do
-    [[ -n "$subject" ]] || continue
-    type="${subject%%:*}"; commit_type="${type%%(*}"
-    if [[ "$commit_type" == feat || "$commit_type" == feature ]]; then
-      printf -- '- %s\n' "${subject#*: }"
-    fi
-  done)"
-  optimization_lines="$(printf '%s\n' "$commits" | while IFS= read -r subject; do
-    [[ -n "$subject" ]] || continue
-    type="${subject%%:*}"; commit_type="${type%%(*}"
-    if [[ ("$commit_type" == perf || "$commit_type" == refactor || "$commit_type" == build) && "${subject#*: }" != docs ]]; then
-      printf -- '- %s\n' "${subject#*: }"
-    fi
-  done)"
-  fix_lines="$(printf '%s\n' "$commits" | while IFS= read -r subject; do
-    [[ -n "$subject" ]] || continue
-    type="${subject%%:*}"; commit_type="${type%%(*}"
-    if [[ "$commit_type" == fix ]]; then
-      printf -- '- %s\n' "${subject#*: }"
-    fi
-  done)"
-  {
-    printf '## 新增\n'
-    if [[ -n "$feature_lines" ]]; then printf '%s\n' "$feature_lines"; else printf '%s\n' '- 持续完善页面体验、跨平台行为和日常使用流程。'; fi
-    printf '\n## 优化\n'
-    if [[ -n "$optimization_lines" ]]; then printf '%s\n' "$optimization_lines"; else printf '%s\n' '- 优化缓存刷新、账号切换、前后台恢复和多端发行流程。'; fi
-    printf '\n## 修复\n'
-    if [[ -n "$fix_lines" ]]; then printf '%s\n' "$fix_lines"; else printf '%s\n' '- 修复已知问题，并提升网络连接、状态恢复和多端运行的可靠性。'; fi
-    printf '\n****************\n\n'
-    printf '## New Features\n'
-    printf '%s\n' '- Added the user-facing changes listed in the Chinese section, covering VRChat social, content-management, and update workflows.'
-    printf '\n## Optimizations\n'
-    printf '%s\n' '- Improved cache refresh, account-switch isolation, foreground/background recovery, and cross-platform distribution.'
-    printf '\n## Bug Fixes\n'
-    printf '%s\n' '- Fixed the issues listed above across authentication, realtime sessions, favorites, Gallery, notifications, and platform behavior.'
-    printf '\n详情 / Details: <%s>\n' "https://github.com/$REPOSITORY/tree/main/docs/releases/$VERSION.md"
-  } > "$NOTES_PATH"
-  log "已生成 Release 文案：$NOTES_PATH"
+  previous_release_body=""
+  if [[ -n "$base_tag" ]]; then
+    previous_release_body="$(curl --fail --silent --show-error \
+      "$GITHUB_API/repos/$REPOSITORY/releases/tags/$base_tag" 2>/dev/null | jq -r '.body // empty' || true)"
+  fi
+  artifact_names="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -exec basename {} \; | sort)"
+  details_url="https://github.com/$REPOSITORY/tree/main/docs/releases/$VERSION.md"
+  content_output="$RELEASE_DIR/codex-release-content.json"
+  generated_docs_dir="$RELEASE_DIR/docs"
+  codex_log="$RELEASE_DIR/codex-release.log"
+  mkdir -p "$generated_docs_dir"
+  [[ -f "$RELEASE_CONTENT_SCHEMA" ]] || fail "缺少 Codex 结构化输出定义：$RELEASE_CONTENT_SCHEMA"
+  rm -f "$content_output"
+
+  log "调用本地 Codex 生成用户可读的双语 Release 文案与三语版本详解"
+  if ! codex exec --ephemeral --sandbox read-only --color never \
+    --cd "$ROOT_DIR" --output-schema "$RELEASE_CONTENT_SCHEMA" \
+    --output-last-message "$content_output" - >"$codex_log" 2>&1 <<EOF
+你是 VRCM 的 Release 文案编辑。请为版本 $VERSION 编写 GitHub Release 正文，以及英文、简体中文、日文三份详细更新文档。
+
+请先以只读方式检查仓库中与本版本有关的实际改动（版本范围为 $base_tag..HEAD）、git diff，以及 docs/releases/ 下可用的版本详解。以下提交标题只是线索，不能直接当作文案：
+
+<commits base="$base_tag">
+$commits
+</commits>
+
+以下是上一版本的 GitHub Release 正文，用它作为篇幅、分组和语气参考，不要复制其具体内容：
+
+<previous_release tag="$base_tag">
+$previous_release_body
+</previous_release>
+
+当前已经生成、可用于本次 Release 的文件如下。只有文件确实出现在列表中时，才可以写成用户现在能够下载；构建脚本具备某种能力不代表本次 Release 已提供对应文件：
+
+<available_artifacts>
+$artifact_names
+</available_artifacts>
+
+输出必须符合给定 JSON Schema，四个字段都填写完整 Markdown，不要在 JSON 字段之外附加说明。
+
+GitHub Release 正文（release_body）必须遵守：
+1. 固定使用这个顺序：## 新增、## 优化、## 修复、****************、## New Features、## Optimizations、## Bug Fixes。
+2. 面向普通用户，优先说明“现在能做什么”“体验有什么改善”“什么问题不再发生”，不要写成 Git 提交清单。
+3. 合并同类改动，每个分组保持简洁，通常使用 3 至 6 条；没有可靠依据的内容不要编造。
+4. 不要直接照抄提交标题。遇到英文提交标题时必须理解实际改动后，用自然中文归纳到中文区，不能把纯英文句子混入中文区。
+5. 避免缓存类型、协程、Cookie 回滚、pipeline、函数名、CI、Shields 等内部实现术语；确有必要时改写成用户能感知的结果。
+6. 产品名和平台名（VRCM、VRChat、Gallery、Print、Android、iOS、macOS、Windows、GitHub）可以保留英文，除此之外中文区应使用自然、易读的中文。
+7. 英文区必须逐项准确对应中文区，使用自然英文，不能用笼统占位句，也不能遗漏中文要点。
+8. 不要把用户无法感知的重构或纯发行维护写成主要功能；只有影响下载、安装、版本识别等用户体验时才可归纳。
+9. 最后一行必须原样为：详情 / Details: <$details_url>
+10. “支持本地恢复与增量刷新”“旧请求不会覆盖当前视图”“版本产物使用一致元数据”仍然过于技术化。应改写为“打开页面时更快看到已有内容”“切换账号后不会显示上一个账号的收藏”“各平台下载文件的版本号和名称保持一致”等用户结果。
+11. 不得把未出现在 available_artifacts 中的安装包写成当前可下载选项；可以省略相关发行维护，或准确说明为尚未提供。
+
+详细更新文档（details_en、details_zh、details_ja）必须遵守：
+1. 三份文档分别使用自然的英文、简体中文和日文，不做生硬逐字翻译；内容范围、事实和章节顺序保持一致。
+2. 英文标题使用 “# VRCM ${VERSION}: What's New”，中文标题使用“# VRCM ${VERSION}：新功能详解”，日文标题使用“# VRCM ${VERSION}：新機能の詳細”。
+3. 标题下提供 English / 中文 / 日本語 三语互链，分别指向 $VERSION.md、${VERSION}_ZH.md、${VERSION}_JP.md。
+4. 开头先用短段落说明这次更新对用户最重要的变化，再按真实使用场景组织章节，例如收藏管理、图片上传、更新下载、连接恢复；不要按代码模块或提交顺序罗列。
+5. 每个主要章节优先回答：用户从哪里使用、现在可以完成什么、相较以前改善了什么。必要时再说明权限、平台差异、数据范围或失败边界。
+6. 使用清晰的小标题、短段落和列表，便于快速浏览。合并重复内容，控制篇幅，不要用大量近义条目堆砌“详尽感”。
+7. 内部实现只在直接影响隐私、安全、兼容性或用户预期时说明；避免类名、函数名、提交号、缓存实现、状态机和构建流水线等开发细节。
+8. 对尚未支持的平台或有限制的功能明确说明，不夸大能力，不把预览版描述为正式商店发行版。
+9. 可以包含简洁的平台差异表和升级提示，但只保留用户作出下载、授权或操作决定所需的信息。
+10. 文末提供返回对应语言 README 和下载页的链接，链接必须使用仓库内正确的相对路径。
+11. 目标读者是使用 VRCM 的普通用户，不是项目贡献者。不要描述“旧响应被丢弃”“API 行为”“认证状态机”“Compose Desktop”“Inno Setup”等实现或构建过程；改写为页面上能观察到的变化。只有安装包格式或签名限制会影响用户选择时才简要说明。
+12. 每个章节的第一段先讲用户收益，再给出操作入口或例子，最后才说明必要限制。平台差异表只比较应用功能，不把打包任务或构建能力当成功能。
+EOF
+  then
+    tail -40 "$codex_log" >&2 || true
+    fail "Codex 生成 Release 文案失败；可检查本地 Codex 登录状态，或使用 --notes-file 提供文案"
+  fi
+
+  [[ -s "$content_output" ]] || fail "Codex 未生成结构化文案"
+  jq -e '.release_body | type == "string" and length > 0' "$content_output" >/dev/null || fail "Codex 未生成 Release 正文"
+  jq -e '.details_en | type == "string" and length > 0' "$content_output" >/dev/null || fail "Codex 未生成英文版本详解"
+  jq -e '.details_zh | type == "string" and length > 0' "$content_output" >/dev/null || fail "Codex 未生成中文版本详解"
+  jq -e '.details_ja | type == "string" and length > 0' "$content_output" >/dev/null || fail "Codex 未生成日文版本详解"
+  jq -r '.release_body' "$content_output" > "$NOTES_PATH"
+  jq -r '.details_en' "$content_output" > "$generated_docs_dir/$VERSION.md"
+  jq -r '.details_zh' "$content_output" > "$generated_docs_dir/${VERSION}_ZH.md"
+  jq -r '.details_ja' "$content_output" > "$generated_docs_dir/${VERSION}_JP.md"
+
+  [[ -s "$NOTES_PATH" ]] || fail "Codex 未生成 Release 文案"
+  grep -Fxq '## 新增' "$NOTES_PATH" || fail "Codex 文案缺少：## 新增"
+  grep -Fxq '## 优化' "$NOTES_PATH" || fail "Codex 文案缺少：## 优化"
+  grep -Fxq '## 修复' "$NOTES_PATH" || fail "Codex 文案缺少：## 修复"
+  grep -Fxq '****************' "$NOTES_PATH" || fail "Codex 文案缺少中英文分隔线"
+  grep -Fxq '## New Features' "$NOTES_PATH" || fail "Codex 文案缺少：## New Features"
+  grep -Fxq '## Optimizations' "$NOTES_PATH" || fail "Codex 文案缺少：## Optimizations"
+  grep -Fxq '## Bug Fixes' "$NOTES_PATH" || fail "Codex 文案缺少：## Bug Fixes"
+  grep -Fxq "详情 / Details: <$details_url>" "$NOTES_PATH" || fail "Codex 文案的 Details 链接不正确"
+  ! grep -q '^```' "$NOTES_PATH" || fail "Codex 文案不能包含代码块"
+  while IFS= read -r line; do
+    case "$line" in
+      '- '*) has_han_text "$line" || fail "Codex 在中文区生成了纯英文条目：$line" ;;
+    esac
+  done < <(awk '$0 == "****************" { exit } { print }' "$NOTES_PATH")
+  for doc in "$generated_docs_dir/$VERSION.md" "$generated_docs_dir/${VERSION}_ZH.md" "$generated_docs_dir/${VERSION}_JP.md"; do
+    [[ -s "$doc" ]] || fail "Codex 生成的版本详解为空：$doc"
+    grep -Fq "${VERSION}_ZH.md" "$doc" || fail "版本详解缺少中文文档链接：$doc"
+    grep -Fq "${VERSION}_JP.md" "$doc" || fail "版本详解缺少日文文档链接：$doc"
+  done
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    copy_one "$generated_docs_dir/$VERSION.md" "$ROOT_DIR/docs/releases/$VERSION.md"
+    copy_one "$generated_docs_dir/${VERSION}_ZH.md" "$ROOT_DIR/docs/releases/${VERSION}_ZH.md"
+    copy_one "$generated_docs_dir/${VERSION}_JP.md" "$ROOT_DIR/docs/releases/${VERSION}_JP.md"
+  fi
+  log "Codex Release 文案已生成：$NOTES_PATH"
+  log "Codex 版本详解已生成：$generated_docs_dir"
 }
 
 api_request() {
@@ -394,7 +488,8 @@ fi
 if [[ "$SKIP_VERSION_UPDATE" -eq 0 ]]; then
   replace_versions
 else
-  [[ "$(read_version)" == "$VERSION" ]] || fail "--skip-version-update 要求工作区版本已经是 $VERSION"
+  [[ "$(read_version)" == "$VERSION" && "$(read_runtime_version)" == "$VERSION" ]] || \
+    fail "--skip-version-update 要求 Version Catalog 和运行时 APP_VERSION 都已经是 $VERSION"
   log "跳过版本写入：使用工作区已有版本"
 fi
 
