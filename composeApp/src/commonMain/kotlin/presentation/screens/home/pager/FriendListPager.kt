@@ -65,7 +65,7 @@ fun FriendsDirectoryContent(
     val refreshFailed by model.directoryRefreshFailed.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(model) { model.refreshFriendDirectory() }
+    LaunchedEffect(model) { model.activateFriendDirectory() }
     LaunchedEffect(listState) {
         SharedFlowCentre.toPagerTop.collect {
             runCatching { listState.animateScrollToFirst() }

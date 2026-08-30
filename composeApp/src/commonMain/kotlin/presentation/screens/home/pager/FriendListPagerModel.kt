@@ -157,7 +157,7 @@ class FriendListPagerModel(
     private var friendFilterJob: Job? = null
     private val offlineStatusDescriptions = mutableMapOf<String, String>()
 
-    private val _directoryRefreshing = MutableStateFlow(true)
+    private val _directoryRefreshing = MutableStateFlow(false)
     val directoryRefreshing = _directoryRefreshing.asStateFlow()
     private val _directoryRefreshFailed = MutableStateFlow(false)
     val directoryRefreshFailed = _directoryRefreshFailed.asStateFlow()
@@ -165,6 +165,7 @@ class FriendListPagerModel(
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
+    private var friendDirectoryActivated = false
     private var favoritesPageActivated = false
     private var favoriteLocale: LocaleStrings? = null
 
@@ -237,9 +238,9 @@ class FriendListPagerModel(
         }
         _refreshErrors.value = emptyMap()
         _refreshingTabs.value = emptySet()
-        _directoryRefreshing.value = sessionToken != null
+        _directoryRefreshing.value = sessionToken != null && friendDirectoryActivated
         _directoryRefreshFailed.value = false
-        if (sessionToken != null) refreshFriendDirectory()
+        if (sessionToken != null && friendDirectoryActivated) refreshFriendDirectory()
         if (sessionToken != null && favoritesPageActivated) refreshFavoritesTabs()
     }
 
@@ -251,6 +252,12 @@ class FriendListPagerModel(
     fun activateFavoritesPage() {
         favoritesPageActivated = true
         if (activeSessionToken != null) refreshFavoritesTabs()
+    }
+
+    /** Marks the friend directory as active and refreshes its friend-only data. */
+    fun activateFriendDirectory() {
+        friendDirectoryActivated = true
+        refreshFriendDirectory()
     }
 
     private fun refreshFavoritesTabs() {
@@ -387,13 +394,14 @@ class FriendListPagerModel(
 
     /** Refreshes only the friend snapshot and VRChat friend favorite groups. */
     fun refreshFriendDirectory() {
+        if (!friendDirectoryActivated) return
         if (directoryRefreshJob?.isActive == true) return
         val sessionToken = activeSessionToken ?: return
         val generation = accountGeneration
+        _directoryRefreshing.value = true
+        _directoryRefreshFailed.value = false
         directoryRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             if (!acceptsAccount(sessionToken, generation)) return@launch
-            _directoryRefreshing.value = true
-            _directoryRefreshFailed.value = false
             var failed = false
             try {
                 if (favoriteService.loadFavoriteByGroup(Friend).isFailure) failed = true
