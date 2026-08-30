@@ -1,6 +1,9 @@
 package io.github.vrcmteam.vrcm.di.modules
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
@@ -33,8 +36,10 @@ import io.github.vrcmteam.vrcm.storage.meetup.defaultMeetupCardConfig
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.runTest
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -48,7 +53,7 @@ import kotlin.test.assertNotNull
 
 class PresentationModuleTest : MainDispatcherTest() {
     @Test
-    fun galleryScreenModelUsesFactoryScope() {
+    fun galleryScreenModelUsesFactoryScope() = runTest {
         val application = koinApplication {
             modules(
                 presentationModule,
@@ -62,12 +67,16 @@ class PresentationModuleTest : MainDispatcherTest() {
         val first = application.koin.get<GalleryScreenModel>()
         val second = application.koin.get<GalleryScreenModel>()
 
-        assertNotSame(first, second)
-        application.close()
+        try {
+            assertNotSame(first, second)
+        } finally {
+            clearViewModels(first, second)
+            application.close()
+        }
     }
 
     @Test
-    fun avatarProfileScreenModelUsesFactoryScope() {
+    fun avatarProfileScreenModelUsesFactoryScope() = runTest {
         val application = koinApplication {
             modules(
                 presentationModule,
@@ -85,8 +94,12 @@ class PresentationModuleTest : MainDispatcherTest() {
         val first = application.koin.get<AvatarProfileScreenModel>()
         val second = application.koin.get<AvatarProfileScreenModel>()
 
-        assertNotSame(first, second)
-        application.close()
+        try {
+            assertNotSame(first, second)
+        } finally {
+            clearViewModels(first, second)
+            application.close()
+        }
     }
 
     @Test
@@ -122,7 +135,7 @@ class PresentationModuleTest : MainDispatcherTest() {
     }
 
     @Test
-    fun meetupCardScreenModelResolvesPerRequestWithOwnerParameter() {
+    fun meetupCardScreenModelResolvesPerRequestWithOwnerParameter() = runTest {
         val application = koinApplication {
             modules(
                 presentationModule,
@@ -136,9 +149,22 @@ class PresentationModuleTest : MainDispatcherTest() {
         val first = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
         val second = application.koin.get<MeetupCardScreenModel> { parametersOf("usr_a") }
 
-        assertNotSame(first, second)
-        application.close()
+        try {
+            assertNotSame(first, second)
+        } finally {
+            clearViewModels(first, second)
+            application.close()
+        }
     }
+}
+
+private suspend fun clearViewModels(vararg models: ViewModel) {
+    val jobs = models.mapNotNull { it.viewModelScope.coroutineContext[Job] }
+    ViewModelStore().apply {
+        models.forEachIndexed { index, model -> put(index.toString(), model) }
+        clear()
+    }
+    jobs.joinAll()
 }
 
 private data object EmptyFavoriteEntrySource : FavoriteEntrySource {
