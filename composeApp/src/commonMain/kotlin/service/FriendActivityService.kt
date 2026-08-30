@@ -394,15 +394,14 @@ class FriendActivityService internal constructor(
     }
 
     private fun resolveWorldName(ownerUserId: String, worldId: String) {
-        serviceScope.launch {
-            try {
-                worldNameResolver.resolve(ownerUserId, worldId)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
+        worldNameResolver.request(
+            scope = serviceScope,
+            ownerUserId = ownerUserId,
+            worldId = worldId,
+            onFailure = { error ->
                 logger.error("Friend activity world lookup failed for $worldId: ${error.message}")
-            }
-        }
+            },
+        )
     }
 
     private companion object {

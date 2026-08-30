@@ -73,6 +73,25 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun loadedSnapshotReplacesTheInitialHeadCollector() = runTest {
+        val source = FakeTimelineSource(listOf(event(3), event(2), event(1)))
+        val model = FriendActivityTimelineModel(source, pageSize = 2)
+        advanceUntilIdle()
+        assertEquals(1, source.headEmissionCount)
+
+        repeat(5) { index ->
+            source.database.value = listOf(event(4L + index)) + source.database.value
+            advanceUntilIdle()
+        }
+
+        assertEquals(1, source.headEmissionCount)
+        assertEquals(
+            8L,
+            assertIs<FriendActivityTimelineState.Content>(model.state.value).events.first().id,
+        )
+    }
+
+    @Test
     fun emptyAppendCompletionKeepsHeadEventsReceivedWhileLoading() = runTest {
         val source = FakeTimelineSource(listOf(event(4), event(3), event(2)))
         val appendStarted = CompletableDeferred<Unit>()
@@ -224,6 +243,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         val appendResponses = ArrayDeque<Flow<List<FriendActivityEvent>>>()
         val requestedCursors = mutableListOf<FriendActivityTimelineCursor>()
         val requestedTokens = mutableListOf<AccountSessionToken>()
+        var headEmissionCount = 0
 
         override fun observeHead(
             token: AccountSessionToken,
@@ -233,7 +253,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             requestedTokens += token
             val accountDatabase = accountDatabases.getValue(token)
             val overridden = filteredHeads[types]
-            return if (overridden != null) {
+            val source = if (overridden != null) {
                 overridden.onEach { page ->
                     accountDatabase.value = if (types.isEmpty()) {
                         page
@@ -247,6 +267,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
                     events.filter { types.isEmpty() || it.type in types }.take(limit)
                 }
             }
+            return source.onEach { headEmissionCount++ }
         }
 
         override fun observeBefore(
