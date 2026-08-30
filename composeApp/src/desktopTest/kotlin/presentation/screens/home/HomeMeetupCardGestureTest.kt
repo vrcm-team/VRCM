@@ -15,7 +15,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleCombinedClickable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** 首页头像的手势契约：单击进资料页、长按进身份牌，二者互不触发。 */
+/** 首页身份区的手势契约：单击打开侧栏、长按进入身份牌，二者互不触发。 */
 @OptIn(ExperimentalTestApi::class)
 class HomeMeetupCardGestureTest {
     @Test

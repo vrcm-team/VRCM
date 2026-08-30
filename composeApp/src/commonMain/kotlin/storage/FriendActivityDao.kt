@@ -70,6 +70,85 @@ internal interface FriendActivityDao {
     ): Flow<List<FriendActivityEventEntity>>
 
     @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId " +
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit OFFSET :offset"
+    )
+    fun observeAllEvents(
+        ownerUserId: String,
+        limit: Int,
+        offset: Int,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND type IN (:types) " +
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit OFFSET :offset"
+    )
+    fun observeAllEventsByTypes(
+        ownerUserId: String,
+        types: List<String>,
+        limit: Int,
+        offset: Int,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND " +
+            "(occurredAtMillis < :beforeOccurredAtMillis OR " +
+            "(occurredAtMillis = :beforeOccurredAtMillis AND id < :beforeId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit"
+    )
+    fun observeAllEventsBefore(
+        ownerUserId: String,
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND type IN (:types) AND " +
+            "(occurredAtMillis < :beforeOccurredAtMillis OR " +
+            "(occurredAtMillis = :beforeOccurredAtMillis AND id < :beforeId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC LIMIT :limit"
+    )
+    fun observeAllEventsByTypesBefore(
+        ownerUserId: String,
+        types: List<String>,
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND " +
+            "(occurredAtMillis > :oldestOccurredAtMillis OR " +
+            "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC"
+    )
+    fun observeAllEventsThrough(
+        ownerUserId: String,
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
+        "SELECT * FROM friend_activity_events " +
+            "WHERE ownerUserId = :ownerUserId AND type IN (:types) AND " +
+            "(occurredAtMillis > :oldestOccurredAtMillis OR " +
+            "(occurredAtMillis = :oldestOccurredAtMillis AND id >= :oldestId)) " +
+            "ORDER BY occurredAtMillis DESC, id DESC"
+    )
+    fun observeAllEventsByTypesThrough(
+        ownerUserId: String,
+        types: List<String>,
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEventEntity>>
+
+    @Query(
         "SELECT worldName FROM friend_activity_events " +
             "WHERE ownerUserId = :ownerUserId AND worldId = :worldId AND worldName IS NOT NULL " +
             "ORDER BY id DESC LIMIT 1"

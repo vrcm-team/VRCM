@@ -19,6 +19,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationCard
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsRow
+import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -112,7 +114,7 @@ fun Pager.FriendLocationPager(
             sharedImageCacheKey = currentLocation.worldImageUrl,
         )
     }
-    val topPadding = getInsetPadding(WindowInsets::getTop) + 80.dp
+    val topPadding = 12.dp
     val onClickUserIcon = { user: FriendData, sharedSuffixKey: String ->
         navigator push UserProfileScreen(
             userProfileVO = UserProfileVo(user),
@@ -131,7 +133,10 @@ fun Pager.FriendLocationPager(
                 location.friends.containsKey(currentUserId)
             }.thenByDescending { it.friendList.size })
         // 如果没有底部系统手势条，默认12dp
-        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + 80.dp
+        val bottomNavigationPadding = if (
+            LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
+        ) 80.dp else 0.dp
+        val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,

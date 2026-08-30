@@ -56,6 +56,8 @@ data class FriendActivitySummary(
 data class FriendActivityEvent(
     val id: Long,
     val friendUserId: String,
+    val displayName: String,
+    val profileImageUrl: String,
     val type: FriendActivityEventType,
     val occurredAtMillis: Long,
     val previousValue: String?,
@@ -289,6 +291,76 @@ class FriendActivityService internal constructor(
         }
     }
 
+    fun observeAllEvents(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        limit: Int = 200,
+        offset: Int = 0,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEvents(token.userId, types, limit, offset)
+            .onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+                }
+            }.mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+            }
+
+    fun observeAllEventsBefore(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        beforeOccurredAtMillis: Long,
+        beforeId: Long,
+        limit: Int = 200,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsBefore(
+                ownerUserId = token.userId,
+                types = types,
+                beforeOccurredAtMillis = beforeOccurredAtMillis,
+                beforeId = beforeId,
+                limit = limit,
+            ).onEach { events ->
+                if (SharedFlowCentre.isCurrentSession(token)) {
+                    events.asSequence()
+                        .filter { it.worldName == null }
+                        .mapNotNull(FriendActivityEventEntity::worldId)
+                        .distinct()
+                        .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+                }
+            }.mapNotNull { events ->
+                events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+            }
+
+    fun observeAllEventsThrough(
+        token: AccountSessionToken,
+        types: Set<FriendActivityEventType> = emptySet(),
+        oldestOccurredAtMillis: Long,
+        oldestId: Long,
+    ): Flow<List<FriendActivityEvent>> =
+        store.observeAllEventsThrough(
+            ownerUserId = token.userId,
+            types = types,
+            oldestOccurredAtMillis = oldestOccurredAtMillis,
+            oldestId = oldestId,
+        ).onEach { events ->
+            if (SharedFlowCentre.isCurrentSession(token)) {
+                events.asSequence()
+                    .filter { it.worldName == null }
+                    .mapNotNull(FriendActivityEventEntity::worldId)
+                    .distinct()
+                    .forEach { worldId -> resolveWorldName(token.userId, worldId) }
+            }
+        }.mapNotNull { events ->
+            events.takeIf { SharedFlowCentre.isCurrentSession(token) }
+                ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+        }
+
     fun observeRecentTogether(
         sinceMillis: Long,
         limit: Int = 20,
@@ -499,6 +571,8 @@ private fun FriendActivityEventEntity.toEventOrNull(): FriendActivityEvent? {
     return FriendActivityEvent(
         id = id,
         friendUserId = friendUserId,
+        displayName = displayName,
+        profileImageUrl = profileImageUrl,
         type = eventType,
         occurredAtMillis = occurredAtMillis,
         previousValue = previousValue,
