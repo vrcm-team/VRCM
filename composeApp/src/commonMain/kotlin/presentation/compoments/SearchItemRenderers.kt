@@ -65,7 +65,7 @@ fun LazyItemScope.renderUserItem(
                 modifier = Modifier.sharedBoundsBy(
                     key = "${user.id}UserIcon",
                     suffixKey = sharedSuffixKey,
-                ),
+                ).size(48.dp),
                 iconUrl = user.iconUrl,
             )
         },
