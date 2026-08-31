@@ -182,6 +182,9 @@ class FriendService(
             if (accountTracker.onAuthenticated(session.account.userId)) {
                 friendStore.clear()
                 publishFriendState()
+            } else if (!restoreCacheBeforeRefresh) {
+                // 同账号续期保留好友状态，但必须用新的完整 token 重新发布绑定快照。
+                publishFriendState()
             }
             publishFriendActivitySource()
             true
