@@ -38,12 +38,18 @@ object FriendListPager : Pager {
 
     @Composable
     override fun Content() {
+        Content(koinViewModel())
+    }
+
+    @Composable
+    fun Content(model: FriendListPagerModel) {
         val bottomNavigationPadding = if (
             LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
         ) 80.dp else 0.dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
         FriendsDirectoryContent(
             contentPadding = PaddingValues(top = 12.dp, bottom = bottomPadding),
+            model = model,
         )
     }
 }
@@ -72,67 +78,59 @@ fun FriendsDirectoryContent(
         }
     }
 
-    RefreshBox(
-        modifier = modifier,
-        isRefreshing = refreshing,
-        doRefresh = { model.refreshFriendDirectory() },
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                item(key = "friend-directory-controls") {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SearchTextField(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                            value = searchText,
-                            onValueChange = model::setFriendDirectorySearchText,
-                        )
-                        GroupOptionsUI(
-                            currentOptions = options,
-                            favoriteType = FavoriteType.Friend,
-                            favoriteGroups = favoriteGroups,
-                            total = total,
-                            defaultText = strings.friendListPagerAllFriends,
-                            onOptionsChanged = model::updateFriendDirectoryGroupOptions,
-                            getSelectedGroup = FriendGroupOptions::selectedGroup,
-                            updateOptions = { current, selected -> current.copy(selectedGroup = selected) },
-                        )
-                    }
-                }
-
-                renderUserItems(friends) { friend, suffix ->
-                    navigator push UserProfileScreen(UserProfileVo(friend), suffix)
+    Box(modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            item(key = "friend-directory-controls") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchTextField(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        value = searchText,
+                        onValueChange = model::setFriendDirectorySearchText,
+                    )
+                    GroupOptionsUI(
+                        currentOptions = options,
+                        favoriteType = FavoriteType.Friend,
+                        favoriteGroups = favoriteGroups,
+                        total = total,
+                        defaultText = strings.friendListPagerAllFriends,
+                        onOptionsChanged = model::updateFriendDirectoryGroupOptions,
+                        getSelectedGroup = FriendGroupOptions::selectedGroup,
+                        updateOptions = { current, selected -> current.copy(selectedGroup = selected) },
+                    )
                 }
             }
 
-            if (refreshing && friends.isEmpty()) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
-            } else if (friends.isEmpty() && refreshFailed) {
-                DirectoryMessage(
-                    message = strings.friendDirectoryLoadFailed,
-                    retry = true,
-                    onRetry = model::refreshFriendDirectory,
-                )
-            } else if (friends.isEmpty()) {
-                DirectoryMessage(
-                    message = if (searchText.isBlank() && options.selectedGroup == null) {
-                        strings.friendDirectoryEmpty
-                    } else {
-                        strings.friendDirectoryNoMatches
-                    },
-                    retry = false,
-                    onRetry = model::refreshFriendDirectory,
-                )
-            } else if (refreshFailed) {
-                DirectoryErrorBanner(
-                    bottomPadding = contentPadding.calculateBottomPadding(),
-                    onRetry = model::refreshFriendDirectory,
-                )
+            renderUserItems(friends) { friend, suffix ->
+                navigator push UserProfileScreen(UserProfileVo(friend), suffix)
             }
+        }
+
+        if (friends.isEmpty() && refreshFailed && !refreshing) {
+            DirectoryMessage(
+                message = strings.friendDirectoryLoadFailed,
+                retry = true,
+                onRetry = model::refreshFriendDirectory,
+            )
+        } else if (friends.isEmpty() && !refreshing) {
+            DirectoryMessage(
+                message = if (searchText.isBlank() && options.selectedGroup == null) {
+                    strings.friendDirectoryEmpty
+                } else {
+                    strings.friendDirectoryNoMatches
+                },
+                retry = false,
+                onRetry = model::refreshFriendDirectory,
+            )
+        } else if (friends.isNotEmpty() && refreshFailed) {
+            DirectoryErrorBanner(
+                bottomPadding = contentPadding.calculateBottomPadding(),
+                onRetry = model::refreshFriendDirectory,
+            )
         }
     }
 }

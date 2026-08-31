@@ -15,12 +15,10 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
-import io.github.vrcmteam.vrcm.service.FriendService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
@@ -30,8 +28,6 @@ import org.koin.core.logger.Logger
 class HomeScreenModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
-    private val friendService: FriendService,
-    private val friendLocationPagerModel: FriendLocationPagerModel,
     private val logger: Logger,
     private val meetupCardRepository: MeetupCardRepository,
 ) : ViewModel() {
@@ -100,8 +96,6 @@ class HomeScreenModel(
     }
 
     init {
-        friendService.preloadFriendList()
-        friendLocationPagerModel.preloadFriendLocations()
         refreshCurrentUser()
         viewModelScope.launch {
             authService.currentUserState.collect { _currentUser.value = it }

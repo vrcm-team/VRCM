@@ -49,6 +49,21 @@ class FriendStateStoreTest {
     }
 
     @Test
+    fun newerOnlineLocationEventWinsOverInFlightActiveFriendsSnapshot() {
+        val store = FriendStateStore()
+        store.putFromEvent(friend("usr_a", LocationType.Offline.value))
+        val activeFriendsToken = store.beginRefresh()
+
+        store.setActiveFromEvent("usr_a", false)
+        store.updateFromEvent("usr_a") { current ->
+            current?.copy(location = LocationType.Private.value)
+        }
+        store.mergeActiveFriends(activeFriendsToken, listOf("usr_a"))
+
+        assertEquals(LocationType.Private.value, store.snapshot.getValue("usr_a").location)
+    }
+
+    @Test
     fun deleteEventDuringFullRefreshLeavesATombstoneAgainstOldPage() {
         val store = FriendStateStore()
         store.putFromEvent(friend("usr_a", "wrld_old:1"))

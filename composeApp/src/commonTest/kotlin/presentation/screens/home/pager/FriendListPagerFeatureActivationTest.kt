@@ -56,7 +56,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
     @Test
-    fun favoritesDoNotRefreshFriendsUntilDirectoryIsActivated() = runBlocking {
+    fun directoryActivationAndReentryLoadGroupsWithoutDuplicatingGlobalFriendRefresh() = runBlocking {
         val fixture = createFixture()
         try {
             fixture.model.activateFavoritesPage()
@@ -69,7 +69,17 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
             fixture.awaitFriendDirectoryRefresh()
 
             assertEquals(1, fixture.requests.favoriteGroups(FavoriteType.Friend))
-            assertTrue(fixture.requests.friendLists > fixture.friendListsBeforeFeatures)
+            assertEquals(fixture.friendListsBeforeFeatures, fixture.requests.friendLists)
+
+            fixture.model.activateFriendDirectory()
+            awaitUntil {
+                fixture.requests.favoriteGroups(FavoriteType.Friend) > 1 &&
+                    !fixture.model.directoryRefreshing.value
+            }
+            assertEquals(fixture.friendListsBeforeFeatures, fixture.requests.friendLists)
+
+            fixture.model.refreshFriendDirectory()
+            awaitUntil { fixture.requests.friendLists > fixture.friendListsBeforeFeatures }
         } finally {
             fixture.close()
         }
@@ -124,7 +134,7 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
     }
 
     @Test
-    fun repeatedDirectoryActivationKeepsSingleRefreshInFlight() = runBlocking {
+    fun repeatedDirectoryActivationKeepsSingleGroupRefreshInFlight() = runBlocking {
         val fixture = createFixture(blockFirstFriendFavoriteGroupRequest = true)
         try {
             fixture.model.activateFriendDirectory()
@@ -136,7 +146,7 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
             fixture.awaitFriendDirectoryRefresh()
 
             assertEquals(1, fixture.requests.favoriteGroups(FavoriteType.Friend))
-            assertTrue(fixture.requests.friendLists > friendListsBeforeDirectoryRefresh)
+            assertEquals(friendListsBeforeDirectoryRefresh, fixture.requests.friendLists)
         } finally {
             fixture.close()
         }

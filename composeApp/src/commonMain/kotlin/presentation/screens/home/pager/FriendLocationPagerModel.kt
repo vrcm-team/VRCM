@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.compose.runtime.*
-import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
@@ -13,9 +12,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
-import io.github.vrcmteam.vrcm.service.AccountBoundTask
-import io.github.vrcmteam.vrcm.service.AccountGenerationToken
-import io.github.vrcmteam.vrcm.service.AccountGenerationTracker
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendPresence
@@ -27,8 +23,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -38,22 +37,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-
-internal class FriendUpdateSessionGate(
-    initialSessionToken: AccountSessionToken? = null,
-) {
-    private var sessionToken: AccountSessionToken? = initialSessionToken
-
-    fun activate(token: AccountSessionToken) {
-        sessionToken = token
-    }
-
-    fun clear() {
-        sessionToken = null
-    }
-
-    fun accepts(token: AccountSessionToken): Boolean = sessionToken == token
-}
 
 internal class FriendLocationPublishedState {
     val locationMap: MutableMap<LocationType, MutableList<FriendLocation>> = mutableStateMapOf()
@@ -99,9 +82,8 @@ class FriendLocationPagerModel(
     private val instancesApi: InstancesApi,
     private val authService: AuthService,
 ) {
-    // This model is a Koin singleton because its location index is shared by
-    // the home pager and profile screens. Keep its workers alive across the
-    // logout/login navigation cycle so a new session can restart preloading.
+    // This model is a Koin singleton because its derived location index is shared by
+    // the home pager and profile screens.
     private val modelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val initialSession = SharedFlowCentre.currentSession.value
     private val publishedState = FriendLocationPublishedState()
@@ -110,209 +92,109 @@ class FriendLocationPagerModel(
     val currentUserId: String
         get() = authService.accountDto().userId
 
-    private val presenceStore = FriendLocationPresenceStore()
-    private var currentUserPresence: FriendPresence? = null
-    private val friendUpdateSessionGate = FriendUpdateSessionGate(initialSession?.token)
-    private val accountTracker = AccountGenerationTracker(initialSession?.account?.userId)
     private val updateMutex = Mutex()
-    private val refreshMutex = Mutex()
     private val instanceFetchSemaphore = Semaphore(4)
     private val instanceJobsLock = SynchronizedObject()
     private val instanceJobs = mutableMapOf<String, Job>()
     private val foregroundGeneration = atomic(0L)
+    private val refreshGeneration = atomic(0L)
     private val isForeground = atomic(true)
-    private val preloadTask = AccountBoundTask(
+    private var activeAccountUserId = initialSession?.account?.userId
+    private var refreshJob: Job? = null
+    private val _isRefreshing = MutableStateFlow(false)
+
+    val isRefreshing: StateFlow<Boolean> = combine(
+        _isRefreshing,
+        friendService.isRefreshing,
+    ) { locationRefreshing, friendsRefreshing ->
+        locationRefreshing || friendsRefreshing
+    }.stateIn(
         scope = modelScope,
-        isCurrent = accountTracker::isCurrent,
-        runTask = { token ->
-            doRefreshFriendLocationForAccount(
-                removeNotIncluded = true,
-                token = token,
-            )
-        },
+        started = SharingStarted.Eagerly,
+        initialValue = friendService.isRefreshing.value,
     )
-    private var hasCompletedInitialRefresh = false
 
     fun close() {
         modelScope.cancel()
     }
 
-    /**
-     * 刷新状态,一次登录成功后只会自动刷新一次
-     */
-    var isRefreshing by mutableStateOf(true)
-        private set
-
     init {
-        accountTracker.currentToken()?.let(preloadTask::start)
         modelScope.launch {
-            friendService.friendState.collect { friends ->
-                if (!hasCompletedInitialRefresh) return@collect
-                updateMutex.withLock { presenceStore.replaceFriends(friends.values) }
+            combine(
+                friendService.friendState,
+                friendService.currentUserLocation,
+                authService.currentUserState,
+            ) { _, _, _ -> Unit }.collect {
                 syncFriendLocations()
             }
         }
         modelScope.launch {
-            friendService.currentUserLocation.collect { presence ->
-                var shouldSync = false
-                updateMutex.withLock {
-                    currentUserPresence = presence
-                    shouldSync = hasCompletedInitialRefresh
-                }
-                if (shouldSync) syncFriendLocations()
-            }
-        }
-        modelScope.launch {
-            friendService.friendUpdateFlow.collect { update ->
-                val refreshRequired = updateMutex.withLock {
-                    if (!acceptsFriendUpdate(update.sessionToken)) return@withLock null
-                    presenceStore.apply(update.event)
-                } ?: return@collect
-                if (!SharedFlowCentre.isCurrentSession(update.sessionToken)) return@collect
-                if (refreshRequired) {
-                    doRefreshFriendLocation(removeNotIncluded = true)
-                } else {
-                    syncFriendLocations()
-                }
-            }
-        }
-        modelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
-                if (session == null) {
-                    accountTracker.clear()
+                val nextUserId = session?.account?.userId
+                if (activeAccountUserId != nextUserId) {
+                    activeAccountUserId = nextUserId
+                    refreshGeneration.incrementAndGet()
+                    refreshJob?.cancel()
+                    refreshJob = null
+                    _isRefreshing.value = false
                     updateMutex.withLock {
-                        friendUpdateSessionGate.clear()
                         clearFriendLocations()
-                        hasCompletedInitialRefresh = false
                     }
-                    isRefreshing = true
-                    preloadTask.cancelAndJoin()
-                } else {
-                    val activation = accountTracker.activate(session.account.userId)
-                    updateMutex.withLock {
-                        friendUpdateSessionGate.activate(session.token)
-                        if (activation.changed) {
-                            clearFriendLocations()
-                            hasCompletedInitialRefresh = false
-                        }
-                    }
-                    if (!activation.changed) return@collect
-                    isRefreshing = true
-                    preloadTask.cancelAndJoin()
-                    preloadTask.start(activation.token)
                 }
             }
         }
-    }
-
-    private fun acceptsFriendUpdate(sessionToken: AccountSessionToken): Boolean =
-        friendUpdateSessionGate.accepts(sessionToken) &&
-            SharedFlowCentre.isCurrentSession(sessionToken)
-
-    fun preloadFriendLocations() {
-        if (hasCompletedInitialRefresh) return
-        val token = accountTracker.currentToken() ?: return
-        preloadTask.start(token)
     }
 
     fun onBackground() {
         isForeground.value = false
         foregroundGeneration.incrementAndGet()
-        preloadTask.cancel()
         synchronized(instanceJobsLock) {
             instanceJobs.values.forEach(Job::cancel)
             instanceJobs.clear()
         }
+        refreshGeneration.incrementAndGet()
+        refreshJob?.cancel()
+        refreshJob = null
+        _isRefreshing.value = false
     }
 
     fun onForeground() {
         if (isForeground.getAndSet(true)) return
         foregroundGeneration.incrementAndGet()
-        val token = accountTracker.currentToken() ?: return
-        isRefreshing = true
-        preloadTask.start(token)
+        startFriendLocationRefresh()
     }
 
     fun findFriendLocation(userId: String, location: String): FriendLocation? =
         friendLocationsByUser.value[userId]?.takeIf { it.location == location }
 
 
-    suspend fun refreshFriendLocation() {
-        val token = accountTracker.currentToken() ?: return
-        // 只有在clear时设置true,用来触发刷新状态动画
-        // 不然切换一个Page就触发动画
-        isRefreshing = true
-        updateMutex.withLock {
-            if (!accountTracker.isCurrent(token)) return
-            clearFriendLocations()
-        }
-        doRefreshFriendLocationForAccount(
-            removeNotIncluded = false,
-            token = token,
-        )
-        // 刷新后更新刷新状态, 防止页面重新加载时自动刷新
+    fun refreshFriendLocation() {
+        startFriendLocationRefresh()
     }
 
-    /**
-     * 刷新好友位置
-     * 未clear()的刷新会因为ws接口失效导致好友下线时未同步产生数据残留, 请让removeNotIncluded = true
-     * @param removeNotIncluded 是否移除不在这一次刷新好友在线列表中的好友
-     */
-    suspend fun doRefreshFriendLocation(removeNotIncluded: Boolean = false) {
-        val token = accountTracker.currentToken() ?: return
-        doRefreshFriendLocationForAccount(removeNotIncluded, token)
-    }
-
-    private suspend fun doRefreshFriendLocationForAccount(
-        removeNotIncluded: Boolean,
-        token: AccountGenerationToken,
-    ) = refreshMutex.withLock refresh@{
-        if (!accountTracker.isCurrent(token)) return@refresh
-        val includedIds = mutableSetOf<String>()
-        updateMutex.withLock { presenceStore.beginRefresh() }
-        try {
-            val currentUser = friendService.refreshCurrentUserLocation()
-            if (currentUser != null) {
-                updateMutex.withLock {
-                    if (!accountTracker.isCurrent(token)) return@withLock
-                    currentUserPresence = friendService.currentUserLocation.value
-                    presenceStore.setActiveFriends(currentUser.activeFriends)
-                }
-            }
-        } catch (e: CancellationException) {
-            updateMutex.withLock {
-                if (accountTracker.isCurrent(token)) presenceStore.cancelRefresh()
-            }
-            throw e
-        } catch (_: Exception) {
-            // Presence events keep this cache current if the account refresh is temporarily unavailable.
-        }
-        if (!accountTracker.isCurrent(token)) return@refresh
-        var completed = false
-        try {
-            completed = withContext(Dispatchers.IO) {
-                friendService.refreshFriendList(offline = false) page@{ friends ->
-                    if (!accountTracker.isCurrent(token)) return@page
-                    updateMutex.withLock {
-                        if (accountTracker.isCurrent(token)) {
-                            presenceStore.addPage(friends)
-                            includedIds.addAll(friends.map(FriendData::id))
-                        }
+    private fun startFriendLocationRefresh() {
+        if (refreshJob?.isActive == true) return
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        val generation = refreshGeneration.incrementAndGet()
+        _isRefreshing.value = true
+        refreshJob = modelScope.launch(Dispatchers.IO) {
+            try {
+                try {
+                    friendService.refreshCurrentUserLocation()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Result.failure<Unit>(error).onApiFailure("FriendLocation") {
+                        SharedFlowCentre.toastText.emit(ToastText.Error(it))
                     }
-                    syncFriendLocations(token, fetchInstanceDetails = false)
                 }
-            }
-            updateMutex.withLock {
-                if (accountTracker.isCurrent(token)) {
-                    presenceStore.finishRefresh(includedIds, reconcile = removeNotIncluded && completed)
+                if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@launch
+                friendService.refreshFriendList()
+            } finally {
+                if (refreshGeneration.value == generation) {
+                    if (SharedFlowCentre.isCurrentSession(sessionToken)) syncFriendLocations()
+                    _isRefreshing.value = false
                 }
-            }
-            if (completed && accountTracker.isCurrent(token)) hasCompletedInitialRefresh = true
-        } finally {
-            if (accountTracker.isCurrent(token)) {
-                if (!completed) updateMutex.withLock { presenceStore.cancelRefresh() }
-                syncFriendLocations(token, fetchInstanceDetails = completed)
-                isRefreshing = false
             }
         }
     }
@@ -322,58 +204,55 @@ class FriendLocationPagerModel(
      * 后台线程往 [FriendLocation.friends] 这类 SnapshotStateMap 插好友，会和主线程读
      * [FriendLocation.friendList] 的排序撞车——排序先读 size 再迭代，中途被插入就数组越界。
      */
-    private suspend fun syncFriendLocations(
-        token: AccountGenerationToken? = null,
-        fetchInstanceDetails: Boolean = true,
-    ) = withContext(Dispatchers.Main) {
-        updateMutex.withLock {
-            if (token != null && !accountTracker.isCurrent(token)) return@withLock
-            runCatching {
-                val snapshot = presenceStore.snapshot()
-                publishedState.syncSimpleLocation(LocationType.Offline, snapshot.offline)
-                publishedState.syncSimpleLocation(LocationType.Web, snapshot.web)
-                val own = currentUserPresence?.let { presence ->
-                    ownEffectiveLocation(presence)?.let { effectiveLocation ->
-                        authService.currentUser().toFriendData(presence, effectiveLocation)
+    private suspend fun syncFriendLocations(fetchInstanceDetails: Boolean = true) =
+        withContext(Dispatchers.Main) {
+            updateMutex.withLock {
+                runCatching {
+                    val snapshot = friendService.friendState.value.values.toFriendLocationSnapshot()
+                    publishedState.syncSimpleLocation(LocationType.Offline, snapshot.offline)
+                    publishedState.syncSimpleLocation(LocationType.Web, snapshot.web)
+                    val own = friendService.currentUserLocation.value?.let { presence ->
+                        ownEffectiveLocation(presence)?.let { effectiveLocation ->
+                            authService.currentUserState.value?.toFriendData(presence, effectiveLocation)
+                        }
                     }
-                }
-                val privateFriends = if (own?.location == LocationType.Private.value) {
-                    snapshot.private.filterNot { it.id == own.id } + own
-                } else {
-                    snapshot.private
-                }
-                publishedState.syncSimpleLocation(LocationType.Private, privateFriends)
-                val instances = snapshot.instances.toMutableMap()
-                if (own != null) {
-                    val group = instances[own.location]
-                    val ownIsTraveling =
-                        currentUserPresence?.location?.startsWith(LocationType.Traveling.value) == true
-                    instances[own.location] = if (group == null) {
-                        FriendLocationGroup(
-                            friends = listOf(own),
-                            travelingIds = if (ownIsTraveling) setOf(own.id) else emptySet(),
-                        )
+                    val privateFriends = if (own?.location == LocationType.Private.value) {
+                        snapshot.private.filterNot { it.id == own.id } + own
                     } else {
-                        FriendLocationGroup(
-                            friends = group.friends.filterNot { it.id == own.id } + own,
-                            travelingIds = if (ownIsTraveling) {
-                                group.travelingIds + own.id
-                            } else {
-                                group.travelingIds - own.id
-                            },
-                        )
+                        snapshot.private
                     }
+                    publishedState.syncSimpleLocation(LocationType.Private, privateFriends)
+                    val instances = snapshot.instances.toMutableMap()
+                    if (own != null) {
+                        val group = instances[own.location]
+                        val ownIsTraveling =
+                            friendService.currentUserLocation.value
+                                ?.location?.startsWith(LocationType.Traveling.value) == true
+                        instances[own.location] = if (group == null) {
+                            FriendLocationGroup(
+                                friends = listOf(own),
+                                travelingIds = if (ownIsTraveling) setOf(own.id) else emptySet(),
+                            )
+                        } else {
+                            FriendLocationGroup(
+                                friends = group.friends.filterNot { it.id == own.id } + own,
+                                travelingIds = if (ownIsTraveling) {
+                                    group.travelingIds + own.id
+                                } else {
+                                    group.travelingIds - own.id
+                                },
+                            )
+                        }
+                    }
+                    syncInstanceLocations(instances, fetchInstanceDetails)
+                    publishFriendLocationIndex()
+                }.onApiFailure("FriendLocation") {
+                    SharedFlowCentre.toastText.emit(ToastText.Error(it))
                 }
-                syncInstanceLocations(instances, fetchInstanceDetails)
-                publishFriendLocationIndex()
-            }.onApiFailure("FriendLocation") {
-                SharedFlowCentre.toastText.emit(ToastText.Error(it))
             }
         }
-    }
 
     private fun clearFriendLocations() {
-        presenceStore.clear()
         publishedState.clear()
     }
 

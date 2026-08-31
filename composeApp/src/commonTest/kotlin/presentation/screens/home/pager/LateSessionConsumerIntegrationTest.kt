@@ -13,6 +13,8 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendLocationContent
+import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOnlineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -50,7 +52,7 @@ import kotlin.test.assertNotNull
 @OptIn(ExperimentalCoroutinesApi::class)
 class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
     @Test
-    fun currentSessionEventReachesConsumersCreatedAfterAuthentication() = runBlocking {
+    fun currentSessionPresenceEventsReachGlobalStateAndLateLocationConsumer() = runBlocking {
         SharedFlowCentre.emitLogout()
         val account = AccountDto(
             userId = "usr_late_consumer",
@@ -113,6 +115,29 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
                 LocationType.Web.value,
                 locationModel.friendLocationsByUser.value.getValue(friendId).location,
             )
+
+            val onlineEvent = onlineFriendEvent(json, friendId)
+            withTimeout(3_000) {
+                while (
+                    friendService.friendState.value[friendId]?.location != LocationType.Private.value ||
+                    locationModel.friendLocationsByUser.value[friendId]?.location != LocationType.Private.value
+                ) {
+                    SharedFlowCentre.emitWebSocket(AccountWebSocketEvent(session.token, onlineEvent))
+                    yield()
+                }
+            }
+
+            val instanceLocation = "wrld_realtime:instance"
+            val locationEvent = locationFriendEvent(json, friendId, instanceLocation)
+            withTimeout(3_000) {
+                while (
+                    friendService.friendState.value[friendId]?.location != instanceLocation ||
+                    locationModel.friendLocationsByUser.value[friendId]?.location != instanceLocation
+                ) {
+                    SharedFlowCentre.emitWebSocket(AccountWebSocketEvent(session.token, locationEvent))
+                    yield()
+                }
+            }
         } finally {
             locationModel.close()
             friendService.dispose()
@@ -170,6 +195,32 @@ class LateSessionConsumerIntegrationTest : MainDispatcherTest() {
                     userIcon = "",
                     pronouns = null,
                 ),
+            )
+        ),
+    )
+
+    private fun onlineFriendEvent(json: Json, friendId: String) = WebSocketEvent(
+        type = FriendEvents.FriendOnline.typeName,
+        content = json.encodeToString(
+            FriendOnlineContent(
+                location = LocationType.Private.value,
+                platform = "web",
+                travelingToLocation = "",
+                userId = friendId,
+                worldId = "",
+            )
+        ),
+    )
+
+    private fun locationFriendEvent(json: Json, friendId: String, location: String) = WebSocketEvent(
+        type = FriendEvents.FriendLocation.typeName,
+        content = json.encodeToString(
+            FriendLocationContent(
+                canRequestInvite = true,
+                location = location,
+                travelingToLocation = "",
+                userId = friendId,
+                worldId = location.substringBefore(':'),
             )
         ),
     )
