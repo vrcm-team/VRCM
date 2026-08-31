@@ -360,6 +360,8 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val profileInviteToMyInstance = "自分のインスタンスに招待"
     override val profileInviteSent = "招待を送信しました"
     override val profileInviteNotInInstance = "現在インスタンスに参加していません"
+    override val profileRequestInvite = "招待をリクエスト"
+    override val profileRequestInviteSent = "招待リクエストを送信しました"
     override val friendActivityTitle = "アクティビティ"
     override val friendActivityRecentTogether = "最近一緒にいたユーザー"
     override val friendActivityLastTogether = "最後に会った日時"
