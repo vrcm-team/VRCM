@@ -27,6 +27,7 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
+import io.github.vrcmteam.vrcm.service.MAX_CONCURRENT_FRIEND_REMOVALS
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
@@ -36,9 +37,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -83,8 +81,6 @@ internal data class FriendRemovalState(
     val successCount: Int get() = results.values.count(FriendRemovalResult::succeeded)
     val failureCount: Int get() = results.size - successCount
 }
-
-private const val FRIEND_REMOVAL_CONCURRENCY = 3
 
 internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
     if (sessionToken != null && this.sessionToken == sessionToken) friends.values.toList() else emptyList()
@@ -424,38 +420,35 @@ class FriendListPagerModel(
         )
         friendRemovalJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                selectedUserIds.chunked(FRIEND_REMOVAL_CONCURRENCY).forEach { batch ->
-                    coroutineScope {
-                        batch.map { userId ->
-                            async {
-                                val result = try {
-                                    friendService.unfriend(userId)
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (error: Throwable) {
-                                    Result.failure(error)
-                                }
-                                if (acceptsAccount(sessionToken, generation)) {
-                                    val itemResult = FriendRemovalResult(
-                                        userId = userId,
-                                        errorMessage = result.exceptionOrNull()?.message
-                                            ?.ifBlank { "Request failed" }
-                                            ?: if (result.isFailure) "Request failed" else null,
-                                    )
-                                    _friendRemovalState.update { current ->
-                                        current.copy(
-                                            selectedUserIds = if (itemResult.succeeded) {
-                                                current.selectedUserIds - userId
-                                            } else {
-                                                current.selectedUserIds
-                                            },
-                                            completedCount = current.completedCount + 1,
-                                            results = current.results + (userId to itemResult),
-                                        )
-                                    }
-                                }
-                            }
-                        }.awaitAll()
+                selectedUserIds.chunked(MAX_CONCURRENT_FRIEND_REMOVALS).forEach { batch ->
+                    val batchResults = try {
+                        friendService.unfriendBatch(batch)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Throwable) {
+                        batch.associateWith { Result.failure(error) }
+                    }
+                    if (!acceptsAccount(sessionToken, generation)) return@launch
+                    batch.forEach { userId ->
+                        val result = batchResults[userId]
+                            ?: Result.failure(IllegalStateException("Missing removal result"))
+                        val itemResult = FriendRemovalResult(
+                            userId = userId,
+                            errorMessage = result.exceptionOrNull()?.message
+                                ?.ifBlank { "Request failed" }
+                                ?: if (result.isFailure) "Request failed" else null,
+                        )
+                        _friendRemovalState.update { current ->
+                            current.copy(
+                                selectedUserIds = if (itemResult.succeeded) {
+                                    current.selectedUserIds - userId
+                                } else {
+                                    current.selectedUserIds
+                                },
+                                completedCount = current.completedCount + 1,
+                                results = current.results + (userId to itemResult),
+                            )
+                        }
                     }
                 }
 

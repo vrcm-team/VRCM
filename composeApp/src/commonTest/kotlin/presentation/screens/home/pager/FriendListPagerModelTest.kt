@@ -53,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.job
@@ -613,6 +614,95 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun unauthorizedBatchRemovalDoesNotReauthenticateAfterAccountSwitch() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val accountA = AccountDto(
+            userId = "usr_removal_auth_owner_a",
+            username = "removal-auth-owner-a",
+            password = "password-a",
+        )
+        val accountB = AccountDto(
+            userId = "usr_removal_auth_owner_b",
+            username = "removal-auth-owner-b",
+            password = "password-b",
+        )
+        SharedFlowCentre.emitAuthenticated(accountA)
+        val sessionA = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val oldFriendId = "usr_removal_auth_old_friend"
+        val newFriendId = "usr_removal_auth_new_friend"
+        val deleteRequests = atomic(0)
+        val authenticationRequests = atomic(0)
+        val firstDeleteStarted = CompletableDeferred<Unit>()
+        val releaseFirstDelete = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.endsWith("/$oldFriendId") -> {
+                            val attempt = deleteRequests.incrementAndGet()
+                            if (attempt == 1) {
+                                firstDeleteStarted.complete(Unit)
+                                releaseFirstDelete.await()
+                                respond("expired", HttpStatusCode.Unauthorized)
+                            } else {
+                                jsonResponse(successResponseJson())
+                            }
+                        }
+                        path == "/auth/user/friends" -> jsonResponse("[]")
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> {
+                            if (request.headers[HttpHeaders.Authorization] != null) {
+                                authenticationRequests.incrementAndGet()
+                            }
+                            respond("unavailable", HttpStatusCode.InternalServerError)
+                        }
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(accountA, client, json)
+
+        try {
+            emitFriendUntilObserved(
+                fixture.friendService,
+                sessionA,
+                oldFriendId,
+                activeFriendEvent(json, oldFriendId, "Old Auth Friend"),
+            )
+            val removal = async {
+                fixture.friendService.unfriendBatch(listOf(oldFriendId)).getValue(oldFriendId)
+            }
+            withTimeout(3_000) { firstDeleteStarted.await() }
+
+            fixture.accountDao.saveAccountInfo(accountB)
+            SharedFlowCentre.emitAuthenticated(accountB)
+            val sessionB = assertNotNull(SharedFlowCentre.currentSession.value)
+            emitFriendUntilObserved(
+                fixture.friendService,
+                sessionB,
+                newFriendId,
+                activeFriendEvent(json, newFriendId, "New Auth Friend"),
+            )
+            releaseFirstDelete.complete(Unit)
+
+            assertTrue(removal.await().isFailure)
+            repeat(20) { yield() }
+            assertEquals(1, deleteRequests.value)
+            assertEquals(0, authenticationRequests.value)
+            assertEquals(setOf(newFriendId), fixture.friendService.friendState.value.keys)
+        } finally {
+            releaseFirstDelete.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     private fun createRemovalFixture(
         account: AccountDto,
         client: HttpClient,
@@ -631,11 +721,12 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             ),
             favoriteListCacheStore = favoriteListCacheStore,
         )
+        val accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+            it.saveAccountInfo(account)
+        }
         val authService = AuthService(
             authApi = AuthApi(client),
-            accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
-                it.saveAccountInfo(account)
-            },
+            accountDao = accountDao,
             cookiesStorage = PersistentCookiesStorage(EmptyLogger()),
             accountCacheManager = accountCacheManager,
         )
@@ -662,13 +753,14 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteListCacheStore = favoriteListCacheStore,
             accountCacheManager = accountCacheManager,
         )
-        return RemovalFixture(model, friendService, favoriteService, profileScope, client)
+        return RemovalFixture(model, friendService, favoriteService, accountDao, profileScope, client)
     }
 
     private data class RemovalFixture(
         val model: FriendListPagerModel,
         val friendService: FriendService,
         val favoriteService: FavoriteService,
+        val accountDao: AccountDao,
         val profileScope: CoroutineScope,
         val client: HttpClient,
     ) {
