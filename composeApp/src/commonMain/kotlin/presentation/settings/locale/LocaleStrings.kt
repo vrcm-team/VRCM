@@ -487,6 +487,26 @@ sealed class LocaleStrings {
     open val avatarEditMetadataSaved: String = "Avatar details updated."
     open val avatarEditMetadataSaveFailed: String = "Failed to update avatar details."
     open val avatarEditCoverSaved: String = "Avatar cover updated."
+    open val avatarEditPublication: String = "Visibility"
+    open val avatarEditPublicationPrivate: String = "Private"
+    open val avatarEditPublicationPublic: String = "Public"
+    open val avatarEditUpdatingPublication: String = "Updating visibility..."
+    open val avatarEditPublishConfirmTitle: String = "Make this avatar public?"
+    open val avatarEditPublishConfirmMessage: String =
+        "Anyone will be able to copy and use this avatar. Only continue if you intend to share it publicly."
+    open val avatarEditPublishConfirmAction: String = "Make public"
+    open val avatarEditPublicationMadePublic: String = "Avatar is now public."
+    open val avatarEditPublicationMadePrivate: String = "Avatar is now private."
+    open val avatarEditPublicationBadRequest: String =
+        "The visibility change was rejected. Check the avatar details and try again."
+    open val avatarEditPublicationUnauthorized: String =
+        "Your session is no longer authorized. Sign in again and retry."
+    open val avatarEditPublicationForbidden: String =
+        "You do not have permission to change this avatar's visibility."
+    open val avatarEditPublicationNotFound: String =
+        "This avatar could not be found. Refresh the page and try again."
+    open val avatarEditPublicationFailed: String =
+        "Failed to update avatar visibility. Please try again later."
     open val avatarEditCoverUploadFailed: String = "Failed to upload the cover image."
     open val avatarEditCoverAssignmentFailed: String =
         "The image was uploaded, but VRChat did not apply it to the avatar. Retry the cover update."
