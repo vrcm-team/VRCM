@@ -63,6 +63,14 @@ class WorldProfileScreenModel internal constructor(
     )
     internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
 
+    private val deletion = WorldDeletionStateModel(
+        source = NetworkWorldDeletionSource(worldsApi, authService),
+        scope = viewModelScope,
+        removeCachedWorld = worldProfileCacheStore::delete,
+    )
+    internal val deletionState: StateFlow<WorldDeletionUiState> = deletion.state
+    internal val deletionNotices: SharedFlow<WorldDeletionNotice> = deletion.notices
+
     internal fun retryFavoriteEntryLoad() {
         favoriteEntry.retry()
     }
@@ -73,6 +81,7 @@ class WorldProfileScreenModel internal constructor(
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
+        deletion.setTarget(worldId, worldProfileVO.authorID)
         favoriteEntry.load(worldId)
         if (worldId.isBlank()) return
         // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。
@@ -82,6 +91,7 @@ class WorldProfileScreenModel internal constructor(
     private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
         val cached = worldProfileCacheStore.load(worldId)
         if (cached != null) {
+            deletion.setTarget(cached.world.id, cached.world.authorId)
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
@@ -158,6 +168,7 @@ class WorldProfileScreenModel internal constructor(
                     instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
 //                    platformFileSizes = platformFileSizes,
                 )
+            deletion.setTarget(worldData.id, worldData.authorId)
 //            viewModelScope.launch(Dispatchers.IO) {
 //                // 获取平台文件大小信息
 //                runCatching {
@@ -333,4 +344,6 @@ class WorldProfileScreenModel internal constructor(
             refreshWorldData()
         }
     }
-} 
+
+    internal fun deleteWorld(): Boolean = deletion.delete()
+}

@@ -61,6 +61,8 @@ interface WorldProfileCacheStore {
 
     suspend fun save(cache: WorldProfileCache)
 
+    suspend fun delete(worldId: String)
+
     suspend fun clearAll()
 }
 
@@ -220,6 +222,8 @@ internal class RoomWorldProfileCacheStore(
     override suspend fun load(worldId: String): WorldProfileCache? = cache.load(worldId)
 
     override suspend fun save(cache: WorldProfileCache) = this.cache.save(cache.world.id, cache)
+
+    override suspend fun delete(worldId: String) = cache.delete(worldId)
 
     override suspend fun clearAll() = cache.clear()
 }

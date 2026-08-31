@@ -235,6 +235,13 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val worldProfilePublishDate = "发布日期"
     override val worldProfileUpdateDate = "更新日期"
     override val worldProfileLabReleaseDate = "实验室发布日期"
+    override val worldDeleteAction = "删除世界"
+    override val worldDeleteConfirmationTitle = "确认删除这个世界？"
+    override val worldDeleteConfirmationMessage =
+        "确定要删除“%name%”吗？世界将转为隐藏状态，关联文件将被永久删除且无法恢复，世界 ID 将永久保留。"
+    override val worldDeleteSuccess = "世界已删除"
+    override val worldDeleteSuccessCacheCleanupFailed = "世界已删除，但未能清理本地缓存的详情。"
+    override val worldDeleteFailed = "删除世界失败，请重试。"
     override val unknown = "未知"
 
     // CreateInstanceDialog

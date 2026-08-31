@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,6 +59,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -103,10 +105,33 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val deletionState by screenModel.deletionState.collectAsState()
         val currentNavigator = currentNavigator
+        val localeStrings = strings
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
+        }
+        LaunchedEffect(screenModel, localeStrings, currentNavigator) {
+            screenModel.deletionNotices.collect { notice ->
+                when (notice) {
+                    is WorldDeletionNotice.Deleted -> {
+                        SharedFlowCentre.toastText.emit(
+                            if (notice.cacheCleanupFailed) {
+                                ToastText.Info(localeStrings.worldDeleteSuccessCacheCleanupFailed)
+                            } else {
+                                ToastText.Success(localeStrings.worldDeleteSuccess)
+                            }
+                        )
+                        if (currentNavigator.lastItem == this@WorldProfileScreen) {
+                            currentNavigator.pop()
+                        }
+                    }
+                    WorldDeletionNotice.Failed -> SharedFlowCentre.toastText.emit(
+                        ToastText.Error(localeStrings.worldDeleteFailed)
+                    )
+                }
+            }
         }
 
         CompositionLocalProvider(
@@ -118,6 +143,10 @@ class WorldProfileScreen(
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
+                isDeleteAvailable = deletionState.isAvailable,
+                isDeleting = deletionState.isDeleting,
+                isDeleted = deletionState.isDeleted,
+                onDelete = { screenModel.deleteWorld() },
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
             )
@@ -132,11 +161,31 @@ class WorldProfileScreen(
         onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
+        isDeleteAvailable: Boolean = false,
+        isDeleting: Boolean = false,
+        isDeleted: Boolean = false,
+        onDelete: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
+        var showDeleteConfirmation by rememberSaveable(worldProfileVo.worldId) {
+            mutableStateOf(false)
+        }
+        LaunchedEffect(isDeleteAvailable, isDeleted) {
+            if (!isDeleteAvailable || isDeleted) showDeleteConfirmation = false
+        }
+
+        if (showDeleteConfirmation) {
+            WorldDeletionConfirmationDialog(
+                worldName = worldProfileVo.worldName,
+                isDeleting = isDeleting,
+                enabled = isDeleteAvailable && !isDeleting && !isRefreshing && !isDeleted,
+                onDismiss = { showDeleteConfirmation = false },
+                onConfirm = onDelete,
+            )
+        }
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
@@ -227,7 +276,12 @@ class WorldProfileScreen(
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                showDelete = isDeleteAvailable && !isDeleted,
+                deleteEnabled = isDeleteAvailable && !isDeleting && !isRefreshing && !isDeleted,
+                isDeleting = isDeleting,
+                isDeleted = isDeleted,
+                onDelete = { showDeleteConfirmation = true },
             )
 
             // ========== BottomSheet ==========
@@ -717,6 +771,7 @@ private fun ColumnScope.InfoArea(
 /**
  * 渲染顶部菜单栏
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RenderTopBar(
     worldId: String,
@@ -729,6 +784,11 @@ private fun RenderTopBar(
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    showDelete: Boolean = false,
+    deleteEnabled: Boolean = false,
+    isDeleting: Boolean = false,
+    isDeleted: Boolean = false,
+    onDelete: () -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -736,7 +796,8 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
+        val reservedWidth = if (showDelete) 256.dp else 208.dp
+        val titleMaxWidth = (maxWidth - reservedWidth).coerceIn(0.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -748,12 +809,34 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null,
             actions = { colors ->
+                if (showDelete) {
+                    ATooltipBox(tooltip = { Text(strings.worldDeleteAction) }) {
+                        IconButton(
+                            enabled = deleteEnabled,
+                            colors = colors,
+                            onClick = onDelete,
+                        ) {
+                            if (isDeleting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = LocalContentColor.current,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = strings.worldDeleteAction,
+                                )
+                            }
+                        }
+                    }
+                }
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
                 )
                 IconButton(
-                    enabled = !isRefreshing,
+                    enabled = !isRefreshing && !isDeleting && !isDeleted,
                     colors = colors,
                     onClick = onRefresh,
                 ) {
@@ -801,6 +884,69 @@ private fun RenderTopBar(
             }
         }
     }
+}
+
+@Composable
+private fun WorldDeletionConfirmationDialog(
+    worldName: String,
+    isDeleting: Boolean,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.worldDeleteConfirmationTitle) },
+        text = {
+            Text(strings.worldDeleteConfirmationMessage.replace("%name%", worldName))
+        },
+        confirmButton = {
+            Button(
+                enabled = enabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                onClick = onConfirm,
+            ) {
+                Box(
+                    modifier = Modifier.size(18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.fillMaxSize(),
+                            color = LocalContentColor.current,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(strings.worldDeleteAction)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = !isDeleting,
+                onClick = onDismiss,
+            ) {
+                Text(strings.cancel)
+            }
+        },
+    )
 }
 
 /**

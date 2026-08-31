@@ -251,6 +251,15 @@ sealed class LocaleStrings {
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldDeleteAction: String = "Delete world"
+    open val worldDeleteConfirmationTitle: String = "Delete this world?"
+    open val worldDeleteConfirmationMessage: String =
+        "Delete \"%name%\"? The world will become hidden, and associated files will be " +
+            "permanently deleted and cannot be recovered. The world ID will remain permanently reserved."
+    open val worldDeleteSuccess: String = "World deleted"
+    open val worldDeleteSuccessCacheCleanupFailed: String =
+        "World deleted, but its local cached details couldn't be removed."
+    open val worldDeleteFailed: String = "Couldn't delete this world. Try again."
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog
