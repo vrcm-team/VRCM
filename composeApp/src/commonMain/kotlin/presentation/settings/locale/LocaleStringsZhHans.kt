@@ -89,6 +89,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val notificationRefreshFailed = "通知刷新失败，已有通知仍可查看。"
     override val notificationMarkRead = "标为已读"
     override val notificationDelete = "删除通知"
+    override val notificationReplyBoop = "回复戳一戳"
     override val notificationAccept = "接受"
     override val notificationIgnore = "忽略"
     override val notificationExpand = "显示详情"

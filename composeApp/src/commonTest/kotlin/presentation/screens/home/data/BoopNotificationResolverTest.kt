@@ -27,10 +27,51 @@ class BoopNotificationResolverTest {
         )
 
         assertEquals("reply", item.actions.single().icon)
+        assertEquals(item.actions.single(), item.boopReplyAction)
         assertEquals("usr_sender", item.senderId)
         assertEquals(
             NotificationResponseTarget.BOOP_USER_API,
             item.responseTarget(item.actions.single()),
+        )
+    }
+
+    @Test
+    fun boopReplyRoutingIgnoresNotificationTypeCase() {
+        val item = NotificationItemData(
+            notification(
+                link = null,
+                responses = listOf(
+                    ResponseData(
+                        responseData = "",
+                        icon = "reply",
+                        text = "Boop back",
+                        textKey = "notification.boop.reply",
+                        type = "boop",
+                    )
+                ),
+            ),
+        ).copy(type = "BOOP")
+
+        val replyAction = requireNotNull(item.boopReplyAction)
+        assertEquals(
+            NotificationResponseTarget.BOOP_USER_API,
+            item.responseTarget(replyAction),
+        )
+    }
+
+    @Test
+    fun boopWithoutResponseCanStillReplyThroughUsersApi() {
+        val item = NotificationItemData(
+            notification(
+                link = null,
+                responses = emptyList(),
+            ),
+        )
+
+        val replyAction = requireNotNull(item.boopReplyAction)
+        assertEquals(
+            NotificationResponseTarget.BOOP_USER_API,
+            item.responseTarget(replyAction),
         )
     }
 

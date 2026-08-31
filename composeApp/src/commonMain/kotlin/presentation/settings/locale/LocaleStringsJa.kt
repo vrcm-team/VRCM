@@ -90,6 +90,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val notificationRefreshFailed = "通知を更新できませんでした。既存の通知は引き続き表示されます。"
     override val notificationMarkRead = "既読にする"
     override val notificationDelete = "通知を削除"
+    override val notificationReplyBoop = "Boop に返信"
     override val notificationAccept = "承認"
     override val notificationIgnore = "無視"
     override val notificationExpand = "詳細を表示"
