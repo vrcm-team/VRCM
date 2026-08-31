@@ -934,12 +934,24 @@ class UserProfileScreenModel(
         successMessage: String,
         failureMessage: String,
     ) {
-        if (userId == cacheOwnerUserId || !userReportStateMachine.tryStart()) return
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (userId == cacheOwnerUserId ||
+            userId == sessionToken.userId ||
+            !userReportStateMachine.tryStart()
+        ) {
+            return
+        }
 
         viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
+            val response = authService.runSessionBoundCatching(sessionToken) {
                 feedbackApi.reportUser(userId)
-            }.onSuccess {
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                userReportStateMachine.fail()
+                return@launch
+            }
+
+            response.result.onSuccess {
                 userReportStateMachine.complete()
                 SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
             }.onFailure { error ->
