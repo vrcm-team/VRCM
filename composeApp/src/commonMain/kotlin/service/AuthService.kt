@@ -162,6 +162,21 @@ class AuthService(
         }
     }
 
+    internal fun applyBoopPrivacyUpdate(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        isEnabled: Boolean,
+    ): Boolean {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return false
+        return synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+            val existing = currentUser ?: return@synchronized false
+            if (existing.id != userId) return@synchronized false
+            publishCurrentUserLocked(existing.copy(isBoopingEnabled = isEnabled))
+            true
+        }
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
             val existing = currentUser ?: return@synchronized

@@ -56,12 +56,14 @@ fun EditProfileSheet(
     isVisible: Boolean,
     currentUser: UserProfileVo,
     bioLinksUpdateState: BioLinksUpdateState,
+    boopPrivacyState: BoopPrivacyUiState,
     onDismiss: () -> Unit,
     onStatusSave: (status: UserStatus, statusDescription: String) -> Unit,
     onLanguageSave: (languages: List<String>) -> Unit,
     onPronounsSave: (pronouns: String) -> Unit,
     onBioSave: (bio: String) -> Unit,
     onBioLinksSave: (bioLinks: List<String>) -> Unit,
+    onBoopPrivacyChange: (isEnabled: Boolean) -> Unit,
 ) {
     if (!isVisible) return
 
@@ -141,6 +143,10 @@ fun EditProfileSheet(
                 ProfileFieldRow(strings.editProfileSocialLinks, bioLinks.filter(String::isNotBlank).joinToString().ifBlank { "—" }) {
                     editBioLinks = bioLinks; editingField = EditField.SocialLinks
                 }
+                BoopPrivacyRow(
+                    state = boopPrivacyState,
+                    onCheckedChange = onBoopPrivacyChange,
+                )
             } else {
                 when (editingField) {
                     EditField.Status -> EditStatusField(editStatus, editStatusDesc, { editStatus = it }, { editStatusDesc = it }, {
@@ -169,6 +175,46 @@ fun EditProfileSheet(
             }
         }
     }
+}
+
+@Composable
+private fun BoopPrivacyRow(
+    state: BoopPrivacyUiState,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = strings.editProfileBoopPrivacy,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Box(
+            modifier = Modifier
+                .width(52.dp)
+                .height(32.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (state.isLoading || state.isUpdating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Switch(
+                    checked = state.isEnabled,
+                    onCheckedChange = onCheckedChange,
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 }
 
 @Composable
