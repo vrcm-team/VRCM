@@ -3,11 +3,13 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi.Companion.findFileId
+import io.github.vrcmteam.vrcm.network.api.files.FileApi.Companion.findFileVersion
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformFileSize
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
 import io.github.vrcmteam.vrcm.network.api.worlds.data.UnityPackage
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -27,13 +29,13 @@ class WorldPlatformService(private val fileApi: FileApi) {
         val platformPackages = worldData.unityPackages.platformPackages
 
         // 处理每个支持的平台
-        val deferredResults = PlatformType.entries.mapNotNull { platform ->
+        val deferredResults = supportedPlatforms.mapNotNull { (platform, displayName) ->
             // 获取此平台的最新包
             val latestPackage = platformPackages[platform]?.firstOrNull()
 
             // 如果此平台有包且有assetUrl，则获取其文件大小
             latestPackage?.assetUrl?.let { assetUrl ->
-                async { getPlatformFileSize(platform, assetUrl).getOrNull() }
+                async { getPlatformFileSize(platform, displayName, assetUrl).getOrNull() }
             }
         }
 
@@ -47,26 +49,43 @@ class WorldPlatformService(private val fileApi: FileApi) {
      * @param assetUrl UnityPackage中的资源URL
      * @return 平台文件大小信息
      */
-    private suspend fun getPlatformFileSize(platform: PlatformType, assetUrl: String): Result<PlatformFileSize> =
-        runCatching {
-            val fileId = findFileId(assetUrl)
-            if (fileId.isEmpty()) error(IllegalArgumentException("Invalid resource URL: $assetUrl"))
+    private suspend fun getPlatformFileSize(
+        platform: PlatformType,
+        displayName: String,
+        assetUrl: String,
+    ): Result<PlatformFileSize> = try {
+        val fileId = findFileId(assetUrl)
+        if (fileId.isEmpty()) throw IllegalArgumentException("Invalid resource URL: $assetUrl")
+        val fileVersion = findFileVersion(assetUrl).toIntOrNull()
+            ?: throw IllegalArgumentException("Invalid resource version: $assetUrl")
 
-            val fileInfoResult = fileApi.getFileInfo(fileId)
-            if (fileInfoResult.isFailure) error(fileInfoResult.exceptionOrNull() ?: Exception("failed to get file information"))
+        val fileInfo = fileApi.getFileInfo(fileId).getOrThrow()
+        val packageVersion = fileInfo.versions.firstOrNull { it.version == fileVersion }
+            ?: error("Version $fileVersion of file $fileId was not found")
 
-            val fileInfo = fileInfoResult.getOrThrow()
-            // 获取最新版本
-            val latestVersion = fileInfo.versions.maxByOrNull { it.version }
-                ?: error("The version of file $fileId was not found")
+        Result.success(
+            PlatformFileSize(
+                platform = platform,
+                sizeInBytes = packageVersion.file.sizeInBytes,
+                displayName = displayName,
+            )
+        )
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        SharedFlowCentre.toastText.emit(
+            ToastText.Error(error.message ?: "Failed to get platform file size")
+        )
+        Result.failure(error)
+    }
 
-            val sizeInBytes = latestVersion.file.sizeInBytes
-            val displayName = platform.name
-
-            PlatformFileSize(platform, sizeInBytes, displayName)
-        }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to get platform file size"))
-        }
+    private companion object {
+        private val supportedPlatforms = listOf(
+            PlatformType.Windows to "PC",
+            PlatformType.Android to "Android",
+            PlatformType.Ios to "iOS",
+        )
+    }
 }
 
 val List<UnityPackage>.platformPackages: Map<PlatformType, List<UnityPackage>>
