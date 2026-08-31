@@ -22,6 +22,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
@@ -322,6 +323,7 @@ class UserProfileScreenModel(
     private val groupsApi: GroupsApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
+    private val playerModerationApi: PlayerModerationApi,
     private val logger: Logger,
     private val instancesApi: InstancesApi,
     private val worldsApi: WorldsApi,
@@ -338,6 +340,14 @@ class UserProfileScreenModel(
 
     private val cacheOwnerUserId = authService.accountDto().userId
     private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
+    private val playerVoiceModerationController = PlayerVoiceModerationController(
+        initialTargetUserId = userProfileVO.id,
+        authService = authService,
+        playerModerationApi = playerModerationApi,
+        scope = viewModelScope,
+    )
+    internal val playerVoiceModerationState: StateFlow<PlayerVoiceModerationState> =
+        playerVoiceModerationController.state
     private val favoriteCacheWriteToken = accountCacheManager.captureWriteToken(cacheOwnerUserId)
     private val _userState = mutableStateOf(userProfileVO.withSelfIdentity())
     val userState by _userState
@@ -668,6 +678,32 @@ class UserProfileScreenModel(
         friendAction(message) {
             friendService.sendFriendRequest(userId)
         }
+
+    fun setPlayerVoiceModerationTarget(userId: String) {
+        playerVoiceModerationController.setTargetUserId(userId)
+    }
+
+    fun retryPlayerVoiceModeration() {
+        playerVoiceModerationController.retry()
+    }
+
+    fun togglePlayerVoiceModeration(
+        mutedMessage: String,
+        unmutedMessage: String,
+        failureMessage: String,
+    ) {
+        playerVoiceModerationController.toggle(
+            onSuccess = { isMuted ->
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Success(if (isMuted) mutedMessage else unmutedMessage),
+                )
+            },
+            onFailure = { error ->
+                logger.error(error.message.orEmpty())
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            },
+        )
+    }
 
     suspend fun deleteFriendRequest(userId: String, message: String): Boolean = friendAction(message) {
         friendService.deleteFriendRequest(userId)
