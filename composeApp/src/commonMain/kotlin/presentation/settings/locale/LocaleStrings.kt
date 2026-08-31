@@ -196,6 +196,15 @@ sealed class LocaleStrings {
     open val instanceCreateSuccess: String = "Successfully created instance and sent invite"
     open val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed"
     open val instanceCreateFailed: String = "Failed to create instance"
+    open val instanceCloseAction: String = "Close instance"
+    open val instanceCloseCheckingPermission: String = "Checking permission"
+    open val instanceCloseConfirmTitle: String = "Close this instance?"
+    open val instanceCloseConfirmMessage: String = "This instance will immediately stop accepting new users. This action cannot be undone."
+    open val instanceCloseInProgress: String = "Closing instance"
+    open val instanceCloseSuccess: String = "Instance closed"
+    open val instanceCloseFailed: String = "Failed to close instance"
+    open val instanceClosePermissionDenied: String = "You do not have permission to close this instance"
+    open val instanceCloseSessionChanged: String = "The account session changed. Open the instance and try again."
 
     // World Search
     open val worldSearchAdvancedOptions: String = "Advanced Search Options"

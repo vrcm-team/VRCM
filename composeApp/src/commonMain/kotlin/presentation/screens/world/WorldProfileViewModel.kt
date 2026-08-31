@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -55,6 +56,37 @@ class WorldProfileScreenModel internal constructor(
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val instanceCloseCoordinator = InstanceCloseCoordinator(
+        currentSessionToken = { SharedFlowCentre.currentSession.value?.token },
+        isCurrentSession = SharedFlowCentre::isCurrentSession,
+        fetchGroupPermissions = { sessionToken, groupId ->
+            authService.runSessionBoundCatching(sessionToken) {
+                groupsApi.fetchGroup(groupId).myMember?.permissions.orEmpty()
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+        closeInstance = { sessionToken, target ->
+            authService.runSessionBoundCatching(sessionToken) {
+                instancesApi.closeInstance(target.worldId, target.instanceId)
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+    )
+    internal val instanceCloseState: StateFlow<InstanceCloseState> = instanceCloseCoordinator.state
+
+    private val _closedInstanceLocations = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    internal val closedInstanceLocations: SharedFlow<String> = _closedInstanceLocations.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                instanceCloseCoordinator.onSessionChanged(session?.token)
+            }
+        }
+    }
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -135,6 +167,80 @@ class WorldProfileScreenModel internal constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    internal fun requestInstanceClose(instance: InstanceVo, strings: LocaleStrings) {
+        val target = instance.closeTargetOrNull() ?: return
+        viewModelScope.launch {
+            when (val result = instanceCloseCoordinator.authorize(target)) {
+                InstanceCloseAuthorizationResult.NotAllowed ->
+                    emitInstanceCloseError(strings.instanceClosePermissionDenied)
+
+                is InstanceCloseAuthorizationResult.Failed ->
+                    emitInstanceCloseFailure(result.error, strings)
+
+                is InstanceCloseAuthorizationResult.SessionChanged ->
+                    emitInstanceCloseSessionChanged(result.userId, strings)
+
+                InstanceCloseAuthorizationResult.Abandoned,
+                InstanceCloseAuthorizationResult.Busy,
+                InstanceCloseAuthorizationResult.Ready -> Unit
+            }
+        }
+    }
+
+    internal fun confirmInstanceClose(strings: LocaleStrings) {
+        viewModelScope.launch {
+            when (val result = instanceCloseCoordinator.submit()) {
+                is InstanceCloseSubmissionResult.Closed -> onInstanceClosed(result, strings)
+                is InstanceCloseSubmissionResult.Failed -> emitInstanceCloseFailure(result.error, strings)
+                is InstanceCloseSubmissionResult.SessionChanged ->
+                    emitInstanceCloseSessionChanged(result.userId, strings)
+
+                InstanceCloseSubmissionResult.Abandoned,
+                InstanceCloseSubmissionResult.Busy -> Unit
+            }
+        }
+    }
+
+    internal fun abandonInstanceClose(location: String) {
+        instanceCloseCoordinator.abandon(location)
+    }
+
+    private suspend fun onInstanceClosed(
+        result: InstanceCloseSubmissionResult.Closed,
+        strings: LocaleStrings,
+    ) {
+        val request = result.request
+        if (!SharedFlowCentre.isCurrentSession(request.sessionToken)) return
+        val target = request.target
+        _worldProfileState.update { profile ->
+            profile?.applyInstanceCloseResponse(target, result.instance)
+        }
+        _closedInstanceLocations.tryEmit(target.location)
+        SharedFlowCentre.toastText.emit(ToastText.Success(strings.instanceCloseSuccess))
+    }
+
+    private suspend fun emitInstanceCloseFailure(error: Throwable, strings: LocaleStrings) {
+        val message = if (error is VRCApiException && error.code == 403) {
+            strings.instanceClosePermissionDenied
+        } else {
+            error.message
+                ?.takeIf { it.isNotBlank() }
+                ?.let { "${strings.instanceCloseFailed}: $it" }
+                ?: strings.instanceCloseFailed
+        }
+        emitInstanceCloseError(message)
+    }
+
+    private suspend fun emitInstanceCloseSessionChanged(userId: String?, strings: LocaleStrings) {
+        if (userId != null && SharedFlowCentre.currentSession.value?.token?.userId == userId) {
+            emitInstanceCloseError(strings.instanceCloseSessionChanged)
+        }
+    }
+
+    private suspend fun emitInstanceCloseError(message: String) {
+        SharedFlowCentre.toastText.emit(ToastText.Error(message))
     }
 
     private suspend fun loadWorldInfo(worldId: String) {

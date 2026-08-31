@@ -180,6 +180,15 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val instanceCreateSuccess = "成功創建房間並發送邀請"
     override val instanceCreateSuccessButInviteFailed = "創建房間成功，但邀請失敗"
     override val instanceCreateFailed = "創建房間失敗"
+    override val instanceCloseAction = "關閉實例"
+    override val instanceCloseCheckingPermission = "正在檢查權限"
+    override val instanceCloseConfirmTitle = "關閉此實例？"
+    override val instanceCloseConfirmMessage = "此實例將立即禁止新使用者加入，此操作無法復原。"
+    override val instanceCloseInProgress = "正在關閉實例"
+    override val instanceCloseSuccess = "實例已關閉"
+    override val instanceCloseFailed = "實例關閉失敗"
+    override val instanceClosePermissionDenied = "你沒有關閉此實例的權限"
+    override val instanceCloseSessionChanged = "帳號工作階段已變更，請重新開啟實例後再試。"
 
     // World Search
     override val worldSearchAdvancedOptions = "高級搜索選項"

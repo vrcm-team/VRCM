@@ -23,6 +23,15 @@ class InstancesApi(private val client: HttpClient) {
     }
 
     /**
+     * 立即关闭实例。
+     */
+    suspend fun closeInstance(worldId: String, instanceId: String): InstanceData {
+        val location = "$worldId:$instanceId"
+        return client.delete { url { path(INSTANCES_API_SUFFIX, location) } }
+            .checkSuccess()
+    }
+
+    /**
      * 创建世界实例
      *
      * @param worldId 世界ID

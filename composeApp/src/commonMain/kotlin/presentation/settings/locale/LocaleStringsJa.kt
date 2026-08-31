@@ -181,6 +181,15 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val instanceCreateSuccess = "インスタンスを作成し、招待を送信しました"
     override val instanceCreateSuccessButInviteFailed = "インスタンスは作成されましたが、招待に失敗しました"
     override val instanceCreateFailed = "インスタンス作成に失敗しました"
+    override val instanceCloseAction = "インスタンスを閉じる"
+    override val instanceCloseCheckingPermission = "権限を確認中"
+    override val instanceCloseConfirmTitle = "このインスタンスを閉じますか？"
+    override val instanceCloseConfirmMessage = "このインスタンスへの新しいユーザーの参加を直ちに停止します。この操作は元に戻せません。"
+    override val instanceCloseInProgress = "インスタンスを閉じています"
+    override val instanceCloseSuccess = "インスタンスを閉じました"
+    override val instanceCloseFailed = "インスタンスを閉じられませんでした"
+    override val instanceClosePermissionDenied = "このインスタンスを閉じる権限がありません"
+    override val instanceCloseSessionChanged = "アカウントのセッションが変更されました。インスタンスを開き直して再試行してください。"
 
     // World Search
     override val worldSearchAdvancedOptions = "詳細検索オプション"

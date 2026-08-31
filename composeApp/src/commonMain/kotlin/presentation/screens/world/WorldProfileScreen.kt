@@ -113,6 +113,7 @@ class WorldProfileScreen(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             WorldProfileContent(
+                screenModel = screenModel,
                 worldProfileVo = profileVoState ?: worldProfileVO,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
@@ -127,6 +128,7 @@ class WorldProfileScreen(
     // 主要内容组件
     @Composable
     fun WorldProfileContent(
+        screenModel: WorldProfileScreenModel,
         worldProfileVo: WorldProfileVo,
         onReturn: () -> Unit = {},
         onMenu: () -> Unit = {},
@@ -232,6 +234,7 @@ class WorldProfileScreen(
 
             // ========== BottomSheet ==========
             RenderBottomSheet(
+                screenModel = screenModel,
                 worldProfileVo = worldProfileVo,
                 bottomSheetState = bottomSheetState,
                 sizes = sizes,
@@ -808,6 +811,7 @@ private fun RenderTopBar(
  */
 @Composable
 private fun AppRoute.RenderBottomSheet(
+    screenModel: WorldProfileScreenModel,
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     sizes: WorldDetailSizesState,
@@ -821,7 +825,9 @@ private fun AppRoute.RenderBottomSheet(
         if (currentDialog == null) {
             currentDialog = InstancesDialog(
                 instance = it,
-                sharedSuffixKey = sharedSuffixKey
+                sharedSuffixKey = sharedSuffixKey,
+                screenModel = screenModel,
+                onClose = { currentDialog = null },
             )
         }
     }
@@ -855,6 +861,7 @@ private fun AppRoute.RenderBottomSheet(
 
                 // 主要信息内容
                 RenderBottomSheetContent(
+                    screenModel = screenModel,
                     worldProfileVo = worldProfileVo,
                     bottomSheetState = bottomSheetState,
                     onShrinkCardClick = onShrinkCardClick,
@@ -871,12 +878,12 @@ private fun AppRoute.RenderBottomSheet(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppRoute.RenderBottomSheetContent(
+    screenModel: WorldProfileScreenModel,
     worldProfileVo: WorldProfileVo,
     bottomSheetState: BottomSheetUIState,
     onShrinkCardClick: (InstanceVo) -> Unit,
     onExpanded: () -> Unit,
 ) {
-    val screenModel = koinViewModel<WorldProfileScreenModel>()
     val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
 
     // 对话框状态管理
