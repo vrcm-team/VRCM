@@ -222,11 +222,14 @@ data class UserProfileScreen(
         }
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
+        val editFailureMsg = strings.editProfileUpdateFailed
         val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
+        val boopPrivacyState by userProfileScreenModel.boopPrivacyState.collectAsState()
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
             bioLinksUpdateState = bioLinksUpdateState,
+            boopPrivacyState = boopPrivacyState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
                 userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
@@ -244,6 +247,13 @@ data class UserProfileScreen(
                 userProfileScreenModel.updateBioLinks(
                     bioLinks = bioLinks,
                     successMessage = editSuccessMsg,
+                )
+            },
+            onBoopPrivacyChange = { isEnabled ->
+                userProfileScreenModel.updateBoopPrivacy(
+                    isEnabled = isEnabled,
+                    successMessage = editSuccessMsg,
+                    failureMessage = editFailureMsg,
                 )
             },
         )

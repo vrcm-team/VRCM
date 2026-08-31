@@ -43,6 +43,7 @@ data class CurrentUpdateUserData(
     val homeLocation: String,
     override val id: String,
     override val isFriend: Boolean,
+    val isBoopingEnabled: Boolean? = null,
     @SerialName("last_activity")
     override val lastActivity: String,
     @SerialName("last_login")

@@ -41,6 +41,8 @@ import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
+import io.github.vrcmteam.vrcm.service.BoopPrivacyService
+import io.github.vrcmteam.vrcm.service.BoopPrivacyUpdateResult
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
@@ -58,8 +60,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -162,6 +166,27 @@ data class BioLinksUpdateState(
     val completedRequestId: Long = 0,
     val savedLinks: List<String>? = null,
 )
+
+/** UI projection of the current account's server-backed privacy setting. */
+data class BoopPrivacyUiState(
+    val isEnabled: Boolean = true,
+    val isLoading: Boolean = true,
+    val isUpdating: Boolean = false,
+)
+
+internal fun resolveBoopPrivacyUiState(
+    currentUserId: String?,
+    sessionUserId: String?,
+    isBoopingEnabled: Boolean?,
+    updatingUserId: String?,
+): BoopPrivacyUiState {
+    val hasCurrentUser = currentUserId != null && currentUserId == sessionUserId
+    return BoopPrivacyUiState(
+        isEnabled = !hasCurrentUser || isBoopingEnabled != false,
+        isLoading = !hasCurrentUser,
+        isUpdating = hasCurrentUser && updatingUserId == currentUserId,
+    )
+}
 
 internal class BioLinksUpdateStateMachine {
     private val _state = MutableStateFlow(BioLinksUpdateState())
@@ -334,6 +359,7 @@ class UserProfileScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     friendActivityService: FriendActivityService,
     private val boopService: BoopService,
+    private val boopPrivacyService: BoopPrivacyService,
 ) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
@@ -396,6 +422,27 @@ class UserProfileScreenModel(
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
+    internal val boopPrivacyState: StateFlow<BoopPrivacyUiState> = combine(
+        authService.currentUserState,
+        SharedFlowCentre.currentSession,
+        boopPrivacyService.updatingUserId,
+    ) { currentUser, session, updatingUserId ->
+        resolveBoopPrivacyUiState(
+            currentUserId = currentUser?.id,
+            sessionUserId = session?.account?.userId,
+            isBoopingEnabled = currentUser?.isBoopingEnabled,
+            updatingUserId = updatingUserId,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = resolveBoopPrivacyUiState(
+            currentUserId = authService.currentUserState.value?.id,
+            sessionUserId = SharedFlowCentre.currentSession.value?.account?.userId,
+            isBoopingEnabled = authService.currentUserState.value?.isBoopingEnabled,
+            updatingUserId = boopPrivacyService.updatingUserId.value,
+        ),
+    )
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -604,6 +651,29 @@ class UserProfileScreenModel(
             }.onFailure { error ->
                 bioLinksUpdateStateMachine.fail()
                 handleError(error)
+            }
+        }
+    }
+
+    fun updateBoopPrivacy(
+        isEnabled: Boolean,
+        successMessage: String,
+        failureMessage: String,
+    ) {
+        if (!userState.isSelf) return
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = boopPrivacyService.update(isEnabled)) {
+                is BoopPrivacyUpdateResult.Updated -> {
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                }
+                is BoopPrivacyUpdateResult.Failed -> {
+                    logger.error(result.error.message.toString())
+                    SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+                }
+                BoopPrivacyUpdateResult.InFlight,
+                BoopPrivacyUpdateResult.SessionChanged,
+                BoopPrivacyUpdateResult.Unavailable,
+                BoopPrivacyUpdateResult.Unchanged -> Unit
             }
         }
     }
