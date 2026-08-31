@@ -36,6 +36,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,6 +63,28 @@ data class WorldGroupOptions(
 data class AvatarGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
+
+internal data class FriendRemovalResult(
+    val userId: String,
+    val errorMessage: String? = null,
+) {
+    val succeeded: Boolean get() = errorMessage == null
+}
+
+internal data class FriendRemovalState(
+    val selectionMode: Boolean = false,
+    val selectedUserIds: Set<String> = emptySet(),
+    val confirmationVisible: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val completedCount: Int = 0,
+    val totalCount: Int = 0,
+    val results: Map<String, FriendRemovalResult> = emptyMap(),
+) {
+    val successCount: Int get() = results.values.count(FriendRemovalResult::succeeded)
+    val failureCount: Int get() = results.size - successCount
+}
+
+private const val FRIEND_REMOVAL_CONCURRENCY = 3
 
 internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
     if (sessionToken != null && this.sessionToken == sessionToken) friends.values.toList() else emptyList()
@@ -186,12 +211,17 @@ class FriendListPagerModel(
         initialValue = friendService.hasRefreshError.value,
     )
     private var directoryRefreshJob: Job? = null
+    private var friendRemovalJob: Job? = null
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
     private var friendDirectoryActivated = false
     private var favoritesPageActivated = false
     private var favoriteLocale: LocaleStrings? = null
+    private var friendDirectoryLocale: LocaleStrings? = null
+
+    private val _friendRemovalState = MutableStateFlow(FriendRemovalState())
+    internal val friendRemovalState: StateFlow<FriendRemovalState> = _friendRemovalState.asStateFlow()
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendSnapshot,
@@ -240,6 +270,7 @@ class FriendListPagerModel(
                 val friends = snapshot.friendsForSession(token)
                 _friendTotal.value = friends.size
                 updateFriendSnapshot(friends)
+                retainExistingFriendSelections(friends.mapTo(mutableSetOf(), FriendData::id))
             }
         }
     }
@@ -252,6 +283,9 @@ class FriendListPagerModel(
         refreshJobsByTab.clear()
         directoryRefreshJob?.cancel()
         directoryRefreshJob = null
+        friendRemovalJob?.cancel()
+        friendRemovalJob = null
+        _friendRemovalState.value = FriendRemovalState()
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
         if (userChanged) {
@@ -293,6 +327,183 @@ class FriendListPagerModel(
 
     fun updateFavoriteLocale(locale: LocaleStrings) {
         favoriteLocale = locale
+    }
+
+    fun updateFriendDirectoryLocale(locale: LocaleStrings) {
+        friendDirectoryLocale = locale
+    }
+
+    fun enterFriendSelectionMode() {
+        if (_friendRemovalState.value.isSubmitting || _friendSnapshot.value.isEmpty()) return
+        _friendRemovalState.value = FriendRemovalState(selectionMode = true)
+    }
+
+    fun exitFriendSelectionMode() {
+        if (_friendRemovalState.value.isSubmitting) return
+        _friendRemovalState.value = FriendRemovalState()
+    }
+
+    fun toggleFriendSelection(userId: String) {
+        val availableIds = _friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id)
+        if (userId !in availableIds) return
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting) return@update state
+            val selected = if (userId in state.selectedUserIds) {
+                state.selectedUserIds - userId
+            } else {
+                state.selectedUserIds + userId
+            }
+            state.copy(
+                selectedUserIds = selected,
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun toggleVisibleFriendSelection(visibleUserIds: Set<String>) {
+        val availableIds = _friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id)
+        val selectableIds = visibleUserIds intersect availableIds
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting || selectableIds.isEmpty()) {
+                return@update state
+            }
+            val allVisibleSelected = selectableIds.all { it in state.selectedUserIds }
+            state.copy(
+                selectedUserIds = if (allVisibleSelected) {
+                    state.selectedUserIds - selectableIds
+                } else {
+                    state.selectedUserIds + selectableIds
+                },
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun requestFriendRemovalConfirmation() {
+        retainExistingFriendSelections(_friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id))
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting || state.selectedUserIds.isEmpty()) state
+            else state.copy(confirmationVisible = true)
+        }
+    }
+
+    fun dismissFriendRemovalConfirmation() {
+        _friendRemovalState.update { state ->
+            if (state.isSubmitting) state else state.copy(confirmationVisible = false)
+        }
+    }
+
+    fun confirmFriendRemoval() {
+        val state = _friendRemovalState.value
+        if (!state.selectionMode || state.isSubmitting || !state.confirmationVisible) return
+        val sessionToken = activeSessionToken ?: return
+        val generation = accountGeneration
+        val currentFriendIds = friendService.friendStateSnapshot.value.friendsForSession(sessionToken)
+            .mapTo(mutableSetOf(), FriendData::id)
+        val selectedUserIds = state.selectedUserIds.filter { it in currentFriendIds }
+        if (selectedUserIds.isEmpty()) {
+            _friendRemovalState.update {
+                it.copy(selectedUserIds = emptySet(), confirmationVisible = false)
+            }
+            return
+        }
+
+        _friendRemovalState.value = state.copy(
+            selectedUserIds = selectedUserIds.toSet(),
+            confirmationVisible = false,
+            isSubmitting = true,
+            completedCount = 0,
+            totalCount = selectedUserIds.size,
+            results = emptyMap(),
+        )
+        friendRemovalJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                selectedUserIds.chunked(FRIEND_REMOVAL_CONCURRENCY).forEach { batch ->
+                    coroutineScope {
+                        batch.map { userId ->
+                            async {
+                                val result = try {
+                                    friendService.unfriend(userId)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Throwable) {
+                                    Result.failure(error)
+                                }
+                                if (acceptsAccount(sessionToken, generation)) {
+                                    val itemResult = FriendRemovalResult(
+                                        userId = userId,
+                                        errorMessage = result.exceptionOrNull()?.message
+                                            ?.ifBlank { "Request failed" }
+                                            ?: if (result.isFailure) "Request failed" else null,
+                                    )
+                                    _friendRemovalState.update { current ->
+                                        current.copy(
+                                            selectedUserIds = if (itemResult.succeeded) {
+                                                current.selectedUserIds - userId
+                                            } else {
+                                                current.selectedUserIds
+                                            },
+                                            completedCount = current.completedCount + 1,
+                                            results = current.results + (userId to itemResult),
+                                        )
+                                    }
+                                }
+                            }
+                        }.awaitAll()
+                    }
+                }
+
+                if (!acceptsAccount(sessionToken, generation)) return@launch
+                val completed = _friendRemovalState.value
+                val failedIds = completed.results.values
+                    .filterNot(FriendRemovalResult::succeeded)
+                    .mapTo(mutableSetOf(), FriendRemovalResult::userId)
+                    .intersect(friendService.friendState.value.keys)
+                _friendRemovalState.value = completed.copy(
+                    selectionMode = failedIds.isNotEmpty(),
+                    selectedUserIds = failedIds,
+                    isSubmitting = false,
+                )
+                showFriendRemovalSummary(completed.successCount, completed.failureCount)
+            } finally {
+                if (acceptsAccount(sessionToken, generation)) {
+                    friendRemovalJob = null
+                }
+            }
+        }
+    }
+
+    private fun retainExistingFriendSelections(friendIds: Set<String>) {
+        _friendRemovalState.update { state ->
+            val retained = state.selectedUserIds intersect friendIds
+            if (retained == state.selectedUserIds) state
+            else state.copy(
+                selectedUserIds = retained,
+                confirmationVisible = state.confirmationVisible && retained.isNotEmpty(),
+            )
+        }
+    }
+
+    private suspend fun showFriendRemovalSummary(successCount: Int, failureCount: Int) {
+        val locale = friendDirectoryLocale ?: return
+        val message = when {
+            failureCount == 0 -> locale.friendDirectoryRemoveSuccess
+                .replaceFirst("%d", successCount.toString())
+            successCount == 0 -> locale.friendDirectoryRemoveFailed
+                .replaceFirst("%d", failureCount.toString())
+            else -> locale.friendDirectoryRemovePartialFailure
+                .replaceFirst("%d", successCount.toString())
+                .replaceFirst("%d", failureCount.toString())
+        }
+        SharedFlowCentre.toastText.emit(
+            if (failureCount == 0) ToastText.Success(message) else ToastText.Error(message)
+        )
     }
 
     /** Marks the Favorites page as active and refreshes its world and avatar tabs. */

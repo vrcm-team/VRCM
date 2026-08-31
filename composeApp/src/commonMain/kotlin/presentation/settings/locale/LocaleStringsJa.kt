@@ -219,6 +219,18 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val friendDirectoryEmpty = "フレンドがいません"
     override val friendDirectoryNoMatches = "条件に一致するフレンドはいません"
     override val friendDirectoryLoadFailed = "フレンド一覧を更新できませんでした"
+    override val friendDirectorySelect = "解除するフレンドを選択"
+    override val friendDirectorySelectedCount = "%d人選択中"
+    override val friendDirectorySelectAll = "表示中をすべて選択"
+    override val friendDirectoryClearSelection = "表示中の選択を解除"
+    override val friendDirectoryRemoveSelected = "選択したフレンドを解除"
+    override val friendDirectoryRemoveConfirmTitle = "フレンドを解除しますか？"
+    override val friendDirectoryRemoveConfirmMessage =
+        "選択した%d人のフレンドを解除します。この操作は元に戻せません。"
+    override val friendDirectoryRemovingProgress = "%d / %d人を解除中"
+    override val friendDirectoryRemoveSuccess = "%d人のフレンドを解除しました"
+    override val friendDirectoryRemovePartialFailure = "%d人を解除し、%d人は失敗しました"
+    override val friendDirectoryRemoveFailed = "%d人のフレンド解除に失敗しました"
     override val friendListPagerAllWorlds = "すべてのワールド"
 
     // WorldProfileScreen

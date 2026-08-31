@@ -42,9 +42,11 @@ import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +67,9 @@ import okio.fakefilesystem.FakeFileSystem
 import org.koin.core.logger.EmptyLogger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class FriendListPagerModelTest : MainDispatcherTest() {
     @Test
@@ -104,7 +108,8 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                             jsonResponse("[]")
                         }
                         "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
-                        "/auth/user/favoritelimits", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                        "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        "/favorites", "/favorite/groups" -> jsonResponse("[]")
                         else -> error("Unexpected request: ${request.url}")
                     }
                 }
@@ -433,6 +438,252 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun batchRemovalKeepsIndependentResultsAndLimitsConcurrentRequests() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(userId = "usr_removal_owner", username = "removal-owner")
+        SharedFlowCentre.emitAuthenticated(account)
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val friendIds = (1..5).map { "usr_removal_$it" }
+        val failedId = friendIds[1]
+        val activeRequests = atomic(0)
+        val maxActiveRequests = atomic(0)
+        val requestCounts = friendIds.associateWith { atomic(0) }
+        val firstBatchStarted = CompletableDeferred<Unit>()
+        val releaseRequests = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.startsWith("/auth/user/friends/") -> {
+                            val userId = path.substringAfterLast('/')
+                            requestCounts.getValue(userId).incrementAndGet()
+                            val active = activeRequests.incrementAndGet()
+                            while (true) {
+                                val currentMax = maxActiveRequests.value
+                                if (active <= currentMax ||
+                                    maxActiveRequests.compareAndSet(currentMax, active)
+                                ) break
+                            }
+                            if (activeRequests.value == 3) firstBatchStarted.complete(Unit)
+                            releaseRequests.await()
+                            activeRequests.decrementAndGet()
+                            if (userId == failedId) {
+                                respond("failed", HttpStatusCode.InternalServerError)
+                            } else {
+                                jsonResponse(successResponseJson())
+                            }
+                        }
+                        path == "/auth/user/friends" -> jsonResponse("[]")
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(account, client, json)
+
+        try {
+            fixture.model.activateFriendDirectory()
+            friendIds.forEachIndexed { index, userId ->
+                emitFriendUntilObserved(
+                    fixture.friendService,
+                    session,
+                    userId,
+                    activeFriendEvent(json, userId, "Removal Friend $index"),
+                )
+            }
+            awaitFriendIds(fixture.model, friendIds.toSet())
+
+            fixture.model.enterFriendSelectionMode()
+            fixture.model.requestFriendRemovalConfirmation()
+            assertFalse(fixture.model.friendRemovalState.value.confirmationVisible)
+
+            fixture.model.toggleVisibleFriendSelection(friendIds.toSet())
+            fixture.model.requestFriendRemovalConfirmation()
+            assertTrue(fixture.model.friendRemovalState.value.confirmationVisible)
+            fixture.model.confirmFriendRemoval()
+            fixture.model.confirmFriendRemoval()
+            fixture.model.requestFriendRemovalConfirmation()
+
+            withTimeout(3_000) { firstBatchStarted.await() }
+            repeat(20) { yield() }
+            assertEquals(3, activeRequests.value)
+            assertEquals(3, maxActiveRequests.value)
+            assertTrue(fixture.model.friendRemovalState.value.isSubmitting)
+
+            releaseRequests.complete(Unit)
+            awaitUntil {
+                val state = fixture.model.friendRemovalState.value
+                !state.isSubmitting && state.completedCount == friendIds.size
+            }
+
+            val state = fixture.model.friendRemovalState.value
+            assertEquals(4, state.successCount)
+            assertEquals(1, state.failureCount)
+            assertEquals(friendIds.toSet(), state.results.keys)
+            assertTrue(state.results.getValue(failedId).errorMessage?.isNotBlank() == true)
+            assertEquals(setOf(failedId), state.selectedUserIds)
+            assertTrue(state.selectionMode)
+            assertEquals(setOf(failedId), fixture.friendService.friendState.value.keys)
+            assertTrue(requestCounts.values.all { it.value == 1 })
+            assertTrue(maxActiveRequests.value <= 3)
+        } finally {
+            releaseRequests.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
+    fun accountSwitchCancelsRemovalAndRejectsLateSuccess() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val accountA = AccountDto(userId = "usr_removal_owner_a", username = "removal-owner-a")
+        val accountB = AccountDto(userId = "usr_removal_owner_b", username = "removal-owner-b")
+        SharedFlowCentre.emitAuthenticated(accountA)
+        val sessionA = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val oldFriendId = "usr_removal_old_friend"
+        val newFriendId = "usr_removal_new_friend"
+        val oldRequestStarted = CompletableDeferred<Unit>()
+        val releaseOldRequest = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.endsWith("/$oldFriendId") -> {
+                            oldRequestStarted.complete(Unit)
+                            withContext(NonCancellable) { releaseOldRequest.await() }
+                            jsonResponse(successResponseJson())
+                        }
+                        path == "/auth/user/friends" -> jsonResponse("[]")
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(accountA, client, json)
+
+        try {
+            fixture.model.activateFriendDirectory()
+            emitFriendUntilObserved(
+                fixture.friendService,
+                sessionA,
+                oldFriendId,
+                activeFriendEvent(json, oldFriendId, "Old Session Friend"),
+            )
+            awaitFriendIds(fixture.model, setOf(oldFriendId))
+            fixture.model.enterFriendSelectionMode()
+            fixture.model.toggleFriendSelection(oldFriendId)
+            fixture.model.requestFriendRemovalConfirmation()
+            fixture.model.confirmFriendRemoval()
+            withTimeout(3_000) { oldRequestStarted.await() }
+
+            SharedFlowCentre.emitAuthenticated(accountB)
+            val sessionB = assertNotNull(SharedFlowCentre.currentSession.value)
+            awaitUntil { fixture.model.friendRemovalState.value == FriendRemovalState() }
+            emitFriendUntilObserved(
+                fixture.friendService,
+                sessionB,
+                newFriendId,
+                activeFriendEvent(json, newFriendId, "New Session Friend"),
+            )
+            awaitFriendIds(fixture.model, setOf(newFriendId))
+
+            releaseOldRequest.complete(Unit)
+            repeat(20) { yield() }
+
+            assertEquals(FriendRemovalState(), fixture.model.friendRemovalState.value)
+            assertEquals(setOf(newFriendId), fixture.friendService.friendState.value.keys)
+            assertEquals(setOf(newFriendId), fixture.model.friendDirectoryFriends.value.map { it.id }.toSet())
+        } finally {
+            releaseOldRequest.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    private fun createRemovalFixture(
+        account: AccountDto,
+        client: HttpClient,
+        json: Json,
+    ): RemovalFixture {
+        val friendListCacheStore = InMemoryFriendListCacheStore()
+        val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
+        val accountCacheManager = AccountCacheManager(
+            friendListCacheStore = friendListCacheStore,
+            userProfileCacheStore = InMemoryUserProfileCacheStore(),
+            friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+            meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+            meetupCardAssetStore = MeetupCardAssetStore(
+                FakeFileSystem(),
+                "/meetup-assets".toPath(),
+            ),
+            favoriteListCacheStore = favoriteListCacheStore,
+        )
+        val authService = AuthService(
+            authApi = AuthApi(client),
+            accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+                it.saveAccountInfo(account)
+            },
+            cookiesStorage = PersistentCookiesStorage(EmptyLogger()),
+            accountCacheManager = accountCacheManager,
+        )
+        val friendService = FriendService(
+            friendsApi = FriendsApi(client),
+            authService = authService,
+            json = json,
+            friendListCacheStore = friendListCacheStore,
+            accountCacheManager = accountCacheManager,
+            logger = EmptyLogger(),
+        )
+        val favoriteService = FavoriteService(
+            favoriteApi = FavoriteApi(client),
+            favoriteLocalDao = FavoriteLocalDao(MapSettings()),
+        )
+        val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val model = FriendListPagerModel(
+            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
+            friendService = friendService,
+            authService = authService,
+            favoriteService = favoriteService,
+            worldsApi = WorldsApi(client),
+            avatarsApi = AvatarsApi(client),
+            favoriteListCacheStore = favoriteListCacheStore,
+            accountCacheManager = accountCacheManager,
+        )
+        return RemovalFixture(model, friendService, favoriteService, profileScope, client)
+    }
+
+    private data class RemovalFixture(
+        val model: FriendListPagerModel,
+        val friendService: FriendService,
+        val favoriteService: FavoriteService,
+        val profileScope: CoroutineScope,
+        val client: HttpClient,
+    ) {
+        fun close() {
+            profileScope.cancel()
+            ViewModelStore().apply {
+                put("friend-list-pager-removal", model)
+                clear()
+            }
+            friendService.dispose()
+            favoriteService.dispose()
+            client.close()
+        }
+    }
+
     private suspend fun emitFriendUntilObserved(
         friendService: FriendService,
         session: AuthenticatedAccount,
@@ -595,6 +846,10 @@ private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
     status = HttpStatusCode.OK,
     headers = headersOf(HttpHeaders.ContentType, "application/json"),
 )
+
+private fun successResponseJson() = """
+    {"success":{"message":"Friend removed","status_code":200}}
+""".trimIndent()
 
 private fun favoriteLimitsJson() = """
     {

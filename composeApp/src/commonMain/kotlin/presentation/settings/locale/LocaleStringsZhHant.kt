@@ -218,6 +218,17 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val friendDirectoryEmpty = "暫無好友"
     override val friendDirectoryNoMatches = "沒有符合篩選條件的好友"
     override val friendDirectoryLoadFailed = "無法重新整理好友列表"
+    override val friendDirectorySelect = "選擇要刪除的好友"
+    override val friendDirectorySelectedCount = "已選擇 %d 人"
+    override val friendDirectorySelectAll = "全選目前結果"
+    override val friendDirectoryClearSelection = "清除目前選擇"
+    override val friendDirectoryRemoveSelected = "刪除所選好友"
+    override val friendDirectoryRemoveConfirmTitle = "刪除好友？"
+    override val friendDirectoryRemoveConfirmMessage = "將刪除所選的 %d 位好友，此操作無法復原。"
+    override val friendDirectoryRemovingProgress = "正在刪除 %d/%d"
+    override val friendDirectoryRemoveSuccess = "已刪除 %d 位好友"
+    override val friendDirectoryRemovePartialFailure = "已刪除 %d 位好友，%d 位失敗"
+    override val friendDirectoryRemoveFailed = "%d 位好友刪除失敗"
     override val friendListPagerAllWorlds = "全部世界"
 
     // WorldProfileScreen

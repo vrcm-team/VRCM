@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.network.api.attributes.VRChatResponse
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -636,8 +637,21 @@ class FriendService(
     suspend fun deleteFriendRequest(userId: String) =
         authService.reTryAuthCatching { friendsApi.deleteFriendRequest(userId) }
 
-    suspend fun unfriend(userId: String) =
-        authService.reTryAuthCatching { friendsApi.unfriend(userId) }
+    suspend fun unfriend(userId: String): Result<VRChatResponse> {
+        val sessionToken = synchronized(friendMapLock) { activeSessionToken }
+            ?: return Result.failure(IllegalStateException("No active account session"))
+        if (!isCurrentSession(sessionToken)) {
+            return Result.failure(IllegalStateException("Account session changed"))
+        }
+
+        val result = authService.reTryAuthCatching { friendsApi.unfriend(userId) }
+        if (result.isFailure) return result
+        if (!removeFriend(sessionToken, userId)) {
+            return Result.failure(IllegalStateException("Account session changed"))
+        }
+        emitFriendUpdate(sessionToken, FriendUpdateEvent.Delete(userId))
+        return result
+    }
 }
 
 data class FriendPresence(val location: String, val travelingToLocation: String = "")

@@ -235,6 +235,18 @@ sealed class LocaleStrings {
     open val friendDirectoryEmpty: String = "No friends yet"
     open val friendDirectoryNoMatches: String = "No friends match this filter"
     open val friendDirectoryLoadFailed: String = "Couldn't refresh friends"
+    open val friendDirectorySelect: String = "Select friends to remove"
+    open val friendDirectorySelectedCount: String = "%d selected"
+    open val friendDirectorySelectAll: String = "Select all shown"
+    open val friendDirectoryClearSelection: String = "Clear shown"
+    open val friendDirectoryRemoveSelected: String = "Remove selected friends"
+    open val friendDirectoryRemoveConfirmTitle: String = "Remove friends?"
+    open val friendDirectoryRemoveConfirmMessage: String =
+        "This will remove %d selected friends. This action cannot be undone."
+    open val friendDirectoryRemovingProgress: String = "Removing %d of %d"
+    open val friendDirectoryRemoveSuccess: String = "Removed %d friends"
+    open val friendDirectoryRemovePartialFailure: String = "Removed %d friends; %d failed"
+    open val friendDirectoryRemoveFailed: String = "Failed to remove %d friends"
 
     // WorldProfileScreen
     open val worldProfileDescription: String = "World Description"
