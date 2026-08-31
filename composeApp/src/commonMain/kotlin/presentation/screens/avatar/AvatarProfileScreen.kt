@@ -63,6 +63,13 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
     is AvatarProfileNotice.SelectionFailed -> ToastText.Error(
         message ?: locale.avatarProfileSelectFailed
     )
+    AvatarProfileNotice.FallbackSelected -> ToastText.Success(locale.avatarProfileFallbackSelected)
+    AvatarProfileNotice.FallbackIneligible -> ToastText.Error(locale.avatarProfileFallbackIneligible)
+    AvatarProfileNotice.FallbackNotFound -> ToastText.Error(locale.avatarProfileFallbackNotFound)
+    AvatarProfileNotice.FallbackUnauthorized -> ToastText.Error(locale.avatarProfileFallbackUnauthorized)
+    is AvatarProfileNotice.FallbackSelectionFailed -> ToastText.Error(
+        message ?: locale.avatarProfileFallbackSelectFailed
+    )
     AvatarProfileNotice.InvalidName -> ToastText.Error(locale.avatarEditInvalidName)
     AvatarProfileNotice.NoMetadataChanges -> ToastText.Info(locale.avatarEditNoChanges)
     AvatarProfileNotice.MetadataSaved -> ToastText.Success(locale.avatarEditMetadataSaved)
@@ -82,6 +89,13 @@ internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings)
     AvatarActionAvailability.CheckFailed -> locale.avatarProfileActionCheckFailed
 }
 
+internal fun AvatarFallbackAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
+    AvatarFallbackAvailability.Hidden -> ""
+    AvatarFallbackAvailability.Available -> locale.avatarProfileFallbackActionSet
+    AvatarFallbackAvailability.Current -> locale.avatarProfileFallbackActionCurrent
+    AvatarFallbackAvailability.Ineligible -> locale.avatarProfileFallbackActionIneligible
+}
+
 @Serializable
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
@@ -98,6 +112,7 @@ class AvatarProfileScreen(
         val editorSessionStore: PrintImageEditorSessionStore = koinInject()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
+        val fallbackActionState by screenModel.fallbackActionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
@@ -147,6 +162,8 @@ class AvatarProfileScreen(
                     contentMinHeight = contentMinHeight,
                     actionState = actionState,
                     onSelectAvatar = screenModel::selectAvatar,
+                    fallbackActionState = fallbackActionState,
+                    onSelectFallbackAvatar = screenModel::selectFallbackAvatar,
                     onFavorite = { showFavoriteSheet = true },
                     favoriteEntryState = favoriteEntryState,
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
@@ -192,6 +209,8 @@ private fun AvatarProfileContent(
     contentMinHeight: Dp,
     actionState: AvatarActionState,
     onSelectAvatar: () -> Unit,
+    fallbackActionState: AvatarFallbackActionState,
+    onSelectFallbackAvatar: () -> Unit,
     onFavorite: () -> Unit,
     favoriteEntryState: FavoriteEntryState,
     onRetryFavorite: () -> Unit,
@@ -236,6 +255,11 @@ private fun AvatarProfileContent(
     AvatarActionButton(
         state = actionState,
         onClick = onSelectAvatar,
+    )
+
+    AvatarFallbackActionButton(
+        state = fallbackActionState,
+        onClick = onSelectFallbackAvatar,
     )
 
     OutlinedButton(
@@ -364,6 +388,53 @@ private fun AvatarActionButton(
             textAlign = TextAlign.Center,
         )
     }
+}
+
+@Composable
+private fun AvatarFallbackActionButton(
+    state: AvatarFallbackActionState,
+    onClick: () -> Unit,
+) {
+    val availability = state.availability
+    if (availability == AvatarFallbackAvailability.Hidden) return
+
+    val enabled = !state.isSelecting && availability == AvatarFallbackAvailability.Available
+    val icon = when (availability) {
+        AvatarFallbackAvailability.Available -> AppIcons.Shield
+        AvatarFallbackAvailability.Current -> AppIcons.CheckCircle
+        AvatarFallbackAvailability.Ineligible -> AppIcons.Block
+        AvatarFallbackAvailability.Hidden -> AppIcons.Shield
+    }
+
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = enabled,
+        onClick = onClick,
+    ) {
+        if (state.isSelecting) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = if (state.isSelecting) {
+                strings.avatarProfileFallbackActionSetting
+            } else {
+                availability.localizedButtonText(strings)
+            },
+            textAlign = TextAlign.Center,
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.service
 
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
@@ -386,6 +387,53 @@ class AuthServiceTest : MainDispatcherTest() {
         assertEquals(firstSession.account.userId, response.sessionToken.userId)
         assertFalse(response.sessionToken == firstSession.token)
         assertTrue(SharedFlowCentre.isCurrentSession(response.sessionToken))
+        fixture.client.close()
+    }
+
+    @Test
+    fun fallbackAvatarUpdateRequiresMatchingSessionUserAndTarget() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount(), currentAvatar = "avtr_initial"))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        val response = fixture.service.currentUser().copy(
+            currentAvatar = "avtr_stale_response",
+            fallbackAvatar = "avtr_fallback",
+        )
+
+        assertFalse(
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
+                avatarId = "avtr_fallback",
+                response = response,
+            )
+        )
+        assertFalse(
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response.copy(id = "usr_other"),
+            )
+        )
+        assertFalse(
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_other",
+                response = response,
+            )
+        )
+
+        fixture.service.applyCurrentAvatarUpdate("avtr_newer")
+        assertTrue(
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+            )
+        )
+        assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
+        assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)
         fixture.client.close()
     }
 

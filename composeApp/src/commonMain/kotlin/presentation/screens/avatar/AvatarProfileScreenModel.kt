@@ -2,12 +2,14 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.updateAndGet
@@ -108,6 +111,77 @@ internal class NetworkAvatarSelector(
             .map { }
 }
 
+internal data class AvatarFallbackUserContext(
+    val userId: String,
+    val fallbackAvatarId: String,
+    val sessionToken: AccountSessionToken,
+)
+
+internal data class AvatarFallbackResponse(
+    val result: Result<CurrentUserData>,
+    val sessionToken: AccountSessionToken,
+)
+
+internal interface AvatarFallbackSetter {
+    val currentUser: Flow<AvatarFallbackUserContext?>
+
+    suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse?
+
+    suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+    ): Boolean
+
+    fun isCurrentSession(sessionToken: AccountSessionToken): Boolean
+}
+
+internal class NetworkAvatarFallbackSetter(
+    private val avatarsApi: AvatarsApi,
+    private val authService: AuthService,
+    private val logger: Logger,
+) : AvatarFallbackSetter {
+    override val currentUser: Flow<AvatarFallbackUserContext?> = combine(
+        authService.currentUserState,
+        SharedFlowCentre.currentSession,
+    ) { user, session ->
+        if (user == null || session == null || user.id != session.account.userId) {
+            null
+        } else {
+            AvatarFallbackUserContext(
+                userId = user.id,
+                fallbackAvatarId = user.fallbackAvatar,
+                sessionToken = session.token,
+            )
+        }
+    }
+
+    override suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse? {
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            avatarsApi.selectFallbackAvatar(avatarId)
+        } ?: return null
+        response.result.onFailure { error ->
+            logger.error(avatarFallbackFailureLog(avatarId, error))
+        }
+        return AvatarFallbackResponse(response.result, response.sessionToken)
+    }
+
+    override suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+    ): Boolean = authService.applyFallbackAvatarUpdate(sessionToken, avatarId, response)
+
+    override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean =
+        SharedFlowCentre.isCurrentSession(sessionToken)
+}
+
 private fun avatarSelectionFailureLog(avatarId: String, error: Throwable): String {
     val request = "method=PUT path=/avatars/$avatarId/select"
     return if (error is VRCApiException) {
@@ -115,6 +189,16 @@ private fun avatarSelectionFailureLog(avatarId: String, error: Throwable): Strin
             "description=${error.description} body=${error.bodyText}"
     } else {
         "Avatar selection failed: $request error=${error.message.orEmpty()}"
+    }
+}
+
+private fun avatarFallbackFailureLog(avatarId: String, error: Throwable): String {
+    val request = "method=PUT path=/avatars/$avatarId/selectFallback"
+    return if (error is VRCApiException) {
+        "Fallback avatar selection failed: $request status=${error.code} " +
+            "description=${error.description} body=${error.bodyText}"
+    } else {
+        "Fallback avatar selection failed: $request error=${error.message.orEmpty()}"
     }
 }
 
@@ -130,6 +214,18 @@ internal sealed interface AvatarActionAvailability {
 
 internal data class AvatarActionState(
     val availability: AvatarActionAvailability = AvatarActionAvailability.Checking,
+    val isSelecting: Boolean = false,
+)
+
+internal sealed interface AvatarFallbackAvailability {
+    data object Hidden : AvatarFallbackAvailability
+    data object Available : AvatarFallbackAvailability
+    data object Current : AvatarFallbackAvailability
+    data object Ineligible : AvatarFallbackAvailability
+}
+
+internal data class AvatarFallbackActionState(
+    val availability: AvatarFallbackAvailability = AvatarFallbackAvailability.Hidden,
     val isSelecting: Boolean = false,
 )
 
@@ -150,6 +246,11 @@ internal sealed interface AvatarProfileNotice {
     data object Switched : AvatarProfileNotice
     data object Copied : AvatarProfileNotice
     data class SelectionFailed(val message: String?) : AvatarProfileNotice
+    data object FallbackSelected : AvatarProfileNotice
+    data object FallbackIneligible : AvatarProfileNotice
+    data object FallbackNotFound : AvatarProfileNotice
+    data object FallbackUnauthorized : AvatarProfileNotice
+    data class FallbackSelectionFailed(val message: String?) : AvatarProfileNotice
     data object InvalidName : AvatarProfileNotice
     data object NoMetadataChanges : AvatarProfileNotice
     data object MetadataSaved : AvatarProfileNotice
@@ -169,6 +270,7 @@ class AvatarProfileScreenModel internal constructor(
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    private val avatarFallbackSetter: AvatarFallbackSetter? = null,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -200,6 +302,12 @@ class AvatarProfileScreenModel internal constructor(
         started = SharingStarted.Eagerly,
         initialValue = null,
     )
+    private val fallbackCurrentUser: StateFlow<AvatarFallbackUserContext?> =
+        (avatarFallbackSetter?.currentUser ?: flowOf(null)).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
+        )
     internal val actionState: StateFlow<AvatarActionState> = combine(
         avatarProfileState,
         validation,
@@ -214,6 +322,32 @@ class AvatarProfileScreenModel internal constructor(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = AvatarActionState(),
+    )
+
+    private val pendingFallbackTarget = MutableStateFlow<AvatarFallbackTarget?>(null)
+    private val fallbackIneligibleTarget = MutableStateFlow<AvatarFallbackTargetKey?>(null)
+    private val latestFallbackRequestToken = MutableStateFlow(0L)
+    internal val fallbackActionState: StateFlow<AvatarFallbackActionState> = combine(
+        avatarProfileState,
+        validation,
+        fallbackCurrentUser,
+        pendingFallbackTarget,
+        fallbackIneligibleTarget,
+    ) { avatar, currentValidation, user, pending, ineligible ->
+        AvatarFallbackActionState(
+            availability = avatarFallbackAvailability(
+                avatar = avatar,
+                validation = currentValidation,
+                user = user,
+                ineligible = ineligible,
+            ),
+            isSelecting = avatar != null && user != null &&
+                pending?.avatarId == avatar.avatarId && pending.userId == user.userId,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AvatarFallbackActionState(),
     )
 
     private val isSavingMetadata = MutableStateFlow(false)
@@ -239,6 +373,8 @@ class AvatarProfileScreenModel internal constructor(
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
+        pendingFallbackTarget.value = null
+        fallbackIneligibleTarget.value = null
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
@@ -304,6 +440,63 @@ class AvatarProfileScreenModel internal constructor(
                     }
                 }
             isSelecting.value = false
+        }
+    }
+
+    internal fun selectFallbackAvatar() {
+        val setter = avatarFallbackSetter ?: return
+        val avatarId = avatarProfileState.value?.avatarId ?: return
+        val user = fallbackCurrentUser.value ?: return
+        if (fallbackActionState.value.availability != AvatarFallbackAvailability.Available) return
+
+        pendingFallbackTarget.value?.let { pending ->
+            if (pending.avatarId != avatarId || pending.userId != user.userId) {
+                pendingFallbackTarget.compareAndSet(pending, null)
+            }
+        }
+        val target = AvatarFallbackTarget(
+            avatarId = avatarId,
+            userId = user.userId,
+            requestSessionToken = user.sessionToken,
+            requestToken = latestFallbackRequestToken.updateAndGet { it + 1 },
+        )
+        if (!pendingFallbackTarget.compareAndSet(expect = null, update = target)) return
+
+        viewModelScope.launch(requestDispatcher) {
+            try {
+                val response = setter.set(target.avatarId, target.requestSessionToken)
+                    ?: return@launch
+                if (!isCurrentFallbackTarget(setter, target, response.sessionToken)) return@launch
+
+                response.result
+                    .onSuccess { currentUser ->
+                        if (setter.apply(target.avatarId, response.sessionToken, currentUser)) {
+                            _notices.emit(AvatarProfileNotice.FallbackSelected)
+                        } else {
+                            _notices.emit(AvatarProfileNotice.FallbackSelectionFailed(null))
+                        }
+                    }
+                    .onFailure { error ->
+                        when {
+                            error is VRCApiException && error.code == 403 -> {
+                                fallbackIneligibleTarget.value = target.key
+                                _notices.emit(AvatarProfileNotice.FallbackIneligible)
+                            }
+                            error is VRCApiException && error.code == 404 -> {
+                                validation.value = AvatarValidation.Banned
+                                _notices.emit(AvatarProfileNotice.FallbackNotFound)
+                            }
+                            error is VRCApiException && error.code == 401 -> {
+                                _notices.emit(AvatarProfileNotice.FallbackUnauthorized)
+                            }
+                            else -> _notices.emit(
+                                AvatarProfileNotice.FallbackSelectionFailed(error.message)
+                            )
+                        }
+                    }
+            } finally {
+                pendingFallbackTarget.compareAndSet(target, null)
+            }
         }
     }
 
@@ -375,12 +568,35 @@ class AvatarProfileScreenModel internal constructor(
     private fun isCurrentTarget(target: AvatarEditTarget): Boolean =
         avatarProfileState.value?.avatarId == target.avatarId &&
             currentUser.value?.userId == target.userId
+
+    private fun isCurrentFallbackTarget(
+        setter: AvatarFallbackSetter,
+        target: AvatarFallbackTarget,
+        responseSessionToken: AccountSessionToken,
+    ): Boolean = pendingFallbackTarget.value == target &&
+        avatarProfileState.value?.avatarId == target.avatarId &&
+        responseSessionToken.userId == target.userId &&
+        setter.isCurrentSession(responseSessionToken)
 }
 
 private data class AvatarEditTarget(
     val avatarId: String,
     val userId: String,
 )
+
+private data class AvatarFallbackTargetKey(
+    val avatarId: String,
+    val userId: String,
+)
+
+private data class AvatarFallbackTarget(
+    val avatarId: String,
+    val userId: String,
+    val requestSessionToken: AccountSessionToken,
+    val requestToken: Long,
+) {
+    val key = AvatarFallbackTargetKey(avatarId, userId)
+}
 
 private fun avatarActionAvailability(
     avatar: AvatarProfileVo?,
@@ -400,4 +616,20 @@ private fun avatarActionAvailability(
             else -> AvatarActionAvailability.NotCopyable
         }
     }
+}
+
+private fun avatarFallbackAvailability(
+    avatar: AvatarProfileVo?,
+    validation: AvatarValidation,
+    user: AvatarFallbackUserContext?,
+    ineligible: AvatarFallbackTargetKey?,
+): AvatarFallbackAvailability {
+    if (avatar == null || user == null || validation != AvatarValidation.Available) {
+        return AvatarFallbackAvailability.Hidden
+    }
+    if (avatar.avatarId == user.fallbackAvatarId) return AvatarFallbackAvailability.Current
+    if (ineligible == AvatarFallbackTargetKey(avatar.avatarId, user.userId)) {
+        return AvatarFallbackAvailability.Ineligible
+    }
+    return AvatarFallbackAvailability.Available
 }

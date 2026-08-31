@@ -4,6 +4,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackSetter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackUserContext
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
@@ -89,6 +94,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                         AvatarProfileLoader { Result.failure(IllegalStateException("unused")) }
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
+                    single<AvatarFallbackSetter> { EmptyAvatarFallbackSetter }
                     single<AvatarEditor> { EmptyAvatarEditor }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
@@ -222,6 +228,23 @@ private data object EmptyAvatarSelector : AvatarSelector {
 
     override suspend fun select(avatarId: String): Result<Unit> =
         Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarFallbackSetter : AvatarFallbackSetter {
+    override val currentUser = flowOf<AvatarFallbackUserContext?>(null)
+
+    override suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse? = null
+
+    override suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+    ): Boolean = false
+
+    override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean = false
 }
 
 private data object EmptyAvatarEditor : AvatarEditor {

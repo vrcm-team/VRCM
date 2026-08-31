@@ -162,6 +162,25 @@ class AuthService(
         }
     }
 
+    internal suspend fun applyFallbackAvatarUpdate(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        response: CurrentUserData,
+    ): Boolean = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock false
+        synchronized(currentUserLock) {
+            val existing = currentUser ?: return@synchronized false
+            if (sessionToken.userId != response.id ||
+                response.fallbackAvatar != avatarId ||
+                existing.id != sessionToken.userId
+            ) {
+                return@synchronized false
+            }
+            publishCurrentUserLocked(existing.copy(fallbackAvatar = avatarId))
+            true
+        }
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
             val existing = currentUser ?: return@synchronized
