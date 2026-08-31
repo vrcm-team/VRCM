@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
@@ -60,6 +61,9 @@ data class AvatarGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
 
+internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
+    if (sessionToken != null && this.sessionToken == sessionToken) friends.values.toList() else emptyList()
+
 class FriendListPagerModel(
     private val userProfileEnrichmentService: UserProfileEnrichmentService,
     private val friendService: FriendService,
@@ -88,11 +92,15 @@ class FriendListPagerModel(
     var worldGroupOptions = _worldGroupOptions.asStateFlow()
 
     // Directory filters derive from this account-bound source and never write back to it.
+    private val initialFriendState = friendService.friendStateSnapshot.value
+    private val initialSessionToken = SharedFlowCentre.currentSession.value?.token
     private val _friendSnapshot = MutableStateFlow(
-        friendService.friendMap.values.toList()
+        initialFriendState.friendsForSession(initialSessionToken)
     )
 
-    private val _friendTotal = MutableStateFlow(friendService.friendMap.size)
+    private val _friendTotal = MutableStateFlow(
+        initialFriendState.friendsForSession(initialSessionToken).size
+    )
     val friendTotal: StateFlow<Int> = _friendTotal.asStateFlow()
 
     // 缓存世界数据，以ID为键
@@ -155,10 +163,28 @@ class FriendListPagerModel(
     private var friendSnapshotJob: Job? = null
     private val offlineStatusDescriptions = mutableMapOf<String, String>()
 
-    private val _directoryRefreshing = MutableStateFlow(false)
-    val directoryRefreshing = _directoryRefreshing.asStateFlow()
-    private val _directoryRefreshFailed = MutableStateFlow(false)
-    val directoryRefreshFailed = _directoryRefreshFailed.asStateFlow()
+    private val _friendGroupsRefreshing = MutableStateFlow(false)
+    val directoryRefreshing: StateFlow<Boolean> = combine(
+        _friendGroupsRefreshing,
+        friendService.isRefreshing,
+    ) { groupsRefreshing, friendsRefreshing ->
+        groupsRefreshing || friendsRefreshing
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = friendService.isRefreshing.value,
+    )
+    private val _friendGroupsRefreshFailed = MutableStateFlow(false)
+    val directoryRefreshFailed: StateFlow<Boolean> = combine(
+        _friendGroupsRefreshFailed,
+        friendService.hasRefreshError,
+    ) { groupsFailed, friendsFailed ->
+        groupsFailed || friendsFailed
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = friendService.hasRefreshError.value,
+    )
     private var directoryRefreshJob: Job? = null
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
@@ -193,6 +219,7 @@ class FriendListPagerModel(
     val friendList: StateFlow<List<FriendData>> = friendDirectoryFriends
 
     init {
+        SharedFlowCentre.currentSession.value?.token?.let(::activateAccount)
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 val nextToken = session?.token
@@ -200,11 +227,19 @@ class FriendListPagerModel(
             }
         }
         viewModelScope.launch {
-            friendService.friendState.collect { friends ->
-                val token = activeSessionToken ?: return@collect
-                if (SharedFlowCentre.currentSession.value?.token?.userId != token.userId) return@collect
+            friendService.friendStateSnapshot.collect { snapshot ->
+                val token = activeSessionToken
+                if (snapshot.sessionToken != token ||
+                    token == null ||
+                    SharedFlowCentre.currentSession.value?.token != token
+                ) {
+                    _friendTotal.value = 0
+                    _friendSnapshot.value = emptyList()
+                    return@collect
+                }
+                val friends = snapshot.friendsForSession(token)
                 _friendTotal.value = friends.size
-                updateFriendSnapshot(friends.values.toList())
+                updateFriendSnapshot(friends)
             }
         }
     }
@@ -223,8 +258,10 @@ class FriendListPagerModel(
             favoritedWorldMap.clear()
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()
-            _friendSnapshot.value = emptyList()
-            _friendTotal.value = 0
+            val currentState = friendService.friendStateSnapshot.value
+            val currentFriends = currentState.friendsForSession(sessionToken)
+            _friendSnapshot.value = currentFriends
+            _friendTotal.value = currentFriends.size
             _worldList.value = emptyList()
             _worldTotal.value = 0
             _avatarList.value = emptyList()
@@ -235,11 +272,22 @@ class FriendListPagerModel(
             searchTexts.indices.forEach { searchTexts[it] = "" }
             _searchText.value = ""
         }
+        val currentState = friendService.friendStateSnapshot.value
+        val currentFriends = currentState.friendsForSession(sessionToken)
+        if (sessionToken != null && currentState.sessionToken == sessionToken) {
+            _friendTotal.value = currentFriends.size
+            updateFriendSnapshot(currentFriends)
+        } else {
+            _friendTotal.value = 0
+            _friendSnapshot.value = emptyList()
+        }
         _refreshErrors.value = emptyMap()
         _refreshingTabs.value = emptySet()
-        _directoryRefreshing.value = sessionToken != null && friendDirectoryActivated
-        _directoryRefreshFailed.value = false
-        if (sessionToken != null && friendDirectoryActivated) refreshFriendDirectory()
+        _friendGroupsRefreshing.value = false
+        _friendGroupsRefreshFailed.value = false
+        if (sessionToken != null && friendDirectoryActivated) {
+            startFriendDirectoryRefresh(refreshFriends = false)
+        }
         if (sessionToken != null && favoritesPageActivated) refreshFavoritesTabs()
     }
 
@@ -256,7 +304,7 @@ class FriendListPagerModel(
     /** Marks the friend directory as active and refreshes its friend-only data. */
     fun activateFriendDirectory() {
         friendDirectoryActivated = true
-        refreshFriendDirectory()
+        startFriendDirectoryRefresh(refreshFriends = false)
     }
 
     private fun refreshFavoritesTabs() {
@@ -402,14 +450,18 @@ class FriendListPagerModel(
         friendService.refreshFriendList()
     }
 
-    /** Refreshes only the friend snapshot and VRChat friend favorite groups. */
+    /** Refreshes the global friend snapshot and VRChat friend favorite groups. */
     fun refreshFriendDirectory() {
+        startFriendDirectoryRefresh(refreshFriends = true)
+    }
+
+    private fun startFriendDirectoryRefresh(refreshFriends: Boolean) {
         if (!friendDirectoryActivated) return
-        if (directoryRefreshJob?.isActive == true) return
+        if (_friendGroupsRefreshing.value) return
         val sessionToken = activeSessionToken ?: return
         val generation = accountGeneration
-        _directoryRefreshing.value = true
-        _directoryRefreshFailed.value = false
+        _friendGroupsRefreshing.value = true
+        _friendGroupsRefreshFailed.value = false
         directoryRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             if (!acceptsAccount(sessionToken, generation)) return@launch
             var failed = false
@@ -420,18 +472,18 @@ class FriendListPagerModel(
             } catch (_: Exception) {
                 failed = true
             }
-            if (!acceptsAccount(sessionToken, generation)) return@launch
-            try {
-                if (!friendService.refreshFriendList()) failed = true
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                failed = true
-            } finally {
-                if (acceptsAccount(sessionToken, generation)) {
-                    _directoryRefreshFailed.value = failed
-                    _directoryRefreshing.value = false
+            if (refreshFriends && acceptsAccount(sessionToken, generation)) {
+                try {
+                    if (!friendService.refreshFriendList()) failed = true
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    failed = true
                 }
+            }
+            if (acceptsAccount(sessionToken, generation)) {
+                _friendGroupsRefreshFailed.value = failed
+                _friendGroupsRefreshing.value = false
             }
         }
     }
@@ -535,15 +587,22 @@ class FriendListPagerModel(
     private fun updateFriendSnapshot(sourceFriends: List<FriendData>) {
         val sessionToken = activeSessionToken ?: return
         val generation = accountGeneration
+        if (!acceptsAccount(sessionToken, generation)) return
+        // Cached and socket-backed data must be visible before optional profile enrichment completes.
+        _friendSnapshot.value = applyOfflineStatusDescriptions(sourceFriends)
         friendSnapshotJob?.cancel()
         friendSnapshotJob = viewModelScope.launch {
-            val friendSnapshot = enrichOfflineStatusDescriptions(
+            enrichOfflineStatusDescriptions(
                 friends = sourceFriends,
                 sessionToken = sessionToken,
                 generation = generation,
             )
             if (!acceptsAccount(sessionToken, generation)) return@launch
-            _friendSnapshot.value = friendSnapshot
+            val latestState = friendService.friendStateSnapshot.value
+            if (latestState.sessionToken != sessionToken) return@launch
+            _friendSnapshot.value = applyOfflineStatusDescriptions(
+                latestState.friendsForSession(sessionToken)
+            )
         }
     }
 
@@ -556,13 +615,14 @@ class FriendListPagerModel(
         friends: List<FriendData>,
         sessionToken: AccountSessionToken,
         generation: Long,
-    ): List<FriendData> {
+    ) {
         val candidates = friends.filter {
             it.status == UserStatus.Offline && it.statusDescription.isBlank()
         }
-        if (candidates.isEmpty()) return friends
+        if (candidates.isEmpty()) return
 
         val missing = candidates.filterNot { offlineStatusDescriptions.containsKey(it.id) }
+        if (missing.isEmpty()) return
         val profiles = userProfileEnrichmentService.fetchProfiles(
             sessionToken = sessionToken,
             userIds = missing.map { it.id },
@@ -573,7 +633,10 @@ class FriendListPagerModel(
             }
         }
 
-        return friends.map { friend ->
+    }
+
+    private fun applyOfflineStatusDescriptions(friends: List<FriendData>): List<FriendData> =
+        friends.map { friend ->
             val description = offlineStatusDescriptions[friend.id].orEmpty()
             if (friend.status == UserStatus.Offline &&
                 friend.statusDescription.isBlank() &&
@@ -584,7 +647,6 @@ class FriendListPagerModel(
                 friend
             }
         }
-    }
 
     // 先按状态排序, 如果是离线就再按最后登录时间排序, 再按名字排序
     /**

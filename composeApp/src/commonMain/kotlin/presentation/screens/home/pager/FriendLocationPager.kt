@@ -69,12 +69,8 @@ object FriendLocationPager : Pager {
     ) {
         val friendLocationPagerModel: FriendLocationPagerModel = koinInject()
         val currentIsActive by rememberUpdatedState(isActive)
-        // 控制只有第一次跳转到当前页面时自动刷新
         val lazyListState = rememberLazyListState()
-        LaunchedEffect(Unit) {
-            // 未clear()的同步刷新一次
-            friendLocationPagerModel.preloadFriendLocations()
-        }
+        val isRefreshing by friendLocationPagerModel.isRefreshing.collectAsState()
         LaunchedEffect(Unit) {
             SharedFlowCentre.toPagerTop.collect {
                 // 子任务承接手势取消，避免终止长期 Flow 监听。
@@ -85,9 +81,9 @@ object FriendLocationPager : Pager {
         FriendLocationPager(
             friendLocationMap = friendLocationPagerModel.friendLocationMap,
             currentUserId = friendLocationPagerModel.currentUserId,
-            isRefreshing = friendLocationPagerModel.isRefreshing,
+            isRefreshing = isRefreshing,
             lazyListState = lazyListState,
-            doRefresh = friendLocationPagerModel::refreshFriendLocation,
+            doRefresh = { friendLocationPagerModel.refreshFriendLocation() },
             headerContent = headerContent,
         )
 

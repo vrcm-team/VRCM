@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -11,16 +12,17 @@ import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.websocket.data.WebSocketEvent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendActiveContent
-import io.github.vrcmteam.vrcm.network.websocket.data.content.FriendOfflineContent
 import io.github.vrcmteam.vrcm.network.websocket.data.content.UserContent
 import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -30,6 +32,7 @@ import io.github.vrcmteam.vrcm.storage.InMemoryFavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.InMemoryFriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.InMemorySecureStorage
 import io.github.vrcmteam.vrcm.storage.InMemoryUserProfileCacheStore
+import io.github.vrcmteam.vrcm.storage.data.FriendListCache
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardConfigDao
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
@@ -65,6 +68,122 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class FriendListPagerModelTest : MainDispatcherTest() {
+    @Test
+    fun staleFriendSnapshotIsRejectedAfterSessionTokenChanges() {
+        val accountAToken = AccountSessionToken(userId = "usr_account_a", generation = 1L)
+        val accountBToken = AccountSessionToken(userId = "usr_account_b", generation = 2L)
+        val accountAFriend = cachedFriend(
+            id = "usr_account_a_friend",
+            displayName = "Account A Friend",
+            status = UserStatus.Active,
+        )
+
+        val state = FriendStateSnapshot(
+            sessionToken = accountAToken,
+            friends = mapOf(accountAFriend.id to accountAFriend),
+        )
+
+        assertEquals(emptyList(), state.friendsForSession(accountBToken))
+    }
+
+    @Test
+    fun sameAccountReauthenticationRepublishesRetainedFriendSnapshot() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(userId = "usr_same_account", username = "same-account")
+        SharedFlowCentre.emitAuthenticated(account)
+        val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        var failFriendRefresh = false
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.encodedPath) {
+                        "/auth/user/friends" -> if (failFriendRefresh) {
+                            respond("unavailable", HttpStatusCode.InternalServerError)
+                        } else {
+                            jsonResponse("[]")
+                        }
+                        "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
+                        "/auth/user/favoritelimits", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val friendListCacheStore = InMemoryFriendListCacheStore()
+        val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
+        val accountCacheManager = AccountCacheManager(
+            friendListCacheStore = friendListCacheStore,
+            userProfileCacheStore = InMemoryUserProfileCacheStore(),
+            friendActivityStore = io.github.vrcmteam.vrcm.storage.NoOpFriendActivityCacheStore,
+            meetupCardConfigDao = MeetupCardConfigDao(MapSettings()),
+            meetupCardAssetStore = MeetupCardAssetStore(
+                FakeFileSystem(),
+                "/meetup-assets".toPath(),
+            ),
+            favoriteListCacheStore = favoriteListCacheStore,
+        )
+        val authService = AuthService(
+            authApi = AuthApi(client),
+            accountDao = AccountDao(MapSettings(), InMemorySecureStorage()).also {
+                it.saveAccountInfo(account)
+            },
+            cookiesStorage = PersistentCookiesStorage(EmptyLogger()),
+            accountCacheManager = accountCacheManager,
+        )
+        val friendService = FriendService(
+            friendsApi = FriendsApi(client),
+            authService = authService,
+            json = json,
+            friendListCacheStore = friendListCacheStore,
+            accountCacheManager = accountCacheManager,
+            logger = EmptyLogger(),
+        )
+        val favoriteService = FavoriteService(
+            favoriteApi = FavoriteApi(client),
+            favoriteLocalDao = FavoriteLocalDao(MapSettings()),
+        )
+        val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val model = FriendListPagerModel(
+            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
+            friendService = friendService,
+            authService = authService,
+            favoriteService = favoriteService,
+            worldsApi = WorldsApi(client),
+            avatarsApi = AvatarsApi(client),
+            favoriteListCacheStore = favoriteListCacheStore,
+            accountCacheManager = accountCacheManager,
+        )
+
+        try {
+            val friendId = "usr_retained_friend"
+            val friendEvent = activeFriendEvent(json, friendId, "Retained Friend")
+            emitFriendUntilObserved(friendService, firstSession, friendId, friendEvent)
+            awaitFriendIds(model, setOf(friendId))
+
+            failFriendRefresh = true
+            SharedFlowCentre.emitAuthenticated(account)
+            val renewedSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+            awaitUntil {
+                friendService.friendStateSnapshot.value.sessionToken == renewedSession.token &&
+                    model.friendDirectoryFriends.value.mapTo(mutableSetOf()) { it.id } == setOf(friendId)
+            }
+            assertEquals(renewedSession.token, friendService.friendStateSnapshot.value.sessionToken)
+        } finally {
+            profileScope.cancel()
+            ViewModelStore().apply {
+                put("friend-list-pager", model)
+                clear()
+            }
+            friendService.dispose()
+            favoriteService.dispose()
+            SharedFlowCentre.emitLogout()
+            client.close()
+        }
+    }
+
     @Test
     fun clearingSearchRestoresAllFriendsAfterFilteredFriendStateUpdate() = runBlocking {
         SharedFlowCentre.emitLogout()
@@ -180,21 +299,35 @@ class FriendListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun lateOfflineProfileFromPreviousAccountCannotReplaceCurrentFriendSnapshot() = runBlocking {
+    fun offlineSnapshotPublishesBeforeEnrichmentAndLateProfileCannotCrossAccounts() = runBlocking {
         SharedFlowCentre.emitLogout()
         val accountA = AccountDto(userId = "usr_directory_owner_a", username = "directory-owner-a")
         val accountB = AccountDto(userId = "usr_directory_owner_b", username = "directory-owner-b")
-        SharedFlowCentre.emitAuthenticated(accountA)
-        val sessionA = assertNotNull(SharedFlowCentre.currentSession.value)
+        val accountAFriend = cachedFriend(
+            id = "usr_account_a_friend",
+            displayName = "Account A Friend",
+            status = UserStatus.Offline,
+        )
+        val accountBFriend = cachedFriend(
+            id = "usr_account_b_friend",
+            displayName = "Account B Friend",
+            status = UserStatus.Active,
+        )
         val json = Json { ignoreUnknownKeys = true }
         val accountAProfileStarted = CompletableDeferred<Unit>()
         val releaseAccountAProfile = CompletableDeferred<Unit>()
         val accountAProfileJob = CompletableDeferred<Job>()
+        val accountANetworkStarted = CompletableDeferred<Unit>()
+        val releaseAccountANetwork = CompletableDeferred<Unit>()
         val client = accountSwitchClient(
             json = json,
+            accountAUserId = accountA.userId,
+            accountBFriend = accountBFriend,
             accountAProfileStarted = accountAProfileStarted,
             releaseAccountAProfile = releaseAccountAProfile,
             accountAProfileJob = accountAProfileJob,
+            accountANetworkStarted = accountANetworkStarted,
+            releaseAccountANetwork = releaseAccountANetwork,
         )
         val friendListCacheStore = InMemoryFriendListCacheStore()
         val favoriteListCacheStore = InMemoryFavoriteListCacheStore()
@@ -230,43 +363,42 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteLocalDao = FavoriteLocalDao(MapSettings()),
         )
         val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val model = FriendListPagerModel(
-            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
-            friendService = friendService,
-            authService = authService,
-            favoriteService = favoriteService,
-            worldsApi = WorldsApi(client),
-            avatarsApi = AvatarsApi(client),
-            favoriteListCacheStore = favoriteListCacheStore,
-            accountCacheManager = accountCacheManager,
-        )
+        var model: FriendListPagerModel? = null
 
         try {
-            awaitUntil {
-                friendService.initialRefreshCompleted.value && !model.directoryRefreshing.value
-            }
-            emitFriendUntilObserved(
-                friendService,
-                sessionA,
-                userId = "usr_account_a_friend",
-                event = activeFriendEvent(json, "usr_account_a_friend", "Account A Friend"),
-            )
-            awaitFriendIds(model, setOf("usr_account_a_friend"))
+            val activeModel = FriendListPagerModel(
+                userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
+                friendService = friendService,
+                authService = authService,
+                favoriteService = favoriteService,
+                worldsApi = WorldsApi(client),
+                avatarsApi = AvatarsApi(client),
+                favoriteListCacheStore = favoriteListCacheStore,
+                accountCacheManager = accountCacheManager,
+            ).also { model = it }
+            friendListCacheStore.save(accountA.userId, FriendListCache(listOf(accountAFriend)))
 
-            SharedFlowCentre.emitWebSocket(
-                AccountWebSocketEvent(
-                    sessionA.token,
-                    offlineFriendEvent(json, "usr_account_a_friend"),
-                )
-            )
+            SharedFlowCentre.emitAuthenticated(accountA)
             withTimeout(3_000) { accountAProfileStarted.await() }
+            withTimeout(3_000) { accountANetworkStarted.await() }
             val oldProfileJob = withTimeout(3_000) { accountAProfileJob.await() }
+            assertEquals(
+                listOf("usr_account_a_friend"),
+                activeModel.friendDirectoryFriends.value.map { it.id },
+            )
+
+            releaseAccountANetwork.complete(Unit)
+            awaitUntil {
+                friendService.initialRefreshCompleted.value &&
+                    !friendService.isRefreshing.value &&
+                    friendService.friendState.value.isEmpty()
+            }
 
             SharedFlowCentre.emitAuthenticated(accountB)
             val sessionB = assertNotNull(SharedFlowCentre.currentSession.value)
             awaitUntil {
                 friendService.friendState.value.isEmpty() &&
-                    model.friendDirectoryFriends.value.isEmpty()
+                    activeModel.friendDirectoryFriends.value.isEmpty()
             }
             emitFriendUntilObserved(
                 friendService,
@@ -274,22 +406,25 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                 userId = "usr_account_b_friend",
                 event = activeFriendEvent(json, "usr_account_b_friend", "Account B Friend"),
             )
-            awaitFriendIds(model, setOf("usr_account_b_friend"))
+            awaitFriendIds(activeModel, setOf("usr_account_b_friend"))
 
             releaseAccountAProfile.complete(Unit)
             withTimeout(3_000) { oldProfileJob.join() }
 
             assertEquals(
                 listOf("usr_account_b_friend"),
-                model.friendDirectoryFriends.value.map { it.id },
+                activeModel.friendDirectoryFriends.value.map { it.id },
             )
-            assertEquals("", model.friendDirectoryFriends.value.single().statusDescription)
+            assertEquals("", activeModel.friendDirectoryFriends.value.single().statusDescription)
         } finally {
             profileScope.cancel()
             releaseAccountAProfile.complete(Unit)
-            ViewModelStore().apply {
-                put("friend-list-pager", model)
-                clear()
+            releaseAccountANetwork.complete(Unit)
+            model?.let { activeModel ->
+                ViewModelStore().apply {
+                    put("friend-list-pager", activeModel)
+                    clear()
+                }
             }
             friendService.dispose()
             favoriteService.dispose()
@@ -384,23 +519,38 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         ),
     )
 
-    private fun offlineFriendEvent(json: Json, userId: String) = WebSocketEvent(
-        type = FriendEvents.FriendOffline.typeName,
-        content = json.encodeToString(FriendOfflineContent(userId = userId)),
-    )
 }
 
 private fun accountSwitchClient(
     json: Json,
+    accountAUserId: String,
+    accountBFriend: FriendData,
     accountAProfileStarted: CompletableDeferred<Unit>,
     releaseAccountAProfile: CompletableDeferred<Unit>,
     accountAProfileJob: CompletableDeferred<Job>,
+    accountANetworkStarted: CompletableDeferred<Unit>,
+    releaseAccountANetwork: CompletableDeferred<Unit>,
 ) = HttpClient(MockEngine) {
     engine {
         addHandler { request ->
             when (request.url.encodedPath) {
                 "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
-                "/auth/user/friends", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                "/auth/user/friends" -> {
+                    val offline = request.url.parameters["offline"] == "true"
+                    val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                    val requestUserId = SharedFlowCentre.currentSession.value?.account?.userId
+                    val friends = when {
+                        offline || offset != 0 -> emptyList()
+                        requestUserId == accountAUserId -> {
+                            accountANetworkStarted.complete(Unit)
+                            withContext(NonCancellable) { releaseAccountANetwork.await() }
+                            emptyList()
+                        }
+                        else -> listOf(accountBFriend)
+                    }
+                    jsonResponse(json.encodeToString(friends))
+                }
+                "/favorites", "/favorite/groups" -> jsonResponse("[]")
                 "/users/usr_account_a_friend" -> {
                     accountAProfileJob.complete(currentCoroutineContext().job)
                     accountAProfileStarted.complete(Unit)
@@ -414,6 +564,31 @@ private fun accountSwitchClient(
     }
     install(ContentNegotiation) { json(json) }
 }
+
+private fun cachedFriend(
+    id: String,
+    displayName: String,
+    status: UserStatus,
+) = FriendData(
+    bio = null,
+    currentAvatarImageUrl = "",
+    currentAvatarThumbnailImageUrl = "",
+    developerType = "none",
+    displayName = displayName,
+    friendKey = "",
+    id = id,
+    imageUrl = "",
+    isFriend = true,
+    lastLogin = "",
+    lastActivity = "",
+    lastPlatform = "web",
+    location = "offline",
+    profilePicOverride = "",
+    status = status,
+    statusDescription = "",
+    userIcon = "",
+    pronouns = null,
+)
 
 private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
     content = content,

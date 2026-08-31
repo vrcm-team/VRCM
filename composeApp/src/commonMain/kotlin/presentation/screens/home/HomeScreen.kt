@@ -50,6 +50,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUser
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
@@ -87,6 +88,11 @@ object HomeScreen : AppListRoute {
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
+        val friendListModel = if (selectedDestination == HomeDestination.Friends) {
+            koinViewModel<FriendListPagerModel>()
+        } else {
+            null
+        }
         val showMainNavigation = navigator.lastItem == HomeScreen
         var statusVisible by remember { mutableStateOf(true) }
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
@@ -144,8 +150,10 @@ object HomeScreen : AppListRoute {
                             hazeState = hazeState,
                             statusVisible = statusVisible,
                         ) {
-                            if (selectedDestination == HomeDestination.Notifications) {
-                                NotificationRefreshAction(notificationModel)
+                            when (selectedDestination) {
+                                HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
+                                HomeDestination.Friends -> FriendRefreshAction(requireNotNull(friendListModel))
+                                else -> Unit
                             }
                         }
                     }
@@ -192,7 +200,9 @@ object HomeScreen : AppListRoute {
                                         bottomNavigationPadding = if (!useRail && showMainNavigation) 80.dp else 0.dp,
                                         showTopBar = false,
                                     )
-                                    HomeDestination.Friends -> FriendListPager.Content()
+                                    HomeDestination.Friends -> FriendListPager.Content(
+                                        requireNotNull(friendListModel),
+                                    )
                                 }
                             }
                         }
@@ -459,6 +469,18 @@ private fun NotificationRefreshAction(model: NotificationCenterModel) {
             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
         } else {
             Icon(AppIcons.Update, strings.notificationRefresh)
+        }
+    }
+}
+
+@Composable
+private fun FriendRefreshAction(model: FriendListPagerModel) {
+    val isRefreshing by model.directoryRefreshing.collectAsState()
+    IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
+        if (isRefreshing) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(AppIcons.Update, strings.refresh)
         }
     }
 }

@@ -51,12 +51,75 @@ import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendOfflineLastActivityRefreshTest : MainDispatcherTest() {
+    @Test
+    fun initialRefreshingSpansCacheRestoreAndNetworkRefresh() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(userId = "usr_owner", username = "owner")
+        SharedFlowCentre.emitAuthenticated(account)
+        val cacheStore = BlockingFriendListCacheStore(FriendListCache(listOf(friend())))
+        val networkRefreshStarted = CompletableDeferred<Unit>()
+        val releaseNetworkRefresh = CompletableDeferred<Unit>()
+        val json = Json { ignoreUnknownKeys = true }
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.encodedPath) {
+                        "/auth/user/friends" -> {
+                            val offline = request.url.parameters["offline"] == "true"
+                            val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                            if (!offline && offset == 0) {
+                                networkRefreshStarted.complete(Unit)
+                                releaseNetworkRefresh.await()
+                            }
+                            respond(
+                                content = "[]",
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        }
+                        "/auth/user" -> respond(
+                            content = "unavailable",
+                            status = HttpStatusCode.InternalServerError,
+                        )
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val friendService = createFriendService(account, client, json, cacheStore)
+
+        try {
+            withTimeout(3_000L) { cacheStore.loadStarted.await() }
+            assertTrue(friendService.isRefreshing.value)
+
+            cacheStore.releaseLoad.complete(Unit)
+            withTimeout(3_000L) { networkRefreshStarted.await() }
+            assertTrue(friendService.isRefreshing.value)
+
+            releaseNetworkRefresh.complete(Unit)
+            withTimeout(3_000L) {
+                while (!friendService.initialRefreshCompleted.value || friendService.isRefreshing.value) {
+                    yield()
+                }
+            }
+            assertFalse(friendService.hasRefreshError.value)
+        } finally {
+            cacheStore.releaseLoad.complete(Unit)
+            releaseNetworkRefresh.complete(Unit)
+            friendService.dispose()
+            SharedFlowCentre.emitLogout()
+            client.close()
+        }
+    }
+
     @Test
     fun repeatedPresenceSocketEventsOnlyPublishRealTransitions() {
         runBlocking {
