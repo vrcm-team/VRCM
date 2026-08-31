@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -396,6 +397,14 @@ class UserProfileScreenModel(
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
+    private val playerInteractionController = PlayerInteractionOverrideController(
+        ownerUserId = cacheOwnerUserId,
+        initialSessionToken = profileSessionToken,
+        authService = authService,
+        usersApi = usersApi,
+    )
+    internal val playerInteractionState: StateFlow<PlayerInteractionState> =
+        playerInteractionController.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -406,6 +415,14 @@ class UserProfileScreenModel(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                val shouldReload = playerInteractionController.onSessionChanged(session?.token)
+                if (shouldReload && userState.id != cacheOwnerUserId) {
+                    refreshPlayerInteractionStatus()
+                }
+            }
+        }
         viewModelScope.launch {
             authService.currentUserState.collect { currentUser ->
                 _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
@@ -606,6 +623,49 @@ class UserProfileScreenModel(
                 handleError(error)
             }
         }
+    }
+
+    fun refreshPlayerInteractionStatus(failureMessage: String? = null) {
+        if (userState.id == cacheOwnerUserId) return
+        val targetUserId = userState.id
+        viewModelScope.launch(Dispatchers.IO) {
+            var result = playerInteractionController.refresh(targetUserId)
+            if (result is PlayerInteractionRequestResult.Stale && result.canReload) {
+                result = playerInteractionController.refresh(targetUserId)
+            }
+            if (result is PlayerInteractionRequestResult.Failed && failureMessage != null) {
+                handleActionError(result.error, failureMessage)
+            }
+        }
+    }
+
+    internal suspend fun setPlayerInteractionOverride(
+        override: PlayerInteractionOverride,
+        successMessage: String,
+        failureMessage: String,
+    ): Boolean = viewModelScope.async(Dispatchers.IO) {
+        if (userState.id == cacheOwnerUserId) return@async false
+        val targetUserId = userState.id
+        when (val result = playerInteractionController.setOverride(targetUserId, override)) {
+            PlayerInteractionRequestResult.Succeeded -> {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                true
+            }
+            is PlayerInteractionRequestResult.Failed -> {
+                handleActionError(result.error, failureMessage)
+                false
+            }
+            is PlayerInteractionRequestResult.Stale -> {
+                if (result.canReload) playerInteractionController.refresh(targetUserId)
+                false
+            }
+            PlayerInteractionRequestResult.Ignored -> false
+        }
+    }.await()
+
+    private suspend fun handleActionError(error: Throwable, message: String) {
+        logger.error(error.message.toString())
+        SharedFlowCentre.toastText.emit(ToastText.Error(message))
     }
 
     fun updateUserProfile(
