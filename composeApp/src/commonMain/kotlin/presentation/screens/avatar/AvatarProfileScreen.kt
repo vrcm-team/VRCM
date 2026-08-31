@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +71,10 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.ModerationBlocked -> ToastText.Success(locale.avatarModerationBlocked)
+    AvatarProfileNotice.ModerationUnblocked -> ToastText.Success(locale.avatarModerationUnblocked)
+    AvatarProfileNotice.ModerationLoadFailed -> ToastText.Error(locale.avatarModerationLoadFailed)
+    AvatarProfileNotice.ModerationChangeFailed -> ToastText.Error(locale.avatarModerationChangeFailed)
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -99,11 +104,13 @@ class AvatarProfileScreen(
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
+        val moderationState by screenModel.moderationState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
+        var pendingModerationChange by remember { mutableStateOf<Boolean?>(null) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
@@ -120,6 +127,20 @@ class AvatarProfileScreen(
         }
 
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
+        LaunchedEffect(displayedAvatar.avatarId) {
+            pendingModerationChange = null
+        }
+        LaunchedEffect(moderationState.status, moderationState.isUpdating) {
+            val blocked = pendingModerationChange ?: return@LaunchedEffect
+            val requiredStatus = if (blocked) {
+                AvatarModerationStatus.NotBlocked
+            } else {
+                AvatarModerationStatus.Blocked
+            }
+            if (moderationState.status != requiredStatus || moderationState.isUpdating) {
+                pendingModerationChange = null
+            }
+        }
         LaunchedEffect(displayedAvatar.avatarId, avatarCoverUpdates) {
             val updated = avatarCoverUpdates[displayedAvatar.avatarId]
                 ?: return@LaunchedEffect
@@ -150,6 +171,11 @@ class AvatarProfileScreen(
                     onFavorite = { showFavoriteSheet = true },
                     favoriteEntryState = favoriteEntryState,
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
+                    moderationState = moderationState,
+                    onRetryModeration = screenModel::retryAvatarModerationLoad,
+                    onModerationChangeRequested = { blocked ->
+                        pendingModerationChange = blocked
+                    },
                     canEdit = editState.canEdit,
                     onEdit = { showEditSheet = true },
                 )
@@ -182,6 +208,16 @@ class AvatarProfileScreen(
                 },
             )
         }
+        pendingModerationChange?.let { blocked ->
+            AvatarModerationConfirmationDialog(
+                blocked = blocked,
+                onDismiss = { pendingModerationChange = null },
+                onConfirm = {
+                    pendingModerationChange = null
+                    screenModel.setAvatarBlocked(blocked)
+                },
+            )
+        }
     }
 }
 
@@ -195,6 +231,9 @@ private fun AvatarProfileContent(
     onFavorite: () -> Unit,
     favoriteEntryState: FavoriteEntryState,
     onRetryFavorite: () -> Unit,
+    moderationState: AvatarModerationState,
+    onRetryModeration: () -> Unit,
+    onModerationChangeRequested: (Boolean) -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
 ) {
@@ -267,7 +306,16 @@ private fun AvatarProfileContent(
         )
     }
 
+    Spacer(Modifier.height(8.dp))
+
+    AvatarModerationButton(
+        state = moderationState,
+        onRetry = onRetryModeration,
+        onChangeRequested = onModerationChangeRequested,
+    )
+
     if (canEdit) {
+        Spacer(Modifier.height(8.dp))
         FilledTonalButton(
             onClick = onEdit,
             modifier = Modifier.fillMaxWidth(),
@@ -315,6 +363,130 @@ private fun AvatarProfileContent(
         AvatarPlatformSection(knownPlatforms)
     }
 
+}
+
+@Composable
+private fun AvatarModerationButton(
+    state: AvatarModerationState,
+    onRetry: () -> Unit,
+    onChangeRequested: (Boolean) -> Unit,
+) {
+    val status = state.status
+    val isBlockAction = status == AvatarModerationStatus.NotBlocked
+    val isUnblockAction = status == AvatarModerationStatus.Blocked
+    val enabled = !state.isUpdating && (
+        isBlockAction ||
+            isUnblockAction ||
+            status == AvatarModerationStatus.LoadFailed
+    )
+    val contentColor = if (isBlockAction) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val label = when {
+        state.isUpdating && isBlockAction -> strings.avatarModerationBlocking
+        state.isUpdating && isUnblockAction -> strings.avatarModerationUnblocking
+        status == AvatarModerationStatus.Unavailable -> strings.avatarModerationUnavailable
+        status == AvatarModerationStatus.Loading -> strings.avatarModerationChecking
+        status == AvatarModerationStatus.Blocked -> strings.avatarModerationUnblock
+        status == AvatarModerationStatus.NotBlocked -> strings.avatarModerationBlock
+        else -> strings.avatarModerationRetry
+    }
+
+    OutlinedButton(
+        onClick = {
+            when (status) {
+                AvatarModerationStatus.Blocked -> onChangeRequested(false)
+                AvatarModerationStatus.NotBlocked -> onChangeRequested(true)
+                AvatarModerationStatus.LoadFailed -> onRetry()
+                AvatarModerationStatus.Unavailable,
+                AvatarModerationStatus.Loading -> Unit
+            }
+        },
+        enabled = enabled,
+        border = BorderStroke(
+            1.dp,
+            if (enabled) contentColor else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (state.isUpdating || status == AvatarModerationStatus.Loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(
+                imageVector = when (status) {
+                    AvatarModerationStatus.Blocked -> AppIcons.CheckCircle
+                    AvatarModerationStatus.LoadFailed -> AppIcons.QuestionMark
+                    AvatarModerationStatus.Unavailable,
+                    AvatarModerationStatus.Loading,
+                    AvatarModerationStatus.NotBlocked -> AppIcons.Block
+                },
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(label, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun AvatarModerationConfirmationDialog(
+    blocked: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(AppIcons.Block, contentDescription = null) },
+        title = {
+            Text(
+                if (blocked) {
+                    strings.avatarModerationBlockConfirmTitle
+                } else {
+                    strings.avatarModerationUnblockConfirmTitle
+                }
+            )
+        },
+        text = {
+            Text(
+                if (blocked) {
+                    strings.avatarModerationBlockConfirmMessage
+                } else {
+                    strings.avatarModerationUnblockConfirmMessage
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (blocked) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                ),
+            ) {
+                Text(
+                    if (blocked) {
+                        strings.avatarModerationBlock
+                    } else {
+                        strings.avatarModerationUnblock
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
+        },
+    )
 }
 
 @Composable

@@ -50,6 +50,12 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             .localizedToast(LocaleStringsEn)
         assertTrue(selectionFailure is ToastText.Error)
         assertEquals(LocaleStringsEn.avatarProfileSelectFailed, selectionFailure.text)
+        assertTrue(
+            AvatarProfileNotice.ModerationBlocked.localizedToast(LocaleStringsEn) is ToastText.Success
+        )
+        assertTrue(
+            AvatarProfileNotice.ModerationLoadFailed.localizedToast(LocaleStringsEn) is ToastText.Error
+        )
     }
 
     @Test
@@ -223,6 +229,137 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
 
         assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
         assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun failedModerationLoadCanRetryWithoutLeavingTheProfile() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_retry"))
+        moderationSource.completeLoad(
+            avatarId = "avtr_retry",
+            result = Result.failure(IllegalStateException("offline")),
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.LoadFailed, model.moderationState.value.status)
+        assertEquals(
+            listOf<AvatarProfileNotice>(AvatarProfileNotice.ModerationLoadFailed),
+            notices,
+        )
+
+        model.retryAvatarModerationLoad()
+        moderationSource.completeLoad("avtr_retry", Result.success(true), requestIndex = 1)
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun staleModerationLoadCannotReplaceTheLatestAvatarState() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_old"))
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_new"))
+        moderationSource.completeLoad("avtr_new", Result.success(false))
+        moderationSource.completeLoad("avtr_old", Result.success(true))
+        yield()
+
+        assertEquals("avtr_new", model.moderationState.value.avatarId)
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+    }
+
+    @Test
+    fun moderationChangesIgnoreRepeatedClicksAndOfferStatusRetryAfterFailure() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+
+        model.setAvatarBlocked(true)
+        model.setAvatarBlocked(true)
+        yield()
+
+        assertEquals(listOf("avtr_target"), moderationSource.blockedAvatarIds)
+        assertTrue(model.moderationState.value.isUpdating)
+
+        moderationSource.completeBlock(Result.success(Unit))
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+
+        model.setAvatarBlocked(false)
+        model.setAvatarBlocked(false)
+        yield()
+        assertEquals(listOf("avtr_target"), moderationSource.unblockedAvatarIds)
+
+        moderationSource.completeUnblock(Result.failure(IllegalStateException("offline")))
+        yield()
+
+        assertEquals(AvatarModerationStatus.LoadFailed, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+        assertEquals(
+            listOf(
+                AvatarProfileNotice.ModerationBlocked,
+                AvatarProfileNotice.ModerationChangeFailed,
+            ),
+            notices,
+        )
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun accountSwitchReloadsModerationForTheCurrentAvatar() = runBlocking {
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = "usr_account_a"),
+                token = AccountSessionToken(userId = "usr_account_a", generation = 1),
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = "usr_account_b"),
+            token = AccountSessionToken(userId = "usr_account_b", generation = 2),
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+        moderationSource.completeLoad("avtr_target", Result.success(true), requestIndex = 1)
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
     }
 
     @Test
@@ -597,6 +734,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     private fun avatarModel(
         loader: AvatarProfileLoader,
         selector: AvatarSelector = FakeAvatarSelector(),
+        moderationSource: AvatarModerationSource = ImmediateAvatarModerationSource(),
         favoriteSource: FavoriteEntrySource = EmptyFavoriteEntrySource(),
         editor: AvatarEditor? = null,
         favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
@@ -604,12 +742,61 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         AvatarProfileScreenModel(
             loader,
             selector,
+            moderationSource,
             favoriteSource,
             Dispatchers.Unconfined,
             editor,
             favoriteSession,
         )
             .also(models::add)
+}
+
+private class ImmediateAvatarModerationSource : AvatarModerationSource {
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> = Result.success(false)
+
+    override suspend fun block(avatarId: String): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unblock(avatarId: String): Result<Unit> = Result.success(Unit)
+}
+
+private class ControlledAvatarModerationSource : AvatarModerationSource {
+    private val loadRequests = mutableMapOf<String, MutableList<CompletableDeferred<Result<Boolean>>>>()
+    private val blockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
+    private val unblockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
+    val blockedAvatarIds = mutableListOf<String>()
+    val unblockedAvatarIds = mutableListOf<String>()
+
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> {
+        val request = CompletableDeferred<Result<Boolean>>()
+        loadRequests.getOrPut(avatarId, ::mutableListOf).add(request)
+        return request.await()
+    }
+
+    override suspend fun block(avatarId: String): Result<Unit> {
+        blockedAvatarIds += avatarId
+        return CompletableDeferred<Result<Unit>>().also(blockRequests::add).await()
+    }
+
+    override suspend fun unblock(avatarId: String): Result<Unit> {
+        unblockedAvatarIds += avatarId
+        return CompletableDeferred<Result<Unit>>().also(unblockRequests::add).await()
+    }
+
+    fun completeLoad(
+        avatarId: String,
+        result: Result<Boolean>,
+        requestIndex: Int = 0,
+    ) {
+        loadRequests.getValue(avatarId)[requestIndex].complete(result)
+    }
+
+    fun completeBlock(result: Result<Unit>) {
+        blockRequests.single().complete(result)
+    }
+
+    fun completeUnblock(result: Result<Unit>) {
+        unblockRequests.single().complete(result)
+    }
 }
 
 private class EmptyFavoriteEntrySource : FavoriteEntrySource {
