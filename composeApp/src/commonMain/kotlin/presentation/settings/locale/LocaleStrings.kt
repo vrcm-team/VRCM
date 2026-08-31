@@ -564,6 +564,36 @@ sealed class LocaleStrings {
     open val meetupCardPhotoFailed: String = "The selected photo could not be used."
     open val meetupCardSaveFailed: String = "The change could not be saved."
     open val meetupCardSessionExpired: String = "The photo selection expired. Choose the photo again."
+
+    // Player moderation cleanup
+    open val playerModerationCleanupTitle: String = "Player moderation cleanup"
+    open val playerModerationCleanupEntrySummary: String = "Per-player overrides"
+    open val playerModerationCleanupDescription: String =
+        "Choose one server-backed override type to remove for this account. This cannot be undone."
+    open val playerModerationCleanupSelectType: String = "Override type"
+    open val playerModerationCleanupTargetCount: String = "%count% targets"
+    open val playerModerationCleanupAction: String = "Clear selected type"
+    open val playerModerationCleanupConfirmTitle: String = "Clear this override type?"
+    open val playerModerationCleanupConfirmMessage: String =
+        "Clear %type% records for %count% targets? This action cannot be undone."
+    open val playerModerationCleanupPreparing: String = "Checking current records..."
+    open val playerModerationCleanupProgress: String = "Clearing %processed% of %total% targets..."
+    open val playerModerationCleanupSuccess: String = "Cleared records for %removed% targets."
+    open val playerModerationCleanupNoRecords: String = "No matching records remain."
+    open val playerModerationCleanupPartialFailure: String =
+        "Cleared %removed% targets; %failed% could not be cleared."
+    open val playerModerationCleanupFailure: String =
+        "Could not confirm that all selected records were cleared. Refresh to check the current state."
+    open val playerModerationCleanupEmpty: String = "No supported player moderation records were found."
+    open val playerModerationCleanupLoadFailed: String = "Player moderation records could not be loaded."
+    open val playerModerationCleanupSessionUnavailable: String = "Sign in again to manage these records."
+    open val playerModerationTypeBlock: String = "Blocked"
+    open val playerModerationTypeInteractOff: String = "Interaction disabled"
+    open val playerModerationTypeInteractOn: String = "Interaction enabled"
+    open val playerModerationTypeMute: String = "Voice muted"
+    open val playerModerationTypeMuteChat: String = "Chatbox muted"
+    open val playerModerationTypeUnmute: String = "Voice allowed"
+    open val playerModerationTypeUnmuteChat: String = "Chatbox allowed"
 }
 
 val strings: LocaleStrings
