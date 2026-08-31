@@ -112,6 +112,27 @@ class BoopNotificationResolverTest {
     }
 
     @Test
+    fun uppercaseBoopTypeStillEnrichesSenderPresentation() = runTest {
+        val resolver = BoopNotificationResolver()
+        val item = boop(id = "uppercase").copy(type = "BOOP")
+
+        val result = resolver.resolve(
+            notifications = listOf(item),
+            friends = mapOf(
+                "usr_sender" to NotificationUserPresentation(
+                    imageUrl = "https://example.com/sender.png",
+                    displayName = "Sender",
+                )
+            ),
+        ) {
+            error("sender in friend snapshot should not use the network")
+        }
+
+        assertEquals("https://example.com/sender.png", result.single().imageUrl)
+        assertEquals("Sender", result.single().title)
+    }
+
+    @Test
     fun duplicateSenderUsesOneFallbackRequestAndCachesIt() = runTest {
         val resolver = BoopNotificationResolver()
         val notifications = listOf(boop("first"), boop("second"))
