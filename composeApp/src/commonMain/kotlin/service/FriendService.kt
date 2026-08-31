@@ -662,17 +662,22 @@ class FriendService(
 
     suspend fun unfriend(userId: String): Result<VRChatResponse> {
         val sessionToken = synchronized(friendMapLock) { activeSessionToken }
-            ?: return Result.failure(IllegalStateException("No active account session"))
+            ?: return friendSessionChangedResult()
         if (!isCurrentSession(sessionToken)) {
-            return Result.failure(IllegalStateException("Account session changed"))
+            return friendSessionChangedResult()
         }
 
-        val result = authService.reTryAuthCatching { friendsApi.unfriend(userId) }
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            friendsApi.unfriend(userId)
+        } ?: return friendSessionChangedResult()
+        val result = response.result
         if (result.isFailure) return result
-        if (!removeFriend(sessionToken, userId)) {
-            return Result.failure(IllegalStateException("Account session changed"))
+        val activeSessionToken = resolveActiveFriendSession(response.sessionToken)
+            ?: return friendSessionChangedResult()
+        if (!removeFriend(activeSessionToken, userId)) {
+            return friendSessionChangedResult()
         }
-        emitFriendUpdate(sessionToken, FriendUpdateEvent.Delete(userId))
+        emitFriendUpdate(activeSessionToken, FriendUpdateEvent.Delete(userId))
         return result
     }
 

@@ -703,6 +703,87 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun singleRemovalCommitsAfterSameAccountReauthentication() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(
+            userId = "usr_single_removal_owner",
+            username = "single-removal-owner",
+            password = "single-removal-password",
+        )
+        SharedFlowCentre.emitAuthenticated(account)
+        val initialSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val friendId = "usr_single_removal_friend"
+        val deleteRequests = atomic(0)
+        val authenticationRequests = atomic(0)
+        val remoteRemoved = atomic(false)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.endsWith("/$friendId") -> {
+                            if (deleteRequests.incrementAndGet() == 1) {
+                                respond("expired", HttpStatusCode.Unauthorized)
+                            } else {
+                                remoteRemoved.value = true
+                                jsonResponse(successResponseJson())
+                            }
+                        }
+                        path == "/auth/user/friends" -> {
+                            val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                            val offline = request.url.parameters["offline"] == "true"
+                            val friends = if (!remoteRemoved.value && !offline && offset == 0) {
+                                listOf(cachedFriend(friendId, "Single Removal Friend", UserStatus.Active))
+                            } else {
+                                emptyList()
+                            }
+                            jsonResponse(json.encodeToString(friends))
+                        }
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> {
+                            if (request.headers[HttpHeaders.Authorization] != null) {
+                                authenticationRequests.incrementAndGet()
+                            }
+                            jsonResponse(currentUserJson(account))
+                        }
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(account, client, json)
+
+        try {
+            emitFriendUntilObserved(
+                fixture.friendService,
+                initialSession,
+                friendId,
+                activeFriendEvent(json, friendId, "Single Removal Friend"),
+            )
+            awaitCachedFriendIds(fixture, account.userId, setOf(friendId))
+
+            val result = fixture.friendService.unfriend(friendId)
+
+            assertTrue(result.isSuccess)
+            val renewedSession = assertNotNull(SharedFlowCentre.currentSession.value)
+            assertFalse(renewedSession.token == initialSession.token)
+            awaitUntil {
+                fixture.friendService.friendStateSnapshot.value.sessionToken == renewedSession.token &&
+                    fixture.friendService.friendState.value.isEmpty()
+            }
+            awaitCachedFriendIds(fixture, account.userId, emptySet())
+            assertEquals(2, deleteRequests.value)
+            assertEquals(1, authenticationRequests.value)
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     private fun createRemovalFixture(
         account: AccountDto,
         client: HttpClient,
@@ -753,7 +834,15 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteListCacheStore = favoriteListCacheStore,
             accountCacheManager = accountCacheManager,
         )
-        return RemovalFixture(model, friendService, favoriteService, accountDao, profileScope, client)
+        return RemovalFixture(
+            model,
+            friendService,
+            favoriteService,
+            accountDao,
+            friendListCacheStore,
+            profileScope,
+            client,
+        )
     }
 
     private data class RemovalFixture(
@@ -761,6 +850,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         val friendService: FriendService,
         val favoriteService: FavoriteService,
         val accountDao: AccountDao,
+        val friendListCacheStore: InMemoryFriendListCacheStore,
         val profileScope: CoroutineScope,
         val client: HttpClient,
     ) {
@@ -793,6 +883,22 @@ class FriendListPagerModelTest : MainDispatcherTest() {
     private suspend fun awaitFriendIds(model: FriendListPagerModel, expectedIds: Set<String>) {
         awaitUntil {
             model.friendDirectoryFriends.value.mapTo(mutableSetOf()) { it.id } == expectedIds
+        }
+    }
+
+    private suspend fun awaitCachedFriendIds(
+        fixture: RemovalFixture,
+        accountUserId: String,
+        expectedIds: Set<String>,
+    ) {
+        withTimeout(3_000) {
+            while (
+                fixture.friendListCacheStore.load(accountUserId)?.let { cache ->
+                    cache.friends.mapTo(mutableSetOf(), FriendData::id) == expectedIds
+                } != true
+            ) {
+                yield()
+            }
         }
     }
 
@@ -941,6 +1047,39 @@ private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
 
 private fun successResponseJson() = """
     {"success":{"message":"Friend removed","status_code":200}}
+""".trimIndent()
+
+private fun currentUserJson(account: AccountDto): String = """
+    {
+      "requiresTwoFactorAuth":null,
+      "ageVerificationStatus":"verified","ageVerified":true,
+      "acceptedPrivacyVersion":0,"acceptedTOSVersion":0,
+      "accountDeletionDate":null,"accountDeletionLog":null,"activeFriends":[],
+      "allowAvatarCopying":true,"bio":null,"bioLinks":[],
+      "currentAvatar":"","currentAvatarAssetUrl":null,"currentAvatarImageUrl":"",
+      "currentAvatarTags":[],"currentAvatarThumbnailImageUrl":"","date_joined":"",
+      "developerType":"none","displayName":"${account.username}","emailVerified":true,
+      "fallbackAvatar":"","friendGroupNames":[],"friendKey":"","friends":[],
+      "googleId":"","hasBirthday":true,"hasEmail":true,
+      "hasLoggedInFromClient":true,"hasPendingEmail":false,
+      "hideContentFilterSettings":false,"homeLocation":"","id":"${account.userId}",
+      "isFriend":false,"last_activity":"","last_login":"",
+      "last_platform":"standalonewindows","obfuscatedEmail":"",
+      "obfuscatedPendingEmail":"","oculusId":"","offlineFriends":[],
+      "onlineFriends":[],"pastDisplayNames":[],"picoId":"",
+      "presence":{
+        "avatarThumbnail":null,"displayName":"${account.username}","groups":[],
+        "id":"${account.userId}","instance":"","instanceType":"",
+        "isRejoining":null,"platform":"standalonewindows","profilePicOverride":null,
+        "status":"active","travelingToInstance":"","travelingToWorld":"","world":""
+      },
+      "profilePicOverride":"","state":"online","status":"active",
+      "statusDescription":"","statusFirstTime":false,"statusHistory":[],
+      "steamDetails":{},"steamId":"","tags":[],"twoFactorAuthEnabled":false,
+      "twoFactorAuthEnabledDate":null,"unsubscribe":false,"updated_at":"",
+      "userIcon":"","userLanguage":null,"userLanguageCode":null,
+      "username":"${account.username}","viveId":"","pronouns":null
+    }
 """.trimIndent()
 
 private fun favoriteLimitsJson() = """
