@@ -222,6 +222,54 @@ class PlayerVoiceModerationControllerTest {
     }
 
     @Test
+    fun targetChangeDuringFailingMutationDoesNotReportOldFailure() = runTest {
+        val mutationStarted = CompletableDeferred<Unit>()
+        val finishMutation = CompletableDeferred<Unit>()
+        val queriedTargets = mutableListOf<String?>()
+        val fixture = fixture(this) { request ->
+            when (request.method) {
+                HttpMethod.Get -> {
+                    val target = request.url.parameters["targetUserId"]
+                    queriedTargets += target
+                    jsonResponse(
+                        if (target == TARGET_ONE) {
+                            "[${moderationJson(TARGET_ONE, "mute")}]"
+                        } else {
+                            "[${moderationJson(TARGET_TWO, "unmute")}]"
+                        },
+                    )
+                }
+                HttpMethod.Put -> jsonResponse(SUCCESS_JSON)
+                HttpMethod.Post -> {
+                    mutationStarted.complete(Unit)
+                    finishMutation.await()
+                    respond("update failed", HttpStatusCode.InternalServerError)
+                }
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+
+        try {
+            awaitReady(fixture.controller) { it.isMuted }
+            var successes = 0
+            var failures = 0
+
+            fixture.controller.toggle({ successes++ }) { failures++ }
+            mutationStarted.await()
+            fixture.controller.setTargetUserId(TARGET_TWO)
+            finishMutation.complete(Unit)
+            val ready = awaitReady(fixture.controller) { it.targetUserId == TARGET_TWO }
+
+            assertFalse(ready.isMuted)
+            assertEquals(0, successes)
+            assertEquals(0, failures)
+            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun externalSameAccountTokenChangeRejectsOldCheckAndReloads() = runTest {
         val firstRequestStarted = CompletableDeferred<Unit>()
         val finishFirstRequest = CompletableDeferred<Unit>()

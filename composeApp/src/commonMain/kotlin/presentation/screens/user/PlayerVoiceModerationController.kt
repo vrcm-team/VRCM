@@ -144,13 +144,13 @@ internal class PlayerVoiceModerationController(
                     return@launch
                 }
 
+                val responseContext = VoiceModerationContext(
+                    targetUserId = ready.targetUserId,
+                    sessionToken = acceptedResponse.sessionToken,
+                )
                 acceptedResponse.result.fold(
                     onSuccess = {
-                        val responseContext = VoiceModerationContext(
-                            targetUserId = ready.targetUserId,
-                            sessionToken = acceptedResponse.sessionToken,
-                        )
-                        val committed = commitMutationResult(
+                        val committed = commitMutationState(
                             updating = updating,
                             responseContext = responseContext,
                             next = PlayerVoiceModerationState.Ready(
@@ -168,8 +168,18 @@ internal class PlayerVoiceModerationController(
                         }
                     },
                     onFailure = { error ->
-                        requestRefresh()
-                        onFailure(error)
+                        val claimed = commitMutationState(
+                            updating = updating,
+                            responseContext = responseContext,
+                            next = PlayerVoiceModerationState.Checking(ready.targetUserId),
+                        )
+                        val refreshContext = requestRefresh()
+                        if (claimed &&
+                            refreshContext == responseContext &&
+                            currentContext() == responseContext
+                        ) {
+                            onFailure(error)
+                        }
                     },
                 )
             } finally {
@@ -179,15 +189,16 @@ internal class PlayerVoiceModerationController(
         }
     }
 
-    private fun requestRefresh() {
+    private fun requestRefresh(): VoiceModerationContext? {
         val context = currentContext()
         pendingRefresh.value = context
         if (context == null) {
             _state.value = PlayerVoiceModerationState.Unavailable
-            return
+            return null
         }
         _state.value = PlayerVoiceModerationState.Checking(context.targetUserId)
         startRefreshWorkerIfNeeded()
+        return context
     }
 
     private fun startRefreshWorkerIfNeeded() {
@@ -259,10 +270,10 @@ internal class PlayerVoiceModerationController(
         }
     }
 
-    private fun commitMutationResult(
+    private fun commitMutationState(
         updating: PlayerVoiceModerationState.Updating,
         responseContext: VoiceModerationContext,
-        next: PlayerVoiceModerationState.Ready,
+        next: PlayerVoiceModerationState,
     ): Boolean {
         while (currentContext() == responseContext) {
             val expected = when (val state = _state.value) {
