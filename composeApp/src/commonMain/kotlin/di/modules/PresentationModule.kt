@@ -38,6 +38,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenMode
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
@@ -57,7 +58,10 @@ import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.ktor.client.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
@@ -150,6 +154,13 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
     viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
+    viewModel {
+        RewardCodeScreenModel(
+            redeemer = get(),
+            sessions = SharedFlowCentre.currentSession,
+            requestDispatcher = Dispatchers.IO,
+        )
+    }
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }
