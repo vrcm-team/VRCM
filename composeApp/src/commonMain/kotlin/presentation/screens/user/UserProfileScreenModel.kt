@@ -610,12 +610,7 @@ class UserProfileScreenModel(
             val response = authService.runSessionBoundCatching(sessionToken) {
                 economyApi.getCreditsBalance(sessionToken.userId)
             }
-            if (response == null) {
-                if (SharedFlowCentre.currentSession.value?.token?.userId == sessionToken.userId) {
-                    _creditsBalanceState.value = CreditsBalanceState.Error
-                }
-                return@launch
-            }
+            if (response == null) return@launch
             if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
 
             response.result
