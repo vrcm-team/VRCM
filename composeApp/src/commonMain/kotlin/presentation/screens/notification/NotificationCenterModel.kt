@@ -222,7 +222,7 @@ class NotificationCenterModel(
             item.type == NotificationType.FriendRequest.value &&
             !action.type.equals("Accept", ignoreCase = true)
         ) {
-            deleteNotification(item)
+            deleteNotification(item, PendingNotificationMutation.Action(action))
             return
         }
         launchReservedMutation(item, PendingNotificationMutation.Action(action)) { token ->
@@ -277,7 +277,14 @@ class NotificationCenterModel(
     }
 
     fun deleteNotification(item: NotificationItemData) {
-        launchReservedMutation(item, PendingNotificationMutation.Delete) { token ->
+        deleteNotification(item, PendingNotificationMutation.Delete)
+    }
+
+    private fun deleteNotification(
+        item: NotificationItemData,
+        mutation: PendingNotificationMutation,
+    ) {
+        launchReservedMutation(item, mutation) { token ->
             val result = runNotificationMutation(token) {
                 deleteRemoteNotification(item)
             } ?: return@launchReservedMutation
