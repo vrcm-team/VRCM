@@ -64,6 +64,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import org.koin.core.logger.Logger
 
 internal const val MAX_PROFILE_BIO_LINKS = 3
@@ -188,6 +190,91 @@ internal class BioLinksUpdateStateMachine {
             completedRequestId = current.completedRequestId + 1,
             savedLinks = savedLinks,
         )
+    }
+}
+
+internal data class PlayerBlockState(
+    val isBlocked: Boolean? = null,
+    val isLoading: Boolean = false,
+    val isUpdating: Boolean = false,
+    val loadFailed: Boolean = false,
+    val isSessionAvailable: Boolean = true,
+)
+
+/** Serializes profile block reads and writes so stale completions cannot replace newer state. */
+internal class PlayerBlockStateMachine {
+    private val lock = SynchronizedObject()
+    private val _state = MutableStateFlow(PlayerBlockState())
+    val state: StateFlow<PlayerBlockState> = _state.asStateFlow()
+    private var revision = 0L
+    private var pendingBlockedState: Boolean? = null
+
+    fun tryStartLoad(): Long? = synchronized(lock) {
+        val current = _state.value
+        if (current.isLoading || current.isUpdating) return@synchronized null
+        (++revision).also {
+            pendingBlockedState = null
+            _state.value = current.copy(
+                isLoading = true,
+                loadFailed = false,
+                isSessionAvailable = true,
+            )
+        }
+    }
+
+    fun completeLoad(operationId: Long, isBlocked: Boolean): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isLoading) return@synchronized false
+        _state.value = PlayerBlockState(isBlocked = isBlocked)
+        true
+    }
+
+    fun failLoad(operationId: Long): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isLoading) return@synchronized false
+        _state.value = _state.value.copy(
+            isBlocked = null,
+            isLoading = false,
+            loadFailed = true,
+        )
+        true
+    }
+
+    fun tryStartUpdate(blocked: Boolean): Long? = synchronized(lock) {
+        val current = _state.value
+        if (!current.isSessionAvailable ||
+            current.isLoading ||
+            current.isUpdating ||
+            current.isBlocked == null ||
+            current.isBlocked == blocked
+        ) {
+            return@synchronized null
+        }
+        (++revision).also {
+            pendingBlockedState = blocked
+            _state.value = current.copy(isUpdating = true)
+        }
+    }
+
+    fun completeUpdate(operationId: Long): Boolean = synchronized(lock) {
+        val blocked = pendingBlockedState
+        if (operationId != revision || !_state.value.isUpdating || blocked == null) {
+            return@synchronized false
+        }
+        pendingBlockedState = null
+        _state.value = PlayerBlockState(isBlocked = blocked)
+        true
+    }
+
+    fun failUpdate(operationId: Long): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isUpdating) return@synchronized false
+        pendingBlockedState = null
+        _state.value = _state.value.copy(isUpdating = false)
+        true
+    }
+
+    fun invalidate() = synchronized(lock) {
+        revision++
+        pendingBlockedState = null
+        _state.value = PlayerBlockState(isSessionAvailable = false)
     }
 }
 
@@ -396,6 +483,9 @@ class UserProfileScreenModel(
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
+    private val playerBlockStateMachine = PlayerBlockStateMachine()
+    internal val playerBlockState: StateFlow<PlayerBlockState> =
+        playerBlockStateMachine.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -406,6 +496,13 @@ class UserProfileScreenModel(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                if (session?.account?.userId != cacheOwnerUserId) {
+                    playerBlockStateMachine.invalidate()
+                }
+            }
+        }
         viewModelScope.launch {
             authService.currentUserState.collect { currentUser ->
                 _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
@@ -574,6 +671,73 @@ class UserProfileScreenModel(
                 loadGroups = { loadUserGroups(userId) },
             )
         }
+
+    fun refreshPlayerBlockStatus(failureMessage: String) {
+        if (userState.id == cacheOwnerUserId) return
+        val sessionToken = currentProfileSessionToken() ?: run {
+            playerBlockStateMachine.invalidate()
+            return
+        }
+        val operationId = playerBlockStateMachine.tryStartLoad() ?: return
+        val targetUserId = userState.id
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                usersApi.isUserBlocked(targetUserId)
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                playerBlockStateMachine.invalidate()
+                return@launch
+            }
+            response.result.onSuccess { isBlocked ->
+                playerBlockStateMachine.completeLoad(operationId, isBlocked)
+            }.onFailure { error ->
+                if (playerBlockStateMachine.failLoad(operationId)) {
+                    handleActionError(error, failureMessage)
+                }
+            }
+        }
+    }
+
+    suspend fun setPlayerBlocked(
+        blocked: Boolean,
+        successMessage: String,
+        failureMessage: String,
+    ): Boolean = viewModelScope.async(Dispatchers.IO) {
+        if (userState.id == cacheOwnerUserId) return@async false
+        val sessionToken = currentProfileSessionToken() ?: run {
+            playerBlockStateMachine.invalidate()
+            return@async false
+        }
+        val operationId = playerBlockStateMachine.tryStartUpdate(blocked) ?: return@async false
+        val targetUserId = userState.id
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            if (blocked) usersApi.blockUser(targetUserId) else usersApi.unblockUser(targetUserId)
+        }
+        if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+            playerBlockStateMachine.invalidate()
+            return@async false
+        }
+        val error = response.result.exceptionOrNull()
+        if (error != null) {
+            if (playerBlockStateMachine.failUpdate(operationId)) {
+                handleActionError(error, failureMessage)
+            }
+            return@async false
+        }
+        if (!playerBlockStateMachine.completeUpdate(operationId)) return@async false
+        SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+        true
+    }.await()
+
+    private fun currentProfileSessionToken(): AccountSessionToken? =
+        SharedFlowCentre.currentSession.value
+            ?.takeIf { it.account.userId == cacheOwnerUserId }
+            ?.token
+
+    private suspend fun handleActionError(error: Throwable, message: String) {
+        logger.error(error.message.toString())
+        SharedFlowCentre.toastText.emit(ToastText.Error(message))
+    }
 
     fun updateBioLinks(
         bioLinks: List<String>,
