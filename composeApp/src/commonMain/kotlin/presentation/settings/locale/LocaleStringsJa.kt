@@ -543,4 +543,32 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val meetupCardPhotoFailed = "選択した写真を使用できません。"
     override val meetupCardSaveFailed = "変更を保存できませんでした。"
     override val meetupCardSessionExpired = "写真の選択が期限切れです。もう一度選択してください。"
+    override val playerModerationCleanupTitle = "プレイヤー管理記録の消去"
+    override val playerModerationCleanupEntrySummary = "プレイヤー別の上書き設定"
+    override val playerModerationCleanupDescription =
+        "このアカウントのサーバー保存済み上書き設定を、種類ごとに消去します。この操作は元に戻せません。"
+    override val playerModerationCleanupSelectType = "上書き設定の種類"
+    override val playerModerationCleanupTargetCount = "%count% 人"
+    override val playerModerationCleanupAction = "選択した種類を消去"
+    override val playerModerationCleanupConfirmTitle = "この種類を消去しますか？"
+    override val playerModerationCleanupConfirmMessage =
+        "%count% 人分の「%type%」記録を消去します。この操作は元に戻せません。"
+    override val playerModerationCleanupPreparing = "現在の記録を確認しています..."
+    override val playerModerationCleanupProgress = "%total% 人中 %processed% 人を処理しました..."
+    override val playerModerationCleanupSuccess = "%removed% 人分の記録を消去しました。"
+    override val playerModerationCleanupNoRecords = "該当する記録は残っていません。"
+    override val playerModerationCleanupPartialFailure =
+        "%removed% 人分を消去しました。%failed% 人分は消去できませんでした。"
+    override val playerModerationCleanupFailure =
+        "選択した記録がすべて消去されたことを確認できません。更新して現在の状態を確認してください。"
+    override val playerModerationCleanupEmpty = "対応しているプレイヤー管理記録はありません。"
+    override val playerModerationCleanupLoadFailed = "プレイヤー管理記録を読み込めませんでした。"
+    override val playerModerationCleanupSessionUnavailable = "記録を管理するには、もう一度ログインしてください。"
+    override val playerModerationTypeBlock = "ブロック"
+    override val playerModerationTypeInteractOff = "インタラクション無効"
+    override val playerModerationTypeInteractOn = "インタラクション有効"
+    override val playerModerationTypeMute = "ボイスミュート"
+    override val playerModerationTypeMuteChat = "チャットボックスミュート"
+    override val playerModerationTypeUnmute = "ボイス許可"
+    override val playerModerationTypeUnmuteChat = "チャットボックス許可"
 }

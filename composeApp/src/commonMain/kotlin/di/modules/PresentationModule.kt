@@ -35,6 +35,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageLim
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
@@ -144,6 +145,7 @@ val presentationModule: Module = module {
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)
+    viewModelOf(::PlayerModerationCleanupModel)
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
