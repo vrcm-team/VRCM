@@ -65,4 +65,35 @@ class LocaleActionMessagesTest {
             assertTrue(locale.printEditorReadFailed.contains("%s"))
         }
     }
+
+    @Test
+    fun playerInteractionMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.profileInteractionChecking,
+                locale.profileInteractionClose,
+                locale.profileInteractionRestore,
+                locale.profileInteractionClosing,
+                locale.profileInteractionRestoring,
+                locale.profileInteractionRetry,
+                locale.profileInteractionUnavailable,
+                locale.profileInteractionCloseConfirmTitle,
+                locale.profileInteractionRestoreConfirmTitle,
+                locale.profileInteractionClosedSuccess,
+                locale.profileInteractionRestoredSuccess,
+                locale.profileInteractionLoadFailed,
+                locale.profileInteractionUpdateFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileInteractionCloseConfirmMessage.contains("%s"))
+            assertTrue(locale.profileInteractionRestoreConfirmMessage.contains("%s"))
+        }
+    }
 }
