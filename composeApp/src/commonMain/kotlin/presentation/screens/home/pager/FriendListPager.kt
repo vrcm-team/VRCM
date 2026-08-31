@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.FavoriteGroupClearDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -62,6 +63,7 @@ fun FriendsDirectoryContent(
     model: FriendListPagerModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
+    val favoriteLocale = strings
     val searchText by model.searchText.collectAsState()
     val friends by model.friendDirectoryFriends.collectAsState()
     val favoriteGroups by model.friendFavoriteGroupsFlow.collectAsState()
@@ -69,8 +71,10 @@ fun FriendsDirectoryContent(
     val total by model.friendTotal.collectAsState()
     val refreshing by model.directoryRefreshing.collectAsState()
     val refreshFailed by model.directoryRefreshFailed.collectAsState()
+    val clearState by model.favoriteGroupClearState.collectAsState()
     val listState = rememberLazyListState()
 
+    SideEffect { model.updateFavoriteLocale(favoriteLocale) }
     LaunchedEffect(model) { model.activateFriendDirectory() }
     LaunchedEffect(listState) {
         SharedFlowCentre.toPagerTop.collect {
@@ -101,6 +105,12 @@ fun FriendsDirectoryContent(
                         onOptionsChanged = model::updateFriendDirectoryGroupOptions,
                         getSelectedGroup = FriendGroupOptions::selectedGroup,
                         updateOptions = { current, selected -> current.copy(selectedGroup = selected) },
+                        onClearGroup = model::openFavoriteGroupClearConfirmation,
+                        clearGroupEnabled = options.selectedGroup
+                            ?.let(model::canClearFavoriteGroup) == true,
+                        clearGroupInProgress = clearState.isClearing &&
+                            clearState.group?.type == FavoriteType.Friend.value,
+                        clearGroupContentDescription = strings.favoriteGroupClearAction,
                     )
                 }
             }
@@ -132,6 +142,17 @@ fun FriendsDirectoryContent(
                 onRetry = model::refreshFriendDirectory,
             )
         }
+    }
+
+    clearState.group?.let { group ->
+        FavoriteGroupClearDialog(
+            groupDisplayName = group.displayName,
+            itemCount = clearState.itemCount,
+            isClearing = clearState.isClearing,
+            hasFailure = clearState.failure != null,
+            onConfirm = model::confirmFavoriteGroupClear,
+            onDismiss = model::dismissFavoriteGroupClearConfirmation,
+        )
     }
 }
 

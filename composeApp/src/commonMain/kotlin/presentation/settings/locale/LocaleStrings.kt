@@ -432,6 +432,15 @@ sealed class LocaleStrings {
     open val favoriteAvatarsLoadFailed: String = "Couldn't load favorite avatars"
     open val favoriteWorldCacheSaveFailed: String = "Couldn't save favorite worlds cache"
     open val favoriteAvatarCacheSaveFailed: String = "Couldn't save favorite avatars cache"
+    open val favoriteGroupClearAction: String = "Clear group"
+    open val favoriteGroupClearTitle: String = "Clear \"%s\"?"
+    open val favoriteGroupClearMessage: String =
+        "Remove %d favorite relationships from this group? The group itself will remain. This cannot be undone."
+    open val favoriteGroupClearing: String = "Clearing..."
+    open val favoriteGroupClearSuccess: String = "Favorite group cleared"
+    open val favoriteGroupClearFailed: String = "Couldn't clear favorite group"
+    open val favoriteGroupClearSyncFailed: String =
+        "The group was cleared, but local data couldn't be refreshed"
     open val personalDrawerTitle: String = "Personal navigation"
     open val mainNavigationHome: String = "Home"
     open val mainNavigationSearch: String = "Search"
