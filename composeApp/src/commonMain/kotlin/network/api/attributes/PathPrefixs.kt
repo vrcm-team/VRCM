@@ -34,6 +34,8 @@ internal const val USER_NOTES_API_PREFIX = "userNotes"
 
 internal const val FAVORITES_API_PREFIX = "favorites"
 
+internal const val FEEDBACK_API_PREFIX = "feedback"
+
 internal const val FAVORITE_LIMITS_API_SUFFIX = "favoritelimits"
 
 internal const val VRC_API_URL = "https://api.vrchat.cloud/api/1/"

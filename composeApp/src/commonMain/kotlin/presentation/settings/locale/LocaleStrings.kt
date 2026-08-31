@@ -128,6 +128,13 @@ sealed class LocaleStrings {
     open val profileFriendRequestAccepted: String = "Friend Request Accepted"
     open val profileUnfriended: String = "Friend is Unfriended"
     open val profileUnfriend: String = "Unfriend"
+    open val profileReportUser: String = "Report suspected hacking/avatar theft"
+    open val profileReportTitle: String = "Report user"
+    open val profileReportMessage: String =
+        "Report %name% for suspected hacking or avatar theft? Only submit this report if you observed the behavior."
+    open val profileReportSubmit: String = "Submit report"
+    open val profileReportSuccess: String = "Report submitted"
+    open val profileReportFailed: String = "Failed to submit report. Please try again."
     open val profileViewJsonData: String = "View JSON data"
     open val profileViewGallery: String = "View Gallery"
     open val profileViewMutualFriends: String = "View Mutual Friends"

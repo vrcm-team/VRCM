@@ -16,6 +16,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
+import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
@@ -191,6 +192,44 @@ internal class BioLinksUpdateStateMachine {
     }
 }
 
+internal enum class UserReportState {
+    Idle,
+    Submitting,
+    Submitted,
+    Failed,
+}
+
+internal class UserReportStateMachine {
+    private val _state = MutableStateFlow(UserReportState.Idle)
+    val state: StateFlow<UserReportState> = _state.asStateFlow()
+
+    fun tryStart(): Boolean {
+        while (true) {
+            val current = _state.value
+            if (current == UserReportState.Submitting || current == UserReportState.Submitted) {
+                return false
+            }
+            if (_state.compareAndSet(current, UserReportState.Submitting)) return true
+        }
+    }
+
+    fun complete() = finish(UserReportState.Submitted)
+
+    fun fail() = finish(UserReportState.Failed)
+
+    fun reset() {
+        while (true) {
+            val current = _state.value
+            if (current == UserReportState.Idle || current == UserReportState.Submitting) return
+            if (_state.compareAndSet(current, UserReportState.Idle)) return
+        }
+    }
+
+    private fun finish(result: UserReportState) {
+        _state.compareAndSet(UserReportState.Submitting, result)
+    }
+}
+
 internal fun resolveFriendLocation(
     userId: String,
     location: String?,
@@ -327,6 +366,7 @@ class UserProfileScreenModel(
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
+    private val feedbackApi: FeedbackApi,
     private val inviteApi: InviteApi,
     private val userProfileCacheStore: UserProfileCacheStore,
     private val favoriteListCacheStore: FavoriteListCacheStore,
@@ -396,6 +436,8 @@ class UserProfileScreenModel(
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
+    private val userReportStateMachine = UserReportStateMachine()
+    internal val userReportState: StateFlow<UserReportState> = userReportStateMachine.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -886,6 +928,41 @@ class UserProfileScreenModel(
             }
         }
     }
+
+    fun reportUser(
+        userId: String,
+        successMessage: String,
+        failureMessage: String,
+    ) {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (userId == cacheOwnerUserId ||
+            userId == sessionToken.userId ||
+            !userReportStateMachine.tryStart()
+        ) {
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                feedbackApi.reportUser(userId)
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                userReportStateMachine.fail()
+                return@launch
+            }
+
+            response.result.onSuccess {
+                userReportStateMachine.complete()
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure { error ->
+                logger.error(error.message.toString())
+                userReportStateMachine.fail()
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            }
+        }
+    }
+
+    fun resetUserReportState() = userReportStateMachine.reset()
 
     suspend fun boop(
         userId: String,

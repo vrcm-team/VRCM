@@ -113,6 +113,13 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val profileFriendRequestAccepted = "フレンドリクエストを承認しました"
     override val profileUnfriended = "フレンド解除しました"
     override val profileUnfriend = "フレンド解除"
+    override val profileReportUser = "チート・アバター盗用を報告"
+    override val profileReportTitle = "ユーザーを報告"
+    override val profileReportMessage =
+        "%name% をチートまたはアバター盗用の疑いで報告しますか？実際に行為を確認した場合のみ送信してください。"
+    override val profileReportSubmit = "報告を送信"
+    override val profileReportSuccess = "報告を送信しました"
+    override val profileReportFailed = "報告を送信できませんでした。もう一度お試しください"
     override val profileViewJsonData = "JSONデータを表示"
     override val profileViewGallery = "ギャラリーを表示"
     override val profileViewMutualFriends = "共通の友達を見る"
