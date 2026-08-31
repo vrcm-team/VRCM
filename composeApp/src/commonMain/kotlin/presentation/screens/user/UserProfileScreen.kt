@@ -179,11 +179,13 @@ data class UserProfileScreen(
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
+                    creditsBalanceState = userProfileScreenModel.creditsBalanceState,
                     contentMinHeight = contentMinHeight,
                     animateGroupEntrance = animateGroupEntrance,
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
                     onLoadAvatars = { userProfileScreenModel.loadCreatedAvatars() },
                     onLoadFavoritedWorlds = { userProfileScreenModel.loadFavoritedWorlds(userProfileVO.id) },
+                    onLoadCreditsBalance = userProfileScreenModel::loadCreditsBalance,
                 )
             }
         }
@@ -522,11 +524,13 @@ private fun ColumnScope.ProfileContent(
     favoritedWorlds: List<Pair<String, List<FavoritedWorld>>>,
     friendActivitySummary: io.github.vrcmteam.vrcm.service.FriendActivitySummary?,
     friendActivityEvents: List<io.github.vrcmteam.vrcm.service.FriendActivityEvent>,
+    creditsBalanceState: CreditsBalanceState,
     contentMinHeight: Dp,
     animateGroupEntrance: Boolean,
     onLoadWorlds: () -> Unit,
     onLoadAvatars: () -> Unit,
     onLoadFavoritedWorlds: () -> Unit,
+    onLoadCreditsBalance: () -> Unit,
 ) {
     if (currentUser == null) return
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -540,6 +544,7 @@ private fun ColumnScope.ProfileContent(
         onLoadFavoritedWorlds()
         if (currentUser.isSelf) {
             onLoadAvatars()
+            onLoadCreditsBalance()
         }
     }
 
@@ -547,6 +552,13 @@ private fun ColumnScope.ProfileContent(
         userProfileVO = currentUser,
         sharedUserId = sharedUserId,
     )
+
+    if (currentUser.isSelf) {
+        CreditsBalanceCard(
+            state = creditsBalanceState,
+            onRefresh = onLoadCreditsBalance,
+        )
+    }
 
     var isSelected by remember { mutableStateOf(false) }
     // LocationCard: show the room of this user and friends in the same room
@@ -1432,6 +1444,80 @@ private fun UserFavoritedWorldsSection(
                         )
                     }
                 )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun CreditsBalanceCard(
+    state: CreditsBalanceState,
+    onRefresh: () -> Unit,
+) {
+    val localeStrings = strings
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = localeStrings.profileCreditsTitle,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                when (state) {
+                    CreditsBalanceState.Loading -> Text(
+                        text = localeStrings.loading,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                    is CreditsBalanceState.Available -> Text(
+                        text = state.balance.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+
+                    CreditsBalanceState.Unavailable -> Text(
+                        text = localeStrings.profileCreditsUnavailable,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    CreditsBalanceState.Error -> Text(
+                        text = localeStrings.profileCreditsLoadFailed,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            if (state == CreditsBalanceState.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        imageVector = AppIcons.Update,
+                        contentDescription = if (state == CreditsBalanceState.Error) {
+                            localeStrings.retry
+                        } else {
+                            localeStrings.refresh
+                        },
+                    )
+                }
             }
         }
     }

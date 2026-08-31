@@ -26,6 +26,25 @@ class LocaleActionMessagesTest {
     }
 
     @Test
+    fun creditsBalanceMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.profileCreditsTitle,
+                locale.profileCreditsUnavailable,
+                locale.profileCreditsLoadFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+        }
+    }
+
+    @Test
     fun printEditorMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,

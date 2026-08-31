@@ -360,6 +360,9 @@ sealed class LocaleStrings {
 
     // Local profile actions
     open val userMutualGroups: String = "Mutual Groups"
+    open val profileCreditsTitle: String = "VRChat Credits"
+    open val profileCreditsUnavailable: String = "Credits are unavailable for this account"
+    open val profileCreditsLoadFailed: String = "Couldn't load your VRChat Credits"
     open val profileBoop: String = "Boop"
     open val profileBoopSuccess: String = "Boop sent"
     open val profileBoopAlreadySent: String = "Already booped"

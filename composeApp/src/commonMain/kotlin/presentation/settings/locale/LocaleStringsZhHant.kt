@@ -342,6 +342,9 @@ internal object LocaleStringsZhHant : LocaleStrings() {
 
     // Local profile actions
     override val userMutualGroups = "共同群組"
+    override val profileCreditsTitle = "VRChat 點數"
+    override val profileCreditsUnavailable = "此帳戶暫時無法使用 VRChat 點數"
+    override val profileCreditsLoadFailed = "無法載入 VRChat 點數"
     override val profileBoop = "戳一下"
     override val profileBoopSuccess = "已戳一下"
     override val profileBoopAlreadySent = "已經戳過了"
