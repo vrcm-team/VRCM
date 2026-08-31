@@ -43,6 +43,7 @@ fun PersonalNavigationDrawer(
     onFavoritesClick: () -> Unit,
     onMyGroupsClick: () -> Unit,
     onRecentWorldsClick: () -> Unit,
+    onInventoryClick: () -> Unit,
     onNameplateClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onLogoutClick: () -> Unit,
@@ -83,6 +84,7 @@ fun PersonalNavigationDrawer(
                     DrawerItem(AppIcons.Favorite, strings.favoritesTitle, onFavoritesClick)
                     DrawerItem(AppIcons.Groups, strings.myGroups, onMyGroupsClick)
                     DrawerItem(AppIcons.Explore, strings.recentWorldsTitle, onRecentWorldsClick)
+                    DrawerItem(AppIcons.Dashboard, strings.inventoryTitle, onInventoryClick)
                     DrawerItem(AppIcons.AccountCircle, strings.meetupCardTitle, onNameplateClick)
                     DrawerItem(AppIcons.Settings, strings.drawerSettings, onSettingsClick)
                     Spacer(Modifier.height(20.dp))

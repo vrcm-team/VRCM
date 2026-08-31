@@ -55,6 +55,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
@@ -537,6 +538,7 @@ private fun HomePersonalDrawer(
         onFavoritesClick = { closeAndNavigate(FavoritesScreen) },
         onMyGroupsClick = { closeAndNavigate(MyGroupsScreen) },
         onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
+        onInventoryClick = { closeAndNavigate(InventoryScreen) },
         onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
         onSettingsClick = {
             scope.launch {

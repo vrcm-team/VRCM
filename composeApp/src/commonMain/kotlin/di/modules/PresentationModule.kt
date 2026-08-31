@@ -36,6 +36,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImagePro
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
@@ -54,6 +55,8 @@ import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
+import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
+import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.FriendActivityService
@@ -79,6 +82,12 @@ val presentationModule: Module = module {
     viewModelOf(::AuthScreenModel)
     viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
+    viewModel {
+        InventoryScreenModel(
+            authService = get<AuthService>(),
+            inventoryApi = get<InventoryApi>(),
+        )
+    }
     singleOf(::NotificationCenterModel) {
         onClose { it?.close() }
     }
