@@ -56,10 +56,9 @@ object FriendLocationPager : Pager {
     @ExperimentalSharedTransitionApi
     @Composable
     fun Content(
-        headerContent: @Composable () -> Unit,
         isActive: () -> Boolean,
     ) {
-        ContentInternal(headerContent = headerContent, isActive = isActive)
+        ContentInternal(headerContent = null, isActive = isActive)
     }
 
     @ExperimentalSharedTransitionApi
