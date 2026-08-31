@@ -102,6 +102,7 @@ sealed class LocaleStrings {
     open val notificationRefreshFailed: String = "Notifications could not be refreshed. Existing items are still available."
     open val notificationMarkRead: String = "Mark as read"
     open val notificationDelete: String = "Delete notification"
+    open val notificationReplyBoop: String = "Reply to Boop"
     open val notificationAccept: String = "Accept"
     open val notificationIgnore: String = "Ignore"
     open val notificationExpand: String = "Show details"

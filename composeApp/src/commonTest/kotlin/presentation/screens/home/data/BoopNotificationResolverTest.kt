@@ -27,10 +27,51 @@ class BoopNotificationResolverTest {
         )
 
         assertEquals("reply", item.actions.single().icon)
+        assertEquals(item.actions.single(), item.boopReplyAction)
         assertEquals("usr_sender", item.senderId)
         assertEquals(
             NotificationResponseTarget.BOOP_USER_API,
             item.responseTarget(item.actions.single()),
+        )
+    }
+
+    @Test
+    fun boopReplyRoutingIgnoresNotificationTypeCase() {
+        val item = NotificationItemData(
+            notification(
+                link = null,
+                responses = listOf(
+                    ResponseData(
+                        responseData = "",
+                        icon = "reply",
+                        text = "Boop back",
+                        textKey = "notification.boop.reply",
+                        type = "boop",
+                    )
+                ),
+            ),
+        ).copy(type = "BOOP")
+
+        val replyAction = requireNotNull(item.boopReplyAction)
+        assertEquals(
+            NotificationResponseTarget.BOOP_USER_API,
+            item.responseTarget(replyAction),
+        )
+    }
+
+    @Test
+    fun boopWithoutResponseCanStillReplyThroughUsersApi() {
+        val item = NotificationItemData(
+            notification(
+                link = null,
+                responses = emptyList(),
+            ),
+        )
+
+        val replyAction = requireNotNull(item.boopReplyAction)
+        assertEquals(
+            NotificationResponseTarget.BOOP_USER_API,
+            item.responseTarget(replyAction),
         )
     }
 
@@ -66,6 +107,27 @@ class BoopNotificationResolverTest {
 
         assertEquals("usr_sender", item.senderId)
         assertEquals(null, item.linkedUserId)
+        assertEquals("https://example.com/sender.png", result.single().imageUrl)
+        assertEquals("Sender", result.single().title)
+    }
+
+    @Test
+    fun uppercaseBoopTypeStillEnrichesSenderPresentation() = runTest {
+        val resolver = BoopNotificationResolver()
+        val item = boop(id = "uppercase").copy(type = "BOOP")
+
+        val result = resolver.resolve(
+            notifications = listOf(item),
+            friends = mapOf(
+                "usr_sender" to NotificationUserPresentation(
+                    imageUrl = "https://example.com/sender.png",
+                    displayName = "Sender",
+                )
+            ),
+        ) {
+            error("sender in friend snapshot should not use the network")
+        }
+
         assertEquals("https://example.com/sender.png", result.single().imageUrl)
         assertEquals("Sender", result.single().title)
     }

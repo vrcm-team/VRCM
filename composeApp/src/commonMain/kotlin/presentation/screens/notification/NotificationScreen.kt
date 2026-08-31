@@ -9,20 +9,19 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
@@ -36,8 +35,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.isGroupNotificationType
@@ -92,12 +89,8 @@ fun NotificationCenterContent(
     val boopSuccess = strings.profileBoopSuccess
     val boopAlreadySent = strings.profileBoopAlreadySent
     val boopDisabled = strings.profileBoopDisabled
-    val onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, action ->
-        if (item.responseTarget(action) == NotificationResponseTarget.BOOP_USER_API) {
-            boopReply = BoopReply(item, action)
-        } else {
-            model.respondToNotification(item, action, null, boopSuccess, boopAlreadySent, boopDisabled)
-        }
+    val onBoopReply: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, action ->
+        boopReply = BoopReply(item, action)
     }
     val reply = boopReply
     val replySending = reply?.let { model.pendingAction(it.item) == it.action } == true
@@ -184,7 +177,7 @@ fun NotificationCenterContent(
                         pending = model.isNotificationPending(item),
                         onRead = { model.markNotificationAsRead(item) },
                         onDelete = { model.deleteNotification(item) },
-                        onResponse = onResponse,
+                        onBoopReply = onBoopReply,
                     )
                 }
             }
@@ -231,7 +224,7 @@ private fun LazyItemScope.NotificationItem(
     pending: Boolean,
     onRead: () -> Unit,
     onDelete: () -> Unit,
-    onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
+    onBoopReply: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
 ) {
     val identity = item.identity
     var expanded by remember(identity.stableKey) { mutableStateOf(false) }
@@ -248,6 +241,7 @@ private fun LazyItemScope.NotificationItem(
         }
     }
     val headline = item.announcementTitle ?: item.title ?: item.groupName ?: item.message
+    val boopReplyAction = item.boopReplyAction
     Box(
         Modifier.fillMaxWidth().animateItem().clip(MaterialTheme.shapes.large)
             .background(
@@ -319,55 +313,31 @@ private fun LazyItemScope.NotificationItem(
                     )
                 }
             }
-            FlowRow(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                item.actions.forEach { action ->
-                    val loading = loadingAction == action
-                    FilledTonalButton(
-                        onClick = {
-                            if (action.type.equals("link", true)) {
-                                if (!item.seen) onRead()
-                                when (val target = item.actionTarget(action)) {
-                                    is NotificationActionTarget.User -> navigator push UserProfileScreen(
-                                        UserProfileVo(id = target.id, profileImageUrl = item.imageUrl),
-                                        sharedSuffixKey,
-                                    )
-                                    is NotificationActionTarget.Group -> navigator push GroupProfileScreen(
-                                        GroupProfileVo(groupId = target.id),
-                                    )
-                                    is NotificationActionTarget.World -> navigator push WorldProfileScreen(
-                                        WorldProfileVo(worldId = target.id),
-                                    )
-                                    null -> Unit
-                                }
-                            } else onResponse(item, action)
-                        },
-                        enabled = !pending,
-                        modifier = Modifier.padding(start = 6.dp).animateContentSize(),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                notificationActionLabel(item, action),
-                                Modifier.alpha(if (loading) 0f else 1f),
-                            )
-                            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            if (boopReplyAction != null || !item.seen || item.canDelete) {
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (boopReplyAction != null) {
+                        val loading = loadingAction == boopReplyAction
+                        IconButton(
+                            enabled = !pending && senderId.isNotEmpty(),
+                            onClick = { onBoopReply(item, boopReplyAction) },
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.AutoMirrored.Outlined.Reply, strings.notificationReplyBoop)
+                            }
                         }
                     }
-                }
-                if (!item.seen) IconButton(enabled = !pending, onClick = onRead) {
-                    Icon(Icons.Outlined.MarkEmailRead, strings.notificationMarkRead)
-                }
-                if (item.canDelete) IconButton(enabled = !pending, onClick = onDelete) {
-                    Icon(Icons.Default.DeleteOutline, strings.notificationDelete)
-                }
-                IconButton(enabled = !pending, onClick = { expanded = !expanded }) {
-                    Icon(
-                        if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
-                        if (expanded) strings.notificationCollapse else strings.notificationExpand,
-                    )
+                    if (!item.seen) IconButton(enabled = !pending, onClick = onRead) {
+                        Icon(Icons.Outlined.MarkEmailRead, strings.notificationMarkRead)
+                    }
+                    if (item.canDelete) IconButton(enabled = !pending, onClick = onDelete) {
+                        Icon(Icons.Default.DeleteOutline, strings.notificationDelete)
+                    }
                 }
             }
             AnimatedVisibility(expanded) {
@@ -400,18 +370,6 @@ private fun NotificationTypeLabel(item: NotificationItemData) {
         },
         style = MaterialTheme.typography.labelSmall,
     )
-}
-
-@Composable
-private fun notificationActionLabel(
-    item: NotificationItemData,
-    action: NotificationItemData.ActionData,
-) = when {
-    item.type == NotificationType.FriendRequest.value && action.type.equals("Accept", true) ->
-        strings.notificationAccept
-    item.type == NotificationType.FriendRequest.value -> strings.notificationIgnore
-    action.label.isNotBlank() -> action.label
-    else -> action.type.capitalizeFirst()
 }
 
 private fun boopIcon(emojiId: String?) = when (emojiId?.lowercase()) {

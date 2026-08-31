@@ -212,10 +212,18 @@ internal fun NotificationItemData.responseTarget(
 ): NotificationResponseTarget =
     if (action.type.equals("link", ignoreCase = true)) {
         NotificationResponseTarget.NAVIGATION_LINK
-    } else if (type == "boop" && action.icon.equals("reply", ignoreCase = true)) {
+    } else if (type.equals("boop", ignoreCase = true) && action.icon.equals("reply", ignoreCase = true)) {
         NotificationResponseTarget.BOOP_USER_API
     } else {
         NotificationResponseTarget.NOTIFICATION_API
+    }
+
+/** Resolves the server reply response, with a Users API fallback when a Boop omits responses. */
+internal val NotificationItemData.boopReplyAction: NotificationItemData.ActionData?
+    get() {
+        if (!type.equals("boop", ignoreCase = true)) return null
+        return actions.firstOrNull { responseTarget(it) == NotificationResponseTarget.BOOP_USER_API }
+            ?: NotificationItemData.ActionData(data = "", type = "boop", icon = "reply")
     }
 
 internal sealed interface NotificationActionTarget {
