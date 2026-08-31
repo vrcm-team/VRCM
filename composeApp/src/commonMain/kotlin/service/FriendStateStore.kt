@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.service
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import kotlinx.coroutines.sync.Mutex
@@ -8,6 +9,11 @@ import kotlinx.coroutines.sync.withLock
 internal data class FriendRefreshToken(
     val generation: Long,
     val eventVersion: Long,
+)
+
+internal data class FriendStateSnapshot(
+    val sessionToken: AccountSessionToken?,
+    val friends: Map<String, FriendData>,
 )
 
 internal class FriendRefreshCoordinator {
@@ -108,6 +114,9 @@ internal class FriendStateStore {
             friendsById.keys
                 .filter { it !in incoming && !wasTouchedAfter(token, it) }
                 .forEach(friendsById::remove)
+            (activeFriendIds - incoming.keys)
+                .filterNot { wasTouchedAfter(token, it) }
+                .forEach(activeFriendIds::remove)
         }
         incoming.forEach { (userId, friend) ->
             if (!wasTouchedAfter(token, userId)) friendsById[userId] = friend

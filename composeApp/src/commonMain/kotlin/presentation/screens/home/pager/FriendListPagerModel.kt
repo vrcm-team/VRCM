@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
@@ -60,6 +61,9 @@ data class AvatarGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
 )
 
+internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
+    if (sessionToken != null && this.sessionToken == sessionToken) friends.values.toList() else emptyList()
+
 class FriendListPagerModel(
     private val userProfileEnrichmentService: UserProfileEnrichmentService,
     private val friendService: FriendService,
@@ -88,11 +92,15 @@ class FriendListPagerModel(
     var worldGroupOptions = _worldGroupOptions.asStateFlow()
 
     // Directory filters derive from this account-bound source and never write back to it.
+    private val initialFriendState = friendService.friendStateSnapshot.value
+    private val initialSessionToken = SharedFlowCentre.currentSession.value?.token
     private val _friendSnapshot = MutableStateFlow(
-        friendService.friendMap.values.toList()
+        initialFriendState.friendsForSession(initialSessionToken)
     )
 
-    private val _friendTotal = MutableStateFlow(friendService.friendMap.size)
+    private val _friendTotal = MutableStateFlow(
+        initialFriendState.friendsForSession(initialSessionToken).size
+    )
     val friendTotal: StateFlow<Int> = _friendTotal.asStateFlow()
 
     // 缓存世界数据，以ID为键
@@ -211,6 +219,7 @@ class FriendListPagerModel(
     val friendList: StateFlow<List<FriendData>> = friendDirectoryFriends
 
     init {
+        SharedFlowCentre.currentSession.value?.token?.let(::activateAccount)
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 val nextToken = session?.token
@@ -218,11 +227,19 @@ class FriendListPagerModel(
             }
         }
         viewModelScope.launch {
-            friendService.friendState.collect { friends ->
-                val token = activeSessionToken ?: return@collect
-                if (SharedFlowCentre.currentSession.value?.token != token) return@collect
+            friendService.friendStateSnapshot.collect { snapshot ->
+                val token = activeSessionToken
+                if (snapshot.sessionToken != token ||
+                    token == null ||
+                    SharedFlowCentre.currentSession.value?.token != token
+                ) {
+                    _friendTotal.value = 0
+                    _friendSnapshot.value = emptyList()
+                    return@collect
+                }
+                val friends = snapshot.friendsForSession(token)
                 _friendTotal.value = friends.size
-                updateFriendSnapshot(friends.values.toList())
+                updateFriendSnapshot(friends)
             }
         }
     }
@@ -241,11 +258,8 @@ class FriendListPagerModel(
             favoritedWorldMap.clear()
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()
-            val currentFriends = if (sessionToken == null) {
-                emptyList()
-            } else {
-                friendService.friendState.value.values.toList()
-            }
+            val currentState = friendService.friendStateSnapshot.value
+            val currentFriends = currentState.friendsForSession(sessionToken)
             _friendSnapshot.value = currentFriends
             _friendTotal.value = currentFriends.size
             _worldList.value = emptyList()
@@ -257,6 +271,15 @@ class FriendListPagerModel(
             _avatarGroupOptions.value = AvatarGroupOptions()
             searchTexts.indices.forEach { searchTexts[it] = "" }
             _searchText.value = ""
+        }
+        val currentState = friendService.friendStateSnapshot.value
+        val currentFriends = currentState.friendsForSession(sessionToken)
+        if (sessionToken != null && currentState.sessionToken == sessionToken) {
+            _friendTotal.value = currentFriends.size
+            updateFriendSnapshot(currentFriends)
+        } else {
+            _friendTotal.value = 0
+            _friendSnapshot.value = emptyList()
         }
         _refreshErrors.value = emptyMap()
         _refreshingTabs.value = emptySet()
@@ -575,8 +598,11 @@ class FriendListPagerModel(
                 generation = generation,
             )
             if (!acceptsAccount(sessionToken, generation)) return@launch
-            val latestFriends = friendService.friendState.value.values.toList()
-            _friendSnapshot.value = applyOfflineStatusDescriptions(latestFriends)
+            val latestState = friendService.friendStateSnapshot.value
+            if (latestState.sessionToken != sessionToken) return@launch
+            _friendSnapshot.value = applyOfflineStatusDescriptions(
+                latestState.friendsForSession(sessionToken)
+            )
         }
     }
 

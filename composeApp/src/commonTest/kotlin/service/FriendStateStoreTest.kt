@@ -64,6 +64,25 @@ class FriendStateStoreTest {
     }
 
     @Test
+    fun fullRefreshClearsUntouchedActiveIdBeforeFriendReappears() {
+        val store = FriendStateStore()
+        store.putFromEvent(friend("usr_a", LocationType.Private.value))
+        store.setActiveFromEvent("usr_a", true)
+
+        val removalRefresh = store.beginRefresh()
+        store.mergeRefresh(removalRefresh, emptyList(), replaceUntouched = true)
+
+        val reappearanceRefresh = store.beginRefresh()
+        store.mergeRefresh(
+            reappearanceRefresh,
+            listOf(friend("usr_a", LocationType.Private.value)),
+            replaceUntouched = true,
+        )
+
+        assertEquals(LocationType.Private.value, store.snapshot.getValue("usr_a").location)
+    }
+
+    @Test
     fun deleteEventDuringFullRefreshLeavesATombstoneAgainstOldPage() {
         val store = FriendStateStore()
         store.putFromEvent(friend("usr_a", "wrld_old:1"))

@@ -87,6 +87,11 @@ class FriendService(
 
     private val _friendState = MutableStateFlow<Map<String, FriendData>>(emptyMap())
     val friendState: StateFlow<Map<String, FriendData>> = _friendState.asStateFlow()
+    private val _friendStateSnapshot = MutableStateFlow(
+        FriendStateSnapshot(sessionToken = null, friends = emptyMap())
+    )
+    internal val friendStateSnapshot: StateFlow<FriendStateSnapshot> =
+        _friendStateSnapshot.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val _hasRefreshError = MutableStateFlow(false)
@@ -515,6 +520,13 @@ class FriendService(
 
     private fun publishFriendState() {
         val snapshot = friendStore.snapshot
+        val stateSnapshot = FriendStateSnapshot(
+            sessionToken = activeSessionToken,
+            friends = snapshot,
+        )
+        if (_friendStateSnapshot.value != stateSnapshot) {
+            _friendStateSnapshot.value = stateSnapshot
+        }
         if (_friendState.value != snapshot) {
             _friendState.value = snapshot
         }

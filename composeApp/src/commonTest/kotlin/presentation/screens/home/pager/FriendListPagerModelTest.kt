@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 
 import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AccountWebSocketEvent
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
@@ -21,6 +22,7 @@ import io.github.vrcmteam.vrcm.network.websocket.data.type.FriendEvents
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -66,6 +68,24 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class FriendListPagerModelTest : MainDispatcherTest() {
+    @Test
+    fun staleFriendSnapshotIsRejectedAfterSessionTokenChanges() {
+        val accountAToken = AccountSessionToken(userId = "usr_account_a", generation = 1L)
+        val accountBToken = AccountSessionToken(userId = "usr_account_b", generation = 2L)
+        val accountAFriend = cachedFriend(
+            id = "usr_account_a_friend",
+            displayName = "Account A Friend",
+            status = UserStatus.Active,
+        )
+
+        val state = FriendStateSnapshot(
+            sessionToken = accountAToken,
+            friends = mapOf(accountAFriend.id to accountAFriend),
+        )
+
+        assertEquals(emptyList(), state.friendsForSession(accountBToken))
+    }
+
     @Test
     fun clearingSearchRestoresAllFriendsAfterFilteredFriendStateUpdate() = runBlocking {
         SharedFlowCentre.emitLogout()
