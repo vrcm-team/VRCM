@@ -25,6 +25,8 @@ import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionState
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
@@ -43,6 +45,7 @@ import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import kotlinx.coroutines.launch
 import org.koin.compose.currentKoinScope
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import presentation.compoments.UpdateDialog
 import presentation.screens.auth.data.VersionVo
 
@@ -73,8 +76,114 @@ fun SettingsBottomSheet(
             SettingsBlockSurface {
                 AboutBlock(onDismissRequest)
             }
+            SettingsBlockSurface {
+                RemoteWorldSaveDataBlock()
+            }
             LogoutButton(onDismissRequest)
         }
+    }
+}
+
+@Composable
+private fun RemoteWorldSaveDataBlock(
+    model: AllWorldPersistenceDeletionModel = koinViewModel(),
+) {
+    val state by model.state.collectAsState()
+    var showConfirmation by remember { mutableStateOf(false) }
+    val actionAvailable = state is AllWorldPersistenceDeletionState.Ready ||
+        state is AllWorldPersistenceDeletionState.Failed
+
+    LaunchedEffect(state) {
+        if (!actionAvailable) showConfirmation = false
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = strings.settingWorldSaveDataTitle,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = strings.settingWorldSaveDataDescription,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                enabled = actionAvailable,
+                onClick = { showConfirmation = true },
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                if (state is AllWorldPersistenceDeletionState.Deleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    when (state) {
+                        AllWorldPersistenceDeletionState.Deleting ->
+                            strings.settingWorldSaveDataDeleting
+                        else -> strings.settingWorldSaveDataDelete
+                    }
+                )
+            }
+        }
+        when (state) {
+            AllWorldPersistenceDeletionState.Unavailable -> Text(
+                text = strings.settingWorldSaveDataUnavailable,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AllWorldPersistenceDeletionState.Deleted -> Text(
+                text = strings.settingWorldSaveDataDeleted,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            is AllWorldPersistenceDeletionState.Failed -> Text(
+                text = strings.settingWorldSaveDataFailed,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            AllWorldPersistenceDeletionState.Ready,
+            AllWorldPersistenceDeletionState.Deleting -> Unit
+        }
+    }
+
+    if (showConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showConfirmation = false },
+            title = { Text(strings.settingWorldSaveDataConfirmTitle) },
+            text = { Text(strings.settingWorldSaveDataConfirmMessage) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showConfirmation = false
+                        model.deleteAllWorldSaveData()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Text(strings.settingWorldSaveDataDelete)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmation = false }) {
+                    Text(strings.cancel)
+                }
+            },
+        )
     }
 }
 

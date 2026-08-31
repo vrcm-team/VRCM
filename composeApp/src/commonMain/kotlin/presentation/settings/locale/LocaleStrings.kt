@@ -58,6 +58,19 @@ sealed class LocaleStrings {
     open val stettingAbout: String = "About Application"
     open val stettingVersion: String = "Version"
     open val stettingClearCache: String = "Clear Cache"
+    open val settingWorldSaveDataTitle: String = "Remote world save data"
+    open val settingWorldSaveDataDescription: String =
+        "Manage data saved for your account by worlds. This is separate from the local cache."
+    open val settingWorldSaveDataDelete: String = "Delete all world save data"
+    open val settingWorldSaveDataDeleting: String = "Deleting..."
+    open val settingWorldSaveDataDeleted: String = "All world save data deleted"
+    open val settingWorldSaveDataFailed: String = "Could not delete world save data. Try again."
+    open val settingWorldSaveDataUnavailable: String =
+        "Sign in to manage remote world save data."
+    open val settingWorldSaveDataConfirmTitle: String = "Delete all world save data?"
+    open val settingWorldSaveDataConfirmMessage: String =
+        "This permanently deletes the data saved for your account by every world. " +
+            "This cannot be undone and does not clear the local app cache."
     open val stettingAlreadyLatest: String = "Already Latest"
     open val stettingFriendActivity: String = "Friend activity"
     open val stettingFriendPresenceNotifications: String = "Presence alerts"

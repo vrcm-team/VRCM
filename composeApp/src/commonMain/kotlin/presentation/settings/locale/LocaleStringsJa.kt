@@ -47,6 +47,17 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val stettingAbout = "アプリについて"
     override val stettingVersion = "バージョン"
     override val stettingClearCache = "キャッシュをクリア"
+    override val settingWorldSaveDataTitle = "リモートのワールド保存データ"
+    override val settingWorldSaveDataDescription =
+        "ワールドがアカウント用に保存したデータを管理します。ローカルキャッシュとは別です。"
+    override val settingWorldSaveDataDelete = "すべてのワールド保存データを削除"
+    override val settingWorldSaveDataDeleting = "削除中..."
+    override val settingWorldSaveDataDeleted = "すべてのワールド保存データを削除しました"
+    override val settingWorldSaveDataFailed = "ワールド保存データを削除できませんでした。もう一度お試しください。"
+    override val settingWorldSaveDataUnavailable = "リモートの保存データを管理するにはログインしてください。"
+    override val settingWorldSaveDataConfirmTitle = "すべてのワールド保存データを削除しますか？"
+    override val settingWorldSaveDataConfirmMessage =
+        "すべてのワールドがこのアカウント用に保存したデータを完全に削除します。この操作は元に戻せず、アプリのローカルキャッシュは削除されません。"
     override val stettingAlreadyLatest = "すでに最新バージョン"
     override val stettingFriendActivity = "フレンドの動向"
     override val stettingFriendPresenceNotifications = "オンライン通知"

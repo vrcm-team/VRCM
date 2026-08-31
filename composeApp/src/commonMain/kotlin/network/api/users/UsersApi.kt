@@ -65,6 +65,12 @@ class UsersApi(private val client: HttpClient) {
             parameter("offset", offset)
         }.checkSuccess()
 
+    suspend fun deleteAllWorldPersistence(userId: String) {
+        client.delete {
+            url { path(USERS_API_PREFIX, userId, "persist") }
+        }.checkSuccess { Unit }
+    }
+
     suspend fun saveUserNote(targetUserId: String, note: String): String =
         client.post(USER_NOTES_API_PREFIX) {
             setBody(mapOf("targetUserId" to targetUserId, "note" to note))
