@@ -131,6 +131,7 @@ fun FriendActivityTimelineContent(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     headerContent: (@Composable () -> Unit)? = null,
+    controlsInList: Boolean = headerContent != null,
     bottomNavigationPadding: Dp = 0.dp,
 ) {
     val contentState = state as? FriendActivityTimelineState.Content
@@ -151,7 +152,7 @@ fun FriendActivityTimelineContent(
         onLoadMore()
     }
 
-    if (headerContent == null) {
+    if (!controlsInList) {
         Column(modifier = modifier.fillMaxSize()) {
             ActivityTimelineFilters(filter, onFilterSelected)
             ActivityTimelineObservedHint()
@@ -165,6 +166,7 @@ fun FriendActivityTimelineContent(
                 onWorldClick = onWorldClick,
                 listState = listState,
                 modifier = Modifier.weight(1f),
+                headerContent = headerContent,
                 includeControls = false,
                 bottomNavigationPadding = bottomNavigationPadding,
             )

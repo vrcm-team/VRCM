@@ -332,6 +332,7 @@ private fun FriendActivityTimelineDestination(
             )
         },
         listState = listState,
+        controlsInList = true,
         bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
 }
