@@ -5,7 +5,7 @@ import kotlin.test.assertTrue
 
 class LocaleActionMessagesTest {
     @Test
-    fun boopInviteAndRetryMessagesArePresentInEveryLocale() {
+    fun profileActionMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,
             LocaleStringsJa,
@@ -20,6 +20,15 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileChatboxModerationMute,
+                locale.profileChatboxModerationUnmute,
+                locale.profileChatboxModerationChecking,
+                locale.profileChatboxModerationRetry,
+                locale.profileChatboxModerationMuting,
+                locale.profileChatboxModerationUnmuting,
+                locale.profileChatboxModerationMuted,
+                locale.profileChatboxModerationUnmuted,
+                locale.profileChatboxModerationUpdateFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
         }
