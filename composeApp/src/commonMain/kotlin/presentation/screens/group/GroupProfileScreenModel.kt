@@ -2,8 +2,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.group
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
+import io.github.vrcmteam.vrcm.network.api.groups.data.GroupData
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupPost
@@ -15,15 +17,19 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.storage.GroupProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.coroutineScope
 import org.koin.core.logger.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -89,10 +95,38 @@ class GroupProfileScreenModel(
     private val _isActionLoading = MutableStateFlow(false)
     val isActionLoading: StateFlow<Boolean> = _isActionLoading.asStateFlow()
 
+    private val _isRepresentationUpdating = MutableStateFlow(false)
+    val isRepresentationUpdating: StateFlow<Boolean> = _isRepresentationUpdating.asStateFlow()
+
     private val initialLoadGate = GroupProfileInitialLoadGate()
+    private val representationCoordinator = GroupRepresentationCoordinator(
+        request = NetworkGroupRepresentationRequest(
+            groupsApi = groupsApi,
+            authService = authService,
+        ),
+    )
+    private var representationJob: Job? = null
+    private var representationGeneration = 0L
+    private var representationSessionUserId = SharedFlowCentre.currentSession.value?.token?.userId
+
+    init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                val nextUserId = session?.token?.userId
+                if (representationSessionUserId != nextUserId) {
+                    cancelRepresentationUpdate()
+                }
+                representationSessionUserId = nextUserId
+            }
+        }
+    }
 
     fun loadGroupData(groupProfileVo: GroupProfileVo) {
         val groupId = groupProfileVo.groupId
+        val currentGroupId = _groupProfileState.value?.groupId
+        if (currentGroupId != null && currentGroupId != groupId) {
+            cancelRepresentationUpdate()
+        }
         if (groupId.isBlank()) {
             _groupProfileState.value = groupProfileVo
             return
@@ -190,7 +224,7 @@ class GroupProfileScreenModel(
 
     fun joinGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
-        if (_isActionLoading.value) return
+        if (_isActionLoading.value || _isRepresentationUpdating.value) return
         _isActionLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
@@ -206,7 +240,7 @@ class GroupProfileScreenModel(
 
     fun leaveGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
-        if (_isActionLoading.value) return
+        if (_isActionLoading.value || _isRepresentationUpdating.value) return
         _isActionLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
@@ -217,6 +251,118 @@ class GroupProfileScreenModel(
                 refreshGroupData()
             }
             _isActionLoading.value = false
+        }
+    }
+
+    fun updateRepresentation(
+        isRepresenting: Boolean,
+        failureMessage: String,
+        sessionChangedMessage: String,
+    ) {
+        val group = _groupProfileState.value ?: return
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (_isActionLoading.value ||
+            _isRepresentationUpdating.value ||
+            !group.hasActiveMembership(sessionToken)
+        ) {
+            return
+        }
+
+        val groupId = group.groupId
+        val generation = ++representationGeneration
+        _isRepresentationUpdating.value = true
+        val job = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            try {
+                when (
+                    val result = representationCoordinator.update(
+                        group = group,
+                        isRepresenting = isRepresenting,
+                        sessionToken = sessionToken,
+                    )
+                ) {
+                    is GroupRepresentationUpdateResult.Updated -> {
+                        if (acceptsRepresentationResult(groupId, generation, result.sessionToken)) {
+                            _groupProfileState.value = GroupProfileVo(result.group)
+                            saveRepresentationCache(
+                                groupId = groupId,
+                                generation = generation,
+                                sessionToken = result.sessionToken,
+                                group = result.group,
+                            )
+                        }
+                    }
+
+                    is GroupRepresentationUpdateResult.Failed -> {
+                        if (acceptsRepresentationResult(groupId, generation, result.sessionToken)) {
+                            logger.error("GroupRepresentation: ${result.error.message.orEmpty()}")
+                            SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+                        }
+                    }
+
+                    GroupRepresentationUpdateResult.SessionChanged -> {
+                        if (acceptsRepresentationRequest(groupId, generation, sessionToken.userId)) {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(sessionChangedMessage))
+                        }
+                    }
+
+                    GroupRepresentationUpdateResult.InFlight,
+                    GroupRepresentationUpdateResult.NotAllowed,
+                    GroupRepresentationUpdateResult.Unchanged -> Unit
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } finally {
+                if (representationGeneration == generation) {
+                    _isRepresentationUpdating.value = false
+                    representationJob = null
+                }
+            }
+        }
+        representationJob = job
+        job.start()
+    }
+
+    private fun acceptsRepresentationResult(
+        groupId: String,
+        generation: Long,
+        sessionToken: AccountSessionToken,
+    ): Boolean = representationGeneration == generation &&
+        _groupProfileState.value?.groupId == groupId &&
+        SharedFlowCentre.isCurrentSession(sessionToken)
+
+    private fun acceptsRepresentationRequest(
+        groupId: String,
+        generation: Long,
+        userId: String,
+    ): Boolean = representationGeneration == generation &&
+        _groupProfileState.value?.groupId == groupId &&
+        SharedFlowCentre.currentSession.value?.token?.userId == userId
+
+    private fun cancelRepresentationUpdate() {
+        representationGeneration++
+        representationJob?.cancel()
+        representationJob = null
+        _isRepresentationUpdating.value = false
+    }
+
+    private suspend fun saveRepresentationCache(
+        groupId: String,
+        generation: Long,
+        sessionToken: AccountSessionToken,
+        group: GroupData,
+    ) {
+        if (!acceptsRepresentationResult(groupId, generation, sessionToken)) return
+        try {
+            groupProfileCacheStore.save(
+                GroupProfileCache(
+                    group = group,
+                    cachedAtEpochMilliseconds = nowMilliseconds(),
+                )
+            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            logger.error("GroupRepresentationCache: ${error.message.orEmpty()}")
         }
     }
 
