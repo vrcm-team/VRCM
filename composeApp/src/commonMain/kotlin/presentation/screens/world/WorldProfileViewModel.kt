@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
+import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -63,6 +64,14 @@ class WorldProfileScreenModel internal constructor(
     )
     internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
 
+    private val publication = WorldPublicationStateModel(
+        source = NetworkWorldPublicationSource(worldsApi, authService),
+        scope = viewModelScope,
+        onWorldRefreshed = ::applyPublicationWorld,
+    )
+    internal val publicationState: StateFlow<WorldPublicationUiState> = publication.state
+    internal val publicationNotices: SharedFlow<WorldPublicationNotice> = publication.notices
+
     internal fun retryFavoriteEntryLoad() {
         favoriteEntry.retry()
     }
@@ -73,6 +82,7 @@ class WorldProfileScreenModel internal constructor(
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
+        publication.setTarget(worldId, worldProfileVO.authorID)
         favoriteEntry.load(worldId)
         if (worldId.isBlank()) return
         // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。
@@ -82,6 +92,7 @@ class WorldProfileScreenModel internal constructor(
     private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
         val cached = worldProfileCacheStore.load(worldId)
         if (cached != null) {
+            publication.observeKnownWorld(cached.world)
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
@@ -96,6 +107,7 @@ class WorldProfileScreenModel internal constructor(
             refreshWorldData()
         } else {
             loadCachedInstances(cached.world.instances.orEmpty())
+            publication.refreshIfOwned()
         }
     }
 
@@ -138,9 +150,12 @@ class WorldProfileScreenModel internal constructor(
     }
 
     private suspend fun loadWorldInfo(worldId: String) {
-        authService.reTryAuthCatching {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        val response = authService.runSessionBoundCatching(sessionToken) {
             worldsApi.getWorldById(worldId)
-        }.onSuccess { worldData ->
+        } ?: return
+        response.result.onSuccess { worldData ->
+            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@onSuccess
             worldProfileCacheStore.save(
                 WorldProfileCache(
                     world = worldData,
@@ -158,6 +173,7 @@ class WorldProfileScreenModel internal constructor(
                     instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
 //                    platformFileSizes = platformFileSizes,
                 )
+            publication.acceptVerifiedWorld(worldData, response.sessionToken)
 //            viewModelScope.launch(Dispatchers.IO) {
 //                // 获取平台文件大小信息
 //                runCatching {
@@ -176,8 +192,35 @@ class WorldProfileScreenModel internal constructor(
                 loadInstanceData(mergeInstanceIds)
             }
         }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
+            if (SharedFlowCentre.isCurrentSession(response.sessionToken) &&
+                _worldProfileState.value?.worldId == worldId
+            ) {
+                SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
+            }
         }
+    }
+
+    private fun applyPublicationWorld(worldData: WorldData) {
+        val current = _worldProfileState.value ?: return
+        if (current.worldId != worldData.id) return
+
+        _worldProfileState.value = WorldProfileVo(
+            world = worldData,
+            instancesList = current.instances,
+            platformFileSizes = current.platformFileSizes,
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            worldProfileCacheStore.save(
+                WorldProfileCache(
+                    world = worldData,
+                    cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                )
+            )
+        }
+    }
+
+    internal fun changeWorldPublication(action: WorldPublicationAction) {
+        publication.changePublication(action)
     }
 
     private fun collectInstanceIds(
