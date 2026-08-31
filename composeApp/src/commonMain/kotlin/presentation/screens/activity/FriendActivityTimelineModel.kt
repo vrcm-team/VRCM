@@ -153,13 +153,12 @@ class FriendActivityTimelineModel internal constructor(
                 _state.value = FriendActivityTimelineState.Loading
                 var emittedContent = false
                 try {
-                    source.observeHead(token, filter.eventTypes, pageSize + 1).collect { page ->
-                        if (!isCurrent(currentGeneration, token, filter)) return@collect
-                        if (oldestCursor != null) return@collect
+                    source.observeHead(token, filter.eventTypes, pageSize + 1).first { page ->
+                        if (!isCurrent(currentGeneration, token, filter)) return@first false
                         emittedContent = true
                         if (page.isEmpty()) {
                             _state.value = FriendActivityTimelineState.Content(emptyList(), hasMore = false)
-                            return@collect
+                            return@first false
                         }
 
                         val loaded = page.take(pageSize)
@@ -171,6 +170,7 @@ class FriendActivityTimelineModel internal constructor(
                             hasMore = hasMore,
                         )
                         observeLoadedSnapshot(currentGeneration, token, filter)
+                        true
                     }
                 } catch (error: CancellationException) {
                     throw error
