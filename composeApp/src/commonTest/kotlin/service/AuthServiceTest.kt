@@ -570,6 +570,34 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun avatarCopyingUpdateOnlyAppliesToTheActiveSession() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertTrue(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = false,
+            )
+        )
+        assertEquals(false, fixture.service.currentUserState.value?.allowAvatarCopying)
+
+        fixture.service.logout()
+
+        assertFalse(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = true,
+            )
+        )
+        assertNull(fixture.service.currentUserState.value)
+        fixture.client.close()
+    }
+
+    @Test
     fun networkAvatarSelectionFailureLogsResponseDetailsWithoutCredentials() = runTest {
         var requestCount = 0
         val responseBody = """{"error":{"message":"Avatar not available","status_code":403}}"""

@@ -56,12 +56,15 @@ fun EditProfileSheet(
     isVisible: Boolean,
     currentUser: UserProfileVo,
     bioLinksUpdateState: BioLinksUpdateState,
+    avatarCopyingPrivacyState: AvatarCopyingPrivacyState,
     onDismiss: () -> Unit,
     onStatusSave: (status: UserStatus, statusDescription: String) -> Unit,
     onLanguageSave: (languages: List<String>) -> Unit,
     onPronounsSave: (pronouns: String) -> Unit,
     onBioSave: (bio: String) -> Unit,
     onBioLinksSave: (bioLinks: List<String>) -> Unit,
+    onAvatarCopyingChange: (isAllowed: Boolean) -> Unit,
+    onAvatarCopyingRetry: () -> Unit,
 ) {
     if (!isVisible) return
 
@@ -138,6 +141,11 @@ fun EditProfileSheet(
                 ProfileFieldRow(strings.editProfileBio, bio.ifBlank { "—" }.let { if (it.length > 60) it.take(60) + "…" else it }) {
                     editBio = bio; editingField = EditField.Bio
                 }
+                AvatarCopyingPrivacyRow(
+                    state = avatarCopyingPrivacyState,
+                    onCheckedChange = onAvatarCopyingChange,
+                    onRetry = onAvatarCopyingRetry,
+                )
                 ProfileFieldRow(strings.editProfileSocialLinks, bioLinks.filter(String::isNotBlank).joinToString().ifBlank { "—" }) {
                     editBioLinks = bioLinks; editingField = EditField.SocialLinks
                 }
@@ -169,6 +177,83 @@ fun EditProfileSheet(
             }
         }
     }
+}
+
+@Composable
+private fun AvatarCopyingPrivacyRow(
+    state: AvatarCopyingPrivacyState,
+    onCheckedChange: (Boolean) -> Unit,
+    onRetry: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = strings.editProfileAvatarCopying,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = strings.editProfileAvatarCopyingDescription,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.loadFailed || state.updateFailed) {
+                Text(
+                    text = if (state.loadFailed) {
+                        strings.editProfileAvatarCopyingLoadFailed
+                    } else {
+                        strings.editProfileAvatarCopyingUpdateFailed
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .width(96.dp)
+                .heightIn(min = 48.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            when {
+                state.isAllowed != null -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (state.isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Switch(
+                            checked = state.isAllowed,
+                            onCheckedChange = onCheckedChange,
+                            enabled = !state.isSaving,
+                        )
+                    }
+                }
+                state.loadFailed -> TextButton(onClick = onRetry) {
+                    Text(strings.retry)
+                }
+                else -> CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 }
 
 @Composable
