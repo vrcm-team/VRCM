@@ -336,11 +336,7 @@ private fun FriendActivityTimelineDestination(
         },
         listState = listState,
         headerContent = headerContent,
-        modifier = Modifier
-            .windowInsetsPadding(
-                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-            )
-            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
+        bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
 }
 
