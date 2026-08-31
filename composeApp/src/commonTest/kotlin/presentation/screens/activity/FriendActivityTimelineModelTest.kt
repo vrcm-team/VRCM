@@ -25,11 +25,12 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class FriendActivityTimelineModelTest : MainDispatcherTest() {
     @Test
-    fun newHeadEventsDoNotMoveTheAppendCursorOrDuplicateLoadedEvents() = runTest {
+    fun newHeadEventsKeepLoadedWindowBoundedAndMoveAppendCursorWithoutGaps() = runTest {
         val source = FakeTimelineSource(
             initialHead = listOf(event(5), event(4), event(3), event(2)),
         )
         source.appendResponses += flowOf(listOf(event(2), event(1)))
+        source.appendResponses += flowOf(listOf(event(1)))
         val model = FriendActivityTimelineModel(source, pageSize = 3)
         advanceUntilIdle()
 
@@ -43,9 +44,22 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         advanceUntilIdle()
 
         val loaded = assertIs<FriendActivityTimelineState.Content>(model.state.value)
-        assertEquals(listOf(6L, 5L, 4L, 3L, 2L, 1L), loaded.events.map(FriendActivityEvent::id))
-        assertFalse(loaded.hasMore)
-        assertEquals(FriendActivityTimelineCursor(3_000L, 3L), source.requestedCursors.single())
+        assertEquals(listOf(6L, 5L, 4L, 3L, 2L), loaded.events.map(FriendActivityEvent::id))
+        assertTrue(loaded.hasMore)
+
+        model.loadMore()
+        advanceUntilIdle()
+
+        val completed = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(6L, 5L, 4L, 3L, 2L, 1L), completed.events.map(FriendActivityEvent::id))
+        assertFalse(completed.hasMore)
+        assertEquals(
+            listOf(
+                FriendActivityTimelineCursor(3_000L, 3L),
+                FriendActivityTimelineCursor(2_000L, 2L),
+            ),
+            source.requestedCursors,
+        )
     }
 
     @Test
@@ -73,7 +87,26 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun emptyAppendCompletionKeepsHeadEventsReceivedWhileLoading() = runTest {
+    fun loadedSnapshotReplacesTheInitialHeadCollector() = runTest {
+        val source = FakeTimelineSource(listOf(event(3), event(2), event(1)))
+        val model = FriendActivityTimelineModel(source, pageSize = 2)
+        advanceUntilIdle()
+        assertEquals(1, source.headEmissionCount)
+
+        repeat(5) { index ->
+            source.database.value = listOf(event(4L + index)) + source.database.value
+            advanceUntilIdle()
+        }
+
+        assertEquals(1, source.headEmissionCount)
+        assertEquals(
+            8L,
+            assertIs<FriendActivityTimelineState.Content>(model.state.value).events.first().id,
+        )
+    }
+
+    @Test
+    fun emptyAppendFromStaleCursorKeepsTheDisplacedBoundaryLoadable() = runTest {
         val source = FakeTimelineSource(listOf(event(4), event(3), event(2)))
         val appendStarted = CompletableDeferred<Unit>()
         val releaseAppend = CompletableDeferred<Unit>()
@@ -82,6 +115,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             releaseAppend.await()
             emit(emptyList())
         }
+        source.appendResponses += flowOf(listOf(event(3), event(2)))
         val model = FriendActivityTimelineModel(source, pageSize = 2)
         advanceUntilIdle()
 
@@ -93,10 +127,17 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         advanceUntilIdle()
 
         val completed = assertIs<FriendActivityTimelineState.Content>(model.state.value)
-        assertEquals(listOf(5L, 4L, 3L), completed.events.map(FriendActivityEvent::id))
-        assertFalse(completed.hasMore)
+        assertEquals(listOf(5L, 4L), completed.events.map(FriendActivityEvent::id))
+        assertTrue(completed.hasMore)
         assertFalse(completed.isLoadingMore)
         assertFalse(completed.loadMoreError)
+
+        model.loadMore()
+        advanceUntilIdle()
+
+        val reloaded = assertIs<FriendActivityTimelineState.Content>(model.state.value)
+        assertEquals(listOf(5L, 4L, 3L, 2L), reloaded.events.map(FriendActivityEvent::id))
+        assertFalse(reloaded.hasMore)
     }
 
     @Test
@@ -124,7 +165,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             initialHead = listOf(event(4), event(3), event(2)),
         )
         source.appendResponses += flow { throw IllegalStateException("read failed") }
-        source.appendResponses += flowOf(listOf(event(1)))
+        source.appendResponses += flowOf(listOf(event(2), event(1)))
         val model = FriendActivityTimelineModel(source, pageSize = 2)
         advanceUntilIdle()
 
@@ -224,6 +265,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
         val appendResponses = ArrayDeque<Flow<List<FriendActivityEvent>>>()
         val requestedCursors = mutableListOf<FriendActivityTimelineCursor>()
         val requestedTokens = mutableListOf<AccountSessionToken>()
+        var headEmissionCount = 0
 
         override fun observeHead(
             token: AccountSessionToken,
@@ -233,7 +275,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             requestedTokens += token
             val accountDatabase = accountDatabases.getValue(token)
             val overridden = filteredHeads[types]
-            return if (overridden != null) {
+            val source = if (overridden != null) {
                 overridden.onEach { page ->
                     accountDatabase.value = if (types.isEmpty()) {
                         page
@@ -247,6 +289,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
                     events.filter { types.isEmpty() || it.type in types }.take(limit)
                 }
             }
+            return source.onEach { headEmissionCount++ }
         }
 
         override fun observeBefore(
@@ -267,6 +310,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
             token: AccountSessionToken,
             types: Set<FriendActivityEventType>,
             cursor: FriendActivityTimelineCursor,
+            limit: Int,
         ): Flow<List<FriendActivityEvent>> {
             requestedTokens += token
             return accountDatabases.getValue(token).map { events ->
@@ -274,7 +318,7 @@ class FriendActivityTimelineModelTest : MainDispatcherTest() {
                     (types.isEmpty() || event.type in types) &&
                         (event.occurredAtMillis > cursor.occurredAtMillis ||
                             (event.occurredAtMillis == cursor.occurredAtMillis && event.id >= cursor.id))
-                }
+                }.take(limit)
             }
         }
     }

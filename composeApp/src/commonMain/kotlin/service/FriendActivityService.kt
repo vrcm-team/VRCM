@@ -342,12 +342,14 @@ class FriendActivityService internal constructor(
         types: Set<FriendActivityEventType> = emptySet(),
         oldestOccurredAtMillis: Long,
         oldestId: Long,
+        limit: Int,
     ): Flow<List<FriendActivityEvent>> =
         store.observeAllEventsThrough(
             ownerUserId = token.userId,
             types = types,
             oldestOccurredAtMillis = oldestOccurredAtMillis,
             oldestId = oldestId,
+            limit = limit,
         ).onEach { events ->
             if (SharedFlowCentre.isCurrentSession(token)) {
                 events.asSequence()
@@ -394,15 +396,14 @@ class FriendActivityService internal constructor(
     }
 
     private fun resolveWorldName(ownerUserId: String, worldId: String) {
-        serviceScope.launch {
-            try {
-                worldNameResolver.resolve(ownerUserId, worldId)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
+        worldNameResolver.request(
+            scope = serviceScope,
+            ownerUserId = ownerUserId,
+            worldId = worldId,
+            onFailure = { error ->
                 logger.error("Friend activity world lookup failed for $worldId: ${error.message}")
-            }
-        }
+            },
+        )
     }
 
     private companion object {

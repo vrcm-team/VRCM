@@ -1,7 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
@@ -26,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -121,13 +120,7 @@ object GalleryScreen : AppRoute {
                             selected = pagerState.currentPage == index,
                             onClick = {
                                 coroutineScope.launch {
-                                    pagerState.animateScrollToPage(
-                                        index,
-                                        animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessLow
-                                        )
-                                    )
+                                    pagerState.animateScrollToTab(index)
                                 }
                             },
                             text = {

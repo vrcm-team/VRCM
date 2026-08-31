@@ -129,73 +129,17 @@ fun FriendActivityTimelineContent(
     onWorldClick: (FriendActivityEvent) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
+    headerContent: (@Composable () -> Unit)? = null,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
-                FilterChip(
-                    selected = option == filter,
-                    onClick = { onFilterSelected(option) },
-                    label = { Text(option.label()) },
-                )
-            }
-        }
-
-        Text(
-            text = strings.friendActivityObservedHint,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        when (state) {
-            FriendActivityTimelineState.Loading -> TimelineMessage {
-                CircularProgressIndicator()
-            }
-            FriendActivityTimelineState.Error -> TimelineMessage {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(strings.friendActivityTimelineError)
-                    TextButton(onClick = onRetry) { Text(strings.retry) }
-                }
-            }
-            is FriendActivityTimelineState.Content -> if (state.events.isEmpty()) {
-                TimelineMessage { Text(strings.friendActivityTimelineEmpty) }
-            } else {
-                ActivityTimelineList(
-                    state = state,
-                    listState = listState,
-                    onUserClick = onUserClick,
-                    onWorldClick = onWorldClick,
-                    onLoadMore = onLoadMore,
-                    onRetryLoadMore = onRetryLoadMore,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimelineMessage(content: @Composable () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
-}
-
-@Composable
-private fun ActivityTimelineList(
-    state: FriendActivityTimelineState.Content,
-    listState: LazyListState,
-    onUserClick: (FriendActivityEvent) -> Unit,
-    onWorldClick: (FriendActivityEvent) -> Unit,
-    onLoadMore: () -> Unit,
-    onRetryLoadMore: () -> Unit,
-) {
-    val events = state.events
-    val groups = events.groupBy(FriendActivityEvent::activityDate)
-    LaunchedEffect(listState, state.hasMore, state.isLoadingMore, state.loadMoreError) {
-        if (!state.hasMore || state.isLoadingMore || state.loadMoreError) return@LaunchedEffect
+    val contentState = state as? FriendActivityTimelineState.Content
+    LaunchedEffect(
+        listState,
+        contentState?.hasMore,
+        contentState?.isLoadingMore,
+        contentState?.loadMoreError,
+    ) {
+        val content = contentState ?: return@LaunchedEffect
+        if (!content.hasMore || content.isLoadingMore || content.loadMoreError) return@LaunchedEffect
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
             val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
@@ -204,55 +148,207 @@ private fun ActivityTimelineList(
         }.filter { it }.first()
         onLoadMore()
     }
+
+    if (headerContent == null) {
+        Column(modifier = modifier.fillMaxSize()) {
+            ActivityTimelineFilters(filter, onFilterSelected)
+            ActivityTimelineObservedHint()
+            ActivityTimelineList(
+                state = state,
+                filter = filter,
+                onFilterSelected = onFilterSelected,
+                onRetry = onRetry,
+                onRetryLoadMore = onRetryLoadMore,
+                onUserClick = onUserClick,
+                onWorldClick = onWorldClick,
+                listState = listState,
+                modifier = Modifier.weight(1f),
+                includeControls = false,
+            )
+        }
+    } else {
+        ActivityTimelineList(
+            state = state,
+            filter = filter,
+            onFilterSelected = onFilterSelected,
+            onRetry = onRetry,
+            onRetryLoadMore = onRetryLoadMore,
+            onUserClick = onUserClick,
+            onWorldClick = onWorldClick,
+            listState = listState,
+            modifier = modifier,
+            headerContent = headerContent,
+            includeControls = true,
+        )
+    }
+}
+
+@Composable
+private fun ActivityTimelineList(
+    state: FriendActivityTimelineState,
+    filter: FriendActivityTimelineFilter,
+    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+    onRetry: () -> Unit,
+    onRetryLoadMore: () -> Unit,
+    onUserClick: (FriendActivityEvent) -> Unit,
+    onWorldClick: (FriendActivityEvent) -> Unit,
+    listState: LazyListState,
+    modifier: Modifier,
+    headerContent: (@Composable () -> Unit)? = null,
+    includeControls: Boolean,
+) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+        modifier = modifier.fillMaxSize().navigationBarsPadding(),
         state = listState,
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            top = if (includeControls) 0.dp else 16.dp,
+            bottom = 16.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        groups.forEach { (date, dateEvents) ->
-            item(key = "date:$date") {
-                Text(
-                    text = date,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            itemsIndexed(dateEvents, key = { _, event -> event.id }) { _, event ->
-                FriendTimelineEvent(
-                    event = event,
-                    onUserClick = { onUserClick(event) },
-                    onWorldClick = if (event.navigableWorldId() != null) {
-                        { onWorldClick(event) }
-                    } else {
-                        null
-                    },
-                )
+        if (headerContent != null) {
+            item(key = "activity-header") {
+                headerContent()
             }
         }
-        if (state.isLoadingMore) {
-            item(key = "activity-load-more") {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                }
+        if (includeControls) {
+            item(key = "activity-filters") {
+                ActivityTimelineFilters(filter, onFilterSelected)
             }
-        } else if (state.loadMoreError) {
-            item(key = "activity-load-more-error") {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            item(key = "activity-observed-hint") {
+                ActivityTimelineObservedHint()
+            }
+        }
+
+        when (state) {
+            FriendActivityTimelineState.Loading -> item(key = "activity-loading") {
+                TimelineMessage(
+                    if (includeControls) Modifier.padding(vertical = 48.dp)
+                    else Modifier.fillParentMaxHeight(),
                 ) {
-                    Text(
-                        strings.friendActivityLoadMoreError,
-                        Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = onRetryLoadMore) { Text(strings.retry) }
+                    CircularProgressIndicator()
                 }
             }
+            FriendActivityTimelineState.Error -> item(key = "activity-error") {
+                TimelineMessage(
+                    if (includeControls) Modifier.padding(vertical = 48.dp)
+                    else Modifier.fillParentMaxHeight(),
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(strings.friendActivityTimelineError)
+                        TextButton(onClick = onRetry) { Text(strings.retry) }
+                    }
+                }
+            }
+            is FriendActivityTimelineState.Content -> if (state.events.isEmpty()) {
+                item(key = "activity-empty") {
+                    TimelineMessage(
+                        if (includeControls) Modifier.padding(vertical = 48.dp)
+                        else Modifier.fillParentMaxHeight(),
+                    ) {
+                        Text(strings.friendActivityTimelineEmpty)
+                    }
+                }
+            } else {
+                state.events.groupBy(FriendActivityEvent::activityDate).forEach { (date, dateEvents) ->
+                    item(key = "date:$date") {
+                        Text(
+                            text = date,
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                top = 8.dp,
+                                end = 16.dp,
+                                bottom = 2.dp,
+                            ),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    itemsIndexed(dateEvents, key = { _, event -> event.id }) { _, event ->
+                        FriendTimelineEvent(
+                            event = event,
+                            onUserClick = { onUserClick(event) },
+                            onWorldClick = if (event.navigableWorldId() != null) {
+                                { onWorldClick(event) }
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                }
+                if (state.isLoadingMore) {
+                    item(key = "activity-load-more") {
+                        Box(
+                            Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                } else if (state.loadMoreError) {
+                    item(key = "activity-load-more-error") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                strings.friendActivityLoadMoreError,
+                                Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            TextButton(onClick = onRetryLoadMore) { Text(strings.retry) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityTimelineFilters(
+    filter: FriendActivityTimelineFilter,
+    onFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
+            FilterChip(
+                selected = option == filter,
+                onClick = { onFilterSelected(option) },
+                label = { Text(option.label()) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActivityTimelineObservedHint() {
+    Text(
+        text = strings.friendActivityObservedHint,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun TimelineMessage(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
+            content()
         }
     }
 }
@@ -262,9 +358,10 @@ private fun FriendTimelineEvent(
     event: FriendActivityEvent,
     onUserClick: () -> Unit,
     onWorldClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
     ) {

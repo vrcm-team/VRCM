@@ -5,9 +5,13 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,9 +79,6 @@ object HomeScreen : AppListRoute {
         val navigator = currentNavigator
         val model: HomeScreenModel = koinViewModel()
         val notificationModel = koinInject<NotificationCenterModel>()
-        val timelineModel: FriendActivityTimelineModel = koinViewModel()
-        val timelineState by timelineModel.state.collectAsState()
-        val timelineFilter by timelineModel.filter.collectAsState()
         val stateHolder = rememberSaveableStateHolder()
         val scope = rememberCoroutineScope()
         val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -184,9 +185,6 @@ object HomeScreen : AppListRoute {
                                 when (selectedDestination) {
                                     HomeDestination.Home -> HomeDestinationContent(
                                         model,
-                                        timelineModel,
-                                        timelineState,
-                                        timelineFilter,
                                         hasBottomNavigation = !useRail && showMainNavigation,
                                     )
                                     HomeDestination.Search -> SearchListPager.Content()
@@ -211,84 +209,145 @@ object HomeScreen : AppListRoute {
 @Composable
 private fun HomeDestinationContent(
     model: HomeScreenModel,
-    timelineModel: FriendActivityTimelineModel,
-    timelineState: FriendActivityTimelineState,
-    timelineFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
-    val selectedTab = HomeTab.entries[model.selectedHomeTabIndex]
     val stateHolder = rememberSaveableStateHolder()
-    val timelineListState = rememberLazyListState()
-    val navigator = currentNavigator
     val scope = rememberCoroutineScope()
+    var activityActivated by rememberSaveable { mutableStateOf(false) }
+    val pagerState = rememberPagerState(
+        initialPage = model.selectedHomeTabIndex,
+        pageCount = { HomeTab.entries.size },
+    )
 
-    if (selectedTab == HomeTab.Activity) {
-        LaunchedEffect(timelineListState) {
-            SharedFlowCentre.toPagerTop.collect {
-                runCatching { timelineListState.animateScrollToItem(0) }
+    LaunchedEffect(pagerState, model) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                model.selectHomeTab(HomeTab.entries[page])
+                if (page == HomeTab.Activity.ordinal) activityActivated = true
+            }
+    }
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        key = { HomeTab.entries[it].name },
+    ) { page ->
+        stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
+            val tabRow: @Composable () -> Unit = {
+                HomeTabRow(
+                    pagerState = pagerState,
+                    onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
+                )
+            }
+            when (HomeTab.entries[page]) {
+                HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                        FriendLocationPager.Content(
+                            headerContent = tabRow,
+                            isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
+                        )
+                    }
+                }
+                HomeTab.Activity -> if (activityActivated) {
+                    FriendActivityTimelineDestination(
+                        hasBottomNavigation = hasBottomNavigation,
+                        headerContent = tabRow,
+                        isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
+                    )
+                } else {
+                    ActivityTimelinePreview(headerContent = tabRow)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeTabRow(
+    pagerState: PagerState,
+    onReselect: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        HomeTab.entries.forEachIndexed { index, tab ->
+            Tab(
+                selected = index == pagerState.currentPage,
+                onClick = {
+                    if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                        onReselect()
+                    } else {
+                        scope.launch { pagerState.animateScrollToTab(index) }
+                    }
+                },
+                text = {
+                    Text(
+                        if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendActivityTimelineDestination(
+    hasBottomNavigation: Boolean,
+    headerContent: @Composable () -> Unit,
+    isActive: () -> Boolean,
+) {
+    val model: FriendActivityTimelineModel = koinViewModel()
+    val state by model.state.collectAsState()
+    val filter by model.filter.collectAsState()
+    val listState = rememberLazyListState()
+    val navigator = currentNavigator
+    val currentIsActive by rememberUpdatedState(isActive)
+
+    LaunchedEffect(listState) {
+        SharedFlowCentre.toPagerTop.collect {
+            if (currentIsActive()) {
+                launch { runCatching { listState.animateScrollToItem(0) } }
             }
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = selectedTab.ordinal) {
-            HomeTab.entries.forEach { tab ->
-                Tab(
-                    selected = tab == selectedTab,
-                    onClick = {
-                        if (tab == selectedTab) scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) }
-                        else model.selectHomeTab(tab)
-                    },
-                    text = {
-                        Text(
-                            if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
+    FriendActivityTimelineContent(
+        state = state,
+        filter = filter,
+        onFilterSelected = model::selectFilter,
+        onLoadMore = model::loadMore,
+        onRetry = model::retry,
+        onRetryLoadMore = model::retryLoadMore,
+        onUserClick = { event ->
+            navigator push UserProfileScreen(
+                UserProfileVo(
+                    id = event.friendUserId,
+                    displayName = event.displayName,
+                    profileImageUrl = event.profileImageUrl,
                 )
-            }
-        }
-        Box(Modifier.weight(1f)) {
-            stateHolder.SaveableStateProvider(selectedTab.name) {
-                when (selectedTab) {
-                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
-                        CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            FriendLocationPager.Content()
-                        }
-                    }
-                    HomeTab.Activity -> FriendActivityTimelineContent(
-                        state = timelineState,
-                        filter = timelineFilter,
-                        onFilterSelected = timelineModel::selectFilter,
-                        onLoadMore = timelineModel::loadMore,
-                        onRetry = timelineModel::retry,
-                        onRetryLoadMore = timelineModel::retryLoadMore,
-                        onUserClick = { event ->
-                            navigator push UserProfileScreen(
-                                UserProfileVo(
-                                    id = event.friendUserId,
-                                    displayName = event.displayName,
-                                    profileImageUrl = event.profileImageUrl,
-                                )
-                            )
-                        },
-                        onWorldClick = { event ->
-                            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
-                            navigator push WorldProfileScreen(
-                                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
-                            )
-                        },
-                        listState = timelineListState,
-                        modifier = Modifier
-                            .windowInsetsPadding(
-                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                            )
-                            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
-                    )
-                }
-            }
-        }
+            )
+        },
+        onWorldClick = { event ->
+            val worldId = event.navigableWorldId() ?: return@FriendActivityTimelineContent
+            navigator push WorldProfileScreen(
+                WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
+            )
+        },
+        listState = listState,
+        headerContent = headerContent,
+        modifier = Modifier
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+            )
+            .padding(bottom = if (hasBottomNavigation) 80.dp else 0.dp),
+    )
+}
+
+@Composable
+private fun ActivityTimelinePreview(headerContent: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        headerContent()
     }
 }
 

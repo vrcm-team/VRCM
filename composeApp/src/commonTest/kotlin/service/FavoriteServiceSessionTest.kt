@@ -33,13 +33,15 @@ class FavoriteServiceSessionTest {
             favoritesRequestCount++
             error("Unexpected favorites request: $requestPath")
         }
+        val service = favoriteService(client)
         try {
-            val result = favoriteService(client).loadFavoriteByGroup(FavoriteType.World)
+            val result = service.loadFavoriteByGroup(FavoriteType.World)
 
             assertTrue(result.isFailure)
             assertEquals("No authenticated session", result.exceptionOrNull()?.message)
             assertEquals(0, favoritesRequestCount)
         } finally {
+            service.dispose()
             client.close()
             SharedFlowCentre.emitLogout()
         }
@@ -71,8 +73,8 @@ class FavoriteServiceSessionTest {
                 else -> error("Unexpected favorites request: $requestPath")
             }
         }
+        val service = favoriteService(client)
         try {
-            val service = favoriteService(client)
             val oldLoad = async(start = CoroutineStart.UNDISPATCHED) {
                 service.loadFavoriteByGroup(FavoriteType.World)
             }
@@ -97,6 +99,7 @@ class FavoriteServiceSessionTest {
                     .map { it.id },
             )
         } finally {
+            service.dispose()
             client.close()
             SharedFlowCentre.emitLogout()
         }
@@ -124,14 +127,15 @@ class FavoriteServiceSessionTest {
                 else -> error("Unexpected favorites request: $requestPath")
             }
         }
+        val service = favoriteService(client)
         try {
-            val service = favoriteService(client)
             assertTrue(service.loadFavoriteByGroup(FavoriteType.World).isSuccess)
             val previous = service.favoritesByGroup(FavoriteType.World).value
 
             assertTrue(service.loadFavoriteByGroup(FavoriteType.World).isFailure)
             assertEquals(previous, service.favoritesByGroup(FavoriteType.World).value)
         } finally {
+            service.dispose()
             client.close()
             SharedFlowCentre.emitLogout()
         }
