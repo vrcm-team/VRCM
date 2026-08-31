@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
@@ -130,6 +131,7 @@ fun FriendActivityTimelineContent(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     headerContent: (@Composable () -> Unit)? = null,
+    bottomNavigationPadding: Dp = 0.dp,
 ) {
     val contentState = state as? FriendActivityTimelineState.Content
     LaunchedEffect(
@@ -164,6 +166,7 @@ fun FriendActivityTimelineContent(
                 listState = listState,
                 modifier = Modifier.weight(1f),
                 includeControls = false,
+                bottomNavigationPadding = bottomNavigationPadding,
             )
         }
     } else {
@@ -179,6 +182,7 @@ fun FriendActivityTimelineContent(
             modifier = modifier,
             headerContent = headerContent,
             includeControls = true,
+            bottomNavigationPadding = bottomNavigationPadding,
         )
     }
 }
@@ -196,13 +200,14 @@ private fun ActivityTimelineList(
     modifier: Modifier,
     headerContent: (@Composable () -> Unit)? = null,
     includeControls: Boolean,
+    bottomNavigationPadding: Dp,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize().navigationBarsPadding(),
         state = listState,
         contentPadding = PaddingValues(
             top = if (includeControls) 0.dp else 16.dp,
-            bottom = 16.dp,
+            bottom = 16.dp + bottomNavigationPadding,
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
