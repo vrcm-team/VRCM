@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
@@ -36,7 +37,11 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -144,6 +149,7 @@ private class FeatureActivationFixture(
     val friendListsBeforeFeatures: Int,
     private val friendService: FriendService,
     private val favoriteService: FavoriteService,
+    private val profileScope: CoroutineScope,
     private val client: HttpClient,
 ) {
     suspend fun awaitFavoritesRefresh() {
@@ -179,6 +185,7 @@ private class FeatureActivationFixture(
         }
         friendService.dispose()
         favoriteService.dispose()
+        profileScope.cancel()
         SharedFlowCentre.emitLogout()
         client.close()
     }
@@ -226,8 +233,9 @@ private suspend fun createFixture(
         favoriteApi = FavoriteApi(client),
         favoriteLocalDao = FavoriteLocalDao(MapSettings()),
     )
+    val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val model = FriendListPagerModel(
-        usersApi = UsersApi(client),
+        userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
         friendService = friendService,
         authService = authService,
         favoriteService = favoriteService,
@@ -242,6 +250,7 @@ private suspend fun createFixture(
         friendListsBeforeFeatures = friendListsBeforeFeatures,
         friendService = friendService,
         favoriteService = favoriteService,
+        profileScope = profileScope,
         client = client,
     )
 }

@@ -24,6 +24,7 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,7 @@ import org.koin.core.logger.Logger
 class NotificationCenterModel(
     private val authService: AuthService,
     private val usersApi: UsersApi,
+    private val userProfileEnrichmentService: UserProfileEnrichmentService,
     private val notificationApi: NotificationApi,
     private val friendService: FriendService,
     private val logger: Logger,
@@ -114,7 +116,7 @@ class NotificationCenterModel(
         reduceForSession(token) { it.copy(isRefreshing = true, hasRefreshError = false) }
         try {
             val (friendRequestsResult, notificationsResult) = supervisorScope {
-                async { loadFriendRequests() } to async { loadNotifications() }
+                async { loadFriendRequests(token) } to async { loadNotifications() }
             }.let { (friendRequests, notifications) ->
                 friendRequests.await() to notifications.await()
             }
@@ -160,16 +162,22 @@ class NotificationCenterModel(
         }
     }
 
-    private suspend fun loadFriendRequests(): Result<List<NotificationItemData>> =
+    private suspend fun loadFriendRequests(
+        token: AccountSessionToken,
+    ): Result<List<NotificationItemData>> =
         authService.reTryAuthCatching {
             notificationApi.fetchNotificationsV2(NotificationType.FriendRequest.value)
         }.mapCatching { data ->
+            val usersById = userProfileEnrichmentService.fetchProfiles(
+                sessionToken = token,
+                userIds = data.map { it.senderUserId },
+            )
             data.map { notification ->
-                val user = usersApi.fetchUser(notification.senderUserId)
+                val user = usersById[notification.senderUserId]
                 NotificationItemData(
                     n = notification,
-                    imageUrl = user.profileImageUrl,
-                    title = user.displayName,
+                    imageUrl = user?.profileImageUrl.orEmpty(),
+                    title = user?.displayName ?: notification.senderUserId,
                     actions = listOf(
                         NotificationItemData.ActionData(data = "", type = "Hide"),
                         NotificationItemData.ActionData(data = "", type = "Accept"),

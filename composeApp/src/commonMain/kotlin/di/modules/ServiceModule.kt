@@ -26,6 +26,7 @@ import org.koin.dsl.module
 val serviceModule: Module = module {
     singleOf(::VersionService)
     singleOf(::AuthService) bind WebSocketSessionRecovery::class
+    single { UserProfileEnrichmentService(get()) }
     singleOf(::FavoriteService)
     singleOf(::FriendService)
     singleOf(::FriendActivityService)
