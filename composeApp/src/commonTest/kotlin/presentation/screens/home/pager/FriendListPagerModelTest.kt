@@ -43,8 +43,12 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
@@ -103,8 +107,9 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteApi = FavoriteApi(client),
             favoriteLocalDao = FavoriteLocalDao(MapSettings()),
         )
+        val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val model = FriendListPagerModel(
-            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client)),
+            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
             friendService = friendService,
             authService = authService,
             favoriteService = favoriteService,
@@ -162,6 +167,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
 
             assertEquals(0, nonFriendProfileRequests)
         } finally {
+            profileScope.cancel()
             ViewModelStore().apply {
                 put("friend-list-pager", model)
                 clear()
@@ -223,8 +229,9 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             favoriteApi = FavoriteApi(client),
             favoriteLocalDao = FavoriteLocalDao(MapSettings()),
         )
+        val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val model = FriendListPagerModel(
-            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client)),
+            userProfileEnrichmentService = UserProfileEnrichmentService(UsersApi(client), profileScope),
             friendService = friendService,
             authService = authService,
             favoriteService = favoriteService,
@@ -278,6 +285,7 @@ class FriendListPagerModelTest : MainDispatcherTest() {
             )
             assertEquals("", model.friendDirectoryFriends.value.single().statusDescription)
         } finally {
+            profileScope.cancel()
             releaseAccountAProfile.complete(Unit)
             ViewModelStore().apply {
                 put("friend-list-pager", model)

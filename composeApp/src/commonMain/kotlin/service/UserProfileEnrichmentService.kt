@@ -42,9 +42,17 @@ class UserProfileEnrichmentService internal constructor(
     private val nowMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     constructor(usersApi: UsersApi) : this(
+        usersApi = usersApi,
+        requestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    )
+
+    internal constructor(
+        usersApi: UsersApi,
+        requestScope: CoroutineScope,
+    ) : this(
         fetchUser = usersApi::fetchUser,
         currentSessionToken = { SharedFlowCentre.currentSession.value?.token },
-        requestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        requestScope = requestScope,
         sessionTokens = SharedFlowCentre.currentSession
             .map { session -> session?.token }
             .distinctUntilChanged(),
