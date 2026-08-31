@@ -26,6 +26,9 @@ class AvatarsApi(private val client: HttpClient) {
             setBody(update)
         }.checkSuccess()
 
+    suspend fun deleteAvatar(avatarId: String): AvatarData =
+        client.delete("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
+
     suspend fun getFavoritedAvatars(
         n: Int = 50,
         offset: Int = 0,

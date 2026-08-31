@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -15,6 +16,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -155,6 +157,7 @@ internal sealed interface AvatarProfileNotice {
     data object MetadataSaved : AvatarProfileNotice
     data class MetadataSaveFailed(val message: String?) : AvatarProfileNotice
     data object CoverSaved : AvatarProfileNotice
+    data object Deleted : AvatarProfileNotice
 }
 
 private enum class AvatarSelectionKind {
@@ -169,6 +172,8 @@ class AvatarProfileScreenModel internal constructor(
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    private val avatarDeleter: AvatarDeleter? = null,
+    private val avatarDeletionResults: AvatarDeletionResultStore? = null,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -235,10 +240,45 @@ class AvatarProfileScreenModel internal constructor(
         initialValue = AvatarEditState(),
     )
 
+    private val deletionOperation = MutableStateFlow(AvatarDeletionOperation())
+    internal val deletionState: StateFlow<AvatarDeletionState> = combine(
+        avatarProfileState,
+        validation,
+        favoriteSession,
+        deletionOperation,
+        isSelecting,
+    ) { avatar, currentValidation, session, operation, selecting ->
+        val canDelete = avatarDeleter != null && avatarDeletionResults != null &&
+            !selecting &&
+            currentValidation == AvatarValidation.Available &&
+            avatar?.avatarId?.isNotBlank() == true &&
+            avatar.authorId.isNotBlank() &&
+            avatar.authorId == session?.token?.userId &&
+            avatar.releaseStatus != DELETED_AVATAR_RELEASE_STATUS
+        val confirmation = operation.target?.takeIf { target ->
+            avatar?.avatarId == target.avatarId &&
+                session?.token?.userId == target.sessionToken.userId &&
+                (operation.isDeleting || session?.token == target.sessionToken)
+        }
+        AvatarDeletionState(
+            canDelete = canDelete,
+            confirmation = confirmation,
+            isDeleting = operation.isDeleting,
+            failure = operation.failure.takeIf { confirmation != null },
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AvatarDeletionState(),
+    )
+
     private val latestRequestToken = MutableStateFlow(0L)
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
+        if (!deletionOperation.value.isDeleting) {
+            deletionOperation.value = AvatarDeletionOperation()
+        }
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
@@ -277,6 +317,7 @@ class AvatarProfileScreenModel internal constructor(
     }
 
     fun selectAvatar() {
+        if (deletionOperation.value.target != null) return
         val avatarId = avatarProfileState.value?.avatarId ?: return
         val selectionKind = when (actionState.value.availability) {
             AvatarActionAvailability.Own -> AvatarSelectionKind.Switch
@@ -352,6 +393,59 @@ class AvatarProfileScreenModel internal constructor(
         }
     }
 
+    internal fun requestAvatarDeletion() {
+        if (deletionOperation.value.isDeleting) return
+        val target = currentDeletionTarget() ?: return
+        deletionOperation.value = AvatarDeletionOperation(target = target)
+    }
+
+    internal fun dismissAvatarDeletion() {
+        if (deletionOperation.value.isDeleting) return
+        deletionOperation.value = AvatarDeletionOperation()
+    }
+
+    internal fun confirmAvatarDeletion() {
+        val deleter = avatarDeleter ?: return
+        val operation = deletionOperation.value
+        val target = operation.target ?: return
+        if (operation.isDeleting) return
+        if (currentDeletionTarget() != target) {
+            deletionOperation.value = AvatarDeletionOperation()
+            return
+        }
+        if (!deletionOperation.compareAndSet(
+                expect = operation,
+                update = operation.copy(isDeleting = true, failure = null),
+            )
+        ) {
+            return
+        }
+
+        viewModelScope.launch(requestDispatcher) {
+            val response = try {
+                deleter.delete(target.sessionToken, target.avatarId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                AuthenticatedAvatarDeletion(Result.failure(error), target.sessionToken)
+            }
+            if (response == null || !acceptDeletionSession(response.sessionToken, target)) {
+                finishDeletion(target)
+                return@launch
+            }
+            response.result.fold(
+                onSuccess = { deleted -> handleDeletionSuccess(target, response.sessionToken, deleted) },
+                onFailure = { error ->
+                    finishDeletionFailure(
+                        target = target,
+                        responseToken = response.sessionToken,
+                        failure = error.toAvatarDeletionFailure(),
+                    )
+                },
+            )
+        }
+    }
+
     internal fun applyCoverUpdate(updated: AvatarData): Boolean {
         val current = _avatarProfileState.value ?: return false
         if (current.avatarId != updated.id) return false
@@ -375,7 +469,108 @@ class AvatarProfileScreenModel internal constructor(
     private fun isCurrentTarget(target: AvatarEditTarget): Boolean =
         avatarProfileState.value?.avatarId == target.avatarId &&
             currentUser.value?.userId == target.userId
+
+    private fun currentDeletionTarget(): AvatarDeletionTarget? {
+        if (avatarDeleter == null || avatarDeletionResults == null ||
+            isSelecting.value ||
+            validation.value != AvatarValidation.Available
+        ) {
+            return null
+        }
+        val avatar = avatarProfileState.value ?: return null
+        val sessionToken = favoriteSession.value?.token ?: return null
+        if (avatar.avatarId.isBlank() || avatar.authorId.isBlank() ||
+            avatar.authorId != sessionToken.userId ||
+            avatar.releaseStatus == DELETED_AVATAR_RELEASE_STATUS
+        ) {
+            return null
+        }
+        return AvatarDeletionTarget(
+            sessionToken = sessionToken,
+            avatarId = avatar.avatarId,
+            avatarName = avatar.avatarName,
+        )
+    }
+
+    private fun acceptDeletionSession(
+        responseToken: AccountSessionToken,
+        target: AvatarDeletionTarget,
+    ): Boolean = responseToken.userId == target.sessionToken.userId &&
+        favoriteSession.value?.token == responseToken &&
+        avatarDeleter?.isCurrentSession(responseToken) == true
+
+    private fun handleDeletionSuccess(
+        target: AvatarDeletionTarget,
+        responseToken: AccountSessionToken,
+        deleted: AvatarData,
+    ) {
+        val validResponse = deleted.id == target.avatarId &&
+            deleted.authorId == target.sessionToken.userId &&
+            deleted.releaseStatus == DELETED_AVATAR_RELEASE_STATUS
+        if (!validResponse) {
+            finishDeletionFailure(
+                target = target,
+                responseToken = responseToken,
+                failure = AvatarDeletionFailure.InvalidResponse,
+            )
+            return
+        }
+        val recorded = avatarDeletionResults?.record(responseToken, deleted) == true
+        if (!recorded) {
+            finishDeletion(target)
+            return
+        }
+
+        val current = avatarProfileState.value
+        if (current != null &&
+            current.avatarId == target.avatarId &&
+            current.authorId == responseToken.userId &&
+            favoriteSession.value?.token == responseToken
+        ) {
+            _avatarProfileState.value = AvatarProfileVo(deleted)
+            validation.value = AvatarValidation.Available
+            finishDeletion(target)
+            _notices.tryEmit(AvatarProfileNotice.Deleted)
+        } else {
+            finishDeletion(target)
+        }
+    }
+
+    private fun finishDeletionFailure(
+        target: AvatarDeletionTarget,
+        responseToken: AccountSessionToken,
+        failure: AvatarDeletionFailure,
+    ) {
+        val current = avatarProfileState.value
+        if (current == null ||
+            current.avatarId != target.avatarId ||
+            current.authorId != responseToken.userId ||
+            favoriteSession.value?.token != responseToken
+        ) {
+            finishDeletion(target)
+            return
+        }
+        val currentOperation = deletionOperation.value
+        if (currentOperation.target != target) return
+        deletionOperation.value = currentOperation.copy(
+            target = target.copy(sessionToken = responseToken),
+            isDeleting = false,
+            failure = failure,
+        )
+    }
+
+    private fun finishDeletion(target: AvatarDeletionTarget) {
+        if (deletionOperation.value.target == target) {
+            deletionOperation.value = AvatarDeletionOperation()
+        }
+    }
 }
+
+private data class AvatarDeletionOperation(
+    val target: AvatarDeletionTarget? = null,
+    val isDeleting: Boolean = false,
+    val failure: AvatarDeletionFailure? = null,
+)
 
 private data class AvatarEditTarget(
     val avatarId: String,

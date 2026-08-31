@@ -4,6 +4,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AuthenticatedAvatarDeletion
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
@@ -90,6 +93,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
+                    single<AvatarDeleter> { EmptyAvatarDeleter }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
             )
@@ -237,6 +241,15 @@ private data object EmptyAvatarEditor : AvatarEditor {
         avatarId: String,
         imageUrl: String,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarDeleter : AvatarDeleter {
+    override fun isCurrentSession(token: AccountSessionToken): Boolean = false
+
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): AuthenticatedAvatarDeletion? = null
 }
 
 private data object EmptyGalleryDataSource : GalleryDataSource {
