@@ -121,6 +121,7 @@ data class UserProfileScreen(
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
@@ -205,6 +206,10 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                openReportDialog = {
+                    userProfileScreenModel.resetUserReportState()
+                    openReportDialog = true
+                },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -283,6 +288,31 @@ data class UserProfileScreen(
                 }
             },
         )
+        val userReportState by userProfileScreenModel.userReportState.collectAsState()
+        LaunchedEffect(userReportState) {
+            if (userReportState == UserReportState.Submitted) {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            }
+        }
+        val reportSuccessMessage = strings.profileReportSuccess
+        val reportFailureMessage = strings.profileReportFailed
+        UserReportDialog(
+            visible = openReportDialog,
+            targetName = currentUser.displayName,
+            state = userReportState,
+            onDismiss = {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            },
+            onSubmit = {
+                userProfileScreenModel.reportUser(
+                    userId = currentUser.id,
+                    successMessage = reportSuccessMessage,
+                    failureMessage = reportFailureMessage,
+                )
+            },
+        )
     }
 
 }
@@ -299,6 +329,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    openReportDialog: () -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -390,6 +421,20 @@ private fun ColumnScope.SheetItems(
             openAlertDialog()
         }
     })
+    if (!currentUser.isSelf) {
+        SheetButtonItem(
+            text = localeStrings.profileReportUser,
+            onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openReportDialog()
+                }
+            },
+            content = { label ->
+                Text(label, color = MaterialTheme.colorScheme.error)
+            },
+        )
+    }
 
 }
 
