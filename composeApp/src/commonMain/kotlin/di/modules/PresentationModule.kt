@@ -38,6 +38,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenMode
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
@@ -82,6 +83,7 @@ val presentationModule: Module = module {
     singleOf(::NotificationCenterModel) {
         onClose { it?.close() }
     }
+    viewModelOf(::PlayerModerationListScreenModel)
     viewModelOf(::UserProfileScreenModel)
     viewModelOf(::MutualFriendsScreenModel)
     viewModelOf(::FriendNetworkScreenModel)
