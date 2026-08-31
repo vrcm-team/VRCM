@@ -26,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
@@ -208,6 +209,18 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    navigator push RewardCodeScreen
+                    onDismissRequest()
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = strings.rewardCodeEntry)
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         val diskCache = imageLoader.diskCache
