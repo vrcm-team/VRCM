@@ -61,6 +61,7 @@ private fun FavoritesScreenContent(
     val avatarOptions by favoritesModel.avatarGroupOptions.collectAsState()
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
+    val favoriteGroupEditState by favoritesModel.favoriteGroupEditState.collectAsState()
     val settledPage = pagerState.settledPage
     val modelTabIndex = settledPage + 1
 
@@ -131,8 +132,30 @@ private fun FavoritesScreenContent(
                 onValueChange = favoritesModel::setSearchText,
             )
             when (settledPage) {
-                0 -> GroupOptionsUI(worldOptions, FavoriteType.World, worldGroups, worldTotal, strings.friendListPagerAllWorlds, favoritesModel::updateWorldGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
-                1 -> GroupOptionsUI(avatarOptions, FavoriteType.Avatar, avatarGroups, avatarTotal, strings.friendListPagerAllAvatars, favoritesModel::updateAvatarGroupOptions, { it.selectedGroup }, { o, g -> o.copy(selectedGroup = g) })
+                0 -> GroupOptionsUI(
+                    currentOptions = worldOptions,
+                    favoriteType = FavoriteType.World,
+                    favoriteGroups = worldGroups,
+                    total = worldTotal,
+                    defaultText = strings.friendListPagerAllWorlds,
+                    onOptionsChanged = favoritesModel::updateWorldGroupOptions,
+                    getSelectedGroup = { it.selectedGroup },
+                    updateOptions = { options, group -> options.copy(selectedGroup = group) },
+                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
+                    editGroupContentDescription = strings.favoriteGroupEditAction,
+                )
+                1 -> GroupOptionsUI(
+                    currentOptions = avatarOptions,
+                    favoriteType = FavoriteType.Avatar,
+                    favoriteGroups = avatarGroups,
+                    total = avatarTotal,
+                    defaultText = strings.friendListPagerAllAvatars,
+                    onOptionsChanged = favoritesModel::updateAvatarGroupOptions,
+                    getSelectedGroup = { it.selectedGroup },
+                    updateOptions = { options, group -> options.copy(selectedGroup = group) },
+                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
+                    editGroupContentDescription = strings.favoriteGroupEditAction,
+                )
             }
             val loading = modelTabIndex in refreshingTabs
             Box(Modifier.fillMaxWidth().height(4.dp)) {
@@ -188,6 +211,13 @@ private fun FavoritesScreenContent(
             }
         }
     }
+
+    FavoriteGroupEditDialog(
+        state = favoriteGroupEditState,
+        onDismiss = favoritesModel::dismissFavoriteGroupEditor,
+        onClearFailure = favoritesModel::clearFavoriteGroupEditFailure,
+        onSave = favoritesModel::saveFavoriteGroup,
+    )
 }
 
 @Composable

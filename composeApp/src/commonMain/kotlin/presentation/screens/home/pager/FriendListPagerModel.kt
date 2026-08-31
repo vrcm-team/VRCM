@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
@@ -59,6 +60,17 @@ data class WorldGroupOptions(
  */
 data class AvatarGroupOptions(
     val selectedGroup: FavoriteGroupData? = null
+)
+
+internal enum class FavoriteGroupEditFailure {
+    InvalidName,
+    SaveFailed,
+}
+
+internal data class FavoriteGroupEditState(
+    val group: FavoriteGroupData? = null,
+    val isSaving: Boolean = false,
+    val failure: FavoriteGroupEditFailure? = null,
 )
 
 internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
@@ -192,6 +204,11 @@ class FriendListPagerModel(
     private var friendDirectoryActivated = false
     private var favoritesPageActivated = false
     private var favoriteLocale: LocaleStrings? = null
+    private val _favoriteGroupEditState = MutableStateFlow(FavoriteGroupEditState())
+    internal val favoriteGroupEditState: StateFlow<FavoriteGroupEditState> =
+        _favoriteGroupEditState.asStateFlow()
+    private var favoriteGroupEditJob: Job? = null
+    private var favoriteGroupEditRequest = 0L
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendSnapshot,
@@ -255,6 +272,10 @@ class FriendListPagerModel(
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
         if (userChanged) {
+            favoriteGroupEditRequest++
+            favoriteGroupEditJob?.cancel()
+            favoriteGroupEditJob = null
+            _favoriteGroupEditState.value = FavoriteGroupEditState()
             favoritedWorldMap.clear()
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()
@@ -582,6 +603,154 @@ class FriendListPagerModel(
         _avatarGroupOptions.value = options
         refreshCurrentTabListData()
     }
+
+    fun openFavoriteGroupEditor(group: FavoriteGroupData) {
+        if (_favoriteGroupEditState.value.isSaving) return
+        val type = group.editableFavoriteType() ?: return
+        val sessionToken = activeSessionToken ?: return
+        if (!SharedFlowCentre.isCurrentSession(sessionToken) || group.ownerId != sessionToken.userId) return
+        val currentGroup = favoriteService.favoritesByGroup(type).value.keys.firstOrNull {
+            it.ownerId == sessionToken.userId && it.name == group.name && it.type == group.type
+        } ?: return
+        _favoriteGroupEditState.value = FavoriteGroupEditState(group = currentGroup)
+    }
+
+    fun dismissFavoriteGroupEditor() {
+        if (_favoriteGroupEditState.value.isSaving) return
+        _favoriteGroupEditState.value = FavoriteGroupEditState()
+    }
+
+    fun clearFavoriteGroupEditFailure() {
+        _favoriteGroupEditState.update { state -> state.copy(failure = null) }
+    }
+
+    fun saveFavoriteGroup(
+        displayName: String,
+        visibility: FavoriteGroupVisibility,
+    ) {
+        val state = _favoriteGroupEditState.value
+        val group = state.group ?: return
+        if (state.isSaving || favoriteGroupEditJob?.isActive == true) return
+        val normalizedDisplayName = displayName.trim()
+        if (normalizedDisplayName.isEmpty()) {
+            _favoriteGroupEditState.value = state.copy(failure = FavoriteGroupEditFailure.InvalidName)
+            return
+        }
+        if (normalizedDisplayName == group.displayName && visibility.value == group.visibility) return
+
+        val type = group.editableFavoriteType() ?: return
+        val requestToken = activeSessionToken?.takeIf(SharedFlowCentre::isCurrentSession) ?: return
+        if (group.ownerId != requestToken.userId) return
+        val request = ++favoriteGroupEditRequest
+        _favoriteGroupEditState.value = state.copy(isSaving = true, failure = null)
+        favoriteGroupEditJob = viewModelScope.launch(Dispatchers.IO) {
+            val update = try {
+                favoriteService.prepareFavoriteGroupUpdate(
+                    sessionToken = requestToken,
+                    favoriteType = type,
+                    groupName = group.name,
+                    displayName = normalizedDisplayName,
+                    visibility = visibility,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (acceptsFavoriteGroupEdit(requestToken, request)) {
+                    publishFavoriteGroupEditFailure(error)
+                }
+                return@launch
+            }
+
+            val response = authService.runSessionBoundCatching(requestToken) {
+                favoriteService.sendFavoriteGroupUpdate(update)
+            } ?: run {
+                releaseStaleFavoriteGroupEdit(request)
+                return@launch
+            }
+            val requestError = response.result.exceptionOrNull()
+            val result = if (requestError != null) {
+                Result.failure(requestError)
+            } else {
+                runCatching {
+                    favoriteService.commitFavoriteGroupUpdate(response.sessionToken, update)
+                }
+            }
+            result.exceptionOrNull()?.let { error ->
+                if (error is CancellationException) throw error
+            }
+            if (!acceptsFavoriteGroupEdit(response.sessionToken, request)) {
+                releaseStaleFavoriteGroupEdit(request)
+                return@launch
+            }
+
+            val updatedGroup = result.getOrNull()
+            if (updatedGroup != null) {
+                updateSelectedFavoriteGroup(updatedGroup)
+                _favoriteGroupEditState.value = FavoriteGroupEditState()
+                favoriteLocale?.favoriteGroupEditSuccess?.let { message ->
+                    SharedFlowCentre.toastText.emit(ToastText.Success(message))
+                }
+            } else {
+                publishFavoriteGroupEditFailure(result.exceptionOrNull() ?: return@launch)
+            }
+        }
+    }
+
+    private suspend fun publishFavoriteGroupEditFailure(error: Throwable? = null) {
+        _favoriteGroupEditState.value = _favoriteGroupEditState.value.copy(
+            isSaving = false,
+            failure = FavoriteGroupEditFailure.SaveFailed,
+        )
+        if (error != null) {
+            showFavoriteError(favoriteLocale?.favoriteGroupEditFailed, error)
+        } else {
+            favoriteLocale?.favoriteGroupEditFailed?.let { message ->
+                SharedFlowCentre.toastText.emit(ToastText.Error(message))
+            }
+        }
+    }
+
+    private suspend fun releaseStaleFavoriteGroupEdit(request: Long) {
+        val state = _favoriteGroupEditState.value
+        val ownerId = state.group?.ownerId ?: return
+        if (favoriteGroupEditRequest != request ||
+            SharedFlowCentre.currentSession.value?.token?.userId != ownerId
+        ) {
+            return
+        }
+        publishFavoriteGroupEditFailure()
+    }
+
+    private fun FavoriteGroupData.editableFavoriteType(): FavoriteType? = when (type) {
+        World.value -> World
+        Avatar.value -> Avatar
+        else -> null
+    }
+
+    private fun acceptsFavoriteGroupEdit(sessionToken: AccountSessionToken, request: Long): Boolean =
+        favoriteGroupEditRequest == request &&
+            SharedFlowCentre.isCurrentSession(sessionToken)
+
+    private fun updateSelectedFavoriteGroup(updatedGroup: FavoriteGroupData) {
+        when (updatedGroup.type) {
+            World.value -> {
+                if (_worldGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
+                    _worldGroupOptions.value = WorldGroupOptions(updatedGroup)
+                    findWorldList(searchTexts[1])
+                }
+            }
+
+            Avatar.value -> {
+                if (_avatarGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
+                    _avatarGroupOptions.value = AvatarGroupOptions(updatedGroup)
+                    findAvatarList(searchTexts[2])
+                }
+            }
+        }
+    }
+
+    private fun FavoriteGroupData.sameFavoriteGroup(other: FavoriteGroupData): Boolean =
+        ownerId == other.ownerId && type == other.type && name == other.name
 
     /** Updates the account-bound source snapshot without applying UI filters. */
     private fun updateFriendSnapshot(sourceFriends: List<FriendData>) {
