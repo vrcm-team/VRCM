@@ -236,6 +236,21 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldProfilePublishDate = "公開日"
     override val worldProfileUpdateDate = "更新日"
     override val worldProfileLabReleaseDate = "ラボ公開日"
+    override val worldPersistenceTitle = "ワールドの保存データ"
+    override val worldPersistenceInitial = "このワールドにアカウントの保存データがあるか確認します。"
+    override val worldPersistenceCheck = "確認"
+    override val worldPersistenceChecking = "保存データを確認中..."
+    override val worldPersistenceExists = "このワールドにはアカウントの保存データがあります。"
+    override val worldPersistenceMissing = "このワールドにはアカウントの保存データがありません。"
+    override val worldPersistenceDeleted = "このワールドの保存データを削除しました。"
+    override val worldPersistenceCheckFailed = "保存データを確認できませんでした。もう一度お試しください。"
+    override val worldPersistenceCheckAgain = "再確認"
+    override val worldPersistenceDelete = "保存データを削除"
+    override val worldPersistenceDeleting = "保存データを削除中..."
+    override val worldPersistenceDeleteFailed = "保存データを削除できませんでした。もう一度お試しください。"
+    override val worldPersistenceDeleteConfirmTitle = "保存データを削除しますか？"
+    override val worldPersistenceDeleteConfirmMessage =
+        "このアカウントの、このワールドに保存されたデータを完全に削除します。この操作は取り消せません。"
     override val unknown = "不明"
 
     // CreateInstanceDialog
