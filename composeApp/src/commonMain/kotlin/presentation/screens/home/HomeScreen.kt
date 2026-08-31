@@ -227,35 +227,33 @@ private fun HomeDestinationContent(
                 if (page == HomeTab.Activity.ordinal) activityActivated = true
             }
     }
-    HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize(),
-        key = { HomeTab.entries[it].name },
-    ) { page ->
-        stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
-            val tabRow: @Composable () -> Unit = {
-                HomeTabRow(
-                    pagerState = pagerState,
-                    onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
-                )
-            }
-            when (HomeTab.entries[page]) {
-                HomeTab.Location -> Box(Modifier.fillMaxSize()) {
-                    CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                        FriendLocationPager.Content(
-                            headerContent = tabRow,
-                            isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
-                        )
+    Column(Modifier.fillMaxSize()) {
+        HomeTabRow(
+            pagerState = pagerState,
+            onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            key = { HomeTab.entries[it].name },
+        ) { page ->
+            stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
+                when (HomeTab.entries[page]) {
+                    HomeTab.Location -> Box(Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
+                            FriendLocationPager.Content(
+                                isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
+                            )
+                        }
                     }
-                }
-                HomeTab.Activity -> if (activityActivated) {
-                    FriendActivityTimelineDestination(
-                        hasBottomNavigation = hasBottomNavigation,
-                        headerContent = tabRow,
-                        isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
-                    )
-                } else {
-                    ActivityTimelinePreview(headerContent = tabRow)
+                    HomeTab.Activity -> if (activityActivated) {
+                        FriendActivityTimelineDestination(
+                            hasBottomNavigation = hasBottomNavigation,
+                            isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
+                        )
+                    } else {
+                        ActivityTimelinePreview()
+                    }
                 }
             }
         }
@@ -294,7 +292,6 @@ private fun HomeTabRow(
 @Composable
 private fun FriendActivityTimelineDestination(
     hasBottomNavigation: Boolean,
-    headerContent: @Composable () -> Unit,
     isActive: () -> Boolean,
 ) {
     val model: FriendActivityTimelineModel = koinViewModel()
@@ -335,16 +332,13 @@ private fun FriendActivityTimelineDestination(
             )
         },
         listState = listState,
-        headerContent = headerContent,
         bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
 }
 
 @Composable
-private fun ActivityTimelinePreview(headerContent: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize()) {
-        headerContent()
-    }
+private fun ActivityTimelinePreview() {
+    Spacer(Modifier.fillMaxSize())
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
