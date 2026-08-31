@@ -415,6 +415,15 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val favoriteAvatarsLoadFailed = "お気に入りアバターを読み込めませんでした"
     override val favoriteWorldCacheSaveFailed = "お気に入りワールドのキャッシュを保存できませんでした"
     override val favoriteAvatarCacheSaveFailed = "お気に入りアバターのキャッシュを保存できませんでした"
+    override val favoriteGroupClearAction = "お気に入りグループを空にする"
+    override val favoriteGroupClearTitle = "「%s」を空にしますか？"
+    override val favoriteGroupClearMessage =
+        "このグループから%d件のお気に入り関係だけを削除します。グループ自体は残り、この操作は元に戻せません。"
+    override val favoriteGroupClearing = "削除中..."
+    override val favoriteGroupClearSuccess = "お気に入りグループを空にしました"
+    override val favoriteGroupClearFailed = "お気に入りグループを空にできませんでした"
+    override val favoriteGroupClearSyncFailed =
+        "グループは空になりましたが、ローカルデータを更新できませんでした"
     override val personalDrawerTitle = "個人ナビゲーション"
     override val mainNavigationHome = "ホーム"
     override val mainNavigationSearch = "検索"

@@ -117,6 +117,25 @@ class FavoriteApi(private val client: HttpClient) {
         client.delete("$FAVORITES_API_PREFIX/$favoriteId").checkSuccess<Unit>()
     }
 
+    /** Clears every favorite relationship in an owned official group without deleting the group. */
+    suspend fun clearFavoriteGroup(
+        favoriteType: FavoriteType,
+        favoriteGroupName: String,
+        userId: String,
+    ) {
+        client.delete {
+            url {
+                path(
+                    FAVORITE_API_PREFIX,
+                    "group",
+                    favoriteType.value,
+                    favoriteGroupName,
+                    userId,
+                )
+            }
+        }.checkSuccess { Unit }
+    }
+
     /**
      * 获取收藏限制信息
      * 
