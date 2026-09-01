@@ -32,6 +32,10 @@ class FileApi(private val client: HttpClient) {
             if (fileId.isBlank() || fileVersion < 1) return ""
             return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
         }
+        fun originalFileUrl(fileId: String, fileVersion: Int): String {
+            if (fileId.isBlank() || fileVersion < 1) return ""
+            return "https://api.vrchat.cloud/api/1/file/$fileId/$fileVersion/file"
+        }
         fun convertFileUrl(fileUrl: String, fileSize: Int = 1024): String {
             if (fileUrl.isEmpty()) return ""
             val fileId = findFileId(fileUrl)
@@ -173,7 +177,8 @@ internal fun vrcxImageUploadParameters(
 ): FileImageUploadParameters = when (tagType) {
     FileTagType.Gallery,
     FileTagType.Icon,
-    FileTagType.AvatarImage -> FileImageUploadParameters(tag = tagType.value)
+    FileTagType.AvatarImage,
+    FileTagType.WorldImage -> FileImageUploadParameters(tag = tagType.value)
 
     FileTagType.Sticker -> FileImageUploadParameters(
         tag = tagType.value,

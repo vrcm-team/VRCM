@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -33,6 +35,24 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+internal data class WorldImageEditState(
+    val canEdit: Boolean = false,
+    val sessionToken: AccountSessionToken? = null,
+)
+
+internal sealed interface WorldProfileNotice {
+    data object ImageSaved : WorldProfileNotice
+}
+
+internal fun isCurrentWorldImageUpdate(
+    currentWorld: WorldProfileVo?,
+    currentSession: AuthenticatedAccount?,
+    update: WorldImageUpdate,
+): Boolean = currentWorld?.worldId == update.world.id &&
+    currentWorld.authorID == update.world.authorId &&
+    update.world.authorId == currentSession?.account?.userId &&
+    update.sessionToken == currentSession?.token
+
 /**
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
  */
@@ -55,6 +75,25 @@ class WorldProfileScreenModel internal constructor(
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    internal val imageEditState: StateFlow<WorldImageEditState> = combine(
+        worldProfileState,
+        SharedFlowCentre.currentSession,
+    ) { world, session ->
+        val canEdit = world?.authorID?.isNotBlank() == true &&
+            world.authorID == session?.account?.userId
+        WorldImageEditState(
+            canEdit = canEdit,
+            sessionToken = session?.token?.takeIf { canEdit },
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = WorldImageEditState(),
+    )
+
+    private val _notices = MutableSharedFlow<WorldProfileNotice>(extraBufferCapacity = 1)
+    internal val notices: SharedFlow<WorldProfileNotice> = _notices.asSharedFlow()
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -81,7 +120,7 @@ class WorldProfileScreenModel internal constructor(
 
     private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
         val cached = worldProfileCacheStore.load(worldId)
-        if (cached != null) {
+        if (cached != null && _worldProfileState.value?.worldId == worldId) {
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
@@ -97,6 +136,35 @@ class WorldProfileScreenModel internal constructor(
         } else {
             loadCachedInstances(cached.world.instances.orEmpty())
         }
+    }
+
+    internal suspend fun applyWorldImageUpdate(update: WorldImageUpdate): Boolean {
+        val current = _worldProfileState.value
+        val session = SharedFlowCentre.currentSession.value
+        if (!isCurrentWorldImageUpdate(current, session, update)) return false
+
+        worldProfileCacheStore.save(
+            WorldProfileCache(
+                world = update.world,
+                cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+            )
+        )
+
+        val latest = _worldProfileState.value
+        if (!isCurrentWorldImageUpdate(
+                currentWorld = latest,
+                currentSession = SharedFlowCentre.currentSession.value,
+                update = update,
+            )
+        ) return false
+
+        _worldProfileState.value = WorldProfileVo(
+            world = update.world,
+            instancesList = latest?.instances.orEmpty(),
+            platformFileSizes = latest?.platformFileSizes.orEmpty(),
+        )
+        _notices.emit(WorldProfileNotice.ImageSaved)
+        return true
     }
 
     private fun loadCachedInstances(worldInstances: List<List<String>>) {

@@ -236,6 +236,26 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldProfilePublishDate = "公開日"
     override val worldProfileUpdateDate = "更新日"
     override val worldProfileLabReleaseDate = "ラボ公開日"
+    override val worldImageEditTitle = "ワールド画像を管理"
+    override val worldImageEditPreview = "プレビュー画像"
+    override val worldImageEditThumbnail = "カバーのサムネイル"
+    override val worldImageEditHint =
+        "10 MiB 以下の JPEG、PNG、WebP を選択してください。編集後は 1920 x 1080 で出力され、カバーのサムネイルは VRChat が生成します。"
+    override val worldImageEditChoose = "画像を選択"
+    override val worldImageEditUpload = "ワールド画像を更新"
+    override val worldImageEditUploading = "ワールド画像をアップロード中..."
+    override val worldImageEditSaved = "ワールドのプレビューとカバーを更新しました"
+    override val worldImageEditUploadFailed = "ワールド画像のアップロードに失敗しました"
+    override val worldImageEditAssignmentFailed =
+        "画像はアップロードされましたが、VRChat でワールドに設定できませんでした。画像の更新を再試行してください。"
+    override val worldImageEditRefreshFailed =
+        "画像は更新されましたが、最新のワールド情報を取得できませんでした。ワールドを更新して確認してください。"
+    override val worldImageEditSessionChanged =
+        "アカウントのセッションが変更されました。画像管理を開き直して再試行してください。"
+    override val worldImageEditUnsupportedFormat =
+        "画像形式が未対応か、拡張子と内容が一致しません。有効な JPEG、PNG、WebP を選択してください。"
+    override val worldImageEditFileTooLarge = "選択した画像は 10 MiB を超えています"
+    override val worldImageEditReadFailed = "選択したワールド画像を読み込めませんでした"
     override val unknown = "不明"
 
     // CreateInstanceDialog

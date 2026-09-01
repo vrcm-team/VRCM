@@ -251,6 +251,26 @@ sealed class LocaleStrings {
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldImageEditTitle: String = "Manage World Image"
+    open val worldImageEditPreview: String = "Preview image"
+    open val worldImageEditThumbnail: String = "Cover thumbnail"
+    open val worldImageEditHint: String =
+        "Choose a JPEG, PNG, or WebP up to 10 MiB. The editor exports a 1920 x 1080 image; VRChat generates the cover thumbnail."
+    open val worldImageEditChoose: String = "Choose image"
+    open val worldImageEditUpload: String = "Update world image"
+    open val worldImageEditUploading: String = "Uploading world image..."
+    open val worldImageEditSaved: String = "World preview and cover updated"
+    open val worldImageEditUploadFailed: String = "World image upload failed"
+    open val worldImageEditAssignmentFailed: String =
+        "The image was uploaded, but VRChat could not assign it to the world. Try updating the image again."
+    open val worldImageEditRefreshFailed: String =
+        "The image was updated, but the latest world details could not be loaded. Refresh the world to verify it."
+    open val worldImageEditSessionChanged: String =
+        "Your account session changed. Reopen image management and try again."
+    open val worldImageEditUnsupportedFormat: String =
+        "The image format is unsupported or does not match its extension. Choose a valid JPEG, PNG, or WebP file."
+    open val worldImageEditFileTooLarge: String = "The selected image is larger than 10 MiB"
+    open val worldImageEditReadFailed: String = "The selected world image could not be read"
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog

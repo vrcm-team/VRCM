@@ -235,6 +235,25 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val worldProfilePublishDate = "發布日期"
     override val worldProfileUpdateDate = "更新日期"
     override val worldProfileLabReleaseDate = "實驗室發布日期"
+    override val worldImageEditTitle = "管理世界圖片"
+    override val worldImageEditPreview = "預覽圖"
+    override val worldImageEditThumbnail = "封面縮圖"
+    override val worldImageEditHint =
+        "請選擇不超過 10 MiB 的 JPEG、PNG 或 WebP 圖片。編輯器將輸出 1920 x 1080 圖片，封面縮圖由 VRChat 產生。"
+    override val worldImageEditChoose = "選擇圖片"
+    override val worldImageEditUpload = "更新世界圖片"
+    override val worldImageEditUploading = "正在上傳世界圖片..."
+    override val worldImageEditSaved = "世界預覽圖和封面已更新"
+    override val worldImageEditUploadFailed = "世界圖片上傳失敗"
+    override val worldImageEditAssignmentFailed =
+        "圖片已上傳，但 VRChat 未能將其設為世界圖片，請重新嘗試更新。"
+    override val worldImageEditRefreshFailed =
+        "圖片已更新，但無法取得最新世界詳情，請重新整理世界以確認結果。"
+    override val worldImageEditSessionChanged = "帳號工作階段已變更，請重新開啟圖片管理後再試。"
+    override val worldImageEditUnsupportedFormat =
+        "圖片格式不受支援或副檔名與內容不符，請選擇有效的 JPEG、PNG 或 WebP 檔案。"
+    override val worldImageEditFileTooLarge = "所選圖片超過 10 MiB"
+    override val worldImageEditReadFailed = "無法讀取所選世界圖片"
     override val unknown = "未知"
 
     // CreateInstanceDialog

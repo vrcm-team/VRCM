@@ -50,6 +50,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 import kotlinx.serialization.Serializable
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -58,6 +59,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -65,6 +67,11 @@ import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.handoffPreparedImageToEditor
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.EmptyInstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
@@ -99,27 +106,79 @@ class WorldProfileScreen(
     override fun Content() {
         // 创建ViewModel
         val screenModel: WorldProfileScreenModel = koinViewModel()
+        val imageProcessor: PrintImageProcessor = koinInject()
+        val editorSessionStore: PrintImageEditorSessionStore = koinInject()
 
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val imageEditState by screenModel.imageEditState.collectAsState()
+        val worldCoverUpdates by editorSessionStore.worldCoverUpdates.collectAsState()
         val currentNavigator = currentNavigator
+        val locale = strings
+        var showImageEditSheet by remember { mutableStateOf(false) }
+
+        LaunchedEffect(screenModel, locale) {
+            screenModel.notices.collect { notice ->
+                val text = when (notice) {
+                    WorldProfileNotice.ImageSaved -> locale.worldImageEditSaved
+                }
+                SharedFlowCentre.toastText.emit(ToastText.Success(text))
+            }
+        }
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
+        }
+
+        LaunchedEffect(imageEditState.canEdit) {
+            if (!imageEditState.canEdit) showImageEditSheet = false
+        }
+
+        val displayedWorld = profileVoState ?: worldProfileVO
+        LaunchedEffect(displayedWorld.worldId, worldCoverUpdates) {
+            val update = worldCoverUpdates[displayedWorld.worldId]
+                ?: return@LaunchedEffect
+            screenModel.applyWorldImageUpdate(update)
+            editorSessionStore.consumeWorldCoverUpdate(displayedWorld.worldId)
         }
 
         CompositionLocalProvider(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
             WorldProfileContent(
-                worldProfileVo = profileVoState ?: worldProfileVO,
+                worldProfileVo = displayedWorld,
                 onReturn = { currentNavigator.pop() },
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
+                canEditImage = imageEditState.canEdit,
+                onEditImage = { showImageEditSheet = true },
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
+            )
+        }
+        val editToken = imageEditState.sessionToken
+        if (showImageEditSheet && imageEditState.canEdit && editToken != null) {
+            WorldImageEditSheet(
+                world = displayedWorld,
+                imageProcessor = imageProcessor,
+                onDismiss = { showImageEditSheet = false },
+                onEditImage = { source, prepared ->
+                    handoffPreparedImageToEditor(
+                        source = source,
+                        prepared = prepared,
+                        sessionStore = editorSessionStore,
+                        target = ImageEditorTarget.WorldCover(
+                            worldId = displayedWorld.worldId,
+                            sessionToken = editToken,
+                        ),
+                        push = { sessionId ->
+                            currentNavigator.push(PrintImageEditorScreen(sessionId))
+                            showImageEditSheet = false
+                        },
+                    )
+                },
             )
         }
     }
@@ -132,6 +191,8 @@ class WorldProfileScreen(
         onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
+        canEditImage: Boolean = false,
+        onEditImage: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
@@ -227,7 +288,9 @@ class WorldProfileScreen(
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                canEditImage = canEditImage,
+                onEditImage = onEditImage,
             )
 
             // ========== BottomSheet ==========
@@ -729,6 +792,8 @@ private fun RenderTopBar(
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    canEditImage: Boolean = false,
+    onEditImage: () -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -736,7 +801,8 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
+        val reservedActionsWidth = if (canEditImage) 256.dp else 208.dp
+        val titleMaxWidth = (maxWidth - reservedActionsWidth).coerceIn(40.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -748,6 +814,17 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null,
             actions = { colors ->
+                if (canEditImage) {
+                    IconButton(
+                        colors = colors,
+                        onClick = onEditImage,
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Edit,
+                            contentDescription = strings.worldImageEditTitle,
+                        )
+                    }
+                }
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
