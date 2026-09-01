@@ -796,8 +796,6 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val reservedWidth = if (showDelete) 256.dp else 208.dp
-        val titleMaxWidth = (maxWidth - reservedWidth).coerceIn(0.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -808,6 +806,29 @@ private fun RenderTopBar(
             color = MaterialTheme.colorScheme.surface,
             onReturn = onReturn,
             onMenu = null,
+            centerContent = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .alpha(blurProgress)
+                        .simpleClickable(onClick = onCollapse),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        text = worldName,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            },
             actions = { colors ->
                 if (showDelete) {
                     ATooltipBox(tooltip = { Text(strings.worldDeleteAction) }) {
@@ -853,36 +874,8 @@ private fun RenderTopBar(
                         )
                     }
                 }
-            },
-        )
-        // 标题显示
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(topBarHeight + sysTopPadding)
-                .alpha(blurProgress)
-                .padding(top = sysTopPadding)
-        ) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .simpleClickable(onClick = onCollapse),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    modifier = Modifier.widthIn(max = titleMaxWidth),
-                    text = worldName,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-            }
-        }
+                },
+            )
     }
 }
 
