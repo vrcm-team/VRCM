@@ -47,6 +47,7 @@ import kotlin.test.assertNotEquals
 
 class AllWorldPersistenceDeletionModelTest : MainDispatcherTest() {
     private val models = mutableListOf<AllWorldPersistenceDeletionModel>()
+    private val authServices = mutableListOf<AuthService>()
     private val clients = mutableListOf<HttpClient>()
 
     @BeforeTest
@@ -62,6 +63,7 @@ class AllWorldPersistenceDeletionModelTest : MainDispatcherTest() {
                 clear()
             }
         }
+        authServices.forEach { it.closeAndJoin() }
         clients.forEach(HttpClient::close)
         SharedFlowCentre.emitLogout()
     }
@@ -291,7 +293,7 @@ class AllWorldPersistenceDeletionModelTest : MainDispatcherTest() {
                     "/meetup-assets".toPath(),
                 ),
             ),
-        )
+        ).also(authServices::add)
         return Fixture(client, authService)
     }
 

@@ -19,13 +19,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val serviceModule: Module = module {
     singleOf(::VersionService)
-    singleOf(::AuthService) bind WebSocketSessionRecovery::class
+    singleOf(::AuthService) {
+        onClose { it?.close() }
+    } bind WebSocketSessionRecovery::class
     single { UserProfileEnrichmentService(get()) }
     singleOf(::FavoriteService)
     singleOf(::FriendService)
