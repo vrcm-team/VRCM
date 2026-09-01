@@ -69,7 +69,7 @@ internal class ImageInviteService(
         sessionToken: AccountSessionToken,
     ): ImageInviteRemoteResult<Unit> {
         val response = authService.runSessionBoundCatching(sessionToken) {
-            val instanceLocation = authService.currentUser().location
+            val instanceLocation = authService.currentUser().presence.instance
             if (instanceLocation.isBlank() || instanceLocation == "offline") {
                 throw ImageInviteNotInInstanceException()
             }
