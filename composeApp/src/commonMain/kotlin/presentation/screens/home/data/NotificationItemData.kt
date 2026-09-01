@@ -108,6 +108,11 @@ data class NotificationItemData(
 
 }
 
+/** Photo responses are accepted only for the two invitation notification families. */
+internal val NotificationItemData.supportsInvitePhotoResponse: Boolean
+    get() = type.equals("invite", ignoreCase = true) ||
+            type.equals("requestInvite", ignoreCase = true)
+
 /** Number of notifications that still need the user's attention. */
 val List<NotificationItemData>.unreadCount: Int
     get() = count { !it.seen }

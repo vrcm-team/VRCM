@@ -10,10 +10,15 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class NotificationApiTest {
     @Test
@@ -66,6 +71,64 @@ class NotificationApiTest {
             listOf(HttpMethod.Put to "/api/1/auth/user/notifications/not_friend_request/see"),
             requests,
         )
+        client.close()
+    }
+
+    @Test
+    fun invitePhotoResponseUsesOfficialMultipartContract() = runBlocking {
+        var capturedPath = ""
+        var capturedBody = ""
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    capturedPath = request.url.encodedPath
+                    val body = request.body as MultiPartFormDataContent
+                    val channel = ByteChannel()
+                    body.writeTo(channel)
+                    capturedBody = channel.readRemaining().readByteArray().decodeToString()
+                    respond(
+                        content = "{\"id\":\"not_response\"}",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+        }
+
+        io.github.vrcmteam.vrcm.network.api.invite.InviteApi(client).respondInviteWithPhoto(
+            notificationId = "not_response",
+            responseSlot = 3,
+            imageBytes = byteArrayOf(
+                0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            ),
+        )
+
+        assertEquals("/api/1/invite/not_response/response/photo", capturedPath)
+        assertTrue(capturedBody.contains("name=data"))
+        assertTrue(capturedBody.contains("{\"responseSlot\":3}"))
+        assertTrue(capturedBody.contains("name=image; filename=\"image.png\""))
+        assertTrue(capturedBody.contains("Content-Type: image/png"))
+        client.close()
+    }
+
+    @Test
+    fun invitePhotoResponseRejectsInvalidPngAndSlotBeforeSending() = runBlocking {
+        var requestCount = 0
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    requestCount++
+                    respond("{}", HttpStatusCode.OK)
+                }
+            }
+        }
+
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            io.github.vrcmteam.vrcm.network.api.invite.InviteApi(client)
+                .respondInviteWithPhoto("not_response", 12, byteArrayOf())
+        }
+        kotlin.test.assertEquals(0, requestCount)
         client.close()
     }
 

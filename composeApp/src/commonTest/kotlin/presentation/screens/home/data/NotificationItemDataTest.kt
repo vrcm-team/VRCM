@@ -67,6 +67,19 @@ class NotificationItemDataTest {
     }
 
     @Test
+    fun photoResponseSupportIsLimitedToInviteNotificationFamilies() {
+        val invite = NotificationItemData(pipelineNotification(type = "invite"))
+        val requestInvite = NotificationItemData(pipelineNotification(type = "requestInvite"))
+        val inviteResponse = NotificationItemData(pipelineNotification(type = "inviteResponse"))
+        val boop = NotificationItemData(pipelineNotification(type = "boop"))
+
+        assertEquals(true, invite.supportsInvitePhotoResponse)
+        assertEquals(true, requestInvite.supportsInvitePhotoResponse)
+        assertEquals(false, inviteResponse.supportsInvitePhotoResponse)
+        assertEquals(false, boop.supportsInvitePhotoResponse)
+    }
+
+    @Test
     fun groupTargetFallsBackToOwnerIdAndOfficialLink() {
         val ownerItem = NotificationItemData(
             pipelineNotification(details = NotificationData.Data(ownerId = "grp_owner")),
@@ -121,6 +134,7 @@ class NotificationItemDataTest {
     private fun pipelineNotification(
         details: NotificationData.Data? = null,
         link: String? = null,
+        type: String = "group.announcement",
     ) = NotificationData(
         canDelete = true,
         category = "group",
@@ -147,7 +161,7 @@ class NotificationItemDataTest {
         senderUsername = null,
         title = null,
         titleKey = null,
-        type = "group.announcement",
+        type = type,
         updatedAt = "2026-08-30T00:00:00Z",
         version = 2,
     )
