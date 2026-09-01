@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
@@ -13,7 +12,6 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
-import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -52,6 +50,7 @@ class WorldProfileScreenModel internal constructor(
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
     val worldProfileState: StateFlow<WorldProfileVo?> = _worldProfileState.asStateFlow()
+    private val worldInstanceStateStore = WorldInstanceStateStore(_worldProfileState)
 
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
@@ -63,6 +62,13 @@ class WorldProfileScreenModel internal constructor(
         fetchGroupPermissions = { sessionToken, groupId ->
             authService.runSessionBoundCatching(sessionToken) {
                 groupsApi.fetchGroup(groupId).myMember?.permissions.orEmpty()
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+        fetchInstance = { sessionToken, target ->
+            authService.runSessionBoundCatching(sessionToken) {
+                instancesApi.closeStatus(target.worldId, target.instanceId)
             }?.let { response ->
                 InstanceCloseSessionResult(response.result, response.sessionToken)
             }
@@ -214,22 +220,19 @@ class WorldProfileScreenModel internal constructor(
         val request = result.request
         if (!SharedFlowCentre.isCurrentSession(request.sessionToken)) return
         val target = request.target
-        _worldProfileState.update { profile ->
-            profile?.applyInstanceCloseResponse(target, result.instance)
+        val applied = worldInstanceStateStore.applyClose(target, result.instance) {
+            SharedFlowCentre.isCurrentSession(request.sessionToken)
         }
+        if (!applied) return
         _closedInstanceLocations.tryEmit(target.location)
         SharedFlowCentre.toastText.emit(ToastText.Success(strings.instanceCloseSuccess))
     }
 
     private suspend fun emitInstanceCloseFailure(error: Throwable, strings: LocaleStrings) {
-        val message = if (error is VRCApiException && error.code == 403) {
-            strings.instanceClosePermissionDenied
-        } else {
-            error.message
-                ?.takeIf { it.isNotBlank() }
-                ?.let { "${strings.instanceCloseFailed}: $it" }
-                ?: strings.instanceCloseFailed
-        }
+        val message = error.message
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "${strings.instanceCloseFailed}: $it" }
+            ?: strings.instanceCloseFailed
         emitInstanceCloseError(message)
     }
 
@@ -305,13 +308,17 @@ class WorldProfileScreenModel internal constructor(
      */
     private suspend fun loadInstanceData(instanceIds: Map<String, Owner?>) {
         val currentProfile = _worldProfileState.value ?: return
-        val instanceVos = currentProfile.instances.toMutableList()
-        _worldProfileState.value = currentProfile.copy(instances = instanceVos)
         authService.reTryAuthCatching {
             // 获取所有实例数据
-            instanceIds.keys.asFlow().mapNotNull { instanceId ->
+            instanceIds.entries.asFlow().mapNotNull { (instanceId, initialOwner) ->
                 try {
-                    worldsApi.getWorldInstanceById(currentProfile.worldId, instanceId)
+                    worldInstanceStateStore.refreshInstance(
+                        worldId = currentProfile.worldId,
+                        instanceId = instanceId,
+                        initialOwner = initialOwner,
+                    ) {
+                        worldsApi.getWorldInstanceById(currentProfile.worldId, instanceId)
+                    }
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
                     SharedFlowCentre.toastText.emit(
@@ -321,13 +328,6 @@ class WorldProfileScreenModel internal constructor(
                 }
             }.catch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance data"))
-            }.map { instanceData ->
-                val owner: MutableStateFlow<Owner?> = MutableStateFlow(instanceIds[instanceData.instanceId])
-                val instanceVo = InstanceVo(instanceData, owner)
-                instanceVos.removeFirst { it.id == instanceData.id }
-                instanceVos.add(instanceVo)
-                _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos.toList())
-                instanceData.ownerId to owner
             }.collect { (ownerId, owner) ->
                 // 如果实例是活跃的，则获取实例的拥有者名称
                 fetchAndSetOwner(ownerId)

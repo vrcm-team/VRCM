@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class InstancesApiTest {
@@ -50,7 +51,23 @@ class InstancesApiTest {
         client.close()
     }
 
+    @Test
+    fun closeInstanceAcceptsResponseWithoutOptionalInstanceFields() = runBlocking {
+        val client = closeInstanceClient(
+            status = { HttpStatusCode.OK },
+            successContent = closedInstanceJson(includeOptionalFields = false),
+        )
+
+        val closed = InstancesApi(client).closeInstance(WORLD_ID, INSTANCE_ID)
+
+        assertEquals(LOCATION, closed.location)
+        assertNull(closed.active)
+        assertNull(closed.ownerId)
+        client.close()
+    }
+
     private fun closeInstanceClient(
+        successContent: String = closedInstanceJson(),
         status: (HttpRequestData) -> HttpStatusCode,
     ) = HttpClient(MockEngine) {
         engine {
@@ -58,7 +75,7 @@ class InstancesApiTest {
                 val responseStatus = status(request)
                 respond(
                     content = if (responseStatus == HttpStatusCode.OK) {
-                        closedInstanceJson()
+                        successContent
                     } else {
                         "permission denied"
                     },
@@ -72,22 +89,29 @@ class InstancesApiTest {
         }
     }
 
-    private fun closedInstanceJson(): String =
-        """
+    private fun closedInstanceJson(includeOptionalFields: Boolean = true): String {
+        val optionalFields = if (includeOptionalFields) {
+            """
+              "active":false,
+              "canRequestInvite":false,
+              "capacity":16,
+              "hidden":null,
+              "ownerId":"$USER_ID",
+            """.trimIndent()
+        } else {
+            ""
+        }
+        return """
         {
-          "active":false,
-          "canRequestInvite":false,
-          "capacity":16,
+          $optionalFields
           "clientNumber":"1",
           "closedAt":"2026-08-31T08:00:00.000Z",
           "full":false,
-          "hidden":null,
           "id":"$LOCATION",
           "instanceId":"$INSTANCE_ID",
           "location":"$LOCATION",
           "n_users":0,
           "name":"12345",
-          "ownerId":"$USER_ID",
           "permanent":false,
           "photonRegion":"us",
           "platforms":{"android":0,"ios":0,"standalonewindows":0},
@@ -130,6 +154,7 @@ class InstancesApiTest {
           "worldId":"$WORLD_ID"
         }
         """.trimIndent()
+    }
 
     private companion object {
         const val WORLD_ID = "wrld_00000000-0000-0000-0000-000000000001"

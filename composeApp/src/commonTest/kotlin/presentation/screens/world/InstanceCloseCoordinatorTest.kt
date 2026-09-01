@@ -129,6 +129,56 @@ class InstanceCloseCoordinatorTest {
     }
 
     @Test
+    fun forbiddenCloseConvergesToSuccessWhenRecheckShowsClosed() = runTest {
+        var currentToken: AccountSessionToken? = OWNER_TOKEN
+        var recheckCount = 0
+        val coordinator = coordinator(
+            currentSession = { currentToken },
+            fetchInstance = { token, _ ->
+                recheckCount++
+                InstanceCloseSessionResult(Result.success(closedInstance()), token)
+            },
+            closeInstance = { token, _ ->
+                InstanceCloseSessionResult(
+                    Result.failure(VRCApiException("Forbidden", 403, "already closed")),
+                    token,
+                )
+            },
+        )
+        coordinator.authorize(personalTarget())
+
+        assertIs<InstanceCloseSubmissionResult.Closed>(coordinator.submit())
+        assertEquals(1, recheckCount)
+        assertIs<InstanceCloseState.Idle>(coordinator.state.value)
+    }
+
+    @Test
+    fun forbiddenCloseRemainsRetryableWhenRecheckShowsActive() = runTest {
+        var currentToken: AccountSessionToken? = OWNER_TOKEN
+        val coordinator = coordinator(
+            currentSession = { currentToken },
+            fetchInstance = { token, _ ->
+                InstanceCloseSessionResult(
+                    Result.success(closedInstance(active = true, closedAt = null)),
+                    token,
+                )
+            },
+            closeInstance = { token, _ ->
+                InstanceCloseSessionResult(
+                    Result.failure(VRCApiException("Forbidden", 403, "permission denied")),
+                    token,
+                )
+            },
+        )
+        coordinator.authorize(personalTarget())
+
+        val failed = assertIs<InstanceCloseSubmissionResult.Failed>(coordinator.submit())
+
+        assertEquals(403, assertIs<VRCApiException>(failed.error).code)
+        assertIs<InstanceCloseState.AwaitingConfirmation>(coordinator.state.value)
+    }
+
+    @Test
     fun authenticationRenewalCanCompleteTheOriginalRequest() = runTest {
         var currentToken: AccountSessionToken? = OWNER_TOKEN
         val renewedToken = AccountSessionToken(OWNER_ID, generation = 2)
@@ -290,14 +340,17 @@ class InstanceCloseCoordinatorTest {
 
         val stillActive = profile.applyInstanceCloseResponse(
             target,
-            originalData.copy(nUsers = 2),
+            originalData.copy(nUsers = 2).asInstanceCloseResponse(),
         )
         assertEquals(2, stillActive.instances.single().currentUsers)
         assertTrue(stillActive.instances.single().owner === original.owner)
 
         val closed = stillActive.applyInstanceCloseResponse(
             target,
-            originalData.copy(active = false, closedAt = "2026-08-31T08:00:00.000Z"),
+            originalData.copy(
+                active = false,
+                closedAt = "2026-08-31T08:00:00.000Z",
+            ).asInstanceCloseResponse(),
         )
         assertTrue(closed.instances.isEmpty())
     }
@@ -310,6 +363,15 @@ class InstanceCloseCoordinatorTest {
         ) -> InstanceCloseSessionResult<List<String>>? = { token, _ ->
             InstanceCloseSessionResult(Result.success(emptyList()), token)
         },
+        fetchInstance: suspend (
+            AccountSessionToken,
+            InstanceCloseTarget,
+        ) -> InstanceCloseSessionResult<InstanceData>? = { token, _ ->
+            InstanceCloseSessionResult(
+                Result.success(closedInstance(active = true, closedAt = null)),
+                token,
+            )
+        },
         closeInstance: suspend (
             AccountSessionToken,
             InstanceCloseTarget,
@@ -320,7 +382,22 @@ class InstanceCloseCoordinatorTest {
         currentSessionToken = currentSession,
         isCurrentSession = { it == currentSession() },
         fetchGroupPermissions = groupPermissions,
-        closeInstance = closeInstance,
+        fetchInstance = { token, target ->
+            fetchInstance(token, target)?.let { response ->
+                InstanceCloseSessionResult(
+                    result = response.result.map { it.asInstanceCloseResponse() },
+                    sessionToken = response.sessionToken,
+                )
+            }
+        },
+        closeInstance = { token, target ->
+            closeInstance(token, target)?.let { response ->
+                InstanceCloseSessionResult(
+                    result = response.result.map { it.asInstanceCloseResponse() },
+                    sessionToken = response.sessionToken,
+                )
+            }
+        },
     )
 
     private fun personalTarget(ownerId: String = OWNER_ID) = InstanceCloseTarget(

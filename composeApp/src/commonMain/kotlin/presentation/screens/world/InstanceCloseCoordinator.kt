@@ -2,9 +2,9 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
-import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
+import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceCloseResponse
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
-import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,7 +59,7 @@ internal sealed interface InstanceCloseAuthorizationResult {
 internal sealed interface InstanceCloseSubmissionResult {
     data class Closed(
         val request: InstanceCloseRequest,
-        val instance: InstanceData,
+        val instance: InstanceCloseResponse,
     ) : InstanceCloseSubmissionResult
     data object Busy : InstanceCloseSubmissionResult
     data object Abandoned : InstanceCloseSubmissionResult
@@ -75,10 +75,14 @@ internal class InstanceCloseCoordinator(
         AccountSessionToken,
         String,
     ) -> InstanceCloseSessionResult<List<String>>?,
+    private val fetchInstance: suspend (
+        AccountSessionToken,
+        InstanceCloseTarget,
+    ) -> InstanceCloseSessionResult<InstanceCloseResponse>?,
     private val closeInstance: suspend (
         AccountSessionToken,
         InstanceCloseTarget,
-    ) -> InstanceCloseSessionResult<InstanceData>?,
+    ) -> InstanceCloseSessionResult<InstanceCloseResponse>?,
 ) {
     private val _state = MutableStateFlow<InstanceCloseState>(InstanceCloseState.Idle)
     val state: StateFlow<InstanceCloseState> = _state.asStateFlow()
@@ -224,31 +228,85 @@ internal class InstanceCloseCoordinator(
 
         val refreshedRequest = request.copy(sessionToken = response.sessionToken)
         val closedInstance = response.result.getOrElse { error ->
-            _state.compareAndSet(
-                submitting,
-                InstanceCloseState.AwaitingConfirmation(refreshedRequest),
-            )
-            return InstanceCloseSubmissionResult.Failed(error)
+            if (error is VRCApiException && error.code == 403) {
+                return verifyForbiddenClose(submitting, refreshedRequest, error)
+            }
+            return failSubmission(submitting, refreshedRequest, error)
         }
-        if (closedInstance.worldId != request.target.worldId ||
-            closedInstance.instanceId != request.target.instanceId ||
-            closedInstance.location != request.target.location
-        ) {
-            _state.compareAndSet(
+        if (!closedInstance.matches(request.target)) {
+            return failSubmission(
                 submitting,
-                InstanceCloseState.AwaitingConfirmation(refreshedRequest),
-            )
-            return InstanceCloseSubmissionResult.Failed(
+                refreshedRequest,
                 InstanceCloseResponseMismatchException(),
             )
         }
 
-        return if (_state.compareAndSet(submitting, InstanceCloseState.Idle)) {
-            InstanceCloseSubmissionResult.Closed(refreshedRequest, closedInstance)
+        return completeSubmission(submitting, refreshedRequest, closedInstance)
+    }
+
+    private suspend fun verifyForbiddenClose(
+        submitting: InstanceCloseState.Submitting,
+        request: InstanceCloseRequest,
+        originalError: VRCApiException,
+    ): InstanceCloseSubmissionResult {
+        val response = try {
+            fetchInstance(request.sessionToken, request.target)
+        } catch (cancellation: CancellationException) {
+            _state.compareAndSet(submitting, InstanceCloseState.Idle)
+            throw cancellation
+        } catch (_: Throwable) {
+            return failSubmission(submitting, request, originalError)
+        } ?: run {
+            _state.compareAndSet(submitting, InstanceCloseState.Idle)
+            return InstanceCloseSubmissionResult.SessionChanged(request.sessionToken.userId)
+        }
+
+        if (response.sessionToken.userId != request.sessionToken.userId ||
+            !isCurrentSession(response.sessionToken)
+        ) {
+            _state.compareAndSet(submitting, InstanceCloseState.Idle)
+            return InstanceCloseSubmissionResult.SessionChanged(request.sessionToken.userId)
+        }
+
+        val refreshedRequest = request.copy(sessionToken = response.sessionToken)
+        val instance = response.result.getOrElse {
+            return failSubmission(submitting, refreshedRequest, originalError)
+        }
+        if (!instance.matches(request.target)) {
+            return failSubmission(
+                submitting,
+                refreshedRequest,
+                InstanceCloseResponseMismatchException(),
+            )
+        }
+        if (!instance.isClosed) {
+            return failSubmission(submitting, refreshedRequest, originalError)
+        }
+        return completeSubmission(submitting, refreshedRequest, instance)
+    }
+
+    private fun failSubmission(
+        submitting: InstanceCloseState.Submitting,
+        request: InstanceCloseRequest,
+        error: Throwable,
+    ): InstanceCloseSubmissionResult {
+        _state.compareAndSet(
+            submitting,
+            InstanceCloseState.AwaitingConfirmation(request),
+        )
+        return InstanceCloseSubmissionResult.Failed(error)
+    }
+
+    private fun completeSubmission(
+        submitting: InstanceCloseState.Submitting,
+        request: InstanceCloseRequest,
+        response: InstanceCloseResponse,
+    ): InstanceCloseSubmissionResult =
+        if (_state.compareAndSet(submitting, InstanceCloseState.Idle)) {
+            InstanceCloseSubmissionResult.Closed(request, response)
         } else {
             InstanceCloseSubmissionResult.Abandoned
         }
-    }
 
     /** Only an idle confirmation can be invalidated immediately by an unrelated session change. */
     fun onSessionChanged(sessionToken: AccountSessionToken?) {
@@ -296,24 +354,8 @@ internal fun InstanceVo.canOfferInstanceClose(sessionToken: AccountSessionToken?
     }
 }
 
-internal fun WorldProfileVo.applyInstanceCloseResponse(
-    target: InstanceCloseTarget,
-    response: InstanceData,
-): WorldProfileVo {
-    if (worldId != target.worldId) return this
-    val updatedInstances = if (!response.active || response.closedAt != null) {
-        instances.filterNot { it.location == target.location }
-    } else {
-        instances.map { current ->
-            if (current.location == target.location) {
-                InstanceVo(response, current.owner)
-            } else {
-                current
-            }
-        }
-    }
-    return copy(instances = updatedInstances)
-}
-
 private fun String.blueprintTypeOrNull(): BlueprintType? =
     runCatching { BlueprintType.fromValue(this) }.getOrNull()
+
+private fun InstanceCloseResponse.matches(target: InstanceCloseTarget): Boolean =
+    worldId == target.worldId && instanceId == target.instanceId && location == target.location
