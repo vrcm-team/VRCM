@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
+import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -25,9 +26,12 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -55,6 +59,7 @@ class WorldProfileScreenModel internal constructor(
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private val platformFileSizesJob = atomic<Job?>(null)
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -71,6 +76,9 @@ class WorldProfileScreenModel internal constructor(
      * 刷新世界数据
      */
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
+        if (_worldProfileState.value?.worldId != worldProfileVO.worldId) {
+            platformFileSizesJob.getAndSet(null)?.cancel()
+        }
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
         favoriteEntry.load(worldId)
@@ -85,13 +93,14 @@ class WorldProfileScreenModel internal constructor(
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
-                platformFileSizes = worldProfileVO.platformFileSizes,
+                platformFileSizes = cached.platformFileSizes ?: worldProfileVO.platformFileSizes,
             )
         }
 
         val shouldRefreshProfile = cached == null ||
             cached.isExpired(Clock.System.now().toEpochMilliseconds()) ||
-            cached.world.instances == null
+            cached.world.instances == null ||
+            cached.platformFileSizes == null
         if (shouldRefreshProfile) {
             refreshWorldData()
         } else {
@@ -145,27 +154,19 @@ class WorldProfileScreenModel internal constructor(
                 WorldProfileCache(
                     world = worldData,
                     cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                    platformFileSizes = null,
                 )
             )
             if (_worldProfileState.value?.worldId != worldId) return@onSuccess
 
-            // TODO
-//            val platformFileSizes = mutableStateListOf<PlatformFileSize>()
             // 更新世界基本信息
             _worldProfileState.value =
                 WorldProfileVo(
-                    world = worldData, 
+                    world = worldData,
                     instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
-//                    platformFileSizes = platformFileSizes,
+                    platformFileSizes = _worldProfileState.value?.platformFileSizes.orEmpty(),
                 )
-//            viewModelScope.launch(Dispatchers.IO) {
-//                // 获取平台文件大小信息
-//                runCatching {
-//                    platformFileSizes.addAll(worldPlatformService.getWorldPlatformFileSizes(worldData))
-//                }.onFailure {
-//                    SharedFlowCentre.toastText.emit(ToastText.Error("Failed to load platform file sizes: ${it.message}"))
-//                }
-//            }
+            loadPlatformFileSizes(worldData)
             // 获取实例ID列表
             val mergeInstanceIds = collectInstanceIds(
                 profile = _worldProfileState.value ?: return@onSuccess,
@@ -178,6 +179,31 @@ class WorldProfileScreenModel internal constructor(
         }.onFailure {
             SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
         }
+    }
+
+    private fun loadPlatformFileSizes(worldData: WorldData) {
+        val job = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            val result = worldPlatformService.getWorldPlatformFileSizes(worldData)
+            _worldProfileState.update { currentProfile ->
+                if (currentProfile?.worldId == worldData.id) {
+                    currentProfile.copy(platformFileSizes = result.platformFileSizes)
+                } else {
+                    currentProfile
+                }
+            }
+            if (result.isComplete) {
+                worldProfileCacheStore.save(
+                    WorldProfileCache(
+                        world = worldData,
+                        cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                        platformFileSizes = result.platformFileSizes,
+                    )
+                )
+            }
+        }
+        platformFileSizesJob.getAndSet(job)?.cancel()
+        job.invokeOnCompletion { platformFileSizesJob.compareAndSet(job, null) }
+        job.start()
     }
 
     private fun collectInstanceIds(

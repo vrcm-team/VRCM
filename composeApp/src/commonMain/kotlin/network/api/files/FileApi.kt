@@ -147,7 +147,7 @@ class FileApi(private val client: HttpClient) {
      * @return 文件信息
      */
     suspend fun getFileInfo(fileId: String): Result<FileResponse> = runCatching {
-        client.get("$FILES_API_PREFIX/$fileId").checkSuccess<FileResponse>()
+        client.get("$FILE_API_PREFIX/$fileId").checkSuccess<FileResponse>()
     }
     /**
      * 删除指定文件
