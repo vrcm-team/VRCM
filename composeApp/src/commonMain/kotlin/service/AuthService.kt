@@ -162,6 +162,17 @@ class AuthService(
         }
     }
 
+    internal fun applyCurrentUserHomeLocation(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        homeLocation: String,
+    ): Boolean = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+        val existing = currentUser?.takeIf { it.id == userId } ?: return@synchronized false
+        publishCurrentUserLocked(existing.copy(homeLocation = homeLocation))
+        true
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
             val existing = currentUser ?: return@synchronized

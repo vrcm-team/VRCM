@@ -236,6 +236,14 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldProfilePublishDate = "公開日"
     override val worldProfileUpdateDate = "更新日"
     override val worldProfileLabReleaseDate = "ラボ公開日"
+    override val worldProfileSetHomeWorld = "Home World に設定"
+    override val worldProfileResetHomeWorld = "Home World をリセット"
+    override val worldProfileHomeWorldUnavailable = "Home World の操作は利用できません"
+    override val worldProfileSetHomeWorldConfirmation = "このワールドを Home World に設定しますか？"
+    override val worldProfileResetHomeWorldConfirmation = "カスタム Home World を解除して VRChat のデフォルトに戻しますか？"
+    override val worldProfileHomeWorldSetSuccess = "Home World を更新しました"
+    override val worldProfileHomeWorldResetSuccess = "Home World をリセットしました"
+    override val worldProfileHomeWorldUpdateFailed = "Home World を更新できませんでした"
     override val unknown = "不明"
 
     // CreateInstanceDialog

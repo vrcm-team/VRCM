@@ -22,6 +22,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo.Owner
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.HomeWorldManager
+import io.github.vrcmteam.vrcm.service.HomeWorldSessionChangedException
+import io.github.vrcmteam.vrcm.service.HomeWorldUserContext
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
@@ -32,6 +35,23 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+
+internal enum class HomeWorldActionAvailability {
+    Unavailable,
+    CanSet,
+    Current,
+}
+
+internal data class HomeWorldActionState(
+    val availability: HomeWorldActionAvailability = HomeWorldActionAvailability.Unavailable,
+    val isUpdating: Boolean = false,
+)
+
+internal sealed interface HomeWorldNotice {
+    data object Set : HomeWorldNotice
+    data object Reset : HomeWorldNotice
+    data object UpdateFailed : HomeWorldNotice
+}
 
 /**
  * 世界档案页面的ViewModel，负责处理世界数据的加载和刷新
@@ -47,6 +67,7 @@ class WorldProfileScreenModel internal constructor(
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
     private val worldProfileCacheStore: WorldProfileCacheStore,
+    private val homeWorldManager: HomeWorldManager,
 ) : ViewModel() {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -55,6 +76,29 @@ class WorldProfileScreenModel internal constructor(
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val currentHomeWorldUser = homeWorldManager.currentUser.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = null,
+    )
+    private val isUpdatingHomeWorld = MutableStateFlow(false)
+    internal val homeWorldActionState: StateFlow<HomeWorldActionState> = combine(
+        worldProfileState,
+        currentHomeWorldUser,
+        isUpdatingHomeWorld,
+    ) { world, user, isUpdating ->
+        HomeWorldActionState(
+            availability = homeWorldActionAvailability(world?.worldId, user),
+            isUpdating = isUpdating,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = HomeWorldActionState(),
+    )
+    private val _homeWorldNotices = MutableSharedFlow<HomeWorldNotice>(extraBufferCapacity = 1)
+    internal val homeWorldNotices: SharedFlow<HomeWorldNotice> = _homeWorldNotices.asSharedFlow()
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -65,6 +109,38 @@ class WorldProfileScreenModel internal constructor(
 
     internal fun retryFavoriteEntryLoad() {
         favoriteEntry.retry()
+    }
+
+    internal fun updateHomeWorld() {
+        val worldId = worldProfileState.value?.worldId ?: return
+        val reset = when (homeWorldActionState.value.availability) {
+            HomeWorldActionAvailability.CanSet -> false
+            HomeWorldActionAvailability.Current -> true
+            HomeWorldActionAvailability.Unavailable -> return
+        }
+        if (!isUpdatingHomeWorld.compareAndSet(expect = false, update = true)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                homeWorldManager.updateHomeWorld(worldId.takeUnless { reset })
+                    .onSuccess {
+                        if (_worldProfileState.value?.worldId == worldId) {
+                            _homeWorldNotices.emit(
+                                if (reset) HomeWorldNotice.Reset else HomeWorldNotice.Set
+                            )
+                        }
+                    }
+                    .onFailure { error ->
+                        if (error !is HomeWorldSessionChangedException &&
+                            _worldProfileState.value?.worldId == worldId
+                        ) {
+                            _homeWorldNotices.emit(HomeWorldNotice.UpdateFailed)
+                        }
+                    }
+            } finally {
+                isUpdatingHomeWorld.value = false
+            }
+        }
     }
 
     /**
@@ -333,4 +409,14 @@ class WorldProfileScreenModel internal constructor(
             refreshWorldData()
         }
     }
-} 
+}
+
+internal fun homeWorldActionAvailability(
+    worldId: String?,
+    user: HomeWorldUserContext?,
+): HomeWorldActionAvailability = when {
+    worldId == null || !io.github.vrcmteam.vrcm.service.isWorldId(worldId) || user == null ->
+        HomeWorldActionAvailability.Unavailable
+    user.homeLocation == worldId -> HomeWorldActionAvailability.Current
+    else -> HomeWorldActionAvailability.CanSet
+}

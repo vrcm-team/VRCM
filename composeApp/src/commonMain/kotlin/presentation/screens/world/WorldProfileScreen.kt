@@ -24,7 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home as FilledHome
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Home as OutlinedHome
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -58,6 +60,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -72,10 +75,17 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCar
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
 import kotlin.math.abs
+
+internal fun HomeWorldNotice.localizedToast(locale: LocaleStrings): ToastText = when (this) {
+    HomeWorldNotice.Set -> ToastText.Success(locale.worldProfileHomeWorldSetSuccess)
+    HomeWorldNotice.Reset -> ToastText.Success(locale.worldProfileHomeWorldResetSuccess)
+    HomeWorldNotice.UpdateFailed -> ToastText.Error(locale.worldProfileHomeWorldUpdateFailed)
+}
 
 /**
  *
@@ -103,10 +113,25 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val homeWorldActionState by screenModel.homeWorldActionState.collectAsState()
         val currentNavigator = currentNavigator
+        val locale = strings
+        var showHomeWorldConfirmation by remember { mutableStateOf(false) }
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
+        }
+
+        LaunchedEffect(screenModel, locale) {
+            screenModel.homeWorldNotices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+            }
+        }
+
+        LaunchedEffect(homeWorldActionState.availability) {
+            if (homeWorldActionState.availability == HomeWorldActionAvailability.Unavailable) {
+                showHomeWorldConfirmation = false
+            }
         }
 
         CompositionLocalProvider(
@@ -118,20 +143,65 @@ class WorldProfileScreen(
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
+                homeWorldActionState = homeWorldActionState,
+                onHomeWorldClick = { showHomeWorldConfirmation = true },
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
+            )
+        }
+
+        if (showHomeWorldConfirmation) {
+            val resetHomeWorld = homeWorldActionState.availability == HomeWorldActionAvailability.Current
+            AlertDialog(
+                onDismissRequest = {
+                    if (!homeWorldActionState.isUpdating) showHomeWorldConfirmation = false
+                },
+                title = {
+                    Text(
+                        if (resetHomeWorld) strings.worldProfileResetHomeWorld
+                        else strings.worldProfileSetHomeWorld
+                    )
+                },
+                text = {
+                    Text(
+                        if (resetHomeWorld) strings.worldProfileResetHomeWorldConfirmation
+                        else strings.worldProfileSetHomeWorldConfirmation
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !homeWorldActionState.isUpdating &&
+                            homeWorldActionState.availability != HomeWorldActionAvailability.Unavailable,
+                        onClick = {
+                            showHomeWorldConfirmation = false
+                            screenModel.updateHomeWorld()
+                        },
+                    ) {
+                        Text(strings.confirm)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !homeWorldActionState.isUpdating,
+                        onClick = { showHomeWorldConfirmation = false },
+                    ) {
+                        Text(strings.cancel)
+                    }
+                },
             )
         }
     }
 
     // 主要内容组件
     @Composable
-    fun WorldProfileContent(
+    internal fun WorldProfileContent(
         worldProfileVo: WorldProfileVo,
         onReturn: () -> Unit = {},
         onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
+        homeWorldActionState: HomeWorldActionState = HomeWorldActionState(),
+        onHomeWorldClick: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
@@ -227,7 +297,9 @@ class WorldProfileScreen(
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                homeWorldActionState = homeWorldActionState,
+                onHomeWorldClick = onHomeWorldClick,
             )
 
             // ========== BottomSheet ==========
@@ -729,6 +801,8 @@ private fun RenderTopBar(
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    homeWorldActionState: HomeWorldActionState,
+    onHomeWorldClick: () -> Unit,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -736,7 +810,7 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
+        val titleMaxWidth = (maxWidth - 256.dp).coerceIn(40.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -751,6 +825,11 @@ private fun RenderTopBar(
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
+                )
+                HomeWorldActionButton(
+                    state = homeWorldActionState,
+                    colors = colors,
+                    onClick = onHomeWorldClick,
                 )
                 IconButton(
                     enabled = !isRefreshing,
@@ -798,6 +877,41 @@ private fun RenderTopBar(
                     overflow = TextOverflow.Ellipsis
                 )
 
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeWorldActionButton(
+    state: HomeWorldActionState,
+    colors: IconButtonColors,
+    onClick: () -> Unit,
+) {
+    val current = state.availability == HomeWorldActionAvailability.Current
+    val description = when (state.availability) {
+        HomeWorldActionAvailability.Unavailable -> strings.worldProfileHomeWorldUnavailable
+        HomeWorldActionAvailability.CanSet -> strings.worldProfileSetHomeWorld
+        HomeWorldActionAvailability.Current -> strings.worldProfileResetHomeWorld
+    }
+    ATooltipBox(tooltip = { Text(description) }) {
+        IconButton(
+            enabled = state.availability != HomeWorldActionAvailability.Unavailable && !state.isUpdating,
+            colors = colors,
+            onClick = onClick,
+        ) {
+            if (state.isUpdating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (current) Icons.Filled.FilledHome else Icons.Outlined.OutlinedHome,
+                    contentDescription = description,
+                )
             }
         }
     }

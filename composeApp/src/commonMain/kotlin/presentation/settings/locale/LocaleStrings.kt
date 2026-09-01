@@ -251,6 +251,15 @@ sealed class LocaleStrings {
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldProfileSetHomeWorld: String = "Set as Home World"
+    open val worldProfileResetHomeWorld: String = "Reset Home World"
+    open val worldProfileHomeWorldUnavailable: String = "Home World action unavailable"
+    open val worldProfileSetHomeWorldConfirmation: String = "Use this world as your Home World?"
+    open val worldProfileResetHomeWorldConfirmation: String =
+        "Remove your custom Home World and restore VRChat's default?"
+    open val worldProfileHomeWorldSetSuccess: String = "Home World updated"
+    open val worldProfileHomeWorldResetSuccess: String = "Home World reset"
+    open val worldProfileHomeWorldUpdateFailed: String = "Couldn't update Home World"
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog

@@ -235,6 +235,14 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val worldProfilePublishDate = "發布日期"
     override val worldProfileUpdateDate = "更新日期"
     override val worldProfileLabReleaseDate = "實驗室發布日期"
+    override val worldProfileSetHomeWorld = "設為 Home World"
+    override val worldProfileResetHomeWorld = "重設 Home World"
+    override val worldProfileHomeWorldUnavailable = "Home World 操作不可用"
+    override val worldProfileSetHomeWorldConfirmation = "將此世界設為你的 Home World？"
+    override val worldProfileResetHomeWorldConfirmation = "移除自訂 Home World 並恢復 VRChat 預設設定？"
+    override val worldProfileHomeWorldSetSuccess = "Home World 已更新"
+    override val worldProfileHomeWorldResetSuccess = "Home World 已重設"
+    override val worldProfileHomeWorldUpdateFailed = "無法更新 Home World"
     override val unknown = "未知"
 
     // CreateInstanceDialog
