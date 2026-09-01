@@ -65,6 +65,7 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
         val getStarted = CompletableDeferred<Unit>()
         val releaseGet = CompletableDeferred<Unit>()
         val updatedWorld = testWorld(name = "late response")
+        var worldGetCount = 0
         val fixture = worldProfileFixture { request ->
             when {
                 request.url.encodedPath == "/api/1/auth/user" ->
@@ -72,6 +73,7 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
 
                 request.method == HttpMethod.Get &&
                     request.url.encodedPath == "/api/1/worlds/wrld_owned" -> {
+                    worldGetCount++
                     getStarted.complete(Unit)
                     releaseGet.await()
                     jsonResponse(Json.encodeToString(WorldData.serializer(), updatedWorld))
@@ -111,12 +113,14 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
             assertTrue(model.isLoading.value)
 
             assertTrue(model.deleteWorld())
+            model.refreshWorldData()
             releaseGet.complete(Unit)
             cache.deleted.await()
 
             assertTrue(cache.saved.isEmpty())
             assertEquals(listOf("wrld_owned"), cache.deletedWorlds)
             assertEquals("cached", model.worldProfileState.value?.worldName)
+            assertEquals(1, worldGetCount)
         } finally {
             fixture.client.close()
         }

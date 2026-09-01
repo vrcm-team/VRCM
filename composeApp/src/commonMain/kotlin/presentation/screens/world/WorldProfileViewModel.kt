@@ -151,7 +151,11 @@ class WorldProfileScreenModel internal constructor(
 
     fun refreshWorldData() {
         val worldId = _worldProfileState.value?.worldId ?: return
-        if (_isLoading.value || worldId.isBlank()) return
+        if (_isLoading.value ||
+            worldId.isBlank() ||
+            deletion.state.value.isDeleting ||
+            deletion.state.value.isDeleted
+        ) return
         worldLoadJob?.cancel()
         val loadGeneration = ++worldLoadGeneration
         _isLoading.value = true
