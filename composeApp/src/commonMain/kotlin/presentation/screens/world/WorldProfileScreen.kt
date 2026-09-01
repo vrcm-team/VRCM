@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
@@ -134,6 +135,7 @@ class WorldProfileScreen(
         val isLoading by screenModel.isLoading.collectAsState()
         val publicationState by screenModel.publicationState.collectAsState()
         val worldPersistenceState by screenModel.worldPersistenceState.collectAsState()
+        val deletionState by screenModel.deletionState.collectAsState()
         val currentNavigator = currentNavigator
         val localeStrings = strings
         // 组件首次加载时自动刷新数据
@@ -143,6 +145,27 @@ class WorldProfileScreen(
         LaunchedEffect(screenModel, localeStrings) {
             screenModel.publicationNotices.collect { notice ->
                 SharedFlowCentre.toastText.emit(notice.localizedToast(localeStrings))
+            }
+        }
+        LaunchedEffect(screenModel, localeStrings, currentNavigator) {
+            screenModel.deletionNotices.collect { notice ->
+                when (notice) {
+                    is WorldDeletionNotice.Deleted -> {
+                        SharedFlowCentre.toastText.emit(
+                            if (notice.cacheCleanupFailed) {
+                                ToastText.Info(localeStrings.worldDeleteSuccessCacheCleanupFailed)
+                            } else {
+                                ToastText.Success(localeStrings.worldDeleteSuccess)
+                            }
+                        )
+                        if (currentNavigator.lastItem == this@WorldProfileScreen) {
+                            currentNavigator.pop()
+                        }
+                    }
+                    WorldDeletionNotice.Failed -> SharedFlowCentre.toastText.emit(
+                        ToastText.Error(localeStrings.worldDeleteFailed)
+                    )
+                }
             }
         }
 
@@ -161,6 +184,10 @@ class WorldProfileScreen(
                 onRequestWorldPersistenceDeletion = screenModel::requestWorldPersistenceDeletion,
                 onDismissWorldPersistenceDeletion = screenModel::dismissWorldPersistenceDeletion,
                 onConfirmWorldPersistenceDeletion = screenModel::confirmWorldPersistenceDeletion,
+                isDeleteAvailable = deletionState.isAvailable,
+                isDeleting = deletionState.isDeleting,
+                isDeleted = deletionState.isDeleted,
+                onDelete = { screenModel.deleteWorld() },
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
             )
@@ -181,6 +208,10 @@ class WorldProfileScreen(
         onRequestWorldPersistenceDeletion: () -> Unit = {},
         onDismissWorldPersistenceDeletion: () -> Unit = {},
         onConfirmWorldPersistenceDeletion: () -> Unit = {},
+        isDeleteAvailable: Boolean = false,
+        isDeleting: Boolean = false,
+        isDeleted: Boolean = false,
+        onDelete: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
@@ -205,7 +236,7 @@ class WorldProfileScreen(
                 action = action,
                 worldName = worldProfileVo.worldName,
                 enabled = publicationState.action == action && publicationState.canExecute &&
-                    !publicationState.isChanging && !isRefreshing,
+                    !publicationState.isChanging && !isRefreshing && !isDeleting && !isDeleted,
                 onDismiss = { publicationConfirmation = null },
                 onConfirm = {
                     onPublicationAction(action)
@@ -230,6 +261,26 @@ class WorldProfileScreen(
                 onRequestDeletion = onRequestWorldPersistenceDeletion,
                 onDismissDeletion = onDismissWorldPersistenceDeletion,
                 onConfirmDeletion = onConfirmWorldPersistenceDeletion,
+            )
+        }
+
+        var showDeleteConfirmation by rememberSaveable(worldProfileVo.worldId) {
+            mutableStateOf(false)
+        }
+        val canDeleteNow = isDeleteAvailable && !isDeleting && !isRefreshing && !isDeleted &&
+            !publicationState.isChanging &&
+            worldPersistenceState.status != WorldPersistenceStatus.Deleting
+        LaunchedEffect(isDeleteAvailable, isDeleted) {
+            if (!isDeleteAvailable || isDeleted) showDeleteConfirmation = false
+        }
+
+        if (showDeleteConfirmation) {
+            WorldDeletionConfirmationDialog(
+                worldName = worldProfileVo.worldName,
+                isDeleting = isDeleting,
+                enabled = canDeleteNow,
+                onDismiss = { showDeleteConfirmation = false },
+                onConfirm = onDelete,
             )
         }
 
@@ -325,6 +376,11 @@ class WorldProfileScreen(
                 onRefresh = onRefresh,
                 publicationState = publicationState,
                 onPublicationAction = { publicationConfirmation = it },
+                showDelete = isDeleteAvailable && !isDeleted,
+                deleteEnabled = canDeleteNow,
+                isDeleting = isDeleting,
+                isDeleted = isDeleted,
+                onDelete = { showDeleteConfirmation = true },
             )
 
             // ========== BottomSheet ==========
@@ -829,6 +885,11 @@ private fun RenderTopBar(
     onRefresh: () -> Unit = {},
     publicationState: WorldPublicationUiState = WorldPublicationUiState(),
     onPublicationAction: (WorldPublicationAction) -> Unit = {},
+    showDelete: Boolean = false,
+    deleteEnabled: Boolean = false,
+    isDeleting: Boolean = false,
+    isDeleted: Boolean = false,
+    onDelete: () -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -836,9 +897,6 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val actionCount = 3 + if (publicationState.action == null) 0 else 1
-        val leftActionSlot = 68.dp
-        val rightActionSlot = 10.dp + 48.dp * actionCount
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -849,17 +907,41 @@ private fun RenderTopBar(
             color = MaterialTheme.colorScheme.surface,
             onReturn = onReturn,
             onMenu = null,
+            centerContent = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .alpha(blurProgress)
+                        .simpleClickable(onClick = onCollapse),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        text = worldName,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            },
             actions = { colors ->
                 WorldPublicationActionButton(
                     state = publicationState,
                     colors = colors,
-                    pageRefreshing = isRefreshing,
+                    pageRefreshing = isRefreshing || isDeleting || isDeleted,
                     onClick = onPublicationAction,
                 )
                 ATooltipBox(
                     tooltip = { Text(strings.worldPersistenceTitle) },
                 ) {
                     IconButton(
+                        enabled = !isDeleting && !isDeleted,
                         colors = colors,
                         onClick = onManagePersistence,
                     ) {
@@ -869,12 +951,35 @@ private fun RenderTopBar(
                         )
                     }
                 }
+                if (showDelete) {
+                    ATooltipBox(tooltip = { Text(strings.worldDeleteAction) }) {
+                        IconButton(
+                            enabled = deleteEnabled,
+                            colors = colors,
+                            onClick = onDelete,
+                        ) {
+                            if (isDeleting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = LocalContentColor.current,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = strings.worldDeleteAction,
+                                )
+                            }
+                        }
+                    }
+                }
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
                 )
                 IconButton(
-                    enabled = !isRefreshing && !publicationState.isChanging,
+                    enabled = !isRefreshing && !publicationState.isChanging &&
+                        !isDeleting && !isDeleted,
                     colors = colors,
                     onClick = onRefresh,
                 ) {
@@ -893,37 +998,6 @@ private fun RenderTopBar(
                 }
             },
         )
-        // 标题显示
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(topBarHeight + sysTopPadding)
-                .alpha(blurProgress)
-                .padding(top = sysTopPadding)
-        ) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .simpleClickable(onClick = onCollapse),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Spacer(modifier = Modifier.width(leftActionSlot))
-                Text(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                    text = worldName,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.width(rightActionSlot))
-            }
-        }
     }
 }
 
@@ -1009,6 +1083,69 @@ private fun WorldPublicationConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun WorldDeletionConfirmationDialog(
+    worldName: String,
+    isDeleting: Boolean,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.worldDeleteConfirmationTitle) },
+        text = {
+            Text(strings.worldDeleteConfirmationMessage.replace("%name%", worldName))
+        },
+        confirmButton = {
+            Button(
+                enabled = enabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                onClick = onConfirm,
+            ) {
+                Box(
+                    modifier = Modifier.size(18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.fillMaxSize(),
+                            color = LocalContentColor.current,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(strings.worldDeleteAction)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = !isDeleting,
+                onClick = onDismiss,
+            ) {
                 Text(strings.cancel)
             }
         },

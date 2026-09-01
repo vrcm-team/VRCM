@@ -269,6 +269,14 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldPersistenceDeleteConfirmTitle = "保存データを削除しますか？"
     override val worldPersistenceDeleteConfirmMessage =
         "このアカウントの、このワールドに保存されたデータを完全に削除します。この操作は取り消せません。"
+    override val worldDeleteAction = "ワールドを削除"
+    override val worldDeleteConfirmationTitle = "このワールドを削除しますか？"
+    override val worldDeleteConfirmationMessage =
+        "「%name%」を削除しますか？ワールドは非表示になり、関連ファイルは完全に削除されて復元できません。ワールドIDは永久に予約されたままです。"
+    override val worldDeleteSuccess = "ワールドを削除しました"
+    override val worldDeleteSuccessCacheCleanupFailed =
+        "ワールドは削除されましたが、ローカルのキャッシュ情報を削除できませんでした。"
+    override val worldDeleteFailed = "ワールドを削除できませんでした。もう一度お試しください。"
     override val unknown = "不明"
 
     // CreateInstanceDialog

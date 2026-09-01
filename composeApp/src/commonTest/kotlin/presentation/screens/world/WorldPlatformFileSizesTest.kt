@@ -353,6 +353,10 @@ private class RecordingWorldProfileCacheStore : WorldProfileCacheStore {
         value.value = cache
     }
 
+    override suspend fun delete(worldId: String) {
+        if (value.value?.world?.id == worldId) value.value = null
+    }
+
     override suspend fun clearAll() {
         value.value = null
     }

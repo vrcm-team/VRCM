@@ -264,6 +264,13 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val worldPersistenceDeleteFailed = "无法删除保存数据，请重试。"
     override val worldPersistenceDeleteConfirmTitle = "删除世界保存数据？"
     override val worldPersistenceDeleteConfirmMessage = "这会永久删除当前账号在这个世界中的保存数据，且无法恢复。"
+    override val worldDeleteAction = "删除世界"
+    override val worldDeleteConfirmationTitle = "确认删除这个世界？"
+    override val worldDeleteConfirmationMessage =
+        "确定要删除“%name%”吗？世界将转为隐藏状态，关联文件将被永久删除且无法恢复，世界 ID 将永久保留。"
+    override val worldDeleteSuccess = "世界已删除"
+    override val worldDeleteSuccessCacheCleanupFailed = "世界已删除，但未能清理本地缓存的详情。"
+    override val worldDeleteFailed = "删除世界失败，请重试。"
     override val unknown = "未知"
 
     // CreateInstanceDialog

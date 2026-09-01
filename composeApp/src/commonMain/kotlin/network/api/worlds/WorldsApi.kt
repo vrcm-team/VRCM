@@ -36,6 +36,10 @@ class WorldsApi(private val client: HttpClient)  {
         client.delete("$WORLDS_API_PREFIX/$worldId/publish").checkSuccess { Unit }
     }
 
+    suspend fun deleteWorld(worldId: String) {
+        client.delete("$WORLDS_API_PREFIX/$worldId").checkSuccess { Unit }
+    }
+
     suspend fun getRecentWorlds(
         n: Int = 50,
         offset: Int = 0,
