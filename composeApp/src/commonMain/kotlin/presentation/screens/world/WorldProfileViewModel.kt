@@ -183,21 +183,23 @@ class WorldProfileScreenModel internal constructor(
 
     private fun loadPlatformFileSizes(worldData: WorldData) {
         val job = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-            val platformFileSizes = worldPlatformService.getWorldPlatformFileSizes(worldData)
+            val result = worldPlatformService.getWorldPlatformFileSizes(worldData)
             _worldProfileState.update { currentProfile ->
                 if (currentProfile?.worldId == worldData.id) {
-                    currentProfile.copy(platformFileSizes = platformFileSizes)
+                    currentProfile.copy(platformFileSizes = result.platformFileSizes)
                 } else {
                     currentProfile
                 }
             }
-            worldProfileCacheStore.save(
-                WorldProfileCache(
-                    world = worldData,
-                    cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
-                    platformFileSizes = platformFileSizes,
+            if (result.isComplete) {
+                worldProfileCacheStore.save(
+                    WorldProfileCache(
+                        world = worldData,
+                        cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                        platformFileSizes = result.platformFileSizes,
+                    )
                 )
-            )
+            }
         }
         platformFileSizesJob.getAndSet(job)?.cancel()
         job.invokeOnCompletion { platformFileSizesJob.compareAndSet(job, null) }
