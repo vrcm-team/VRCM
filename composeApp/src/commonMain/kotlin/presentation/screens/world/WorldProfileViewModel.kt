@@ -144,33 +144,36 @@ class WorldProfileScreenModel internal constructor(
         val session = SharedFlowCentre.currentSession.value
         if (!isCurrentWorldImageUpdate(current, session, update)) return false
 
-        if (!worldProfileCacheStore.saveIfCurrent(
+        if (!worldProfileCacheStore.saveAndCommitIfCurrent(
             WorldProfileCache(
                 world = update.world,
                 cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
             ),
-            isCurrent = {
+            canStart = {
                 isCurrentWorldImageUpdate(
                     currentWorld = _worldProfileState.value,
                     currentSession = SharedFlowCentre.currentSession.value,
                     update = update,
                 )
             },
+            commit = {
+                SharedFlowCentre.commitIfCurrentSession(update.sessionToken) { currentSession ->
+                    val latest = _worldProfileState.value
+                        ?: return@commitIfCurrentSession false
+                    if (!isCurrentWorldImageUpdate(latest, currentSession, update)) {
+                        return@commitIfCurrentSession false
+                    }
+                    _worldProfileState.compareAndSet(
+                        expect = latest,
+                        update = WorldProfileVo(
+                            world = update.world,
+                            instancesList = latest.instances,
+                            platformFileSizes = latest.platformFileSizes,
+                        ),
+                    )
+                }
+            },
         )) return false
-
-        val latest = _worldProfileState.value
-        if (!isCurrentWorldImageUpdate(
-                currentWorld = latest,
-                currentSession = SharedFlowCentre.currentSession.value,
-                update = update,
-            )
-        ) return false
-
-        _worldProfileState.value = WorldProfileVo(
-            world = update.world,
-            instancesList = latest?.instances.orEmpty(),
-            platformFileSizes = latest?.platformFileSizes.orEmpty(),
-        )
         _notices.emit(WorldProfileNotice.ImageSaved)
         return true
     }

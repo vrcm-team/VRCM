@@ -2,7 +2,9 @@ package io.github.vrcmteam.vrcm.storage
 
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import io.github.vrcmteam.vrcm.core.shared.AuthenticationSessionRegistry
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
@@ -13,25 +15,35 @@ import kotlin.test.assertNull
 
 class RoomWorldProfileCacheStoreTest {
     @Test
-    fun invalidatedSessionRestoresPreviousWorldCache() = withStore { store ->
+    fun sessionInvalidatedBeforeStateCommitRestoresPreviousWorldCache() = withStore { store ->
         store.save(WorldProfileCache(worldData("old.png"), cachedAtEpochMilliseconds = 1L))
+        val sessions = AuthenticationSessionRegistry()
+        val token = sessions.authenticate(AccountDto(userId = "usr_owner")).token
+        var displayedImage = "old.png"
 
-        var checks = 0
-        val committed = store.saveIfCurrent(
+        val committed = store.saveAndCommitIfCurrent(
             WorldProfileCache(worldData("new.png"), cachedAtEpochMilliseconds = 2L),
-            isCurrent = { ++checks == 1 },
+            canStart = { sessions.isCurrent(token) },
+            commit = {
+                sessions.invalidate()
+                sessions.commitIfCurrent(token) {
+                    displayedImage = "new.png"
+                    true
+                }
+            },
         )
 
         assertFalse(committed)
+        assertEquals("old.png", displayedImage)
         assertEquals("old.png", store.load("wrld_cached")?.world?.imageUrl)
     }
 
     @Test
     fun invalidatedSessionDoesNotLeaveNewWorldCache() = withStore { store ->
-        var checks = 0
-        val committed = store.saveIfCurrent(
+        val committed = store.saveAndCommitIfCurrent(
             WorldProfileCache(worldData("new.png"), cachedAtEpochMilliseconds = 1L),
-            isCurrent = { ++checks == 1 },
+            canStart = { true },
+            commit = { false },
         )
 
         assertFalse(committed)
