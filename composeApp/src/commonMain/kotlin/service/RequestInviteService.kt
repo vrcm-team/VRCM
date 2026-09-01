@@ -36,15 +36,20 @@ internal class NetworkRequestInviteCall(
 }
 
 private class RequestInviteSubmissionGate {
-    private val lock = SynchronizedObject()
-    private val recipients = mutableSetOf<String>()
+    private data class Key(
+        val accountUserId: String,
+        val recipientUserId: String,
+    )
 
-    fun tryStart(userId: String): Boolean = synchronized(lock) {
-        recipients.add(userId)
+    private val lock = SynchronizedObject()
+    private val submissions = mutableSetOf<Key>()
+
+    fun tryStart(accountUserId: String, recipientUserId: String): Boolean = synchronized(lock) {
+        submissions.add(Key(accountUserId, recipientUserId))
     }
 
-    fun finish(userId: String) = synchronized(lock) {
-        recipients.remove(userId)
+    fun finish(accountUserId: String, recipientUserId: String) = synchronized(lock) {
+        submissions.remove(Key(accountUserId, recipientUserId))
     }
 }
 
@@ -56,7 +61,7 @@ class RequestInviteService internal constructor(
     suspend fun send(userId: String): RequestInviteResult {
         val sessionToken = SharedFlowCentre.currentSession.value?.token
             ?: return RequestInviteResult.SessionChanged
-        if (!submissionGate.tryStart(userId)) return RequestInviteResult.InFlight
+        if (!submissionGate.tryStart(sessionToken.userId, userId)) return RequestInviteResult.InFlight
 
         return try {
             val response = request.send(sessionToken, userId)
@@ -69,7 +74,7 @@ class RequestInviteService internal constructor(
                 onFailure = { RequestInviteResult.Failed(it, response.sessionToken) },
             )
         } finally {
-            submissionGate.finish(userId)
+            submissionGate.finish(sessionToken.userId, userId)
         }
     }
 }
