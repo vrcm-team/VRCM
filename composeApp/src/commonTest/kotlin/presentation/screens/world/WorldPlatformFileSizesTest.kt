@@ -50,6 +50,7 @@ import org.koin.core.logger.EmptyLogger
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -57,6 +58,11 @@ import kotlin.test.assertNull
 class WorldPlatformFileSizesTest : MainDispatcherTest() {
     private val models = mutableListOf<WorldProfileScreenModel>()
     private val clients = mutableListOf<HttpClient>()
+
+    @BeforeTest
+    fun authenticateViewer() = runBlocking {
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_viewer"))
+    }
 
     @AfterTest
     fun disposeResources() {

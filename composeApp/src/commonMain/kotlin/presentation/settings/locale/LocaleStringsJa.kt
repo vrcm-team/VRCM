@@ -181,6 +181,24 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val instanceCreateSuccess = "インスタンスを作成し、招待を送信しました"
     override val instanceCreateSuccessButInviteFailed = "インスタンスは作成されましたが、招待に失敗しました"
     override val instanceCreateFailed = "インスタンス作成に失敗しました"
+    override val worldPublishAction = "コミュニティラボに公開"
+    override val worldUnpublishAction = "ワールドを非公開にする"
+    override val worldPublishConfirmationTitle = "ワールドを公開しますか？"
+    override val worldUnpublishConfirmationTitle = "ワールドを非公開にしますか？"
+    override val worldPublishConfirmationMessage =
+        "%sをコミュニティラボに公開しますか？公開できるワールドは週に1つまでです。"
+    override val worldUnpublishConfirmationMessage = "%sを非公開にしてプライベートに戻しますか？"
+    override val worldPublishSuccess = "ワールドを公開しました"
+    override val worldUnpublishSuccess = "ワールドを非公開にしました"
+    override val worldPublishFailed = "ワールドの公開に失敗しました"
+    override val worldUnpublishFailed = "ワールドの非公開化に失敗しました"
+    override val worldPublishUnavailable = "現在このワールドは公開資格を満たしていません。公開できるワールドは週に1つまでです。"
+    override val worldPublishAvailabilityCheckFailed =
+        "公開可能か確認できませんでした。更新してもう一度お試しください。"
+    override val worldPublicationRefreshRequired =
+        "リクエストは完了しましたが、現在の状態を確認できませんでした。再実行する前に更新してください。"
+    override val worldPublicationCacheSyncFailed =
+        "ワールドの状態は更新されましたが、キャッシュを保存できませんでした。再実行する前に更新してください。"
 
     // World Search
     override val worldSearchAdvancedOptions = "詳細検索オプション"

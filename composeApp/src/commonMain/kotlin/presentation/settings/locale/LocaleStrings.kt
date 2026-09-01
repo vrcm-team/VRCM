@@ -196,6 +196,25 @@ sealed class LocaleStrings {
     open val instanceCreateSuccess: String = "Successfully created instance and sent invite"
     open val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed"
     open val instanceCreateFailed: String = "Failed to create instance"
+    open val worldPublishAction: String = "Publish to Community Labs"
+    open val worldUnpublishAction: String = "Unpublish World"
+    open val worldPublishConfirmationTitle: String = "Publish World?"
+    open val worldUnpublishConfirmationTitle: String = "Unpublish World?"
+    open val worldPublishConfirmationMessage: String =
+        "Publish %s to Community Labs? Publishing is limited to one world per week."
+    open val worldUnpublishConfirmationMessage: String = "Unpublish %s and make it private?"
+    open val worldPublishSuccess: String = "World published"
+    open val worldUnpublishSuccess: String = "World unpublished"
+    open val worldPublishFailed: String = "Failed to publish world"
+    open val worldUnpublishFailed: String = "Failed to unpublish world"
+    open val worldPublishUnavailable: String =
+        "This world is not currently eligible for publishing. You can publish at most one world per week."
+    open val worldPublishAvailabilityCheckFailed: String =
+        "Could not check publishing availability. Refresh to try again."
+    open val worldPublicationRefreshRequired: String =
+        "The request completed, but the current status could not be confirmed. Refresh before trying again."
+    open val worldPublicationCacheSyncFailed: String =
+        "World status updated, but the cached data could not be saved. Refresh before trying again."
 
     // World Search
     open val worldSearchAdvancedOptions: String = "Advanced Search Options"

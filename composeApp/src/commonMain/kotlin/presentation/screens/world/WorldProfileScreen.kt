@@ -58,6 +58,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -72,10 +73,36 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCar
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import presentation.compoments.TopMenuBar
 import kotlin.math.abs
+
+internal fun WorldPublicationNotice.localizedToast(locale: LocaleStrings): ToastText =
+    when (this) {
+        is WorldPublicationNotice.Changed -> ToastText.Success(
+            when (action) {
+                WorldPublicationAction.Publish -> locale.worldPublishSuccess
+                WorldPublicationAction.Unpublish -> locale.worldUnpublishSuccess
+            }
+        )
+        is WorldPublicationNotice.ChangeFailed -> ToastText.Error(
+            when (action) {
+                WorldPublicationAction.Publish -> locale.worldPublishFailed
+                WorldPublicationAction.Unpublish -> locale.worldUnpublishFailed
+            }.withOptionalDetail(message)
+        )
+        is WorldPublicationNotice.RefreshFailed -> ToastText.Error(
+            locale.worldPublicationRefreshRequired.withOptionalDetail(message)
+        )
+        is WorldPublicationNotice.CacheSyncFailed -> ToastText.Error(
+            locale.worldPublicationCacheSyncFailed.withOptionalDetail(message)
+        )
+    }
+
+private fun String.withOptionalDetail(detail: String?): String =
+    detail?.takeIf { it.isNotBlank() }?.let { "$this: $it" } ?: this
 
 /**
  *
@@ -103,10 +130,17 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val publicationState by screenModel.publicationState.collectAsState()
         val currentNavigator = currentNavigator
+        val localeStrings = strings
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
+        }
+        LaunchedEffect(screenModel, localeStrings) {
+            screenModel.publicationNotices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(localeStrings))
+            }
         }
 
         CompositionLocalProvider(
@@ -118,6 +152,8 @@ class WorldProfileScreen(
                 onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
+                publicationState = publicationState,
+                onPublicationAction = screenModel::changeWorldPublication,
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
             )
@@ -126,17 +162,46 @@ class WorldProfileScreen(
 
     // 主要内容组件
     @Composable
-    fun WorldProfileContent(
+    private fun WorldProfileContent(
         worldProfileVo: WorldProfileVo,
         onReturn: () -> Unit = {},
         onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
+        publicationState: WorldPublicationUiState = WorldPublicationUiState(),
+        onPublicationAction: (WorldPublicationAction) -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
+        var publicationConfirmation by rememberSaveable(worldProfileVo.worldId) {
+            mutableStateOf<WorldPublicationAction?>(null)
+        }
+        LaunchedEffect(
+            worldProfileVo.worldId,
+            publicationState.action,
+            publicationState.canExecute,
+        ) {
+            val pendingAction = publicationConfirmation ?: return@LaunchedEffect
+            if (publicationState.action != pendingAction || !publicationState.canExecute) {
+                publicationConfirmation = null
+            }
+        }
+
+        publicationConfirmation?.let { action ->
+            WorldPublicationConfirmationDialog(
+                action = action,
+                worldName = worldProfileVo.worldName,
+                enabled = publicationState.action == action && publicationState.canExecute &&
+                    !publicationState.isChanging && !isRefreshing,
+                onDismiss = { publicationConfirmation = null },
+                onConfirm = {
+                    onPublicationAction(action)
+                    publicationConfirmation = null
+                },
+            )
+        }
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
@@ -227,7 +292,9 @@ class WorldProfileScreen(
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                publicationState = publicationState,
+                onPublicationAction = { publicationConfirmation = it },
             )
 
             // ========== BottomSheet ==========
@@ -729,6 +796,8 @@ private fun RenderTopBar(
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    publicationState: WorldPublicationUiState = WorldPublicationUiState(),
+    onPublicationAction: (WorldPublicationAction) -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -736,7 +805,9 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
+        val actionCount = 2 + if (publicationState.action == null) 0 else 1
+        val leftActionSlot = 68.dp
+        val rightActionSlot = 10.dp + 48.dp * actionCount
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -748,12 +819,18 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null,
             actions = { colors ->
+                WorldPublicationActionButton(
+                    state = publicationState,
+                    colors = colors,
+                    pageRefreshing = isRefreshing,
+                    onClick = onPublicationAction,
+                )
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
                 )
                 IconButton(
-                    enabled = !isRefreshing,
+                    enabled = !isRefreshing && !publicationState.isChanging,
                     colors = colors,
                     onClick = onRefresh,
                 ) {
@@ -783,12 +860,15 @@ private fun RenderTopBar(
             Row(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .fillMaxWidth()
                     .simpleClickable(onClick = onCollapse),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Spacer(modifier = Modifier.width(leftActionSlot))
                 Text(
-                    modifier = Modifier.widthIn(max = titleMaxWidth),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
                     text = worldName,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
@@ -797,10 +877,98 @@ private fun RenderTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
+                Spacer(modifier = Modifier.width(rightActionSlot))
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorldPublicationActionButton(
+    state: WorldPublicationUiState,
+    colors: IconButtonColors,
+    pageRefreshing: Boolean,
+    onClick: (WorldPublicationAction) -> Unit,
+) {
+    val action = state.action ?: return
+    val description = when (state.blockReason) {
+        WorldPublicationBlockReason.Unavailable -> strings.worldPublishUnavailable
+        WorldPublicationBlockReason.CheckFailed -> strings.worldPublishAvailabilityCheckFailed
+        WorldPublicationBlockReason.RefreshRequired -> strings.worldPublicationRefreshRequired
+        null -> when (action) {
+            WorldPublicationAction.Publish -> strings.worldPublishAction
+            WorldPublicationAction.Unpublish -> strings.worldUnpublishAction
+        }
+    }
+
+    ATooltipBox(tooltip = { Text(description) }) {
+        IconButton(
+            enabled = state.canExecute && !state.isChecking && !state.isChanging &&
+                !pageRefreshing,
+            colors = colors,
+            onClick = { onClick(action) },
+        ) {
+            if (state.isChecking || state.isChanging) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = when (action) {
+                        WorldPublicationAction.Publish -> AppIcons.Publish
+                        WorldPublicationAction.Unpublish -> AppIcons.VisibilityOff
+                    },
+                    contentDescription = description,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldPublicationConfirmationDialog(
+    action: WorldPublicationAction,
+    worldName: String,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val title = when (action) {
+        WorldPublicationAction.Publish -> strings.worldPublishConfirmationTitle
+        WorldPublicationAction.Unpublish -> strings.worldUnpublishConfirmationTitle
+    }
+    val message = when (action) {
+        WorldPublicationAction.Publish -> strings.worldPublishConfirmationMessage
+        WorldPublicationAction.Unpublish -> strings.worldUnpublishConfirmationMessage
+    }.replace("%s", worldName)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = when (action) {
+                    WorldPublicationAction.Publish -> AppIcons.Publish
+                    WorldPublicationAction.Unpublish -> AppIcons.VisibilityOff
+                },
+                contentDescription = null,
+            )
+        },
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = enabled) {
+                Text(strings.confirm)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        },
+    )
 }
 
 /**

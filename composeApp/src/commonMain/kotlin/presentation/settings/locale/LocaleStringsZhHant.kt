@@ -180,6 +180,21 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val instanceCreateSuccess = "成功創建房間並發送邀請"
     override val instanceCreateSuccessButInviteFailed = "創建房間成功，但邀請失敗"
     override val instanceCreateFailed = "創建房間失敗"
+    override val worldPublishAction = "發布到社群實驗室"
+    override val worldUnpublishAction = "取消發布世界"
+    override val worldPublishConfirmationTitle = "發布世界？"
+    override val worldUnpublishConfirmationTitle = "取消發布世界？"
+    override val worldPublishConfirmationMessage =
+        "將「%s」發布到社群實驗室嗎？每週最多只能發布一個世界。"
+    override val worldUnpublishConfirmationMessage = "取消發布「%s」並將其設為私人嗎？"
+    override val worldPublishSuccess = "世界已發布"
+    override val worldUnpublishSuccess = "世界已取消發布"
+    override val worldPublishFailed = "發布世界失敗"
+    override val worldUnpublishFailed = "取消發布世界失敗"
+    override val worldPublishUnavailable = "目前此世界不符合發布資格。每週最多只能發布一個世界。"
+    override val worldPublishAvailabilityCheckFailed = "無法檢查發布資格，請重新整理後再試。"
+    override val worldPublicationRefreshRequired = "請求已完成，但無法確認目前狀態。再次操作前請先重新整理。"
+    override val worldPublicationCacheSyncFailed = "世界狀態已更新，但快取保存失敗。再次操作前請先重新整理。"
 
     // World Search
     override val worldSearchAdvancedOptions = "高級搜索選項"
