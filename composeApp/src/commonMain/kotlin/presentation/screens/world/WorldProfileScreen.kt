@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +72,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.EmptyInstan
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.WorldPersistenceDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
@@ -131,6 +133,7 @@ class WorldProfileScreen(
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
         val publicationState by screenModel.publicationState.collectAsState()
+        val worldPersistenceState by screenModel.worldPersistenceState.collectAsState()
         val currentNavigator = currentNavigator
         val localeStrings = strings
         // 组件首次加载时自动刷新数据
@@ -149,11 +152,15 @@ class WorldProfileScreen(
             WorldProfileContent(
                 worldProfileVo = profileVoState ?: worldProfileVO,
                 onReturn = { currentNavigator.pop() },
-                onMenu = { /* 打开菜单 */ },
                 isRefreshing = isLoading,
                 onRefresh = screenModel::refreshWorldData,
                 publicationState = publicationState,
                 onPublicationAction = screenModel::changeWorldPublication,
+                worldPersistenceState = worldPersistenceState,
+                onCheckWorldPersistence = screenModel::checkWorldPersistence,
+                onRequestWorldPersistenceDeletion = screenModel::requestWorldPersistenceDeletion,
+                onDismissWorldPersistenceDeletion = screenModel::dismissWorldPersistenceDeletion,
+                onConfirmWorldPersistenceDeletion = screenModel::confirmWorldPersistenceDeletion,
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
             )
@@ -165,11 +172,15 @@ class WorldProfileScreen(
     private fun WorldProfileContent(
         worldProfileVo: WorldProfileVo,
         onReturn: () -> Unit = {},
-        onMenu: () -> Unit = {},
         isRefreshing: Boolean = false,
         onRefresh: () -> Unit = {},
         publicationState: WorldPublicationUiState = WorldPublicationUiState(),
         onPublicationAction: (WorldPublicationAction) -> Unit = {},
+        worldPersistenceState: WorldPersistenceUiState = WorldPersistenceUiState(),
+        onCheckWorldPersistence: () -> Unit = {},
+        onRequestWorldPersistenceDeletion: () -> Unit = {},
+        onDismissWorldPersistenceDeletion: () -> Unit = {},
+        onConfirmWorldPersistenceDeletion: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
@@ -200,6 +211,25 @@ class WorldProfileScreen(
                     onPublicationAction(action)
                     publicationConfirmation = null
                 },
+            )
+        }
+
+        var showWorldPersistenceDialog by rememberSaveable(worldProfileVo.worldId) {
+            mutableStateOf(false)
+        }
+
+        if (showWorldPersistenceDialog) {
+            WorldPersistenceDialog(
+                state = worldPersistenceState,
+                localeStrings = strings,
+                onDismiss = {
+                    onDismissWorldPersistenceDeletion()
+                    showWorldPersistenceDialog = false
+                },
+                onCheck = onCheckWorldPersistence,
+                onRequestDeletion = onRequestWorldPersistenceDeletion,
+                onDismissDeletion = onDismissWorldPersistenceDeletion,
+                onConfirmDeletion = onConfirmWorldPersistenceDeletion,
             )
         }
 
@@ -289,7 +319,7 @@ class WorldProfileScreen(
                 topBarHeight = sizes.topBarHeight,
                 sysTopPadding = sizes.sysTopPadding,
                 onReturn = handleReturn,
-                onMenu = onMenu,
+                onManagePersistence = { showWorldPersistenceDialog = true },
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
@@ -784,6 +814,7 @@ private fun ColumnScope.InfoArea(
 /**
  * 渲染顶部菜单栏
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RenderTopBar(
     worldId: String,
@@ -792,7 +823,7 @@ private fun RenderTopBar(
     topBarHeight: Dp,
     sysTopPadding: Dp,
     onReturn: () -> Unit,
-    onMenu: (() -> Unit)?,
+    onManagePersistence: () -> Unit,
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
@@ -805,7 +836,7 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val actionCount = 2 + if (publicationState.action == null) 0 else 1
+        val actionCount = 3 + if (publicationState.action == null) 0 else 1
         val leftActionSlot = 68.dp
         val rightActionSlot = 10.dp + 48.dp * actionCount
 
@@ -825,6 +856,19 @@ private fun RenderTopBar(
                     pageRefreshing = isRefreshing,
                     onClick = onPublicationAction,
                 )
+                ATooltipBox(
+                    tooltip = { Text(strings.worldPersistenceTitle) },
+                ) {
+                    IconButton(
+                        colors = colors,
+                        onClick = onManagePersistence,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Storage,
+                            contentDescription = strings.worldPersistenceTitle,
+                        )
+                    }
+                }
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,

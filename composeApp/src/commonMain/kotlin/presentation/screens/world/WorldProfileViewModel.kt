@@ -61,6 +61,12 @@ class WorldProfileScreenModel internal constructor(
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     private val platformFileSizesJob = atomic<Job?>(null)
 
+    private val worldPersistence = WorldPersistenceStateModel(
+        request = NetworkWorldPersistenceRequest(authService, usersApi),
+        scope = viewModelScope,
+    )
+    internal val worldPersistenceState: StateFlow<WorldPersistenceUiState> = worldPersistence.state
+
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
         source = favoriteEntrySource,
@@ -80,6 +86,14 @@ class WorldProfileScreenModel internal constructor(
         favoriteEntry.retry()
     }
 
+    internal fun checkWorldPersistence() = worldPersistence.check()
+
+    internal fun requestWorldPersistenceDeletion() = worldPersistence.requestDeletion()
+
+    internal fun dismissWorldPersistenceDeletion() = worldPersistence.dismissDeletionConfirmation()
+
+    internal fun confirmWorldPersistenceDeletion() = worldPersistence.confirmDeletion()
+
     /**
      * 刷新世界数据
      */
@@ -90,6 +104,7 @@ class WorldProfileScreenModel internal constructor(
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
         publication.setTarget(worldId, worldProfileVO.authorID)
+        worldPersistence.bindWorld(worldId)
         favoriteEntry.load(worldId)
         if (worldId.isBlank()) return
         // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。

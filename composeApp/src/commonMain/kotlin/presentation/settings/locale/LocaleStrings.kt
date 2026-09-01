@@ -270,6 +270,22 @@ sealed class LocaleStrings {
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldPersistenceTitle: String = "Saved world data"
+    open val worldPersistenceInitial: String =
+        "Check whether this world has saved data for your account."
+    open val worldPersistenceCheck: String = "Check"
+    open val worldPersistenceChecking: String = "Checking saved data..."
+    open val worldPersistenceExists: String = "This world has saved data for your account."
+    open val worldPersistenceMissing: String = "No saved data was found for your account in this world."
+    open val worldPersistenceDeleted: String = "The saved data for this world has been deleted."
+    open val worldPersistenceCheckFailed: String = "Couldn't check saved data. Try again."
+    open val worldPersistenceCheckAgain: String = "Check again"
+    open val worldPersistenceDelete: String = "Delete data"
+    open val worldPersistenceDeleting: String = "Deleting saved data..."
+    open val worldPersistenceDeleteFailed: String = "Couldn't delete saved data. Try again."
+    open val worldPersistenceDeleteConfirmTitle: String = "Delete saved world data?"
+    open val worldPersistenceDeleteConfirmMessage: String =
+        "This permanently deletes your account's saved data for this world. This action cannot be undone."
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog
