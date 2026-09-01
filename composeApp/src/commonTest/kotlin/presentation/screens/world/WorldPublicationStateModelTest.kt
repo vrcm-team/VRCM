@@ -8,9 +8,11 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -278,6 +280,50 @@ class WorldPublicationStateModelTest {
 
         model.acceptVerifiedWorld(source.worlds.getValue("wrld_new"), token)
         assertEquals(WorldPublicationAction.Unpublish, model.state.value.action)
+    }
+
+    @Test
+    fun accountSwitchDuringCacheSyncDoesNotPublishStaleNotice() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val tokenA = AccountSessionToken("usr_author", 1)
+        val tokenB = AccountSessionToken("usr_other", 2)
+        val session = MutableStateFlow(authenticated(tokenA))
+        val cacheStarted = CompletableDeferred<Unit>()
+        val releaseCache = CompletableDeferred<Unit>()
+        val source = FakeWorldPublicationSource(
+            worlds = mutableMapOf("wrld_owned" to world(releaseStatus = "private")),
+        )
+        val model = WorldPublicationStateModel(
+            source = source,
+            scope = backgroundScope,
+            requestDispatcher = dispatcher,
+            sessionFlow = session,
+            onWorldRefreshed = {
+                cacheStarted.complete(Unit)
+                withContext(NonCancellable) { releaseCache.await() }
+                Result.success(Unit)
+            },
+        )
+        val notices = mutableListOf<WorldPublicationNotice>()
+        val noticeJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+
+        model.setTarget("wrld_owned", "usr_author")
+        model.acceptVerifiedWorld(source.worlds.getValue("wrld_owned"), tokenA)
+        runCurrent()
+        model.changePublication(WorldPublicationAction.Publish)
+        runCurrent()
+        cacheStarted.await()
+
+        session.value = authenticated(tokenB)
+        runCurrent()
+        releaseCache.complete(Unit)
+        runCurrent()
+
+        assertTrue(notices.isEmpty())
+        assertNull(model.state.value.action)
+        noticeJob.cancel()
     }
 }
 

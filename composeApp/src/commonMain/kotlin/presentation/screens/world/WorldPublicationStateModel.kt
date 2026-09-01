@@ -306,6 +306,9 @@ internal class WorldPublicationStateModel(
                 WorldPublicationAction.Unpublish -> "private"
             }
             val cacheSync = syncWorld(refreshedWorld)
+            if (!accepts(verified.worldId, refreshed.sessionToken, requestGeneration)) {
+                return@launch
+            }
             if (cacheSync.isFailure) {
                 applyVerifiedWorld(
                     world = refreshedWorld,
