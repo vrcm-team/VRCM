@@ -120,7 +120,8 @@ class WorldProfileScreenModel internal constructor(
 
     private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
         val cached = worldProfileCacheStore.load(worldId)
-        if (cached != null && _worldProfileState.value?.worldId == worldId) {
+        if (_worldProfileState.value?.worldId != worldId) return
+        if (cached != null) {
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
@@ -143,12 +144,19 @@ class WorldProfileScreenModel internal constructor(
         val session = SharedFlowCentre.currentSession.value
         if (!isCurrentWorldImageUpdate(current, session, update)) return false
 
-        worldProfileCacheStore.save(
+        if (!worldProfileCacheStore.saveIfCurrent(
             WorldProfileCache(
                 world = update.world,
                 cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
-            )
-        )
+            ),
+            isCurrent = {
+                isCurrentWorldImageUpdate(
+                    currentWorld = _worldProfileState.value,
+                    currentSession = SharedFlowCentre.currentSession.value,
+                    update = update,
+                )
+            },
+        )) return false
 
         val latest = _worldProfileState.value
         if (!isCurrentWorldImageUpdate(

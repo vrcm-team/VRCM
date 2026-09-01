@@ -61,6 +61,16 @@ interface WorldProfileCacheStore {
 
     suspend fun save(cache: WorldProfileCache)
 
+    /**
+     * 仅在 [isCurrent] 在写入前后均为真时提交缓存。
+     * 默认实现用于兼容轻量测试存储，Room 实现会在会话失效后恢复旧值。
+     */
+    suspend fun saveIfCurrent(cache: WorldProfileCache, isCurrent: () -> Boolean): Boolean {
+        if (!isCurrent()) return false
+        save(cache)
+        return isCurrent()
+    }
+
     suspend fun clearAll()
 }
 
@@ -208,6 +218,7 @@ internal class RoomWorldProfileCacheStore(
     nowMillis: () -> Long,
     retained: Int = 60,
 ) : WorldProfileCacheStore {
+    private val mutationMutex = Mutex()
     private val cache = JsonBlobCache(
         dao = dao,
         scope = CacheScopes.WORLD_PROFILE,
@@ -219,9 +230,29 @@ internal class RoomWorldProfileCacheStore(
 
     override suspend fun load(worldId: String): WorldProfileCache? = cache.load(worldId)
 
-    override suspend fun save(cache: WorldProfileCache) = this.cache.save(cache.world.id, cache)
+    override suspend fun save(cache: WorldProfileCache) = mutationMutex.withLock {
+        this.cache.save(cache.world.id, cache)
+    }
 
-    override suspend fun clearAll() = cache.clear()
+    override suspend fun saveIfCurrent(cache: WorldProfileCache, isCurrent: () -> Boolean): Boolean =
+        mutationMutex.withLock {
+            if (!isCurrent()) return@withLock false
+            val worldId = cache.world.id
+            val previous = this.cache.load(worldId)
+            this.cache.save(worldId, cache)
+            if (isCurrent()) {
+                true
+            } else {
+                if (previous == null) {
+                    this.cache.delete(worldId)
+                } else {
+                    this.cache.save(worldId, previous)
+                }
+                false
+            }
+        }
+
+    override suspend fun clearAll() = mutationMutex.withLock { cache.clear() }
 }
 
 internal class RoomGroupProfileCacheStore(
