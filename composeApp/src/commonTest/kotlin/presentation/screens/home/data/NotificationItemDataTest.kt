@@ -113,6 +113,44 @@ class NotificationItemDataTest {
     }
 
     @Test
+    fun currentNotificationDeduplicatesEquivalentInternalLinkRepresentations() {
+        val response = Json.decodeFromString<ResponseData>(
+            """{"data":"group:grp_123","icon":"check","text":"Open group","textKey":null,"type":"link"}""",
+        )
+        val item = NotificationItemData(
+            pipelineNotification(
+                link = "https://vrchat.com/home/group/grp_123",
+                linkText = "View group",
+                responses = listOf(response),
+            ),
+        )
+
+        assertEquals(
+            listOf(NotificationItemData.ActionData("group:grp_123", "link", "check", "Open group")),
+            item.displayActions,
+        )
+    }
+
+    @Test
+    fun currentNotificationDeduplicatesNormalizedExternalLinks() {
+        val response = Json.decodeFromString<ResponseData>(
+            """{"data":"https://example.com","icon":"link","text":"Open site","textKey":null,"type":"link"}""",
+        )
+        val item = NotificationItemData(
+            pipelineNotification(
+                link = "https://example.com/",
+                linkText = "View site",
+                responses = listOf(response),
+            ),
+        )
+
+        assertEquals(
+            listOf(NotificationItemData.ActionData("https://example.com", "link", "link", "Open site")),
+            item.displayActions,
+        )
+    }
+
+    @Test
     fun linkActionParsesInternalAndSafeExternalTargets() {
         val item = NotificationItemData(pipelineNotification())
 

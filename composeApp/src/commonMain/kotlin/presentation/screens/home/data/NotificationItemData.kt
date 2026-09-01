@@ -244,16 +244,50 @@ internal val NotificationItemData.displayActions: List<NotificationItemData.Acti
     get() {
         if (source != NotificationSource.PIPELINE) return actions
         val topLevelLink = link?.trim().takeUnless { it.isNullOrEmpty() } ?: return actions
-        if (actions.any { it.type.equals("link", ignoreCase = true) && it.data.trim() == topLevelLink }) {
-            return actions
-        }
-        return actions + NotificationItemData.ActionData(
+        val topLevelAction = NotificationItemData.ActionData(
             data = topLevelLink,
             type = "link",
             icon = "link",
             label = linkText.orEmpty(),
         )
+        val topLevelTarget = actionTarget(topLevelAction)
+        val containsSameTarget = actions.any { action ->
+            action.type.equals("link", ignoreCase = true) &&
+                (action.data.trim() == topLevelLink ||
+                    topLevelTarget?.isSameDestinationAs(actionTarget(action)) == true)
+        }
+        if (containsSameTarget) return actions
+        return actions + topLevelAction
     }
+
+private fun NotificationActionTarget.isSameDestinationAs(other: NotificationActionTarget?): Boolean {
+    if (other == null) return false
+    if (this !is NotificationActionTarget.External || other !is NotificationActionTarget.External) {
+        return this == other
+    }
+    return externalUrlIdentity(url) == externalUrlIdentity(other.url)
+}
+
+private data class ExternalUrlIdentity(
+    val protocol: URLProtocol,
+    val host: String,
+    val port: Int,
+    val encodedPath: String,
+    val encodedQuery: String,
+    val encodedFragment: String,
+)
+
+private fun externalUrlIdentity(value: String): ExternalUrlIdentity {
+    val url = Url(value)
+    return ExternalUrlIdentity(
+        protocol = url.protocol,
+        host = url.host.lowercase(),
+        port = url.port,
+        encodedPath = url.encodedPath.ifEmpty { "/" },
+        encodedQuery = url.encodedQuery,
+        encodedFragment = url.encodedFragment,
+    )
+}
 
 internal fun NotificationItemData.actionTarget(
     action: NotificationItemData.ActionData,
