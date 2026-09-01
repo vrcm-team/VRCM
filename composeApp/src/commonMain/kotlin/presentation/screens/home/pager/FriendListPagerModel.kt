@@ -209,6 +209,7 @@ class FriendListPagerModel(
         _favoriteGroupEditState.asStateFlow()
     private var favoriteGroupEditJob: Job? = null
     private var favoriteGroupEditRequest = 0L
+    private var favoriteGroupEditReauthenticationRequest: Long? = null
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendSnapshot,
@@ -278,10 +279,16 @@ class FriendListPagerModel(
                 favoriteGroupEditRequest++
                 favoriteGroupEditJob?.cancel()
                 favoriteGroupEditJob = null
+                favoriteGroupEditReauthenticationRequest = null
                 _favoriteGroupEditState.value = FavoriteGroupEditState()
-            } else if (_favoriteGroupEditState.value.isSaving) {
-                // Keep an auth-bound 401 retry alive, but release the UI lock immediately.
-                // A later user retry increments the request id and invalidates this result.
+            } else if (
+                // AuthService marks its own 401 retry before rotating the token; only an
+                // external rotation invalidates and cancels the current editor request.
+                _favoriteGroupEditState.value.isSaving &&
+                favoriteGroupEditReauthenticationRequest != favoriteGroupEditRequest
+            ) {
+                favoriteGroupEditRequest++
+                favoriteGroupEditJob?.cancel()
                 favoriteGroupEditJob = null
                 _favoriteGroupEditState.update { state ->
                     state.copy(
@@ -677,8 +684,22 @@ class FriendListPagerModel(
                 return@launch
             }
 
-            val response = authService.runSessionBoundCatching(requestToken) {
-                favoriteService.sendFavoriteGroupUpdate(update)
+            val response = try {
+                authService.runSessionBoundCatchingWithReauthentication(
+                    sessionToken = requestToken,
+                    callback = { favoriteService.sendFavoriteGroupUpdate(update) },
+                    onReauthentication = {
+                        if (favoriteGroupEditRequest == request &&
+                            SharedFlowCentre.isCurrentSession(requestToken)
+                        ) {
+                            favoriteGroupEditReauthenticationRequest = request
+                        }
+                    },
+                )
+            } finally {
+                if (favoriteGroupEditReauthenticationRequest == request) {
+                    favoriteGroupEditReauthenticationRequest = null
+                }
             } ?: run {
                 releaseStaleFavoriteGroupEdit(request)
                 return@launch

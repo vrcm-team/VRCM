@@ -188,6 +188,38 @@ class FavoriteGroupEditStateTest : MainDispatcherTest() {
     }
 
     @Test
+    fun sameAccountRenewalAllowsImmediateRetryWithoutWaitingForStaleRequest() = runBlocking {
+        val fixture = createFavoriteGroupEditFixture(
+            FavoriteGroupEditScenario.SessionRenewalBeforeSuccess,
+        )
+        try {
+            val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+            val group = fixture.favoriteService.favoritesByGroup(FavoriteType.Avatar).value.keys
+                .single { it.ownerId != "local" }
+            fixture.model.openFavoriteGroupEditor(group)
+            fixture.model.saveFavoriteGroup("Stale success", FavoriteGroupVisibility.Public)
+            awaitUntil { fixture.requests.firstUpdateStarted.isCompleted }
+
+            SharedFlowCentre.emitAuthenticated(firstSession.account)
+            awaitUntil {
+                val state = fixture.model.favoriteGroupEditState.value
+                !state.isSaving && state.failure == FavoriteGroupEditFailure.SaveFailed
+            }
+
+            fixture.model.saveFavoriteGroup("Retried avatars", FavoriteGroupVisibility.Public)
+            awaitUntil { fixture.requests.updateCount.value == 2 }
+            awaitUntil { fixture.model.favoriteGroupEditState.value.group == null }
+
+            val updatedGroup = fixture.favoriteService.favoritesByGroup(FavoriteType.Avatar).value.keys
+                .single { it.ownerId != "local" }
+            assertEquals("Retried avatars", updatedGroup.displayName)
+            assertEquals("public", updatedGroup.visibility)
+        } finally {
+            fixture.close()
+        }
+    }
+
+    @Test
     fun accountSwitchBeforeUnauthorizedResponseDoesNotRetryOrPublishOldUpdate() = runBlocking {
         val fixture = createFavoriteGroupEditFixture(
             FavoriteGroupEditScenario.SwitchAccountBeforeUnauthorized,
@@ -403,10 +435,13 @@ private fun favoriteGroupEditClient(
                             }
                         }
                         FavoriteGroupEditScenario.SessionRenewalBeforeSuccess -> {
-                            check(updateNumber == 1) { "Stale success must not be retried" }
-                            requests.releaseFirstUpdate.await()
-                            requests.firstUpdateResponded.complete(Unit)
-                            jsonResponse("")
+                            if (updateNumber == 1) {
+                                requests.releaseFirstUpdate.await()
+                                requests.firstUpdateResponded.complete(Unit)
+                                jsonResponse("")
+                            } else {
+                                jsonResponse("")
+                            }
                         }
                         FavoriteGroupEditScenario.SwitchAccountBeforeUnauthorized -> {
                             check(updateNumber == 1) { "Old account request must not be retried" }
