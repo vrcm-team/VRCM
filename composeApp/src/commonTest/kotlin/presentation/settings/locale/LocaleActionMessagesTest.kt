@@ -20,6 +20,14 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileRequestInvite,
+                locale.profileRequestInviteSent,
+                locale.inviteMessageSelectorInviteTitle,
+                locale.inviteMessageSelectorRequestTitle,
+                locale.inviteMessageSelectorLoadFailed,
+                locale.inviteMessageSelectorEmpty,
+                locale.inviteMessageSelectorSend,
+                locale.inviteMessageSelectorSlot,
             )
             assertTrue(messages.all { it.isNotBlank() })
         }

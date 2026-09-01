@@ -59,6 +59,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -122,6 +123,7 @@ data class UserProfileScreen(
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -205,6 +207,13 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
+                    )
+                },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -283,6 +292,25 @@ data class UserProfileScreen(
                 }
             },
         )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -299,6 +327,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -351,14 +380,16 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
                 }
             })
         }
