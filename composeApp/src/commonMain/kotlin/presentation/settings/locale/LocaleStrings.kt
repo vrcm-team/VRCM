@@ -228,6 +228,15 @@ sealed class LocaleStrings {
         "The request completed, but the current status could not be confirmed. Refresh before trying again."
     open val worldPublicationCacheSyncFailed: String =
         "World status updated, but the cached data could not be saved. Refresh before trying again."
+    open val instanceCloseAction: String = "Close instance"
+    open val instanceCloseCheckingPermission: String = "Checking permission"
+    open val instanceCloseConfirmTitle: String = "Close this instance?"
+    open val instanceCloseConfirmMessage: String = "This instance will immediately stop accepting new users. This action cannot be undone."
+    open val instanceCloseInProgress: String = "Closing instance"
+    open val instanceCloseSuccess: String = "Instance closed"
+    open val instanceCloseFailed: String = "Failed to close instance"
+    open val instanceClosePermissionDenied: String = "You do not have permission to close this instance"
+    open val instanceCloseSessionChanged: String = "The account session changed. Open the instance and try again."
 
     // World Search
     open val worldSearchAdvancedOptions: String = "Advanced Search Options"

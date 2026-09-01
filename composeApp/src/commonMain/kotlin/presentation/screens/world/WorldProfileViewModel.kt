@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
@@ -57,6 +56,7 @@ class WorldProfileScreenModel internal constructor(
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
     val worldProfileState: StateFlow<WorldProfileVo?> = _worldProfileState.asStateFlow()
+    private val worldInstanceStateStore = WorldInstanceStateStore(_worldProfileState)
 
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
@@ -68,6 +68,44 @@ class WorldProfileScreenModel internal constructor(
         scope = viewModelScope,
     )
     internal val worldPersistenceState: StateFlow<WorldPersistenceUiState> = worldPersistence.state
+
+    private val instanceCloseCoordinator = InstanceCloseCoordinator(
+        currentSessionToken = { SharedFlowCentre.currentSession.value?.token },
+        isCurrentSession = SharedFlowCentre::isCurrentSession,
+        fetchGroupPermissions = { sessionToken, groupId ->
+            authService.runSessionBoundCatching(sessionToken) {
+                groupsApi.fetchGroup(groupId).myMember?.permissions.orEmpty()
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+        fetchInstance = { sessionToken, target ->
+            authService.runSessionBoundCatching(sessionToken) {
+                instancesApi.closeStatus(target.worldId, target.instanceId)
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+        closeInstance = { sessionToken, target ->
+            authService.runSessionBoundCatching(sessionToken) {
+                instancesApi.closeInstance(target.worldId, target.instanceId)
+            }?.let { response ->
+                InstanceCloseSessionResult(response.result, response.sessionToken)
+            }
+        },
+    )
+    internal val instanceCloseState: StateFlow<InstanceCloseState> = instanceCloseCoordinator.state
+
+    private val _closedInstanceLocations = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    internal val closedInstanceLocations: SharedFlow<String> = _closedInstanceLocations.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                instanceCloseCoordinator.onSessionChanged(session?.token)
+            }
+        }
+    }
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -181,6 +219,77 @@ class WorldProfileScreenModel internal constructor(
                 loadGeneration,
             )
         }
+    }
+
+    internal fun requestInstanceClose(instance: InstanceVo, strings: LocaleStrings) {
+        val target = instance.closeTargetOrNull() ?: return
+        viewModelScope.launch {
+            when (val result = instanceCloseCoordinator.authorize(target)) {
+                InstanceCloseAuthorizationResult.NotAllowed ->
+                    emitInstanceCloseError(strings.instanceClosePermissionDenied)
+
+                is InstanceCloseAuthorizationResult.Failed ->
+                    emitInstanceCloseFailure(result.error, strings)
+
+                is InstanceCloseAuthorizationResult.SessionChanged ->
+                    emitInstanceCloseSessionChanged(result.userId, strings)
+
+                InstanceCloseAuthorizationResult.Abandoned,
+                InstanceCloseAuthorizationResult.Busy,
+                InstanceCloseAuthorizationResult.Ready -> Unit
+            }
+        }
+    }
+
+    internal fun confirmInstanceClose(strings: LocaleStrings) {
+        viewModelScope.launch {
+            when (val result = instanceCloseCoordinator.submit()) {
+                is InstanceCloseSubmissionResult.Closed -> onInstanceClosed(result, strings)
+                is InstanceCloseSubmissionResult.Failed -> emitInstanceCloseFailure(result.error, strings)
+                is InstanceCloseSubmissionResult.SessionChanged ->
+                    emitInstanceCloseSessionChanged(result.userId, strings)
+
+                InstanceCloseSubmissionResult.Abandoned,
+                InstanceCloseSubmissionResult.Busy -> Unit
+            }
+        }
+    }
+
+    internal fun abandonInstanceClose(location: String) {
+        instanceCloseCoordinator.abandon(location)
+    }
+
+    private suspend fun onInstanceClosed(
+        result: InstanceCloseSubmissionResult.Closed,
+        strings: LocaleStrings,
+    ) {
+        val request = result.request
+        if (!SharedFlowCentre.isCurrentSession(request.sessionToken)) return
+        val target = request.target
+        val applied = worldInstanceStateStore.applyClose(target, result.instance) {
+            SharedFlowCentre.isCurrentSession(request.sessionToken)
+        }
+        if (!applied) return
+        _closedInstanceLocations.tryEmit(target.location)
+        SharedFlowCentre.toastText.emit(ToastText.Success(strings.instanceCloseSuccess))
+    }
+
+    private suspend fun emitInstanceCloseFailure(error: Throwable, strings: LocaleStrings) {
+        val message = error.message
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "${strings.instanceCloseFailed}: $it" }
+            ?: strings.instanceCloseFailed
+        emitInstanceCloseError(message)
+    }
+
+    private suspend fun emitInstanceCloseSessionChanged(userId: String?, strings: LocaleStrings) {
+        if (userId != null && SharedFlowCentre.currentSession.value?.token?.userId == userId) {
+            emitInstanceCloseError(strings.instanceCloseSessionChanged)
+        }
+    }
+
+    private suspend fun emitInstanceCloseError(message: String) {
+        SharedFlowCentre.toastText.emit(ToastText.Error(message))
     }
 
     fun refreshWorldData() {
@@ -364,15 +473,22 @@ class WorldProfileScreenModel internal constructor(
     ) {
         val currentProfile = _worldProfileState.value ?: return
         if (loadGeneration != null && !isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) return
-        val instanceVos = currentProfile.instances.toMutableList()
-        if (loadGeneration == null || isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) {
-            _worldProfileState.value = currentProfile.copy(instances = instanceVos)
-        }
         authService.reTryAuthCatching {
             // 获取所有实例数据
-            instanceIds.keys.asFlow().mapNotNull { instanceId ->
+            instanceIds.entries.asFlow().mapNotNull { (instanceId, initialOwner) ->
                 try {
-                    worldsApi.getWorldInstanceById(currentProfile.worldId, instanceId)
+                    worldInstanceStateStore.refreshInstance(
+                        worldId = currentProfile.worldId,
+                        instanceId = instanceId,
+                        initialOwner = initialOwner,
+                        fetch = {
+                            worldsApi.getWorldInstanceById(currentProfile.worldId, instanceId)
+                        },
+                        canCommit = {
+                            loadGeneration == null ||
+                                isCurrentWorldLoad(loadGeneration, currentProfile.worldId)
+                        },
+                    )
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
                     SharedFlowCentre.toastText.emit(
@@ -382,15 +498,6 @@ class WorldProfileScreenModel internal constructor(
                 }
             }.catch {
                 SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance data"))
-            }.map { instanceData ->
-                val owner: MutableStateFlow<Owner?> = MutableStateFlow(instanceIds[instanceData.instanceId])
-                val instanceVo = InstanceVo(instanceData, owner)
-                instanceVos.removeFirst { it.id == instanceData.id }
-                instanceVos.add(instanceVo)
-                if (loadGeneration == null || isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) {
-                    _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos.toList())
-                }
-                instanceData.ownerId to owner
             }.collect { (ownerId, owner) ->
                 // 如果实例是活跃的，则获取实例的拥有者名称
                 if (loadGeneration != null && !isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) return@collect

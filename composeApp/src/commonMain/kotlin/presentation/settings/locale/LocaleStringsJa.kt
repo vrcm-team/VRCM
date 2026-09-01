@@ -210,6 +210,15 @@ internal object LocaleStringsJa : LocaleStrings() {
         "リクエストは完了しましたが、現在の状態を確認できませんでした。再実行する前に更新してください。"
     override val worldPublicationCacheSyncFailed =
         "ワールドの状態は更新されましたが、キャッシュを保存できませんでした。再実行する前に更新してください。"
+    override val instanceCloseAction = "インスタンスを閉じる"
+    override val instanceCloseCheckingPermission = "権限を確認中"
+    override val instanceCloseConfirmTitle = "このインスタンスを閉じますか？"
+    override val instanceCloseConfirmMessage = "このインスタンスへの新しいユーザーの参加を直ちに停止します。この操作は元に戻せません。"
+    override val instanceCloseInProgress = "インスタンスを閉じています"
+    override val instanceCloseSuccess = "インスタンスを閉じました"
+    override val instanceCloseFailed = "インスタンスを閉じられませんでした"
+    override val instanceClosePermissionDenied = "このインスタンスを閉じる権限がありません"
+    override val instanceCloseSessionChanged = "アカウントのセッションが変更されました。インスタンスを開き直して再試行してください。"
 
     // World Search
     override val worldSearchAdvancedOptions = "詳細検索オプション"

@@ -205,6 +205,15 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val worldPublishAvailabilityCheckFailed = "無法檢查發布資格，請重新整理後再試。"
     override val worldPublicationRefreshRequired = "請求已完成，但無法確認目前狀態。再次操作前請先重新整理。"
     override val worldPublicationCacheSyncFailed = "世界狀態已更新，但快取保存失敗。再次操作前請先重新整理。"
+    override val instanceCloseAction = "關閉實例"
+    override val instanceCloseCheckingPermission = "正在檢查權限"
+    override val instanceCloseConfirmTitle = "關閉此實例？"
+    override val instanceCloseConfirmMessage = "此實例將立即禁止新使用者加入，此操作無法復原。"
+    override val instanceCloseInProgress = "正在關閉實例"
+    override val instanceCloseSuccess = "實例已關閉"
+    override val instanceCloseFailed = "實例關閉失敗"
+    override val instanceClosePermissionDenied = "你沒有關閉此實例的權限"
+    override val instanceCloseSessionChanged = "帳號工作階段已變更，請重新開啟實例後再試。"
 
     // World Search
     override val worldSearchAdvancedOptions = "高級搜索選項"
