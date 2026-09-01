@@ -640,8 +640,8 @@ class FriendService(
         combine(_friendStateSnapshot, SharedFlowCentre.currentSession) { snapshot, session ->
             snapshot.sessionToken to session?.token
         }.first { (snapshotToken, currentToken) ->
-            currentToken?.userId != sessionToken.userId || snapshotToken == currentToken
-        }.second?.takeIf { it.userId == sessionToken.userId }
+            currentToken != sessionToken || snapshotToken == currentToken
+        }.second?.takeIf { it == sessionToken }
 
     fun preloadFriendList() {
         val sessionToken = synchronized(friendMapLock) { activeSessionToken } ?: return

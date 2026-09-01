@@ -784,6 +784,80 @@ class FriendListPagerModelTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun singleRemovalRejectsSameAccountReauthenticationDuringRequest() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(
+            userId = "usr_single_removal_stale_owner",
+            username = "single-removal-stale-owner",
+            password = "single-removal-stale-password",
+        )
+        SharedFlowCentre.emitAuthenticated(account)
+        val initialSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val friendId = "usr_single_removal_stale_friend"
+        val requestStarted = CompletableDeferred<Unit>()
+        val releaseRequest = CompletableDeferred<Unit>()
+        val remoteRemoved = atomic(false)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.endsWith("/$friendId") -> {
+                            requestStarted.complete(Unit)
+                            withContext(NonCancellable) { releaseRequest.await() }
+                            remoteRemoved.value = true
+                            jsonResponse(successResponseJson())
+                        }
+                        path == "/auth/user/friends" -> {
+                            val offline = request.url.parameters["offline"] == "true"
+                            val friends = if (!offline) {
+                                listOf(cachedFriend(friendId, "Stale Removal Friend", UserStatus.Active))
+                            } else {
+                                emptyList()
+                            }
+                            jsonResponse(json.encodeToString(friends))
+                        }
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> jsonResponse(currentUserJson(account))
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(account, client, json)
+
+        try {
+            emitFriendUntilObserved(
+                fixture.friendService,
+                initialSession,
+                friendId,
+                activeFriendEvent(json, friendId, "Stale Removal Friend"),
+            )
+            awaitCachedFriendIds(fixture, account.userId, setOf(friendId))
+
+            val removal = async { fixture.friendService.unfriend(friendId) }
+            withTimeout(3_000) { requestStarted.await() }
+
+            SharedFlowCentre.emitAuthenticated(account)
+            val renewedSession = assertNotNull(SharedFlowCentre.currentSession.value)
+            assertFalse(renewedSession.token == initialSession.token)
+            awaitUntil { fixture.friendService.friendStateSnapshot.value.sessionToken == renewedSession.token }
+            releaseRequest.complete(Unit)
+
+            assertTrue(removal.await().isFailure)
+            assertTrue(remoteRemoved.value)
+            assertTrue(friendId in fixture.friendService.friendState.value)
+        } finally {
+            releaseRequest.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     private fun createRemovalFixture(
         account: AccountDto,
         client: HttpClient,
