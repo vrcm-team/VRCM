@@ -28,8 +28,11 @@ import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -63,13 +66,20 @@ class WorldProfileScreenModel internal constructor(
     )
     internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
 
+    private val worldCacheMutex = Mutex()
+
     private val deletion = WorldDeletionStateModel(
         source = NetworkWorldDeletionSource(worldsApi, authService),
         scope = viewModelScope,
-        removeCachedWorld = worldProfileCacheStore::delete,
+        removeCachedWorld = { worldId ->
+            worldCacheMutex.withLock { worldProfileCacheStore.delete(worldId) }
+        },
     )
     internal val deletionState: StateFlow<WorldDeletionUiState> = deletion.state
     internal val deletionNotices: SharedFlow<WorldDeletionNotice> = deletion.notices
+
+    private var worldLoadJob: Job? = null
+    private var worldLoadGeneration = 0L
 
     internal fun retryFavoriteEntryLoad() {
         favoriteEntry.retry()
@@ -79,17 +89,43 @@ class WorldProfileScreenModel internal constructor(
      * 刷新世界数据
      */
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
+        worldLoadJob?.cancel()
+        val loadGeneration = ++worldLoadGeneration
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
-        deletion.setTarget(worldId, worldProfileVO.authorID)
+        // 路由快照可能来自列表、活动或房间事件，作者字段不作为删除权限依据。
+        deletion.setTarget("", null)
         favoriteEntry.load(worldId)
-        if (worldId.isBlank()) return
-        // 缓存读取改为挂起（Room），先出网络前的占位状态，缓存到达后再回填。
-        viewModelScope.launch { applyCachedWorld(worldId, worldProfileVO) }
+        if (worldId.isBlank()) {
+            _isLoading.value = false
+            return
+        }
+        _isLoading.value = true
+        // 缓存读取和后续详情刷新共享同一任务，删除开始后会取消并使其代次失效。
+        worldLoadJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                applyCachedWorld(worldId, worldProfileVO, loadGeneration)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Error(error.message ?: "Failed to load world data")
+                )
+            } finally {
+                if (isCurrentWorldLoad(loadGeneration, worldId)) {
+                    _isLoading.value = false
+                    worldLoadJob = null
+                }
+            }
+        }
     }
 
-    private suspend fun applyCachedWorld(worldId: String, worldProfileVO: WorldProfileVo) {
+    private suspend fun applyCachedWorld(
+        worldId: String,
+        worldProfileVO: WorldProfileVo,
+        loadGeneration: Long,
+    ) {
         val cached = worldProfileCacheStore.load(worldId)
+        if (!isCurrentWorldLoad(loadGeneration, worldId)) return
         if (cached != null) {
             deletion.setTarget(cached.world.id, cached.world.authorId)
             _worldProfileState.value = WorldProfileVo(
@@ -103,61 +139,53 @@ class WorldProfileScreenModel internal constructor(
             cached.isExpired(Clock.System.now().toEpochMilliseconds()) ||
             cached.world.instances == null
         if (shouldRefreshProfile) {
-            refreshWorldData()
+            loadWorldInfo(worldId, loadGeneration)
         } else {
-            loadCachedInstances(cached.world.instances.orEmpty())
-        }
-    }
-
-    private fun loadCachedInstances(worldInstances: List<List<String>>) {
-        val profile = _worldProfileState.value ?: return
-        val instanceIds = collectInstanceIds(profile, worldInstances)
-        if (instanceIds.isEmpty() || _isLoading.value) return
-
-        _isLoading.value = true
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                loadInstanceData(instanceIds)
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                SharedFlowCentre.toastText.emit(
-                    ToastText.Error(error.message ?: "Failed to load instance data")
-                )
-            } finally {
-                _isLoading.value = false
-            }
+            val profile = _worldProfileState.value ?: return
+            loadInstanceData(
+                collectInstanceIds(profile, cached.world.instances.orEmpty()),
+                loadGeneration,
+            )
         }
     }
 
     fun refreshWorldData() {
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
+        worldLoadJob?.cancel()
+        val loadGeneration = ++worldLoadGeneration
         _isLoading.value = true
-        viewModelScope.launch(Dispatchers.IO) {
+        worldLoadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                loadWorldInfo(worldId)
+                loadWorldInfo(worldId, loadGeneration)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 SharedFlowCentre.toastText.emit(
                     ToastText.Error(error.message ?: "Failed to load world data")
                 )
             } finally {
-                _isLoading.value = false
+                if (isCurrentWorldLoad(loadGeneration, worldId)) {
+                    _isLoading.value = false
+                    worldLoadJob = null
+                }
             }
         }
     }
 
-    private suspend fun loadWorldInfo(worldId: String) {
+    private suspend fun loadWorldInfo(worldId: String, loadGeneration: Long) {
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
-            worldProfileCacheStore.save(
-                WorldProfileCache(
-                    world = worldData,
-                    cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+            worldCacheMutex.withLock {
+                if (!isCurrentWorldLoad(loadGeneration, worldId)) return@withLock
+                worldProfileCacheStore.save(
+                    WorldProfileCache(
+                        world = worldData,
+                        cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                    )
                 )
-            )
-            if (_worldProfileState.value?.worldId != worldId) return@onSuccess
+            }
+            if (!isCurrentWorldLoad(loadGeneration, worldId)) return@onSuccess
 
             // TODO
 //            val platformFileSizes = mutableStateListOf<PlatformFileSize>()
@@ -184,10 +212,12 @@ class WorldProfileScreenModel internal constructor(
             )
             // 如果有实例ID，则获取实例信息
             if (mergeInstanceIds.isNotEmpty()) {
-                loadInstanceData(mergeInstanceIds)
+                loadInstanceData(mergeInstanceIds, loadGeneration)
             }
         }.onFailure {
-            SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
+            if (isCurrentWorldLoad(loadGeneration, worldId)) {
+                SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load world data"))
+            }
         }
     }
 
@@ -208,10 +238,16 @@ class WorldProfileScreenModel internal constructor(
     /**
      * 加载实例数据
      */
-    private suspend fun loadInstanceData(instanceIds: Map<String, Owner?>) {
+    private suspend fun loadInstanceData(
+        instanceIds: Map<String, Owner?>,
+        loadGeneration: Long? = null,
+    ) {
         val currentProfile = _worldProfileState.value ?: return
+        if (loadGeneration != null && !isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) return
         val instanceVos = currentProfile.instances.toMutableList()
-        _worldProfileState.value = currentProfile.copy(instances = instanceVos)
+        if (loadGeneration == null || isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) {
+            _worldProfileState.value = currentProfile.copy(instances = instanceVos)
+        }
         authService.reTryAuthCatching {
             // 获取所有实例数据
             instanceIds.keys.asFlow().mapNotNull { instanceId ->
@@ -231,16 +267,31 @@ class WorldProfileScreenModel internal constructor(
                 val instanceVo = InstanceVo(instanceData, owner)
                 instanceVos.removeFirst { it.id == instanceData.id }
                 instanceVos.add(instanceVo)
-                _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos.toList())
+                if (loadGeneration == null || isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) {
+                    _worldProfileState.value = _worldProfileState.value?.copy(instances = instanceVos.toList())
+                }
                 instanceData.ownerId to owner
             }.collect { (ownerId, owner) ->
                 // 如果实例是活跃的，则获取实例的拥有者名称
+                if (loadGeneration != null && !isCurrentWorldLoad(loadGeneration, currentProfile.worldId)) return@collect
                 fetchAndSetOwner(ownerId)
-                    .onSuccess { if (it != null) owner.value = it }
+                    .onSuccess {
+                        if (it != null &&
+                            (loadGeneration == null || isCurrentWorldLoad(loadGeneration, currentProfile.worldId))
+                        ) {
+                            owner.value = it
+                        }
+                    }
                     .onFailure { SharedFlowCentre.toastText.emit(ToastText.Error(it.message ?: "Failed to load instance Owner")) }
             }
         }
     }
+
+    private fun isCurrentWorldLoad(loadGeneration: Long, worldId: String): Boolean =
+        worldLoadGeneration == loadGeneration &&
+            _worldProfileState.value?.worldId == worldId &&
+            !deletion.state.value.isDeleting &&
+            !deletion.state.value.isDeleted
 
     /**
      * 获取房间实例的拥有者名称
@@ -345,5 +396,14 @@ class WorldProfileScreenModel internal constructor(
         }
     }
 
-    internal fun deleteWorld(): Boolean = deletion.delete()
+    internal fun deleteWorld(): Boolean {
+        if (!deletion.state.value.canDelete) return false
+
+        // 先取消缓存/详情加载并提升代次，再启动不可逆请求，迟到响应只能被丢弃。
+        worldLoadGeneration++
+        worldLoadJob?.cancel()
+        worldLoadJob = null
+        _isLoading.value = false
+        return deletion.delete()
+    }
 }
