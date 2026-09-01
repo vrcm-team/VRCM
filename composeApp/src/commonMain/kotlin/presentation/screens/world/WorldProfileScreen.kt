@@ -805,8 +805,9 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
-        val reservedWidth = if (publicationState.action == null) 208.dp else 304.dp
-        val titleMaxWidth = (maxWidth - reservedWidth).coerceIn(0.dp, 200.dp)
+        val actionCount = 2 + if (publicationState.action == null) 0 else 1
+        val leftActionSlot = 68.dp
+        val rightActionSlot = 10.dp + 48.dp * actionCount
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -859,12 +860,15 @@ private fun RenderTopBar(
             Row(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .fillMaxWidth()
                     .simpleClickable(onClick = onCollapse),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Spacer(modifier = Modifier.width(leftActionSlot))
                 Text(
-                    modifier = Modifier.widthIn(max = titleMaxWidth),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp),
                     text = worldName,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
@@ -873,7 +877,7 @@ private fun RenderTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
+                Spacer(modifier = Modifier.width(rightActionSlot))
             }
         }
     }
