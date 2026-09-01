@@ -41,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
@@ -144,6 +145,7 @@ val presentationModule: Module = module {
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)
+    viewModel { AllWorldPersistenceDeletionModel(get(), get()) }
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
