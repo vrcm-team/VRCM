@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
+import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
@@ -92,9 +93,10 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
                 cachedAtEpochMilliseconds = 0L,
             ),
         )
+        var model: WorldProfileScreenModel? = null
         try {
             fixture.service.restoreAuth()
-            val model = WorldProfileScreenModel(
+            model = WorldProfileScreenModel(
                 worldsApi = WorldsApi(fixture.client),
                 instancesApi = InstancesApi(fixture.client),
                 usersApi = UsersApi(fixture.client),
@@ -105,23 +107,30 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
                 worldPlatformService = WorldPlatformService(FileApi(fixture.client)),
                 worldProfileCacheStore = cache,
             )
+            val screenModel = requireNotNull(model)
 
-            model.loadWorldData(WorldProfileVo(worldId = "wrld_owned", authorID = "usr_owner"))
-            assertFalse(model.deletionState.value.isAvailable)
+            screenModel.loadWorldData(WorldProfileVo(worldId = "wrld_owned", authorID = "usr_owner"))
+            assertFalse(screenModel.deletionState.value.isAvailable)
             getStarted.await()
-            assertTrue(model.deletionState.value.canDelete)
-            assertTrue(model.isLoading.value)
+            assertTrue(screenModel.deletionState.value.canDelete)
+            assertTrue(screenModel.isLoading.value)
 
-            assertTrue(model.deleteWorld())
-            model.refreshWorldData()
+            assertTrue(screenModel.deleteWorld())
+            screenModel.refreshWorldData()
             releaseGet.complete(Unit)
             cache.deleted.await()
 
             assertTrue(cache.saved.isEmpty())
             assertEquals(listOf("wrld_owned"), cache.deletedWorlds)
-            assertEquals("cached", model.worldProfileState.value?.worldName)
+            assertEquals("cached", screenModel.worldProfileState.value?.worldName)
             assertEquals(1, worldGetCount)
         } finally {
+            model?.let {
+                ViewModelStore().apply {
+                    put("world-profile", it)
+                    clear()
+                }
+            }
             fixture.client.close()
         }
     }
