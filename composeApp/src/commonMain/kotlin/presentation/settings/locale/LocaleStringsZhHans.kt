@@ -194,6 +194,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val worldPublishUnavailable = "当前暂时无法发布世界"
     override val worldPublishAvailabilityCheckFailed = "无法检查发布资格，请刷新后重试。"
     override val worldPublicationRefreshRequired = "请求已完成，但无法确认当前状态。再次操作前请先刷新。"
+    override val worldPublicationCacheSyncFailed = "世界状态已更新，但缓存保存失败。再次操作前请先刷新。"
 
     // World Search
     override val worldSearchAdvancedOptions = "高级搜索选项"

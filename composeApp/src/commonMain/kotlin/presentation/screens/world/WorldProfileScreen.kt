@@ -96,6 +96,9 @@ internal fun WorldPublicationNotice.localizedToast(locale: LocaleStrings): Toast
         is WorldPublicationNotice.RefreshFailed -> ToastText.Error(
             locale.worldPublicationRefreshRequired.withOptionalDetail(message)
         )
+        is WorldPublicationNotice.CacheSyncFailed -> ToastText.Error(
+            locale.worldPublicationCacheSyncFailed.withOptionalDetail(message)
+        )
     }
 
 private fun String.withOptionalDetail(detail: String?): String =

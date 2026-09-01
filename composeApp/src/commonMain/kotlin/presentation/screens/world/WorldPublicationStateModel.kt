@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -50,6 +51,8 @@ internal sealed interface WorldPublicationNotice {
     ) : WorldPublicationNotice
 
     data class RefreshFailed(val message: String?) : WorldPublicationNotice
+
+    data class CacheSyncFailed(val message: String?) : WorldPublicationNotice
 }
 
 internal fun worldPublicationAction(
@@ -130,7 +133,7 @@ internal class WorldPublicationStateModel(
     private val scope: CoroutineScope,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val sessionFlow: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
-    private val onWorldRefreshed: (WorldData) -> Unit = {},
+    private val onWorldRefreshed: suspend (WorldData) -> Result<Unit> = { Result.success(Unit) },
 ) {
     private data class Target(
         val worldId: String = "",
@@ -213,11 +216,13 @@ internal class WorldPublicationStateModel(
             if (!accepts(currentTarget.worldId, response.sessionToken, requestGeneration)) {
                 return@launch
             }
-            response.result.onSuccess { world ->
-                if (world.id != currentTarget.worldId) return@onSuccess
-                onWorldRefreshed(world)
-                applyVerifiedWorld(world, response.sessionToken, requestGeneration)
+            val world = response.result.getOrNull() ?: return@launch
+            if (world.id != currentTarget.worldId) return@launch
+            val cacheSync = syncWorld(world)
+            if (cacheSync.isFailure && accepts(world.id, response.sessionToken, requestGeneration)) {
+                _notices.emit(WorldPublicationNotice.CacheSyncFailed(cacheSync.exceptionOrNull()?.message))
             }
+            applyVerifiedWorld(world, response.sessionToken, requestGeneration)
         }
         return true
     }
@@ -300,7 +305,17 @@ internal class WorldPublicationStateModel(
                 WorldPublicationAction.Publish -> "public"
                 WorldPublicationAction.Unpublish -> "private"
             }
-            onWorldRefreshed(refreshedWorld)
+            val cacheSync = syncWorld(refreshedWorld)
+            if (cacheSync.isFailure) {
+                applyVerifiedWorld(
+                    world = refreshedWorld,
+                    sessionToken = refreshed.sessionToken,
+                    requestGeneration = requestGeneration,
+                    forcedBlockReason = WorldPublicationBlockReason.RefreshRequired,
+                )
+                _notices.emit(WorldPublicationNotice.CacheSyncFailed(cacheSync.exceptionOrNull()?.message))
+                return@launch
+            }
             if (refreshedWorld.releaseStatus != expectedStatus) {
                 applyVerifiedWorld(
                     world = refreshedWorld,
@@ -415,6 +430,14 @@ internal class WorldPublicationStateModel(
         mutationJob?.cancel()
         verifiedWorld = null
         _state.value = WorldPublicationUiState()
+    }
+
+    private suspend fun syncWorld(world: WorldData): Result<Unit> = try {
+        onWorldRefreshed(world)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        Result.failure(error)
     }
 
     private fun accepts(

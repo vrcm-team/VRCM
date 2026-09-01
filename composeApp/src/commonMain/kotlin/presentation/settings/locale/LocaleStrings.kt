@@ -212,6 +212,8 @@ sealed class LocaleStrings {
         "Could not check publishing availability. Refresh to try again."
     open val worldPublicationRefreshRequired: String =
         "The request completed, but the current status could not be confirmed. Refresh before trying again."
+    open val worldPublicationCacheSyncFailed: String =
+        "World status updated, but the cached data could not be saved. Refresh before trying again."
 
     // World Search
     open val worldSearchAdvancedOptions: String = "Advanced Search Options"

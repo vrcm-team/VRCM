@@ -200,22 +200,30 @@ class WorldProfileScreenModel internal constructor(
         }
     }
 
-    private fun applyPublicationWorld(worldData: WorldData) {
-        val current = _worldProfileState.value ?: return
-        if (current.worldId != worldData.id) return
+    private suspend fun applyPublicationWorld(worldData: WorldData): Result<Unit> {
+        val current = _worldProfileState.value
+            ?: return Result.failure(IllegalStateException("World profile is no longer active"))
+        if (current.worldId != worldData.id) {
+            return Result.failure(IllegalStateException("World profile target changed before cache sync"))
+        }
 
         _worldProfileState.value = WorldProfileVo(
             world = worldData,
             instancesList = current.instances,
             platformFileSizes = current.platformFileSizes,
         )
-        viewModelScope.launch(Dispatchers.IO) {
+        return try {
             worldProfileCacheStore.save(
                 WorldProfileCache(
                     world = worldData,
                     cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
                 )
             )
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
         }
     }
 

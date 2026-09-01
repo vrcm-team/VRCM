@@ -197,6 +197,8 @@ internal object LocaleStringsJa : LocaleStrings() {
         "公開可能か確認できませんでした。更新してもう一度お試しください。"
     override val worldPublicationRefreshRequired =
         "リクエストは完了しましたが、現在の状態を確認できませんでした。再実行する前に更新してください。"
+    override val worldPublicationCacheSyncFailed =
+        "ワールドの状態は更新されましたが、キャッシュを保存できませんでした。再実行する前に更新してください。"
 
     // World Search
     override val worldSearchAdvancedOptions = "詳細検索オプション"

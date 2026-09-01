@@ -75,7 +75,10 @@ class WorldPublicationStateModelTest {
             scope = backgroundScope,
             requestDispatcher = dispatcher,
             sessionFlow = session,
-            onWorldRefreshed = refreshedWorlds::add,
+            onWorldRefreshed = { world ->
+                refreshedWorlds += world
+                Result.success(Unit)
+            },
         )
         val notices = mutableListOf<WorldPublicationNotice>()
         val noticeJob = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -159,6 +162,43 @@ class WorldPublicationStateModelTest {
     }
 
     @Test
+    fun cacheSyncFailureBlocksSuccessUntilTheWorldCanBeRefreshed() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val token = AccountSessionToken("usr_author", 1)
+        val session = MutableStateFlow(authenticated(token))
+        val source = FakeWorldPublicationSource(
+            worlds = mutableMapOf("wrld_owned" to world(releaseStatus = "private")),
+        )
+        val model = WorldPublicationStateModel(
+            source = source,
+            scope = backgroundScope,
+            requestDispatcher = dispatcher,
+            sessionFlow = session,
+            onWorldRefreshed = {
+                Result.failure(IllegalStateException("cache unavailable"))
+            },
+        )
+        val notices = mutableListOf<WorldPublicationNotice>()
+        val noticeJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+
+        model.setTarget("wrld_owned", "usr_author")
+        model.acceptVerifiedWorld(source.worlds.getValue("wrld_owned"), token)
+        runCurrent()
+        model.changePublication(WorldPublicationAction.Publish)
+        runCurrent()
+
+        assertEquals(WorldPublicationBlockReason.RefreshRequired, model.state.value.blockReason)
+        assertFalse(model.state.value.canExecute)
+        assertEquals(
+            listOf<WorldPublicationNotice>(WorldPublicationNotice.CacheSyncFailed("cache unavailable")),
+            notices,
+        )
+        noticeJob.cancel()
+    }
+
+    @Test
     fun accountSwitchRejectsACompletedMutationFromThePreviousSession() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val tokenA = AccountSessionToken("usr_author", 1)
@@ -175,7 +215,10 @@ class WorldPublicationStateModelTest {
             scope = backgroundScope,
             requestDispatcher = dispatcher,
             sessionFlow = session,
-            onWorldRefreshed = refreshedWorlds::add,
+            onWorldRefreshed = { world ->
+                refreshedWorlds += world
+                Result.success(Unit)
+            },
         )
 
         model.setTarget("wrld_owned", "usr_author")
@@ -213,7 +256,10 @@ class WorldPublicationStateModelTest {
             scope = backgroundScope,
             requestDispatcher = dispatcher,
             sessionFlow = session,
-            onWorldRefreshed = refreshedWorlds::add,
+            onWorldRefreshed = { world ->
+                refreshedWorlds += world
+                Result.success(Unit)
+            },
         )
 
         model.setTarget("wrld_old", "usr_author")
