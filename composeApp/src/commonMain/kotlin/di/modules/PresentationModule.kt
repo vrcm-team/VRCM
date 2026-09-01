@@ -49,6 +49,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreenMode
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldEditor
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
@@ -148,6 +150,7 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    singleOf(::NetworkWorldEditor) bind WorldEditor::class
     viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }

@@ -38,5 +38,6 @@ data class WorldData(
     @SerialName("updated_at")
     val updatedAt: String?,
     val version: Int?,
-    val visits: Int?
+    val visits: Int?,
+    val urlList: List<String> = emptyList(),
 )

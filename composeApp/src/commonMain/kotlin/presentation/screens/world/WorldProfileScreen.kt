@@ -58,6 +58,7 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
@@ -103,10 +104,21 @@ class WorldProfileScreen(
         // 收集ViewModel状态
         val profileVoState by screenModel.worldProfileState.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
+        val metadataEditState by screenModel.metadataEditState.collectAsState()
+        val locale = strings
+        var showMetadataEditor by remember { mutableStateOf(false) }
         val currentNavigator = currentNavigator
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
+        }
+        LaunchedEffect(screenModel, locale) {
+            screenModel.metadataEditNotices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+            }
+        }
+        LaunchedEffect(metadataEditState.canEdit) {
+            if (!metadataEditState.canEdit) showMetadataEditor = false
         }
 
         CompositionLocalProvider(
@@ -120,6 +132,17 @@ class WorldProfileScreen(
                 onRefresh = screenModel::refreshWorldData,
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
+                canEditMetadata = metadataEditState.canEdit,
+                onEditMetadata = { showMetadataEditor = true },
+            )
+        }
+        val displayedWorld = profileVoState ?: worldProfileVO
+        if (showMetadataEditor && metadataEditState.canEdit) {
+            WorldMetadataEditSheet(
+                world = displayedWorld,
+                state = metadataEditState,
+                onDismiss = { showMetadataEditor = false },
+                onSave = screenModel::saveMetadata,
             )
         }
     }
@@ -134,6 +157,8 @@ class WorldProfileScreen(
         onRefresh: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
+        canEditMetadata: Boolean = false,
+        onEditMetadata: () -> Unit = {},
     ) {
         // 模糊效果状态
         val hazeState = remember { HazeState() }
@@ -227,7 +252,9 @@ class WorldProfileScreen(
                 onMenu = onMenu,
                 onCollapse = { sheetState = SheetState.COLLAPSED },
                 isRefreshing = isRefreshing,
-                onRefresh = onRefresh
+                onRefresh = onRefresh,
+                canEditMetadata = canEditMetadata,
+                onEditMetadata = onEditMetadata,
             )
 
             // ========== BottomSheet ==========
@@ -729,6 +756,8 @@ private fun RenderTopBar(
     onCollapse: () -> Unit,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    canEditMetadata: Boolean = false,
+    onEditMetadata: () -> Unit = {},
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -748,6 +777,17 @@ private fun RenderTopBar(
             onReturn = onReturn,
             onMenu = null,
             actions = { colors ->
+                if (canEditMetadata) {
+                    IconButton(
+                        colors = colors,
+                        onClick = onEditMetadata,
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.Settings,
+                            contentDescription = strings.worldEditTitle,
+                        )
+                    }
+                }
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,

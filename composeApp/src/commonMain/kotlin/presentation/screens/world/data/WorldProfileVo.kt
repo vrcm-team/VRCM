@@ -28,6 +28,8 @@ data class WorldProfileVo(
     val publicOccupants: Int = 0,
     val featured: Boolean? = null,
     val tags: List<String>? = null,
+    val rawTags: List<String> = emptyList(),
+    val allowedDomains: List<String> = emptyList(),
     val releaseStatus: String? = null,
     val version: Int? = null,
 
@@ -69,6 +71,8 @@ data class WorldProfileVo(
         featured = world.featured,
         tags = world.tags.filter { it.startsWith("author_tag_") }
             .map { it.substringAfter("author_tag_") },
+        rawTags = world.tags,
+        allowedDomains = world.urlList,
         releaseStatus = world.releaseStatus,
         version = world.version,
         createdAt = world.createdAt,

@@ -5,9 +5,11 @@ import io.github.vrcmteam.vrcm.network.api.attributes.WORLDS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldUpdateData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -23,6 +25,12 @@ class WorldsApi(private val client: HttpClient)  {
      */
     suspend fun getWorldById(worldId: String): WorldData =
         client.get("$WORLDS_API_PREFIX/$worldId").checkSuccess()
+
+    suspend fun updateWorld(worldId: String, update: WorldUpdateData): WorldData =
+        client.put("$WORLDS_API_PREFIX/$worldId") {
+            contentType(ContentType.Application.Json)
+            setBody(update)
+        }.checkSuccess()
 
     suspend fun getRecentWorlds(
         n: Int = 50,

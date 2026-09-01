@@ -251,6 +251,27 @@ sealed class LocaleStrings {
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldEditTitle: String = "Edit world"
+    open val worldEditName: String = "Name"
+    open val worldEditDescription: String = "Description"
+    open val worldEditCapacity: String = "Capacity"
+    open val worldEditRecommendedCapacity: String = "Recommended capacity"
+    open val worldEditCapacityHint: String =
+        "Capacity must be between 0 and 40; recommended capacity cannot exceed it."
+    open val worldEditTags: String = "Tags"
+    open val worldEditTagsHint: String = "Enter one complete VRChat tag per line."
+    open val worldEditAllowedDomains: String = "Allowed Domains"
+    open val worldEditAllowedDomainsHint: String =
+        "Enter one domain accepted by VRChat per line."
+    open val worldEditSave: String = "Save world details"
+    open val worldEditSaving: String = "Saving..."
+    open val worldEditInvalidName: String = "World name cannot be empty."
+    open val worldEditInvalidCapacity: String = "Capacity must be a whole number from 0 to 40."
+    open val worldEditInvalidRecommendedCapacity: String =
+        "Recommended capacity must be a whole number and cannot exceed capacity."
+    open val worldEditNoChanges: String = "World details have not changed."
+    open val worldEditSaved: String = "World details updated."
+    open val worldEditSaveFailed: String = "Failed to update world details."
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog

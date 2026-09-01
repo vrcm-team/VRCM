@@ -47,6 +47,7 @@ class WorldProfileScreenModel internal constructor(
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
     private val worldProfileCacheStore: WorldProfileCacheStore,
+    worldEditor: WorldEditor,
 ) : ViewModel() {
     // 世界数据状态
     private val _worldProfileState = MutableStateFlow<WorldProfileVo?>(null)
@@ -55,6 +56,34 @@ class WorldProfileScreenModel internal constructor(
     // 加载状态
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val metadataReady = MutableStateFlow(false)
+    private val metadataEditor = WorldMetadataEditStateModel(
+        editor = worldEditor,
+        scope = viewModelScope,
+        world = worldProfileState,
+        metadataReady = metadataReady,
+        session = SharedFlowCentre.currentSession,
+        onAcceptedUpdate = { current, updated ->
+            _worldProfileState.value = WorldProfileVo(
+                world = updated,
+                instancesList = current.instances,
+                platformFileSizes = current.platformFileSizes,
+            )
+            metadataReady.value = true
+            viewModelScope.launch {
+                worldProfileCacheStore.save(
+                    WorldProfileCache(
+                        world = updated,
+                        cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                    )
+                )
+            }
+        },
+    )
+    internal val metadataEditState: StateFlow<WorldMetadataEditState> = metadataEditor.state
+    internal val metadataEditNotices: SharedFlow<WorldMetadataEditNotice> = metadataEditor.notices
+    private var refreshMetadataAfterCurrentLoad = false
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -67,10 +96,35 @@ class WorldProfileScreenModel internal constructor(
         favoriteEntry.retry()
     }
 
+    init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession
+                .map { it?.token?.userId }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { userId ->
+                    metadataReady.value = false
+                    if (_worldProfileState.value?.authorID == userId) {
+                        if (_isLoading.value) {
+                            refreshMetadataAfterCurrentLoad = true
+                        } else {
+                            refreshWorldData()
+                        }
+                    }
+                }
+        }
+    }
+
+    internal fun saveMetadata(draft: WorldMetadataDraft) {
+        metadataEditor.save(draft)
+    }
+
     /**
      * 刷新世界数据
      */
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
+        metadataEditor.invalidate()
+        metadataReady.value = false
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
         favoriteEntry.load(worldId)
@@ -91,7 +145,8 @@ class WorldProfileScreenModel internal constructor(
 
         val shouldRefreshProfile = cached == null ||
             cached.isExpired(Clock.System.now().toEpochMilliseconds()) ||
-            cached.world.instances == null
+            cached.world.instances == null ||
+            cached.world.authorId == SharedFlowCentre.currentSession.value?.token?.userId
         if (shouldRefreshProfile) {
             refreshWorldData()
         } else {
@@ -122,10 +177,11 @@ class WorldProfileScreenModel internal constructor(
     fun refreshWorldData() {
         val worldId = _worldProfileState.value?.worldId ?: return
         if (_isLoading.value || worldId.isBlank()) return
+        val requestUserId = SharedFlowCentre.currentSession.value?.token?.userId
         _isLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                loadWorldInfo(worldId)
+                loadWorldInfo(worldId, requestUserId)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 SharedFlowCentre.toastText.emit(
@@ -133,11 +189,18 @@ class WorldProfileScreenModel internal constructor(
                 )
             } finally {
                 _isLoading.value = false
+                if (refreshMetadataAfterCurrentLoad) {
+                    refreshMetadataAfterCurrentLoad = false
+                    val currentUserId = SharedFlowCentre.currentSession.value?.token?.userId
+                    if (_worldProfileState.value?.authorID == currentUserId) {
+                        refreshWorldData()
+                    }
+                }
             }
         }
     }
 
-    private suspend fun loadWorldInfo(worldId: String) {
+    private suspend fun loadWorldInfo(worldId: String, requestUserId: String?) {
         authService.reTryAuthCatching {
             worldsApi.getWorldById(worldId)
         }.onSuccess { worldData ->
@@ -158,6 +221,8 @@ class WorldProfileScreenModel internal constructor(
                     instancesList = _worldProfileState.value?.instances ?: mutableListOf(),
 //                    platformFileSizes = platformFileSizes,
                 )
+            metadataReady.value =
+                requestUserId == SharedFlowCentre.currentSession.value?.token?.userId
 //            viewModelScope.launch(Dispatchers.IO) {
 //                // 获取平台文件大小信息
 //                runCatching {
