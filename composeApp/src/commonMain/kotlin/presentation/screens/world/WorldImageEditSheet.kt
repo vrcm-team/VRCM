@@ -19,14 +19,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +66,13 @@ internal fun WorldImageEditSheet(
     var isPreparing by remember(world.worldId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val locale = strings
+    val latestIsPreparing = rememberUpdatedState(isPreparing)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestIsPreparing.value
+        },
+    )
     val picker = rememberFilePickerLauncher(
         type = galleryImagePickerType(WorldImageLimits.ALLOWED_EXTENSIONS),
     ) { file ->
@@ -109,6 +119,8 @@ internal fun WorldImageEditSheet(
 
     ModalBottomSheet(
         onDismissRequest = { if (!isPreparing) onDismiss() },
+        sheetState = sheetState,
+        sheetGesturesEnabled = !isPreparing,
     ) {
         Column(
             modifier = Modifier
