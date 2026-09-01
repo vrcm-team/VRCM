@@ -30,7 +30,7 @@ internal enum class WorldPublicationAction {
 }
 
 internal enum class WorldPublicationBlockReason {
-    WeeklyLimit,
+    Unavailable,
     CheckFailed,
     RefreshRequired,
 }
@@ -410,7 +410,7 @@ internal class WorldPublicationStateModel(
                         blockReason = if (canPublish) {
                             null
                         } else {
-                            WorldPublicationBlockReason.WeeklyLimit
+                            WorldPublicationBlockReason.Unavailable
                         },
                     )
                 }

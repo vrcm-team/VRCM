@@ -207,7 +207,8 @@ sealed class LocaleStrings {
     open val worldUnpublishSuccess: String = "World unpublished"
     open val worldPublishFailed: String = "Failed to publish world"
     open val worldUnpublishFailed: String = "Failed to unpublish world"
-    open val worldPublishUnavailable: String = "Publishing is not available yet"
+    open val worldPublishUnavailable: String =
+        "This world is not currently eligible for publishing. You can publish at most one world per week."
     open val worldPublishAvailabilityCheckFailed: String =
         "Could not check publishing availability. Refresh to try again."
     open val worldPublicationRefreshRequired: String =

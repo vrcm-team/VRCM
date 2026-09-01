@@ -192,7 +192,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldUnpublishSuccess = "ワールドを非公開にしました"
     override val worldPublishFailed = "ワールドの公開に失敗しました"
     override val worldUnpublishFailed = "ワールドの非公開化に失敗しました"
-    override val worldPublishUnavailable = "現在はワールドを公開できません"
+    override val worldPublishUnavailable = "現在このワールドは公開資格を満たしていません。公開できるワールドは週に1つまでです。"
     override val worldPublishAvailabilityCheckFailed =
         "公開可能か確認できませんでした。更新してもう一度お試しください。"
     override val worldPublicationRefreshRequired =

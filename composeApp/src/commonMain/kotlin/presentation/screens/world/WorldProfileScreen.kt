@@ -893,7 +893,7 @@ private fun WorldPublicationActionButton(
 ) {
     val action = state.action ?: return
     val description = when (state.blockReason) {
-        WorldPublicationBlockReason.WeeklyLimit -> strings.worldPublishUnavailable
+        WorldPublicationBlockReason.Unavailable -> strings.worldPublishUnavailable
         WorldPublicationBlockReason.CheckFailed -> strings.worldPublishAvailabilityCheckFailed
         WorldPublicationBlockReason.RefreshRequired -> strings.worldPublicationRefreshRequired
         null -> when (action) {

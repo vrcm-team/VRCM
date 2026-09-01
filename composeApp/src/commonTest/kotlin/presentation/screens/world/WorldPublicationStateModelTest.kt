@@ -38,7 +38,7 @@ class WorldPublicationStateModelTest {
     }
 
     @Test
-    fun weeklyLimitKeepsTheVerifiedPublishActionVisibleButDisabled() = runTest {
+    fun unavailablePublishingKeepsTheVerifiedPublishActionVisibleButDisabled() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val token = AccountSessionToken("usr_author", 1)
         val session = MutableStateFlow(authenticated(token))
@@ -54,7 +54,7 @@ class WorldPublicationStateModelTest {
 
         assertEquals(WorldPublicationAction.Publish, model.state.value.action)
         assertFalse(model.state.value.canExecute)
-        assertEquals(WorldPublicationBlockReason.WeeklyLimit, model.state.value.blockReason)
+        assertEquals(WorldPublicationBlockReason.Unavailable, model.state.value.blockReason)
     }
 
     @Test
