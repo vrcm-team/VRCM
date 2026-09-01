@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
-import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceCloseResponse
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
@@ -71,10 +70,15 @@ internal class WorldInstanceStateStore(
         if (!canCommit()) return@withLock false
         val profile = profileState.value?.takeIf { it.worldId == target.worldId }
             ?: return@withLock false
-        locationRevisions[target.location] = (locationRevisions[target.location] ?: 0L) + 1L
-        if (response.isClosed) {
-            closedLocations += target.location
+        if (response.worldId != target.worldId ||
+            response.instanceId != target.instanceId ||
+            response.location != target.location
+        ) {
+            return@withLock false
         }
+        locationRevisions[target.location] = (locationRevisions[target.location] ?: 0L) + 1L
+        // A successful DELETE is authoritative even when active/closedAt are omitted.
+        closedLocations += target.location
         profileState.value = profile.applyInstanceCloseResponse(target, response)
         true
     }
@@ -88,14 +92,7 @@ internal fun WorldProfileVo.applyInstanceCloseResponse(
     response: InstanceCloseResponse,
 ): WorldProfileVo {
     if (worldId != target.worldId) return this
-    val updatedInstances = if (response.isClosed) {
-        instances.filterNot { it.location == target.location }
-    } else {
-        instances.map { current ->
-            if (current.location == target.location) response.mergeWith(current) else current
-        }
-    }
-    return copy(instances = updatedInstances)
+    return copy(instances = instances.filterNot { it.location == target.location })
 }
 
 internal fun InstanceData.asInstanceCloseResponse() = InstanceCloseResponse(
@@ -132,43 +129,3 @@ internal fun InstanceData.asInstanceCloseResponse() = InstanceCloseResponse(
     world = world,
     worldId = worldId,
 )
-
-private fun InstanceCloseResponse.mergeWith(current: InstanceVo): InstanceVo = current.copy(
-    id = id,
-    instanceId = instanceId,
-    worldId = worldId,
-    location = location,
-    ownerId = ownerId ?: current.ownerId,
-    instanceName = name,
-    currentUsers = nUsers,
-    pcUsers = platforms.standaloneWindows,
-    androidUsers = platforms.android,
-    iosUsers = platforms.ios,
-    queueEnabled = queueEnabled,
-    queueSize = queueSize,
-    isActive = active ?: current.isActive,
-    isFull = full,
-    hasCapacity = hasCapacityForYou ?: current.hasCapacity,
-    regionType = region,
-    regionName = region.name,
-    accessType = mergedAccessType(current.accessType),
-)
-
-private fun InstanceCloseResponse.mergedAccessType(current: AccessType): AccessType = when (type) {
-    AccessType.Group.value -> when (instanceId.substringAfter("groupAccessType(").substringBefore(")")) {
-        AccessType.GroupPublic.value -> AccessType.GroupPublic
-        AccessType.GroupPlus.value -> AccessType.GroupPlus
-        AccessType.GroupMembers.value -> AccessType.GroupMembers
-        else -> AccessType.Group
-    }
-
-    AccessType.Private.value -> when (canRequestInvite) {
-        true -> AccessType.InvitePlus
-        false -> AccessType.Invite
-        null -> current
-    }
-
-    AccessType.FriendPlus.value -> AccessType.FriendPlus
-    AccessType.Friend.value -> AccessType.Friend
-    else -> AccessType.Public
-}

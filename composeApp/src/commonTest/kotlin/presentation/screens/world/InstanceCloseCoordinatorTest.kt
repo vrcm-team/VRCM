@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
+import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceCloseResponse
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.instances.data.Platforms
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -11,6 +12,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -160,6 +162,36 @@ class InstanceCloseCoordinatorTest {
             fetchInstance = { token, _ ->
                 InstanceCloseSessionResult(
                     Result.success(closedInstance(active = true, closedAt = null)),
+                    token,
+                )
+            },
+            closeInstance = { token, _ ->
+                InstanceCloseSessionResult(
+                    Result.failure(VRCApiException("Forbidden", 403, "permission denied")),
+                    token,
+                )
+            },
+        )
+        coordinator.authorize(personalTarget())
+
+        val failed = assertIs<InstanceCloseSubmissionResult.Failed>(coordinator.submit())
+
+        assertEquals(403, assertIs<VRCApiException>(failed.error).code)
+        assertIs<InstanceCloseState.AwaitingConfirmation>(coordinator.state.value)
+    }
+
+    @Test
+    fun forbiddenCloseRemainsRetryableWhenRecheckOmitsCloseState() = runTest {
+        var currentToken: AccountSessionToken? = OWNER_TOKEN
+        val coordinator = coordinator(
+            currentSession = { currentToken },
+            fetchInstanceResponse = { token, _ ->
+                InstanceCloseSessionResult(
+                    Result.success(
+                        closedInstance(active = true, closedAt = null)
+                            .asInstanceCloseResponse()
+                            .copy(active = null, closedAt = null),
+                    ),
                     token,
                 )
             },
@@ -329,30 +361,21 @@ class InstanceCloseCoordinatorTest {
     }
 
     @Test
-    fun serverResponseControlsWhetherTheInstanceIsUpdatedOrRemoved() {
+    fun successfulDeleteRemovesInstanceWhenCloseStatusFieldsAreOmitted() = runTest {
         val target = personalTarget()
-        val originalData = closedInstance(active = true, closedAt = null).copy(nUsers = 3)
-        val original = InstanceVo(originalData)
-        val profile = WorldProfileVo(
-            worldId = WORLD_ID,
-            instances = listOf(original),
+        val profileState = MutableStateFlow<WorldProfileVo?>(
+            WorldProfileVo(
+                worldId = WORLD_ID,
+                instances = listOf(InstanceVo(closedInstance(active = true, closedAt = null))),
+            )
         )
+        val response = closedInstance(active = true, closedAt = null)
+            .asInstanceCloseResponse()
+            .copy(active = null, closedAt = null)
 
-        val stillActive = profile.applyInstanceCloseResponse(
-            target,
-            originalData.copy(nUsers = 2).asInstanceCloseResponse(),
-        )
-        assertEquals(2, stillActive.instances.single().currentUsers)
-        assertTrue(stillActive.instances.single().owner === original.owner)
+        WorldInstanceStateStore(profileState).applyClose(target, response)
 
-        val closed = stillActive.applyInstanceCloseResponse(
-            target,
-            originalData.copy(
-                active = false,
-                closedAt = "2026-08-31T08:00:00.000Z",
-            ).asInstanceCloseResponse(),
-        )
-        assertTrue(closed.instances.isEmpty())
+        assertTrue(profileState.value!!.instances.isEmpty())
     }
 
     private fun coordinator(
@@ -372,6 +395,10 @@ class InstanceCloseCoordinatorTest {
                 token,
             )
         },
+        fetchInstanceResponse: suspend (
+            AccountSessionToken,
+            InstanceCloseTarget,
+        ) -> InstanceCloseSessionResult<InstanceCloseResponse>? = { _, _ -> null },
         closeInstance: suspend (
             AccountSessionToken,
             InstanceCloseTarget,
@@ -383,12 +410,13 @@ class InstanceCloseCoordinatorTest {
         isCurrentSession = { it == currentSession() },
         fetchGroupPermissions = groupPermissions,
         fetchInstance = { token, target ->
-            fetchInstance(token, target)?.let { response ->
-                InstanceCloseSessionResult(
-                    result = response.result.map { it.asInstanceCloseResponse() },
-                    sessionToken = response.sessionToken,
-                )
-            }
+            fetchInstanceResponse(token, target)
+                ?: fetchInstance(token, target)?.let { response ->
+                    InstanceCloseSessionResult(
+                        result = response.result.map { it.asInstanceCloseResponse() },
+                        sessionToken = response.sessionToken,
+                    )
+                }
         },
         closeInstance = { token, target ->
             closeInstance(token, target)?.let { response ->
