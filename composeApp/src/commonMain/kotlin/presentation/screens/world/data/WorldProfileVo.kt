@@ -72,7 +72,7 @@ data class WorldProfileVo(
         tags = world.tags.filter { it.startsWith("author_tag_") }
             .map { it.substringAfter("author_tag_") },
         rawTags = world.tags,
-        allowedDomains = world.urlList,
+        allowedDomains = world.urlList.orEmpty(),
         releaseStatus = world.releaseStatus,
         version = world.version,
         createdAt = world.createdAt,

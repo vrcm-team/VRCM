@@ -39,5 +39,5 @@ data class WorldData(
     val updatedAt: String?,
     val version: Int?,
     val visits: Int?,
-    val urlList: List<String> = emptyList(),
+    val urlList: List<String>? = emptyList(),
 )

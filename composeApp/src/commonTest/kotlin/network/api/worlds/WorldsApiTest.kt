@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.network.api.worlds
 
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldUpdateData
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -61,7 +62,30 @@ class WorldsApiTest {
         client.close()
     }
 
-    private fun worldJson() = """{
+    @Test
+    fun getWorldByIdAcceptsNullAllowedDomainsAndMapsToEmptyList() = runBlocking {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    respond(
+                        content = worldJson(urlListJson = "null"),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val world = WorldsApi(client).getWorldById("wrld_owned")
+
+        assertEquals(null, world.urlList)
+        assertEquals(emptyList(), WorldProfileVo(world).allowedDomains)
+        client.close()
+    }
+
+    private fun worldJson(urlListJson: String = "[\"https://example.com\"]") = """{
         "authorId":"usr_owner",
         "authorName":"Owner",
         "capacity":16,
@@ -87,6 +111,6 @@ class WorldsApiTest {
         "updated_at":"2026-01-02T00:00:00.000Z",
         "version":2,
         "visits":1,
-        "urlList":["https://example.com"]
+        "urlList":$urlListJson
     }"""
 }
