@@ -75,6 +75,8 @@ class WorldProfileScreenModel internal constructor(
 
     private var instanceCreationGroupsJob: Job? = null
     private var instanceCreationJob: Job? = null
+    private var instanceCreationGroupsGeneration = 0L
+    private var instanceCreationGeneration = 0L
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
@@ -92,8 +94,8 @@ class WorldProfileScreenModel internal constructor(
                 .collect { userId ->
                     if (userId == activeUserId) return@collect
                     activeUserId = userId
-                    instanceCreationGroupsJob?.cancel()
-                    instanceCreationJob?.cancel()
+                    cancelInstanceCreationGroups()
+                    cancelInstanceCreation()
                     _instanceCreationGroups.value = InstanceCreationGroupsState.Idle
                     _instanceCreationState.value = InstanceCreationSubmissionState.Idle
                 }
@@ -104,10 +106,30 @@ class WorldProfileScreenModel internal constructor(
         favoriteEntry.retry()
     }
 
+    private fun cancelInstanceCreationGroups() {
+        instanceCreationGroupsGeneration++
+        instanceCreationGroupsJob?.cancel()
+        instanceCreationGroupsJob = null
+    }
+
+    private fun cancelInstanceCreation() {
+        instanceCreationGeneration++
+        instanceCreationJob?.cancel()
+        instanceCreationJob = null
+        if (_instanceCreationState.value == InstanceCreationSubmissionState.Submitting) {
+            _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+        }
+    }
+
     /**
      * 刷新世界数据
      */
     fun loadWorldData(worldProfileVO: WorldProfileVo) {
+        if (_worldProfileState.value?.worldId != null &&
+            _worldProfileState.value?.worldId != worldProfileVO.worldId
+        ) {
+            cancelInstanceCreation()
+        }
         _worldProfileState.value = worldProfileVO
         val worldId = worldProfileVO.worldId
         favoriteEntry.load(worldId)
@@ -308,31 +330,44 @@ class WorldProfileScreenModel internal constructor(
             return
         }
         _instanceCreationGroups.value = InstanceCreationGroupsState.Loading
+        val generation = ++instanceCreationGroupsGeneration
         instanceCreationGroupsJob = viewModelScope.launch(Dispatchers.IO) {
             val response = authService.runSessionBoundCatching(token) {
                 usersApi.getUserGroups(token.userId).map { limitedGroup ->
                     val groupId = limitedGroup.groupId.ifBlank { limitedGroup.id }
                     groupsApi.fetchGroup(groupId, includeRoles = true)
                 }
-            } ?: return@launch
-            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+            }
+            if (generation != instanceCreationGroupsGeneration) return@launch
+            if (response == null) {
+                _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+                return@launch
+            }
+            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+                return@launch
+            }
             response.result.fold(
                 onSuccess = { groups ->
-                    _instanceCreationGroups.value = InstanceCreationGroupsState.Ready(
-                        groups.map { group ->
-                            InstanceCreationGroup(
-                                id = group.id,
-                                name = group.name,
-                                permissions = group.myMember?.permissions.orEmpty().toSet(),
-                                roles = group.roles.orEmpty()
-                                    .filter { it.id.isNotBlank() }
-                                    .map { InstanceCreationRole(it.id, it.name.ifBlank { it.id }) },
-                            )
-                        }.filter { it.canCreateAny }.sortedBy { it.name.lowercase() }
-                    )
+                    if (generation == instanceCreationGroupsGeneration) {
+                        _instanceCreationGroups.value = InstanceCreationGroupsState.Ready(
+                            groups.map { group ->
+                                InstanceCreationGroup(
+                                    id = group.id,
+                                    name = group.name,
+                                    permissions = group.myMember?.permissions.orEmpty().toSet(),
+                                    roles = group.roles.orEmpty()
+                                        .filter { it.id.isNotBlank() }
+                                        .map { InstanceCreationRole(it.id, it.name.ifBlank { it.id }) },
+                                )
+                            }.filter { it.canCreateAny }.sortedBy { it.name.lowercase() }
+                        )
+                    }
                 },
                 onFailure = {
-                    _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+                    if (generation == instanceCreationGroupsGeneration) {
+                        _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+                    }
                 },
             )
         }
@@ -359,6 +394,7 @@ class WorldProfileScreenModel internal constructor(
         }
         val session = SharedFlowCentre.currentSession.value ?: return
         _instanceCreationState.value = InstanceCreationSubmissionState.Submitting
+        val generation = ++instanceCreationGeneration
         instanceCreationJob = viewModelScope.launch(Dispatchers.IO) {
             val options = InstanceCreationOptions(
                 worldId = worldId,
@@ -374,9 +410,13 @@ class WorldProfileScreenModel internal constructor(
             )
             when (val result = instanceCreationService.create(options)) {
                 is InstanceCreationResult.Created -> {
+                    if (generation != instanceCreationGeneration) return@launch
                     if (!SharedFlowCentre.isCurrentSession(result.sessionToken) ||
                         _worldProfileState.value?.worldId != worldId
-                    ) return@launch
+                    ) {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                        return@launch
+                    }
                     val groupOwner = groups.firstOrNull { it.id == draft.groupId }
                     val owner = if (groupOwner != null) {
                         Owner(groupOwner.id, groupOwner.name, BlueprintType.Group)
@@ -387,7 +427,10 @@ class WorldProfileScreenModel internal constructor(
                             ?: result.sessionToken.userId
                         Owner(result.sessionToken.userId, currentUserName, BlueprintType.User)
                     }
-                    val currentProfile = _worldProfileState.value ?: return@launch
+                    val currentProfile = _worldProfileState.value ?: run {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                        return@launch
+                    }
                     _worldProfileState.value = currentProfile.copy(
                         instances = currentProfile.instances +
                             InstanceVo(result.instance, MutableStateFlow(owner))
@@ -395,7 +438,12 @@ class WorldProfileScreenModel internal constructor(
 
                     val inviteToken = SharedFlowCentre.currentSession.value?.token
                         ?.takeIf { it.userId == result.sessionToken.userId }
-                        ?: return@launch
+                        ?: run {
+                            if (generation == instanceCreationGeneration) {
+                                _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                            }
+                            return@launch
+                        }
                     val inviteResponse = authService.runSessionBoundCatching(inviteToken) {
                         inviteApi.inviteMyselfToInstance(result.instance.id)
                     }
@@ -416,30 +464,42 @@ class WorldProfileScreenModel internal constructor(
                                 )
                             },
                         )
-                        _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                        if (generation == instanceCreationGeneration) {
+                            _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                        }
                     } else if (SharedFlowCentre.currentSession.value?.account?.userId ==
                         result.sessionToken.userId
                     ) {
                         SharedFlowCentre.toastText.emit(
                             ToastText.Error(strings.instanceCreateSuccessButInviteFailed)
                         )
-                        _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                        if (generation == instanceCreationGeneration) {
+                            _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                        }
+                    } else if (generation == instanceCreationGeneration) {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Idle
                     }
                 }
 
                 InstanceCreationResult.InFlight -> {
-                    _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+                    if (generation == instanceCreationGeneration) {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+                    }
                 }
 
                 InstanceCreationResult.SessionChanged -> {
-                    _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                    if (generation == instanceCreationGeneration) {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                    }
                 }
 
                 is InstanceCreationResult.Failed -> {
-                    _instanceCreationState.value = InstanceCreationSubmissionState.Failed
-                    SharedFlowCentre.toastText.emit(
-                        ToastText.Error(strings.instanceCreateFailed + ": ${result.error.message}")
-                    )
+                    if (generation == instanceCreationGeneration) {
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+                        SharedFlowCentre.toastText.emit(
+                            ToastText.Error(strings.instanceCreateFailed + ": ${result.error.message}")
+                        )
+                    }
                 }
             }
         }
