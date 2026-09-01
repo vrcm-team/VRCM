@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsZhHans
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.HomeWorldService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountDao
@@ -174,6 +175,7 @@ class WorldProfileInstanceCloseTest : MainDispatcherTest() {
             inviteApi = InviteApi(client),
             worldPlatformService = WorldPlatformService(FileApi(client), authService),
             worldProfileCacheStore = cacheStore,
+            homeWorldManager = HomeWorldService(UsersApi(client), authService),
         ).also(models::add)
     }
 

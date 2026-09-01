@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.HomeWorldService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -276,7 +277,10 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
         )
 
         model.loadWorldData(WorldProfileVo(worldId = WORLD_ID))
-        awaitProfile { model.worldProfileState.value?.platformFileSizes?.isNotEmpty() == true }
+        awaitProfile {
+            model.worldProfileState.value?.platformFileSizes?.isNotEmpty() == true &&
+                cache.value.value?.platformFileSizes?.size == 3
+        }
 
         assertEquals(3, model.worldProfileState.value.orEmptyPlatformSizes().size)
         assertEquals(2, pcRequests.value)
@@ -317,6 +321,7 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
             inviteApi = InviteApi(client),
             worldPlatformService = WorldPlatformService(FileApi(client), authService),
             worldProfileCacheStore = cache,
+            homeWorldManager = HomeWorldService(UsersApi(client), authService),
         ).also(models::add)
     }
 

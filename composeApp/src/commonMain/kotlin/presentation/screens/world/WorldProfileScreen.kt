@@ -27,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Home as FilledHome
+import androidx.compose.material.icons.outlined.Home as OutlinedHome
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -107,6 +109,12 @@ internal fun WorldPublicationNotice.localizedToast(locale: LocaleStrings): Toast
 private fun String.withOptionalDetail(detail: String?): String =
     detail?.takeIf { it.isNotBlank() }?.let { "$this: $it" } ?: this
 
+internal fun HomeWorldNotice.localizedToast(locale: LocaleStrings): ToastText = when (this) {
+    HomeWorldNotice.Set -> ToastText.Success(locale.worldProfileHomeWorldSetSuccess)
+    HomeWorldNotice.Reset -> ToastText.Success(locale.worldProfileHomeWorldResetSuccess)
+    HomeWorldNotice.UpdateFailed -> ToastText.Error(locale.worldProfileHomeWorldUpdateFailed)
+}
+
 /**
  *
  * kotlin类作用描述
@@ -138,6 +146,9 @@ class WorldProfileScreen(
         val deletionState by screenModel.deletionState.collectAsState()
         val currentNavigator = currentNavigator
         val localeStrings = strings
+        val homeWorldActionState by screenModel.homeWorldActionState.collectAsState()
+        val locale = strings
+        var showHomeWorldConfirmation by remember { mutableStateOf(false) }
         // 组件首次加载时自动刷新数据
         LaunchedEffect(Unit) {
             screenModel.loadWorldData(worldProfileVO)
@@ -169,6 +180,18 @@ class WorldProfileScreen(
             }
         }
 
+        LaunchedEffect(screenModel, locale) {
+            screenModel.homeWorldNotices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+            }
+        }
+
+        LaunchedEffect(homeWorldActionState.availability) {
+            if (homeWorldActionState.availability == HomeWorldActionAvailability.Unavailable) {
+                showHomeWorldConfirmation = false
+            }
+        }
+
         CompositionLocalProvider(
             LocalSharedSuffixKey provides sharedSuffixKey,
         ) {
@@ -189,8 +212,51 @@ class WorldProfileScreen(
                 isDeleting = deletionState.isDeleting,
                 isDeleted = deletionState.isDeleted,
                 onDelete = { screenModel.deleteWorld() },
+                homeWorldActionState = homeWorldActionState,
+                onHomeWorldClick = { showHomeWorldConfirmation = true },
                 sharedKeyPrefix = sharedKeyPrefix,
                 sharedImageCacheKey = sharedImageCacheKey,
+            )
+        }
+
+        if (showHomeWorldConfirmation) {
+            val resetHomeWorld = homeWorldActionState.availability == HomeWorldActionAvailability.Current
+            AlertDialog(
+                onDismissRequest = {
+                    if (!homeWorldActionState.isUpdating) showHomeWorldConfirmation = false
+                },
+                title = {
+                    Text(
+                        if (resetHomeWorld) strings.worldProfileResetHomeWorld
+                        else strings.worldProfileSetHomeWorld
+                    )
+                },
+                text = {
+                    Text(
+                        if (resetHomeWorld) strings.worldProfileResetHomeWorldConfirmation
+                        else strings.worldProfileSetHomeWorldConfirmation
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = !homeWorldActionState.isUpdating &&
+                            homeWorldActionState.availability != HomeWorldActionAvailability.Unavailable,
+                        onClick = {
+                            showHomeWorldConfirmation = false
+                            screenModel.updateHomeWorld()
+                        },
+                    ) {
+                        Text(strings.confirm)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !homeWorldActionState.isUpdating,
+                        onClick = { showHomeWorldConfirmation = false },
+                    ) {
+                        Text(strings.cancel)
+                    }
+                },
             )
         }
     }
@@ -214,6 +280,8 @@ class WorldProfileScreen(
         isDeleting: Boolean = false,
         isDeleted: Boolean = false,
         onDelete: () -> Unit = {},
+        homeWorldActionState: HomeWorldActionState = HomeWorldActionState(),
+        onHomeWorldClick: () -> Unit = {},
         sharedKeyPrefix: String = "",
         sharedImageCacheKey: String? = null,
     ) {
@@ -383,6 +451,8 @@ class WorldProfileScreen(
                 isDeleting = isDeleting,
                 isDeleted = isDeleted,
                 onDelete = { showDeleteConfirmation = true },
+                homeWorldActionState = homeWorldActionState,
+                onHomeWorldClick = onHomeWorldClick,
             )
 
             // ========== BottomSheet ==========
@@ -893,6 +963,8 @@ private fun RenderTopBar(
     isDeleting: Boolean = false,
     isDeleted: Boolean = false,
     onDelete: () -> Unit = {},
+    homeWorldActionState: HomeWorldActionState,
+    onHomeWorldClick: () -> Unit,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -900,6 +972,7 @@ private fun RenderTopBar(
             .zIndex(20f) // 确保在所有内容之上
     ) {
         val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
+        val titleMaxWidth = (maxWidth - 256.dp).coerceIn(40.dp, 200.dp)
 
         // 添加TopMenuBar
         TopMenuBar(
@@ -979,6 +1052,11 @@ private fun RenderTopBar(
                 OfficialUrlShareButton(
                     url = "https://vrchat.com/home/world/$worldId",
                     colors = colors,
+                )
+                HomeWorldActionButton(
+                    state = homeWorldActionState,
+                    colors = colors,
+                    onClick = onHomeWorldClick,
                 )
                 IconButton(
                     enabled = !isRefreshing && !publicationState.isChanging &&
@@ -1153,6 +1231,40 @@ private fun WorldDeletionConfirmationDialog(
             }
         },
     )
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeWorldActionButton(
+    state: HomeWorldActionState,
+    colors: IconButtonColors,
+    onClick: () -> Unit,
+) {
+    val current = state.availability == HomeWorldActionAvailability.Current
+    val description = when (state.availability) {
+        HomeWorldActionAvailability.Unavailable -> strings.worldProfileHomeWorldUnavailable
+        HomeWorldActionAvailability.CanSet -> strings.worldProfileSetHomeWorld
+        HomeWorldActionAvailability.Current -> strings.worldProfileResetHomeWorld
+    }
+    ATooltipBox(tooltip = { Text(description) }) {
+        IconButton(
+            enabled = state.availability != HomeWorldActionAvailability.Unavailable && !state.isUpdating,
+            colors = colors,
+            onClick = onClick,
+        ) {
+            if (state.isUpdating) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (current) Icons.Filled.FilledHome else Icons.Outlined.OutlinedHome,
+                    contentDescription = description,
+                )
+            }
+        }
+    }
 }
 
 /**

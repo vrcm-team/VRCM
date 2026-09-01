@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.HomeWorldService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -106,6 +107,7 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
                 inviteApi = InviteApi(fixture.client),
                 worldPlatformService = WorldPlatformService(FileApi(fixture.client), fixture.service),
                 worldProfileCacheStore = cache,
+                homeWorldManager = HomeWorldService(UsersApi(fixture.client), fixture.service),
             )
             val screenModel = requireNotNull(model)
 

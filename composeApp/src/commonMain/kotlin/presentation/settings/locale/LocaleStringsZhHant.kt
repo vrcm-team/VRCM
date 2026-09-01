@@ -290,6 +290,14 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val worldDeleteSuccess = "世界已刪除"
     override val worldDeleteSuccessCacheCleanupFailed = "世界已刪除，但未能清理本機快取的詳情。"
     override val worldDeleteFailed = "刪除世界失敗，請重試。"
+    override val worldProfileSetHomeWorld = "設為 Home World"
+    override val worldProfileResetHomeWorld = "重設 Home World"
+    override val worldProfileHomeWorldUnavailable = "Home World 操作不可用"
+    override val worldProfileSetHomeWorldConfirmation = "將此世界設為你的 Home World？"
+    override val worldProfileResetHomeWorldConfirmation = "移除自訂 Home World 並恢復 VRChat 預設設定？"
+    override val worldProfileHomeWorldSetSuccess = "Home World 已更新"
+    override val worldProfileHomeWorldResetSuccess = "Home World 已重設"
+    override val worldProfileHomeWorldUpdateFailed = "無法更新 Home World"
     override val unknown = "未知"
 
     // CreateInstanceDialog
