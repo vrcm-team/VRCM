@@ -88,6 +88,26 @@ class InviteMessageSelectionApiTest {
         client.close()
     }
 
+    @Test
+    fun malformedMessageCollectionsAreRejectedAtTheApiBoundary() = runBlocking {
+        val invalidResponses = listOf(
+            """[{"canBeUpdated":true,"id":"request-0","message":"Hello","messageType":"request","remainingCooldownMinutes":0,"slot":0,"updatedAt":"2026-09-01T00:00:00Z"}]""",
+            """[{"canBeUpdated":true,"id":"message-12","message":"Hello","messageType":"message","remainingCooldownMinutes":0,"slot":12,"updatedAt":"2026-09-01T00:00:00Z"}]""",
+            """[{"canBeUpdated":true,"id":"message-a","message":"Hello","messageType":"message","remainingCooldownMinutes":0,"slot":1,"updatedAt":"2026-09-01T00:00:00Z"},{"canBeUpdated":true,"id":"message-b","message":"Again","messageType":"message","remainingCooldownMinutes":0,"slot":1,"updatedAt":"2026-09-01T00:00:00Z"}]""",
+        )
+
+        invalidResponses.forEach { response ->
+            val client = testClient { response }
+            try {
+                assertFailsWith<IllegalStateException> {
+                    InviteApi(client).getInviteMessages("usr_current", InviteMessageType.Message)
+                }
+            } finally {
+                client.close()
+            }
+        }
+    }
+
     private fun testClient(response: (HttpRequestData) -> String) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->

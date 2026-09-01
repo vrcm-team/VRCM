@@ -41,7 +41,27 @@ class InviteApi(private val client: HttpClient) {
         userId: String,
         messageType: InviteMessageType,
     ): List<InviteMessageData> =
-        client.get("message/$userId/${messageType.pathValue}").checkSuccess()
+        client.get("message/$userId/${messageType.pathValue}")
+            .checkSuccess<List<InviteMessageData>>()
+            .also { validateInviteMessages(it, messageType) }
+
+    private fun validateInviteMessages(
+        messages: List<InviteMessageData>,
+        requestedType: InviteMessageType,
+    ) {
+        val slots = mutableSetOf<Int>()
+        messages.forEach { message ->
+            check(message.messageType == requestedType) {
+                "Invite message response type does not match the requested collection"
+            }
+            check(message.slot in INVITE_MESSAGE_SLOT_RANGE) {
+                "Invite message response contains an out-of-range slot"
+            }
+            check(slots.add(message.slot)) {
+                "Invite message response contains duplicate slots"
+            }
+        }
+    }
 
     private fun requireValidSlot(slot: Int) {
         require(slot in INVITE_MESSAGE_SLOT_RANGE) { "Invalid invite message slot" }

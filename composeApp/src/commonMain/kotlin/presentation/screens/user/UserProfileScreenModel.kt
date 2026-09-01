@@ -1041,7 +1041,6 @@ class UserProfileScreenModel(
                         ?: return@launch
                     _inviteMessageSelection.value = current.copy(
                         messages = result.messages
-                            .filter { it.messageType == action.messageType && it.slot in 0..11 }
                             .sortedBy { it.slot },
                         isLoading = false,
                         loadFailed = false,
