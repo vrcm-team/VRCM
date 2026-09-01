@@ -390,6 +390,34 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun sessionBoundRequestReturnsRefreshedSessionAfterRetryFailure() = runTest {
+        val retryError = IllegalStateException("photo response failed after reauthentication")
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val firstSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        var attempts = 0
+
+        val response = assertNotNull(
+            fixture.service.runSessionBoundCatching(firstSession.token) {
+                attempts++
+                if (attempts == 1) {
+                    throw VRCApiException("Unauthorized", 401, "expired")
+                }
+                throw retryError
+            }
+        )
+
+        assertEquals(2, attempts)
+        assertEquals(retryError, response.result.exceptionOrNull())
+        assertEquals(firstSession.account.userId, response.sessionToken.userId)
+        assertFalse(response.sessionToken == firstSession.token)
+        assertTrue(SharedFlowCentre.isCurrentSession(response.sessionToken))
+        fixture.client.close()
+    }
+
+    @Test
     fun expiredRealtimeSessionReauthenticatesSavedAccount() = runTest {
         val requests = mutableListOf<Pair<String?, String?>>()
         var requestCount = 0

@@ -236,7 +236,7 @@ class NotificationCenterModel(
         launchReservedMutation(item, PendingNotificationMutation.Action(action)) { token ->
             when (responseTarget) {
                 NotificationResponseTarget.BOOP_USER_API -> {
-                    val senderId = item.senderId ?: return@launchReservedMutation
+                    val senderId = item.senderId ?: return@launchReservedMutation token
                     boopUser(
                         item = item,
                         token = token,
@@ -260,6 +260,7 @@ class NotificationCenterModel(
 
                 NotificationResponseTarget.NAVIGATION_LINK -> Unit
             }
+            token
         }
     }
 
@@ -307,7 +308,7 @@ class NotificationCenterModel(
                     NotificationReadTarget.LEGACY_SEE ->
                         notificationApi.markLegacyNotificationAsRead(item.id)
                 }
-            } ?: return@launchReservedMutation
+            } ?: return@launchReservedMutation token
             result
                 .onNotificationFailure()
                 .onSuccess {
@@ -315,6 +316,7 @@ class NotificationCenterModel(
                         current.copy(inboxState = current.inboxState.markSeen(item))
                     }
                 }
+            token
         }
     }
 
@@ -322,13 +324,14 @@ class NotificationCenterModel(
         launchReservedMutation(item, PendingNotificationMutation.Delete) { token ->
             val result = runNotificationMutation(token) {
                 deleteRemoteNotification(item)
-            } ?: return@launchReservedMutation
+            } ?: return@launchReservedMutation token
             reduceForSession(token) { current ->
                 current.copy(
                     inboxState = current.inboxState.afterNotificationAction(item, result),
                 )
             }
             result.onNotificationFailure()
+            token
         }
     }
 
@@ -347,16 +350,17 @@ class NotificationCenterModel(
     private fun launchReservedMutation(
         item: NotificationItemData,
         mutation: PendingNotificationMutation,
-        block: suspend (AccountSessionToken) -> Unit,
+        block: suspend (AccountSessionToken) -> AccountSessionToken,
     ) {
         val token = SharedFlowCentre.currentSession.value?.token ?: return
         modelScope.launch {
             if (!stateStore.reserveMutation(token, item.identity, mutation)) return@launch
             modelScope.launch(Dispatchers.IO) {
+                var activeToken = token
                 try {
-                    block(token)
+                    activeToken = block(token)
                 } finally {
-                    finishNotificationMutation(item, token)
+                    finishNotificationMutation(item, activeToken)
                 }
             }
         }
@@ -368,23 +372,8 @@ class NotificationCenterModel(
         initialToken: AccountSessionToken,
         successMessage: String,
         preparationFailedMessage: String,
-    ) {
-        if (
-            !stateStore.transitionPhotoResponse(
-                initialToken,
-                item.identity,
-                selection,
-                InvitePhotoResponsePhase.PREPARING,
-            )
-        ) return
-
-        val loaded = invitePhotoResponseService.loadGalleryPhoto(
-            sessionToken = initialToken,
-            fileId = selection.fileId,
-            imageUrl = selection.imageUrl,
-        )
-        val loadedResponse = loaded as? InvitePhotoSessionResult.Completed ?: return
-        val activeToken = loadedResponse.sessionToken
+    ): AccountSessionToken {
+        var activeToken = initialToken
         if (
             !stateStore.transitionPhotoResponse(
                 activeToken,
@@ -392,13 +381,29 @@ class NotificationCenterModel(
                 selection,
                 InvitePhotoResponsePhase.PREPARING,
             )
-        ) return
+        ) return activeToken
+
+        val loaded = invitePhotoResponseService.loadGalleryPhoto(
+            sessionToken = activeToken,
+            fileId = selection.fileId,
+            imageUrl = selection.imageUrl,
+        )
+        val loadedResponse = loaded as? InvitePhotoSessionResult.Completed ?: return activeToken
+        activeToken = loadedResponse.sessionToken
+        if (
+            !stateStore.transitionPhotoResponse(
+                activeToken,
+                item.identity,
+                selection,
+                InvitePhotoResponsePhase.PREPARING,
+            )
+        ) return activeToken
         val imageBytes = loadedResponse.result.getOrElse { error ->
             logger.error("Failed to prepare Gallery photo response: $error")
             if (SharedFlowCentre.isCurrentSession(activeToken)) {
                 SharedFlowCentre.toastText.emit(ToastText.Error(preparationFailedMessage))
             }
-            return
+            return activeToken
         }
 
         if (
@@ -408,7 +413,7 @@ class NotificationCenterModel(
                 selection,
                 InvitePhotoResponsePhase.RESPONDING,
             )
-        ) return
+        ) return activeToken
         when (
             val response = invitePhotoResponseService.respond(
                 sessionToken = activeToken,
@@ -418,8 +423,8 @@ class NotificationCenterModel(
         ) {
             InvitePhotoSessionResult.SessionChanged -> Unit
             is InvitePhotoSessionResult.Completed -> {
-                val responseToken = response.sessionToken
-                reduceForSession(responseToken) { current ->
+                activeToken = response.sessionToken
+                reduceForSession(activeToken) { current ->
                     current.copy(
                         inboxState = current.inboxState.afterNotificationAction(item, response.result),
                         failedPhotoResponses = if (response.result.isSuccess) {
@@ -432,13 +437,14 @@ class NotificationCenterModel(
                 response.result
                     .onNotificationFailure()
                     .onSuccess {
-                        if (SharedFlowCentre.isCurrentSession(responseToken)) {
+                        if (SharedFlowCentre.isCurrentSession(activeToken)) {
                             SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                            queueNotificationRefresh(responseToken)
+                            queueNotificationRefresh(activeToken)
                         }
                     }
             }
         }
+        return activeToken
     }
 
     private suspend fun boopUser(
@@ -504,15 +510,11 @@ class NotificationCenterModel(
         return response.result.takeIf { SharedFlowCentre.isCurrentSession(response.sessionToken) }
     }
 
-    private fun finishNotificationMutation(
+    private suspend fun finishNotificationMutation(
         item: NotificationItemData,
         token: AccountSessionToken,
     ) {
-        reduceForSession(token) { current ->
-            current.copy(
-                pendingMutations = current.pendingMutations - item.identity,
-            )
-        }
+        stateStore.finishMutation(token, item.identity)
     }
 
     override fun close() {

@@ -131,6 +131,19 @@ internal class NotificationCenterStateStore(
         }
     }
 
+    suspend fun finishMutation(
+        sessionToken: AccountSessionToken,
+        identity: NotificationIdentity,
+    ): Boolean = reduceWithResult { current ->
+        if (current.sessionToken != sessionToken) {
+            current to false
+        } else {
+            current.copy(
+                pendingMutations = current.pendingMutations - identity,
+            ) to true
+        }
+    }
+
     fun close() {
         reductions.close()
     }
