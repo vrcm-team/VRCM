@@ -262,7 +262,9 @@ class FriendListPagerModel(
     }
 
     private fun activateAccount(sessionToken: AccountSessionToken?) {
-        val userChanged = activeSessionToken?.userId != sessionToken?.userId
+        val previousSessionToken = activeSessionToken
+        val userChanged = previousSessionToken?.userId != sessionToken?.userId
+        val sessionChanged = previousSessionToken != sessionToken
         accountGeneration++
         activeSessionToken = sessionToken
         refreshJobsByTab.values.forEach(Job::cancel)
@@ -271,11 +273,25 @@ class FriendListPagerModel(
         directoryRefreshJob = null
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
+        if (sessionChanged) {
+            if (userChanged) {
+                favoriteGroupEditRequest++
+                favoriteGroupEditJob?.cancel()
+                favoriteGroupEditJob = null
+                _favoriteGroupEditState.value = FavoriteGroupEditState()
+            } else if (_favoriteGroupEditState.value.isSaving) {
+                // Keep an auth-bound 401 retry alive, but release the UI lock immediately.
+                // A later user retry increments the request id and invalidates this result.
+                favoriteGroupEditJob = null
+                _favoriteGroupEditState.update { state ->
+                    state.copy(
+                        isSaving = false,
+                        failure = FavoriteGroupEditFailure.SaveFailed,
+                    )
+                }
+            }
+        }
         if (userChanged) {
-            favoriteGroupEditRequest++
-            favoriteGroupEditJob?.cancel()
-            favoriteGroupEditJob = null
-            _favoriteGroupEditState.value = FavoriteGroupEditState()
             favoritedWorldMap.clear()
             favoritedAvatarMap.clear()
             offlineStatusDescriptions.clear()

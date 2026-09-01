@@ -161,6 +161,11 @@ class FavoriteGroupEditStateTest : MainDispatcherTest() {
             SharedFlowCentre.emitAuthenticated(firstSession.account)
             val renewedSession = assertNotNull(SharedFlowCentre.currentSession.value)
             assertNotEquals(firstSession.token, renewedSession.token)
+            awaitUntil {
+                val state = fixture.model.favoriteGroupEditState.value
+                !state.isSaving && state.failure == FavoriteGroupEditFailure.SaveFailed
+            }
+            assertEquals(group, fixture.model.favoriteGroupEditState.value.group)
             fixture.requests.releaseFirstUpdate.complete(Unit)
             awaitUntil {
                 fixture.model.favoriteGroupEditState.value.failure ==
