@@ -878,29 +878,32 @@ private fun AppRoute.RenderBottomSheetContent(
 ) {
     val screenModel = koinViewModel<WorldProfileScreenModel>()
     val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
+    val instanceCreationGroups by screenModel.instanceCreationGroups.collectAsState()
+    val instanceCreationState by screenModel.instanceCreationState.collectAsState()
 
     // 对话框状态管理
     var showCreateInstanceDialog by remember { mutableStateOf(false) }
     var showFavoriteGroupBottomSheet by remember { mutableStateOf(false) }
     val localeStrings = strings
+    LaunchedEffect(instanceCreationState) {
+        if (instanceCreationState == InstanceCreationSubmissionState.Created) {
+            showCreateInstanceDialog = false
+            screenModel.resetInstanceCreationState()
+        }
+    }
     // 如果显示创建实例对话框，则显示对话框内容
     if (showCreateInstanceDialog) {
         CreateInstanceDialog(
-            onDismiss = { showCreateInstanceDialog = false },
-            onConfirm = { accessType, regionType, queueEnabled, groupId, groupAccessType, roleIds ->
-                // 关闭对话框
+            groupsState = instanceCreationGroups,
+            submissionState = instanceCreationState,
+            onDismiss = {
                 showCreateInstanceDialog = false
-                // 调用创建实例方法
-                screenModel.createInstanceAndInviteSelf(
-                    accessType = accessType,
-                    region = regionType,
-                    queueEnabled = queueEnabled,
-                    groupId = groupId,
-                    groupAccessType = groupAccessType,
-                    roleIds = roleIds,
-                    strings = localeStrings
-                )
-            }
+                screenModel.resetInstanceCreationState()
+            },
+            onRetryGroups = screenModel::prepareInstanceCreation,
+            onConfirm = { draft ->
+                screenModel.createInstanceAndInviteSelf(draft, localeStrings)
+            },
         ).Content()
     }
 
@@ -976,7 +979,10 @@ private fun AppRoute.RenderBottomSheetContent(
 
             if (hasNoInstances && bottomSheetState.blurProgress > 0f) {
                 EmptyInstanceCard(
-                    onCreateInstance = { showCreateInstanceDialog = true },
+                    onCreateInstance = {
+                        screenModel.prepareInstanceCreation()
+                        showCreateInstanceDialog = true
+                    },
                     enabled = bottomSheetState.blurProgress >= 1f,
                     modifier = Modifier.alpha(bottomSheetState.blurProgress),
                 )
@@ -1010,7 +1016,10 @@ private fun AppRoute.RenderBottomSheetContent(
                 .padding(vertical = 16.dp)
         ) {
             Button(
-                onClick = { showCreateInstanceDialog = true },
+                onClick = {
+                    screenModel.prepareInstanceCreation()
+                    showCreateInstanceDialog = true
+                },
                 modifier = Modifier.weight(1f),
             ) {
                 Text(strings.createInstance)

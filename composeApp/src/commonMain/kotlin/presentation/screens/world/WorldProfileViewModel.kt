@@ -4,13 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.extensions.removeFirst
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
-import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
-import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceCreationOptions
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -19,15 +17,24 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo.Owner
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationDraft
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationGroup
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationGroupsState
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationRole
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationSubmissionState
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.validationError
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.InstanceCreationResult
+import io.github.vrcmteam.vrcm.service.InstanceCreationService
 import io.github.vrcmteam.vrcm.service.WorldPlatformService
 import io.github.vrcmteam.vrcm.storage.WorldProfileCacheStore
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -39,10 +46,10 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 class WorldProfileScreenModel internal constructor(
     private val worldsApi: WorldsApi,
-    private val instancesApi: InstancesApi,
     private val usersApi: UsersApi,
     private val groupsApi: GroupsApi,
     private val authService: AuthService,
+    private val instanceCreationService: InstanceCreationService,
     favoriteEntrySource: FavoriteEntrySource,
     private val inviteApi: InviteApi,
     private val worldPlatformService: WorldPlatformService,
@@ -56,12 +63,42 @@ class WorldProfileScreenModel internal constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _instanceCreationGroups =
+        MutableStateFlow<InstanceCreationGroupsState>(InstanceCreationGroupsState.Idle)
+    internal val instanceCreationGroups: StateFlow<InstanceCreationGroupsState> =
+        _instanceCreationGroups.asStateFlow()
+
+    private val _instanceCreationState =
+        MutableStateFlow<InstanceCreationSubmissionState>(InstanceCreationSubmissionState.Idle)
+    internal val instanceCreationState: StateFlow<InstanceCreationSubmissionState> =
+        _instanceCreationState.asStateFlow()
+
+    private var instanceCreationGroupsJob: Job? = null
+    private var instanceCreationJob: Job? = null
+
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.World,
         source = favoriteEntrySource,
         scope = viewModelScope,
     )
     internal val favoriteEntryState: StateFlow<FavoriteEntryState> = favoriteEntry.state
+
+    init {
+        viewModelScope.launch {
+            var activeUserId = SharedFlowCentre.currentSession.value?.account?.userId
+            SharedFlowCentre.currentSession
+                .map { it?.account?.userId }
+                .distinctUntilChanged()
+                .collect { userId ->
+                    if (userId == activeUserId) return@collect
+                    activeUserId = userId
+                    instanceCreationGroupsJob?.cancel()
+                    instanceCreationJob?.cancel()
+                    _instanceCreationGroups.value = InstanceCreationGroupsState.Idle
+                    _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                }
+        }
+    }
 
     internal fun retryFavoriteEntryLoad() {
         favoriteEntry.retry()
@@ -263,64 +300,147 @@ class WorldProfileScreenModel internal constructor(
         }
     }
 
-    /**
-     * 创建世界实例并邀请自己
-     */
-    fun createInstanceAndInviteSelf(
-        accessType: AccessType,
-        region: RegionType,
-        queueEnabled: Boolean = false,
-        groupId: String? = null,
-        groupName: String? = null,
-        groupAccessType: String? = null,
-        roleIds: List<String>? = null,
+    internal fun prepareInstanceCreation() {
+        if (instanceCreationGroupsJob?.isActive == true) return
+        _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+        val token = SharedFlowCentre.currentSession.value?.token ?: run {
+            _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+            return
+        }
+        _instanceCreationGroups.value = InstanceCreationGroupsState.Loading
+        instanceCreationGroupsJob = viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(token) {
+                usersApi.getUserGroups(token.userId).map { limitedGroup ->
+                    val groupId = limitedGroup.groupId.ifBlank { limitedGroup.id }
+                    groupsApi.fetchGroup(groupId, includeRoles = true)
+                }
+            } ?: return@launch
+            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+            response.result.fold(
+                onSuccess = { groups ->
+                    _instanceCreationGroups.value = InstanceCreationGroupsState.Ready(
+                        groups.map { group ->
+                            InstanceCreationGroup(
+                                id = group.id,
+                                name = group.name,
+                                permissions = group.myMember?.permissions.orEmpty().toSet(),
+                                roles = group.roles.orEmpty()
+                                    .filter { it.id.isNotBlank() }
+                                    .map { InstanceCreationRole(it.id, it.name.ifBlank { it.id }) },
+                            )
+                        }.filter { it.canCreateAny }.sortedBy { it.name.lowercase() }
+                    )
+                },
+                onFailure = {
+                    _instanceCreationGroups.value = InstanceCreationGroupsState.Failed
+                },
+            )
+        }
+    }
+
+    internal fun resetInstanceCreationState() {
+        if (_instanceCreationState.value != InstanceCreationSubmissionState.Submitting) {
+            _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+        }
+    }
+
+    /** Creates an instance from the validated dialog draft and then invites the current account. */
+    internal fun createInstanceAndInviteSelf(
+        draft: InstanceCreationDraft,
         strings: LocaleStrings,
     ) {
         val worldId = _worldProfileState.value?.worldId ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            _isLoading.value = true
-            try {
-                // 获取当前用户ID
-                val userId = authService.currentUser().id
-
-                // 创建实例
-                authService.reTryAuthCatching {
-                    instancesApi.createInstance(
-                        worldId = worldId,
-                        accessType = accessType,
-                        region = region,
-                        userId = userId,
-                        queueEnabled = queueEnabled,
-                        groupId = groupId,
-                        groupAccessType = groupAccessType,
-                        roleIds = roleIds
-                    )
-                }.onSuccess { instanceData ->
-                    val owner =
-                        if (groupId != null && groupName != null)
-                            Owner(groupId, groupName, BlueprintType.Group)
-                        else
-                            Owner(userId, authService.currentUser().displayName, BlueprintType.User)
-                    // 更新实例列表
-                    val ownerState: MutableStateFlow<Owner?> = MutableStateFlow(owner)
-                    val instanceVo = InstanceVo(instanceData, ownerState)
-                    val currentInstances = _worldProfileState.value?.instances?.toMutableList() ?: mutableListOf()
-                    currentInstances.add(instanceVo)
-                    _worldProfileState.value = _worldProfileState.value?.copy(instances = currentInstances)
-
-                    // 邀请自己
-                    authService.reTryAuthCatching {
-                        inviteApi.inviteMyselfToInstance(instanceData.id)
-                    }.onSuccess {
-                        SharedFlowCentre.toastText.emit(ToastText.Success(strings.instanceCreateSuccess))
-                    }.onFailure {
-                        SharedFlowCentre.toastText.emit(ToastText.Error(strings.instanceCreateSuccessButInviteFailed + ": ${it.message}"))
+        if (_instanceCreationState.value == InstanceCreationSubmissionState.Submitting) return
+        val groups = (_instanceCreationGroups.value as? InstanceCreationGroupsState.Ready)
+            ?.groups.orEmpty()
+        if (draft.validationError(groups) != null) {
+            _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+            return
+        }
+        val session = SharedFlowCentre.currentSession.value ?: return
+        _instanceCreationState.value = InstanceCreationSubmissionState.Submitting
+        instanceCreationJob = viewModelScope.launch(Dispatchers.IO) {
+            val options = InstanceCreationOptions(
+                worldId = worldId,
+                accessType = draft.accessType,
+                region = draft.region,
+                userId = session.account.userId,
+                queueEnabled = draft.queueEnabled,
+                groupId = draft.groupId,
+                roleIds = draft.roleIds,
+                ageGate = draft.ageGate,
+                displayName = draft.displayName,
+                minimumAvatarPerformance = draft.minimumAvatarPerformance,
+            )
+            when (val result = instanceCreationService.create(options)) {
+                is InstanceCreationResult.Created -> {
+                    if (!SharedFlowCentre.isCurrentSession(result.sessionToken) ||
+                        _worldProfileState.value?.worldId != worldId
+                    ) return@launch
+                    val groupOwner = groups.firstOrNull { it.id == draft.groupId }
+                    val owner = if (groupOwner != null) {
+                        Owner(groupOwner.id, groupOwner.name, BlueprintType.Group)
+                    } else {
+                        val currentUserName = authService.currentUserState.value
+                            ?.takeIf { it.id == result.sessionToken.userId }
+                            ?.displayName
+                            ?: result.sessionToken.userId
+                        Owner(result.sessionToken.userId, currentUserName, BlueprintType.User)
                     }
-                }.onFailure {
-                    SharedFlowCentre.toastText.emit(ToastText.Error(strings.instanceCreateFailed + ": ${it.message}"))
+                    val currentProfile = _worldProfileState.value ?: return@launch
+                    _worldProfileState.value = currentProfile.copy(
+                        instances = currentProfile.instances +
+                            InstanceVo(result.instance, MutableStateFlow(owner))
+                    )
+
+                    val inviteToken = SharedFlowCentre.currentSession.value?.token
+                        ?.takeIf { it.userId == result.sessionToken.userId }
+                        ?: return@launch
+                    val inviteResponse = authService.runSessionBoundCatching(inviteToken) {
+                        inviteApi.inviteMyselfToInstance(result.instance.id)
+                    }
+                    if (inviteResponse != null &&
+                        SharedFlowCentre.isCurrentSession(inviteResponse.sessionToken)
+                    ) {
+                        inviteResponse.result.fold(
+                            onSuccess = {
+                                SharedFlowCentre.toastText.emit(
+                                    ToastText.Success(strings.instanceCreateSuccess)
+                                )
+                            },
+                            onFailure = {
+                                SharedFlowCentre.toastText.emit(
+                                    ToastText.Error(
+                                        strings.instanceCreateSuccessButInviteFailed + ": ${it.message}"
+                                    )
+                                )
+                            },
+                        )
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                    } else if (SharedFlowCentre.currentSession.value?.account?.userId ==
+                        result.sessionToken.userId
+                    ) {
+                        SharedFlowCentre.toastText.emit(
+                            ToastText.Error(strings.instanceCreateSuccessButInviteFailed)
+                        )
+                        _instanceCreationState.value = InstanceCreationSubmissionState.Created
+                    }
                 }
-            } finally {
-                _isLoading.value = false
+
+                InstanceCreationResult.InFlight -> {
+                    _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+                }
+
+                InstanceCreationResult.SessionChanged -> {
+                    _instanceCreationState.value = InstanceCreationSubmissionState.Idle
+                }
+
+                is InstanceCreationResult.Failed -> {
+                    _instanceCreationState.value = InstanceCreationSubmissionState.Failed
+                    SharedFlowCentre.toastText.emit(
+                        ToastText.Error(strings.instanceCreateFailed + ": ${result.error.message}")
+                    )
+                }
             }
         }
     }

@@ -256,6 +256,33 @@ sealed class LocaleStrings {
     // CreateInstanceDialog
     open val createInstanceStandardAccessType: String = "Standard Access Type"
     open val createInstanceEnableQueue: String = "Enable Queue Function"
+    open val createInstanceGroupAccessType: String = "Group Access Type"
+    open val createInstanceGroup: String = "Group"
+    open val createInstanceGroupsLoading: String = "Loading available groups..."
+    open val createInstanceGroupsFailed: String = "Unable to load available groups"
+    open val createInstanceNoEligibleGroups: String = "No groups allow you to create instances"
+    open val createInstanceGroupMembers: String = "Group Members"
+    open val createInstanceGroupPlus: String = "Group Plus"
+    open val createInstanceGroupPublic: String = "Group Public"
+    open val createInstanceRoleRestriction: String = "Allowed Roles"
+    open val createInstanceAgeGate: String = "Age Gate"
+    open val createInstanceDisplayName: String = "Custom Name"
+    open val createInstanceOptional: String = "Optional"
+    open val createInstanceMinimumPerformance: String = "Minimum Avatar Performance"
+    open val createInstancePerformanceDefault: String = "Group Default"
+    open val createInstancePerformancePoor: String = "Poor"
+    open val createInstancePerformanceMedium: String = "Medium"
+    open val createInstancePerformanceGood: String = "Good"
+    open val createInstanceGroupRequired: String = "Select an available group"
+    open val createInstanceAccessPermissionRequired: String =
+        "Your group roles do not allow this instance type"
+    open val createInstanceRoleRequired: String = "Select at least one allowed role"
+    open val createInstanceInvalidRole: String = "One or more selected roles are no longer available"
+    open val createInstanceAgeGatePermissionRequired: String =
+        "Your group roles do not allow age-gated instances"
+    open val createInstancePerformancePermissionRequired: String =
+        "Your group roles do not allow overriding avatar performance"
+    open val createInstanceSubmitting: String = "Creating..."
 
     // GalleryTabPager
     open val galleryTabNoFiles: String = "No %s Files"
