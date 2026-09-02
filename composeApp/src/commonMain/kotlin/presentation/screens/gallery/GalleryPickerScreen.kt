@@ -38,6 +38,7 @@ import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
+import io.github.vrcmteam.vrcm.network.api.files.data.FileStatus
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
@@ -77,13 +78,17 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
 
         val onPick: (FileData) -> Unit = onPick@{ file ->
             if (completed) return@onPick
+            val latestVersion = file.versions
+                .filter { it.status == FileStatus.Complete && !it.deleted }
+                .maxOfOrNull { it.version }
+                ?: return@onPick
             val accepted = sessionStore.complete(
                 sessionId,
                 GallerySelection(
                     fileId = file.id,
                     fileName = file.name,
                     extension = file.extension,
-                    imageUrl = FileApi.convertFileUrl(file.id, 2048),
+                    imageUrl = FileApi.imageUrl(file.id, latestVersion, 2048),
                 ),
             )
             if (accepted) {

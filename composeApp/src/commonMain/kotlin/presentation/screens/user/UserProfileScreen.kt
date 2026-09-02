@@ -61,6 +61,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -127,6 +128,7 @@ data class UserProfileScreen(
         var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
         val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
         val imageInviteSentMessage = strings.imageInviteSent
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -235,6 +237,13 @@ data class UserProfileScreen(
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
                 openImageInvitePicker = openImageInvitePicker,
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
+                    )
+                },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -321,6 +330,25 @@ data class UserProfileScreen(
             onChooseAnother = openImageInvitePicker,
             onDismiss = userProfileScreenModel::dismissImageInvite,
         )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -338,6 +366,7 @@ private fun ColumnScope.SheetItems(
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
     openImageInvitePicker: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -390,14 +419,16 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
                 }
             })
             SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {

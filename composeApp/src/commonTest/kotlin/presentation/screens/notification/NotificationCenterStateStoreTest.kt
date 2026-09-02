@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationInboxS
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationSource
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.identity
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -195,6 +196,46 @@ class NotificationCenterStateStoreTest {
             joinAll(firstMutation, secondMutation)
 
             assertEquals(emptyList(), store.value.inboxState.pipeline)
+        } finally {
+            store.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun renewedSessionCleanupAllowsPhotoResponseRetry() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val initialToken = AccountSessionToken(userId = "usr_test", generation = 1)
+        val renewedToken = AccountSessionToken(userId = "usr_test", generation = 2)
+        val store = NotificationCenterStateStore(
+            scope = scope,
+            initialState = NotificationCenterUiState(sessionToken = initialToken),
+            reducerDispatcher = dispatcher,
+        )
+        val target = notification("not_photo")
+        val selection = GallerySelection(
+            fileId = "file_gallery",
+            fileName = "photo.png",
+            extension = ".png",
+            imageUrl = "https://api.vrchat.cloud/api/1/image/file_gallery/1/2048",
+        )
+        val mutation = PendingNotificationMutation.PhotoResponse(
+            selection = selection,
+            phase = InvitePhotoResponsePhase.RESPONDING,
+        )
+
+        try {
+            store.reduce {
+                NotificationCenterUiState(sessionToken = renewedToken)
+            }.join()
+            assertEquals(true, store.reserveMutation(renewedToken, target.identity, mutation))
+
+            assertEquals(false, store.finishMutation(initialToken, target.identity))
+            assertEquals(true, target.identity in store.value.pendingMutations)
+            assertEquals(true, store.finishMutation(renewedToken, target.identity))
+            assertEquals(false, target.identity in store.value.pendingMutations)
+            assertEquals(true, store.reserveMutation(renewedToken, target.identity, mutation))
         } finally {
             store.close()
             scope.cancel()

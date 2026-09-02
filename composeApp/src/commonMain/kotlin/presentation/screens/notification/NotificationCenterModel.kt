@@ -19,11 +19,15 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationUserPr
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.identity
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.readTarget
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.responseTarget
+import io.github.vrcmteam.vrcm.presentation.screens.home.data.supportsInvitePhotoResponse
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.unreadCount
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
 import io.github.vrcmteam.vrcm.service.FriendService
+import io.github.vrcmteam.vrcm.service.InvitePhotoResponseService
+import io.github.vrcmteam.vrcm.service.InvitePhotoSessionResult
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -48,6 +52,7 @@ class NotificationCenterModel(
     private val friendService: FriendService,
     private val logger: Logger,
     private val boopService: BoopService,
+    private val invitePhotoResponseService: InvitePhotoResponseService,
 ) : AutoCloseable {
     private val modelScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val boopNotificationResolver = BoopNotificationResolver()
@@ -74,6 +79,9 @@ class NotificationCenterModel(
 
     val hasRefreshError: Boolean
         get() = state.hasRefreshError
+
+    internal val currentSessionKey: String?
+        get() = state.sessionToken?.let { "${it.userId}:${it.generation}" }
 
     val unreadCount: Int
         get() = (friendRequestNotifications + notifications).unreadCount
@@ -222,13 +230,13 @@ class NotificationCenterModel(
             item.type == NotificationType.FriendRequest.value &&
             !action.type.equals("Accept", ignoreCase = true)
         ) {
-            deleteNotification(item)
+            deleteNotification(item, PendingNotificationMutation.Action(action))
             return
         }
         launchReservedMutation(item, PendingNotificationMutation.Action(action)) { token ->
             when (responseTarget) {
                 NotificationResponseTarget.BOOP_USER_API -> {
-                    val senderId = item.senderId ?: return@launchReservedMutation
+                    val senderId = item.senderId ?: return@launchReservedMutation token
                     boopUser(
                         item = item,
                         token = token,
@@ -252,6 +260,41 @@ class NotificationCenterModel(
 
                 NotificationResponseTarget.NAVIGATION_LINK -> Unit
             }
+            token
+        }
+    }
+
+    fun respondToInviteWithPhoto(
+        item: NotificationItemData,
+        selection: GallerySelection,
+        successMessage: String,
+        preparationFailedMessage: String,
+    ) {
+        if (!item.supportsInvitePhotoResponse) return
+        launchReservedMutation(
+            item = item,
+            mutation = PendingNotificationMutation.PhotoResponse(
+                selection = selection,
+                phase = InvitePhotoResponsePhase.PREPARING,
+            ),
+        ) { token ->
+            sendInvitePhotoResponse(
+                item = item,
+                selection = selection,
+                initialToken = token,
+                successMessage = successMessage,
+                preparationFailedMessage = preparationFailedMessage,
+            )
+        }
+    }
+
+    fun retryInvitePhotoResponse(
+        item: NotificationItemData,
+        successMessage: String,
+        preparationFailedMessage: String,
+    ) {
+        failedPhotoResponse(item)?.let { selection ->
+            respondToInviteWithPhoto(item, selection, successMessage, preparationFailedMessage)
         }
     }
 
@@ -265,7 +308,7 @@ class NotificationCenterModel(
                     NotificationReadTarget.LEGACY_SEE ->
                         notificationApi.markLegacyNotificationAsRead(item.id)
                 }
-            } ?: return@launchReservedMutation
+            } ?: return@launchReservedMutation token
             result
                 .onNotificationFailure()
                 .onSuccess {
@@ -273,25 +316,40 @@ class NotificationCenterModel(
                         current.copy(inboxState = current.inboxState.markSeen(item))
                     }
                 }
+            token
         }
     }
 
     fun deleteNotification(item: NotificationItemData) {
-        launchReservedMutation(item, PendingNotificationMutation.Delete) { token ->
+        deleteNotification(item, PendingNotificationMutation.Delete)
+    }
+
+    private fun deleteNotification(
+        item: NotificationItemData,
+        mutation: PendingNotificationMutation,
+    ) {
+        launchReservedMutation(item, mutation) { token ->
             val result = runNotificationMutation(token) {
                 deleteRemoteNotification(item)
-            } ?: return@launchReservedMutation
+            } ?: return@launchReservedMutation token
             reduceForSession(token) { current ->
                 current.copy(
                     inboxState = current.inboxState.afterNotificationAction(item, result),
                 )
             }
             result.onNotificationFailure()
+            token
         }
     }
 
     internal fun pendingAction(item: NotificationItemData): NotificationItemData.ActionData? =
         (state.pendingMutations[item.identity] as? PendingNotificationMutation.Action)?.action
+
+    internal fun pendingPhotoResponsePhase(item: NotificationItemData): InvitePhotoResponsePhase? =
+        (state.pendingMutations[item.identity] as? PendingNotificationMutation.PhotoResponse)?.phase
+
+    internal fun failedPhotoResponse(item: NotificationItemData): GallerySelection? =
+        state.failedPhotoResponses[item.identity]
 
     internal fun isNotificationPending(item: NotificationItemData): Boolean =
         item.identity in state.pendingMutations
@@ -299,19 +357,101 @@ class NotificationCenterModel(
     private fun launchReservedMutation(
         item: NotificationItemData,
         mutation: PendingNotificationMutation,
-        block: suspend (AccountSessionToken) -> Unit,
+        block: suspend (AccountSessionToken) -> AccountSessionToken,
     ) {
         val token = SharedFlowCentre.currentSession.value?.token ?: return
         modelScope.launch {
             if (!stateStore.reserveMutation(token, item.identity, mutation)) return@launch
             modelScope.launch(Dispatchers.IO) {
+                var activeToken = token
                 try {
-                    block(token)
+                    activeToken = block(token)
                 } finally {
-                    finishNotificationMutation(item, token)
+                    finishNotificationMutation(item, activeToken)
                 }
             }
         }
+    }
+
+    private suspend fun sendInvitePhotoResponse(
+        item: NotificationItemData,
+        selection: GallerySelection,
+        initialToken: AccountSessionToken,
+        successMessage: String,
+        preparationFailedMessage: String,
+    ): AccountSessionToken {
+        var activeToken = initialToken
+        if (
+            !stateStore.transitionPhotoResponse(
+                activeToken,
+                item.identity,
+                selection,
+                InvitePhotoResponsePhase.PREPARING,
+            )
+        ) return activeToken
+
+        val loaded = invitePhotoResponseService.loadGalleryPhoto(
+            sessionToken = activeToken,
+            fileId = selection.fileId,
+            imageUrl = selection.imageUrl,
+        )
+        val loadedResponse = loaded as? InvitePhotoSessionResult.Completed ?: return activeToken
+        activeToken = loadedResponse.sessionToken
+        if (
+            !stateStore.transitionPhotoResponse(
+                activeToken,
+                item.identity,
+                selection,
+                InvitePhotoResponsePhase.PREPARING,
+            )
+        ) return activeToken
+        val imageBytes = loadedResponse.result.getOrElse { error ->
+            logger.error("Failed to prepare Gallery photo response: $error")
+            if (SharedFlowCentre.isCurrentSession(activeToken)) {
+                SharedFlowCentre.toastText.emit(ToastText.Error(preparationFailedMessage))
+            }
+            return activeToken
+        }
+
+        if (
+            !stateStore.transitionPhotoResponse(
+                activeToken,
+                item.identity,
+                selection,
+                InvitePhotoResponsePhase.RESPONDING,
+            )
+        ) return activeToken
+        when (
+            val response = invitePhotoResponseService.respond(
+                sessionToken = activeToken,
+                notificationId = item.id,
+                imageBytes = imageBytes,
+            )
+        ) {
+            InvitePhotoSessionResult.SessionChanged -> Unit
+            is InvitePhotoSessionResult.Completed -> {
+                activeToken = response.sessionToken
+                reduceForSession(activeToken) { current ->
+                    current.copy(
+                        inboxState = current.inboxState.afterNotificationAction(item, response.result),
+                        failedPhotoResponses = if (response.result.isSuccess) {
+                            current.failedPhotoResponses - item.identity
+                        } else {
+                            current.failedPhotoResponses + (item.identity to selection)
+                        },
+                    )
+                }
+                response.result
+                    .onNotificationFailure()
+                    .onSuccess {
+                        if (SharedFlowCentre.isCurrentSession(activeToken)) {
+                            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                            queueNotificationRefresh(activeToken)
+                        }
+                    }
+            }
+        }
+        return activeToken
     }
 
     private suspend fun boopUser(
@@ -377,15 +517,11 @@ class NotificationCenterModel(
         return response.result.takeIf { SharedFlowCentre.isCurrentSession(response.sessionToken) }
     }
 
-    private fun finishNotificationMutation(
+    private suspend fun finishNotificationMutation(
         item: NotificationItemData,
         token: AccountSessionToken,
     ) {
-        reduceForSession(token) { current ->
-            current.copy(
-                pendingMutations = current.pendingMutations - item.identity,
-            )
-        }
+        stateStore.finishMutation(token, item.identity)
     }
 
     override fun close() {

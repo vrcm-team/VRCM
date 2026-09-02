@@ -21,6 +21,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
@@ -43,6 +44,10 @@ import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.service.ImageInviteRemote
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
+import io.github.vrcmteam.vrcm.service.InviteMessageActionService
+import io.github.vrcmteam.vrcm.service.InviteMessageLoadResult
+import io.github.vrcmteam.vrcm.service.InviteMessageSendResult
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
@@ -75,6 +80,16 @@ private enum class UserLoadState {
     Loading,
     Loaded,
 }
+
+data class InviteMessageSelectionState(
+    val action: InviteMessageAction,
+    val targetUserId: String,
+    val targetDisplayName: String,
+    val messages: List<InviteMessageData> = emptyList(),
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false,
+    val sendingSlot: Int? = null,
+)
 
 internal class UserProfileLoadGate {
     private val mutex = Mutex()
@@ -332,6 +347,7 @@ class UserProfileScreenModel internal constructor(
     private val inviteApi: InviteApi,
     gallerySelectionSessionStore: GallerySelectionSessionStore,
     imageInviteRemote: ImageInviteRemote,
+    private val inviteMessageActionService: InviteMessageActionService,
     private val userProfileCacheStore: UserProfileCacheStore,
     private val favoriteListCacheStore: FavoriteListCacheStore,
     private val accountCacheManager: AccountCacheManager,
@@ -372,6 +388,11 @@ class UserProfileScreenModel internal constructor(
 
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
+
+    private val _inviteMessageSelection = MutableStateFlow<InviteMessageSelectionState?>(null)
+    val inviteMessageSelection: StateFlow<InviteMessageSelectionState?> =
+        _inviteMessageSelection.asStateFlow()
+    private var inviteMessageSelectionGeneration = 0L
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -416,6 +437,13 @@ class UserProfileScreenModel internal constructor(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                if (_inviteMessageSelection.value != null && session?.account?.userId != cacheOwnerUserId) {
+                    clearInviteMessageSelection(force = true)
+                }
+            }
+        }
         viewModelScope.launch {
             authService.currentUserState.collect { currentUser ->
                 _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
@@ -917,22 +945,92 @@ class UserProfileScreenModel internal constructor(
         BoopResult.InFlight, BoopResult.SessionChanged -> result
     }
 
-    fun inviteToMyInstance(
-        userId: String,
+    fun openInviteMessageSelection(
+        action: InviteMessageAction,
+        targetUserId: String,
+        targetDisplayName: String,
+    ) {
+        if (_inviteMessageSelection.value?.sendingSlot != null) return
+        val generation = ++inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = InviteMessageSelectionState(
+            action = action,
+            targetUserId = targetUserId,
+            targetDisplayName = targetDisplayName,
+        )
+        loadInviteMessages(generation, action, targetUserId)
+    }
+
+    fun retryInviteMessageSelection() {
+        val selection = _inviteMessageSelection.value ?: return
+        if (selection.isLoading || selection.sendingSlot != null) return
+        val generation = ++inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = selection.copy(
+            messages = emptyList(),
+            isLoading = true,
+            loadFailed = false,
+        )
+        loadInviteMessages(generation, selection.action, selection.targetUserId)
+    }
+
+    fun dismissInviteMessageSelection() {
+        clearInviteMessageSelection(force = false)
+    }
+
+    fun sendInviteMessage(
+        slot: Int,
         successMessage: String,
         notInInstanceMessage: String,
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                val instanceLocation = authService.currentUser().presence.instance
-                require(instanceLocation.isNotBlank() && instanceLocation != "offline") {
-                    notInInstanceMessage
+        val selection = _inviteMessageSelection.value ?: return
+        if (selection.isLoading || selection.loadFailed || selection.sendingSlot != null) return
+        if (selection.messages.none { it.slot == slot }) return
+        val generation = inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = selection.copy(sendingSlot = slot)
+        viewModelScope.launch {
+            when (
+                val result = inviteMessageActionService.send(
+                    targetUserId = selection.targetUserId,
+                    action = selection.action,
+                    slot = slot,
+                )
+            ) {
+                is InviteMessageSendResult.Sent -> {
+                    if (generation != inviteMessageSelectionGeneration ||
+                        !SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        return@launch
+                    }
+                    clearInviteMessageSelection(force = true)
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
                 }
-                inviteApi.inviteUser(userId, instanceLocation)
-            }.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure {
-                handleError(it)
+
+                is InviteMessageSendResult.Failed -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value
+                            ?.takeIf { it.targetUserId == selection.targetUserId && it.action == selection.action }
+                            ?.copy(sendingSlot = null)
+                        handleError(result.error)
+                    }
+                }
+
+                is InviteMessageSendResult.NotInInstance -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value?.copy(sendingSlot = null)
+                        SharedFlowCentre.toastText.emit(ToastText.Error(notInInstanceMessage))
+                    }
+                }
+
+                InviteMessageSendResult.InFlight -> {
+                    if (generation == inviteMessageSelectionGeneration) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value?.copy(sendingSlot = null)
+                    }
+                }
+
+                InviteMessageSendResult.SessionChanged -> clearInviteMessageSelection(force = true)
             }
         }
     }
@@ -959,6 +1057,51 @@ class UserProfileScreenModel internal constructor(
     }
 
     internal fun dismissImageInvite() = imageInviteCoordinator.dismiss()
+    private fun loadInviteMessages(
+        generation: Long,
+        action: InviteMessageAction,
+        targetUserId: String,
+    ) {
+        viewModelScope.launch {
+            when (val result = inviteMessageActionService.load(action)) {
+                is InviteMessageLoadResult.Loaded -> {
+                    if (generation != inviteMessageSelectionGeneration ||
+                        !SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        return@launch
+                    }
+                    val current = _inviteMessageSelection.value
+                        ?.takeIf { it.action == action && it.targetUserId == targetUserId }
+                        ?: return@launch
+                    _inviteMessageSelection.value = current.copy(
+                        messages = result.messages
+                            .sortedBy { it.slot },
+                        isLoading = false,
+                        loadFailed = false,
+                    )
+                }
+
+                is InviteMessageLoadResult.Failed -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        logger.error(result.error.message.toString())
+                        _inviteMessageSelection.value = _inviteMessageSelection.value
+                            ?.takeIf { it.action == action && it.targetUserId == targetUserId }
+                            ?.copy(isLoading = false, loadFailed = true)
+                    }
+                }
+
+                InviteMessageLoadResult.SessionChanged -> clearInviteMessageSelection(force = true)
+            }
+        }
+    }
+
+    private fun clearInviteMessageSelection(force: Boolean) {
+        if (!force && _inviteMessageSelection.value?.sendingSlot != null) return
+        inviteMessageSelectionGeneration++
+        _inviteMessageSelection.value = null
+    }
 
     fun computeFriendLocation(location: String) {
         val type = LocationType.fromValue(location)
