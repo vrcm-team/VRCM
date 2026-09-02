@@ -30,7 +30,6 @@ data class InviteMessageData(
     val slot: Int,
     val updatedAt: String,
 )
-
 @Serializable
 internal data class UpdateInviteMessageRequest(
     val message: String,

@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageType
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMyselfData
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteResponseRequest
+import io.github.vrcmteam.vrcm.network.api.invite.data.InviteUserRequest
 import io.github.vrcmteam.vrcm.network.api.invite.data.RequestInviteRequest
 import io.github.vrcmteam.vrcm.network.api.invite.data.UpdateInviteMessageRequest
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
@@ -20,10 +21,13 @@ import kotlinx.serialization.json.Json
 
 class InviteApi(private val client: HttpClient) {
 
-    suspend fun inviteUser (userId: String, instanceId: String, messageSlot: Int = 0): VRChatResponse =
-         client.post("$INVITE_API_PREFIX/$userId"){
-            setBody(mapOf("instanceId" to instanceId,"messageSlot" to messageSlot))
-    }.checkSuccess()
+    suspend fun inviteUser(userId: String, instanceId: String, messageSlot: Int = 0): VRChatResponse {
+        requireValidSlot(messageSlot)
+        return client.post("$INVITE_API_PREFIX/$userId") {
+            contentType(ContentType.Application.Json)
+            setBody(InviteUserRequest(instanceId = instanceId, messageSlot = messageSlot))
+        }.checkSuccess()
+    }
 
 
     suspend fun inviteMyselfToInstance(instanceId: String): InviteMyselfData =
@@ -31,9 +35,10 @@ class InviteApi(private val client: HttpClient) {
             .checkSuccess()
 
     suspend fun requestInvite(userId: String, requestSlot: Int = 0) {
+        requireValidSlot(requestSlot)
         client.post("$REQUEST_INVITE_API_PREFIX/$userId") {
             contentType(ContentType.Application.Json)
-            setBody(RequestInviteRequest(requestSlot = requestSlot))
+            setBody(RequestInviteRequest(requestSlot))
         }.checkSuccess { Unit }
     }
 
@@ -76,7 +81,27 @@ class InviteApi(private val client: HttpClient) {
         messageType: InviteMessageType,
     ): List<InviteMessageData> {
         requireValidUserId(userId)
-        return client.get("message/$userId/${messageType.pathValue}").checkSuccess()
+        return client.get("message/$userId/${messageType.pathValue}")
+            .checkSuccess<List<InviteMessageData>>()
+            .also { validateInviteMessages(it, messageType) }
+    }
+
+    private fun validateInviteMessages(
+        messages: List<InviteMessageData>,
+        requestedType: InviteMessageType,
+    ) {
+        val slots = mutableSetOf<Int>()
+        messages.forEach { message ->
+            check(message.messageType == requestedType) {
+                "Invite message response type does not match the requested collection"
+            }
+            check(message.slot in INVITE_MESSAGE_SLOT_RANGE) {
+                "Invite message response contains an out-of-range slot"
+            }
+            check(slots.add(message.slot)) {
+                "Invite message response contains duplicate slots"
+            }
+        }
     }
 
     suspend fun updateInviteMessage(

@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.service.*
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.service.meetup.DecorationResolver
 import io.github.vrcmteam.vrcm.service.meetup.DecorationTemplateSource
@@ -34,6 +35,7 @@ val serviceModule: Module = module {
     singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
+    single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
     singleOf(::InvitePhotoResponseService)
     singleOf(::NetworkRequestInviteCall) bind RequestInviteCall::class
     singleOf(::RequestInviteService)
