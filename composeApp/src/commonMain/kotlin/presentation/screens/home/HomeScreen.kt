@@ -84,7 +84,8 @@ object HomeScreen : AppListRoute {
         val scope = rememberCoroutineScope()
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val drawerCoordinator = remember { HomeDrawerStateCoordinator() }
-        val useRail = LocalAppWindowWidthClass.current != AppWindowWidthClass.Compact
+        val windowWidthClass = LocalAppWindowWidthClass.current
+        val useRail = windowWidthClass != AppWindowWidthClass.Compact
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
@@ -93,7 +94,9 @@ object HomeScreen : AppListRoute {
         } else {
             null
         }
-        val showMainNavigation = navigator.lastItem == HomeScreen
+        val topRoute = navigator.lastItem
+        val showMainNavigation = topRoute == HomeScreen ||
+            (windowWidthClass == AppWindowWidthClass.Expanded && topRoute is AppDetailRoute)
         var statusVisible by remember { mutableStateOf(true) }
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
             if (model.selectDestination(destination)) {
