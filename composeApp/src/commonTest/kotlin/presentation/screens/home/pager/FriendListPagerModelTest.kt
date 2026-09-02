@@ -104,7 +104,8 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                             jsonResponse("[]")
                         }
                         "/auth/user" -> respond("unavailable", HttpStatusCode.InternalServerError)
-                        "/auth/user/favoritelimits", "/favorites", "/favorite/groups" -> jsonResponse("[]")
+                        "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        "/favorites", "/favorite/groups" -> jsonResponse("[]")
                         else -> error("Unexpected request: ${request.url}")
                     }
                 }
