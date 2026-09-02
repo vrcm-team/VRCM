@@ -261,6 +261,12 @@ internal object LocaleStringsJa : LocaleStrings() {
 
     // WorldProfileScreen
     override val worldProfileDescription = "ワールド説明"
+    override val worldProfileRooms = "インスタンス"
+    override val worldProfileActiveRooms = "アクティブなインスタンス"
+    override val worldProfileInformation = "ワールド情報"
+    override val worldProfileCapacityValue = "%count% 人"
+    override val worldProfileCommunityLabs = "コミュニティラボ"
+    override val worldProfileMoreActions = "その他の操作"
     override val worldProfileAuthorTags = "作者タグ"
     override val worldProfileCreateFirstInstance = "最初のインスタンスを作成"
     override val worldProfileCreateFirstInstanceHint = "ここを選択して作成を開始"
@@ -271,6 +277,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val worldProfileHeat = "熱度"
     override val worldProfilePopularity = "人気度"
     override val worldProfileVersion = "バージョン"
+    override val worldProfileCreatedDate = "作成日"
     override val worldProfilePublishDate = "公開日"
     override val worldProfileUpdateDate = "更新日"
     override val worldProfileLabReleaseDate = "ラボ公開日"
