@@ -34,6 +34,7 @@ val serviceModule: Module = module {
     singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
+    singleOf(::InvitePhotoResponseService)
     singleOf(::NetworkRequestInviteCall) bind RequestInviteCall::class
     singleOf(::RequestInviteService)
     singleOf(::WorldPlatformService)

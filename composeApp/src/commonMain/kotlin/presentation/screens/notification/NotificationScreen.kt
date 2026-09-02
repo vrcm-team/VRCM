@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,6 +43,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -81,6 +84,7 @@ fun NotificationCenterContent(
     bottomNavigationPadding: Dp = 0.dp,
 ) {
     val model = koinInject<NotificationCenterModel>()
+    val gallerySessions = koinInject<GallerySelectionSessionStore>()
     val navigator = LocalNavigator.currentOrThrow
     LaunchedEffect(Unit) { model.refreshAllNotification() }
     val notifications by remember {
@@ -106,6 +110,8 @@ fun NotificationCenterContent(
     val boopSuccess = strings.profileBoopSuccess
     val boopAlreadySent = strings.profileBoopAlreadySent
     val boopDisabled = strings.profileBoopDisabled
+    val photoResponseSuccess = strings.notificationPhotoResponseSuccess
+    val photoPreparationFailed = strings.notificationPhotoPreparationFailed
     val externalLinkFailed = strings.notificationExternalLinkFailed
     val onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, action ->
         if (item.responseTarget(action) == NotificationResponseTarget.BOOP_USER_API) {
@@ -118,6 +124,43 @@ fun NotificationCenterContent(
     val replySending = reply?.let { model.pendingAction(it.item) == it.action } == true
     LaunchedEffect(reply?.item?.identity, notifications) {
         if (reply != null && notifications.none { it.identity == reply.item.identity }) boopReply = null
+    }
+
+    var pendingPhotoGallerySession by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingPhotoTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingPhotoSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentSessionKey = model.currentSessionKey
+
+    // Consume a Gallery result only for the account and notification that opened the picker.
+    LaunchedEffect(pendingPhotoGallerySession, currentSessionKey, notifications) {
+        val gallerySessionId = pendingPhotoGallerySession ?: return@LaunchedEffect
+        if (pendingPhotoSessionKey != currentSessionKey) {
+            gallerySessions.cancel(gallerySessionId)
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+            return@LaunchedEffect
+        }
+        val selection = gallerySessions.consume(gallerySessionId)
+        if (selection != null) {
+            notifications.firstOrNull { it.identity.stableKey == pendingPhotoTargetKey }
+                ?.takeIf(NotificationItemData::supportsInvitePhotoResponse)
+                ?.let { item ->
+                    model.respondToInviteWithPhoto(
+                        item = item,
+                        selection = selection,
+                        successMessage = photoResponseSuccess,
+                        preparationFailedMessage = photoPreparationFailed,
+                    )
+                }
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+        } else if (!gallerySessions.isPending(gallerySessionId)) {
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+        }
     }
 
     Scaffold(
@@ -197,10 +240,28 @@ fun NotificationCenterContent(
                         item = item,
                         loadingAction = model.pendingAction(item),
                         pending = model.isNotificationPending(item),
+                        photoResponsePhase = model.pendingPhotoResponsePhase(item),
+                        canRetryPhotoResponse = model.failedPhotoResponse(item) != null,
                         onRead = { model.markNotificationAsRead(item) },
                         onDelete = { model.deleteNotification(item) },
                         onResponse = onResponse,
                         onExternalLink = { externalLink = it },
+                        onPhotoReply = photoReply@{
+                            if (pendingPhotoGallerySession != null) return@photoReply
+                            val sessionKey = model.currentSessionKey ?: return@photoReply
+                            val gallerySessionId = gallerySessions.create()
+                            pendingPhotoGallerySession = gallerySessionId
+                            pendingPhotoTargetKey = item.identity.stableKey
+                            pendingPhotoSessionKey = sessionKey
+                            navigator.push(GalleryPickerScreen(gallerySessionId))
+                        },
+                        onPhotoRetry = {
+                            model.retryInvitePhotoResponse(
+                                item = item,
+                                successMessage = photoResponseSuccess,
+                                preparationFailedMessage = photoPreparationFailed,
+                            )
+                        },
                     )
                 }
             }
@@ -271,16 +332,24 @@ private data class BoopReply(
     val action: NotificationItemData.ActionData,
 )
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalSharedTransitionApi::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+)
 @Composable
 private fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
     loadingAction: NotificationItemData.ActionData?,
     pending: Boolean,
+    photoResponsePhase: InvitePhotoResponsePhase?,
+    canRetryPhotoResponse: Boolean,
     onRead: () -> Unit,
     onDelete: () -> Unit,
     onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
     onExternalLink: (NotificationActionTarget.External) -> Unit,
+    onPhotoReply: () -> Unit,
+    onPhotoRetry: () -> Unit,
 ) {
     val identity = item.identity
     var expanded by remember(identity.stableKey) { mutableStateOf(false) }
@@ -393,7 +462,11 @@ private fun LazyItemScope.NotificationItem(
                     )
                 }
             }
-            if (ordinaryActions.isNotEmpty() || boopReplyAction != null || !item.seen || item.canDelete) {
+            if (
+                ordinaryActions.isNotEmpty() || boopReplyAction != null ||
+                item.supportsInvitePhotoResponse ||
+                !item.seen || item.canDelete
+            ) {
                 FlowRow(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -428,6 +501,35 @@ private fun LazyItemScope.NotificationItem(
                                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.AutoMirrored.Outlined.Reply, strings.notificationReplyBoop)
+                            }
+                        }
+                    }
+                    if (item.supportsInvitePhotoResponse) {
+                        val photoLabel = when {
+                            photoResponsePhase == InvitePhotoResponsePhase.PREPARING ->
+                                strings.notificationPhotoPreparing
+                            photoResponsePhase == InvitePhotoResponsePhase.RESPONDING ->
+                                strings.notificationPhotoResponding
+                            canRetryPhotoResponse -> strings.notificationRetryPhotoResponse
+                            else -> strings.notificationReplyWithPhoto
+                        }
+                        ATooltipBox(tooltip = { Text(photoLabel) }) {
+                            IconButton(
+                                enabled = !pending,
+                                onClick = if (canRetryPhotoResponse) onPhotoRetry else onPhotoReply,
+                            ) {
+                                if (photoResponsePhase != null) {
+                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        imageVector = if (canRetryPhotoResponse) {
+                                            Icons.Outlined.Refresh
+                                        } else {
+                                            Icons.Outlined.AddPhotoAlternate
+                                        },
+                                        contentDescription = photoLabel,
+                                    )
+                                }
                             }
                         }
                     }
