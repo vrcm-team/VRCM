@@ -393,6 +393,8 @@ sealed class LocaleStrings {
     open val profileInviteToMyInstance: String = "Invite to My Instance"
     open val profileInviteSent: String = "Invite sent"
     open val profileInviteNotInInstance: String = "You are not in an instance"
+    open val profileRequestInvite: String = "Request Invite"
+    open val profileRequestInviteSent: String = "Invite request sent"
     open val friendActivityTitle: String = "Activity"
     open val friendActivityRecentTogether: String = "Recently together"
     open val friendActivityLastTogether: String = "Last met"

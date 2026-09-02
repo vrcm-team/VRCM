@@ -374,6 +374,8 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val profileInviteToMyInstance = "邀請來我的房間"
     override val profileInviteSent = "邀請已發送"
     override val profileInviteNotInInstance = "你當前不在任何房間中"
+    override val profileRequestInvite = "請求對方邀請"
+    override val profileRequestInviteSent = "邀請請求已傳送"
     override val friendActivityTitle = "好友活動"
     override val friendActivityRecentTogether = "最近一起玩過"
     override val friendActivityLastTogether = "最後見面"
