@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -69,14 +70,26 @@ fun FriendsDirectoryContent(
     val total by model.friendTotal.collectAsState()
     val refreshing by model.directoryRefreshing.collectAsState()
     val refreshFailed by model.directoryRefreshFailed.collectAsState()
+    val removalState by model.friendRemovalState.collectAsState()
     val listState = rememberLazyListState()
+    val localeStrings = strings
+    val visibleUserIds = remember(friends) { friends.mapTo(mutableSetOf()) { it.id } }
+    val allVisibleSelected = visibleUserIds.isNotEmpty() &&
+        visibleUserIds.all { it in removalState.selectedUserIds }
 
-    LaunchedEffect(model) { model.activateFriendDirectory() }
+    LaunchedEffect(model, localeStrings) {
+        model.updateFriendDirectoryLocale(localeStrings)
+        model.activateFriendDirectory()
+    }
     LaunchedEffect(listState) {
         SharedFlowCentre.toPagerTop.collect {
             runCatching { listState.animateScrollToFirst() }
         }
     }
+    HandleBackNavigation(
+        enabled = removalState.selectionMode && !removalState.isSubmitting,
+        onBack = model::exitFriendSelectionMode,
+    )
 
     Box(modifier.fillMaxSize()) {
         LazyColumn(
@@ -102,11 +115,55 @@ fun FriendsDirectoryContent(
                         getSelectedGroup = FriendGroupOptions::selectedGroup,
                         updateOptions = { current, selected -> current.copy(selectedGroup = selected) },
                     )
+                    if (removalState.selectionMode) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (removalState.isSubmitting) {
+                                    localeStrings.friendDirectoryRemovingProgress
+                                        .replaceFirst("%d", removalState.completedCount.toString())
+                                        .replaceFirst("%d", removalState.totalCount.toString())
+                                } else {
+                                    localeStrings.friendDirectorySelectedCount.replaceFirst(
+                                        "%d",
+                                        removalState.selectedUserIds.size.toString(),
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            TextButton(
+                                enabled = !removalState.isSubmitting && visibleUserIds.isNotEmpty(),
+                                onClick = {
+                                    model.toggleVisibleFriendSelection(visibleUserIds)
+                                },
+                            ) {
+                                Text(
+                                    if (allVisibleSelected) {
+                                        localeStrings.friendDirectoryClearSelection
+                                    } else {
+                                        localeStrings.friendDirectorySelectAll
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            renderUserItems(friends) { friend, suffix ->
-                navigator push UserProfileScreen(UserProfileVo(friend), suffix)
+            if (removalState.selectionMode) {
+                renderSelectableUserItems(
+                    users = friends,
+                    selectedUserIds = removalState.selectedUserIds,
+                    enabled = !removalState.isSubmitting,
+                    onSelectionToggle = model::toggleFriendSelection,
+                )
+            } else {
+                renderUserItems(friends) { friend, suffix ->
+                    navigator push UserProfileScreen(UserProfileVo(friend), suffix)
+                }
             }
         }
 
@@ -132,6 +189,34 @@ fun FriendsDirectoryContent(
                 onRetry = model::refreshFriendDirectory,
             )
         }
+    }
+
+    if (removalState.confirmationVisible) {
+        AlertDialog(
+            onDismissRequest = model::dismissFriendRemovalConfirmation,
+            title = { Text(localeStrings.friendDirectoryRemoveConfirmTitle) },
+            text = {
+                Text(
+                    localeStrings.friendDirectoryRemoveConfirmMessage.replaceFirst(
+                        "%d",
+                        removalState.selectedUserIds.size.toString(),
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
+                    onClick = model::confirmFriendRemoval,
+                ) {
+                    Text(localeStrings.friendDirectoryRemoveSelected)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = model::dismissFriendRemovalConfirmation) {
+                    Text(localeStrings.cancel)
+                }
+            },
+        )
     }
 }
 
