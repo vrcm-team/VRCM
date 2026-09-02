@@ -9,6 +9,12 @@ data class ResponseData(
     val responseData: String,
     val icon: String,
     val text: String,
-    val textKey: String,
-    val type: String
+    val textKey: String?,
+    val type: String,
+)
+
+@Serializable
+internal data class RespondNotificationRequest(
+    val responseData: String,
+    val responseType: String,
 )

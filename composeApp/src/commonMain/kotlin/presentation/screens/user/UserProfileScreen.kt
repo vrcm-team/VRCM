@@ -122,6 +122,7 @@ data class UserProfileScreen(
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
+        val requestInviteSubmitting by userProfileScreenModel.isRequestInviteSubmitting.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -205,6 +206,7 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                requestInviteSubmitting = requestInviteSubmitting,
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -299,6 +301,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    requestInviteSubmitting: Boolean,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -351,6 +354,25 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(
+                text = localeStrings.profileRequestInvite,
+                enabled = !requestInviteSubmitting,
+                onClick = {
+                    userProfileScreenModel.requestInvite(
+                        userId = currentUser.id,
+                        successMessage = localeStrings.profileRequestInviteSent,
+                    )
+                },
+            ) { label ->
+                if (requestInviteSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(label)
+            }
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
