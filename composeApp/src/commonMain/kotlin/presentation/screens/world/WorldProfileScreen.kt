@@ -1249,6 +1249,7 @@ private fun WorldProfileTopBar(
         color = MaterialTheme.colorScheme.surface,
         onReturn = onReturn,
         onMenu = { bottomSheetIsVisible = true },
+        menuContentDescription = strings.worldProfileMoreActions,
         actions = { colors ->
             OfficialUrlShareButton(
                 url = "https://vrchat.com/home/world/$worldId",
