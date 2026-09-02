@@ -527,6 +527,8 @@ class WorldProfileScreen(
 
 }
 
+private val WorldProfileCompactContentMaxWidth = 720.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WorldProfileCompactLayout(
@@ -544,58 +546,66 @@ private fun WorldProfileCompactLayout(
     onFavoriteWorld: () -> Unit,
     onOpenRoom: (InstanceVo) -> Unit,
 ) {
-    LazyColumn(
+    Box(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = sysBottomPadding + 24.dp),
+        contentAlignment = Alignment.TopCenter,
     ) {
-        item(key = "hero") {
-            WorldProfileHero(
-                worldProfileVo = worldProfileVo,
-                favoriteEntryState = favoriteEntryState,
-                worldIdForSharedElement = worldIdForSharedElement,
-                sharedKeyPrefix = sharedKeyPrefix,
-                sharedImageCacheKey = sharedImageCacheKey,
-                onCreateRoom = onCreateRoom,
-                onFavoriteWorld = onFavoriteWorld,
-                showRooms = showRooms,
-                onShowDetails = onShowDetails,
-                onShowRooms = onShowRooms,
-            )
-        }
-
-        if (!showRooms) {
-            item(key = "details") {
-                WorldDetails(
+        LazyColumn(
+            // 保持窄屏信息层级，并将 4:3 封面在宽窗口中的高度限制为 540dp。
+            modifier = Modifier
+                .widthIn(max = WorldProfileCompactContentMaxWidth)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(bottom = sysBottomPadding + 24.dp),
+        ) {
+            item(key = "hero") {
+                WorldProfileHero(
                     worldProfileVo = worldProfileVo,
-                    modifier = Modifier.padding(16.dp),
+                    favoriteEntryState = favoriteEntryState,
+                    worldIdForSharedElement = worldIdForSharedElement,
+                    sharedKeyPrefix = sharedKeyPrefix,
+                    sharedImageCacheKey = sharedImageCacheKey,
+                    onCreateRoom = onCreateRoom,
+                    onFavoriteWorld = onFavoriteWorld,
+                    showRooms = showRooms,
+                    onShowDetails = onShowDetails,
+                    onShowRooms = onShowRooms,
                 )
             }
-        } else {
-            item(key = "rooms-heading") {
-                WorldRoomsHeading(
-                    count = activeInstances.size,
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
-            if (activeInstances.isEmpty()) {
-                item(key = "rooms-empty") {
-                    EmptyInstanceCard(
-                        onCreateInstance = onCreateRoom,
-                        enabled = true,
-                        modifier = Modifier.padding(horizontal = 16.dp),
+
+            if (!showRooms) {
+                item(key = "details") {
+                    WorldDetails(
+                        worldProfileVo = worldProfileVo,
+                        modifier = Modifier.padding(16.dp),
                     )
                 }
             } else {
-                itemsIndexed(
-                    items = activeInstances,
-                    key = { _, instance -> instance.id },
-                ) { _, instance ->
-                    WorldRoomListItem(
-                        instance = instance,
-                        capacity = worldProfileVo.capacity,
-                        onClick = { onOpenRoom(instance) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                item(key = "rooms-heading") {
+                    WorldRoomsHeading(
+                        count = activeInstances.size,
+                        modifier = Modifier.padding(16.dp),
                     )
+                }
+                if (activeInstances.isEmpty()) {
+                    item(key = "rooms-empty") {
+                        EmptyInstanceCard(
+                            onCreateInstance = onCreateRoom,
+                            enabled = true,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+                } else {
+                    itemsIndexed(
+                        items = activeInstances,
+                        key = { _, instance -> instance.id },
+                    ) { _, instance ->
+                        WorldRoomListItem(
+                            instance = instance,
+                            capacity = worldProfileVo.capacity,
+                            onClick = { onOpenRoom(instance) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                 }
             }
         }
