@@ -20,6 +20,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
@@ -30,6 +31,7 @@ import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
@@ -39,6 +41,7 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
+import io.github.vrcmteam.vrcm.service.ImageInviteRemote
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
 import io.github.vrcmteam.vrcm.service.InviteMessageAction
@@ -329,7 +332,7 @@ internal fun WorldData.detailRevision() = WorldDetailRevision(
 private fun WorldDetailRevision.matches(world: WorldData): Boolean =
     (updatedAt != null || version != null) && updatedAt == world.updatedAt && version == world.version
 
-class UserProfileScreenModel(
+class UserProfileScreenModel internal constructor(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
     private val usersApi: UsersApi,
@@ -341,6 +344,9 @@ class UserProfileScreenModel(
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
+    private val inviteApi: InviteApi,
+    gallerySelectionSessionStore: GallerySelectionSessionStore,
+    imageInviteRemote: ImageInviteRemote,
     private val inviteMessageActionService: InviteMessageActionService,
     private val userProfileCacheStore: UserProfileCacheStore,
     private val favoriteListCacheStore: FavoriteListCacheStore,
@@ -349,6 +355,12 @@ class UserProfileScreenModel(
     friendActivityService: FriendActivityService,
     private val boopService: BoopService,
 ) : ViewModel() {
+
+    private val imageInviteCoordinator = ImageInviteCoordinator(
+        gallerySessions = gallerySelectionSessionStore,
+        remote = imageInviteRemote,
+    )
+    internal val imageInviteState: StateFlow<ImageInviteUiState> = imageInviteCoordinator.state
 
     private val cacheOwnerUserId = authService.accountDto().userId
     private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
@@ -1023,6 +1035,28 @@ class UserProfileScreenModel(
         }
     }
 
+    internal fun beginImageInvite(userId: String): String? =
+        imageInviteCoordinator.beginSelection(userId)
+
+    internal fun isImageInviteSelectionPending(selectionSessionId: String): Boolean =
+        imageInviteCoordinator.isSelectionPending(selectionSessionId)
+
+    internal suspend fun finishImageInviteSelection(selectionSessionId: String) =
+        imageInviteCoordinator.finishSelection(selectionSessionId)
+
+    internal fun retryImageInvitePreparation() {
+        viewModelScope.launch(Dispatchers.IO) {
+            imageInviteCoordinator.retryPreparation()
+        }
+    }
+
+    internal fun sendImageInvite() {
+        viewModelScope.launch(Dispatchers.IO) {
+            imageInviteCoordinator.send()
+        }
+    }
+
+    internal fun dismissImageInvite() = imageInviteCoordinator.dismiss()
     private fun loadInviteMessages(
         generation: Long,
         action: InviteMessageAction,

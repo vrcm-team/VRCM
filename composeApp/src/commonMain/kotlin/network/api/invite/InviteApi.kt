@@ -16,6 +16,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -29,6 +30,40 @@ class InviteApi(private val client: HttpClient) {
         }.checkSuccess()
     }
 
+    /** Sends a Gallery PNG as an invite attachment using VRChat's multipart contract. */
+    suspend fun inviteUserWithPhoto(
+        userId: String,
+        instanceId: String,
+        imageBytes: ByteArray,
+        messageSlot: Int = 0,
+    ) {
+        require(userId.isNotBlank()) { "userId must not be blank" }
+        require(instanceId.isNotBlank() && instanceId != "offline") {
+            "instanceId must identify an active instance"
+        }
+        require(messageSlot in INVITE_MESSAGE_SLOT_RANGE) { "messageSlot must be between 0 and 11" }
+        require(imageBytes.hasPngSignature()) { "Invite image must be a PNG file" }
+        require(imageBytes.size <= MAX_INVITE_IMAGE_BYTES) {
+            "Invite image exceeds $MAX_INVITE_IMAGE_BYTES bytes"
+        }
+
+        client.submitFormWithBinaryData(
+            url = "$INVITE_API_PREFIX/$userId/photo",
+            formData = formData {
+                append(
+                    key = "data",
+                    value = Json.encodeToString(InvitePhotoRequest(instanceId, messageSlot)),
+                    headers = Headers.build {
+                        append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    },
+                )
+                append("image", imageBytes, Headers.build {
+                    append(HttpHeaders.ContentType, ContentType.Image.PNG.toString())
+                    append(HttpHeaders.ContentDisposition, "filename=\"image.png\"")
+                })
+            },
+        ).checkSuccess { Unit }
+    }
 
     suspend fun inviteMyselfToInstance(instanceId: String): InviteMyselfData =
         client.post("$INVITE_API_PREFIX/myself/to/$instanceId")
@@ -49,7 +84,7 @@ class InviteApi(private val client: HttpClient) {
         imageBytes: ByteArray,
     ): String {
         require(notificationId.isNotBlank()) { "notificationId must not be blank" }
-        require(responseSlot in INVITE_RESPONSE_SLOT_RANGE) {
+        require(responseSlot in INVITE_MESSAGE_SLOT_RANGE) {
             "responseSlot must be between 0 and 11"
         }
         require(imageBytes.hasPngSignature()) { "Invite response image must be a PNG file" }
@@ -142,26 +177,22 @@ class InviteApi(private val client: HttpClient) {
 
     companion object {
         const val MAX_INVITE_MESSAGE_CODE_POINTS = 64
+        private const val MAX_INVITE_IMAGE_BYTES = 10_000_000
         private val ID_PATTERN = Regex("[A-Za-z0-9_-]+")
         private val INVITE_MESSAGE_SLOT_RANGE = 0..11
+        private val PNG_SIGNATURE = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        )
     }
 
+    private fun ByteArray.hasPngSignature(): Boolean = size >= PNG_SIGNATURE.size &&
+        PNG_SIGNATURE.indices.all { index -> this[index] == PNG_SIGNATURE[index] }
 }
 
-private fun ByteArray.hasPngSignature(): Boolean = size >= PNG_SIGNATURE.size &&
-        PNG_SIGNATURE.indices.all { index -> this[index] == PNG_SIGNATURE[index] }
-
-private val INVITE_RESPONSE_SLOT_RANGE = 0..11
-
-private val PNG_SIGNATURE = byteArrayOf(
-    0x89.toByte(),
-    0x50,
-    0x4E,
-    0x47,
-    0x0D,
-    0x0A,
-    0x1A,
-    0x0A,
+@Serializable
+private data class InvitePhotoRequest(
+    val instanceId: String,
+    val messageSlot: Int,
 )
 
 internal fun String.inviteMessageCodePointCount(): Int {
