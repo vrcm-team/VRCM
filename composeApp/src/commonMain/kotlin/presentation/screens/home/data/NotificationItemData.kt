@@ -6,6 +6,8 @@ import io.github.vrcmteam.vrcm.network.api.notification.data.resolveNotification
 import io.github.vrcmteam.vrcm.service.OfficialLinkType
 import io.github.vrcmteam.vrcm.service.parseOfficialId
 import io.github.vrcmteam.vrcm.service.parseOfficialLink
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 
 /** API family that owns a notification and all mutations performed on it. */
 enum class NotificationSource {
@@ -33,6 +35,8 @@ data class NotificationItemData(
     val boopEmojiId: String? = null,
     /** Pipeline events can reference this inbox item through a different notification ID. */
     val relatedNotificationId: String? = null,
+    /** Label supplied for the notification's top-level link. */
+    val linkText: String? = null,
 ) {
     /** The notification sender used by sender-specific actions such as opening a profile or replying to a Boop. */
     val senderId: String?
@@ -84,6 +88,7 @@ data class NotificationItemData(
         announcementTitle = n.details?.announcementTitle ?: n.data.announcementTitle,
         relatedNotificationId = n.relatedNotificationsId,
         boopEmojiId = n.details?.emojiId ?: n.data.emojiId,
+        linkText = n.linkText,
     )
 
     constructor(
@@ -235,32 +240,100 @@ internal sealed interface NotificationActionTarget {
     data class User(val id: String) : NotificationActionTarget
     data class Group(val id: String) : NotificationActionTarget
     data class World(val id: String) : NotificationActionTarget
+    data class Avatar(val id: String) : NotificationActionTarget
+    data class External(val url: String, val host: String) : NotificationActionTarget
+}
+
+/** Responses plus the current notification's independent top-level link, without duplicates. */
+internal val NotificationItemData.displayActions: List<NotificationItemData.ActionData>
+    get() {
+        if (source != NotificationSource.PIPELINE) return actions
+        val topLevelLink = link?.trim().takeUnless { it.isNullOrEmpty() } ?: return actions
+        val topLevelAction = NotificationItemData.ActionData(
+            data = topLevelLink,
+            type = "link",
+            icon = "link",
+            label = linkText.orEmpty(),
+        )
+        val topLevelTarget = actionTarget(topLevelAction)
+        val containsSameTarget = actions.any { action ->
+            action.type.equals("link", ignoreCase = true) &&
+                (action.data.trim() == topLevelLink ||
+                    topLevelTarget?.isSameDestinationAs(actionTarget(action)) == true)
+        }
+        if (containsSameTarget) return actions
+        return actions + topLevelAction
+    }
+
+private fun NotificationActionTarget.isSameDestinationAs(other: NotificationActionTarget?): Boolean {
+    if (other == null) return false
+    if (this !is NotificationActionTarget.External || other !is NotificationActionTarget.External) {
+        return this == other
+    }
+    return externalUrlIdentity(url) == externalUrlIdentity(other.url)
+}
+
+private data class ExternalUrlIdentity(
+    val protocol: URLProtocol,
+    val host: String,
+    val port: Int,
+    val encodedPath: String,
+    val encodedQuery: String,
+    val encodedFragment: String,
+)
+
+private fun externalUrlIdentity(value: String): ExternalUrlIdentity {
+    val url = Url(value)
+    return ExternalUrlIdentity(
+        protocol = url.protocol,
+        host = url.host.lowercase(),
+        port = url.port,
+        encodedPath = url.encodedPath.ifEmpty { "/" },
+        encodedQuery = url.encodedQuery,
+        encodedFragment = url.encodedFragment,
+    )
 }
 
 internal fun NotificationItemData.actionTarget(
     action: NotificationItemData.ActionData,
 ): NotificationActionTarget? {
     if (!action.type.equals("link", ignoreCase = true)) return null
-    val target = sequenceOf(action.data, link.orEmpty())
-        .mapNotNull { candidate ->
-            val value = candidate.trim()
-            if (value.isEmpty()) return@mapNotNull null
-            val prefixedTarget = value.substringBefore(':').lowercase().let { prefix ->
-                val id = value.substringAfter(':', missingDelimiterValue = "")
-                when (prefix) {
-                    "user" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.User }
-                    "group" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.Group }
-                    "world" -> parseOfficialId(id)?.takeIf { it.type == OfficialLinkType.World }
-                    else -> null
-                }
-            }
-            prefixedTarget ?: parseOfficialLink(value)
-        }
-        .firstOrNull() ?: return null
+    val value = action.data.trim().takeIf(String::isNotEmpty) ?: return null
+    val target = prefixedNotificationTarget(value) ?: parseOfficialLink(value)
+    if (target == null) return safeExternalTarget(value)
     return when (target.type) {
         OfficialLinkType.User -> NotificationActionTarget.User(target.id)
         OfficialLinkType.Group -> NotificationActionTarget.Group(target.id)
         OfficialLinkType.World -> NotificationActionTarget.World(target.id)
-        OfficialLinkType.Avatar -> null
+        OfficialLinkType.Avatar -> NotificationActionTarget.Avatar(target.id)
     }
+}
+
+private fun prefixedNotificationTarget(value: String) =
+    value.substringBefore(':').lowercase().let { prefix ->
+        val payload = value.substringAfter(':', missingDelimiterValue = "")
+        val id = when (prefix) {
+            "event" -> payload.split(',', limit = 2)
+                .takeIf { parts ->
+                    parts.size == 2 && Regex("cal_[A-Za-z0-9-]+").matches(parts[1])
+                }
+                ?.first()
+            "user", "group", "world", "avatar" -> payload
+            else -> null
+        } ?: return@let null
+        val expectedType = when (prefix) {
+            "user" -> OfficialLinkType.User
+            "world" -> OfficialLinkType.World
+            "avatar" -> OfficialLinkType.Avatar
+            else -> OfficialLinkType.Group
+        }
+        parseOfficialId(id)?.takeIf { it.type == expectedType }
+    }
+
+private fun safeExternalTarget(value: String): NotificationActionTarget.External? {
+    if (value.any(Char::isISOControl)) return null
+    val url = runCatching { Url(value) }.getOrNull() ?: return null
+    if (url.protocol != URLProtocol.HTTPS || url.host.isBlank()) return null
+    if (url.user != null || url.password != null) return null
+    return NotificationActionTarget.External(url = url.toString(), host = url.host)
 }

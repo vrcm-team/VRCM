@@ -35,6 +35,8 @@ val serviceModule: Module = module {
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
     singleOf(::InvitePhotoResponseService)
+    singleOf(::NetworkRequestInviteCall) bind RequestInviteCall::class
+    singleOf(::RequestInviteService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class

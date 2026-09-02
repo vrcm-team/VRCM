@@ -41,6 +41,8 @@ import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
+import io.github.vrcmteam.vrcm.service.RequestInviteResult
+import io.github.vrcmteam.vrcm.service.RequestInviteService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
@@ -334,6 +336,7 @@ class UserProfileScreenModel(
     private val friendLocationPagerModel: FriendLocationPagerModel,
     friendActivityService: FriendActivityService,
     private val boopService: BoopService,
+    private val requestInviteService: RequestInviteService,
 ) : ViewModel() {
 
     private val cacheOwnerUserId = authService.accountDto().userId
@@ -362,6 +365,9 @@ class UserProfileScreenModel(
 
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
+
+    private val _isRequestInviteSubmitting = MutableStateFlow(false)
+    val isRequestInviteSubmitting: StateFlow<Boolean> = _isRequestInviteSubmitting.asStateFlow()
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -905,6 +911,33 @@ class UserProfileScreenModel(
         }
         is BoopResult.Failed -> result.also { handleError(it.error) }
         BoopResult.InFlight, BoopResult.SessionChanged -> result
+    }
+
+    fun requestInvite(
+        userId: String,
+        successMessage: String,
+    ) {
+        if (!_isRequestInviteSubmitting.compareAndSet(expect = false, update = true)) return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                when (val result = requestInviteService.send(userId)) {
+                    is RequestInviteResult.Sent -> {
+                        if (SharedFlowCentre.isCurrentSession(result.sessionToken)) {
+                            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                        }
+                    }
+                    is RequestInviteResult.Failed -> {
+                        if (SharedFlowCentre.isCurrentSession(result.sessionToken)) {
+                            handleError(result.error)
+                        }
+                    }
+                    RequestInviteResult.InFlight,
+                    RequestInviteResult.SessionChanged -> Unit
+                }
+            } finally {
+                _isRequestInviteSubmitting.value = false
+            }
+        }
     }
 
     fun inviteToMyInstance(

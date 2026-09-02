@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.data
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationData
 import io.github.vrcmteam.vrcm.network.api.notification.data.NotificationDataV2
+import io.github.vrcmteam.vrcm.network.api.notification.data.ResponseData
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -64,6 +66,7 @@ class NotificationItemDataTest {
         assertEquals(1, listOf(unread, read).unreadCount)
         assertEquals(NotificationSource.LEGACY, unread.source)
         assertEquals(NotificationReadTarget.LEGACY_SEE, unread.readTarget)
+        assertEquals(emptyList(), unread.displayActions)
     }
 
     @Test
@@ -93,7 +96,75 @@ class NotificationItemDataTest {
     }
 
     @Test
-    fun linkActionParsesSafeTargetsAndRejectsUnknownValues() {
+    fun currentNotificationMapsResponsesAndAddsTopLevelLinkOnce() {
+        val response = Json.decodeFromString<ResponseData>(
+            """{"data":"group:grp_123","icon":"check","text":"Open group","textKey":null,"type":"link"}""",
+        )
+        val item = NotificationItemData(
+            pipelineNotification(
+                link = "group:grp_123",
+                linkText = "View group",
+                responses = listOf(response),
+            ),
+        )
+        val linkOnly = NotificationItemData(
+            pipelineNotification(
+                link = "event:grp_events,cal_weekly",
+                linkText = "View event",
+            ),
+        )
+
+        assertNull(response.textKey)
+        assertEquals(
+            listOf(NotificationItemData.ActionData("group:grp_123", "link", "check", "Open group")),
+            item.displayActions,
+        )
+        assertEquals(
+            NotificationItemData.ActionData("event:grp_events,cal_weekly", "link", "link", "View event"),
+            linkOnly.displayActions.single(),
+        )
+    }
+
+    @Test
+    fun currentNotificationDeduplicatesEquivalentInternalLinkRepresentations() {
+        val response = Json.decodeFromString<ResponseData>(
+            """{"data":"group:grp_123","icon":"check","text":"Open group","textKey":null,"type":"link"}""",
+        )
+        val item = NotificationItemData(
+            pipelineNotification(
+                link = "https://vrchat.com/home/group/grp_123",
+                linkText = "View group",
+                responses = listOf(response),
+            ),
+        )
+
+        assertEquals(
+            listOf(NotificationItemData.ActionData("group:grp_123", "link", "check", "Open group")),
+            item.displayActions,
+        )
+    }
+
+    @Test
+    fun currentNotificationDeduplicatesNormalizedExternalLinks() {
+        val response = Json.decodeFromString<ResponseData>(
+            """{"data":"https://example.com","icon":"link","text":"Open site","textKey":null,"type":"link"}""",
+        )
+        val item = NotificationItemData(
+            pipelineNotification(
+                link = "https://example.com/",
+                linkText = "View site",
+                responses = listOf(response),
+            ),
+        )
+
+        assertEquals(
+            listOf(NotificationItemData.ActionData("https://example.com", "link", "link", "Open site")),
+            item.displayActions,
+        )
+    }
+
+    @Test
+    fun linkActionParsesInternalAndSafeExternalTargets() {
         val item = NotificationItemData(pipelineNotification())
 
         assertEquals(
@@ -113,6 +184,14 @@ class NotificationItemDataTest {
             item.actionTarget(NotificationItemData.ActionData("world:wrld_123", "link")),
         )
         assertEquals(
+            NotificationActionTarget.Avatar("avtr_123"),
+            item.actionTarget(NotificationItemData.ActionData("avatar:avtr_123", "link")),
+        )
+        assertEquals(
+            NotificationActionTarget.Group("grp_events"),
+            item.actionTarget(NotificationItemData.ActionData("event:grp_events,cal_weekly", "link")),
+        )
+        assertEquals(
             NotificationActionTarget.Group("grp_official"),
             item.actionTarget(
                 NotificationItemData.ActionData(
@@ -122,18 +201,28 @@ class NotificationItemDataTest {
             ),
         )
         assertEquals(
-            NotificationActionTarget.Group("grp_fallback"),
+            NotificationActionTarget.External("https://example.com/group/grp_public", "example.com"),
+            item.actionTarget(
+                NotificationItemData.ActionData("https://example.com/group/grp_public", "link"),
+            ),
+        )
+        assertNull(
             item.copy(link = "https://vrchat.com/home/group/grp_fallback")
                 .actionTarget(NotificationItemData.ActionData("unsupported:value", "link")),
         )
-        assertNull(item.actionTarget(NotificationItemData.ActionData("https://example.com/group/grp_bad", "link")))
         assertNull(item.actionTarget(NotificationItemData.ActionData("group:not-a-group", "link")))
         assertNull(item.actionTarget(NotificationItemData.ActionData("user:grp_mismatch", "link")))
+        assertNull(item.actionTarget(NotificationItemData.ActionData("event:grp_events,invalid", "link")))
+        assertNull(item.actionTarget(NotificationItemData.ActionData("http://example.com", "link")))
+        assertNull(item.actionTarget(NotificationItemData.ActionData("https://user:secret@example.com", "link")))
+        assertNull(item.actionTarget(NotificationItemData.ActionData("javascript:alert(1)", "link")))
     }
 
     private fun pipelineNotification(
         details: NotificationData.Data? = null,
         link: String? = null,
+        linkText: String? = null,
+        responses: List<ResponseData> = emptyList(),
         type: String = "group.announcement",
     ) = NotificationData(
         canDelete = true,
@@ -148,14 +237,14 @@ class NotificationItemDataTest {
         imageUrl = null,
         isSystem = false,
         link = link,
-        linkText = null,
+        linkText = linkText,
         linkTextKey = null,
         message = "Join us",
         messageKey = null,
         receiverUserId = "usr_receiver",
         relatedNotificationsId = null,
         requireSeen = true,
-        responses = emptyList(),
+        responses = responses,
         seen = false,
         senderUserId = null,
         senderUsername = null,
