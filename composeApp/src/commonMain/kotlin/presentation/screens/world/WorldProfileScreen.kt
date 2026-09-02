@@ -775,15 +775,14 @@ private fun WorldPlatformBadges(
             )
         }
         listOf(
-            Windows to AppIcons.Computer,
-            Android to AppIcons.Android,
-            Ios to AppIcons.Apple,
-        ).forEach { (platform, icon) ->
-            val platformFile = worldProfileVo.platformFileSizes.firstOrNull { it.platform == platform }
-                ?: return@forEach
+            Triple(Windows, AppIcons.Computer, "PC"),
+            Triple(Android, AppIcons.Android, "Android"),
+            Triple(Ios, AppIcons.Apple, "iOS"),
+        ).forEach { (platform, icon, description) ->
+            if (platform !in worldProfileVo.supportedPlatforms) return@forEach
             WorldPlatformBadge(
                 icon = icon,
-                description = platformFile.displayName,
+                description = description,
             )
         }
     }

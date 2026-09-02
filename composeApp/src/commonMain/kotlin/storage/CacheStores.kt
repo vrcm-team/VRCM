@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.supportedPlatforms
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -226,7 +227,12 @@ internal class RoomWorldProfileCacheStore(
         serializer = WorldProfileCache.serializer(),
         nowMillis = nowMillis,
         retained = retained,
-        prune = { it.copy(world = it.world.prunedForProfileCache()) },
+        prune = {
+            it.copy(
+                world = it.world.prunedForProfileCache(),
+                supportedPlatforms = it.supportedPlatforms ?: it.world.supportedPlatforms,
+            )
+        },
     )
 
     override suspend fun load(worldId: String): WorldProfileCache? = mutationMutex.withLock {
