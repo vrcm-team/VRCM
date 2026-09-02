@@ -9,35 +9,52 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.Reply
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.getAppPlatform
+import io.github.vrcmteam.vrcm.core.extensions.capitalizeFirst
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
+import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
+import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.*
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.BoopSelectorDialog
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.isGroupNotificationType
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -67,6 +84,7 @@ fun NotificationCenterContent(
     bottomNavigationPadding: Dp = 0.dp,
 ) {
     val model = koinInject<NotificationCenterModel>()
+    val gallerySessions = koinInject<GallerySelectionSessionStore>()
     val navigator = LocalNavigator.currentOrThrow
     LaunchedEffect(Unit) { model.refreshAllNotification() }
     val notifications by remember {
@@ -86,16 +104,63 @@ fun NotificationCenterContent(
     }
 
     var boopReply by remember { mutableStateOf<BoopReply?>(null) }
+    var externalLink by remember { mutableStateOf<NotificationActionTarget.External?>(null) }
+    val platform = getAppPlatform()
+    val scope = rememberCoroutineScope()
     val boopSuccess = strings.profileBoopSuccess
     val boopAlreadySent = strings.profileBoopAlreadySent
     val boopDisabled = strings.profileBoopDisabled
-    val onBoopReply: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, action ->
-        boopReply = BoopReply(item, action)
+    val photoResponseSuccess = strings.notificationPhotoResponseSuccess
+    val photoPreparationFailed = strings.notificationPhotoPreparationFailed
+    val externalLinkFailed = strings.notificationExternalLinkFailed
+    val onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit = { item, action ->
+        if (item.responseTarget(action) == NotificationResponseTarget.BOOP_USER_API) {
+            boopReply = BoopReply(item, action)
+        } else {
+            model.respondToNotification(item, action, null, boopSuccess, boopAlreadySent, boopDisabled)
+        }
     }
     val reply = boopReply
     val replySending = reply?.let { model.pendingAction(it.item) == it.action } == true
     LaunchedEffect(reply?.item?.identity, notifications) {
         if (reply != null && notifications.none { it.identity == reply.item.identity }) boopReply = null
+    }
+
+    var pendingPhotoGallerySession by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingPhotoTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingPhotoSessionKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentSessionKey = model.currentSessionKey
+
+    // Consume a Gallery result only for the account and notification that opened the picker.
+    LaunchedEffect(pendingPhotoGallerySession, currentSessionKey, notifications) {
+        val gallerySessionId = pendingPhotoGallerySession ?: return@LaunchedEffect
+        if (pendingPhotoSessionKey != currentSessionKey) {
+            gallerySessions.cancel(gallerySessionId)
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+            return@LaunchedEffect
+        }
+        val selection = gallerySessions.consume(gallerySessionId)
+        if (selection != null) {
+            notifications.firstOrNull { it.identity.stableKey == pendingPhotoTargetKey }
+                ?.takeIf(NotificationItemData::supportsInvitePhotoResponse)
+                ?.let { item ->
+                    model.respondToInviteWithPhoto(
+                        item = item,
+                        selection = selection,
+                        successMessage = photoResponseSuccess,
+                        preparationFailedMessage = photoPreparationFailed,
+                    )
+                }
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+        } else if (!gallerySessions.isPending(gallerySessionId)) {
+            pendingPhotoGallerySession = null
+            pendingPhotoTargetKey = null
+            pendingPhotoSessionKey = null
+        }
     }
 
     Scaffold(
@@ -175,9 +240,28 @@ fun NotificationCenterContent(
                         item = item,
                         loadingAction = model.pendingAction(item),
                         pending = model.isNotificationPending(item),
+                        photoResponsePhase = model.pendingPhotoResponsePhase(item),
+                        canRetryPhotoResponse = model.failedPhotoResponse(item) != null,
                         onRead = { model.markNotificationAsRead(item) },
                         onDelete = { model.deleteNotification(item) },
-                        onBoopReply = onBoopReply,
+                        onResponse = onResponse,
+                        onExternalLink = { externalLink = it },
+                        onPhotoReply = photoReply@{
+                            if (pendingPhotoGallerySession != null) return@photoReply
+                            val sessionKey = model.currentSessionKey ?: return@photoReply
+                            val gallerySessionId = gallerySessions.create()
+                            pendingPhotoGallerySession = gallerySessionId
+                            pendingPhotoTargetKey = item.identity.stableKey
+                            pendingPhotoSessionKey = sessionKey
+                            navigator.push(GalleryPickerScreen(gallerySessionId))
+                        },
+                        onPhotoRetry = {
+                            model.retryInvitePhotoResponse(
+                                item = item,
+                                successMessage = photoResponseSuccess,
+                                preparationFailedMessage = photoPreparationFailed,
+                            )
+                        },
                     )
                 }
             }
@@ -196,6 +280,38 @@ fun NotificationCenterContent(
             }
         },
     )
+    externalLink?.let { target ->
+        AlertDialog(
+            onDismissRequest = { externalLink = null },
+            icon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
+            title = { Text(strings.notificationExternalLinkTitle) },
+            text = {
+                Text(strings.notificationExternalLinkMessage.replace("%s", target.host))
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        externalLink = null
+                        runCatching { platform.openUrl(target.url) }
+                            .onFailure {
+                                scope.launch {
+                                    SharedFlowCentre.toastText.emit(
+                                        ToastText.Error(externalLinkFailed),
+                                    )
+                                }
+                            }
+                    },
+                ) {
+                    Text(strings.officialLinkOpen)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { externalLink = null }) {
+                    Text(strings.cancel)
+                }
+            },
+        )
+    }
 }
 
 internal fun notificationListIndex(notificationIndex: Int, hasRefreshError: Boolean): Int =
@@ -216,15 +332,24 @@ private data class BoopReply(
     val action: NotificationItemData.ActionData,
 )
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalSharedTransitionApi::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+)
 @Composable
 private fun LazyItemScope.NotificationItem(
     item: NotificationItemData,
     loadingAction: NotificationItemData.ActionData?,
     pending: Boolean,
+    photoResponsePhase: InvitePhotoResponsePhase?,
+    canRetryPhotoResponse: Boolean,
     onRead: () -> Unit,
     onDelete: () -> Unit,
-    onBoopReply: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
+    onResponse: (NotificationItemData, NotificationItemData.ActionData) -> Unit,
+    onExternalLink: (NotificationActionTarget.External) -> Unit,
+    onPhotoReply: () -> Unit,
+    onPhotoRetry: () -> Unit,
 ) {
     val identity = item.identity
     var expanded by remember(identity.stableKey) { mutableStateOf(false) }
@@ -242,6 +367,30 @@ private fun LazyItemScope.NotificationItem(
     }
     val headline = item.announcementTitle ?: item.title ?: item.groupName ?: item.message
     val boopReplyAction = item.boopReplyAction
+    val ordinaryActions = item.displayActions.filter { action ->
+        item.responseTarget(action) != NotificationResponseTarget.BOOP_USER_API
+    }
+    val openActionTarget: (NotificationActionTarget) -> Unit = { target ->
+        when (target) {
+            is NotificationActionTarget.User -> navigator push UserProfileScreen(
+                UserProfileVo(id = target.id, profileImageUrl = item.imageUrl),
+                sharedSuffixKey,
+            )
+            is NotificationActionTarget.Group -> navigator push GroupProfileScreen(
+                GroupProfileVo(
+                    groupId = target.id,
+                    name = groupName.takeIf { groupId == target.id }.orEmpty(),
+                ),
+            )
+            is NotificationActionTarget.World -> navigator push WorldProfileScreen(
+                WorldProfileVo(worldId = target.id),
+            )
+            is NotificationActionTarget.Avatar -> navigator push AvatarProfileScreen(
+                AvatarProfileVo(avatarId = target.id),
+            )
+            is NotificationActionTarget.External -> onExternalLink(target)
+        }
+    }
     Box(
         Modifier.fillMaxWidth().animateItem().clip(MaterialTheme.shapes.large)
             .background(
@@ -313,22 +462,74 @@ private fun LazyItemScope.NotificationItem(
                     )
                 }
             }
-            if (boopReplyAction != null || !item.seen || item.canDelete) {
+            if (
+                ordinaryActions.isNotEmpty() || boopReplyAction != null ||
+                item.supportsInvitePhotoResponse ||
+                !item.seen || item.canDelete
+            ) {
                 FlowRow(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    ordinaryActions.forEach { action ->
+                        val isLink = action.type.equals("link", ignoreCase = true)
+                        val actionTarget = if (isLink) item.actionTarget(action) else null
+                        NotificationResponseButton(
+                            item = item,
+                            action = action,
+                            loading = loadingAction == action,
+                            enabled = !pending && (!isLink || actionTarget != null),
+                            unavailableLink = isLink && actionTarget == null,
+                            onClick = {
+                                if (isLink) {
+                                    if (!item.seen) onRead()
+                                    actionTarget?.let(openActionTarget)
+                                } else {
+                                    onResponse(item, action)
+                                }
+                            },
+                        )
+                    }
                     if (boopReplyAction != null) {
                         val loading = loadingAction == boopReplyAction
                         IconButton(
                             enabled = !pending && senderId.isNotEmpty(),
-                            onClick = { onBoopReply(item, boopReplyAction) },
+                            onClick = { onResponse(item, boopReplyAction) },
                         ) {
                             if (loading) {
                                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                             } else {
                                 Icon(Icons.AutoMirrored.Outlined.Reply, strings.notificationReplyBoop)
+                            }
+                        }
+                    }
+                    if (item.supportsInvitePhotoResponse) {
+                        val photoLabel = when {
+                            photoResponsePhase == InvitePhotoResponsePhase.PREPARING ->
+                                strings.notificationPhotoPreparing
+                            photoResponsePhase == InvitePhotoResponsePhase.RESPONDING ->
+                                strings.notificationPhotoResponding
+                            canRetryPhotoResponse -> strings.notificationRetryPhotoResponse
+                            else -> strings.notificationReplyWithPhoto
+                        }
+                        ATooltipBox(tooltip = { Text(photoLabel) }) {
+                            IconButton(
+                                enabled = !pending,
+                                onClick = if (canRetryPhotoResponse) onPhotoRetry else onPhotoReply,
+                            ) {
+                                if (photoResponsePhase != null) {
+                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        imageVector = if (canRetryPhotoResponse) {
+                                            Icons.Outlined.Refresh
+                                        } else {
+                                            Icons.Outlined.AddPhotoAlternate
+                                        },
+                                        contentDescription = photoLabel,
+                                    )
+                                }
                             }
                         }
                     }
@@ -352,6 +553,70 @@ private fun LazyItemScope.NotificationItem(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationResponseButton(
+    item: NotificationItemData,
+    action: NotificationItemData.ActionData,
+    loading: Boolean,
+    enabled: Boolean,
+    unavailableLink: Boolean,
+    onClick: () -> Unit,
+) {
+    val label = notificationActionLabel(item, action)
+    val button = @Composable {
+        FilledTonalButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.padding(start = 6.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier.alpha(if (loading) 0f else 1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(notificationActionIcon(action), contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            }
+        }
+    }
+    if (unavailableLink) {
+        ATooltipBox(tooltip = { Text(strings.notificationUnsupportedLink) }, content = button)
+    } else {
+        button()
+    }
+}
+
+@Composable
+private fun notificationActionLabel(
+    item: NotificationItemData,
+    action: NotificationItemData.ActionData,
+) = when {
+    item.type == NotificationType.FriendRequest.value && action.type.equals("Accept", true) ->
+        strings.notificationAccept
+    item.type == NotificationType.FriendRequest.value -> strings.notificationIgnore
+    action.label.isNotBlank() -> action.label
+    action.type.equals("link", true) -> strings.officialLinkOpen
+    else -> action.type.capitalizeFirst()
+}
+
+private fun notificationActionIcon(action: NotificationItemData.ActionData): ImageVector = when {
+    action.type.equals("link", true) -> Icons.AutoMirrored.Outlined.OpenInNew
+    action.type.equals("accept", true) || action.icon.equals("check", true) -> Icons.Outlined.Check
+    action.type.equals("delete", true) -> Icons.Default.DeleteOutline
+    action.type.equals("decline", true) || action.type.equals("hide", true) ||
+        action.icon.equals("cancel", true) -> Icons.Outlined.Close
+    action.type.equals("unsubscribe", true) || action.icon.equals("bell-slash", true) ->
+        Icons.Outlined.NotificationsOff
+    action.icon.equals("bell", true) -> Icons.Outlined.Notifications
+    action.icon.equals("ban", true) -> Icons.Outlined.Block
+    action.icon.equals("reply", true) -> Icons.AutoMirrored.Outlined.Reply
+    else -> Icons.Outlined.Tag
 }
 
 @Composable
