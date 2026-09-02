@@ -77,7 +77,7 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
     }
 
     @Test
-    fun worldLoadPublishesAndCachesReferencedPlatformPackageSizes() = runBlocking {
+    fun worldLoadPublishesAndCachesSizesFromSecurityVariantPackageUrl() = runBlocking {
         val worldRequests = atomic(0)
         val client = HttpClient(MockEngine) {
             engine {
@@ -401,7 +401,8 @@ private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
 )
 
 private fun worldJson(
-    androidAssetUrl: String = "https://api.vrchat.cloud/api/1/file/file_android/3/file",
+    androidAssetUrl: String =
+        "https://api.vrchat.cloud/api/1/file/file_android/3/variant/security?v=1787741575",
 ) = """
     {
       "authorId":"usr_author","authorName":"Author","capacity":16,"created_at":null,

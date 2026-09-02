@@ -92,15 +92,19 @@ class WorldPlatformService(
 
     private fun parseFileReference(assetUrl: String): FileReference? {
         val segments = runCatching { Url(assetUrl).segments }.getOrNull() ?: return null
-        if (segments.size < FILE_REFERENCE_SEGMENT_COUNT) return null
-        val (resource, fileId, versionText, fileType) = segments.takeLast(FILE_REFERENCE_SEGMENT_COUNT)
-        val version = versionText.toIntOrNull()?.takeIf { it > 0 } ?: return null
-        if (resource != "file" || fileType != "file" || !fileIdRegex.matches(fileId)) return null
-        return FileReference(fileId, version)
+        return segments.windowed(FILE_REFERENCE_SEGMENT_COUNT).firstNotNullOfOrNull {
+            (resource, fileId, versionText) ->
+            val version = versionText.toIntOrNull()?.takeIf { it > 0 }
+            if (resource == "file" && fileIdRegex.matches(fileId) && version != null) {
+                FileReference(fileId, version)
+            } else {
+                null
+            }
+        }
     }
 
     private companion object {
-        private const val FILE_REFERENCE_SEGMENT_COUNT = 4
+        private const val FILE_REFERENCE_SEGMENT_COUNT = 3
         private val fileIdRegex = Regex("file_[\\w-]+")
         private val supportedPlatforms = listOf(
             PlatformType.Windows to "PC",
