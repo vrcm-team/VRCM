@@ -81,6 +81,9 @@ class InviteMessageSelectionApiTest {
             api.inviteUser("usr_friend", "wrld_test:instance", messageSlot = 12)
         }
         assertFailsWith<IllegalArgumentException> {
+            api.inviteUser("usr_friend", "instance~region(use)")
+        }
+        assertFailsWith<IllegalArgumentException> {
             api.requestInvite("usr_friend", requestSlot = -1)
         }
         assertEquals(0, requestCount)

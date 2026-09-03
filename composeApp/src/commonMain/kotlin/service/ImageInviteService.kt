@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.network.api.invite.inviteLocationOrNull
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import io.github.vrcmteam.vrcm.service.meetup.MeetupRemoteBytesLoader
 
@@ -69,10 +70,8 @@ internal class ImageInviteService(
         sessionToken: AccountSessionToken,
     ): ImageInviteRemoteResult<Unit> {
         val response = authService.runSessionBoundCatching(sessionToken) {
-            val instanceLocation = authService.currentUser().presence.instance
-            if (instanceLocation.isBlank() || instanceLocation == "offline") {
-                throw ImageInviteNotInInstanceException()
-            }
+            val instanceLocation = authService.currentUser().presence.inviteLocationOrNull()
+                ?: throw ImageInviteNotInInstanceException()
             inviteApi.inviteUserWithPhoto(
                 userId = userId,
                 instanceId = instanceLocation,

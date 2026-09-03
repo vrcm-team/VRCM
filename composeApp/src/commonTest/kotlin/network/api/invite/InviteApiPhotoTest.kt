@@ -64,9 +64,11 @@ class InviteApiPhotoTest {
 
     @Test
     fun photoInviteRejectsInvalidInputBeforeNetworkCall() = runBlocking {
+        var requestCount = 0
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler {
+                    requestCount++
                     respond("{}", HttpStatusCode.OK)
                 }
             }
@@ -76,8 +78,12 @@ class InviteApiPhotoTest {
             api.inviteUserWithPhoto("usr_friend", "offline", PNG)
         }
         assertFailsWith<IllegalArgumentException> {
+            api.inviteUserWithPhoto("usr_friend", "12345~region(use)", PNG)
+        }
+        assertFailsWith<IllegalArgumentException> {
             api.inviteUserWithPhoto("usr_friend", "wrld_world:12345", byteArrayOf(1, 2, 3))
         }
+        assertEquals(0, requestCount)
         client.close()
     }
 
