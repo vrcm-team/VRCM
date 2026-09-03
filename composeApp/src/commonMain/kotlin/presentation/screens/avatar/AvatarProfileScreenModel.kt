@@ -249,7 +249,9 @@ class AvatarProfileScreenModel internal constructor(
     )
 
     private val latestRequestToken = MutableStateFlow(0L)
-    private val latestModerationRequestToken = MutableStateFlow(0L)
+    private val latestModerationContextToken = MutableStateFlow(0L)
+    private val latestModerationLoadToken = MutableStateFlow(0L)
+    private val latestModerationMutationToken = MutableStateFlow(0L)
     private val _moderationState = MutableStateFlow(AvatarModerationState())
     internal val moderationState: StateFlow<AvatarModerationState> =
         _moderationState.asStateFlow()
@@ -263,10 +265,15 @@ class AvatarProfileScreenModel internal constructor(
                 .distinctUntilChanged()
                 .collect { sessionToken ->
                     if (sessionToken == observedSessionToken) return@collect
+                    val previousUserId = observedSessionToken?.userId
                     observedSessionToken = sessionToken
+                    if (sessionToken?.userId != previousUserId) {
+                        latestModerationContextToken.updateAndGet { it + 1 }
+                    }
                     val avatarId = avatarProfileState.value?.avatarId.orEmpty()
                     if (sessionToken == null) {
-                        latestModerationRequestToken.updateAndGet { it + 1 }
+                        latestModerationLoadToken.updateAndGet { it + 1 }
+                        latestModerationMutationToken.updateAndGet { it + 1 }
                         _moderationState.value = AvatarModerationState(
                             avatarId = avatarId.takeIf(String::isNotBlank),
                         )
@@ -279,6 +286,9 @@ class AvatarProfileScreenModel internal constructor(
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
+        if (_avatarProfileState.value?.avatarId != avatarProfileVo.avatarId) {
+            latestModerationContextToken.updateAndGet { it + 1 }
+        }
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
@@ -328,6 +338,8 @@ class AvatarProfileScreenModel internal constructor(
     internal fun setAvatarBlocked(blocked: Boolean) {
         val avatarId = avatarProfileState.value?.avatarId ?: return
         val sessionToken = favoriteSession.value?.token
+        val requestUserId = sessionToken?.userId
+        val contextToken = latestModerationContextToken.value
         val expected = moderationState.value
         val requiredStatus = if (blocked) {
             AvatarModerationStatus.NotBlocked
@@ -342,7 +354,7 @@ class AvatarProfileScreenModel internal constructor(
         }
         if (!_moderationState.compareAndSet(expected, expected.copy(isUpdating = true))) return
 
-        val requestToken = latestModerationRequestToken.updateAndGet { it + 1 }
+        val requestToken = latestModerationMutationToken.updateAndGet { it + 1 }
         viewModelScope.launch(requestDispatcher) {
             val response = if (sessionToken == null) {
                 AvatarModerationResponse(
@@ -364,13 +376,27 @@ class AvatarProfileScreenModel internal constructor(
                     sessionToken = sessionBoundResponse.sessionToken,
                 )
             }
-            if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+            if (!isCurrentModerationMutation(
+                    requestToken,
+                    avatarId,
+                    requestUserId,
+                    contextToken,
+                    response.sessionToken,
+                )
+            ) {
                 return@launch
             }
 
             response.result
                 .onSuccess {
-                    if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (!isCurrentModerationMutation(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         return@onSuccess
                     }
                     _moderationState.value = expected.copy(
@@ -381,7 +407,14 @@ class AvatarProfileScreenModel internal constructor(
                         },
                         isUpdating = false,
                     )
-                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (isCurrentModerationMutation(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         _notices.emit(
                             if (blocked) {
                                 AvatarProfileNotice.ModerationBlocked
@@ -392,14 +425,28 @@ class AvatarProfileScreenModel internal constructor(
                     }
                 }
                 .onFailure {
-                    if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (!isCurrentModerationMutation(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         return@onFailure
                     }
                     _moderationState.value = AvatarModerationState(
                         avatarId = avatarId,
                         status = AvatarModerationStatus.LoadFailed,
                     )
-                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (isCurrentModerationMutation(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         _notices.emit(AvatarProfileNotice.ModerationChangeFailed)
                     }
                 }
@@ -407,8 +454,10 @@ class AvatarProfileScreenModel internal constructor(
     }
 
     private fun loadAvatarModeration(avatarId: String) {
-        val requestToken = latestModerationRequestToken.updateAndGet { it + 1 }
+        val requestToken = latestModerationLoadToken.updateAndGet { it + 1 }
         val sessionToken = favoriteSession.value?.token
+        val requestUserId = sessionToken?.userId
+        val contextToken = latestModerationContextToken.value
         if (avatarId.isBlank()) {
             _moderationState.value = AvatarModerationState()
             return
@@ -434,7 +483,14 @@ class AvatarProfileScreenModel internal constructor(
             }
             response.result
                 .onSuccess { blocked ->
-                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (isCurrentModerationLoad(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         _moderationState.value = AvatarModerationState(
                             avatarId = avatarId,
                             status = if (blocked) {
@@ -446,12 +502,26 @@ class AvatarProfileScreenModel internal constructor(
                     }
                 }
                 .onFailure {
-                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                    if (isCurrentModerationLoad(
+                            requestToken,
+                            avatarId,
+                            requestUserId,
+                            contextToken,
+                            response.sessionToken,
+                        )
+                    ) {
                         _moderationState.value = AvatarModerationState(
                             avatarId = avatarId,
                             status = AvatarModerationStatus.LoadFailed,
                         )
-                        if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                        if (isCurrentModerationLoad(
+                                requestToken,
+                                avatarId,
+                                requestUserId,
+                                contextToken,
+                                response.sessionToken,
+                            )
+                        ) {
                             _notices.emit(AvatarProfileNotice.ModerationLoadFailed)
                         }
                     }
@@ -459,13 +529,36 @@ class AvatarProfileScreenModel internal constructor(
         }
     }
 
-    private fun isCurrentModerationRequest(
+    private fun isCurrentModerationLoad(
         requestToken: Long,
         avatarId: String,
+        requestUserId: String?,
+        contextToken: Long,
         sessionToken: AccountSessionToken?,
     ): Boolean =
-        requestToken == latestModerationRequestToken.value &&
-            avatarProfileState.value?.avatarId == avatarId &&
+        requestToken == latestModerationLoadToken.value &&
+            contextToken == latestModerationContextToken.value &&
+            isCurrentModerationSession(avatarId, requestUserId, sessionToken)
+
+    private fun isCurrentModerationMutation(
+        requestToken: Long,
+        avatarId: String,
+        requestUserId: String?,
+        contextToken: Long,
+        sessionToken: AccountSessionToken?,
+    ): Boolean =
+        requestToken == latestModerationMutationToken.value &&
+            contextToken == latestModerationContextToken.value &&
+            isCurrentModerationSession(avatarId, requestUserId, sessionToken)
+
+    private fun isCurrentModerationSession(
+        avatarId: String,
+        requestUserId: String?,
+        sessionToken: AccountSessionToken?,
+    ): Boolean =
+        avatarProfileState.value?.avatarId == avatarId &&
+            sessionToken?.userId == requestUserId &&
+            favoriteSession.value?.account?.userId == requestUserId &&
             favoriteSession.value?.token == sessionToken &&
             (sessionToken == null || sessionValidator(sessionToken))
 

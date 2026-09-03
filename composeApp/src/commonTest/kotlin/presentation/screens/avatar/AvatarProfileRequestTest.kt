@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsEn
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -393,6 +394,52 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
         assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
         SharedFlowCentre.emitLogout()
+    }
+
+    @Test
+    fun sessionRetryTokenRotationKeepsMutationValidWhenReloadFinishesFirst() = runBlocking {
+        val tokenA = AccountSessionToken(userId = "usr_account_a", generation = 1)
+        val tokenB = AccountSessionToken(userId = "usr_account_a", generation = 2)
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = tokenA.userId),
+                token = tokenA,
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+
+        model.setAvatarBlocked(true)
+        yield()
+        assertTrue(model.moderationState.value.isUpdating)
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = tokenB.userId),
+            token = tokenB,
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        yield()
+        // The controlled source models AuthService retrying a 401 and returning tokenB.
+        moderationSource.completeSessionBoundBlock(
+            SessionBoundResponse(Result.success(Unit), tokenB)
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+        assertEquals(listOf(tokenA), moderationSource.sessionBoundBlockTokens)
     }
 
     @Test
@@ -799,9 +846,12 @@ private class ImmediateAvatarModerationSource : AvatarModerationSource {
 private class ControlledAvatarModerationSource : AvatarModerationSource {
     private val loadRequests = mutableMapOf<String, MutableList<CompletableDeferred<Result<Boolean>>>>()
     private val blockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
+    private val sessionBoundBlockRequests =
+        mutableListOf<CompletableDeferred<SessionBoundResponse<Unit>?>>()
     private val unblockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
     val blockedAvatarIds = mutableListOf<String>()
     val unblockedAvatarIds = mutableListOf<String>()
+    val sessionBoundBlockTokens = mutableListOf<AccountSessionToken>()
 
     override suspend fun isBlocked(avatarId: String): Result<Boolean> {
         val request = CompletableDeferred<Result<Boolean>>()
@@ -812,6 +862,17 @@ private class ControlledAvatarModerationSource : AvatarModerationSource {
     override suspend fun block(avatarId: String): Result<Unit> {
         blockedAvatarIds += avatarId
         return CompletableDeferred<Result<Unit>>().also(blockRequests::add).await()
+    }
+
+    override suspend fun block(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? {
+        blockedAvatarIds += avatarId
+        sessionBoundBlockTokens += sessionToken
+        return CompletableDeferred<SessionBoundResponse<Unit>?>()
+            .also(sessionBoundBlockRequests::add)
+            .await()
     }
 
     override suspend fun unblock(avatarId: String): Result<Unit> {
@@ -829,6 +890,10 @@ private class ControlledAvatarModerationSource : AvatarModerationSource {
 
     fun completeBlock(result: Result<Unit>) {
         blockRequests.single().complete(result)
+    }
+
+    fun completeSessionBoundBlock(response: SessionBoundResponse<Unit>?) {
+        sessionBoundBlockRequests.single().complete(response)
     }
 
     fun completeUnblock(result: Result<Unit>) {
