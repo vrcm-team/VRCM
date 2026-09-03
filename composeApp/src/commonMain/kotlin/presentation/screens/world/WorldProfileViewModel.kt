@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.HomeWorldManager
 import io.github.vrcmteam.vrcm.service.HomeWorldSessionChangedException
+import io.github.vrcmteam.vrcm.service.HomeWorldStateChangedException
 import io.github.vrcmteam.vrcm.service.HomeWorldUserContext
 import io.github.vrcmteam.vrcm.service.InstanceCreationResult
 import io.github.vrcmteam.vrcm.service.InstanceCreationService
@@ -354,11 +355,24 @@ class WorldProfileScreenModel internal constructor(
         }
         if (!isUpdatingHomeWorld.compareAndSet(expect = false, update = true)) return
 
+        val resetSessionToken = if (action == HomeWorldAction.Reset) {
+            currentHomeWorldUser.value
+                ?.takeIf { it.homeLocation == worldId }
+                ?.sessionToken
+        } else {
+            null
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val result = when (action) {
                     HomeWorldAction.Set -> homeWorldManager.setHomeWorld(worldId)
-                    HomeWorldAction.Reset -> homeWorldManager.resetHomeWorld()
+                    HomeWorldAction.Reset -> resetSessionToken?.let { sessionToken ->
+                        homeWorldManager.resetHomeWorld(
+                            expectedWorldId = worldId,
+                            expectedSessionToken = sessionToken,
+                        )
+                    } ?: Result.failure(HomeWorldStateChangedException())
                 }
                 result
                     .onSuccess {

@@ -175,6 +175,16 @@ class AuthService(
         true
     }
 
+    /** Reads the current user's Home World while holding the same lock as user updates. */
+    internal fun isCurrentUserHomeWorld(
+        sessionToken: AccountSessionToken,
+        expectedWorldId: String,
+    ): Boolean = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+        currentUser?.let { it.id == sessionToken.userId && it.homeLocation == expectedWorldId }
+            ?: false
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
             val existing = currentUser ?: return@synchronized

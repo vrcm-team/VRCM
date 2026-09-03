@@ -197,6 +197,36 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun resetHomeWorldDoesNotClearAHomeWorldChangedBeforeSubmission() = runTest {
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            if (request.method == HttpMethod.Put) {
+                updateRequests++
+                jsonResponse(currentUserJson(cachedAccount(), homeLocation = ""))
+            } else {
+                jsonResponse(currentUserJson(cachedAccount(), homeLocation = "wrld_confirmed"))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val sessionToken = requireNotNull(SharedFlowCentre.currentSession.value).token
+        fixture.service.applyCurrentUserHomeLocation(
+            sessionToken = sessionToken,
+            userId = sessionToken.userId,
+            homeLocation = "wrld_later",
+        )
+
+        val result = HomeWorldService(UsersApi(fixture.client), fixture.service).resetHomeWorld(
+            expectedWorldId = "wrld_confirmed",
+            expectedSessionToken = sessionToken,
+        )
+
+        assertIs<HomeWorldStateChangedException>(result.exceptionOrNull())
+        assertEquals(0, updateRequests)
+        assertEquals("wrld_later", fixture.service.currentUserState.value?.homeLocation)
+        fixture.client.close()
+    }
+
+    @Test
     fun unauthorizedCachedCookieFallsBackToSavedPassword() = runTest {
         val requests = mutableListOf<Pair<String?, String?>>()
         val fixture = fixture { request ->

@@ -18,11 +18,18 @@ internal interface HomeWorldManager {
 
     suspend fun setHomeWorld(worldId: String): Result<String>
 
-    suspend fun resetHomeWorld(): Result<String>
+    suspend fun resetHomeWorld(
+        expectedWorldId: String,
+        expectedSessionToken: AccountSessionToken,
+    ): Result<String>
 }
 
 internal class HomeWorldSessionChangedException : IllegalStateException(
     "The authenticated account changed while updating the Home World"
+)
+
+internal class HomeWorldStateChangedException : IllegalStateException(
+    "The Home World changed before the reset could be submitted"
 )
 
 internal class InvalidHomeWorldException : IllegalArgumentException("Invalid VRChat world ID")
@@ -57,23 +64,57 @@ internal class HomeWorldService(
         return updateHomeLocation(worldId.trim())
     }
 
-    override suspend fun resetHomeWorld(): Result<String> = updateHomeLocation("")
+    override suspend fun resetHomeWorld(
+        expectedWorldId: String,
+        expectedSessionToken: AccountSessionToken,
+    ): Result<String> {
+        if (!isWorldId(expectedWorldId)) {
+            return Result.failure(InvalidHomeWorldException())
+        }
+        return updateHomeLocation(
+            homeLocation = "",
+            expectedWorldId = expectedWorldId.trim(),
+            expectedSessionToken = expectedSessionToken,
+        )
+    }
 
-    private suspend fun updateHomeLocation(homeLocation: String): Result<String> {
+    private suspend fun updateHomeLocation(
+        homeLocation: String,
+        expectedWorldId: String? = null,
+        expectedSessionToken: AccountSessionToken? = null,
+    ): Result<String> {
         if (!updateInFlight.compareAndSet(expect = false, update = true)) {
             return Result.failure(HomeWorldUpdateInFlightException())
         }
         return try {
-            performHomeWorldUpdate(homeLocation)
+            performHomeWorldUpdate(
+                homeLocation = homeLocation,
+                expectedWorldId = expectedWorldId,
+                expectedSessionToken = expectedSessionToken,
+            )
         } finally {
             updateInFlight.value = false
         }
     }
 
-    private suspend fun performHomeWorldUpdate(homeLocation: String): Result<String> {
-        val session = SharedFlowCentre.currentSession.value
+    private suspend fun performHomeWorldUpdate(
+        homeLocation: String,
+        expectedWorldId: String?,
+        expectedSessionToken: AccountSessionToken?,
+    ): Result<String> {
+        val session = SharedFlowCentre.currentSession.value?.takeIf { current ->
+            expectedSessionToken == null || current.token == expectedSessionToken
+        }
             ?: return Result.failure(HomeWorldSessionChangedException())
         val response = authService.runSessionBoundCatching(session.token) {
+            if (expectedWorldId != null && expectedSessionToken != null &&
+                !authService.isCurrentUserHomeWorld(
+                    sessionToken = expectedSessionToken,
+                    expectedWorldId = expectedWorldId,
+                )
+            ) {
+                throw HomeWorldStateChangedException()
+            }
             usersApi.updateUserInfo(
                 userId = session.account.userId,
                 updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),

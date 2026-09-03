@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import androidx.lifecycle.ViewModelStore
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -232,7 +233,10 @@ private class RecordingHomeWorldManager(initialUser: HomeWorldUserContext) : Hom
         return Result.success(worldId)
     }
 
-    override suspend fun resetHomeWorld(): Result<String> {
+    override suspend fun resetHomeWorld(
+        expectedWorldId: String,
+        expectedSessionToken: AccountSessionToken,
+    ): Result<String> {
         resetCount++
         updated.complete(Unit)
         return Result.success("")
