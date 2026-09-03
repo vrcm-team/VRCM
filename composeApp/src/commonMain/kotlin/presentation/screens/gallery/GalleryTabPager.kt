@@ -389,14 +389,15 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         galleryScreenModel: GalleryScreenModel,
     ) {
         val minimumCellSize = when (tagType) {
-            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.Print -> 160.dp
+            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.WorldImage,
+            FileTagType.Print -> 160.dp
             FileTagType.Emoji, FileTagType.Sticker -> 104.dp
             FileTagType.Icon -> 80.dp
         }
         // 根据文件类型设置不同的宽高比
         val aspectRatio = when (tagType) {
             FileTagType.Icon -> 1.0f  // 圆形展示，使用1:1比例
-            FileTagType.Gallery, FileTagType.AvatarImage,
+            FileTagType.Gallery, FileTagType.AvatarImage, FileTagType.WorldImage,
             FileTagType.Print -> 16f / 9f  // 16:9比例
             FileTagType.Emoji, FileTagType.Sticker -> 1.0f  // 正方形展示，使用1:1比例
         }

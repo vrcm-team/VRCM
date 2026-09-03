@@ -9,6 +9,7 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.readRemaining
@@ -67,6 +68,15 @@ class FileApiUploadTest {
     }
 
     @Test
+    fun worldImageUploadUsesTheVrchatWorldImageTag() = runBlocking {
+        val capturedBody = captureUploadBody(FileTagType.WorldImage)
+
+        assertTrue(capturedBody.contains("filename=\"blob\""))
+        assertTrue(capturedBody.contains("worldimage"))
+        assertFalse(capturedBody.contains("name=maskTag"))
+    }
+
+    @Test
     fun animatedEmojiUploadUsesVrcxFilenameMetadata() = runBlocking {
         val capturedBody = captureUploadBody(
             tagType = FileTagType.Emoji,
@@ -80,6 +90,58 @@ class FileApiUploadTest {
         assertTrue(capturedBody.contains("24"))
         assertTrue(capturedBody.contains("name=loopStyle"))
         assertTrue(capturedBody.contains("pingpong"))
+    }
+
+    @Test
+    fun avatarGalleryUploadSendsAvatarGalleryTagAndGalleryId() = runBlocking {
+        var capturedBody = ""
+        var capturedUrl = ""
+        val progress = mutableListOf<Pair<Long, Long?>>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    capturedUrl = request.url.toString()
+                    capturedBody = (request.body as OutgoingContent.ReadChannelContent)
+                        .readFrom()
+                        .readRemaining()
+                        .readByteArray()
+                        .decodeToString()
+                    respond(
+                        content = """{
+                            "id":"file_gallery",
+                            "name":"blob",
+                            "ownerId":"usr_owner",
+                            "mimeType":"image/png",
+                            "extension":".png",
+                            "animationStyle":null,
+                            "tags":["avatargallery"],
+                            "versions":[]
+                        }""".trimIndent(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        FileApi(client).uploadAvatarGalleryImage(
+            fileBytes = byteArrayOf(1, 2, 3),
+            fileName = "source.png",
+            mimeType = "image/png",
+            avatarId = "avtr_owner",
+            onProgress = { sent, total -> progress += sent to total },
+        ).getOrThrow()
+
+        assertTrue(capturedUrl.endsWith("/file/image"))
+        assertTrue(capturedBody.contains("name=tag"))
+        assertTrue(capturedBody.contains("avatargallery"))
+        assertTrue(capturedBody.contains("name=galleryId"))
+        assertTrue(capturedBody.contains("avtr_owner"))
+        assertTrue(progress.any { (sent, _) -> sent > 0 })
+        client.close()
     }
 
     @Test

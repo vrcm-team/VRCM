@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -7,7 +8,18 @@ import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryPendingRefresh
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryTarget
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUpdate
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
+import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageFile
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import kotlinx.coroutines.runBlocking
@@ -15,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ImageEditorSubmitterTest {
     @Test
@@ -24,7 +37,12 @@ class ImageEditorSubmitterTest {
             uploadResult = Result.failure(IllegalStateException("unused")),
             assignmentResult = Result.failure(IllegalStateException("unused")),
         )
-        val submitter = NetworkImageEditorSubmitter(printUploader, avatarEditor, UnusedGalleryDataSource)
+        val submitter = NetworkImageEditorSubmitter(
+            printUploader,
+            avatarEditor,
+            UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
+        )
         val png = byteArrayOf(1, 2, 3)
 
         val result = submitter.submit(
@@ -54,6 +72,7 @@ class ImageEditorSubmitterTest {
             printUploader = UnusedPrintUploader,
             avatarEditor = avatarEditor,
             galleryDataSource = UnusedGalleryDataSource,
+            worldImageEditor = UnusedWorldImageEditor,
         )
         val png = byteArrayOf(1, 2, 3)
 
@@ -81,6 +100,7 @@ class ImageEditorSubmitterTest {
             UnusedPrintUploader,
             avatarEditor,
             UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
         )
 
         val result = submitter.submit(
@@ -104,6 +124,7 @@ class ImageEditorSubmitterTest {
             UnusedPrintUploader,
             avatarEditor,
             UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
         )
 
         val result = submitter.submit(
@@ -123,6 +144,7 @@ class ImageEditorSubmitterTest {
             printUploader = UnusedPrintUploader,
             avatarEditor = UnusedAvatarEditor,
             galleryDataSource = galleryDataSource,
+            worldImageEditor = UnusedWorldImageEditor,
         )
         val png = byteArrayOf(1, 2, 3)
 
@@ -138,6 +160,73 @@ class ImageEditorSubmitterTest {
         assertEquals("image/png", galleryDataSource.mimeType)
         assertEquals(FileTagType.Sticker, galleryDataSource.tagType)
     }
+
+    @Test
+    fun avatarGallerySubmissionReportsUploadAndRefreshStages() = runBlocking {
+        val uploader = RecordingAvatarGalleryUploader()
+        val submitter = NetworkImageEditorSubmitter(
+            printUploader = UnusedPrintUploader,
+            avatarEditor = UnusedAvatarEditor,
+            galleryDataSource = UnusedGalleryDataSource,
+            worldImageEditor = UnusedWorldImageEditor,
+            avatarGalleryUploader = uploader,
+        )
+        val target = ImageEditorTarget.AvatarGallery(
+            AvatarGalleryTarget(
+                avatarId = "avtr_owner",
+                ownerUserId = "usr_owner",
+                sessionToken = AccountSessionToken("usr_owner", 1),
+            )
+        )
+        val progress = mutableListOf<ImageEditorSubmissionProgress>()
+
+        val result = submitter.submit(target, byteArrayOf(1), "gallery.png", progress::add)
+
+        assertIs<ImageEditorSubmission.AvatarGallery>(result.getOrThrow())
+        assertEquals("avtr_owner", uploader.lastTarget?.avatarId)
+        assertEquals(
+            listOf(
+                ImageEditorSubmissionProgress.Upload(4, 8),
+                ImageEditorSubmissionProgress.Refreshing,
+            ),
+            progress,
+        )
+    }
+
+    @Test
+    fun avatarGalleryRefreshFailureRetryDoesNotUploadAgain() = runBlocking {
+        val uploader = RecordingAvatarGalleryUploader(refreshFailure = true)
+        val submitter = NetworkImageEditorSubmitter(
+            UnusedPrintUploader,
+            UnusedAvatarEditor,
+            UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
+            uploader,
+        )
+        val targetValue = AvatarGalleryTarget(
+            "avtr_owner",
+            "usr_owner",
+            AccountSessionToken("usr_owner", 1),
+        )
+        val target = ImageEditorTarget.AvatarGallery(targetValue)
+        val first = submitter.submit(target, byteArrayOf(1), "gallery.png", {})
+        val failure = first.exceptionOrNull()
+        assertIs<io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploadFailure.Refresh>(failure)
+
+        val stillPending = submitter.retry(target, byteArrayOf(1), "gallery.png", failure, {})
+        val retryFailure = stillPending.exceptionOrNull()
+        assertIs<io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploadFailure.Refresh>(
+            retryFailure,
+        )
+        assertEquals(1, uploader.uploadCount)
+
+        uploader.refreshFailure = false
+        val retried = submitter.retry(target, byteArrayOf(1), "gallery.png", retryFailure, {})
+
+        assertTrue(retried.isSuccess)
+        assertEquals(1, uploader.uploadCount)
+        assertEquals(3, uploader.refreshCount)
+    }
 }
 
 private class FakeSubmissionAvatarEditor(
@@ -147,10 +236,21 @@ private class FakeSubmissionAvatarEditor(
     var uploadedCover: AvatarCoverFile? = null
     val assignments = mutableListOf<Pair<String, String>>()
 
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Metadata update is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Metadata update is not used")
+    ): AvatarMetadataUpdateResponse? = error("Metadata update is not used")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Publication update is not used")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> {
         uploadedCover = cover
@@ -169,16 +269,45 @@ private data object UnusedPrintUploader : PrintUploader {
 }
 
 private data object UnusedAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Avatar editing is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Avatar editing is not used")
+    ): AvatarMetadataUpdateResponse? = error("Avatar editing is not used")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Avatar editing is not used")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         error("Avatar editing is not used")
 
     override suspend fun assignCover(avatarId: String, imageUrl: String): Result<AvatarData> =
         error("Avatar editing is not used")
+}
+
+private data object UnusedWorldImageEditor : WorldImageEditor {
+    override suspend fun uploadImage(
+        sessionToken: AccountSessionToken,
+        image: WorldImageFile,
+    ): Result<SessionBoundValue<String>> = error("World image editing is not used")
+
+    override suspend fun assignImage(
+        sessionToken: AccountSessionToken,
+        worldId: String,
+        imageUrl: String,
+    ): Result<SessionBoundValue<Unit>> = error("World image editing is not used")
+
+    override suspend fun refreshWorld(
+        sessionToken: AccountSessionToken,
+        worldId: String,
+    ): Result<WorldImageUpdate> = error("World image editing is not used")
 }
 
 private data object UnusedGalleryDataSource : GalleryDataSource {
@@ -222,6 +351,64 @@ private class RecordingGalleryDataSource : GalleryDataSource {
     override suspend fun getPrints(n: Int, offset: Int): List<PrintData> = error("Not used")
     override suspend fun deleteFile(id: String) = error("Not used")
     override suspend fun deletePrint(id: String) = error("Not used")
+}
+
+private class RecordingAvatarGalleryUploader(
+    var refreshFailure: Boolean = false,
+) : AvatarGalleryUploader {
+    var uploadCount = 0
+    var refreshCount = 0
+    var lastTarget: AvatarGalleryTarget? = null
+
+    override suspend fun uploadAndRefresh(
+        target: AvatarGalleryTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        onUploadProgress: suspend (Long, Long?) -> Unit,
+        onRefreshing: () -> Unit,
+    ): Result<AvatarGalleryUpdate> {
+        uploadCount++
+        lastTarget = target
+        onUploadProgress(4, 8)
+        val pending = AvatarGalleryPendingRefresh(
+            target,
+            testFile(FileTagType.Gallery),
+            target.sessionToken,
+        )
+        refreshCount++
+        onRefreshing()
+        return if (refreshFailure) {
+            Result.failure(
+                io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploadFailure.Refresh(
+                    pending,
+                    IllegalStateException("refresh"),
+                )
+            )
+        } else {
+            Result.success(AvatarGalleryUpdate(target.avatarId, emptyList(), target.sessionToken))
+        }
+    }
+
+    override suspend fun refresh(
+        pending: AvatarGalleryPendingRefresh,
+        onRefreshing: () -> Unit,
+    ): Result<AvatarGalleryUpdate> {
+        refreshCount++
+        onRefreshing()
+        return if (refreshFailure) {
+            Result.failure(
+                io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploadFailure.Refresh(
+                    pending,
+                    IllegalStateException("still refreshing"),
+                )
+            )
+        } else {
+            Result.success(
+                AvatarGalleryUpdate(pending.target.avatarId, emptyList(), pending.sessionToken)
+            )
+        }
+    }
 }
 
 private fun testFile(tagType: FileTagType) = FileData(

@@ -2,9 +2,12 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -19,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,6 +34,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
@@ -42,6 +47,10 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleFormat
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarPlatformInfo
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.ImagePreviewDialog
+import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
+import coil3.ImageLoader
+import coil3.compose.SubcomposeAsyncImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
@@ -70,12 +79,42 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
     AvatarProfileNotice.FallbackSelectionFailed ->
         ToastText.Error(locale.avatarProfileFallbackSelectFailed)
     AvatarProfileNotice.InvalidName -> ToastText.Error(locale.avatarEditInvalidName)
+    AvatarProfileNotice.InvalidContentTags ->
+        ToastText.Error(locale.avatarEditInvalidContentTags)
+    AvatarProfileNotice.InvalidPrimaryStyle ->
+        ToastText.Error(locale.avatarEditInvalidStyle)
+    AvatarProfileNotice.InvalidSecondaryStyle ->
+        ToastText.Error(locale.avatarEditInvalidStyle)
     AvatarProfileNotice.NoMetadataChanges -> ToastText.Info(locale.avatarEditNoChanges)
     AvatarProfileNotice.MetadataSaved -> ToastText.Success(locale.avatarEditMetadataSaved)
     is AvatarProfileNotice.MetadataSaveFailed -> ToastText.Error(
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.Deleted -> ToastText.Success(locale.avatarDeleteSuccess)
+    AvatarProfileNotice.GalleryUploaded -> ToastText.Success(locale.avatarGalleryUploaded)
+    AvatarProfileNotice.PublicationMadePublic ->
+        ToastText.Success(locale.avatarEditPublicationMadePublic)
+    AvatarProfileNotice.PublicationMadePrivate ->
+        ToastText.Success(locale.avatarEditPublicationMadePrivate)
+    is AvatarProfileNotice.PublicationUpdateFailed -> ToastText.Error(
+        when (reason) {
+            AvatarPublicationFailure.BadRequest -> locale.avatarEditPublicationBadRequest
+            AvatarPublicationFailure.Unauthorized -> locale.avatarEditPublicationUnauthorized
+            AvatarPublicationFailure.Forbidden -> locale.avatarEditPublicationForbidden
+            AvatarPublicationFailure.NotFound -> locale.avatarEditPublicationNotFound
+            AvatarPublicationFailure.Other -> locale.avatarEditPublicationFailed
+        }
+    )
+}
+
+internal fun AvatarDeletionFailure.localizedMessage(locale: LocaleStrings): String = when (this) {
+    AvatarDeletionFailure.BadRequest -> locale.avatarDeleteBadRequest
+    AvatarDeletionFailure.Unauthorized -> locale.avatarDeleteUnauthorized
+    AvatarDeletionFailure.Forbidden -> locale.avatarDeleteForbidden
+    AvatarDeletionFailure.NotFound -> locale.avatarDeleteNotFound
+    AvatarDeletionFailure.InvalidResponse -> locale.avatarDeleteInvalidResponse
+    AvatarDeletionFailure.Unexpected -> locale.avatarDeleteUnexpected
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -95,6 +134,15 @@ internal fun AvatarFallbackAvailability.localizedButtonText(locale: LocaleString
     AvatarFallbackAvailability.Ineligible -> locale.avatarProfileFallbackActionIneligible
 }
 
+internal fun AvatarImpostorDeletionNotice.localizedToast(locale: LocaleStrings): ToastText =
+    when (this) {
+        AvatarImpostorDeletionNotice.Deleted -> ToastText.Success(locale.avatarImpostorDeleteSuccess)
+        AvatarImpostorDeletionNotice.DeleteFailed ->
+            ToastText.Error(locale.avatarImpostorDeleteFailed)
+        AvatarImpostorDeletionNotice.VerificationFailed ->
+            ToastText.Error(locale.avatarImpostorVerificationFailed)
+    }
+
 @Serializable
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
@@ -110,17 +158,30 @@ class AvatarProfileScreen(
         val imageProcessor: PrintImageProcessor = koinInject()
         val editorSessionStore: PrintImageEditorSessionStore = koinInject()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
+        val avatarGalleryState by screenModel.avatarGalleryState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val fallbackActionState by screenModel.fallbackActionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
+        val deletionState by screenModel.deletionState.collectAsState()
+        val impostorDeletionState by screenModel.impostorDeletionState.collectAsState()
+        val impostorState by screenModel.impostorState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
+        val avatarGalleryUpdates by editorSessionStore.avatarGalleryUpdates.collectAsState()
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
+        var showImpostorDeletionConfirmation by remember { mutableStateOf(false) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+                if (notice == AvatarProfileNotice.Deleted) navigator.pop()
+            }
+        }
+        LaunchedEffect(screenModel, locale) {
+            screenModel.impostorDeletionNotices.collect { notice ->
                 SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
             }
         }
@@ -132,6 +193,20 @@ class AvatarProfileScreen(
         LaunchedEffect(editState.canEdit) {
             if (!editState.canEdit) showEditSheet = false
         }
+        LaunchedEffect(
+            impostorDeletionState.isAvailable,
+            impostorDeletionState.hasImpostor,
+            impostorDeletionState.deleteFailed,
+            impostorDeletionState.verificationFailed,
+        ) {
+            if (!impostorDeletionState.isAvailable ||
+                !impostorDeletionState.hasImpostor ||
+                impostorDeletionState.deleteFailed ||
+                impostorDeletionState.verificationFailed
+            ) {
+                showImpostorDeletionConfirmation = false
+            }
+        }
 
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
         LaunchedEffect(displayedAvatar.avatarId, avatarCoverUpdates) {
@@ -139,6 +214,14 @@ class AvatarProfileScreen(
                 ?: return@LaunchedEffect
             if (screenModel.applyCoverUpdate(updated)) {
                 editorSessionStore.consumeAvatarCoverUpdate(updated.id)
+            }
+        }
+        LaunchedEffect(displayedAvatar.avatarId, avatarGalleryUpdates, currentSession?.token) {
+            val update = avatarGalleryUpdates[displayedAvatar.avatarId] ?: return@LaunchedEffect
+            if (screenModel.applyGalleryUpdate(update) ||
+                !SharedFlowCentre.isCurrentSession(update.sessionToken)
+            ) {
+                editorSessionStore.consumeAvatarGalleryUpdate(update.avatarId)
             }
         }
 
@@ -167,7 +250,18 @@ class AvatarProfileScreen(
                     favoriteEntryState = favoriteEntryState,
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
                     canEdit = editState.canEdit,
-                    onEdit = { showEditSheet = true },
+                    onEdit = {
+                        screenModel.loadAvatarStyles()
+                        showEditSheet = true
+                    },
+                    deletionState = deletionState,
+                    onDelete = screenModel::requestAvatarDeletion,
+                    impostorDeletionState = impostorDeletionState,
+                    onDeleteImpostor = { showImpostorDeletionConfirmation = true },
+                    onRetryImpostorVerification = screenModel::retryImpostorVerification,
+                    avatarGalleryState = avatarGalleryState,
+                    onLoadMoreAvatarGallery = screenModel::loadMoreAvatarGallery,
+                    onRetryAvatarGallery = screenModel::retryAvatarGallery,
                 )
             }
         }
@@ -181,9 +275,13 @@ class AvatarProfileScreen(
             AvatarEditSheet(
                 avatar = displayedAvatar,
                 state = editState,
+                impostorState = impostorState,
                 imageProcessor = imageProcessor,
                 onDismiss = { showEditSheet = false },
                 onSaveMetadata = screenModel::saveMetadata,
+                onRetryStyles = screenModel::loadAvatarStyles,
+                onEnqueueImpostor = screenModel::enqueueImpostor,
+                onUpdatePublication = screenModel::updatePublication,
                 onEditCover = { source, prepared ->
                     handoffPreparedImageToEditor(
                         source = source,
@@ -196,6 +294,47 @@ class AvatarProfileScreen(
                         },
                     )
                 },
+                onEditGallery = { source, prepared ->
+                    val session = currentSession
+                    if (session != null && session.account.userId == displayedAvatar.authorId) {
+                        handoffPreparedImageToEditor(
+                            source = source,
+                            prepared = prepared,
+                            sessionStore = editorSessionStore,
+                            target = ImageEditorTarget.AvatarGallery(
+                                AvatarGalleryTarget(
+                                    avatarId = displayedAvatar.avatarId,
+                                    ownerUserId = displayedAvatar.authorId,
+                                    sessionToken = session.token,
+                                )
+                            ),
+                            push = { sessionId ->
+                                navigator.push(PrintImageEditorScreen(sessionId))
+                                showEditSheet = false
+                            },
+                        )
+                    }
+                },
+            )
+        }
+        if (showImpostorDeletionConfirmation &&
+            impostorDeletionState.isAvailable &&
+            impostorDeletionState.hasImpostor
+        ) {
+            AvatarImpostorDeletionConfirmationDialog(
+                avatarName = displayedAvatar.avatarName,
+                isDeleting = impostorDeletionState.isBusy,
+                enabled = impostorDeletionState.canDelete,
+                onDismiss = { showImpostorDeletionConfirmation = false },
+                onConfirm = { screenModel.deleteImpostor() },
+            )
+        }
+        deletionState.confirmation?.let { target ->
+            AvatarDeletionDialog(
+                avatarName = target.avatarName,
+                state = deletionState,
+                onDismiss = screenModel::dismissAvatarDeletion,
+                onConfirm = screenModel::confirmAvatarDeletion,
             )
         }
     }
@@ -215,6 +354,14 @@ private fun AvatarProfileContent(
     onRetryFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
+    deletionState: AvatarDeletionState,
+    onDelete: () -> Unit,
+    impostorDeletionState: AvatarImpostorDeletionUiState,
+    onDeleteImpostor: () -> Unit,
+    onRetryImpostorVerification: () -> Unit,
+    avatarGalleryState: AvatarGalleryState,
+    onLoadMoreAvatarGallery: () -> Unit,
+    onRetryAvatarGallery: () -> Unit,
 ) {
     val navigator = currentNavigator
 
@@ -309,6 +456,46 @@ private fun AvatarProfileContent(
         Spacer(Modifier.height(12.dp))
     }
 
+    if (deletionState.canDelete) {
+        OutlinedButton(
+            onClick = onDelete,
+            enabled = !deletionState.isDeleting,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (deletionState.isDeleting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = AppIcons.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (deletionState.isDeleting) strings.avatarDeleteDeleting
+                else strings.avatarDeleteAction
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    if (impostorDeletionState.isAvailable) {
+        AvatarImpostorDeletionSection(
+            state = impostorDeletionState,
+            onDelete = onDeleteImpostor,
+            onRetryVerification = onRetryImpostorVerification,
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+
     // 描述
     if (avatarProfileVo.avatarDescription.isNotBlank()) {
         Surface(
@@ -341,6 +528,344 @@ private fun AvatarProfileContent(
         AvatarPlatformSection(knownPlatforms)
     }
 
+    AvatarGallerySection(
+        state = avatarGalleryState,
+        onLoadMore = onLoadMoreAvatarGallery,
+        onRetry = onRetryAvatarGallery,
+    )
+
+}
+
+@Composable
+private fun AvatarGallerySection(
+    state: AvatarGalleryState,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    if (!state.isAvailable) return
+
+    val (dialogContent, setDialogContent) = LocationDialogContent.current
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = strings.avatarGalleryTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        when {
+            state.isLoading -> Box(
+                modifier = Modifier.fillMaxWidth().height(96.dp),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
+
+            state.initialLoadFailed -> AvatarGalleryMessage(
+                message = strings.avatarGalleryLoadFailed,
+                actionText = strings.retry,
+                onAction = onRetry,
+            )
+
+            state.files.isEmpty() -> AvatarGalleryMessage(
+                message = strings.avatarGalleryEmpty,
+            )
+
+            else -> {
+                AvatarGalleryGrid(
+                    files = state.files,
+                    dialogContent = dialogContent,
+                    onOpen = { file, version ->
+                        setDialogContent(
+                            ImagePreviewDialog(
+                                fileId = file.id,
+                                fileName = file.name,
+                                fileExtension = file.extension,
+                                fileVersion = version,
+                            )
+                        )
+                    },
+                )
+                if (state.isLoadingMore) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                } else if (state.loadMoreFailed) {
+                    AvatarGalleryMessage(
+                        message = strings.avatarGalleryLoadMoreFailed,
+                        actionText = strings.retry,
+                        onAction = onRetry,
+                    )
+                } else if (state.hasMore) {
+                    OutlinedButton(
+                        onClick = onLoadMore,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) { Text(strings.avatarGalleryLoadMore) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarGalleryMessage(
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (actionText != null && onAction != null) {
+            TextButton(onClick = onAction) { Text(actionText) }
+        }
+    }
+}
+
+@Composable
+private fun AvatarGalleryGrid(
+    files: List<io.github.vrcmteam.vrcm.network.api.files.data.FileData>,
+    dialogContent: io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog?,
+    onOpen: (io.github.vrcmteam.vrcm.network.api.files.data.FileData, Int) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val columns = if (maxWidth >= 560.dp) 3 else 2
+        val spacing = 8.dp
+        val rows = files.chunked(columns)
+        Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                ) {
+                    row.forEach { file ->
+                        val version = file.latestGalleryVersion()?.version
+                        val isDialogOpen = (dialogContent as? ImagePreviewDialog)?.fileId == file.id
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(16f / 9f),
+                        ) {
+                            if (!isDialogOpen) {
+                                SubcomposeAsyncImage(
+                                    model = version?.let { FileApi.imageUrl(file.id, it, 256) },
+                                    contentDescription = file.name,
+                                    imageLoader = koinInject<ImageLoader>(),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .clickable(enabled = version != null) {
+                                            version?.let { selectedVersion -> onOpen(file, selectedVersion) }
+                                        },
+                                    loading = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                                        }
+                                    },
+                                    error = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = strings.galleryTabLoadFailed,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarImpostorDeletionSection(
+    state: AvatarImpostorDeletionUiState,
+    onDelete: () -> Unit,
+    onRetryVerification: () -> Unit,
+) {
+    Text(
+        text = strings.avatarImpostorTitle,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = when {
+            state.verificationFailed -> strings.avatarImpostorVerificationFailed
+            state.deleteFailed -> strings.avatarImpostorDeleteFailed
+            state.hasImpostor -> strings.avatarImpostorAvailable
+            else -> strings.avatarImpostorEmpty
+        },
+        color = if (state.deleteFailed || state.verificationFailed) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (state.hasImpostor) {
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = if (state.verificationFailed) onRetryVerification else onDelete,
+            enabled = state.canDelete || state.canRetryVerification,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                when {
+                    state.phase == AvatarImpostorDeletionPhase.Deleting ->
+                        strings.avatarImpostorDeleting
+                    state.phase == AvatarImpostorDeletionPhase.Verifying ->
+                        strings.avatarImpostorVerifying
+                    state.verificationFailed -> strings.avatarImpostorRetryVerification
+                    else -> strings.avatarImpostorDeleteAction
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvatarImpostorDeletionConfirmationDialog(
+    avatarName: String,
+    isDeleting: Boolean,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.avatarImpostorDeleteConfirmationTitle) },
+        text = {
+            Text(strings.avatarImpostorDeleteConfirmationMessage.replace("%name%", avatarName))
+        },
+        confirmButton = {
+            Button(
+                enabled = enabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                onClick = onConfirm,
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(strings.avatarImpostorDeleteAction)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isDeleting) {
+                Text(strings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun AvatarDeletionDialog(
+    avatarName: String,
+    state: AvatarDeletionState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!state.isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = AppIcons.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.avatarDeleteTitle) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(strings.avatarDeleteMessage.replace("%s", avatarName))
+                state.failure?.let { failure ->
+                    Text(
+                        text = failure.localizedMessage(strings),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !state.isDeleting,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                if (state.isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    if (state.isDeleting) strings.avatarDeleteDeleting
+                    else strings.avatarDeleteConfirm
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !state.isDeleting,
+            ) {
+                Text(strings.cancel)
+            }
+        },
+    )
 }
 
 @Composable

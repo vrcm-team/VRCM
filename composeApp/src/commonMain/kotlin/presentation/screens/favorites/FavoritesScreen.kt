@@ -16,6 +16,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.*
@@ -55,6 +56,10 @@ private fun FavoritesScreenContent(
 
     val worlds by favoritesModel.worldList.collectAsState()
     val avatars by favoritesModel.avatarList.collectAsState()
+    val deletedAvatarIds = currentSessionDeletedAvatarIds()
+    val visibleAvatars = remember(avatars, deletedAvatarIds) {
+        avatars.filterNot { it.id in deletedAvatarIds }
+    }
     val worldGroups by favoritesModel.worldFavoriteGroupsFlow.collectAsState()
     val avatarGroups by favoritesModel.avatarFavoriteGroupsFlow.collectAsState()
     val worldOptions by favoritesModel.worldGroupOptions.collectAsState()
@@ -146,7 +151,7 @@ private fun FavoritesScreenContent(
                 val pageModelTabIndex = page + 1
                 val pageLoading = pageModelTabIndex in refreshingTabs
                 val pageError = refreshErrors[pageModelTabIndex]
-                val pageItemsEmpty = if (page == 0) worlds.isEmpty() else avatars.isEmpty()
+                val pageItemsEmpty = if (page == 0) worlds.isEmpty() else visibleAvatars.isEmpty()
                 Box(Modifier.fillMaxSize()) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -164,7 +169,7 @@ private fun FavoritesScreenContent(
                                     )
                                 }
                             }
-                            1 -> renderAvatarItems(avatars) { avatar, suffix ->
+                            1 -> renderAvatarItems(visibleAvatars) { avatar, suffix ->
                                 if (avatar.releaseStatus != "hidden") {
                                     navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
                                 }

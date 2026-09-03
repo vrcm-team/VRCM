@@ -1,11 +1,13 @@
 package io.github.vrcmteam.vrcm.presentation.supports
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.CropSquare
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FilterNone
 import androidx.compose.material.icons.outlined.Minimize
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.graphics.*
@@ -20,7 +22,9 @@ object AppIcons {
     val WindowMinimize: ImageVector by lazy { Icons.Outlined.Minimize }
     val ContentCopy: ImageVector by lazy { Icons.Outlined.ContentCopy }
     val Share: ImageVector by lazy { Icons.Outlined.Share }
+    val MoreVert: ImageVector by lazy { Icons.Outlined.MoreVert }
     val Edit: ImageVector by lazy { Icons.Outlined.Edit }
+    val Delete: ImageVector by lazy { Icons.Outlined.Delete }
     val WindowMaximize: ImageVector by lazy { Icons.Outlined.CropSquare }
     val WindowRestore: ImageVector by lazy { Icons.Outlined.FilterNone }
     val ScreenRotation: ImageVector by lazy { Icons.Outlined.ScreenRotation }
