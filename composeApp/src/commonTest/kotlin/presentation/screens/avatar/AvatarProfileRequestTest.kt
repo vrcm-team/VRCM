@@ -21,11 +21,16 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.yield
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -360,6 +365,34 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         yield()
 
         assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun staleModerationResponseIsRejectedBeforeSessionCollectorRuns() = runTest {
+        val mainDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(mainDispatcher)
+        SharedFlowCentre.emitLogout()
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_a"))
+
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = SharedFlowCentre.currentSession,
+            sessionValidator = SharedFlowCentre::isCurrentSession,
+        )
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_b"))
+        moderationSource.completeLoad("avtr_target", Result.success(true))
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        runCurrent()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+        SharedFlowCentre.emitLogout()
     }
 
     @Test
@@ -738,6 +771,9 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         favoriteSource: FavoriteEntrySource = EmptyFavoriteEntrySource(),
         editor: AvatarEditor? = null,
         favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+        sessionValidator: (AccountSessionToken) -> Boolean = { token ->
+            favoriteSession.value?.token == token
+        },
     ): AvatarProfileScreenModel =
         AvatarProfileScreenModel(
             loader,
@@ -747,6 +783,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             Dispatchers.Unconfined,
             editor,
             favoriteSession,
+            sessionValidator,
         )
             .also(models::add)
 }

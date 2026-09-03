@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -162,6 +163,11 @@ internal sealed interface AvatarProfileNotice {
     data object ModerationChangeFailed : AvatarProfileNotice
 }
 
+private data class AvatarModerationResponse<T>(
+    val result: Result<T>,
+    val sessionToken: AccountSessionToken?,
+)
+
 private enum class AvatarSelectionKind {
     Switch,
     Copy,
@@ -175,6 +181,7 @@ class AvatarProfileScreenModel internal constructor(
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    private val sessionValidator: (AccountSessionToken) -> Boolean = SharedFlowCentre::isCurrentSession,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -320,6 +327,7 @@ class AvatarProfileScreenModel internal constructor(
 
     internal fun setAvatarBlocked(blocked: Boolean) {
         val avatarId = avatarProfileState.value?.avatarId ?: return
+        val sessionToken = favoriteSession.value?.token
         val expected = moderationState.value
         val requiredStatus = if (blocked) {
             AvatarModerationStatus.NotBlocked
@@ -336,15 +344,35 @@ class AvatarProfileScreenModel internal constructor(
 
         val requestToken = latestModerationRequestToken.updateAndGet { it + 1 }
         viewModelScope.launch(requestDispatcher) {
-            val result = if (blocked) {
-                avatarModerationSource.block(avatarId)
+            val response = if (sessionToken == null) {
+                AvatarModerationResponse(
+                    result = if (blocked) {
+                        avatarModerationSource.block(avatarId)
+                    } else {
+                        avatarModerationSource.unblock(avatarId)
+                    },
+                    sessionToken = null,
+                )
             } else {
-                avatarModerationSource.unblock(avatarId)
+                val sessionBoundResponse = if (blocked) {
+                    avatarModerationSource.block(sessionToken, avatarId)
+                } else {
+                    avatarModerationSource.unblock(sessionToken, avatarId)
+                } ?: return@launch
+                AvatarModerationResponse(
+                    result = sessionBoundResponse.result,
+                    sessionToken = sessionBoundResponse.sessionToken,
+                )
             }
-            if (!isCurrentModerationRequest(requestToken, avatarId)) return@launch
+            if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                return@launch
+            }
 
-            result
+            response.result
                 .onSuccess {
+                    if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                        return@onSuccess
+                    }
                     _moderationState.value = expected.copy(
                         status = if (blocked) {
                             AvatarModerationStatus.Blocked
@@ -353,26 +381,34 @@ class AvatarProfileScreenModel internal constructor(
                         },
                         isUpdating = false,
                     )
-                    _notices.emit(
-                        if (blocked) {
-                            AvatarProfileNotice.ModerationBlocked
-                        } else {
-                            AvatarProfileNotice.ModerationUnblocked
-                        }
-                    )
+                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                        _notices.emit(
+                            if (blocked) {
+                                AvatarProfileNotice.ModerationBlocked
+                            } else {
+                                AvatarProfileNotice.ModerationUnblocked
+                            }
+                        )
+                    }
                 }
                 .onFailure {
+                    if (!isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                        return@onFailure
+                    }
                     _moderationState.value = AvatarModerationState(
                         avatarId = avatarId,
                         status = AvatarModerationStatus.LoadFailed,
                     )
-                    _notices.emit(AvatarProfileNotice.ModerationChangeFailed)
+                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                        _notices.emit(AvatarProfileNotice.ModerationChangeFailed)
+                    }
                 }
         }
     }
 
     private fun loadAvatarModeration(avatarId: String) {
         val requestToken = latestModerationRequestToken.updateAndGet { it + 1 }
+        val sessionToken = favoriteSession.value?.token
         if (avatarId.isBlank()) {
             _moderationState.value = AvatarModerationState()
             return
@@ -383,9 +419,22 @@ class AvatarProfileScreenModel internal constructor(
             status = AvatarModerationStatus.Loading,
         )
         viewModelScope.launch(requestDispatcher) {
-            avatarModerationSource.isBlocked(avatarId)
+            val response = if (sessionToken == null) {
+                AvatarModerationResponse(
+                    result = avatarModerationSource.isBlocked(avatarId),
+                    sessionToken = null,
+                )
+            } else {
+                val sessionBoundResponse = avatarModerationSource.isBlocked(sessionToken, avatarId)
+                    ?: return@launch
+                AvatarModerationResponse(
+                    result = sessionBoundResponse.result,
+                    sessionToken = sessionBoundResponse.sessionToken,
+                )
+            }
+            response.result
                 .onSuccess { blocked ->
-                    if (isCurrentModerationRequest(requestToken, avatarId)) {
+                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
                         _moderationState.value = AvatarModerationState(
                             avatarId = avatarId,
                             status = if (blocked) {
@@ -397,20 +446,28 @@ class AvatarProfileScreenModel internal constructor(
                     }
                 }
                 .onFailure {
-                    if (isCurrentModerationRequest(requestToken, avatarId)) {
+                    if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
                         _moderationState.value = AvatarModerationState(
                             avatarId = avatarId,
                             status = AvatarModerationStatus.LoadFailed,
                         )
-                        _notices.emit(AvatarProfileNotice.ModerationLoadFailed)
+                        if (isCurrentModerationRequest(requestToken, avatarId, response.sessionToken)) {
+                            _notices.emit(AvatarProfileNotice.ModerationLoadFailed)
+                        }
                     }
                 }
         }
     }
 
-    private fun isCurrentModerationRequest(requestToken: Long, avatarId: String): Boolean =
+    private fun isCurrentModerationRequest(
+        requestToken: Long,
+        avatarId: String,
+        sessionToken: AccountSessionToken?,
+    ): Boolean =
         requestToken == latestModerationRequestToken.value &&
-            avatarProfileState.value?.avatarId == avatarId
+            avatarProfileState.value?.avatarId == avatarId &&
+            favoriteSession.value?.token == sessionToken &&
+            (sessionToken == null || sessionValidator(sessionToken))
 
     fun selectAvatar() {
         val avatarId = avatarProfileState.value?.avatarId ?: return
