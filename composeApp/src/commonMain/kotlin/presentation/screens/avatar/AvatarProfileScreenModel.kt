@@ -330,7 +330,12 @@ class AvatarProfileScreenModel internal constructor(
         stylesLoadState.value = AvatarStylesLoadState.Loading
         stylesLoadJob = viewModelScope.launch(requestDispatcher) {
             try {
-                val response = editor.loadStyles(sessionToken) ?: return@launch
+                val response = editor.loadStyles(sessionToken) ?: run {
+                    if (acceptsStylesRequest(sessionToken, avatarId, generation)) {
+                        stylesLoadState.value = AvatarStylesLoadState.Failed(null)
+                    }
+                    return@launch
+                }
                 if (!acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
                     return@launch
                 }
@@ -461,6 +466,12 @@ class AvatarProfileScreenModel internal constructor(
     }
 
     private fun acceptsStylesResponse(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        operationGeneration: Long,
+    ): Boolean = acceptsStylesRequest(sessionToken, avatarId, operationGeneration)
+
+    private fun acceptsStylesRequest(
         sessionToken: AccountSessionToken,
         avatarId: String,
         operationGeneration: Long,

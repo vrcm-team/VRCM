@@ -733,6 +733,28 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun sameAccountRenewalNullStyleResponseBecomesRetryableFailure() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Owned", authorId = "usr_current")
+        yield()
+
+        model.loadAvatarStyles()
+        yield()
+        assertEquals(AvatarStylesLoadState.Loading, model.editState.value.styles)
+
+        session.value = authenticated("usr_current", 2)
+        editor.returnNullStyles = true
+        editor.completeStyles(Result.success(emptyList()))
+        yield()
+
+        assertEquals(AvatarStylesLoadState.Failed(null), model.editState.value.styles)
+    }
+
+    @Test
     fun completedEditorCoverUpdatesTheCurrentAvatarAndEmitsSuccess() = runBlocking {
         val loader = ControlledAvatarProfileLoader()
         val model = avatarModel(loader)
@@ -975,13 +997,18 @@ private class FakeAvatarEditor : AvatarEditor {
         private set
     var metadataResponseToken: AccountSessionToken? = null
     var stylesResponseToken: AccountSessionToken? = null
+    var returnNullStyles: Boolean = false
 
     override suspend fun loadStyles(
         sessionToken: AccountSessionToken,
-    ): AvatarStylesResponse = AvatarStylesResponse(
-        styles.await(),
-        stylesResponseToken ?: sessionToken,
-    )
+    ): AvatarStylesResponse? {
+        val result = styles.await()
+        if (returnNullStyles) return null
+        return AvatarStylesResponse(
+            result,
+            stylesResponseToken ?: sessionToken,
+        )
+    }
 
     override suspend fun updateMetadata(
         sessionToken: AccountSessionToken,
