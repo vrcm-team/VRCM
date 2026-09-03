@@ -179,6 +179,38 @@ class AvatarsApiTest {
     }
 
     @Test
+    fun deleteAvatarUsesDeleteAndParsesAuthoritativeResponse() = runBlocking {
+        var method: HttpMethod? = null
+        var path: String? = null
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    method = request.method
+                    path = request.url.encodedPath
+                    respond(
+                        content = avatarJson(releaseStatus = "hidden"),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        val result = AvatarsApi(client).deleteAvatar("avtr_owned")
+
+        assertEquals(HttpMethod.Delete, method)
+        assertEquals("/api/1/avatars/avtr_owned", path)
+        assertEquals("avtr_owned", result.id)
+        assertEquals("usr_owner", result.authorId)
+        assertEquals("hidden", result.releaseStatus)
+        client.close()
+    }
+
+    @Test
     fun deleteImpostorUsesDeleteAndAcceptsAnEmptySuccessBody() = runBlocking {
         var method: HttpMethod? = null
         var path: String? = null
@@ -255,14 +287,14 @@ class AvatarsApiTest {
         client.close()
     }
 
-    private fun avatarJson() = """{
+    private fun avatarJson(releaseStatus: String = "private") = """{
         "id":"avtr_owned",
         "name":"Avatar",
         "description":"",
         "authorId":"usr_owner",
         "authorName":"Owner",
         "imageUrl":"",
-        "releaseStatus":"private",
+        "releaseStatus":"$releaseStatus",
         "tags":[],
         "unityPackages":[]
     }"""

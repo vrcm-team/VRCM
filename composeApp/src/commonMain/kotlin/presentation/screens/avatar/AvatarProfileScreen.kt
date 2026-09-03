@@ -85,6 +85,7 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.Deleted -> ToastText.Success(locale.avatarDeleteSuccess)
     AvatarProfileNotice.GalleryUploaded -> ToastText.Success(locale.avatarGalleryUploaded)
     AvatarProfileNotice.PublicationMadePublic ->
         ToastText.Success(locale.avatarEditPublicationMadePublic)
@@ -99,6 +100,15 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
             AvatarPublicationFailure.Other -> locale.avatarEditPublicationFailed
         }
     )
+}
+
+internal fun AvatarDeletionFailure.localizedMessage(locale: LocaleStrings): String = when (this) {
+    AvatarDeletionFailure.BadRequest -> locale.avatarDeleteBadRequest
+    AvatarDeletionFailure.Unauthorized -> locale.avatarDeleteUnauthorized
+    AvatarDeletionFailure.Forbidden -> locale.avatarDeleteForbidden
+    AvatarDeletionFailure.NotFound -> locale.avatarDeleteNotFound
+    AvatarDeletionFailure.InvalidResponse -> locale.avatarDeleteInvalidResponse
+    AvatarDeletionFailure.Unexpected -> locale.avatarDeleteUnexpected
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -138,6 +148,7 @@ class AvatarProfileScreen(
         val avatarGalleryState by screenModel.avatarGalleryState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
+        val deletionState by screenModel.deletionState.collectAsState()
         val impostorDeletionState by screenModel.impostorDeletionState.collectAsState()
         val impostorState by screenModel.impostorState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
@@ -152,6 +163,7 @@ class AvatarProfileScreen(
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
                 SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+                if (notice == AvatarProfileNotice.Deleted) navigator.pop()
             }
         }
         LaunchedEffect(screenModel, locale) {
@@ -226,6 +238,8 @@ class AvatarProfileScreen(
                         screenModel.loadAvatarStyles()
                         showEditSheet = true
                     },
+                    deletionState = deletionState,
+                    onDelete = screenModel::requestAvatarDeletion,
                     impostorDeletionState = impostorDeletionState,
                     onDeleteImpostor = { showImpostorDeletionConfirmation = true },
                     onRetryImpostorVerification = screenModel::retryImpostorVerification,
@@ -299,6 +313,14 @@ class AvatarProfileScreen(
                 onConfirm = { screenModel.deleteImpostor() },
             )
         }
+        deletionState.confirmation?.let { target ->
+            AvatarDeletionDialog(
+                avatarName = target.avatarName,
+                state = deletionState,
+                onDismiss = screenModel::dismissAvatarDeletion,
+                onConfirm = screenModel::confirmAvatarDeletion,
+            )
+        }
     }
 }
 
@@ -314,6 +336,8 @@ private fun AvatarProfileContent(
     onRetryFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
+    deletionState: AvatarDeletionState,
+    onDelete: () -> Unit,
     impostorDeletionState: AvatarImpostorDeletionUiState,
     onDeleteImpostor: () -> Unit,
     onRetryImpostorVerification: () -> Unit,
@@ -402,6 +426,37 @@ private fun AvatarProfileContent(
             )
             Spacer(Modifier.width(8.dp))
             Text(strings.avatarEditTitle)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+
+    if (deletionState.canDelete) {
+        OutlinedButton(
+            onClick = onDelete,
+            enabled = !deletionState.isDeleting,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (deletionState.isDeleting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = AppIcons.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (deletionState.isDeleting) strings.avatarDeleteDeleting
+                else strings.avatarDeleteAction
+            )
         }
         Spacer(Modifier.height(12.dp))
     }
@@ -719,6 +774,68 @@ private fun AvatarImpostorDeletionConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !isDeleting) {
+                Text(strings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun AvatarDeletionDialog(
+    avatarName: String,
+    state: AvatarDeletionState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!state.isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = AppIcons.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.avatarDeleteTitle) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(strings.avatarDeleteMessage.replace("%s", avatarName))
+                state.failure?.let { failure ->
+                    Text(
+                        text = failure.localizedMessage(strings),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !state.isDeleting,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                if (state.isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(
+                    if (state.isDeleting) strings.avatarDeleteDeleting
+                    else strings.avatarDeleteConfirm
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !state.isDeleting,
+            ) {
                 Text(strings.cancel)
             }
         },

@@ -36,6 +36,9 @@ class AvatarsApi(private val client: HttpClient) {
             setBody(update)
         }.checkSuccess()
 
+    suspend fun deleteAvatar(avatarId: String): AvatarData =
+        client.delete("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
+
     suspend fun enqueueImpostor(avatarId: String): AvatarImpostorServiceStatus =
         client.post("$AVATARS_API_PREFIX/$avatarId/impostor/enqueue").checkSuccess()
 

@@ -10,18 +10,21 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimelineModel
 import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeletionResultStore
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryUploader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorDeletionSource
@@ -173,18 +176,22 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    singleOf(::NetworkAvatarDeleter) bind AvatarDeleter::class
+    single { AvatarDeletionResultStore() }
     singleOf(::NetworkAvatarImpostorDeletionSource) bind AvatarImpostorDeletionSource::class
     singleOf(::NetworkAvatarImpostorBuilder) bind AvatarImpostorBuilder::class
     singleOf(::NetworkWorldEditor) bind WorldEditor::class
     viewModel {
         AvatarProfileScreenModel(
-            get(),
-            get(),
-            get(),
+            avatarProfileLoader = get(),
+            avatarSelector = get(),
+            favoriteEntrySource = get(),
             avatarEditor = get(),
+            avatarImpostorDeletionSource = get(),
             avatarImpostorBuilder = get(),
             avatarGalleryLoader = get(),
-            avatarImpostorDeletionSource = get(),
+            avatarDeleter = get(),
+            avatarDeletionResults = get(),
         )
     }
     viewModelOf(::RecentWorldsScreenModel)

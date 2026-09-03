@@ -57,6 +57,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
@@ -101,6 +102,10 @@ data class UserProfileScreen(
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinViewModel { parametersOf(userProfileVO) }
         val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleCreatedAvatars = remember(userProfileScreenModel.createdAvatars, deletedAvatarIds) {
+            userProfileScreenModel.createdAvatars.filterNot { it.id in deletedAvatarIds }
+        }
 
         LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.refreshUser(userProfileVO.id)
@@ -175,7 +180,7 @@ data class UserProfileScreen(
                     userGroups = userGroups,
                     mutualGroups = mutualGroups,
                     createdWorlds = userProfileScreenModel.createdWorlds,
-                    createdAvatars = userProfileScreenModel.createdAvatars,
+                    createdAvatars = visibleCreatedAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
@@ -1095,6 +1100,14 @@ class CardListDetailScreen(
         val navigator = currentNavigator
         val scope = rememberCoroutineScope()
         val animateListEntrance = remember { entranceAnimationGate.consume() }
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleItems = remember(items, screenType, deletedAvatarIds) {
+            if (screenType == CardScreenType.AVATAR) {
+                items.filterNot { it.id in deletedAvatarIds }
+            } else {
+                items
+            }
+        }
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -1109,7 +1122,7 @@ class CardListDetailScreen(
                         onReturn = { navigator.pop() }
                     )
                     CardListContent(
-                        items = items,
+                        items = visibleItems,
                         key = { it.listKey },
                         imageUrl = { it.imageUrl ?: it.thumbnailUrl },
                         itemTitle = { it.title },
