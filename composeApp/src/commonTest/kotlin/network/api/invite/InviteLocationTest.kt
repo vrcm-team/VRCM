@@ -7,20 +7,20 @@ import kotlin.test.assertNull
 
 class InviteLocationTest {
     @Test
-    fun activePresenceBuildsAFullLocationWithoutDroppingInstanceTags() {
+    fun activePresenceUsesThePureInstanceWithoutDroppingInstanceTags() {
         val presence = presence(
             world = "wrld_origin",
             instance = "12345~hidden(usr_owner)~region(use)~nonce(value)",
         )
 
         assertEquals(
-            "wrld_origin:12345~hidden(usr_owner)~region(use)~nonce(value)",
+            "12345~hidden(usr_owner)~region(use)~nonce(value)",
             presence.inviteLocationOrNull(),
         )
     }
 
     @Test
-    fun travelingPresenceUsesItsDestinationLocation() {
+    fun travelingPresenceUsesItsDestinationInstanceWithoutDroppingTags() {
         val presence = presence(
             instance = "traveling",
             travelingToWorld = "wrld_destination",
@@ -28,16 +28,20 @@ class InviteLocationTest {
         )
 
         assertEquals(
-            "wrld_destination:67890~region(jp)",
+            "67890~region(jp)",
             presence.inviteLocationOrNull(),
         )
     }
 
     @Test
-    fun presenceWithoutACompleteActiveLocationCannotBeInvitedTo() {
+    fun presenceWithoutAnActiveInstanceCannotBeInvitedTo() {
         assertNull(presence(instance = "offline").inviteLocationOrNull())
         assertNull(presence(instance = "private").inviteLocationOrNull())
-        assertNull(presence(instance = "12345~region(use)").inviteLocationOrNull())
+        assertEquals(
+            "12345~region(use)",
+            presence(instance = "12345~region(use)").inviteLocationOrNull(),
+        )
+        assertNull(presence(instance = "wrld_world:12345~region(use)").inviteLocationOrNull())
         assertNull(presence(instance = "traveling").inviteLocationOrNull())
     }
 

@@ -29,12 +29,12 @@ class InviteMessageSelectionApiTest {
         }
         val api = InviteApi(client)
 
-        api.inviteUser("usr_friend", "wrld_test:instance", messageSlot = 7)
+        api.inviteUser("usr_friend", "12345~region(use)", messageSlot = 7)
         api.requestInvite("usr_friend", requestSlot = 4)
 
         assertEquals(HttpMethod.Post, requests[0].method)
         assertEquals("/api/1/invite/usr_friend", requests[0].url.encodedPath)
-        assertEquals("{\"instanceId\":\"wrld_test:instance\",\"messageSlot\":7}", requests[0].bodyText())
+        assertEquals("{\"instanceId\":\"12345~region(use)\",\"messageSlot\":7}", requests[0].bodyText())
         assertEquals(HttpMethod.Post, requests[1].method)
         assertEquals("/api/1/requestInvite/usr_friend", requests[1].url.encodedPath)
         assertEquals("{\"requestSlot\":4}", requests[1].bodyText())
@@ -81,7 +81,10 @@ class InviteMessageSelectionApiTest {
             api.inviteUser("usr_friend", "wrld_test:instance", messageSlot = 12)
         }
         assertFailsWith<IllegalArgumentException> {
-            api.inviteUser("usr_friend", "instance~region(use)")
+            api.inviteUser("usr_friend", "offline")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            api.inviteUser("usr_friend", "wrld_test:12345~region(use)")
         }
         assertFailsWith<IllegalArgumentException> {
             api.requestInvite("usr_friend", requestSlot = -1)

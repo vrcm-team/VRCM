@@ -46,7 +46,7 @@ class InviteApiPhotoTest {
 
         InviteApi(client).inviteUserWithPhoto(
             userId = "usr_friend",
-            instanceId = "wrld_world:12345",
+            instanceId = "12345~region(use)",
             imageBytes = PNG,
             messageSlot = 4,
         )
@@ -54,7 +54,7 @@ class InviteApiPhotoTest {
         assertEquals("/api/1/invite/usr_friend/photo", path)
         assertContains(body, "name=data")
         assertContains(body, "application/json")
-        assertContains(body, "\"instanceId\":\"wrld_world:12345\"")
+        assertContains(body, "\"instanceId\":\"12345~region(use)\"")
         assertContains(body, "\"messageSlot\":4")
         assertContains(body, "name=image")
         assertContains(body, "image/png")
@@ -78,10 +78,10 @@ class InviteApiPhotoTest {
             api.inviteUserWithPhoto("usr_friend", "offline", PNG)
         }
         assertFailsWith<IllegalArgumentException> {
-            api.inviteUserWithPhoto("usr_friend", "12345~region(use)", PNG)
+            api.inviteUserWithPhoto("usr_friend", "private", PNG)
         }
         assertFailsWith<IllegalArgumentException> {
-            api.inviteUserWithPhoto("usr_friend", "wrld_world:12345", byteArrayOf(1, 2, 3))
+            api.inviteUserWithPhoto("usr_friend", "wrld_world:12345", PNG)
         }
         assertEquals(0, requestCount)
         client.close()
