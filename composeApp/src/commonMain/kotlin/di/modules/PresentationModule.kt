@@ -13,11 +13,13 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
@@ -156,8 +158,17 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    singleOf(::NetworkAvatarImpostorBuilder) bind AvatarImpostorBuilder::class
     singleOf(::NetworkWorldEditor) bind WorldEditor::class
-    viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
+    viewModel {
+        AvatarProfileScreenModel(
+            get(),
+            get(),
+            get(),
+            avatarEditor = get(),
+            avatarImpostorBuilder = get(),
+        )
+    }
     viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
