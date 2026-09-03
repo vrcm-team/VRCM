@@ -39,6 +39,18 @@ internal data class SessionBoundResponse<T>(
     val sessionToken: AccountSessionToken,
 )
 
+internal sealed interface HomeWorldMutationState {
+    data class Ready(val revision: Long) : HomeWorldMutationState
+    data object SessionChanged : HomeWorldMutationState
+    data object HomeWorldChanged : HomeWorldMutationState
+}
+
+internal enum class HomeWorldMutationCommitResult {
+    Applied,
+    SessionChanged,
+    StateChanged,
+}
+
 /**
  * 负责辅助登录验证的类
  * 主要作用是统一验证失效时的重试逻辑
@@ -57,6 +69,7 @@ class AuthService(
     private val currentUserLock = SynchronizedObject()
 
     private var currentUser: CurrentUserData? = null
+    private var homeWorldRevision = 0L
     private var socketPresence: Presence? = null
     private var socketPresenceRevision = 0L
     private val _currentUserState = MutableStateFlow<CurrentUserData?>(null)
@@ -188,19 +201,42 @@ class AuthService(
         true
     }
 
+    internal fun homeWorldMutationState(
+        sessionToken: AccountSessionToken,
+        expectedWorldId: String?,
+    ): HomeWorldMutationState = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
+            return@synchronized HomeWorldMutationState.SessionChanged
+        }
+        val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+            ?: return@synchronized HomeWorldMutationState.SessionChanged
+        if (expectedWorldId != null && existing.homeLocation != expectedWorldId) {
+            return@synchronized HomeWorldMutationState.HomeWorldChanged
+        }
+        HomeWorldMutationState.Ready(homeWorldRevision)
+    }
+
+    internal fun commitHomeWorldMutationLocked(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        expectedRevision: Long,
+        homeLocation: String,
+    ): HomeWorldMutationCommitResult = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
+            return@synchronized HomeWorldMutationCommitResult.SessionChanged
+        }
+        val existing = currentUser?.takeIf { it.id == userId }
+            ?: return@synchronized HomeWorldMutationCommitResult.SessionChanged
+        if (homeWorldRevision != expectedRevision) {
+            return@synchronized HomeWorldMutationCommitResult.StateChanged
+        }
+        publishCurrentUserLocked(existing.copy(homeLocation = homeLocation))
+        HomeWorldMutationCommitResult.Applied
+    }
+
     /** Runs a Home World check and the associated request as one serializable mutation. */
     internal suspend fun <T> withHomeWorldMutation(action: suspend () -> T): T =
         homeWorldMutationGate.withLock { action() }
-
-    /** Reads the current user's Home World while holding the user-state lock. */
-    internal fun isCurrentUserHomeWorld(
-        sessionToken: AccountSessionToken,
-        expectedWorldId: String,
-    ): Boolean = synchronized(currentUserLock) {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
-        currentUser?.let { it.id == sessionToken.userId && it.homeLocation == expectedWorldId }
-            ?: false
-    }
 
     fun applySocketUserLocation(location: String, travelingToLocation: String) {
         synchronized(currentUserLock) {
@@ -441,10 +477,18 @@ class AuthService(
     internal suspend fun <T> runSessionBoundCatching(
         sessionToken: AccountSessionToken,
         callback: suspend () -> T,
+    ): SessionBoundResponse<T>? = runSessionBoundCatchingWithToken(
+        sessionToken = sessionToken,
+        callback = { _: AccountSessionToken -> callback() },
+    )
+
+    internal suspend fun <T> runSessionBoundCatchingWithToken(
+        sessionToken: AccountSessionToken,
+        callback: suspend (AccountSessionToken) -> T,
     ): SessionBoundResponse<T>? = authMutex.withLock {
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
 
-        val first = runRequestCatching(callback)
+        val first = runRequestCatching { callback(sessionToken) }
         val firstError = first.exceptionOrNull()
         if (firstError !is VRCApiException ||
             firstError.code != HttpStatusCode.Unauthorized.value
@@ -468,7 +512,7 @@ class AuthService(
         ) {
             return@withLock null
         }
-        val retried = runRequestCatching(callback)
+        val retried = runRequestCatching { callback(refreshedSession.token) }
         if (!SharedFlowCentre.isCurrentSession(refreshedSession.token)) return@withLock null
         SessionBoundResponse(retried, refreshedSession.token)
     }
@@ -524,12 +568,16 @@ class AuthService(
     }
 
     private fun publishCurrentUserLocked(user: CurrentUserData): CurrentUserData {
+        if (currentUser?.id != user.id || currentUser?.homeLocation != user.homeLocation) {
+            homeWorldRevision++
+        }
         currentUser = user
         _currentUserState.value = user
         return user
     }
 
     private fun clearCurrentUserLocked() {
+        if (currentUser != null) homeWorldRevision++
         currentUser = null
         socketPresence = null
         socketPresenceRevision++

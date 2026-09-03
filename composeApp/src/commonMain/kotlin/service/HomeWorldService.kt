@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,11 @@ internal class InvalidHomeWorldException : IllegalArgumentException("Invalid VRC
 
 internal class HomeWorldUpdateInFlightException : IllegalStateException(
     "A Home World update is already in progress"
+)
+
+private data class PendingHomeWorldUpdate(
+    val user: CurrentUpdateUserData,
+    val stateRevision: Long,
 )
 
 /** Updates the authenticated user's Home World without allowing stale sessions to publish state. */
@@ -106,37 +112,51 @@ internal class HomeWorldService(
             expectedSessionToken == null || current.token == expectedSessionToken
         }
             ?: return Result.failure(HomeWorldSessionChangedException())
-        val response = authService.runSessionBoundCatching(session.token) {
+        val response = authService.runSessionBoundCatchingWithToken(session.token) { activeSessionToken ->
             authService.withHomeWorldMutation {
-                if (expectedWorldId != null && expectedSessionToken != null &&
-                    !authService.isCurrentUserHomeWorld(
-                        sessionToken = expectedSessionToken,
-                        expectedWorldId = expectedWorldId,
-                    )
+                if (expectedSessionToken != null &&
+                    activeSessionToken.userId != expectedSessionToken.userId
                 ) {
-                    throw HomeWorldStateChangedException()
+                    throw HomeWorldSessionChangedException()
                 }
-                usersApi.updateUserInfo(
-                    userId = session.account.userId,
-                    updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
+                val stateRevision = when (val state = authService.homeWorldMutationState(
+                    sessionToken = activeSessionToken,
+                    expectedWorldId = expectedWorldId,
+                )) {
+                    is HomeWorldMutationState.Ready -> state.revision
+                    HomeWorldMutationState.SessionChanged ->
+                        throw HomeWorldSessionChangedException()
+                    HomeWorldMutationState.HomeWorldChanged ->
+                        throw HomeWorldStateChangedException()
+                }
+                PendingHomeWorldUpdate(
+                    user = usersApi.updateUserInfo(
+                        userId = activeSessionToken.userId,
+                        updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
+                    ),
+                    stateRevision = stateRevision,
                 )
             }
         } ?: return Result.failure(HomeWorldSessionChangedException())
 
         return authService.withHomeWorldMutation {
-            response.result.mapCatching { updatedUser ->
+            response.result.mapCatching { pendingUpdate ->
+                val updatedUser = pendingUpdate.user
                 check(updatedUser.id == response.sessionToken.userId) {
                     "Home World update returned a different user"
                 }
-                if (!authService.applyCurrentUserHomeLocationLocked(
-                        sessionToken = response.sessionToken,
-                        userId = updatedUser.id,
-                        homeLocation = updatedUser.homeLocation,
-                    )
-                ) {
-                    throw HomeWorldSessionChangedException()
+                when (authService.commitHomeWorldMutationLocked(
+                    sessionToken = response.sessionToken,
+                    userId = updatedUser.id,
+                    expectedRevision = pendingUpdate.stateRevision,
+                    homeLocation = updatedUser.homeLocation,
+                )) {
+                    HomeWorldMutationCommitResult.Applied -> updatedUser.homeLocation
+                    HomeWorldMutationCommitResult.SessionChanged ->
+                        throw HomeWorldSessionChangedException()
+                    HomeWorldMutationCommitResult.StateChanged ->
+                        throw HomeWorldStateChangedException()
                 }
-                updatedUser.homeLocation
             }
         }
     }

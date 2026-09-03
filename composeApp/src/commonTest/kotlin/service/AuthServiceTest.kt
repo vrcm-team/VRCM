@@ -120,6 +120,42 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun resetHomeWorldRetriesWithTheRefreshedSessionToken() = runTest {
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            when (request.method) {
+                HttpMethod.Put -> {
+                    updateRequests++
+                    if (updateRequests == 1) {
+                        respond(
+                            content = "expired",
+                            status = HttpStatusCode.Unauthorized,
+                        )
+                    } else {
+                        jsonResponse(currentUserJson(cachedAccount(), homeLocation = ""))
+                    }
+                }
+
+                else -> jsonResponse(
+                    currentUserJson(cachedAccount(), homeLocation = "wrld_confirmed")
+                )
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val sessionToken = requireNotNull(SharedFlowCentre.currentSession.value).token
+
+        val result = HomeWorldService(UsersApi(fixture.client), fixture.service).resetHomeWorld(
+            expectedWorldId = "wrld_confirmed",
+            expectedSessionToken = sessionToken,
+        )
+
+        assertEquals("", result.getOrThrow())
+        assertEquals(2, updateRequests)
+        assertEquals("", fixture.service.currentUserState.value?.homeLocation)
+        fixture.client.close()
+    }
+
+    @Test
     fun accountSwitchRejectsLateHomeWorldResponse() = runTest {
         val updateStarted = CompletableDeferred<Unit>()
         val releaseUpdate = CompletableDeferred<Unit>()
@@ -269,6 +305,52 @@ class AuthServiceTest : MainDispatcherTest() {
         assertEquals("wrld_later", refresh.await().homeLocation)
         assertIs<HomeWorldStateChangedException>(reset.await().exceptionOrNull())
         assertEquals(0, updateRequests)
+        fixture.client.close()
+    }
+
+    @Test
+    fun newerUserRefreshWinsBeforeHomeWorldResponseCommit() = runTest {
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val refreshStarted = CompletableDeferred<Unit>()
+        var userRequests = 0
+        val fixture = fixture { request ->
+            when {
+                request.method == HttpMethod.Put -> {
+                    updateStarted.complete(Unit)
+                    releaseUpdate.await()
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = ""))
+                }
+
+                request.method == HttpMethod.Get && userRequests++ == 0 ->
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = "wrld_confirmed"))
+
+                request.method == HttpMethod.Get -> {
+                    refreshStarted.complete(Unit)
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = "wrld_newer"))
+                }
+
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val sessionToken = requireNotNull(SharedFlowCentre.currentSession.value).token
+        val reset = async(start = CoroutineStart.UNDISPATCHED) {
+            HomeWorldService(UsersApi(fixture.client), fixture.service).resetHomeWorld(
+                expectedWorldId = "wrld_confirmed",
+                expectedSessionToken = sessionToken,
+            )
+        }
+        updateStarted.await()
+        val refresh = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.currentUser(isRefresh = true)
+        }
+
+        releaseUpdate.complete(Unit)
+        refreshStarted.await()
+        assertEquals("wrld_newer", refresh.await().homeLocation)
+        assertIs<HomeWorldStateChangedException>(reset.await().exceptionOrNull())
+        assertEquals("wrld_newer", fixture.service.currentUserState.value?.homeLocation)
         fixture.client.close()
     }
 
