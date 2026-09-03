@@ -120,6 +120,7 @@ class AvatarProfileScreen(
         val avatarGalleryState by screenModel.avatarGalleryState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
+        val impostorState by screenModel.impostorState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
@@ -189,9 +190,11 @@ class AvatarProfileScreen(
             AvatarEditSheet(
                 avatar = displayedAvatar,
                 state = editState,
+                impostorState = impostorState,
                 imageProcessor = imageProcessor,
                 onDismiss = { showEditSheet = false },
                 onSaveMetadata = screenModel::saveMetadata,
+                onEnqueueImpostor = screenModel::enqueueImpostor,
                 onUpdatePublication = screenModel::updatePublication,
                 onEditCover = { source, prepared ->
                     handoffPreparedImageToEditor(

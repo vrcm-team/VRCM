@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
@@ -96,6 +97,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
+                    single<AvatarImpostorBuilder> { EmptyAvatarImpostorBuilder }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
             )
@@ -249,6 +251,21 @@ private data object EmptyAvatarEditor : AvatarEditor {
         avatarId: String,
         imageUrl: String,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarImpostorBuilder : AvatarImpostorBuilder {
+    override suspend fun enqueue(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+        avatarId: String,
+    ) = null
+
+    override suspend fun queueStats(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = null
+
+    override fun isCurrentSession(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = false
 }
 
 private data object EmptyGalleryDataSource : GalleryDataSource {

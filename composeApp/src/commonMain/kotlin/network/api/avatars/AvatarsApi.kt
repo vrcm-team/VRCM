@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.network.api.avatars
 import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AVATARS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorQueueStats
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
@@ -25,6 +27,12 @@ class AvatarsApi(private val client: HttpClient) {
             contentType(ContentType.Application.Json)
             setBody(update)
         }.checkSuccess()
+
+    suspend fun enqueueImpostor(avatarId: String): AvatarImpostorServiceStatus =
+        client.post("$AVATARS_API_PREFIX/$avatarId/impostor/enqueue").checkSuccess()
+
+    suspend fun getImpostorQueueStats(): AvatarImpostorQueueStats =
+        client.get("$AVATARS_API_PREFIX/impostor/queue/stats").checkSuccess()
 
     suspend fun getFavoritedAvatars(
         n: Int = 50,

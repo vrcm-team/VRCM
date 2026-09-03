@@ -74,4 +74,7 @@ data class AvatarUnityPackage(
     val platform: String? = null,
     val unityVersion: String? = null,
     val performanceRating: String? = null,
+    val variant: String? = null,
+    val impostorUrl: String? = null,
+    val impostorizerVersion: String? = null,
 )

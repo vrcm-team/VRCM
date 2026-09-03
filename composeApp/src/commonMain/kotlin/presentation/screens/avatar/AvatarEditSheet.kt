@@ -63,9 +63,11 @@ private const val AvatarDescriptionMaxLength = 256
 internal fun AvatarEditSheet(
     avatar: AvatarProfileVo,
     state: AvatarEditState,
+    impostorState: AvatarImpostorState,
     imageProcessor: PrintImageProcessor,
     onDismiss: () -> Unit,
     onSaveMetadata: (String, String) -> Unit,
+    onEnqueueImpostor: () -> Unit,
     onUpdatePublication: (AvatarPublicationStatus) -> Unit,
     onEditCover: (SelectedImage, PreparedImage) -> Unit,
 ) {
@@ -77,14 +79,14 @@ internal fun AvatarEditSheet(
     val scope = rememberCoroutineScope()
     val locale = strings
     val isRemoteUpdateBusy = state.isSavingMetadata || state.isUpdatingPublication
-    val isBusy = isRemoteUpdateBusy || isPreparingCover
+    val isBusy = isRemoteUpdateBusy || isPreparingCover ||
+        impostorState.isSubmitting || impostorState.isLoadingQueueEstimate
     val latestIsBusy = rememberUpdatedState(isBusy)
     val sheetState = rememberModalBottomSheetState(
         confirmValueChange = { targetValue ->
             targetValue != SheetValue.Hidden || !latestIsBusy.value
         },
     )
-
     LaunchedEffect(state.publication) {
         if (state.publication != AvatarPublicationStatus.Private) {
             showPublicConfirmation = false
@@ -292,6 +294,14 @@ internal fun AvatarEditSheet(
                 )
             }
 
+            HorizontalDivider()
+
+            AvatarImpostorSection(
+                state = impostorState,
+                localPreparationInProgress = isPreparingCover,
+                onEnqueue = onEnqueueImpostor,
+            )
+
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
@@ -327,4 +337,120 @@ internal fun AvatarEditSheet(
             },
         )
     }
+}
+
+@Composable
+private fun AvatarImpostorSection(
+    state: AvatarImpostorState,
+    localPreparationInProgress: Boolean,
+    onEnqueue: () -> Unit,
+) {
+    val locale = strings
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = locale.avatarImpostorTitle,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = if (state.hasImpostor) {
+                locale.avatarImpostorAvailable
+            } else {
+                locale.avatarImpostorUnavailable
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = locale.avatarImpostorTaskStatus,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            text = state.taskState?.localizedImpostorState(locale)
+                ?: locale.avatarImpostorTaskEmpty,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when {
+            state.isLoadingQueueEstimate -> Text(
+                text = locale.avatarImpostorQueueEstimateLoading,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.estimatedQueueSeconds != null -> Text(
+                text = locale.avatarImpostorQueueEstimateMinutes.replace(
+                    "%minutes%",
+                    ((state.estimatedQueueSeconds + 59) / 60).coerceAtLeast(1).toString(),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.queueEstimateFailed -> Text(
+                text = locale.avatarImpostorQueueEstimateUnavailable,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        state.failure?.let { failure ->
+            Text(
+                text = failure.localizedMessage(locale),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        OutlinedButton(
+            onClick = onEnqueue,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.canBuild && !localPreparationInProgress,
+        ) {
+            if (state.isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(AppIcons.Update, contentDescription = null, Modifier.size(18.dp))
+            }
+            Spacer(Modifier.size(8.dp))
+            Text(
+                when {
+                    state.isSubmitting -> locale.avatarImpostorSubmitting
+                    state.hasImpostor -> locale.avatarImpostorRebuild
+                    else -> locale.avatarImpostorCreate
+                }
+            )
+        }
+    }
+}
+
+private fun String.localizedImpostorState(
+    locale: io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings,
+): String = when (lowercase()) {
+    "queued", "pending" -> locale.avatarImpostorStatusQueued
+    "processing", "running", "in_progress", "in-progress" ->
+        locale.avatarImpostorStatusProcessing
+    "complete", "completed", "success", "succeeded" ->
+        locale.avatarImpostorStatusCompleted
+    "failed", "failure", "error", "cancelled", "canceled" ->
+        locale.avatarImpostorStatusFailed
+    else -> locale.avatarImpostorStatusUnknown.replace("%s", this)
+}
+
+private fun AvatarImpostorFailure.localizedMessage(
+    locale: io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings,
+): String = when (this) {
+    AvatarImpostorFailure.Authentication -> locale.avatarImpostorAuthenticationFailed
+    AvatarImpostorFailure.Permission -> locale.avatarImpostorPermissionFailed
+    AvatarImpostorFailure.NotFound -> locale.avatarImpostorNotFound
+    AvatarImpostorFailure.Conflict -> locale.avatarImpostorConflict
+    AvatarImpostorFailure.RateLimited -> locale.avatarImpostorRateLimited
+    AvatarImpostorFailure.Server -> locale.avatarImpostorServerFailed
+    AvatarImpostorFailure.InvalidResponse,
+    AvatarImpostorFailure.Unknown -> locale.avatarImpostorUnknownFailed
 }

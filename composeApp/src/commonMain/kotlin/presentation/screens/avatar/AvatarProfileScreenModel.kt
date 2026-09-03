@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
@@ -16,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -141,6 +143,16 @@ internal data class AvatarEditState(
     val isUpdatingPublication: Boolean = false,
 )
 
+internal data class AvatarImpostorState(
+    val canBuild: Boolean = false,
+    val hasImpostor: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val taskState: String? = null,
+    val isLoadingQueueEstimate: Boolean = false,
+    val estimatedQueueSeconds: Int? = null,
+    val queueEstimateFailed: Boolean = false,
+    val failure: AvatarImpostorFailure? = null,
+)
 internal enum class AvatarPublicationStatus(val apiValue: String) {
     Private("private"),
     Public("public"),
@@ -196,6 +208,7 @@ class AvatarProfileScreenModel internal constructor(
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    private val avatarImpostorBuilder: AvatarImpostorBuilder? = null,
     avatarGalleryLoader: AvatarGalleryLoader? = null,
 ) : ViewModel() {
 
@@ -303,10 +316,58 @@ class AvatarProfileScreenModel internal constructor(
         initialValue = AvatarEditState(),
     )
 
+    private val impostorOperation = MutableStateFlow(AvatarImpostorOperation())
+    private val latestImpostorRequestToken = MutableStateFlow(0L)
+    internal val impostorState: StateFlow<AvatarImpostorState> = combine(
+        avatarProfileState,
+        validation,
+        favoriteSession,
+        impostorOperation,
+        isSelecting,
+    ) { avatar, currentValidation, session, operation, selecting ->
+        val visibleOperation = operation.takeIf { current ->
+            val target = current.target ?: return@takeIf false
+            val sameUserAndAvatar = avatar?.avatarId == target.avatarId &&
+                session?.token?.userId == target.sessionToken.userId
+            val operationInProgress = current.isSubmitting ||
+                current.isLoadingQueueEstimate ||
+                current.status?.state.isActiveImpostorState()
+            sameUserAndAvatar && (operationInProgress || session.token == target.sessionToken)
+        }
+        val taskState = visibleOperation?.status?.state
+        val hasImpostor = avatar?.hasImpostor == true || taskState.isSuccessfulImpostorState()
+        val ownsAvatar = currentValidation == AvatarValidation.Available &&
+            avatar?.avatarId?.isNotBlank() == true &&
+            avatar.authorId.isNotBlank() &&
+            avatar.authorId == session?.token?.userId
+        AvatarImpostorState(
+            canBuild = avatarImpostorBuilder != null &&
+                ownsAvatar &&
+                !selecting &&
+                visibleOperation?.isSubmitting != true &&
+                visibleOperation?.isLoadingQueueEstimate != true &&
+                !taskState.isActiveImpostorState(),
+            hasImpostor = hasImpostor,
+            isSubmitting = visibleOperation?.isSubmitting == true,
+            taskState = taskState,
+            isLoadingQueueEstimate = visibleOperation?.isLoadingQueueEstimate == true,
+            estimatedQueueSeconds = visibleOperation?.estimatedQueueSeconds,
+            queueEstimateFailed = visibleOperation?.queueEstimateFailed == true,
+            failure = visibleOperation?.failure,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AvatarImpostorState(),
+    )
+
     private val latestRequestToken = MutableStateFlow(0L)
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
+        if (!impostorOperation.value.isSubmitting) {
+            impostorOperation.value = AvatarImpostorOperation()
+        }
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
@@ -428,6 +489,142 @@ class AvatarProfileScreenModel internal constructor(
         }
     }
 
+    internal fun enqueueImpostor() {
+        val builder = avatarImpostorBuilder ?: return
+        if (!impostorState.value.canBuild) return
+        val avatar = avatarProfileState.value ?: return
+        val sessionToken = favoriteSession.value?.token ?: return
+        if (avatar.authorId != sessionToken.userId) return
+
+        val current = impostorOperation.value
+        if (current.isSubmitting ||
+            current.isLoadingQueueEstimate ||
+            current.status?.state.isActiveImpostorState()
+        ) {
+            return
+        }
+
+        val target = AvatarImpostorTarget(
+            sessionToken = sessionToken,
+            avatarId = avatar.avatarId,
+            requestToken = latestImpostorRequestToken.updateAndGet { it + 1 },
+        )
+        if (!impostorOperation.compareAndSet(
+                expect = current,
+                update = AvatarImpostorOperation(target = target, isSubmitting = true),
+            )
+        ) {
+            return
+        }
+
+        viewModelScope.launch(requestDispatcher) {
+            val response = try {
+                builder.enqueue(target.sessionToken, target.avatarId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                AuthenticatedAvatarImpostorResult(Result.failure(error), target.sessionToken)
+            }
+            if (response == null || !acceptImpostorSession(response.sessionToken, target)) {
+                finishImpostorOperation(target)
+                return@launch
+            }
+            response.result.fold(
+                onSuccess = { status ->
+                    handleImpostorEnqueueSuccess(
+                        target = target,
+                        responseToken = response.sessionToken,
+                        status = status,
+                        builder = builder,
+                    )
+                },
+                onFailure = { error ->
+                    updateImpostorOperation(target) { operation ->
+                        operation.copy(
+                            target = target.copy(sessionToken = response.sessionToken),
+                            isSubmitting = false,
+                            failure = error.toAvatarImpostorFailure(),
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    private suspend fun handleImpostorEnqueueSuccess(
+        target: AvatarImpostorTarget,
+        responseToken: AccountSessionToken,
+        status: AvatarImpostorServiceStatus,
+        builder: AvatarImpostorBuilder,
+    ) {
+        if (!status.isValidFor(target.avatarId, responseToken.userId)) {
+            updateImpostorOperation(target) { operation ->
+                operation.copy(
+                    target = target.copy(sessionToken = responseToken),
+                    isSubmitting = false,
+                    failure = AvatarImpostorFailure.InvalidResponse,
+                )
+            }
+            return
+        }
+
+        val refreshedTarget = target.copy(sessionToken = responseToken)
+        val accepted = updateImpostorOperation(target) { operation ->
+            operation.copy(
+                target = refreshedTarget,
+                isSubmitting = false,
+                status = status,
+                isLoadingQueueEstimate = true,
+                failure = null,
+            )
+        }
+        if (!accepted) return
+
+        val queueResponse = try {
+            builder.queueStats(responseToken)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            AuthenticatedAvatarImpostorResult(Result.failure(error), responseToken)
+        }
+        if (queueResponse == null ||
+            !acceptImpostorSession(queueResponse.sessionToken, refreshedTarget)
+        ) {
+            finishQueueEstimate(refreshedTarget, status.id)
+            return
+        }
+        val queueTarget = refreshedTarget.copy(sessionToken = queueResponse.sessionToken)
+        queueResponse.result.fold(
+            onSuccess = { stats ->
+                updateQueueEstimate(refreshedTarget, status.id) { operation ->
+                    if (stats.estimatedServiceDurationSeconds < 0) {
+                        operation.copy(
+                            target = queueTarget,
+                            isLoadingQueueEstimate = false,
+                            queueEstimateFailed = true,
+                        )
+                    } else {
+                        operation.copy(
+                            target = queueTarget,
+                            isLoadingQueueEstimate = false,
+                            estimatedQueueSeconds = stats.estimatedServiceDurationSeconds,
+                            queueEstimateFailed = false,
+                        )
+                    }
+                }
+            },
+            onFailure = {
+                updateQueueEstimate(refreshedTarget, status.id) { operation ->
+                    operation.copy(
+                        target = queueTarget,
+                        isLoadingQueueEstimate = false,
+                        queueEstimateFailed = true,
+                    )
+                }
+            },
+        )
+    }
+
     internal fun updatePublication(publication: AvatarPublicationStatus) {
         val avatar = avatarProfileState.value ?: return
         val editor = avatarEditor ?: return
@@ -489,6 +686,47 @@ class AvatarProfileScreenModel internal constructor(
         avatarProfileState.value?.avatarId == target.avatarId &&
             currentUser.value?.userId == target.userId
 
+    private fun acceptImpostorSession(
+        responseToken: AccountSessionToken,
+        target: AvatarImpostorTarget,
+    ): Boolean = responseToken.userId == target.sessionToken.userId &&
+        favoriteSession.value?.token == responseToken &&
+        avatarImpostorBuilder?.isCurrentSession(responseToken) == true
+
+    private fun updateImpostorOperation(
+        target: AvatarImpostorTarget,
+        transform: (AvatarImpostorOperation) -> AvatarImpostorOperation,
+    ): Boolean {
+        val operation = impostorOperation.value
+        if (operation.target?.requestToken != target.requestToken) return false
+        impostorOperation.value = transform(operation)
+        return true
+    }
+
+    private fun updateQueueEstimate(
+        target: AvatarImpostorTarget,
+        serviceId: String,
+        transform: (AvatarImpostorOperation) -> AvatarImpostorOperation,
+    ): Boolean {
+        val operation = impostorOperation.value
+        if (operation.target?.requestToken != target.requestToken ||
+            operation.status?.id != serviceId
+        ) {
+            return false
+        }
+        impostorOperation.value = transform(operation)
+        return true
+    }
+
+    private fun finishImpostorOperation(target: AvatarImpostorTarget) {
+        updateImpostorOperation(target) { AvatarImpostorOperation() }
+    }
+
+    private fun finishQueueEstimate(target: AvatarImpostorTarget, serviceId: String) {
+        updateQueueEstimate(target, serviceId) { operation ->
+            operation.copy(isLoadingQueueEstimate = false, queueEstimateFailed = true)
+        }
+    }
     private fun publicationTarget(
         avatar: AvatarProfileVo,
         publication: AvatarPublicationStatus,
@@ -556,11 +794,48 @@ class AvatarProfileScreenModel internal constructor(
     }
 }
 
+private data class AvatarImpostorTarget(
+    val sessionToken: AccountSessionToken,
+    val avatarId: String,
+    val requestToken: Long,
+)
+
+private data class AvatarImpostorOperation(
+    val target: AvatarImpostorTarget? = null,
+    val isSubmitting: Boolean = false,
+    val status: AvatarImpostorServiceStatus? = null,
+    val isLoadingQueueEstimate: Boolean = false,
+    val estimatedQueueSeconds: Int? = null,
+    val queueEstimateFailed: Boolean = false,
+    val failure: AvatarImpostorFailure? = null,
+)
+
 private data class AvatarEditTarget(
     val avatarId: String,
     val userId: String,
 )
 
+private fun AvatarImpostorServiceStatus.isValidFor(avatarId: String, userId: String): Boolean =
+    id.isNotBlank() &&
+        state.isNotBlank() &&
+        subjectId == avatarId &&
+        requesterUserId == userId &&
+        subjectType.isNotBlank() &&
+        type.isNotBlank()
+
+private fun String?.isSuccessfulImpostorState(): Boolean = when (this?.lowercase()) {
+    "complete", "completed", "success", "succeeded" -> true
+    else -> false
+}
+
+private fun String?.isActiveImpostorState(): Boolean {
+    if (this == null) return false
+    return when (lowercase()) {
+        "complete", "completed", "success", "succeeded",
+        "failed", "failure", "error", "cancelled", "canceled" -> false
+        else -> true
+    }
+}
 private data class AvatarPublicationTarget(
     val avatarId: String,
     val userId: String,
