@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UpdateUserInfoData(
     val ageVerificationStatus: AgeVerificationStatus? = null,
+    val allowAvatarCopying: Boolean? = null,
     val bio: String? = null,
     val bioLinks: List<String>? = null,
     val homeLocation: String? = null,

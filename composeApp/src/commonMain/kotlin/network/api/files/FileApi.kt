@@ -82,6 +82,18 @@ class FileApi(private val client: HttpClient) {
         parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccess<List<FileData>>()
 
+    /** 获取指定模型关联的只读 Gallery 文件。 */
+    suspend fun getAvatarGalleryFiles(
+        avatarId: String,
+        n: Int = 100,
+        offset: Int = 0,
+    ) = client.get(FILES_API_PREFIX) {
+        parameter("tag", "avatargallery")
+        parameter("galleryId", avatarId)
+        parameter("n", n.coerceIn(1, 100))
+        parameter("offset", offset.coerceAtLeast(0))
+    }.checkSuccess<List<FileData>>()
+
     /**
      * 上传文件
      * @param fileBytes 文件字节数组
@@ -165,18 +177,6 @@ class FileApi(private val client: HttpClient) {
         },
     ) {
         onUpload { bytesSent, contentLength -> onProgress(bytesSent, contentLength) }
-    }.checkSuccessResult()
-
-    /** Reads only the first page needed to verify the server-authoritative upload result. */
-    suspend fun getAvatarGalleryFiles(
-        avatarId: String,
-        n: Int = 100,
-        offset: Int = 0,
-    ): Result<List<FileData>> = client.get(FILES_API_PREFIX) {
-        parameter("tag", "avatargallery")
-        parameter("galleryId", avatarId)
-        parameter("n", n.coerceIn(1, 100))
-        parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccessResult()
 
     /**

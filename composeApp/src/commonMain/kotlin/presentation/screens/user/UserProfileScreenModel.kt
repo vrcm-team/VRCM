@@ -49,6 +49,8 @@ import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldDetailRevision
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -188,6 +190,144 @@ internal class BioLinksUpdateStateMachine {
             completedRequestId = current.completedRequestId + 1,
             savedLinks = savedLinks,
         )
+    }
+}
+
+/** State shown for the current account's avatar-copying privacy control. */
+data class AvatarCopyingPrivacyState(
+    val accountUserId: String? = null,
+    val isAllowed: Boolean? = null,
+    val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
+    val loadFailed: Boolean = false,
+    val updateFailed: Boolean = false,
+)
+
+internal data class AvatarCopyingPrivacyRequest(
+    val id: Long,
+    val userId: String,
+    val requestedValue: Boolean?,
+)
+
+internal class AvatarCopyingPrivacyStateMachine {
+    private val lock = SynchronizedObject()
+    private val _state = MutableStateFlow(AvatarCopyingPrivacyState())
+    val state: StateFlow<AvatarCopyingPrivacyState> = _state.asStateFlow()
+    private var nextRequestId = 0L
+    private var activeRequest: AvatarCopyingPrivacyRequest? = null
+
+    fun bindAccount(userId: String?, isAllowed: Boolean?) = synchronized(lock) {
+        val current = _state.value
+        if (userId == null) {
+            activeRequest = null
+            _state.value = AvatarCopyingPrivacyState()
+            return@synchronized
+        }
+        if (current.accountUserId != userId) {
+            activeRequest = null
+            _state.value = AvatarCopyingPrivacyState(
+                accountUserId = userId,
+                isAllowed = isAllowed,
+            )
+            return@synchronized
+        }
+        if (isAllowed == null) return@synchronized
+
+        val loadingRequest = activeRequest?.takeIf { it.requestedValue == null }
+        if (loadingRequest != null) activeRequest = null
+        _state.value = current.copy(
+            isAllowed = isAllowed,
+            isLoading = false,
+            loadFailed = false,
+            updateFailed = false,
+        )
+    }
+
+    fun tryStartLoad(userId: String): AvatarCopyingPrivacyRequest? = synchronized(lock) {
+        val current = _state.value
+        if (current.accountUserId != userId || current.isAllowed != null || activeRequest != null) {
+            return@synchronized null
+        }
+        AvatarCopyingPrivacyRequest(
+            id = ++nextRequestId,
+            userId = userId,
+            requestedValue = null,
+        ).also { request ->
+            activeRequest = request
+            _state.value = current.copy(
+                isLoading = true,
+                loadFailed = false,
+                updateFailed = false,
+            )
+        }
+    }
+
+    fun tryStartUpdate(
+        userId: String,
+        requestedValue: Boolean,
+    ): AvatarCopyingPrivacyRequest? = synchronized(lock) {
+        val current = _state.value
+        if (current.accountUserId != userId ||
+            current.isAllowed == null ||
+            current.isAllowed == requestedValue ||
+            activeRequest != null
+        ) {
+            return@synchronized null
+        }
+        AvatarCopyingPrivacyRequest(
+            id = ++nextRequestId,
+            userId = userId,
+            requestedValue = requestedValue,
+        ).also { request ->
+            activeRequest = request
+            _state.value = current.copy(
+                isSaving = true,
+                loadFailed = false,
+                updateFailed = false,
+            )
+        }
+    }
+
+    fun completeLoad(request: AvatarCopyingPrivacyRequest, isAllowed: Boolean): Boolean =
+        finish(request) { current ->
+            current.copy(
+                isAllowed = isAllowed,
+                isLoading = false,
+                loadFailed = false,
+            )
+        }
+
+    fun failLoad(request: AvatarCopyingPrivacyRequest): Boolean = finish(request) { current ->
+        current.copy(isLoading = false, loadFailed = true)
+    }
+
+    fun completeUpdate(request: AvatarCopyingPrivacyRequest, isAllowed: Boolean): Boolean =
+        finish(request) { current ->
+            current.copy(
+                isAllowed = isAllowed,
+                isSaving = false,
+                updateFailed = false,
+            )
+        }
+
+    fun failUpdate(request: AvatarCopyingPrivacyRequest): Boolean = finish(request) { current ->
+        current.copy(isSaving = false, updateFailed = true)
+    }
+
+    fun abandon(request: AvatarCopyingPrivacyRequest): Boolean = finish(request) { current ->
+        current.copy(isLoading = false, isSaving = false)
+    }
+
+    private fun finish(
+        request: AvatarCopyingPrivacyRequest,
+        update: (AvatarCopyingPrivacyState) -> AvatarCopyingPrivacyState,
+    ): Boolean = synchronized(lock) {
+        if (activeRequest != request || _state.value.accountUserId != request.userId) {
+            return@synchronized false
+        }
+        activeRequest = null
+        _state.value = update(_state.value)
+        true
     }
 }
 
@@ -396,6 +536,9 @@ class UserProfileScreenModel(
     private val bioLinksUpdateStateMachine = BioLinksUpdateStateMachine()
     internal val bioLinksUpdateState: StateFlow<BioLinksUpdateState> =
         bioLinksUpdateStateMachine.state
+    private val avatarCopyingPrivacyStateMachine = AvatarCopyingPrivacyStateMachine()
+    internal val avatarCopyingPrivacyState: StateFlow<AvatarCopyingPrivacyState> =
+        avatarCopyingPrivacyStateMachine.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -446,6 +589,27 @@ class UserProfileScreenModel(
                 authService.currentUserState.collect { currentUser ->
                     currentUser?.let { _userState.value = UserProfileVo(it).withSelfIdentity() }
                 }
+            }
+            viewModelScope.launch {
+                combine(
+                    SharedFlowCentre.currentSession,
+                    authService.currentUserState,
+                ) { session, currentUser -> session to currentUser }
+                    .collect { (session, currentUser) ->
+                        val ownSession = session?.takeIf {
+                            it.account.userId == cacheOwnerUserId
+                        }
+                        val ownUser = currentUser?.takeIf {
+                            it.id == ownSession?.account?.userId
+                        }
+                        avatarCopyingPrivacyStateMachine.bindAccount(
+                            userId = ownSession?.account?.userId,
+                            isAllowed = ownUser?.allowAvatarCopying,
+                        )
+                        if (ownSession != null && ownUser == null) {
+                            loadAvatarCopyingPrivacy(ownSession.token)
+                        }
+                    }
             }
         }
         viewModelScope.launch {
@@ -604,6 +768,102 @@ class UserProfileScreenModel(
             }.onFailure { error ->
                 bioLinksUpdateStateMachine.fail()
                 handleError(error)
+            }
+        }
+    }
+
+    fun retryAvatarCopyingPrivacyLoad() {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token
+            ?.takeIf { it.userId == cacheOwnerUserId }
+            ?: return
+        loadAvatarCopyingPrivacy(sessionToken)
+    }
+
+    private fun loadAvatarCopyingPrivacy(sessionToken: AccountSessionToken) {
+        val request = avatarCopyingPrivacyStateMachine.tryStartLoad(sessionToken.userId) ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                authService.currentUser()
+            }
+            if (response == null) {
+                avatarCopyingPrivacyStateMachine.abandon(request)
+                return@launch
+            }
+            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                avatarCopyingPrivacyStateMachine.abandon(request)
+                return@launch
+            }
+            response.result
+                .mapCatching { currentUser ->
+                    check(currentUser.id == response.sessionToken.userId) {
+                        "Current user response did not match the authenticated account"
+                    }
+                    currentUser.allowAvatarCopying
+                }
+                .fold(
+                    onSuccess = { isAllowed ->
+                        avatarCopyingPrivacyStateMachine.completeLoad(request, isAllowed)
+                    },
+                    onFailure = { error ->
+                        if (avatarCopyingPrivacyStateMachine.failLoad(request)) {
+                            handleError(error)
+                        }
+                    },
+                )
+        }
+    }
+
+    fun updateAvatarCopyingPrivacy(
+        isAllowed: Boolean,
+        successMessage: String,
+    ) {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token
+            ?.takeIf { it.userId == cacheOwnerUserId }
+            ?: return
+        val request = avatarCopyingPrivacyStateMachine.tryStartUpdate(
+            userId = sessionToken.userId,
+            requestedValue = isAllowed,
+        ) ?: return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                usersApi.updateUserInfo(
+                    userId = sessionToken.userId,
+                    updateUserInfoData = UpdateUserInfoData(
+                        allowAvatarCopying = isAllowed,
+                    ),
+                )
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                avatarCopyingPrivacyStateMachine.abandon(request)
+                return@launch
+            }
+            val updateResult = response.result.mapCatching { updatedUser ->
+                check(updatedUser.id == response.sessionToken.userId) {
+                    "Profile update returned a different user"
+                }
+                check(updatedUser.allowAvatarCopying == isAllowed) {
+                    "Profile update did not apply the requested privacy value"
+                }
+                updatedUser.allowAvatarCopying
+            }
+            updateResult.exceptionOrNull()?.let { error ->
+                if (avatarCopyingPrivacyStateMachine.failUpdate(request)) {
+                    handleError(error)
+                }
+                return@launch
+            }
+            val acceptedValue = updateResult.getOrThrow()
+            if (!authService.applyAvatarCopyingUpdate(
+                    sessionToken = response.sessionToken,
+                    allowAvatarCopying = acceptedValue,
+                )
+            ) {
+                avatarCopyingPrivacyStateMachine.abandon(request)
+                return@launch
+            }
+            if (avatarCopyingPrivacyStateMachine.completeUpdate(request, acceptedValue)) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
             }
         }
     }

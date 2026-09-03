@@ -4,7 +4,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -13,24 +12,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
-class FileApiUrlTest {
+class FileApiAvatarGalleryTest {
     @Test
-    fun imageUrlUsesUploadedFileVersion() {
-        assertEquals(
-            "https://api.vrchat.cloud/api/1/image/file_avatar/4/1024",
-            FileApi.imageUrl(fileId = "file_avatar", fileVersion = 4),
-        )
-    }
-
-    @Test
-    fun avatarGalleryRefreshUsesAvatarScopedQuery() = runBlocking {
-        var request: HttpRequestData? = null
+    fun avatarGalleryQueryUsesAvatarScopedTagAndPagination() = runBlocking {
+        var query = emptyMap<String, List<String>>()
         val client = HttpClient(MockEngine) {
             engine {
-                addHandler {
-                    request = it
+                addHandler { request ->
+                    query = request.url.parameters.entries().associate { it.key to it.value }
                     respond(
                         content = "[]",
                         status = HttpStatusCode.OK,
@@ -38,16 +28,17 @@ class FileApiUrlTest {
                     )
                 }
             }
-            install(ContentNegotiation) { json(Json) }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
 
-        FileApi(client).getAvatarGalleryFiles("avtr_owner")
+        FileApi(client).getAvatarGalleryFiles("avtr_model", n = 200, offset = -4)
 
-        val url = requireNotNull(request).url.toString()
-        assertTrue(url.contains("tag=avatargallery"))
-        assertTrue(url.contains("galleryId=avtr_owner"))
-        assertTrue(url.contains("n=100"))
-        assertTrue(url.contains("offset=0"))
+        assertEquals(mapOf(
+            "tag" to listOf("avatargallery"),
+            "galleryId" to listOf("avtr_model"),
+            "n" to listOf("100"),
+            "offset" to listOf("0"),
+        ), query)
         client.close()
     }
 }

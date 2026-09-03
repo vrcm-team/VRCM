@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -11,12 +12,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryPendingR
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryTarget
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUpdate
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageFile
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
-import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import kotlinx.coroutines.runBlocking
@@ -233,10 +236,21 @@ private class FakeSubmissionAvatarEditor(
     var uploadedCover: AvatarCoverFile? = null
     val assignments = mutableListOf<Pair<String, String>>()
 
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Metadata update is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Metadata update is not used")
+    ): AvatarMetadataUpdateResponse? = error("Metadata update is not used")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Publication update is not used")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> {
         uploadedCover = cover
@@ -255,10 +269,21 @@ private data object UnusedPrintUploader : PrintUploader {
 }
 
 private data object UnusedAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Avatar editing is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Avatar editing is not used")
+    ): AvatarMetadataUpdateResponse? = error("Avatar editing is not used")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Avatar editing is not used")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         error("Avatar editing is not used")
