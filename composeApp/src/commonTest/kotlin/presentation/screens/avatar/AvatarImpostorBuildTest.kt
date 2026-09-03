@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceSta
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUnityPackage
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -74,6 +75,40 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
         assertFalse(model.impostorState.value.isLoadingQueueEstimate)
         assertFalse(model.impostorState.value.canBuild)
         assertNull(model.impostorState.value.failure)
+    }
+
+    @Test
+    fun queueStatsRenewalKeepsOperationLockedUntilResponseBindsNewSession() = runBlocking {
+        val ownerToken = token("usr_owner", 1)
+        val renewedToken = token("usr_owner", 2)
+        val session = MutableStateFlow(authenticated(ownerToken))
+        val selector = SessionAvatarSelector("usr_owner")
+        val builder = ControlledImpostorBuilder(session)
+        val model = model(session, selector, builder, avatar(hasImpostor = false))
+
+        model.enqueueImpostor()
+        yield()
+        builder.completeEnqueue(
+            ownerToken,
+            Result.success(serviceStatus(subjectId = "avtr_owned", requesterUserId = "usr_owner")),
+        )
+        yield()
+
+        assertTrue(model.impostorState.value.isLoadingQueueEstimate)
+        session.value = authenticated(renewedToken)
+        yield()
+
+        assertTrue(model.impostorState.value.isLoadingQueueEstimate)
+        assertFalse(model.impostorState.value.canBuild)
+
+        builder.completeQueueStats(
+            renewedToken,
+            Result.failure(VRCApiException("Unauthorized", 401, "expired")),
+        )
+        yield()
+
+        assertTrue(model.impostorState.value.queueEstimateFailed)
+        assertFalse(model.impostorState.value.canBuild)
     }
 
     @Test

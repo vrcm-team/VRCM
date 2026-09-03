@@ -261,9 +261,12 @@ class AvatarProfileScreenModel internal constructor(
     ) { avatar, currentValidation, session, operation, selecting ->
         val visibleOperation = operation.takeIf { current ->
             val target = current.target ?: return@takeIf false
-            avatar?.avatarId == target.avatarId &&
-                session?.token?.userId == target.sessionToken.userId &&
-                (current.isSubmitting || session.token == target.sessionToken)
+            val sameUserAndAvatar = avatar?.avatarId == target.avatarId &&
+                session?.token?.userId == target.sessionToken.userId
+            val operationInProgress = current.isSubmitting ||
+                current.isLoadingQueueEstimate ||
+                current.status?.state.isActiveImpostorState()
+            sameUserAndAvatar && (operationInProgress || session.token == target.sessionToken)
         }
         val taskState = visibleOperation?.status?.state
         val hasImpostor = avatar?.hasImpostor == true || taskState.isSuccessfulImpostorState()
