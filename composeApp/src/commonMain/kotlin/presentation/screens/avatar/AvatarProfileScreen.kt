@@ -85,6 +85,7 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.GalleryUploaded -> ToastText.Success(locale.avatarGalleryUploaded)
     AvatarProfileNotice.PublicationMadePublic ->
         ToastText.Success(locale.avatarEditPublicationMadePublic)
     AvatarProfileNotice.PublicationMadePrivate ->
@@ -140,6 +141,8 @@ class AvatarProfileScreen(
         val impostorDeletionState by screenModel.impostorDeletionState.collectAsState()
         val impostorState by screenModel.impostorState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
+        val avatarGalleryUpdates by editorSessionStore.avatarGalleryUpdates.collectAsState()
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
@@ -185,6 +188,14 @@ class AvatarProfileScreen(
                 ?: return@LaunchedEffect
             if (screenModel.applyCoverUpdate(updated)) {
                 editorSessionStore.consumeAvatarCoverUpdate(updated.id)
+            }
+        }
+        LaunchedEffect(displayedAvatar.avatarId, avatarGalleryUpdates, currentSession?.token) {
+            val update = avatarGalleryUpdates[displayedAvatar.avatarId] ?: return@LaunchedEffect
+            if (screenModel.applyGalleryUpdate(update) ||
+                !SharedFlowCentre.isCurrentSession(update.sessionToken)
+            ) {
+                editorSessionStore.consumeAvatarGalleryUpdate(update.avatarId)
             }
         }
 
@@ -252,6 +263,27 @@ class AvatarProfileScreen(
                             showEditSheet = false
                         },
                     )
+                },
+                onEditGallery = { source, prepared ->
+                    val session = currentSession
+                    if (session != null && session.account.userId == displayedAvatar.authorId) {
+                        handoffPreparedImageToEditor(
+                            source = source,
+                            prepared = prepared,
+                            sessionStore = editorSessionStore,
+                            target = ImageEditorTarget.AvatarGallery(
+                                AvatarGalleryTarget(
+                                    avatarId = displayedAvatar.avatarId,
+                                    ownerUserId = displayedAvatar.authorId,
+                                    sessionToken = session.token,
+                                )
+                            ),
+                            push = { sessionId ->
+                                navigator.push(PrintImageEditorScreen(sessionId))
+                                showEditSheet = false
+                            },
+                        )
+                    }
                 },
             )
         }

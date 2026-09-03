@@ -22,6 +22,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryUploader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
@@ -121,7 +123,8 @@ val presentationModule: Module = module {
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
     singleOf(::NetworkWorldImageEditor) bind WorldImageEditor::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get(), get()) }
+    singleOf(::NetworkAvatarGalleryUploader) bind AvatarGalleryUploader::class
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -136,6 +139,13 @@ val presentationModule: Module = module {
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.AvatarGallery -> DefaultPrintImageProcessor(
+                    codec = get(),
+                    spec = session.target.canvasSpec,
+                    maxOutputBytes = PrintImageLimits.MAX_GALLERY_ENCODED_OUTPUT_BYTES,
+                    limitOutputToVisibleSource = true,
+                    shrinkOversizedOutput = true,
+                )
                 is ImageEditorTarget.WorldCover -> get(AvatarCoverImageProcessorQualifier)
                 is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
                     codec = get(),

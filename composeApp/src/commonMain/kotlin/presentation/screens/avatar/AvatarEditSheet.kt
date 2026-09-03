@@ -56,6 +56,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImagePro
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.SelectedImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.localizedMessage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.readSelectedImage
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -78,6 +79,7 @@ internal fun AvatarEditSheet(
     onEnqueueImpostor: () -> Unit,
     onUpdatePublication: (AvatarPublicationStatus) -> Unit,
     onEditCover: (SelectedImage, PreparedImage) -> Unit,
+    onEditGallery: (SelectedImage, PreparedImage) -> Unit,
 ) {
     val metadataKey = arrayOf(avatar.avatarId, avatar.version, avatar.updatedAt, avatar.tags)
     var name by remember(*metadataKey) { mutableStateOf(avatar.avatarName) }
@@ -92,11 +94,13 @@ internal fun AvatarEditSheet(
     }
     var coverError by remember(avatar.avatarId) { mutableStateOf<String?>(null) }
     var isPreparingCover by remember(avatar.avatarId) { mutableStateOf(false) }
+    var galleryError by remember(avatar.avatarId) { mutableStateOf<String?>(null) }
+    var isPreparingGallery by remember(avatar.avatarId) { mutableStateOf(false) }
     var showPublicConfirmation by remember(avatar.avatarId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val locale = strings
     val isRemoteUpdateBusy = state.isSavingMetadata || state.isUpdatingPublication
-    val isBusy = isRemoteUpdateBusy || isPreparingCover ||
+    val isBusy = isRemoteUpdateBusy || isPreparingCover || isPreparingGallery ||
         impostorState.isSubmitting || impostorState.isLoadingQueueEstimate
     val latestIsBusy = rememberUpdatedState(isBusy)
     val sheetState = rememberModalBottomSheetState(
@@ -113,7 +117,7 @@ internal fun AvatarEditSheet(
     val coverPicker = rememberFilePickerLauncher(
         type = galleryImagePickerType(AvatarCoverLimits.ALLOWED_EXTENSIONS),
     ) { file ->
-        if (file != null && !isPreparingCover) {
+        if (file != null && !isBusy) {
             scope.launch {
                 isPreparingCover = true
                 coverError = null
@@ -154,6 +158,43 @@ internal fun AvatarEditSheet(
         }
     }
 
+    val galleryPicker = rememberFilePickerLauncher(
+        type = galleryImagePickerType(AvatarGalleryLimits.ALLOWED_EXTENSIONS),
+    ) { file ->
+        if (file != null && !isBusy) {
+            scope.launch {
+                isPreparingGallery = true
+                galleryError = null
+                try {
+                    val source = readSelectedImage(file.name) {
+                        file.readBoundedBytes(AvatarGalleryLimits.MAX_FILE_BYTES)
+                    }.getOrElse { failure ->
+                        galleryError = if (failure is PrintImageFailure.FileTooLarge) {
+                            locale.avatarGalleryFileTooLarge
+                        } else {
+                            locale.avatarGalleryReadFailed
+                        }
+                        return@launch
+                    }
+                    val prepared = imageProcessor.prepare(source).getOrElse { failure ->
+                        if (failure is CancellationException) throw failure
+                        galleryError = (failure as? PrintImageFailure)
+                            ?.localizedMessage(locale)
+                            ?: locale.avatarGalleryReadFailed
+                        return@launch
+                    }
+                    onEditGallery(source, prepared)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    galleryError = locale.avatarGalleryReadFailed
+                } finally {
+                    isPreparingGallery = false
+                }
+            }
+        }
+    }
+
     ModalBottomSheet(
         onDismissRequest = { if (!isBusy) onDismiss() },
         sheetState = sheetState,
@@ -180,7 +221,7 @@ internal fun AvatarEditSheet(
                 label = { Text(locale.avatarEditName) },
                 supportingText = { Text("${name.length}/$AvatarNameMaxLength") },
                 singleLine = true,
-                enabled = !isRemoteUpdateBusy,
+                enabled = !isBusy,
             )
             OutlinedTextField(
                 value = description,
@@ -194,7 +235,7 @@ internal fun AvatarEditSheet(
                 },
                 minLines = 3,
                 maxLines = 6,
-                enabled = !isRemoteUpdateBusy,
+                enabled = !isBusy,
             )
 
             HorizontalDivider()
@@ -295,7 +336,7 @@ internal fun AvatarEditSheet(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = name.isNotBlank() && !isRemoteUpdateBusy,
+                enabled = name.isNotBlank() && !isBusy,
             ) {
                 if (state.isSavingMetadata) {
                     CircularProgressIndicator(
@@ -408,10 +449,43 @@ internal fun AvatarEditSheet(
             }
 
             HorizontalDivider()
+            Text(
+                text = locale.avatarGalleryTitle,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = locale.avatarGalleryHint,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = galleryPicker::launch,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isBusy,
+            ) {
+                if (isPreparingGallery) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(AppIcons.Publish, contentDescription = null, Modifier.size(18.dp))
+                }
+                Spacer(Modifier.size(8.dp))
+                Text(locale.avatarGalleryChooseImage)
+            }
+            galleryError?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             AvatarImpostorSection(
                 state = impostorState,
-                localPreparationInProgress = isPreparingCover,
+                localPreparationInProgress = isPreparingCover || isPreparingGallery,
                 onEnqueue = onEnqueueImpostor,
             )
 

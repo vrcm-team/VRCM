@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.plugins.onUpload
 import io.ktor.http.*
 
 
@@ -84,7 +85,7 @@ class FileApi(private val client: HttpClient) {
     /** 获取指定模型关联的只读 Gallery 文件。 */
     suspend fun getAvatarGalleryFiles(
         avatarId: String,
-        n: Int = 60,
+        n: Int = 100,
         offset: Int = 0,
     ) = client.get(FILES_API_PREFIX) {
         parameter("tag", "avatargallery")
@@ -156,6 +157,27 @@ class FileApi(private val client: HttpClient) {
             }
         ).checkSuccessResult<FileData>()
     }
+
+    /** Uploads an image to an avatar's private Gallery and reports actual request progress. */
+    suspend fun uploadAvatarGalleryImage(
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        avatarId: String,
+        onProgress: suspend (bytesSent: Long, totalBytes: Long?) -> Unit = { _, _ -> },
+    ): Result<FileData> = client.submitFormWithBinaryData(
+        url = "${FILE_API_PREFIX}/image",
+        formData = formData {
+            append("file", fileBytes, Headers.build {
+                append(HttpHeaders.ContentType, mimeType)
+                append(HttpHeaders.ContentDisposition, "filename=\"blob\"")
+            })
+            append("tag", "avatargallery")
+            append("galleryId", avatarId)
+        },
+    ) {
+        onUpload { bytesSent, contentLength -> onProgress(bytesSent, contentLength) }
+    }.checkSuccessResult()
 
     /**
      * 获取特定文件ID的文件信息

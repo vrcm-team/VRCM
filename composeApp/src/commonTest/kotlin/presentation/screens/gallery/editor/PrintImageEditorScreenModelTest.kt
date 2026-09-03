@@ -95,6 +95,79 @@ class PrintImageEditorScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun dismissingSubmissionErrorStillLetsRetryResumeTheFailedStage() = runBlocking {
+        val failure = IllegalStateException("refresh")
+        val submitter = RetryAwareSubmitter(failure)
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.png", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_080, 1_920)),
+            calculator = CropTransformCalculator(),
+            processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Gallery),
+            sessionId = "retry-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
+
+        model.upload()
+        yield()
+        model.clearError()
+        model.upload()
+        yield()
+
+        assertSame(failure, submitter.retryFailure)
+        assertEquals(1, submitter.submitCount)
+        assertEquals(1, submitter.retryCount)
+    }
+
+    @Test
+    fun uploadProgressMovesToServerRefreshWithoutEnablingAnotherSubmission() = runBlocking {
+        val completion = CompletableDeferred<Unit>()
+        val submitter = object : ImageEditorSubmitter {
+            override suspend fun submit(
+                target: ImageEditorTarget,
+                imageBytes: ByteArray,
+                fileName: String,
+            ): Result<ImageEditorSubmission> = error("Progress overload is required")
+
+            override suspend fun submit(
+                target: ImageEditorTarget,
+                imageBytes: ByteArray,
+                fileName: String,
+                onProgress: (ImageEditorSubmissionProgress) -> Unit,
+            ): Result<ImageEditorSubmission> {
+                onProgress(ImageEditorSubmissionProgress.Upload(5, 10))
+                onProgress(ImageEditorSubmissionProgress.Refreshing)
+                completion.await()
+                return Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
+            }
+        }
+        val model = PrintImageEditorScreenModel(
+            source = SelectedImage("source.png", byteArrayOf(1)),
+            prepared = PreparedImage(TestImageBitmap, ImageSize(1_080, 1_920)),
+            calculator = CropTransformCalculator(),
+            processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) },
+            submitter = submitter,
+            target = ImageEditorTarget.Gallery(FileTagType.Gallery),
+            sessionId = "progress-session",
+            sessionStore = PrintImageEditorSessionStore(),
+            workerDispatcher = Dispatchers.Unconfined,
+        )
+
+        model.upload()
+
+        assertEquals(EditorPhase.Refreshing, model.state.value.phase)
+        assertTrue(model.state.value.isBusy)
+        assertEquals(
+            ImageEditorSubmissionProgress.Refreshing,
+            model.state.value.submissionProgress,
+        )
+        completion.complete(Unit)
+        Unit
+    }
+
+    @Test
     fun directUploadFailureReturnsToReadyAndRetryReusesRenderedPng() = runBlocking {
         val processor = FakePrintImageProcessor { _, _, _ -> Result.success(PNG_BYTES) }
         var attempt = 0
@@ -611,6 +684,42 @@ private class FakeImageEditorSubmitter(
     ): Result<ImageEditorSubmission> {
         lastFileName = fileName
         return submitBlock()
+    }
+}
+
+private class RetryAwareSubmitter(
+    private val failure: Throwable,
+) : ImageEditorSubmitter {
+    var submitCount = 0
+    var retryCount = 0
+    var retryFailure: Throwable? = null
+
+    override suspend fun submit(
+        target: ImageEditorTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+    ): Result<ImageEditorSubmission> = error("Progress overload is required")
+
+    override suspend fun submit(
+        target: ImageEditorTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+        onProgress: (ImageEditorSubmissionProgress) -> Unit,
+    ): Result<ImageEditorSubmission> {
+        submitCount++
+        return Result.failure(failure)
+    }
+
+    override suspend fun retry(
+        target: ImageEditorTarget,
+        imageBytes: ByteArray,
+        fileName: String,
+        previousFailure: Throwable,
+        onProgress: (ImageEditorSubmissionProgress) -> Unit,
+    ): Result<ImageEditorSubmission> {
+        retryCount++
+        retryFailure = previousFailure
+        return Result.success(ImageEditorSubmission.Gallery(FileTagType.Gallery))
     }
 }
 

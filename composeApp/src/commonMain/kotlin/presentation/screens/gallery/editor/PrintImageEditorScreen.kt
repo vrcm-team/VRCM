@@ -78,6 +78,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploadFailure
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageSessionChanged
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
@@ -125,18 +126,21 @@ class PrintImageEditorScreen(
         val title = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorTitle
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCover
+            is ImageEditorTarget.AvatarGallery -> locale.avatarGalleryTitle
             is ImageEditorTarget.WorldCover -> locale.worldImageEditTitle
             is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val submitLabel = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUpload
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadCover
+            is ImageEditorTarget.AvatarGallery -> locale.avatarGalleryUpload
             is ImageEditorTarget.WorldCover -> locale.worldImageEditUpload
             is ImageEditorTarget.Gallery -> locale.galleryTabUploadImage
         }
         val uploadingText = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorUploading
             is ImageEditorTarget.AvatarCover -> locale.avatarEditUploadingCover
+            is ImageEditorTarget.AvatarGallery -> locale.avatarGalleryUploading
             is ImageEditorTarget.WorldCover -> locale.worldImageEditUploading
             is ImageEditorTarget.Gallery -> locale.galleryTabUploading
         }
@@ -156,6 +160,7 @@ class PrintImageEditorScreen(
                                 ToastText.Success(currentLocale.galleryTabUploadSuccess),
                             )
                             is ImageEditorSubmission.AvatarCover -> Unit
+                            is ImageEditorSubmission.AvatarGallery -> Unit
                             is ImageEditorSubmission.WorldCover -> Unit
                         }
                         navigator.pop()
@@ -366,8 +371,16 @@ private fun PrintEditorPreview(
                     Text(
                         text = if (state.phase == EditorPhase.Processing) {
                             locale.printEditorProcessing
+                        } else if (state.phase == EditorPhase.Refreshing) {
+                            locale.avatarGalleryRefreshing
                         } else {
-                            uploadingText
+                            val progress = state.submissionProgress as?
+                                ImageEditorSubmissionProgress.Upload
+                            if (progress?.totalBytes != null && progress.totalBytes > 0) {
+                                "${uploadingText} ${(progress.bytesSent * 100 / progress.totalBytes).toInt()}%"
+                            } else {
+                                uploadingText
+                            }
                         },
                         color = Color.White,
                         style = MaterialTheme.typography.bodyMedium,
@@ -719,6 +732,10 @@ private fun EditorError.localizedMessage(
         is PrintUploadFailure.Unknown -> locale.printEditorUploadUnknownFailed
         is AvatarCoverUpdateFailure.Upload -> locale.avatarEditCoverUploadFailed
         is AvatarCoverUpdateFailure.Assignment -> locale.avatarEditCoverAssignmentFailed
+        is AvatarGalleryUploadFailure.Upload -> locale.avatarGalleryUploadFailed
+        is AvatarGalleryUploadFailure.Refresh -> locale.avatarGalleryRefreshFailed
+        is AvatarGalleryUploadFailure.SessionChanged -> locale.avatarGallerySessionChanged
+        is AvatarGalleryUploadFailure.Permission -> locale.avatarGalleryPermissionDenied
         is WorldImageUpdateFailure -> when {
             cause.cause is WorldImageSessionChanged -> locale.worldImageEditSessionChanged
             cause is WorldImageUpdateFailure.Upload -> locale.worldImageEditUploadFailed
@@ -728,6 +745,7 @@ private fun EditorError.localizedMessage(
         else -> when (target) {
             ImageEditorTarget.Print -> locale.printEditorUploadUnknownFailed
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCoverUploadFailed
+            is ImageEditorTarget.AvatarGallery -> locale.avatarGalleryUploadFailed
             is ImageEditorTarget.WorldCover -> locale.worldImageEditUploadFailed
             is ImageEditorTarget.Gallery -> locale.galleryTabUploadFailed
         }
@@ -739,6 +757,7 @@ private val ImageEditorTarget.cropAspectRatio: Float
         ImageEditorTarget.Print,
         is ImageEditorTarget.AvatarCover,
         is ImageEditorTarget.WorldCover -> 16f / 9f
+        is ImageEditorTarget.AvatarGallery -> canvasSpec.aspectRatio
         is ImageEditorTarget.Gallery -> canvasSpec.aspectRatio
     }
 

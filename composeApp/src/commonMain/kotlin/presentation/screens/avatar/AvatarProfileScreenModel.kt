@@ -171,6 +171,7 @@ internal sealed interface AvatarProfileNotice {
     data object MetadataSaved : AvatarProfileNotice
     data class MetadataSaveFailed(val message: String?) : AvatarProfileNotice
     data object CoverSaved : AvatarProfileNotice
+    data object GalleryUploaded : AvatarProfileNotice
     data object PublicationMadePublic : AvatarProfileNotice
     data object PublicationMadePrivate : AvatarProfileNotice
     data class PublicationUpdateFailed(
@@ -779,6 +780,19 @@ class AvatarProfileScreenModel internal constructor(
             version = updated.version,
         )
         _notices.tryEmit(AvatarProfileNotice.CoverSaved)
+        return true
+    }
+
+    internal fun applyGalleryUpdate(update: AvatarGalleryUpdate): Boolean {
+        val current = _avatarProfileState.value ?: return false
+        val session = favoriteSession.value ?: return false
+        if (current.avatarId != update.avatarId ||
+            current.authorId != session.account.userId ||
+            !SharedFlowCentre.isCurrentSession(update.sessionToken) ||
+            update.sessionToken != session.token
+        ) return false
+
+        _notices.tryEmit(AvatarProfileNotice.GalleryUploaded)
         return true
     }
 
