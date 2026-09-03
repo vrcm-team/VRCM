@@ -196,6 +196,7 @@ class AvatarProfileScreenModel internal constructor(
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    avatarGalleryLoader: AvatarGalleryLoader? = null,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -219,6 +220,25 @@ class AvatarProfileScreenModel internal constructor(
 
     private val _notices = MutableSharedFlow<AvatarProfileNotice>(extraBufferCapacity = 1)
     internal val notices: SharedFlow<AvatarProfileNotice> = _notices.asSharedFlow()
+
+    private val avatarGallery = avatarGalleryLoader?.let {
+        AvatarGalleryStateController(
+            loader = it,
+            scope = viewModelScope,
+            dispatcher = requestDispatcher,
+            session = favoriteSession,
+        )
+    }
+    internal val avatarGalleryState: StateFlow<AvatarGalleryState> =
+        avatarGallery?.state ?: MutableStateFlow(AvatarGalleryState())
+
+    internal fun loadMoreAvatarGallery() {
+        avatarGallery?.loadMore()
+    }
+
+    internal fun retryAvatarGallery() {
+        avatarGallery?.retry()
+    }
 
     private val validation = MutableStateFlow(AvatarValidation.Checking)
     private val isSelecting = MutableStateFlow(false)
@@ -290,6 +310,7 @@ class AvatarProfileScreenModel internal constructor(
         validation.value = AvatarValidation.Checking
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
+        avatarGallery?.showAvatar(avatarId)
         favoriteEntry.load(avatarId)
         if (avatarId.isBlank()) {
             _isLoading.value = false
