@@ -53,6 +53,7 @@ class AuthService(
     private val serviceJob = Job()
     private val scope = CoroutineScope(serviceJob)
     private val authMutex = Mutex()
+    private val homeWorldMutationGate = Mutex()
     private val currentUserLock = SynchronizedObject()
 
     private var currentUser: CurrentUserData? = null
@@ -67,8 +68,10 @@ class AuthService(
         scope.launch {
             SharedFlowCentre.authed.collect { session ->
                 val accountDto = session.account
-                synchronized(currentUserLock) {
-                    if (currentUser?.id != accountDto.userId) clearCurrentUserLocked()
+                homeWorldMutationGate.withLock {
+                    synchronized(currentUserLock) {
+                        if (currentUser?.id != accountDto.userId) clearCurrentUserLocked()
+                    }
                 }
                 currentAccountDto = accountDto
                 accountDao.saveAccountInfo(accountDto)
@@ -122,25 +125,27 @@ class AuthService(
     }
 
     suspend fun currentUser(isRefresh: Boolean = false): CurrentUserData {
-        val cached = synchronized(currentUserLock) { currentUser }
-        if (cached != null && !isRefresh) return cached
-        val refreshed = authApi.currentUser()
-        return synchronized(currentUserLock) {
-            publishCurrentUserLocked(
-                refreshed.copy(
-                    presence = selectCurrentPresence(refreshed.presence, socketPresence),
+        return homeWorldMutationGate.withLock {
+            val cached = synchronized(currentUserLock) { currentUser }
+            if (cached != null && !isRefresh) return@withLock cached
+            val refreshed = authApi.currentUser()
+            synchronized(currentUserLock) {
+                publishCurrentUserLocked(
+                    refreshed.copy(
+                        presence = selectCurrentPresence(refreshed.presence, socketPresence),
+                    )
                 )
-            )
+            }
         }
     }
 
     internal suspend fun refreshCurrentUserPresence(
         sessionToken: AccountSessionToken,
-    ): CurrentUserData? {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return null
+    ): CurrentUserData? = homeWorldMutationGate.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
         val requestSocketRevision = synchronized(currentUserLock) { socketPresenceRevision }
         val refreshed = authApi.currentUser()
-        return synchronized(currentUserLock) {
+        synchronized(currentUserLock) {
             if (!SharedFlowCentre.isCurrentSession(sessionToken) ||
                 refreshed.id != sessionToken.userId
             ) {
@@ -164,7 +169,15 @@ class AuthService(
         }
     }
 
-    internal fun applyCurrentUserHomeLocation(
+    internal suspend fun applyCurrentUserHomeLocation(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        homeLocation: String,
+    ): Boolean = homeWorldMutationGate.withLock {
+        applyCurrentUserHomeLocationLocked(sessionToken, userId, homeLocation)
+    }
+
+    internal fun applyCurrentUserHomeLocationLocked(
         sessionToken: AccountSessionToken,
         userId: String,
         homeLocation: String,
@@ -175,7 +188,11 @@ class AuthService(
         true
     }
 
-    /** Reads the current user's Home World while holding the same lock as user updates. */
+    /** Runs a Home World check and the associated request as one serializable mutation. */
+    internal suspend fun <T> withHomeWorldMutation(action: suspend () -> T): T =
+        homeWorldMutationGate.withLock { action() }
+
+    /** Reads the current user's Home World while holding the user-state lock. */
     internal fun isCurrentUserHomeWorld(
         sessionToken: AccountSessionToken,
         expectedWorldId: String,
@@ -183,6 +200,64 @@ class AuthService(
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
         currentUser?.let { it.id == sessionToken.userId && it.homeLocation == expectedWorldId }
             ?: false
+    }
+
+    fun applySocketUserLocation(location: String, travelingToLocation: String) {
+        synchronized(currentUserLock) {
+            val existing = currentUser ?: return@synchronized
+            val (world, instance) = socketLocationToPresenceParts(location)
+            val (travelingToWorld, travelingToInstance) =
+                socketLocationToPresenceParts(travelingToLocation)
+            val updatedPresence = existing.presence.copy(
+                world = world,
+                instance = instance,
+                travelingToWorld = travelingToWorld,
+                travelingToInstance = travelingToInstance,
+            )
+            socketPresence = updatedPresence
+            socketPresenceRevision++
+            publishCurrentUserLocked(existing.copy(presence = updatedPresence))
+        }
+    }
+
+    suspend fun applyOwnProfileRefresh(user: UserData) {
+        homeWorldMutationGate.withLock {
+            synchronized(currentUserLock) {
+                val existing = currentUser ?: return@synchronized
+                if (existing.id != user.id) return@synchronized
+                val (world, instance) = socketLocationToPresenceParts(user.location)
+                val (travelingToWorld, travelingToInstance) =
+                    socketLocationToPresenceParts(user.travelingToLocation.orEmpty())
+                val updatedPresence = existing.presence.copy(
+                    world = world,
+                    instance = instance,
+                    travelingToWorld = travelingToWorld,
+                    travelingToInstance = travelingToInstance,
+                    platform = user.lastPlatform.ifBlank { existing.presence.platform },
+                )
+                socketPresence = updatedPresence
+                socketPresenceRevision++
+                publishCurrentUserLocked(
+                    existing.copy(
+                        currentAvatarImageUrl = user.currentAvatarImageUrl,
+                        currentAvatarTags = user.currentAvatarTags,
+                        currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
+                        displayName = user.displayName,
+                        lastActivity = user.lastActivity,
+                        lastLogin = user.lastLogin,
+                        lastPlatform = user.lastPlatform,
+                        profilePicOverride = user.profilePicOverride,
+                        state = user.state.value,
+                        status = user.status,
+                        statusDescription = user.statusDescription,
+                        tags = user.tags,
+                        userIcon = user.userIcon,
+                        pronouns = user.pronouns,
+                        presence = updatedPresence,
+                    )
+                )
+            }
+        }
     }
 
     fun applySocketUserUpdate(user: UserContent) {
@@ -209,62 +284,6 @@ class AuthService(
             )
         }
     }
-
-    fun applySocketUserLocation(location: String, travelingToLocation: String) {
-        synchronized(currentUserLock) {
-            val existing = currentUser ?: return@synchronized
-            val (world, instance) = socketLocationToPresenceParts(location)
-            val (travelingToWorld, travelingToInstance) = socketLocationToPresenceParts(travelingToLocation)
-            val updatedPresence = existing.presence.copy(
-                world = world,
-                instance = instance,
-                travelingToWorld = travelingToWorld,
-                travelingToInstance = travelingToInstance,
-            )
-            socketPresence = updatedPresence
-            socketPresenceRevision++
-            publishCurrentUserLocked(existing.copy(presence = updatedPresence))
-        }
-    }
-
-    fun applyOwnProfileRefresh(user: UserData) {
-        synchronized(currentUserLock) {
-            val existing = currentUser ?: return@synchronized
-            if (existing.id != user.id) return@synchronized
-            val (world, instance) = socketLocationToPresenceParts(user.location)
-            val (travelingToWorld, travelingToInstance) =
-                socketLocationToPresenceParts(user.travelingToLocation.orEmpty())
-            val updatedPresence = existing.presence.copy(
-                world = world,
-                instance = instance,
-                travelingToWorld = travelingToWorld,
-                travelingToInstance = travelingToInstance,
-                platform = user.lastPlatform.ifBlank { existing.presence.platform },
-            )
-            socketPresence = updatedPresence
-            socketPresenceRevision++
-            publishCurrentUserLocked(
-                existing.copy(
-                    currentAvatarImageUrl = user.currentAvatarImageUrl,
-                    currentAvatarTags = user.currentAvatarTags,
-                    currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
-                    displayName = user.displayName,
-                    lastActivity = user.lastActivity,
-                    lastLogin = user.lastLogin,
-                    lastPlatform = user.lastPlatform,
-                    profilePicOverride = user.profilePicOverride,
-                    state = user.state.value,
-                    status = user.status,
-                    statusDescription = user.statusDescription,
-                    tags = user.tags,
-                    userIcon = user.userIcon,
-                    pronouns = user.pronouns,
-                    presence = updatedPresence,
-                )
-            )
-        }
-    }
-
 
     suspend fun verify(
         password: String,
@@ -295,12 +314,14 @@ class AuthService(
                 authCookie = cookiesStorage.cookieValue(AUTH_COOKIE),
                 twoFactorAuthCookie = cookiesStorage.cookieValue(TWO_FACTOR_AUTH_COOKIE),
             )
-            synchronized(currentUserLock) {
-                publishCurrentUserLocked(
-                    userData.copy(
-                        presence = selectCurrentPresence(userData.presence, socketPresence),
+            homeWorldMutationGate.withLock {
+                synchronized(currentUserLock) {
+                    publishCurrentUserLocked(
+                        userData.copy(
+                            presence = selectCurrentPresence(userData.presence, socketPresence),
+                        )
                     )
-                )
+                }
             }
             currentAccountDto = accountDto
             accountDao.saveAccountInfo(accountDto)
@@ -338,7 +359,9 @@ class AuthService(
 
     private suspend fun invalidateCurrentSessionLocked() {
         if (SharedFlowCentre.currentSession.value == null) return
-        synchronized(currentUserLock) { clearCurrentUserLocked() }
+        homeWorldMutationGate.withLock {
+            synchronized(currentUserLock) { clearCurrentUserLocked() }
+        }
         currentAccountDto = accountDao.currentAccountDtoOrNull()
         SharedFlowCentre.emitLogout()
     }
@@ -474,7 +497,9 @@ class AuthService(
             ?: synchronized(currentUserLock) { currentUser?.id }
             ?: accountDto().userId
         clearAuthCookie(userId)
-        synchronized(currentUserLock) { clearCurrentUserLocked() }
+        homeWorldMutationGate.withLock {
+            synchronized(currentUserLock) { clearCurrentUserLocked() }
+        }
         currentAccountDto = accountDao.currentAccountDtoOrNull()
         SharedFlowCentre.emitLogout()
     }

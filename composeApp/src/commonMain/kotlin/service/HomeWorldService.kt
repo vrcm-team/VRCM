@@ -107,33 +107,37 @@ internal class HomeWorldService(
         }
             ?: return Result.failure(HomeWorldSessionChangedException())
         val response = authService.runSessionBoundCatching(session.token) {
-            if (expectedWorldId != null && expectedSessionToken != null &&
-                !authService.isCurrentUserHomeWorld(
-                    sessionToken = expectedSessionToken,
-                    expectedWorldId = expectedWorldId,
+            authService.withHomeWorldMutation {
+                if (expectedWorldId != null && expectedSessionToken != null &&
+                    !authService.isCurrentUserHomeWorld(
+                        sessionToken = expectedSessionToken,
+                        expectedWorldId = expectedWorldId,
+                    )
+                ) {
+                    throw HomeWorldStateChangedException()
+                }
+                usersApi.updateUserInfo(
+                    userId = session.account.userId,
+                    updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
                 )
-            ) {
-                throw HomeWorldStateChangedException()
             }
-            usersApi.updateUserInfo(
-                userId = session.account.userId,
-                updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
-            )
         } ?: return Result.failure(HomeWorldSessionChangedException())
 
-        return response.result.mapCatching { updatedUser ->
-            check(updatedUser.id == response.sessionToken.userId) {
-                "Home World update returned a different user"
+        return authService.withHomeWorldMutation {
+            response.result.mapCatching { updatedUser ->
+                check(updatedUser.id == response.sessionToken.userId) {
+                    "Home World update returned a different user"
+                }
+                if (!authService.applyCurrentUserHomeLocationLocked(
+                        sessionToken = response.sessionToken,
+                        userId = updatedUser.id,
+                        homeLocation = updatedUser.homeLocation,
+                    )
+                ) {
+                    throw HomeWorldSessionChangedException()
+                }
+                updatedUser.homeLocation
             }
-            if (!authService.applyCurrentUserHomeLocation(
-                    sessionToken = response.sessionToken,
-                    userId = updatedUser.id,
-                    homeLocation = updatedUser.homeLocation,
-                )
-            ) {
-                throw HomeWorldSessionChangedException()
-            }
-            updatedUser.homeLocation
         }
     }
 }

@@ -227,6 +227,52 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun resetHomeWorldWaitsForUserRefreshBeforeSubmitting() = runTest {
+        val refreshStarted = CompletableDeferred<Unit>()
+        val releaseRefresh = CompletableDeferred<Unit>()
+        var userRequests = 0
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            when {
+                request.method == HttpMethod.Put -> {
+                    updateRequests++
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = ""))
+                }
+
+                request.method == HttpMethod.Get && userRequests++ == 0 ->
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = "wrld_confirmed"))
+
+                request.method == HttpMethod.Get -> {
+                    refreshStarted.complete(Unit)
+                    releaseRefresh.await()
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = "wrld_later"))
+                }
+
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val sessionToken = requireNotNull(SharedFlowCentre.currentSession.value).token
+        val refresh = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.currentUser(isRefresh = true)
+        }
+        refreshStarted.await()
+        val reset = async(start = CoroutineStart.UNDISPATCHED) {
+            HomeWorldService(UsersApi(fixture.client), fixture.service).resetHomeWorld(
+                expectedWorldId = "wrld_confirmed",
+                expectedSessionToken = sessionToken,
+            )
+        }
+
+        assertEquals(0, updateRequests)
+        releaseRefresh.complete(Unit)
+        assertEquals("wrld_later", refresh.await().homeLocation)
+        assertIs<HomeWorldStateChangedException>(reset.await().exceptionOrNull())
+        assertEquals(0, updateRequests)
+        fixture.client.close()
+    }
+
+    @Test
     fun unauthorizedCachedCookieFallsBackToSavedPassword() = runTest {
         val requests = mutableListOf<Pair<String?, String?>>()
         val fixture = fixture { request ->

@@ -546,30 +546,32 @@ class UserProfileScreenModel(
             loadCoordinator.runLoads(
                 forceRefresh = forceRefresh,
                 loadUser = {
-                    var userLoaded = false
-                    authService.reTryAuthCatching {
+                    val responseResult = authService.reTryAuthCatching {
                         usersApi.fetchUserResponse(userId)
-                    }.onFailure {
-                        handleError(it)
-                    }.onSuccess { response ->
-                        // 防止body序列化异常
-                        runCatching { response.body<UserData>() }
-                            .onSuccess {
-                                if (it.id == cacheOwnerUserId) {
-                                    authService.applyOwnProfileRefresh(it)
-                                }
-                                val profile = UserProfileVo(it).withSelfIdentity()
-                                if (_userState.value != profile) {
-                                    _userState.value = profile
-                                    computeFriendLocation(profile.location)
-                                }
-                                saveCache(it)
-                                userLoaded = true
-                            }
-                            .onFailure { handleError(it) }
-                        _userJson.value = response.bodyAsText().pretty()
                     }
-                    userLoaded
+                    responseResult.exceptionOrNull()?.let { error -> handleError(error) }
+                    val response = responseResult.getOrNull()
+                    if (response != null) {
+                        // 防止body序列化异常
+                        val userResult = runCatching { response.body<UserData>() }
+                        userResult.exceptionOrNull()?.let { error -> handleError(error) }
+                        val user = userResult.getOrNull()
+                        if (user != null) {
+                            if (user.id == cacheOwnerUserId) {
+                                authService.applyOwnProfileRefresh(user)
+                            }
+                            val profile = UserProfileVo(user).withSelfIdentity()
+                            if (_userState.value != profile) {
+                                _userState.value = profile
+                                computeFriendLocation(profile.location)
+                            }
+                            saveCache(user)
+                        }
+                        _userJson.value = response.bodyAsText().pretty()
+                        user != null
+                    } else {
+                        false
+                    }
                 },
                 loadGroups = { loadUserGroups(userId) },
             )
