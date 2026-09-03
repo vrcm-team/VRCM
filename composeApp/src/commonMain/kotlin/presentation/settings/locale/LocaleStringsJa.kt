@@ -601,6 +601,17 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val avatarProfileActionSwitch = "このアバターに切り替える"
     override val avatarProfileActionNotCopyable = "このアバターはコピーできません"
     override val avatarProfileActionCheckFailed = "アバターの利用可否を確認できません"
+    override val avatarProfileFallbackSelected = "フォールバックアバターを更新しました"
+    override val avatarProfileFallbackIneligible =
+        "このアバターはフォールバックアバターとして使用できません"
+    override val avatarProfileFallbackNotFound = "このアバターは利用できなくなりました"
+    override val avatarProfileFallbackUnauthorized =
+        "セッションの有効期限が切れました。再ログインしてもう一度お試しください"
+    override val avatarProfileFallbackSelectFailed = "フォールバックアバターを設定できませんでした"
+    override val avatarProfileFallbackActionSet = "フォールバックアバターに設定"
+    override val avatarProfileFallbackActionCurrent = "現在のフォールバックアバター"
+    override val avatarProfileFallbackActionIneligible = "フォールバックアバターに設定不可"
+    override val avatarProfileFallbackActionSetting = "フォールバックアバターを設定中..."
     override val avatarDeleteAction = "アバターを削除"
     override val avatarDeleteTitle = "アバターを削除しますか？"
     override val avatarDeleteMessage =

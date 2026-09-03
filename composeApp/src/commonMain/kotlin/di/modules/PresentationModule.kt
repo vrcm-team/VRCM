@@ -16,13 +16,15 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeletionResultStore
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackSetter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
-import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarFallbackSetter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUploader
@@ -175,6 +177,7 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
+    singleOf(::NetworkAvatarFallbackSetter) bind AvatarFallbackSetter::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
     singleOf(::NetworkAvatarDeleter) bind AvatarDeleter::class
     single { AvatarDeletionResultStore() }
@@ -192,6 +195,7 @@ val presentationModule: Module = module {
             avatarGalleryLoader = get(),
             avatarDeleter = get(),
             avatarDeletionResults = get(),
+            avatarFallbackSetter = get(),
         )
     }
     viewModelOf(::RecentWorldsScreenModel)

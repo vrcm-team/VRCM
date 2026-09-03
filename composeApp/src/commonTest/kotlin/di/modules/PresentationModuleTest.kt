@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackSetter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackUserContext
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AuthenticatedAvatarDeletion
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
@@ -36,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DecodeRequest
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.service.FallbackAvatarUpdateResult
 import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
@@ -102,6 +107,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                         AvatarGalleryLoader { _, _, _ -> Result.success(emptyList()) }
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
+                    single<AvatarFallbackSetter> { EmptyAvatarFallbackSetter }
                     single<AvatarEditor> { EmptyAvatarEditor }
                     single<AvatarDeleter> { EmptyAvatarDeleter }
                     single<AvatarImpostorDeletionSource> { EmptyAvatarImpostorDeletionSource }
@@ -238,6 +244,24 @@ private data object EmptyAvatarSelector : AvatarSelector {
 
     override suspend fun select(avatarId: String): Result<Unit> =
         Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarFallbackSetter : AvatarFallbackSetter {
+    override val currentUser = flowOf<AvatarFallbackUserContext?>(null)
+
+    override suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse? = null
+
+    override suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
+    ): FallbackAvatarUpdateResult = FallbackAvatarUpdateResult.Stale
+
+    override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean = false
 }
 
 private data object EmptyAvatarEditor : AvatarEditor {

@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceSta
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -25,6 +26,9 @@ class AvatarsApi(private val client: HttpClient) {
 
     suspend fun selectAvatar(avatarId: String): AvatarSelectionData =
         client.put("$AVATARS_API_PREFIX/$avatarId/select").checkSuccess()
+
+    suspend fun selectFallbackAvatar(avatarId: String): CurrentUserData =
+        client.put("$AVATARS_API_PREFIX/$avatarId/selectFallback").checkSuccess()
 
     suspend fun deleteImpostor(avatarId: String) {
         client.delete("$AVATARS_API_PREFIX/$avatarId/impostor").checkSuccess { Unit }

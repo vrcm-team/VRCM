@@ -630,6 +630,17 @@ sealed class LocaleStrings {
     open val avatarProfileActionSwitch: String = "Switch to this avatar"
     open val avatarProfileActionNotCopyable: String = "This avatar cannot be copied"
     open val avatarProfileActionCheckFailed: String = "Unable to verify avatar availability"
+    open val avatarProfileFallbackSelected: String = "Fallback avatar updated."
+    open val avatarProfileFallbackIneligible: String =
+        "This avatar is not eligible to be a fallback avatar."
+    open val avatarProfileFallbackNotFound: String = "This avatar is no longer available."
+    open val avatarProfileFallbackUnauthorized: String =
+        "Your session expired. Sign in again and retry."
+    open val avatarProfileFallbackSelectFailed: String = "Failed to set the fallback avatar."
+    open val avatarProfileFallbackActionSet: String = "Set as fallback avatar"
+    open val avatarProfileFallbackActionCurrent: String = "Current fallback avatar"
+    open val avatarProfileFallbackActionIneligible: String = "Unavailable as fallback avatar"
+    open val avatarProfileFallbackActionSetting: String = "Setting fallback avatar..."
     open val avatarDeleteAction: String = "Delete avatar"
     open val avatarDeleteTitle: String = "Delete avatar?"
     open val avatarDeleteMessage: String =

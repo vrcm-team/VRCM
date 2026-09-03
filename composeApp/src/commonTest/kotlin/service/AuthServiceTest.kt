@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.service
 
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
@@ -502,6 +503,78 @@ class AuthServiceTest : MainDispatcherTest() {
         assertEquals(firstSession.account.userId, response.sessionToken.userId)
         assertFalse(response.sessionToken == firstSession.token)
         assertTrue(SharedFlowCentre.isCurrentSession(response.sessionToken))
+        fixture.client.close()
+    }
+
+    @Test
+    fun fallbackAvatarUpdateRequiresMatchingSessionUserAndTarget() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount(), currentAvatar = "avtr_initial"))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        val response = fixture.service.currentUser().copy(
+            currentAvatar = "avtr_stale_response",
+            fallbackAvatar = "avtr_fallback",
+        )
+
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { error("stale session must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response.copy(id = "usr_other"),
+                commitIfCurrent = { error("invalid user must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_other",
+                response = response,
+                commitIfCurrent = { error("invalid target must not reach commit") },
+            ),
+        )
+
+        fixture.service.applyCurrentAvatarUpdate("avtr_newer")
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { _ -> false },
+            ),
+        )
+        assertEquals("", fixture.service.currentUserState.value?.fallbackAvatar)
+        var publishedInsideTargetCommit = false
+        assertEquals(
+            FallbackAvatarUpdateResult.Applied,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { update ->
+                    update()
+                    publishedInsideTargetCommit =
+                        fixture.service.currentUserState.value?.fallbackAvatar == "avtr_fallback"
+                    true
+                },
+            ),
+        )
+        assertTrue(publishedInsideTargetCommit)
+        assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
+        assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)
         fixture.client.close()
     }
 
