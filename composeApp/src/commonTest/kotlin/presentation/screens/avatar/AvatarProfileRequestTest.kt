@@ -557,6 +557,334 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun publicationControlsRequireValidatedOwnedSupportedStatus() = runBlocking {
+        data class Case(
+            val authorId: String,
+            val releaseStatus: String,
+            val sessionUserId: String,
+            val expected: AvatarPublicationStatus?,
+        )
+
+        val cases = listOf(
+            Case("usr_current", "private", "usr_current", AvatarPublicationStatus.Private),
+            Case("usr_current", "public", "usr_current", AvatarPublicationStatus.Public),
+            Case("usr_current", "hidden", "usr_current", null),
+            Case("usr_other", "public", "usr_current", null),
+            Case("usr_current", "private", "usr_other", null),
+        )
+
+        cases.forEachIndexed { index, case ->
+            val avatarId = "avtr_publication_$index"
+            val loader = ControlledAvatarProfileLoader()
+            val session = MutableStateFlow<AuthenticatedAccount?>(
+                authenticatedSession(case.sessionUserId, generation = index.toLong() + 1)
+            )
+            val model = avatarModel(loader = loader, favoriteSession = session)
+
+            model.refreshAvatarData(
+                AvatarProfileVo(
+                    avatarId = avatarId,
+                    authorId = case.authorId,
+                    releaseStatus = case.releaseStatus,
+                )
+            )
+            yield()
+            assertEquals(null, model.editState.value.publication)
+
+            loader.completeSuccess(
+                avatarId = avatarId,
+                avatarName = "Remote",
+                authorId = case.authorId,
+                releaseStatus = case.releaseStatus,
+            )
+            yield()
+
+            assertEquals(case.expected, model.editState.value.publication)
+        }
+    }
+
+    @Test
+    fun unvalidatedReplacementCannotUseThePreviousPublicationState() = runBlocking {
+        val fixture = publicationFixture()
+
+        fixture.model.refreshAvatarData(
+            AvatarProfileVo(
+                avatarId = "avtr_unvalidated",
+                avatarName = "Cached",
+                authorId = "usr_current",
+                releaseStatus = "private",
+            )
+        )
+        fixture.model.updatePublication(AvatarPublicationStatus.Public)
+        yield()
+
+        assertTrue(fixture.editor.publicationRequests.isEmpty())
+        assertEquals(null, fixture.model.editState.value.publication)
+    }
+
+    @Test
+    fun publicationUpdateIsSingleNonOptimisticAndUsesAuthoritativeResponse() = runBlocking {
+        val fixture = publicationFixture()
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            fixture.model.notices.collect(notices::add)
+        }
+
+        fixture.model.updatePublication(AvatarPublicationStatus.Public)
+        fixture.model.updatePublication(AvatarPublicationStatus.Public)
+        yield()
+
+        assertEquals(1, fixture.editor.publicationRequests.size)
+        assertEquals("public", fixture.editor.publicationRequests.single().releaseStatus)
+        assertTrue(fixture.model.editState.value.isUpdatingPublication)
+        assertEquals("private", fixture.model.avatarProfileState.value?.releaseStatus)
+
+        fixture.editor.completePublication(
+            result = Result.success(
+                publicationAvatar(
+                    name = "Authoritative",
+                    releaseStatus = "public",
+                    imageUrl = "https://example.test/authoritative.png",
+                    version = 7,
+                )
+            )
+        )
+        yield()
+
+        assertFalse(fixture.model.editState.value.isUpdatingPublication)
+        assertEquals("Authoritative", fixture.model.avatarProfileState.value?.avatarName)
+        assertEquals("public", fixture.model.avatarProfileState.value?.releaseStatus)
+        assertEquals(
+            "https://example.test/authoritative.png",
+            fixture.model.avatarProfileState.value?.avatarImageUrl,
+        )
+        assertEquals(7, fixture.model.avatarProfileState.value?.version)
+        assertEquals(
+            listOf<AvatarProfileNotice>(AvatarProfileNotice.PublicationMadePublic),
+            notices,
+        )
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun avatarRemoteWritesAreMutuallyExclusive() = runBlocking {
+        val publicationFirst = publicationFixture()
+        publicationFirst.model.updatePublication(AvatarPublicationStatus.Public)
+        publicationFirst.model.saveMetadata("Renamed", "Description")
+        yield()
+
+        assertEquals(1, publicationFirst.editor.publicationRequests.size)
+        assertTrue(publicationFirst.editor.metadataRequests.isEmpty())
+        publicationFirst.editor.completePublication(Result.success(publicationAvatar()))
+        yield()
+
+        val metadataFirst = publicationFixture(avatarId = "avtr_metadata_first")
+        metadataFirst.model.saveMetadata("Renamed", "Description")
+        metadataFirst.model.updatePublication(AvatarPublicationStatus.Public)
+        yield()
+
+        assertEquals(1, metadataFirst.editor.metadataRequests.size)
+        assertTrue(metadataFirst.editor.publicationRequests.isEmpty())
+        metadataFirst.editor.completeMetadata(
+            Result.success(
+                publicationAvatar(
+                    id = "avtr_metadata_first",
+                    name = "Renamed",
+                    releaseStatus = "private",
+                )
+            )
+        )
+        yield()
+        assertFalse(metadataFirst.model.editState.value.isSavingMetadata)
+    }
+
+    @Test
+    fun malformedCurrentPublicationResponsesKeepStateAndEmitFailure() = runBlocking {
+        val responses = listOf(
+            publicationAvatar(id = "avtr_other"),
+            publicationAvatar(authorId = "usr_other"),
+            publicationAvatar(releaseStatus = "hidden"),
+            publicationAvatar(releaseStatus = "private"),
+        )
+
+        responses.forEach { response ->
+            val fixture = publicationFixture()
+            val notices = mutableListOf<AvatarProfileNotice>()
+            val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+                fixture.model.notices.collect(notices::add)
+            }
+
+            fixture.model.updatePublication(AvatarPublicationStatus.Public)
+            yield()
+            fixture.editor.completePublication(Result.success(response))
+            yield()
+
+            assertEquals("Owned", fixture.model.avatarProfileState.value?.avatarName)
+            assertEquals("private", fixture.model.avatarProfileState.value?.releaseStatus)
+            assertFalse(fixture.model.editState.value.isUpdatingPublication)
+            assertEquals(
+                listOf<AvatarProfileNotice>(
+                    AvatarProfileNotice.PublicationUpdateFailed(
+                        AvatarPublicationFailure.Other
+                    )
+                ),
+                notices,
+            )
+            noticeCollector.cancel()
+        }
+    }
+
+    @Test
+    fun refreshedSessionTokenCanOwnThePublicationResponse() = runBlocking {
+        val fixture = publicationFixture(generation = 1)
+
+        fixture.model.updatePublication(AvatarPublicationStatus.Public)
+        yield()
+        val refreshed = authenticatedSession("usr_current", generation = 2)
+        fixture.session.value = refreshed
+        yield()
+        fixture.editor.completePublication(
+            result = Result.success(publicationAvatar()),
+            responseToken = refreshed.token,
+        )
+        yield()
+
+        assertEquals(1, fixture.editor.publicationRequests.single().sessionToken.generation)
+        assertEquals("public", fixture.model.avatarProfileState.value?.releaseStatus)
+        assertEquals(AvatarPublicationStatus.Public, fixture.model.editState.value.publication)
+    }
+
+    @Test
+    fun unrelatedSameAccountSessionDiscardsTheOldPublicationResponse() = runBlocking {
+        val fixture = publicationFixture(generation = 1)
+        val originalToken = fixture.session.value!!.token
+
+        fixture.model.updatePublication(AvatarPublicationStatus.Public)
+        yield()
+        fixture.session.value = authenticatedSession("usr_current", generation = 2)
+        yield()
+        fixture.editor.completePublication(
+            result = Result.success(publicationAvatar()),
+            responseToken = originalToken,
+        )
+        yield()
+
+        assertEquals("private", fixture.model.avatarProfileState.value?.releaseStatus)
+        assertFalse(fixture.model.editState.value.isUpdatingPublication)
+    }
+
+    @Test
+    fun sessionAndTargetChangesDiscardLatePublicationResponses() = runBlocking {
+        listOf("account", "logout", "avatar").forEach { change ->
+            val fixture = publicationFixture()
+            val originalToken = fixture.session.value!!.token
+            val notices = mutableListOf<AvatarProfileNotice>()
+            val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+                fixture.model.notices.collect(notices::add)
+            }
+
+            fixture.model.updatePublication(AvatarPublicationStatus.Public)
+            yield()
+            when (change) {
+                "account" -> {
+                    fixture.selector.switchAccount("usr_other")
+                    fixture.session.value = authenticatedSession("usr_other", generation = 2)
+                }
+                "logout" -> fixture.session.value = null
+                "avatar" -> fixture.model.refreshAvatarData(
+                    AvatarProfileVo(
+                        avatarId = "avtr_new",
+                        avatarName = "New",
+                        authorId = "usr_current",
+                        releaseStatus = "private",
+                    )
+                )
+            }
+            yield()
+            fixture.editor.completePublication(
+                result = Result.success(publicationAvatar()),
+                responseToken = originalToken,
+            )
+            yield()
+
+            if (change == "avatar") {
+                assertEquals("avtr_new", fixture.model.avatarProfileState.value?.avatarId)
+            } else {
+                assertEquals("private", fixture.model.avatarProfileState.value?.releaseStatus)
+            }
+            assertFalse(fixture.model.editState.value.isUpdatingPublication)
+            assertTrue(notices.isEmpty())
+            noticeCollector.cancel()
+        }
+    }
+
+    @Test
+    fun publicationFailuresKeepTheAuthoritativeStateAndUseSpecificFeedback() = runBlocking {
+        data class Case(
+            val status: Int?,
+            val failure: AvatarPublicationFailure,
+            val message: String,
+        )
+
+        val cases = listOf(
+            Case(
+                400,
+                AvatarPublicationFailure.BadRequest,
+                LocaleStringsEn.avatarEditPublicationBadRequest,
+            ),
+            Case(
+                401,
+                AvatarPublicationFailure.Unauthorized,
+                LocaleStringsEn.avatarEditPublicationUnauthorized,
+            ),
+            Case(
+                403,
+                AvatarPublicationFailure.Forbidden,
+                LocaleStringsEn.avatarEditPublicationForbidden,
+            ),
+            Case(
+                404,
+                AvatarPublicationFailure.NotFound,
+                LocaleStringsEn.avatarEditPublicationNotFound,
+            ),
+            Case(
+                null,
+                AvatarPublicationFailure.Other,
+                LocaleStringsEn.avatarEditPublicationFailed,
+            ),
+        )
+
+        cases.forEach { case ->
+            val fixture = publicationFixture()
+            val notices = mutableListOf<AvatarProfileNotice>()
+            val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+                fixture.model.notices.collect(notices::add)
+            }
+
+            fixture.model.updatePublication(AvatarPublicationStatus.Public)
+            yield()
+            val error = case.status?.let {
+                VRCApiException("Request failed", it, "untrusted response")
+            } ?: IllegalStateException("offline")
+            fixture.editor.completePublication(Result.failure(error))
+            yield()
+
+            assertEquals("private", fixture.model.avatarProfileState.value?.releaseStatus)
+            assertEquals(
+                listOf<AvatarProfileNotice>(
+                    AvatarProfileNotice.PublicationUpdateFailed(case.failure)
+                ),
+                notices,
+            )
+            val toast = AvatarProfileNotice.PublicationUpdateFailed(case.failure)
+                .localizedToast(LocaleStringsEn)
+            assertTrue(toast is ToastText.Error)
+            assertEquals(case.message, toast.text)
+            noticeCollector.cancel()
+        }
+    }
+
+    @Test
     fun completedEditorCoverUpdatesTheCurrentAvatarAndEmitsSuccess() = runBlocking {
         val loader = ControlledAvatarProfileLoader()
         val model = avatarModel(loader)
@@ -610,7 +938,72 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             favoriteSession,
         )
             .also(models::add)
+
+    private suspend fun publicationFixture(
+        avatarId: String = "avtr_owned",
+        generation: Long = 1,
+    ): PublicationFixture {
+        val loader = ControlledAvatarProfileLoader()
+        val selector = FakeAvatarSelector()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(
+            authenticatedSession("usr_current", generation)
+        )
+        val model = avatarModel(
+            loader = loader,
+            selector = selector,
+            editor = editor,
+            favoriteSession = session,
+        )
+        model.refreshAvatarData(
+            AvatarProfileVo(
+                avatarId = avatarId,
+                avatarName = "Cached",
+                authorId = "usr_current",
+                releaseStatus = "private",
+            )
+        )
+        loader.completeSuccess(
+            avatarId = avatarId,
+            avatarName = "Owned",
+            authorId = "usr_current",
+            releaseStatus = "private",
+        )
+        yield()
+        return PublicationFixture(model, selector, editor, session)
+    }
 }
+
+private data class PublicationFixture(
+    val model: AvatarProfileScreenModel,
+    val selector: FakeAvatarSelector,
+    val editor: FakeAvatarEditor,
+    val session: MutableStateFlow<AuthenticatedAccount?>,
+)
+
+private fun authenticatedSession(userId: String, generation: Long) = AuthenticatedAccount(
+    account = AccountDto(userId = userId),
+    token = AccountSessionToken(userId = userId, generation = generation),
+)
+
+private fun publicationAvatar(
+    id: String = "avtr_owned",
+    name: String = "Owned",
+    authorId: String = "usr_current",
+    releaseStatus: String = "public",
+    imageUrl: String = "",
+    version: Int? = null,
+) = AvatarData(
+    id = id,
+    name = name,
+    description = "Description",
+    authorId = authorId,
+    authorName = "Author",
+    imageUrl = imageUrl,
+    releaseStatus = releaseStatus,
+    tags = listOf("system_approved"),
+    version = version,
+)
 
 private class EmptyFavoriteEntrySource : FavoriteEntrySource {
     private val favorites = MutableStateFlow<Map<FavoriteGroupData, List<FavoriteData>>>(emptyMap())
@@ -794,11 +1187,26 @@ private class FakeAvatarSelector(
 
 private class FakeAvatarEditor : AvatarEditor {
     private val metadata = CompletableDeferred<Result<AvatarData>>()
+    private val publication = CompletableDeferred<AvatarPublicationResponse?>()
+    val metadataRequests = mutableListOf<Pair<String, AvatarUpdateData>>()
+    val publicationRequests = mutableListOf<PublicationRequest>()
 
     override suspend fun updateMetadata(
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = metadata.await()
+    ): Result<AvatarData> {
+        metadataRequests += avatarId to update
+        return metadata.await()
+    }
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? {
+        publicationRequests += PublicationRequest(sessionToken, avatarId, releaseStatus)
+        return publication.await()
+    }
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         Result.failure(IllegalStateException("Cover upload is not used"))
@@ -810,4 +1218,16 @@ private class FakeAvatarEditor : AvatarEditor {
         metadata.complete(result)
     }
 
+    fun completePublication(
+        result: Result<AvatarData>,
+        responseToken: AccountSessionToken = publicationRequests.single().sessionToken,
+    ) {
+        publication.complete(AvatarPublicationResponse(result, responseToken))
+    }
 }
+
+private data class PublicationRequest(
+    val sessionToken: AccountSessionToken,
+    val avatarId: String,
+    val releaseStatus: String,
+)

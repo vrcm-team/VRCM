@@ -32,6 +32,10 @@ class FileApi(private val client: HttpClient) {
             if (fileId.isBlank() || fileVersion < 1) return ""
             return "https://api.vrchat.cloud/api/1/image/$fileId/$fileVersion/$fileSize"
         }
+        fun originalFileUrl(fileId: String, fileVersion: Int): String {
+            if (fileId.isBlank() || fileVersion < 1) return ""
+            return "https://api.vrchat.cloud/api/1/file/$fileId/$fileVersion/file"
+        }
         fun convertFileUrl(fileUrl: String, fileSize: Int = 1024): String {
             if (fileUrl.isEmpty()) return ""
             val fileId = findFileId(fileUrl)
@@ -73,6 +77,18 @@ class FileApi(private val client: HttpClient) {
     ) = client.get(FILES_API_PREFIX) {
         tag?.let { parameter("tag", it.value) }
         userId?.let { parameter("userId", it) }
+        parameter("n", n.coerceIn(1, 100))
+        parameter("offset", offset.coerceAtLeast(0))
+    }.checkSuccess<List<FileData>>()
+
+    /** 获取指定模型关联的只读 Gallery 文件。 */
+    suspend fun getAvatarGalleryFiles(
+        avatarId: String,
+        n: Int = 60,
+        offset: Int = 0,
+    ) = client.get(FILES_API_PREFIX) {
+        parameter("tag", "avatargallery")
+        parameter("galleryId", avatarId)
         parameter("n", n.coerceIn(1, 100))
         parameter("offset", offset.coerceAtLeast(0))
     }.checkSuccess<List<FileData>>()
@@ -147,7 +163,7 @@ class FileApi(private val client: HttpClient) {
      * @return 文件信息
      */
     suspend fun getFileInfo(fileId: String): Result<FileResponse> = runCatching {
-        client.get("$FILES_API_PREFIX/$fileId").checkSuccess<FileResponse>()
+        client.get("$FILE_API_PREFIX/$fileId").checkSuccess<FileResponse>()
     }
     /**
      * 删除指定文件
@@ -173,7 +189,8 @@ internal fun vrcxImageUploadParameters(
 ): FileImageUploadParameters = when (tagType) {
     FileTagType.Gallery,
     FileTagType.Icon,
-    FileTagType.AvatarImage -> FileImageUploadParameters(tag = tagType.value)
+    FileTagType.AvatarImage,
+    FileTagType.WorldImage -> FileImageUploadParameters(tag = tagType.value)
 
     FileTagType.Sticker -> FileImageUploadParameters(
         tag = tagType.value,
