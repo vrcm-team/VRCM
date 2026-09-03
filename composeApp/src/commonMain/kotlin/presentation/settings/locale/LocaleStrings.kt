@@ -152,6 +152,15 @@ sealed class LocaleStrings {
     open val editProfileStatusType: String = "Status type"
     open val editProfilePronouns: String = "Pronouns"
     open val editProfileBio: String = "Bio"
+    open val editProfileAvatarCopying: String = "Allow Avatar Copying"
+    open val editProfileAvatarCopyingDescription: String =
+        "Lets other users copy the public avatar you are currently using."
+    open val editProfileAvatarCopyingLoadFailed: String =
+        "Could not load this privacy setting."
+    open val editProfileAvatarCopyingUpdateFailed: String =
+        "Could not update this privacy setting. Your previous choice is unchanged."
+    open val editProfileAvatarCopyingEnabled: String = "Avatar copying enabled"
+    open val editProfileAvatarCopyingDisabled: String = "Avatar copying disabled"
     open val editProfileSocialLinks: String = "Social Links"
     open val editProfileSocialLink: String = "Link %s"
     open val editProfileAddSocialLink: String = "Add Link"

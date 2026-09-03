@@ -135,6 +135,14 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val editProfileStatusType = "ステータスタイプ"
     override val editProfilePronouns = "代名詞"
     override val editProfileBio = "自己紹介"
+    override val editProfileAvatarCopying = "アバターのコピーを許可"
+    override val editProfileAvatarCopyingDescription =
+        "現在使用中の公開アバターを他のユーザーがコピーできるようにします。"
+    override val editProfileAvatarCopyingLoadFailed = "このプライバシー設定を読み込めませんでした。"
+    override val editProfileAvatarCopyingUpdateFailed =
+        "このプライバシー設定を更新できませんでした。以前の設定が維持されます。"
+    override val editProfileAvatarCopyingEnabled = "アバターのコピーを許可しました"
+    override val editProfileAvatarCopyingDisabled = "アバターのコピーを無効にしました"
     override val editProfileSocialLinks = "ソーシャルリンク"
     override val editProfileSocialLink = "リンク %s"
     override val editProfileAddSocialLink = "リンクを追加"

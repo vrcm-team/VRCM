@@ -164,6 +164,21 @@ class AuthService(
         }
     }
 
+    internal suspend fun applyAvatarCopyingUpdate(
+        sessionToken: AccountSessionToken,
+        allowAvatarCopying: Boolean,
+    ): Boolean = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized false
+            publishCurrentUserLocked(
+                existing.copy(allowAvatarCopying = allowAvatarCopying),
+            )
+            true
+        }
+    }
+
     internal fun applyCurrentUserHomeLocation(
         sessionToken: AccountSessionToken,
         userId: String,
@@ -181,6 +196,7 @@ class AuthService(
             if (existing.id != user.id) return@synchronized
             publishCurrentUserLocked(
                 existing.copy(
+                    allowAvatarCopying = user.allowAvatarCopying,
                     currentAvatarImageUrl = user.currentAvatarImageUrl,
                     currentAvatarTags = user.currentAvatarTags,
                     currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
@@ -235,6 +251,7 @@ class AuthService(
             socketPresenceRevision++
             publishCurrentUserLocked(
                 existing.copy(
+                    allowAvatarCopying = user.allowAvatarCopying,
                     currentAvatarImageUrl = user.currentAvatarImageUrl,
                     currentAvatarTags = user.currentAvatarTags,
                     currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
