@@ -8,6 +8,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentType
 import io.ktor.http.headersOf
 import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.json
@@ -43,6 +44,47 @@ class AvatarsApiTest {
         )
 
         assertEquals("{\"description\":\"\"}", body)
+        client.close()
+    }
+
+    @Test
+    fun updateAvatarPublicationSendsOnlyTheReleaseStatusAndDecodesTheAvatar() = runBlocking {
+        var method: HttpMethod? = null
+        var path: String? = null
+        var contentType: ContentType? = null
+        var body = ""
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val outgoing = request.body as OutgoingContent.ByteArrayContent
+                    method = request.method
+                    path = request.url.encodedPath
+                    contentType = outgoing.contentType
+                    body = outgoing.bytes().decodeToString()
+                    respond(
+                        content = avatarJson(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val avatar = AvatarsApi(client).updateAvatar(
+            avatarId = "avtr_owned",
+            update = AvatarUpdateData(releaseStatus = "public"),
+        )
+
+        assertEquals(HttpMethod.Put, method)
+        assertEquals("/api/1/avatars/avtr_owned", path)
+        assertEquals(ContentType.Application.Json, contentType)
+        assertEquals("{\"releaseStatus\":\"public\"}", body)
+        assertEquals("avtr_owned", avatar.id)
+        assertEquals("Avatar", avatar.name)
+        assertEquals("usr_owner", avatar.authorId)
+        assertEquals("private", avatar.releaseStatus)
         client.close()
     }
 

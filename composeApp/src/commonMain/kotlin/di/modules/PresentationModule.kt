@@ -11,6 +11,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.activity.FriendActivityTimel
 import io.github.vrcmteam.vrcm.presentation.favorites.AuthenticatedFavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
@@ -156,6 +158,7 @@ val presentationModule: Module = module {
     viewModel { AllWorldPersistenceDeletionModel(get(), get()) }
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
+    singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
     singleOf(::NetworkAvatarImpostorBuilder) bind AvatarImpostorBuilder::class
@@ -167,6 +170,7 @@ val presentationModule: Module = module {
             get(),
             avatarEditor = get(),
             avatarImpostorBuilder = get(),
+            avatarGalleryLoader = get(),
         )
     }
     viewModelOf(::RecentWorldsScreenModel)

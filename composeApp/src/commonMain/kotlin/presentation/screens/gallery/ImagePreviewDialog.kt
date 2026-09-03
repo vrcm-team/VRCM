@@ -57,6 +57,7 @@ class ImagePreviewDialog(
     private val fileName: String,
     private val fileExtension: String,
     private val directImageUrl: String? = null,
+    private val fileVersion: Int? = null,
 ) : SharedDialog {
 
     override val transitionDurationMillis: Int =
@@ -81,9 +82,13 @@ class ImagePreviewDialog(
 
         ) {
             // 如果提供了直接URL（如拍立得），直接使用；否则从fileId构造
-            val previewImageUrl = directImageUrl ?: FileApi.convertFileUrl(fileId, 2048)
+            val previewImageUrl = directImageUrl
+                ?: fileVersion?.let { FileApi.imageUrl(fileId, it, 2048) }
+                ?: FileApi.convertFileUrl(fileId, 2048)
             // 导出和分享使用原始文件端点，预览仍使用受控尺寸避免大图占用内存。
-            val imageUrl = directImageUrl ?: FileApi.convertFileUrlToOriginal(fileId)
+            val imageUrl = directImageUrl
+                ?: fileVersion?.let { FileApi.originalFileUrl(fileId, it) }
+                ?: FileApi.convertFileUrlToOriginal(fileId)
             // 为了防止ZoomableImage拦截背景点击事件，单独放在一个Box中
             Box(
                 modifier = Modifier

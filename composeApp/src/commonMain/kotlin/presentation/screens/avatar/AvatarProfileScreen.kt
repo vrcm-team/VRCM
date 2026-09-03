@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
@@ -42,6 +45,10 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleFormat
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarPlatformInfo
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.ImagePreviewDialog
+import io.github.vrcmteam.vrcm.presentation.compoments.LocationDialogContent
+import coil3.ImageLoader
+import coil3.compose.SubcomposeAsyncImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageEditorTarget
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorSessionStore
@@ -70,6 +77,19 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.PublicationMadePublic ->
+        ToastText.Success(locale.avatarEditPublicationMadePublic)
+    AvatarProfileNotice.PublicationMadePrivate ->
+        ToastText.Success(locale.avatarEditPublicationMadePrivate)
+    is AvatarProfileNotice.PublicationUpdateFailed -> ToastText.Error(
+        when (reason) {
+            AvatarPublicationFailure.BadRequest -> locale.avatarEditPublicationBadRequest
+            AvatarPublicationFailure.Unauthorized -> locale.avatarEditPublicationUnauthorized
+            AvatarPublicationFailure.Forbidden -> locale.avatarEditPublicationForbidden
+            AvatarPublicationFailure.NotFound -> locale.avatarEditPublicationNotFound
+            AvatarPublicationFailure.Other -> locale.avatarEditPublicationFailed
+        }
+    )
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -97,6 +117,7 @@ class AvatarProfileScreen(
         val imageProcessor: PrintImageProcessor = koinInject()
         val editorSessionStore: PrintImageEditorSessionStore = koinInject()
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
+        val avatarGalleryState by screenModel.avatarGalleryState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
         val impostorState by screenModel.impostorState.collectAsState()
@@ -153,6 +174,9 @@ class AvatarProfileScreen(
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
                     canEdit = editState.canEdit,
                     onEdit = { showEditSheet = true },
+                    avatarGalleryState = avatarGalleryState,
+                    onLoadMoreAvatarGallery = screenModel::loadMoreAvatarGallery,
+                    onRetryAvatarGallery = screenModel::retryAvatarGallery,
                 )
             }
         }
@@ -171,6 +195,7 @@ class AvatarProfileScreen(
                 onDismiss = { showEditSheet = false },
                 onSaveMetadata = screenModel::saveMetadata,
                 onEnqueueImpostor = screenModel::enqueueImpostor,
+                onUpdatePublication = screenModel::updatePublication,
                 onEditCover = { source, prepared ->
                     handoffPreparedImageToEditor(
                         source = source,
@@ -200,6 +225,9 @@ private fun AvatarProfileContent(
     onRetryFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
+    avatarGalleryState: AvatarGalleryState,
+    onLoadMoreAvatarGallery: () -> Unit,
+    onRetryAvatarGallery: () -> Unit,
 ) {
     val navigator = currentNavigator
 
@@ -318,6 +346,168 @@ private fun AvatarProfileContent(
         AvatarPlatformSection(knownPlatforms)
     }
 
+    AvatarGallerySection(
+        state = avatarGalleryState,
+        onLoadMore = onLoadMoreAvatarGallery,
+        onRetry = onRetryAvatarGallery,
+    )
+
+}
+
+@Composable
+private fun AvatarGallerySection(
+    state: AvatarGalleryState,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    if (!state.isAvailable) return
+
+    val (dialogContent, setDialogContent) = LocationDialogContent.current
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = strings.avatarGalleryTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        when {
+            state.isLoading -> Box(
+                modifier = Modifier.fillMaxWidth().height(96.dp),
+                contentAlignment = Alignment.Center,
+            ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
+
+            state.initialLoadFailed -> AvatarGalleryMessage(
+                message = strings.avatarGalleryLoadFailed,
+                actionText = strings.retry,
+                onAction = onRetry,
+            )
+
+            state.files.isEmpty() -> AvatarGalleryMessage(
+                message = strings.avatarGalleryEmpty,
+            )
+
+            else -> {
+                AvatarGalleryGrid(
+                    files = state.files,
+                    dialogContent = dialogContent,
+                    onOpen = { file, version ->
+                        setDialogContent(
+                            ImagePreviewDialog(
+                                fileId = file.id,
+                                fileName = file.name,
+                                fileExtension = file.extension,
+                                fileVersion = version,
+                            )
+                        )
+                    },
+                )
+                if (state.isLoadingMore) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                } else if (state.loadMoreFailed) {
+                    AvatarGalleryMessage(
+                        message = strings.avatarGalleryLoadMoreFailed,
+                        actionText = strings.retry,
+                        onAction = onRetry,
+                    )
+                } else if (state.hasMore) {
+                    OutlinedButton(
+                        onClick = onLoadMore,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) { Text(strings.avatarGalleryLoadMore) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarGalleryMessage(
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (actionText != null && onAction != null) {
+            TextButton(onClick = onAction) { Text(actionText) }
+        }
+    }
+}
+
+@Composable
+private fun AvatarGalleryGrid(
+    files: List<io.github.vrcmteam.vrcm.network.api.files.data.FileData>,
+    dialogContent: io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog?,
+    onOpen: (io.github.vrcmteam.vrcm.network.api.files.data.FileData, Int) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val columns = if (maxWidth >= 560.dp) 3 else 2
+        val spacing = 8.dp
+        val rows = files.chunked(columns)
+        Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                ) {
+                    row.forEach { file ->
+                        val version = file.latestGalleryVersion()?.version
+                        val isDialogOpen = (dialogContent as? ImagePreviewDialog)?.fileId == file.id
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(16f / 9f),
+                        ) {
+                            if (!isDialogOpen) {
+                                SubcomposeAsyncImage(
+                                    model = version?.let { FileApi.imageUrl(file.id, it, 256) },
+                                    contentDescription = file.name,
+                                    imageLoader = koinInject<ImageLoader>(),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .clickable(enabled = version != null) {
+                                            version?.let { selectedVersion -> onOpen(file, selectedVersion) }
+                                        },
+                                    loading = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                                        }
+                                    },
+                                    error = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = strings.galleryTabLoadFailed,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
 }
 
 @Composable
