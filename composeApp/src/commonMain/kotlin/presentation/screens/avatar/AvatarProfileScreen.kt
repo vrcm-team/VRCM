@@ -70,6 +70,19 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarEditMetadataSaveFailed
     )
     AvatarProfileNotice.CoverSaved -> ToastText.Success(locale.avatarEditCoverSaved)
+    AvatarProfileNotice.PublicationMadePublic ->
+        ToastText.Success(locale.avatarEditPublicationMadePublic)
+    AvatarProfileNotice.PublicationMadePrivate ->
+        ToastText.Success(locale.avatarEditPublicationMadePrivate)
+    is AvatarProfileNotice.PublicationUpdateFailed -> ToastText.Error(
+        when (reason) {
+            AvatarPublicationFailure.BadRequest -> locale.avatarEditPublicationBadRequest
+            AvatarPublicationFailure.Unauthorized -> locale.avatarEditPublicationUnauthorized
+            AvatarPublicationFailure.Forbidden -> locale.avatarEditPublicationForbidden
+            AvatarPublicationFailure.NotFound -> locale.avatarEditPublicationNotFound
+            AvatarPublicationFailure.Other -> locale.avatarEditPublicationFailed
+        }
+    )
 }
 
 internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings): String = when (this) {
@@ -168,6 +181,7 @@ class AvatarProfileScreen(
                 imageProcessor = imageProcessor,
                 onDismiss = { showEditSheet = false },
                 onSaveMetadata = screenModel::saveMetadata,
+                onUpdatePublication = screenModel::updatePublication,
                 onEditCover = { source, prepared ->
                     handoffPreparedImageToEditor(
                         source = source,

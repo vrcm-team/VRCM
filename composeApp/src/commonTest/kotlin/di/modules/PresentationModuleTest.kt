@@ -4,10 +4,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -229,6 +231,12 @@ private data object EmptyAvatarEditor : AvatarEditor {
         avatarId: String,
         update: AvatarUpdateData,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = null
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         Result.failure(IllegalStateException("unused"))

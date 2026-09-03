@@ -7,4 +7,5 @@ data class AvatarUpdateData(
     val name: String? = null,
     val description: String? = null,
     val imageUrl: String? = null,
+    val releaseStatus: String? = null,
 )
