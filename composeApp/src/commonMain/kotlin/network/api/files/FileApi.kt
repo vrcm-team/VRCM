@@ -11,6 +11,7 @@ import io.github.vrcmteam.vrcm.network.extensions.checkSuccessResult
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
+import io.ktor.client.plugins.onUpload
 import io.ktor.http.*
 
 
@@ -144,6 +145,39 @@ class FileApi(private val client: HttpClient) {
             }
         ).checkSuccessResult<FileData>()
     }
+
+    /** Uploads an image to an avatar's private Gallery and reports actual request progress. */
+    suspend fun uploadAvatarGalleryImage(
+        fileBytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        avatarId: String,
+        onProgress: suspend (bytesSent: Long, totalBytes: Long?) -> Unit = { _, _ -> },
+    ): Result<FileData> = client.submitFormWithBinaryData(
+        url = "${FILE_API_PREFIX}/image",
+        formData = formData {
+            append("file", fileBytes, Headers.build {
+                append(HttpHeaders.ContentType, mimeType)
+                append(HttpHeaders.ContentDisposition, "filename=\"blob\"")
+            })
+            append("tag", "avatargallery")
+            append("galleryId", avatarId)
+        },
+    ) {
+        onUpload { bytesSent, contentLength -> onProgress(bytesSent, contentLength) }
+    }.checkSuccessResult()
+
+    /** Reads only the first page needed to verify the server-authoritative upload result. */
+    suspend fun getAvatarGalleryFiles(
+        avatarId: String,
+        n: Int = 100,
+        offset: Int = 0,
+    ): Result<List<FileData>> = client.get(FILES_API_PREFIX) {
+        parameter("tag", "avatargallery")
+        parameter("galleryId", avatarId)
+        parameter("n", n.coerceIn(1, 100))
+        parameter("offset", offset.coerceAtLeast(0))
+    }.checkSuccessResult()
 
     /**
      * 获取特定文件ID的文件信息

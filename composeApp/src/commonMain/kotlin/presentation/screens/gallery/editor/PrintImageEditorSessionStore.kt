@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryUpdate
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +25,7 @@ class PrintImageEditorSessionStore {
     private val galleryCompletionChannel = Channel<FileTagType>(capacity = Channel.BUFFERED)
     private val _avatarCoverUpdates = MutableStateFlow<Map<String, AvatarData>>(emptyMap())
     private val _worldCoverUpdates = MutableStateFlow<Map<String, WorldImageUpdate>>(emptyMap())
+    private val _avatarGalleryUpdates = MutableStateFlow<Map<String, AvatarGalleryUpdate>>(emptyMap())
     private var nextSessionId = 0L
 
     val uploadCompletions: Flow<Unit> = completionChannel.receiveAsFlow()
@@ -32,6 +34,8 @@ class PrintImageEditorSessionStore {
         _avatarCoverUpdates.asStateFlow()
     val worldCoverUpdates: StateFlow<Map<String, WorldImageUpdate>> =
         _worldCoverUpdates.asStateFlow()
+    internal val avatarGalleryUpdates: StateFlow<Map<String, AvatarGalleryUpdate>> =
+        _avatarGalleryUpdates.asStateFlow()
 
     fun create(
         source: SelectedImage,
@@ -70,6 +74,15 @@ class PrintImageEditorSessionStore {
                 check(target.avatarId == submission.avatar.id)
                 _avatarCoverUpdates.update { it + (submission.avatar.id to submission.avatar) }
             }
+            is ImageEditorSubmission.AvatarGallery -> {
+                val target = session.target as? ImageEditorTarget.AvatarGallery
+                    ?: error("Avatar Gallery result completed a non-avatar Gallery session")
+                check(target.target.avatarId == submission.update.avatarId)
+                check(target.target.sessionToken.userId == submission.update.sessionToken.userId)
+                _avatarGalleryUpdates.update {
+                    it + (submission.update.avatarId to submission.update)
+                }
+            }
             is ImageEditorSubmission.WorldCover -> {
                 val target = session.target as? ImageEditorTarget.WorldCover
                     ?: error("World cover result completed a non-world editor session")
@@ -96,6 +109,12 @@ class PrintImageEditorSessionStore {
     fun consumeWorldCoverUpdate(worldId: String): WorldImageUpdate? {
         val update = _worldCoverUpdates.value[worldId] ?: return null
         _worldCoverUpdates.update { it - worldId }
+        return update
+    }
+
+    internal fun consumeAvatarGalleryUpdate(avatarId: String): AvatarGalleryUpdate? {
+        val update = _avatarGalleryUpdates.value[avatarId] ?: return null
+        _avatarGalleryUpdates.update { it - avatarId }
         return update
     }
 }

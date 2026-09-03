@@ -24,6 +24,7 @@ enum class EditorPhase {
     Ready,
     Processing,
     Uploading,
+    Refreshing,
 }
 
 private enum class UploadStage {
@@ -47,6 +48,7 @@ data class PrintImageEditorState(
     val cropDownloadedPrintBorder: Boolean = false,
     val fillWhiteBorder: Boolean = true,
     val phase: EditorPhase = EditorPhase.Ready,
+    val submissionProgress: ImageEditorSubmissionProgress? = null,
     val error: EditorError? = null,
 ) {
     val isBusy: Boolean get() = phase != EditorPhase.Ready
@@ -84,6 +86,7 @@ class PrintImageEditorScreenModel(
 
     private var cachedPng: ByteArray? = null
     private var cachedFileName: String? = null
+    private var lastSubmissionFailure: Throwable? = null
     private val previewReleaseController = PreviewBitmapReleaseController(
         bitmaps = listOfNotNull(prepared.preview, croppedSource?.prepared?.preview),
         releaseBitmap = releasePreview,
@@ -172,6 +175,7 @@ class PrintImageEditorScreenModel(
         }
         cachedPng = null
         cachedFileName = null
+        lastSubmissionFailure = null
         _state.value = current.copy(
             prepared = nextSource.prepared,
             transform = CropTransform(zoom = zoom),
@@ -194,6 +198,7 @@ class PrintImageEditorScreenModel(
         }
         cachedPng = null
         cachedFileName = null
+        lastSubmissionFailure = null
         _state.value = current.copy(
             transform = current.transform.copy(
                 centerOffsetX = 0f,
@@ -217,10 +222,12 @@ class PrintImageEditorScreenModel(
         val existingPng = cachedPng
         _state.value = current.copy(
             phase = if (existingPng == null) EditorPhase.Processing else EditorPhase.Uploading,
+            submissionProgress = null,
             error = null,
         )
         viewModelScope.launch(workerContext()) {
             var stage = if (existingPng == null) UploadStage.Processing else UploadStage.Uploading
+            val previousFailure = lastSubmissionFailure
             try {
                 val png = existingPng ?: processor.render(
                     source = currentSource.source,
@@ -238,15 +245,53 @@ class PrintImageEditorScreenModel(
                     }
 
                 stage = UploadStage.Uploading
-                _state.update { it.copy(phase = EditorPhase.Uploading, error = null) }
-                val submission = submitter.submit(
-                    target = target,
-                    imageBytes = png,
-                    fileName = cachedFileName
-                        ?: target.uploadFileName(currentSource.source.fileName, nowMillis()),
-                ).getOrThrow()
+                _state.update {
+                    it.copy(
+                        phase = EditorPhase.Uploading,
+                        submissionProgress = null,
+                        error = null,
+                    )
+                }
+                val progress: (ImageEditorSubmissionProgress) -> Unit = { update ->
+                    _state.update {
+                        when (update) {
+                            is ImageEditorSubmissionProgress.Upload ->
+                                it.copy(phase = EditorPhase.Uploading, submissionProgress = update)
+                            ImageEditorSubmissionProgress.Refreshing ->
+                                it.copy(
+                                    phase = EditorPhase.Refreshing,
+                                    submissionProgress = update,
+                                )
+                        }
+                    }
+                }
+                val submission = if (previousFailure != null) {
+                    submitter.retry(
+                        target = target,
+                        imageBytes = png,
+                        fileName = cachedFileName
+                            ?: target.uploadFileName(currentSource.source.fileName, nowMillis()),
+                        previousFailure = previousFailure,
+                        onProgress = progress,
+                    )
+                } else {
+                    submitter.submit(
+                        target = target,
+                        imageBytes = png,
+                        fileName = cachedFileName
+                            ?: target.uploadFileName(currentSource.source.fileName, nowMillis()),
+                        onProgress = progress,
+                    )
+                }.getOrThrow()
 
-                _state.update { it.copy(phase = EditorPhase.Ready, error = null) }
+                _state.update {
+                    it.copy(
+                        phase = EditorPhase.Ready,
+                        submissionProgress = null,
+                        error = null,
+                    )
+                }
+                lastSubmissionFailure = null
                 _events.emit(EditorEvent.Submitted(submission))
             } catch (cause: CancellationException) {
                 throw cause
@@ -263,10 +308,12 @@ class PrintImageEditorScreenModel(
                         },
                     )
                 }
+                lastSubmissionFailure = (error as? EditorError.Submission)?.failure
 
                 _state.update {
                     it.copy(
                         phase = EditorPhase.Ready,
+                        submissionProgress = null,
                         error = error,
                     )
                 }
@@ -288,6 +335,7 @@ class PrintImageEditorScreenModel(
         if (current.isBusy || (viewport != null && !viewport.isValid())) return
         cachedPng = null
         cachedFileName = null
+        lastSubmissionFailure = null
         _state.value = current.copy(
             transform = updateTransform(current),
             error = null,
@@ -357,6 +405,9 @@ private fun ImageSize.isValid(): Boolean = width > 0 && height > 0
 private fun ImageEditorTarget.uploadFileName(sourceFileName: String, nowMillis: Long): String = when (this) {
     ImageEditorTarget.Print -> "print-$nowMillis.png"
     is ImageEditorTarget.AvatarCover -> "avatar-cover-$nowMillis.png"
+    is ImageEditorTarget.AvatarGallery -> sourceFileName.ifBlank {
+        "avatar-gallery-$nowMillis.png"
+    }
     is ImageEditorTarget.WorldCover -> "world-cover-$nowMillis.png"
     is ImageEditorTarget.Gallery -> sourceFileName.ifBlank { "${tagType.value}-$nowMillis.png" }
 }

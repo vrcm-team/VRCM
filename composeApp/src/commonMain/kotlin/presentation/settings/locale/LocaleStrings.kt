@@ -644,6 +644,23 @@ sealed class LocaleStrings {
         "Unsupported or mismatched image format. Choose a valid JPEG, PNG, or WebP file."
     open val avatarEditFileTooLarge: String = "The selected cover exceeds 10 MiB."
     open val avatarEditReadFailed: String = "Failed to read the selected cover image."
+    open val avatarGalleryTitle: String = "Avatar Gallery"
+    open val avatarGalleryHint: String =
+        "Upload an image to this avatar's Gallery; JPEG, PNG, WebP, or HEIC up to 50 MiB."
+    open val avatarGalleryChooseImage: String = "Choose Gallery image"
+    open val avatarGalleryUpload: String = "Upload to Gallery"
+    open val avatarGalleryUploading: String = "Uploading to Avatar Gallery..."
+    open val avatarGalleryRefreshing: String = "Refreshing Avatar Gallery..."
+    open val avatarGalleryUploadFailed: String = "Failed to upload the Avatar Gallery image."
+    open val avatarGalleryFileTooLarge: String = "The selected Gallery image exceeds 50 MiB."
+    open val avatarGalleryReadFailed: String = "Failed to read the selected Gallery image."
+    open val avatarGalleryRefreshFailed: String =
+        "The image was uploaded, but Avatar Gallery could not be refreshed. Retry to refresh."
+    open val avatarGallerySessionChanged: String =
+        "The account changed while uploading. Select the image again."
+    open val avatarGalleryPermissionDenied: String =
+        "You can only upload Gallery images to your own avatar."
+    open val avatarGalleryUploaded: String = "Avatar Gallery updated."
     open val hiddenModel: String = "Hidden model"
     open val hiddenModelCannotView: String = "Cannot view hidden model info"
     open val hiddenWorld: String = "Hidden world"
