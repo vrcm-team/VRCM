@@ -482,39 +482,57 @@ class AuthService(
         callback = { _: AccountSessionToken -> callback() },
     )
 
+    internal suspend fun <T> runSessionBoundCatchingForUser(
+        userId: String,
+        callback: suspend (AccountSessionToken) -> T,
+    ): SessionBoundResponse<T>? = authMutex.withLock {
+        val sessionToken = SharedFlowCentre.currentSession.value
+            ?.takeIf { it.account.userId == userId }
+            ?.token
+            ?: return@withLock null
+        runSessionBoundCatchingLocked(sessionToken, callback)
+    }
+
     internal suspend fun <T> runSessionBoundCatchingWithToken(
         sessionToken: AccountSessionToken,
         callback: suspend (AccountSessionToken) -> T,
     ): SessionBoundResponse<T>? = authMutex.withLock {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
+        runSessionBoundCatchingLocked(sessionToken, callback)
+    }
+
+    private suspend fun <T> runSessionBoundCatchingLocked(
+        sessionToken: AccountSessionToken,
+        callback: suspend (AccountSessionToken) -> T,
+    ): SessionBoundResponse<T>? {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return null
 
         val first = runRequestCatching { callback(sessionToken) }
         val firstError = first.exceptionOrNull()
         if (firstError !is VRCApiException ||
             firstError.code != HttpStatusCode.Unauthorized.value
         ) {
-            return@withLock SessionBoundResponse(first, sessionToken)
+            return SessionBoundResponse(first, sessionToken)
         }
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return null
         val reauthenticated = runRequestCatching {
             doReTryAuthLocked(sessionToken.userId)
         }
         reauthenticated.exceptionOrNull()?.let { error ->
-            return@withLock SessionBoundResponse(Result.failure(error), sessionToken)
+            return SessionBoundResponse(Result.failure(error), sessionToken)
         }
         if (!reauthenticated.getOrThrow()) {
-            return@withLock SessionBoundResponse(first, sessionToken)
+            return SessionBoundResponse(first, sessionToken)
         }
 
         val refreshedSession = SharedFlowCentre.currentSession.value
         if (refreshedSession?.account?.userId != sessionToken.userId ||
             !SharedFlowCentre.isCurrentSession(refreshedSession.token)
         ) {
-            return@withLock null
+            return null
         }
         val retried = runRequestCatching { callback(refreshedSession.token) }
-        if (!SharedFlowCentre.isCurrentSession(refreshedSession.token)) return@withLock null
-        SessionBoundResponse(retried, refreshedSession.token)
+        if (!SharedFlowCentre.isCurrentSession(refreshedSession.token)) return null
+        return SessionBoundResponse(retried, refreshedSession.token)
     }
 
     private suspend fun <T> runRequestCatching(callback: suspend () -> T): Result<T> = try {

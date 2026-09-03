@@ -156,6 +156,41 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun resetHomeWorldUsesCurrentTokenAfterSameAccountSessionRotation() = runTest {
+        var putRequests = 0
+        val fixture = fixture { request ->
+            when (request.method) {
+                HttpMethod.Put -> {
+                    putRequests++
+                    jsonResponse(currentUserJson(cachedAccount(), homeLocation = ""))
+                }
+
+                else -> jsonResponse(
+                    currentUserJson(cachedAccount(), homeLocation = "wrld_confirmed")
+                )
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val confirmedSession = requireNotNull(SharedFlowCentre.currentSession.value)
+
+        assertIs<AuthState.Authed>(
+            fixture.service.login(cachedAccount().username, cachedAccount().password.orEmpty())
+        )
+        val rotatedSession = requireNotNull(SharedFlowCentre.currentSession.value)
+        assertEquals(confirmedSession.token.userId, rotatedSession.token.userId)
+        assertFalse(confirmedSession.token == rotatedSession.token)
+
+        val result = HomeWorldService(UsersApi(fixture.client), fixture.service).resetHomeWorld(
+            expectedWorldId = "wrld_confirmed",
+            expectedSessionToken = confirmedSession.token,
+        )
+
+        assertEquals("", result.getOrThrow())
+        assertEquals(1, putRequests)
+        fixture.client.close()
+    }
+
+    @Test
     fun accountSwitchRejectsLateHomeWorldResponse() = runTest {
         val updateStarted = CompletableDeferred<Unit>()
         val releaseUpdate = CompletableDeferred<Unit>()

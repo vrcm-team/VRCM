@@ -108,14 +108,13 @@ internal class HomeWorldService(
         expectedWorldId: String?,
         expectedSessionToken: AccountSessionToken?,
     ): Result<String> {
-        val session = SharedFlowCentre.currentSession.value?.takeIf { current ->
-            expectedSessionToken == null || current.token == expectedSessionToken
-        }
+        val expectedUserId = expectedSessionToken?.userId
+            ?: SharedFlowCentre.currentSession.value?.account?.userId
             ?: return Result.failure(HomeWorldSessionChangedException())
-        val response = authService.runSessionBoundCatchingWithToken(session.token) { activeSessionToken ->
+        val response = authService.runSessionBoundCatchingForUser(expectedUserId) { activeSessionToken ->
             authService.withHomeWorldMutation {
                 if (expectedSessionToken != null &&
-                    activeSessionToken.userId != expectedSessionToken.userId
+                    activeSessionToken.userId != expectedUserId
                 ) {
                     throw HomeWorldSessionChangedException()
                 }
