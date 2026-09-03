@@ -443,6 +443,48 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun staleReloadCannotOverwriteMutationThatFinishedFirst() = runBlocking {
+        val tokenA = AccountSessionToken(userId = "usr_account_a", generation = 1)
+        val tokenB = AccountSessionToken(userId = "usr_account_a", generation = 2)
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = tokenA.userId),
+                token = tokenA,
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        model.setAvatarBlocked(true)
+        yield()
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = tokenB.userId),
+            token = tokenB,
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        moderationSource.completeSessionBoundBlock(
+            SessionBoundResponse(Result.success(Unit), tokenB)
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        yield()
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+    }
+
+    @Test
     fun pendingFavoriteLoadCannotReviveTheEntryAfterSwitchingToABlankAvatar() = runBlocking {
         val pendingLoad = CompletableDeferred<Unit>()
         val favoriteSource = DirectEntryFavoriteSource(
