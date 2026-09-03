@@ -15,7 +15,9 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.HomeWorldManager
 import io.github.vrcmteam.vrcm.service.HomeWorldService
+import io.github.vrcmteam.vrcm.service.HomeWorldUserContext
 import io.github.vrcmteam.vrcm.service.InstanceCreationService
 import io.github.vrcmteam.vrcm.service.NetworkInstanceCreationRequest
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -46,10 +48,11 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import org.koin.core.logger.EmptyLogger
@@ -141,6 +144,98 @@ class WorldProfileScreenModelTest : MainDispatcherTest() {
             }
             fixture.client.close()
         }
+    }
+
+    @Test
+    fun setHomeWorldIntentCannotTurnIntoResetBeforeConfirmation() = runTest {
+        val fixture = worldProfileFixture { request ->
+            when (request.url.encodedPath) {
+                "/api/1/auth/user" -> jsonResponse(currentUserJson(cachedAccount()))
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        var model: WorldProfileScreenModel? = null
+        try {
+            fixture.service.restoreAuth()
+            val sessionToken = requireNotNull(SharedFlowCentre.currentSession.value).token
+            val homeWorldManager = RecordingHomeWorldManager(
+                HomeWorldUserContext(sessionToken, homeLocation = "wrld_previous")
+            )
+            model = WorldProfileScreenModel(
+                worldsApi = WorldsApi(fixture.client),
+                instancesApi = InstancesApi(fixture.client),
+                usersApi = UsersApi(fixture.client),
+                groupsApi = GroupsApi(fixture.client),
+                authService = fixture.service,
+                instanceCreationService = InstanceCreationService(
+                    NetworkInstanceCreationRequest(fixture.service, InstancesApi(fixture.client))
+                ),
+                favoriteEntrySource = EmptyFavoriteEntrySource(),
+                inviteApi = InviteApi(fixture.client),
+                worldPlatformService = WorldPlatformService(FileApi(fixture.client), fixture.service),
+                worldProfileCacheStore = RecordingWorldProfileCache(
+                    WorldProfileCache(
+                        world = testWorld(name = "cached").copy(authorId = "usr_other"),
+                        cachedAtEpochMilliseconds = Long.MAX_VALUE,
+                        supportedPlatforms = emptyList(),
+                        platformFileSizes = emptyList(),
+                    )
+                ),
+                homeWorldManager = homeWorldManager,
+                worldEditor = TestNoOpWorldEditor,
+            )
+            val screenModel = requireNotNull(model)
+
+            screenModel.loadWorldData(WorldProfileVo(worldId = "wrld_owned"))
+            runCurrent()
+            assertEquals(
+                HomeWorldActionAvailability.CanSet,
+                screenModel.homeWorldActionState.value.availability,
+            )
+            val selectedAction = requireNotNull(screenModel.homeWorldActionState.value.action)
+
+            homeWorldManager.user.value = HomeWorldUserContext(sessionToken, homeLocation = "wrld_owned")
+            runCurrent()
+            assertEquals(
+                HomeWorldActionAvailability.Current,
+                screenModel.homeWorldActionState.value.availability,
+            )
+
+            screenModel.updateHomeWorld(selectedAction)
+            homeWorldManager.updated.await()
+
+            assertEquals(listOf("wrld_owned"), homeWorldManager.setTargets)
+            assertEquals(0, homeWorldManager.resetCount)
+        } finally {
+            model?.let {
+                ViewModelStore().apply {
+                    put("world-profile", it)
+                    clear()
+                }
+            }
+            fixture.client.close()
+        }
+    }
+}
+
+private class RecordingHomeWorldManager(initialUser: HomeWorldUserContext) : HomeWorldManager {
+    val user = MutableStateFlow<HomeWorldUserContext?>(initialUser)
+    val setTargets = mutableListOf<String>()
+    var resetCount = 0
+    val updated = CompletableDeferred<Unit>()
+
+    override val currentUser = user
+
+    override suspend fun setHomeWorld(worldId: String): Result<String> {
+        setTargets += worldId
+        updated.complete(Unit)
+        return Result.success(worldId)
+    }
+
+    override suspend fun resetHomeWorld(): Result<String> {
+        resetCount++
+        updated.complete(Unit)
+        return Result.success("")
     }
 }
 

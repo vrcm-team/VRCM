@@ -111,7 +111,7 @@ class AuthServiceTest : MainDispatcherTest() {
         val result = HomeWorldService(
             usersApi = UsersApi(fixture.client),
             authService = fixture.service,
-        ).updateHomeWorld("wrld_requested")
+        ).setHomeWorld("wrld_requested")
 
         assertEquals("wrld_server_authoritative", result.getOrThrow())
         assertEquals("wrld_server_authoritative", fixture.service.currentUserState.value?.homeLocation)
@@ -142,7 +142,7 @@ class AuthServiceTest : MainDispatcherTest() {
             HomeWorldService(
                 usersApi = UsersApi(fixture.client),
                 authService = fixture.service,
-            ).updateHomeWorld("wrld_requested")
+            ).setHomeWorld("wrld_requested")
         }
         updateStarted.await()
 
@@ -179,18 +179,18 @@ class AuthServiceTest : MainDispatcherTest() {
         assertIs<AuthState.Authed>(fixture.service.restoreAuth())
         val homeWorldService = HomeWorldService(UsersApi(fixture.client), fixture.service)
         val first = async(start = CoroutineStart.UNDISPATCHED) {
-            homeWorldService.updateHomeWorld("wrld_first")
+            homeWorldService.setHomeWorld("wrld_first")
         }
         firstUpdateStarted.await()
 
         assertIs<HomeWorldUpdateInFlightException>(
-            homeWorldService.updateHomeWorld("wrld_duplicate").exceptionOrNull()
+            homeWorldService.setHomeWorld("wrld_duplicate").exceptionOrNull()
         )
         releaseFirstUpdate.complete(Unit)
         assertEquals("wrld_server_1", first.await().getOrThrow())
         assertEquals(
             "wrld_server_2",
-            homeWorldService.updateHomeWorld("wrld_after-completion").getOrThrow(),
+            homeWorldService.setHomeWorld("wrld_after-completion").getOrThrow(),
         )
         assertEquals(2, updateRequests)
         fixture.client.close()

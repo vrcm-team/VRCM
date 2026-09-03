@@ -16,8 +16,9 @@ internal data class HomeWorldUserContext(
 internal interface HomeWorldManager {
     val currentUser: Flow<HomeWorldUserContext?>
 
-    /** A null target removes the custom Home World and restores VRChat's default. */
-    suspend fun updateHomeWorld(worldId: String?): Result<String>
+    suspend fun setHomeWorld(worldId: String): Result<String>
+
+    suspend fun resetHomeWorld(): Result<String>
 }
 
 internal class HomeWorldSessionChangedException : IllegalStateException(
@@ -51,12 +52,14 @@ internal class HomeWorldService(
         }
     }
 
-    override suspend fun updateHomeWorld(worldId: String?): Result<String> {
-        val homeLocation = when {
-            worldId == null -> ""
-            isWorldId(worldId) -> worldId.trim()
-            else -> return Result.failure(InvalidHomeWorldException())
-        }
+    override suspend fun setHomeWorld(worldId: String): Result<String> {
+        if (!isWorldId(worldId)) return Result.failure(InvalidHomeWorldException())
+        return updateHomeLocation(worldId.trim())
+    }
+
+    override suspend fun resetHomeWorld(): Result<String> = updateHomeLocation("")
+
+    private suspend fun updateHomeLocation(homeLocation: String): Result<String> {
         if (!updateInFlight.compareAndSet(expect = false, update = true)) {
             return Result.failure(HomeWorldUpdateInFlightException())
         }
