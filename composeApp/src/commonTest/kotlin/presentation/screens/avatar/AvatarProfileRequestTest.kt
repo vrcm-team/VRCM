@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsEn
+import io.github.vrcmteam.vrcm.service.FallbackAvatarUpdateResult
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.github.vrcmteam.vrcm.testing.currentUserData
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -618,6 +619,37 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun fallbackSelectionIgnoresPageChangeWhileFinalApplyIsWaiting() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val fallbackSetter = FakeAvatarFallbackSetter(pauseApply = true)
+        val model = avatarModel(loader, fallbackSetter = fallbackSetter)
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_old"))
+        loader.completeSuccess(avatarId = "avtr_old", avatarName = "Old")
+        yield()
+        model.selectFallbackAvatar()
+        fallbackSetter.completeSuccess("avtr_old")
+        fallbackSetter.awaitApplyStarted()
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_new"))
+        loader.completeSuccess(avatarId = "avtr_new", avatarName = "New")
+        yield()
+        fallbackSetter.resumeApply()
+        yield()
+
+        assertTrue(fallbackSetter.appliedAvatarIds.isEmpty())
+        assertTrue(notices.isEmpty())
+        assertEquals(
+            AvatarFallbackAvailability.Available,
+            model.fallbackActionState.value.availability,
+        )
+        noticeCollector.cancel()
+    }
+
+    @Test
     fun fallbackSelectionIgnoresResponseFromReplacedSameAccountSession() = runBlocking {
         val avatarId = "avtr_fallback"
         val loader = ControlledAvatarProfileLoader()
@@ -952,6 +984,7 @@ private class FakeAvatarSelector(
 
 private class FakeAvatarFallbackSetter(
     authenticated: Boolean = true,
+    private val pauseApply: Boolean = false,
 ) : AvatarFallbackSetter {
     private val mutableCurrentUser = MutableStateFlow<AvatarFallbackUserContext?>(
         if (authenticated) {
@@ -968,6 +1001,8 @@ private class FakeAvatarFallbackSetter(
     val requestedAvatarIds = mutableListOf<String>()
     val appliedAvatarIds = mutableListOf<String>()
     private val response = CompletableDeferred<AvatarFallbackResponse?>()
+    private val applyStarted = CompletableDeferred<Unit>()
+    private val applyResumed = CompletableDeferred<Unit>()
 
     override suspend fun set(
         avatarId: String,
@@ -981,17 +1016,25 @@ private class FakeAvatarFallbackSetter(
         avatarId: String,
         sessionToken: AccountSessionToken,
         response: CurrentUserData,
-    ): Boolean {
-        val current = mutableCurrentUser.value ?: return false
-        if (current.sessionToken != sessionToken ||
-            current.userId != response.id ||
-            response.fallbackAvatar != avatarId
-        ) {
-            return false
+        claimTarget: () -> Boolean,
+    ): FallbackAvatarUpdateResult {
+        if (pauseApply) {
+            applyStarted.complete(Unit)
+            applyResumed.await()
+        }
+        val current = mutableCurrentUser.value ?: return FallbackAvatarUpdateResult.Stale
+        if (current.sessionToken != sessionToken) {
+            return FallbackAvatarUpdateResult.Stale
+        }
+        if (current.userId != response.id || response.fallbackAvatar != avatarId) {
+            return FallbackAvatarUpdateResult.InvalidResponse
+        }
+        if (!claimTarget()) {
+            return FallbackAvatarUpdateResult.Stale
         }
         appliedAvatarIds += avatarId
         mutableCurrentUser.value = current.copy(fallbackAvatarId = avatarId)
-        return true
+        return FallbackAvatarUpdateResult.Applied
     }
 
     override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean =
@@ -1009,6 +1052,14 @@ private class FakeAvatarFallbackSetter(
         mutableCurrentUser.value = requireNotNull(mutableCurrentUser.value).copy(
             sessionToken = sessionToken,
         )
+    }
+
+    suspend fun awaitApplyStarted() {
+        applyStarted.await()
+    }
+
+    fun resumeApply() {
+        applyResumed.complete(Unit)
     }
 
     fun completeSuccess(

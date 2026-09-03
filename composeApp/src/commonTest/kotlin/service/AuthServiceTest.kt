@@ -402,35 +402,53 @@ class AuthServiceTest : MainDispatcherTest() {
             fallbackAvatar = "avtr_fallback",
         )
 
-        assertFalse(
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
             fixture.service.applyFallbackAvatarUpdate(
                 sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
                 avatarId = "avtr_fallback",
                 response = response,
-            )
+                claimTarget = { true },
+            ),
         )
-        assertFalse(
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
             fixture.service.applyFallbackAvatarUpdate(
                 sessionToken = session.token,
                 avatarId = "avtr_fallback",
                 response = response.copy(id = "usr_other"),
-            )
+                claimTarget = { true },
+            ),
         )
-        assertFalse(
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
             fixture.service.applyFallbackAvatarUpdate(
                 sessionToken = session.token,
                 avatarId = "avtr_other",
                 response = response,
-            )
+                claimTarget = { true },
+            ),
         )
 
         fixture.service.applyCurrentAvatarUpdate("avtr_newer")
-        assertTrue(
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
             fixture.service.applyFallbackAvatarUpdate(
                 sessionToken = session.token,
                 avatarId = "avtr_fallback",
                 response = response,
-            )
+                claimTarget = { false },
+            ),
+        )
+        assertEquals("", fixture.service.currentUserState.value?.fallbackAvatar)
+        assertEquals(
+            FallbackAvatarUpdateResult.Applied,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                claimTarget = { true },
+            ),
         )
         assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
         assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)

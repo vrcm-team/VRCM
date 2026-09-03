@@ -38,6 +38,12 @@ internal data class SessionBoundResponse<T>(
     val sessionToken: AccountSessionToken,
 )
 
+internal enum class FallbackAvatarUpdateResult {
+    Applied,
+    Stale,
+    InvalidResponse,
+}
+
 /**
  * 负责辅助登录验证的类
  * 主要作用是统一验证失效时的重试逻辑
@@ -166,18 +172,26 @@ class AuthService(
         sessionToken: AccountSessionToken,
         avatarId: String,
         response: CurrentUserData,
-    ): Boolean = authMutex.withLock {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock false
+        claimTarget: () -> Boolean,
+    ): FallbackAvatarUpdateResult = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
+            return@withLock FallbackAvatarUpdateResult.Stale
+        }
         synchronized(currentUserLock) {
-            val existing = currentUser ?: return@synchronized false
-            if (sessionToken.userId != response.id ||
-                response.fallbackAvatar != avatarId ||
-                existing.id != sessionToken.userId
-            ) {
-                return@synchronized false
+            val existing = currentUser ?: return@synchronized FallbackAvatarUpdateResult.Stale
+            if (existing.id != sessionToken.userId) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
+            }
+            if (sessionToken.userId != response.id || response.fallbackAvatar != avatarId) {
+                return@synchronized FallbackAvatarUpdateResult.InvalidResponse
+            }
+            // Claim and merge share this non-suspending critical section, so a page
+            // invalidation cannot win after the response has been accepted.
+            if (!claimTarget()) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
             }
             publishCurrentUserLocked(existing.copy(fallbackAvatar = avatarId))
-            true
+            FallbackAvatarUpdateResult.Applied
         }
     }
 

@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DecodeRequest
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.service.FallbackAvatarUpdateResult
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
@@ -242,7 +243,8 @@ private data object EmptyAvatarFallbackSetter : AvatarFallbackSetter {
         avatarId: String,
         sessionToken: AccountSessionToken,
         response: CurrentUserData,
-    ): Boolean = false
+        claimTarget: () -> Boolean,
+    ): FallbackAvatarUpdateResult = FallbackAvatarUpdateResult.Stale
 
     override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean = false
 }
