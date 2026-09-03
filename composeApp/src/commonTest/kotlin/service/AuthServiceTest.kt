@@ -686,6 +686,70 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun avatarCopyingUpdateOnlyAppliesToTheActiveSession() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertTrue(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = false,
+            )
+        )
+        assertEquals(false, fixture.service.currentUserState.value?.allowAvatarCopying)
+
+        fixture.service.logout()
+
+        assertFalse(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = true,
+            )
+        )
+        assertNull(fixture.service.currentUserState.value)
+        fixture.client.close()
+    }
+
+    @Test
+    fun avatarCopyingUpdateWaitsForAuthenticationCommit() = runTest {
+        val loginStarted = CompletableDeferred<Unit>()
+        val finishLogin = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginStarted.complete(Unit)
+                finishLogin.await()
+                jsonResponse("""{"requiresTwoFactorAuth":null}""")
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        val login = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.login(cachedAccount().username, cachedAccount().password.orEmpty())
+        }
+        loginStarted.await()
+
+        val update = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = previousSession.token,
+                allowAvatarCopying = false,
+            )
+        }
+        assertFalse(update.isCompleted)
+
+        finishLogin.complete(Unit)
+        assertIs<AuthState.Authed>(login.await())
+        assertFalse(update.await())
+        assertEquals(true, fixture.service.currentUserState.value?.allowAvatarCopying)
+        fixture.client.close()
+    }
+
+    @Test
     fun networkAvatarSelectionFailureLogsResponseDetailsWithoutCredentials() = runTest {
         var requestCount = 0
         val responseBody = """{"error":{"message":"Avatar not available","status_code":403}}"""

@@ -7,9 +7,12 @@ import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -91,9 +94,13 @@ class PresentationModuleTest : MainDispatcherTest() {
                     single<AvatarProfileLoader> {
                         AvatarProfileLoader { Result.failure(IllegalStateException("unused")) }
                     }
+                    single<AvatarGalleryLoader> {
+                        AvatarGalleryLoader { _, _, _ -> Result.success(emptyList()) }
+                    }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
                     single<AvatarImpostorDeletionSource> { EmptyAvatarImpostorDeletionSource }
+                    single<AvatarImpostorBuilder> { EmptyAvatarImpostorBuilder }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
             )
@@ -234,6 +241,12 @@ private data object EmptyAvatarEditor : AvatarEditor {
         update: AvatarUpdateData,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
 
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = null
+
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         Result.failure(IllegalStateException("unused"))
 
@@ -253,6 +266,21 @@ private data object EmptyAvatarImpostorDeletionSource : AvatarImpostorDeletionSo
         sessionToken: AccountSessionToken,
         avatarId: String,
     ): SessionBoundResponse<AvatarData>? = null
+}
+
+private data object EmptyAvatarImpostorBuilder : AvatarImpostorBuilder {
+    override suspend fun enqueue(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+        avatarId: String,
+    ) = null
+
+    override suspend fun queueStats(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = null
+
+    override fun isCurrentSession(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = false
 }
 
 private data object EmptyGalleryDataSource : GalleryDataSource {

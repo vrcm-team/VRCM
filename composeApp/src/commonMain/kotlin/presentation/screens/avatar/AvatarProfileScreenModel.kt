@@ -2,11 +2,13 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.hasImpostor
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -16,6 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryStateModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -137,7 +140,30 @@ internal data class AvatarActionState(
 internal data class AvatarEditState(
     val canEdit: Boolean = false,
     val isSavingMetadata: Boolean = false,
+    val publication: AvatarPublicationStatus? = null,
+    val isUpdatingPublication: Boolean = false,
 )
+
+internal data class AvatarImpostorState(
+    val canBuild: Boolean = false,
+    val hasImpostor: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val taskState: String? = null,
+    val isLoadingQueueEstimate: Boolean = false,
+    val estimatedQueueSeconds: Int? = null,
+    val queueEstimateFailed: Boolean = false,
+    val failure: AvatarImpostorFailure? = null,
+)
+internal enum class AvatarPublicationStatus(val apiValue: String) {
+    Private("private"),
+    Public("public"),
+    ;
+
+    companion object {
+        fun fromApiValue(value: String): AvatarPublicationStatus? =
+            entries.firstOrNull { it.apiValue == value }
+    }
+}
 
 private enum class AvatarValidation {
     Checking,
@@ -156,6 +182,19 @@ internal sealed interface AvatarProfileNotice {
     data object MetadataSaved : AvatarProfileNotice
     data class MetadataSaveFailed(val message: String?) : AvatarProfileNotice
     data object CoverSaved : AvatarProfileNotice
+    data object PublicationMadePublic : AvatarProfileNotice
+    data object PublicationMadePrivate : AvatarProfileNotice
+    data class PublicationUpdateFailed(
+        val reason: AvatarPublicationFailure,
+    ) : AvatarProfileNotice
+}
+
+internal enum class AvatarPublicationFailure {
+    BadRequest,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    Other,
 }
 
 private enum class AvatarSelectionKind {
@@ -171,6 +210,8 @@ class AvatarProfileScreenModel internal constructor(
     private val avatarEditor: AvatarEditor? = null,
     avatarImpostorDeletionSource: AvatarImpostorDeletionSource,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+    private val avatarImpostorBuilder: AvatarImpostorBuilder? = null,
+    avatarGalleryLoader: AvatarGalleryLoader? = null,
 ) : ViewModel() {
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
@@ -207,6 +248,25 @@ class AvatarProfileScreenModel internal constructor(
     private val _notices = MutableSharedFlow<AvatarProfileNotice>(extraBufferCapacity = 1)
     internal val notices: SharedFlow<AvatarProfileNotice> = _notices.asSharedFlow()
 
+    private val avatarGallery = avatarGalleryLoader?.let {
+        AvatarGalleryStateController(
+            loader = it,
+            scope = viewModelScope,
+            dispatcher = requestDispatcher,
+            session = favoriteSession,
+        )
+    }
+    internal val avatarGalleryState: StateFlow<AvatarGalleryState> =
+        avatarGallery?.state ?: MutableStateFlow(AvatarGalleryState())
+
+    internal fun loadMoreAvatarGallery() {
+        avatarGallery?.loadMore()
+    }
+
+    internal fun retryAvatarGallery() {
+        avatarGallery?.retry()
+    }
+
     private val validation = MutableStateFlow(AvatarValidation.Checking)
     private val isSelecting = MutableStateFlow(false)
     private val currentUser = avatarSelector.currentUser.stateIn(
@@ -231,17 +291,38 @@ class AvatarProfileScreenModel internal constructor(
     )
 
     private val isSavingMetadata = MutableStateFlow(false)
+    private val isUpdatingPublication = MutableStateFlow(false)
+    private val isEditSubmissionInFlight = MutableStateFlow(false)
+    private val editProgress = combine(
+        isSavingMetadata,
+        isUpdatingPublication,
+        ::Pair,
+    )
     internal val editState: StateFlow<AvatarEditState> = combine(
         avatarProfileState,
         validation,
         currentUser,
-        isSavingMetadata,
-    ) { avatar, currentValidation, user, savingMetadata ->
+        favoriteSession,
+        editProgress,
+    ) { avatar, currentValidation, user, session, progress ->
+        val canEdit = currentValidation == AvatarValidation.Available &&
+            avatar?.authorId?.isNotBlank() == true &&
+            avatar.authorId == user?.userId
+        val publication = if (
+            canEdit &&
+            session != null &&
+            session.account.userId == avatar.authorId &&
+            session.token.userId == avatar.authorId
+        ) {
+            AvatarPublicationStatus.fromApiValue(avatar.releaseStatus)
+        } else {
+            null
+        }
         AvatarEditState(
-            canEdit = currentValidation == AvatarValidation.Available &&
-                avatar?.authorId?.isNotBlank() == true &&
-                avatar.authorId == user?.userId,
-            isSavingMetadata = savingMetadata,
+            canEdit = canEdit,
+            isSavingMetadata = progress.first,
+            publication = publication,
+            isUpdatingPublication = progress.second,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -249,14 +330,63 @@ class AvatarProfileScreenModel internal constructor(
         initialValue = AvatarEditState(),
     )
 
+    private val impostorOperation = MutableStateFlow(AvatarImpostorOperation())
+    private val latestImpostorRequestToken = MutableStateFlow(0L)
+    internal val impostorState: StateFlow<AvatarImpostorState> = combine(
+        avatarProfileState,
+        validation,
+        favoriteSession,
+        impostorOperation,
+        isSelecting,
+    ) { avatar, currentValidation, session, operation, selecting ->
+        val visibleOperation = operation.takeIf { current ->
+            val target = current.target ?: return@takeIf false
+            val sameUserAndAvatar = avatar?.avatarId == target.avatarId &&
+                session?.token?.userId == target.sessionToken.userId
+            val operationInProgress = current.isSubmitting ||
+                current.isLoadingQueueEstimate ||
+                current.status?.state.isActiveImpostorState()
+            sameUserAndAvatar && (operationInProgress || session.token == target.sessionToken)
+        }
+        val taskState = visibleOperation?.status?.state
+        val hasImpostor = avatar?.hasImpostor == true || taskState.isSuccessfulImpostorState()
+        val ownsAvatar = currentValidation == AvatarValidation.Available &&
+            avatar?.avatarId?.isNotBlank() == true &&
+            avatar.authorId.isNotBlank() &&
+            avatar.authorId == session?.token?.userId
+        AvatarImpostorState(
+            canBuild = avatarImpostorBuilder != null &&
+                ownsAvatar &&
+                !selecting &&
+                visibleOperation?.isSubmitting != true &&
+                visibleOperation?.isLoadingQueueEstimate != true &&
+                !taskState.isActiveImpostorState(),
+            hasImpostor = hasImpostor,
+            isSubmitting = visibleOperation?.isSubmitting == true,
+            taskState = taskState,
+            isLoadingQueueEstimate = visibleOperation?.isLoadingQueueEstimate == true,
+            estimatedQueueSeconds = visibleOperation?.estimatedQueueSeconds,
+            queueEstimateFailed = visibleOperation?.queueEstimateFailed == true,
+            failure = visibleOperation?.failure,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AvatarImpostorState(),
+    )
+
     private val latestRequestToken = MutableStateFlow(0L)
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
+        if (!impostorOperation.value.isSubmitting) {
+            impostorOperation.value = AvatarImpostorOperation()
+        }
         validation.value = AvatarValidation.Checking
         impostorDeletion.clearTarget()
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
+        avatarGallery?.showAvatar(avatarId)
         favoriteEntry.load(avatarId)
         if (avatarId.isBlank()) {
             _isLoading.value = false
@@ -346,28 +476,208 @@ class AvatarProfileScreenModel internal constructor(
                 return
             }
             is AvatarMetadataChange.Update -> {
-                if (!isSavingMetadata.compareAndSet(expect = false, update = true)) return
+                if (!isEditSubmissionInFlight.compareAndSet(expect = false, update = true)) return
+                isSavingMetadata.value = true
                 viewModelScope.launch(requestDispatcher) {
-                    editor.updateMetadata(target.avatarId, change.data)
-                        .onSuccess { updated ->
-                            if (updated.id == target.avatarId && isCurrentTarget(target)) {
-                                _avatarProfileState.value =
-                                    requireNotNull(_avatarProfileState.value).copy(
-                                        avatarName = updated.name,
-                                        avatarDescription = updated.description.orEmpty(),
-                                        updatedAt = updated.updatedAt,
-                                        version = updated.version,
+                    try {
+                        editor.updateMetadata(target.avatarId, change.data)
+                            .onSuccess { updated ->
+                                if (updated.id == target.avatarId && isCurrentTarget(target)) {
+                                    _avatarProfileState.value =
+                                        requireNotNull(_avatarProfileState.value).copy(
+                                            avatarName = updated.name,
+                                            avatarDescription = updated.description.orEmpty(),
+                                            updatedAt = updated.updatedAt,
+                                            version = updated.version,
+                                        )
+                                    _notices.emit(AvatarProfileNotice.MetadataSaved)
+                                }
+                            }
+                            .onFailure { error ->
+                                if (isCurrentTarget(target)) {
+                                    _notices.emit(
+                                        AvatarProfileNotice.MetadataSaveFailed(error.message)
                                     )
-                                _notices.emit(AvatarProfileNotice.MetadataSaved)
+                                }
                             }
-                        }
-                        .onFailure { error ->
-                            if (isCurrentTarget(target)) {
-                                _notices.emit(AvatarProfileNotice.MetadataSaveFailed(error.message))
-                            }
-                        }
-                    isSavingMetadata.value = false
+                    } finally {
+                        isSavingMetadata.value = false
+                        isEditSubmissionInFlight.value = false
+                    }
                 }
+            }
+        }
+    }
+
+    internal fun enqueueImpostor() {
+        val builder = avatarImpostorBuilder ?: return
+        if (!impostorState.value.canBuild) return
+        val avatar = avatarProfileState.value ?: return
+        val sessionToken = favoriteSession.value?.token ?: return
+        if (avatar.authorId != sessionToken.userId) return
+
+        val current = impostorOperation.value
+        if (current.isSubmitting ||
+            current.isLoadingQueueEstimate ||
+            current.status?.state.isActiveImpostorState()
+        ) {
+            return
+        }
+
+        val target = AvatarImpostorTarget(
+            sessionToken = sessionToken,
+            avatarId = avatar.avatarId,
+            requestToken = latestImpostorRequestToken.updateAndGet { it + 1 },
+        )
+        if (!impostorOperation.compareAndSet(
+                expect = current,
+                update = AvatarImpostorOperation(target = target, isSubmitting = true),
+            )
+        ) {
+            return
+        }
+
+        viewModelScope.launch(requestDispatcher) {
+            val response = try {
+                builder.enqueue(target.sessionToken, target.avatarId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                AuthenticatedAvatarImpostorResult(Result.failure(error), target.sessionToken)
+            }
+            if (response == null || !acceptImpostorSession(response.sessionToken, target)) {
+                finishImpostorOperation(target)
+                return@launch
+            }
+            response.result.fold(
+                onSuccess = { status ->
+                    handleImpostorEnqueueSuccess(
+                        target = target,
+                        responseToken = response.sessionToken,
+                        status = status,
+                        builder = builder,
+                    )
+                },
+                onFailure = { error ->
+                    updateImpostorOperation(target) { operation ->
+                        operation.copy(
+                            target = target.copy(sessionToken = response.sessionToken),
+                            isSubmitting = false,
+                            failure = error.toAvatarImpostorFailure(),
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    private suspend fun handleImpostorEnqueueSuccess(
+        target: AvatarImpostorTarget,
+        responseToken: AccountSessionToken,
+        status: AvatarImpostorServiceStatus,
+        builder: AvatarImpostorBuilder,
+    ) {
+        if (!status.isValidFor(target.avatarId, responseToken.userId)) {
+            updateImpostorOperation(target) { operation ->
+                operation.copy(
+                    target = target.copy(sessionToken = responseToken),
+                    isSubmitting = false,
+                    failure = AvatarImpostorFailure.InvalidResponse,
+                )
+            }
+            return
+        }
+
+        val refreshedTarget = target.copy(sessionToken = responseToken)
+        val accepted = updateImpostorOperation(target) { operation ->
+            operation.copy(
+                target = refreshedTarget,
+                isSubmitting = false,
+                status = status,
+                isLoadingQueueEstimate = true,
+                failure = null,
+            )
+        }
+        if (!accepted) return
+
+        val queueResponse = try {
+            builder.queueStats(responseToken)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            AuthenticatedAvatarImpostorResult(Result.failure(error), responseToken)
+        }
+        if (queueResponse == null ||
+            !acceptImpostorSession(queueResponse.sessionToken, refreshedTarget)
+        ) {
+            finishQueueEstimate(refreshedTarget, status.id)
+            return
+        }
+        val queueTarget = refreshedTarget.copy(sessionToken = queueResponse.sessionToken)
+        queueResponse.result.fold(
+            onSuccess = { stats ->
+                updateQueueEstimate(refreshedTarget, status.id) { operation ->
+                    if (stats.estimatedServiceDurationSeconds < 0) {
+                        operation.copy(
+                            target = queueTarget,
+                            isLoadingQueueEstimate = false,
+                            queueEstimateFailed = true,
+                        )
+                    } else {
+                        operation.copy(
+                            target = queueTarget,
+                            isLoadingQueueEstimate = false,
+                            estimatedQueueSeconds = stats.estimatedServiceDurationSeconds,
+                            queueEstimateFailed = false,
+                        )
+                    }
+                }
+            },
+            onFailure = {
+                updateQueueEstimate(refreshedTarget, status.id) { operation ->
+                    operation.copy(
+                        target = queueTarget,
+                        isLoadingQueueEstimate = false,
+                        queueEstimateFailed = true,
+                    )
+                }
+            },
+        )
+    }
+
+    internal fun updatePublication(publication: AvatarPublicationStatus) {
+        val avatar = avatarProfileState.value ?: return
+        val editor = avatarEditor ?: return
+        val currentPublication = AvatarPublicationStatus.fromApiValue(avatar.releaseStatus)
+            ?: return
+        if (publication == currentPublication) return
+        val target = publicationTarget(avatar, publication) ?: return
+        if (!isEditSubmissionInFlight.compareAndSet(expect = false, update = true)) return
+        isUpdatingPublication.value = true
+
+        viewModelScope.launch(requestDispatcher) {
+            try {
+                val response = editor.updatePublication(
+                    sessionToken = target.requestToken,
+                    avatarId = target.avatarId,
+                    releaseStatus = publication.apiValue,
+                ) ?: return@launch
+                response.result
+                    .onSuccess { updated ->
+                        applyPublicationResponse(target, response.sessionToken, updated)
+                    }
+                    .onFailure { error ->
+                        if (isCurrentPublicationTarget(target, response.sessionToken)) {
+                            _notices.emit(
+                                AvatarProfileNotice.PublicationUpdateFailed(
+                                    error.toAvatarPublicationFailure()
+                                )
+                            )
+                        }
+                    }
+            } finally {
+                isUpdatingPublication.value = false
+                isEditSubmissionInFlight.value = false
             }
         }
     }
@@ -399,12 +709,172 @@ class AvatarProfileScreenModel internal constructor(
     private fun isCurrentTarget(target: AvatarEditTarget): Boolean =
         avatarProfileState.value?.avatarId == target.avatarId &&
             currentUser.value?.userId == target.userId
+
+    private fun acceptImpostorSession(
+        responseToken: AccountSessionToken,
+        target: AvatarImpostorTarget,
+    ): Boolean = responseToken.userId == target.sessionToken.userId &&
+        favoriteSession.value?.token == responseToken &&
+        avatarImpostorBuilder?.isCurrentSession(responseToken) == true
+
+    private fun updateImpostorOperation(
+        target: AvatarImpostorTarget,
+        transform: (AvatarImpostorOperation) -> AvatarImpostorOperation,
+    ): Boolean {
+        val operation = impostorOperation.value
+        if (operation.target?.requestToken != target.requestToken) return false
+        impostorOperation.value = transform(operation)
+        return true
+    }
+
+    private fun updateQueueEstimate(
+        target: AvatarImpostorTarget,
+        serviceId: String,
+        transform: (AvatarImpostorOperation) -> AvatarImpostorOperation,
+    ): Boolean {
+        val operation = impostorOperation.value
+        if (operation.target?.requestToken != target.requestToken ||
+            operation.status?.id != serviceId
+        ) {
+            return false
+        }
+        impostorOperation.value = transform(operation)
+        return true
+    }
+
+    private fun finishImpostorOperation(target: AvatarImpostorTarget) {
+        updateImpostorOperation(target) { AvatarImpostorOperation() }
+    }
+
+    private fun finishQueueEstimate(target: AvatarImpostorTarget, serviceId: String) {
+        updateQueueEstimate(target, serviceId) { operation ->
+            operation.copy(isLoadingQueueEstimate = false, queueEstimateFailed = true)
+        }
+    }
+    private fun publicationTarget(
+        avatar: AvatarProfileVo,
+        publication: AvatarPublicationStatus,
+    ): AvatarPublicationTarget? {
+        if (validation.value != AvatarValidation.Available) return null
+        if (AvatarPublicationStatus.fromApiValue(avatar.releaseStatus) == null) return null
+        val currentUserId = currentUser.value?.userId ?: return null
+        val session = favoriteSession.value ?: return null
+        val userId = session.account.userId
+        if (
+            session.token.userId != userId ||
+            currentUserId != userId ||
+            avatar.authorId != userId
+        ) {
+            return null
+        }
+        return AvatarPublicationTarget(
+            avatarId = avatar.avatarId,
+            userId = userId,
+            requestToken = session.token,
+            publication = publication,
+        )
+    }
+
+    private suspend fun applyPublicationResponse(
+        target: AvatarPublicationTarget,
+        responseToken: AccountSessionToken,
+        updated: AvatarData,
+    ) {
+        if (!isCurrentPublicationTarget(target, responseToken)) return
+        val publication = AvatarPublicationStatus.fromApiValue(updated.releaseStatus)
+        if (
+            updated.id != target.avatarId ||
+            updated.authorId != target.userId ||
+            publication != target.publication
+        ) {
+            _notices.emit(
+                AvatarProfileNotice.PublicationUpdateFailed(AvatarPublicationFailure.Other)
+            )
+            return
+        }
+
+        _avatarProfileState.value = AvatarProfileVo(updated)
+        _notices.emit(
+            when (publication) {
+                AvatarPublicationStatus.Private -> AvatarProfileNotice.PublicationMadePrivate
+                AvatarPublicationStatus.Public -> AvatarProfileNotice.PublicationMadePublic
+            }
+        )
+    }
+
+    private fun isCurrentPublicationTarget(
+        target: AvatarPublicationTarget,
+        responseToken: AccountSessionToken,
+    ): Boolean {
+        val session = favoriteSession.value ?: return false
+        val avatar = avatarProfileState.value ?: return false
+        return responseToken == session.token &&
+            responseToken.userId == target.userId &&
+            session.account.userId == target.userId &&
+            currentUser.value?.userId == target.userId &&
+            validation.value == AvatarValidation.Available &&
+            avatar.avatarId == target.avatarId &&
+            avatar.authorId == target.userId
+    }
 }
+
+private data class AvatarImpostorTarget(
+    val sessionToken: AccountSessionToken,
+    val avatarId: String,
+    val requestToken: Long,
+)
+
+private data class AvatarImpostorOperation(
+    val target: AvatarImpostorTarget? = null,
+    val isSubmitting: Boolean = false,
+    val status: AvatarImpostorServiceStatus? = null,
+    val isLoadingQueueEstimate: Boolean = false,
+    val estimatedQueueSeconds: Int? = null,
+    val queueEstimateFailed: Boolean = false,
+    val failure: AvatarImpostorFailure? = null,
+)
 
 private data class AvatarEditTarget(
     val avatarId: String,
     val userId: String,
 )
+
+private fun AvatarImpostorServiceStatus.isValidFor(avatarId: String, userId: String): Boolean =
+    id.isNotBlank() &&
+        state.isNotBlank() &&
+        subjectId == avatarId &&
+        requesterUserId == userId &&
+        subjectType.isNotBlank() &&
+        type.isNotBlank()
+
+private fun String?.isSuccessfulImpostorState(): Boolean = when (this?.lowercase()) {
+    "complete", "completed", "success", "succeeded" -> true
+    else -> false
+}
+
+private fun String?.isActiveImpostorState(): Boolean {
+    if (this == null) return false
+    return when (lowercase()) {
+        "complete", "completed", "success", "succeeded",
+        "failed", "failure", "error", "cancelled", "canceled" -> false
+        else -> true
+    }
+}
+private data class AvatarPublicationTarget(
+    val avatarId: String,
+    val userId: String,
+    val requestToken: AccountSessionToken,
+    val publication: AvatarPublicationStatus,
+)
+
+private fun Throwable.toAvatarPublicationFailure(): AvatarPublicationFailure =
+    when ((this as? VRCApiException)?.code) {
+        400 -> AvatarPublicationFailure.BadRequest
+        401 -> AvatarPublicationFailure.Unauthorized
+        403 -> AvatarPublicationFailure.Forbidden
+        404 -> AvatarPublicationFailure.NotFound
+        else -> AvatarPublicationFailure.Other
+    }
 
 private fun avatarActionAvailability(
     avatar: AvatarProfileVo?,

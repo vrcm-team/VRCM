@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
@@ -19,8 +20,18 @@ internal sealed class AvatarCoverUpdateFailure(
         AvatarCoverUpdateFailure("Avatar cover assignment failed", cause)
 }
 
+internal data class AvatarPublicationResponse(
+    val result: Result<AvatarData>,
+    val sessionToken: AccountSessionToken,
+)
+
 internal interface AvatarEditor {
     suspend fun updateMetadata(avatarId: String, update: AvatarUpdateData): Result<AvatarData>
+    suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse?
     suspend fun uploadCover(cover: AvatarCoverFile): Result<String>
     suspend fun assignCover(avatarId: String, imageUrl: String): Result<AvatarData>
 
@@ -49,6 +60,20 @@ internal class NetworkAvatarEditor(
         update: AvatarUpdateData,
     ): Result<AvatarData> = authService.reTryAuthCatching {
         avatarsApi.updateAvatar(avatarId, update)
+    }
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? {
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            avatarsApi.updateAvatar(
+                avatarId,
+                AvatarUpdateData(releaseStatus = releaseStatus),
+            )
+        } ?: return null
+        return AvatarPublicationResponse(response.result, response.sessionToken)
     }
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
