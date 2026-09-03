@@ -387,6 +387,7 @@ private class AvatarDeletionFixture(
         avatarProfileLoader = StaticAvatarProfileLoader(avatarsById),
         avatarSelector = selector,
         favoriteEntrySource = DeletionFavoriteEntrySource(),
+        avatarImpostorDeletionSource = EmptyImpostorDeletionSource,
         requestDispatcher = Dispatchers.Unconfined,
         favoriteSession = session,
         avatarDeleter = deleter,
@@ -396,6 +397,18 @@ private class AvatarDeletionFixture(
     fun open(avatarId: String) {
         model.refreshAvatarData(AvatarProfileVo(avatarsById.getValue(avatarId)))
     }
+}
+
+private data object EmptyImpostorDeletionSource : AvatarImpostorDeletionSource {
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ) = null
+
+    override suspend fun load(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ) = null
 }
 
 private data class PendingAvatarDeletion(

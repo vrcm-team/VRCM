@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.storage.data.GroupProfileCache
 import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.supportedPlatforms
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -60,6 +61,17 @@ interface WorldProfileCacheStore {
     suspend fun load(worldId: String): WorldProfileCache?
 
     suspend fun save(cache: WorldProfileCache)
+
+    suspend fun delete(worldId: String)
+    /**
+     * 暂存缓存后执行同步状态提交；提交失败时恢复原缓存。
+     * [commit] 不得调用此存储的挂起方法。
+     */
+    suspend fun saveAndCommitIfCurrent(
+        cache: WorldProfileCache,
+        canStart: () -> Boolean,
+        commit: () -> Boolean,
+    ): Boolean
 
     suspend fun clearAll()
 }
@@ -208,20 +220,63 @@ internal class RoomWorldProfileCacheStore(
     nowMillis: () -> Long,
     retained: Int = 60,
 ) : WorldProfileCacheStore {
+    private val mutationMutex = Mutex()
     private val cache = JsonBlobCache(
         dao = dao,
         scope = CacheScopes.WORLD_PROFILE,
         serializer = WorldProfileCache.serializer(),
         nowMillis = nowMillis,
         retained = retained,
-        prune = { it.copy(world = it.world.prunedForProfileCache()) },
+        prune = {
+            it.copy(
+                world = it.world.prunedForProfileCache(),
+                supportedPlatforms = it.supportedPlatforms ?: it.world.supportedPlatforms,
+            )
+        },
     )
 
-    override suspend fun load(worldId: String): WorldProfileCache? = cache.load(worldId)
+    override suspend fun load(worldId: String): WorldProfileCache? = mutationMutex.withLock {
+        cache.load(worldId)
+    }
 
-    override suspend fun save(cache: WorldProfileCache) = this.cache.save(cache.world.id, cache)
+    override suspend fun save(cache: WorldProfileCache) = mutationMutex.withLock {
+        this.cache.save(cache.world.id, cache)
+    }
 
-    override suspend fun clearAll() = cache.clear()
+    override suspend fun delete(worldId: String) = mutationMutex.withLock {
+        cache.delete(worldId)
+    }
+    override suspend fun saveAndCommitIfCurrent(
+        cache: WorldProfileCache,
+        canStart: () -> Boolean,
+        commit: () -> Boolean,
+    ): Boolean =
+        mutationMutex.withLock {
+            if (!canStart()) return@withLock false
+            val worldId = cache.world.id
+            val previous = this.cache.load(worldId)
+            this.cache.save(worldId, cache)
+
+            val committed = try {
+                commit()
+            } catch (error: Throwable) {
+                restore(worldId, previous)
+                throw error
+            }
+            if (!committed) restore(worldId, previous)
+            committed
+        }
+
+    override suspend fun clearAll() = mutationMutex.withLock { cache.clear() }
+
+    private suspend fun restore(worldId: String, previous: WorldProfileCache?) {
+        if (previous == null) {
+            cache.delete(worldId)
+        } else {
+            cache.save(worldId, previous)
+        }
+    }
+
 }
 
 internal class RoomGroupProfileCacheStore(

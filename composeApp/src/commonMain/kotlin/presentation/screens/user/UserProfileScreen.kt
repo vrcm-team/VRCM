@@ -227,11 +227,17 @@ data class UserProfileScreen(
         }
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
+        val avatarCopyingEnabledMessage = strings.editProfileAvatarCopyingEnabled
+        val avatarCopyingDisabledMessage = strings.editProfileAvatarCopyingDisabled
         val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
+        val avatarCopyingPrivacyState by userProfileScreenModel
+            .avatarCopyingPrivacyState
+            .collectAsState()
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
             bioLinksUpdateState = bioLinksUpdateState,
+            avatarCopyingPrivacyState = avatarCopyingPrivacyState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
                 userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
@@ -251,6 +257,17 @@ data class UserProfileScreen(
                     successMessage = editSuccessMsg,
                 )
             },
+            onAvatarCopyingChange = { isAllowed ->
+                userProfileScreenModel.updateAvatarCopyingPrivacy(
+                    isAllowed = isAllowed,
+                    successMessage = if (isAllowed) {
+                        avatarCopyingEnabledMessage
+                    } else {
+                        avatarCopyingDisabledMessage
+                    },
+                )
+            },
+            onAvatarCopyingRetry = userProfileScreenModel::retryAvatarCopyingPrivacyLoad,
         )
         // 编辑备注弹窗
         val noteSavedMsg = strings.userNoteSaved
