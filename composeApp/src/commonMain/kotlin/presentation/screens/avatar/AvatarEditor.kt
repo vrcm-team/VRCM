@@ -26,6 +26,11 @@ internal data class AvatarMetadataUpdateResponse(
     val sessionToken: AccountSessionToken,
 )
 
+internal data class AvatarPublicationResponse(
+    val result: Result<AvatarData>,
+    val sessionToken: AccountSessionToken,
+)
+
 internal data class AvatarStylesResponse(
     val result: Result<List<AvatarStyle>>,
     val sessionToken: AccountSessionToken,
@@ -38,6 +43,11 @@ internal interface AvatarEditor {
         avatarId: String,
         update: AvatarUpdateData,
     ): AvatarMetadataUpdateResponse?
+    suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse?
     suspend fun uploadCover(cover: AvatarCoverFile): Result<String>
     suspend fun assignCover(avatarId: String, imageUrl: String): Result<AvatarData>
 
@@ -76,6 +86,20 @@ internal class NetworkAvatarEditor(
         avatarsApi.updateAvatar(avatarId, update)
     }?.let { response ->
         AvatarMetadataUpdateResponse(response.result, response.sessionToken)
+    }
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? {
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            avatarsApi.updateAvatar(
+                avatarId,
+                AvatarUpdateData(releaseStatus = releaseStatus),
+            )
+        } ?: return null
+        return AvatarPublicationResponse(response.result, response.sessionToken)
     }
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =

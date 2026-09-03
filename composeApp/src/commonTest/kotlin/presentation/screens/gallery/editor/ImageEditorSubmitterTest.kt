@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.gallery.editor
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileData
@@ -9,12 +10,12 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFail
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageFile
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
-import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import kotlinx.coroutines.runBlocking
@@ -173,6 +174,12 @@ private class FakeSubmissionAvatarEditor(
         update: AvatarUpdateData,
     ): AvatarMetadataUpdateResponse? = error("Metadata update is not used")
 
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Publication update is not used")
+
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> {
         uploadedCover = cover
         return uploadResult
@@ -199,6 +206,12 @@ private data object UnusedAvatarEditor : AvatarEditor {
         avatarId: String,
         update: AvatarUpdateData,
     ): AvatarMetadataUpdateResponse? = error("Avatar editing is not used")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = error("Avatar editing is not used")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         error("Avatar editing is not used")

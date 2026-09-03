@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -27,13 +28,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,10 +70,13 @@ private const val AvatarDescriptionMaxLength = 256
 internal fun AvatarEditSheet(
     avatar: AvatarProfileVo,
     state: AvatarEditState,
+    impostorState: AvatarImpostorState,
     imageProcessor: PrintImageProcessor,
     onDismiss: () -> Unit,
     onSaveMetadata: (AvatarMetadataDraft) -> Unit,
     onRetryStyles: () -> Unit,
+    onEnqueueImpostor: () -> Unit,
+    onUpdatePublication: (AvatarPublicationStatus) -> Unit,
     onEditCover: (SelectedImage, PreparedImage) -> Unit,
 ) {
     val metadataKey = arrayOf(avatar.avatarId, avatar.version, avatar.updatedAt, avatar.tags)
@@ -81,9 +92,23 @@ internal fun AvatarEditSheet(
     }
     var coverError by remember(avatar.avatarId) { mutableStateOf<String?>(null) }
     var isPreparingCover by remember(avatar.avatarId) { mutableStateOf(false) }
+    var showPublicConfirmation by remember(avatar.avatarId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val locale = strings
-    val isBusy = state.isSavingMetadata || isPreparingCover
+    val isRemoteUpdateBusy = state.isSavingMetadata || state.isUpdatingPublication
+    val isBusy = isRemoteUpdateBusy || isPreparingCover ||
+        impostorState.isSubmitting || impostorState.isLoadingQueueEstimate
+    val latestIsBusy = rememberUpdatedState(isBusy)
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestIsBusy.value
+        },
+    )
+    LaunchedEffect(state.publication) {
+        if (state.publication != AvatarPublicationStatus.Private) {
+            showPublicConfirmation = false
+        }
+    }
 
     val coverPicker = rememberFilePickerLauncher(
         type = galleryImagePickerType(AvatarCoverLimits.ALLOWED_EXTENSIONS),
@@ -131,6 +156,8 @@ internal fun AvatarEditSheet(
 
     ModalBottomSheet(
         onDismissRequest = { if (!isBusy) onDismiss() },
+        sheetState = sheetState,
+        sheetGesturesEnabled = !isBusy,
     ) {
         Column(
             modifier = Modifier
@@ -153,7 +180,7 @@ internal fun AvatarEditSheet(
                 label = { Text(locale.avatarEditName) },
                 supportingText = { Text("${name.length}/$AvatarNameMaxLength") },
                 singleLine = true,
-                enabled = !state.isSavingMetadata,
+                enabled = !isRemoteUpdateBusy,
             )
             OutlinedTextField(
                 value = description,
@@ -167,7 +194,7 @@ internal fun AvatarEditSheet(
                 },
                 minLines = 3,
                 maxLines = 6,
-                enabled = !state.isSavingMetadata,
+                enabled = !isRemoteUpdateBusy,
             )
 
             HorizontalDivider()
@@ -268,7 +295,7 @@ internal fun AvatarEditSheet(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = name.isNotBlank() && !state.isSavingMetadata,
+                enabled = name.isNotBlank() && !isRemoteUpdateBusy,
             ) {
                 if (state.isSavingMetadata) {
                     CircularProgressIndicator(
@@ -289,6 +316,61 @@ internal fun AvatarEditSheet(
 
             HorizontalDivider()
 
+            state.publication?.let { currentPublication ->
+                Text(
+                    text = locale.avatarEditPublication,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AvatarPublicationStatus.entries.forEachIndexed { index, publication ->
+                        SegmentedButton(
+                            selected = publication == currentPublication,
+                            onClick = {
+                                if (publication == currentPublication) return@SegmentedButton
+                                if (publication == AvatarPublicationStatus.Public) {
+                                    showPublicConfirmation = true
+                                } else {
+                                    onUpdatePublication(publication)
+                                }
+                            },
+                            enabled = !isBusy,
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index,
+                                AvatarPublicationStatus.entries.size,
+                            ),
+                            label = {
+                                Text(
+                                    when (publication) {
+                                        AvatarPublicationStatus.Private ->
+                                            locale.avatarEditPublicationPrivate
+                                        AvatarPublicationStatus.Public ->
+                                            locale.avatarEditPublicationPublic
+                                    }
+                                )
+                            },
+                        )
+                    }
+                }
+                if (state.isUpdatingPublication) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = locale.avatarEditUpdatingPublication,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+            }
+
             Text(
                 text = locale.avatarEditCover,
                 style = MaterialTheme.typography.titleMedium,
@@ -302,7 +384,7 @@ internal fun AvatarEditSheet(
             OutlinedButton(
                 onClick = coverPicker::launch,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isPreparingCover,
+                enabled = !isBusy,
             ) {
                 if (isPreparingCover) {
                     CircularProgressIndicator(
@@ -325,6 +407,14 @@ internal fun AvatarEditSheet(
                 )
             }
 
+            HorizontalDivider()
+
+            AvatarImpostorSection(
+                state = impostorState,
+                localPreparationInProgress = isPreparingCover,
+                onEnqueue = onEnqueueImpostor,
+            )
+
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
@@ -335,6 +425,147 @@ internal fun AvatarEditSheet(
             Spacer(Modifier.height(12.dp))
         }
     }
+
+    if (showPublicConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showPublicConfirmation = false },
+            title = { Text(locale.avatarEditPublishConfirmTitle) },
+            text = { Text(locale.avatarEditPublishConfirmMessage) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPublicConfirmation = false
+                        onUpdatePublication(AvatarPublicationStatus.Public)
+                    },
+                    enabled = !isBusy &&
+                        state.publication == AvatarPublicationStatus.Private,
+                ) {
+                    Text(locale.avatarEditPublishConfirmAction)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPublicConfirmation = false }) {
+                    Text(locale.cancel)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun AvatarImpostorSection(
+    state: AvatarImpostorState,
+    localPreparationInProgress: Boolean,
+    onEnqueue: () -> Unit,
+) {
+    val locale = strings
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = locale.avatarImpostorTitle,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = if (state.hasImpostor) {
+                locale.avatarImpostorAvailable
+            } else {
+                locale.avatarImpostorUnavailable
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = locale.avatarImpostorTaskStatus,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            text = state.taskState?.localizedImpostorState(locale)
+                ?: locale.avatarImpostorTaskEmpty,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when {
+            state.isLoadingQueueEstimate -> Text(
+                text = locale.avatarImpostorQueueEstimateLoading,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.estimatedQueueSeconds != null -> Text(
+                text = locale.avatarImpostorQueueEstimateMinutes.replace(
+                    "%minutes%",
+                    ((state.estimatedQueueSeconds + 59) / 60).coerceAtLeast(1).toString(),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.queueEstimateFailed -> Text(
+                text = locale.avatarImpostorQueueEstimateUnavailable,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        state.failure?.let { failure ->
+            Text(
+                text = failure.localizedMessage(locale),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        OutlinedButton(
+            onClick = onEnqueue,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = state.canBuild && !localPreparationInProgress,
+        ) {
+            if (state.isSubmitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(AppIcons.Update, contentDescription = null, Modifier.size(18.dp))
+            }
+            Spacer(Modifier.size(8.dp))
+            Text(
+                when {
+                    state.isSubmitting -> locale.avatarImpostorSubmitting
+                    state.hasImpostor -> locale.avatarImpostorRebuild
+                    else -> locale.avatarImpostorCreate
+                }
+            )
+        }
+    }
+}
+
+private fun String.localizedImpostorState(
+    locale: io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings,
+): String = when (lowercase()) {
+    "queued", "pending" -> locale.avatarImpostorStatusQueued
+    "processing", "running", "in_progress", "in-progress" ->
+        locale.avatarImpostorStatusProcessing
+    "complete", "completed", "success", "succeeded" ->
+        locale.avatarImpostorStatusCompleted
+    "failed", "failure", "error", "cancelled", "canceled" ->
+        locale.avatarImpostorStatusFailed
+    else -> locale.avatarImpostorStatusUnknown.replace("%s", this)
+}
+
+private fun AvatarImpostorFailure.localizedMessage(
+    locale: io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings,
+): String = when (this) {
+    AvatarImpostorFailure.Authentication -> locale.avatarImpostorAuthenticationFailed
+    AvatarImpostorFailure.Permission -> locale.avatarImpostorPermissionFailed
+    AvatarImpostorFailure.NotFound -> locale.avatarImpostorNotFound
+    AvatarImpostorFailure.Conflict -> locale.avatarImpostorConflict
+    AvatarImpostorFailure.RateLimited -> locale.avatarImpostorRateLimited
+    AvatarImpostorFailure.Server -> locale.avatarImpostorServerFailed
+    AvatarImpostorFailure.InvalidResponse,
+    AvatarImpostorFailure.Unknown -> locale.avatarImpostorUnknownFailed
 }
 
 @Composable

@@ -10,4 +10,5 @@ data class AvatarUpdateData(
     val tags: List<String>? = null,
     val primaryStyle: String? = null,
     val secondaryStyle: String? = null,
+    val releaseStatus: String? = null,
 )

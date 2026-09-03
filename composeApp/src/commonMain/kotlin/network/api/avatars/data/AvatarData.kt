@@ -88,4 +88,13 @@ data class AvatarUnityPackage(
     val platform: String? = null,
     val unityVersion: String? = null,
     val performanceRating: String? = null,
+    val impostorUrl: String? = null,
+    val impostorizerVersion: String? = null,
+    val variant: String? = null,
 )
+
+internal val AvatarData.hasImpostor: Boolean
+    get() = unityPackages.any { unityPackage ->
+        !unityPackage.impostorUrl.isNullOrBlank() ||
+            unityPackage.variant.equals("impostor", ignoreCase = true)
+    }
