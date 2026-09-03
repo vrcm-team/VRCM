@@ -639,6 +639,47 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     }
 
     @Test
+    fun sameAccountRenewalKeepsMetadataSaveLockedAndAcceptsRenewedResponse() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Before", authorId = "usr_current")
+        yield()
+
+        model.saveMetadata(
+            AvatarMetadataDraft(
+                name = "After",
+                description = "Description",
+                contentTags = emptySet(),
+                authorTags = "",
+            )
+        )
+        yield()
+
+        session.value = authenticated("usr_current", 2)
+        yield()
+        assertTrue(model.editState.value.isSavingMetadata)
+
+        editor.metadataResponseToken = AccountSessionToken("usr_current", 2)
+        editor.completeMetadata(
+            Result.success(
+                AvatarData(
+                    id = "avtr_owned",
+                    name = "After",
+                    description = "Description",
+                    authorId = "usr_current",
+                )
+            )
+        )
+        yield()
+
+        assertEquals("After", model.avatarProfileState.value?.avatarName)
+        assertFalse(model.editState.value.isSavingMetadata)
+    }
+
+    @Test
     fun accountSwitchDiscardsAnInFlightStyleList() = runBlocking {
         val loader = ControlledAvatarProfileLoader()
         val editor = FakeAvatarEditor()
@@ -661,6 +702,34 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
 
         assertEquals(AvatarStylesLoadState.NotLoaded, model.editState.value.styles)
         assertFalse(model.editState.value.canEdit)
+    }
+
+    @Test
+    fun sameAccountRenewalKeepsInFlightStyleListUsable() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Owned", authorId = "usr_current")
+        yield()
+
+        model.loadAvatarStyles()
+        yield()
+        assertEquals(AvatarStylesLoadState.Loading, model.editState.value.styles)
+
+        session.value = authenticated("usr_current", 2)
+        yield()
+        editor.stylesResponseToken = AccountSessionToken("usr_current", 2)
+        editor.completeStyles(
+            Result.success(listOf(AvatarStyle("avst_new", "Renewed style")))
+        )
+        yield()
+
+        assertEquals(
+            AvatarStylesLoadState.Ready(listOf(AvatarStyle("avst_new", "Renewed style"))),
+            model.editState.value.styles,
+        )
     }
 
     @Test
@@ -904,10 +973,15 @@ private class FakeAvatarEditor : AvatarEditor {
     private val styles = CompletableDeferred<Result<List<AvatarStyle>>>()
     var metadataRequests = 0
         private set
+    var metadataResponseToken: AccountSessionToken? = null
+    var stylesResponseToken: AccountSessionToken? = null
 
     override suspend fun loadStyles(
         sessionToken: AccountSessionToken,
-    ): AvatarStylesResponse = AvatarStylesResponse(styles.await(), sessionToken)
+    ): AvatarStylesResponse = AvatarStylesResponse(
+        styles.await(),
+        stylesResponseToken ?: sessionToken,
+    )
 
     override suspend fun updateMetadata(
         sessionToken: AccountSessionToken,
@@ -917,7 +991,7 @@ private class FakeAvatarEditor : AvatarEditor {
         metadataRequests++
         return AvatarMetadataUpdateResponse(
             result = metadata.await(),
-            sessionToken = sessionToken,
+            sessionToken = metadataResponseToken ?: sessionToken,
         )
     }
 

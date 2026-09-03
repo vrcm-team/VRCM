@@ -239,7 +239,7 @@ class AvatarProfileScreenModel internal constructor(
 
     init {
         viewModelScope.launch {
-            favoriteSession.map { it?.token }
+            favoriteSession.map { it?.token?.userId }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { invalidateMetadataOperations() }
@@ -331,10 +331,14 @@ class AvatarProfileScreenModel internal constructor(
         stylesLoadJob = viewModelScope.launch(requestDispatcher) {
             try {
                 val response = editor.loadStyles(sessionToken) ?: return@launch
-                if (!acceptsMetadataResponse(response.sessionToken, avatarId)) return@launch
+                if (!acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
+                    return@launch
+                }
                 response.result.fold(
                     onSuccess = { styles ->
-                        if (!acceptsMetadataResponse(response.sessionToken, avatarId)) return@fold
+                        if (!acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
+                            return@fold
+                        }
                         val options = normalizedAvatarStyles(styles)
                         stylesLoadState.value = if (options.isEmpty()) {
                             AvatarStylesLoadState.Empty
@@ -344,7 +348,7 @@ class AvatarProfileScreenModel internal constructor(
                     },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
-                        if (acceptsMetadataResponse(response.sessionToken, avatarId)) {
+                        if (acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
                             stylesLoadState.value = AvatarStylesLoadState.Failed(error.message)
                         }
                     },
@@ -394,11 +398,17 @@ class AvatarProfileScreenModel internal constructor(
                             avatarId,
                             change.data,
                         ) ?: return@launch
-                        if (!acceptsMetadataResponse(response.sessionToken, avatarId)) return@launch
+                        if (!acceptsMetadataResponse(response.sessionToken, avatarId, generation)) {
+                            return@launch
+                        }
                         response.result.fold(
                             onSuccess = { updated ->
                                 if (updated.id == avatarId &&
-                                    acceptsMetadataResponse(response.sessionToken, avatarId)
+                                    acceptsMetadataResponse(
+                                        response.sessionToken,
+                                        avatarId,
+                                        generation,
+                                    )
                                 ) {
                                     _avatarProfileState.value = AvatarProfileVo(updated)
                                     validation.value = AvatarValidation.Available
@@ -407,7 +417,12 @@ class AvatarProfileScreenModel internal constructor(
                             },
                             onFailure = { error ->
                                 if (error is CancellationException) throw error
-                                if (acceptsMetadataResponse(response.sessionToken, avatarId)) {
+                                if (acceptsMetadataResponse(
+                                        response.sessionToken,
+                                        avatarId,
+                                        generation,
+                                    )
+                                ) {
                                     _notices.emit(
                                         AvatarProfileNotice.MetadataSaveFailed(error.message)
                                     )
@@ -445,10 +460,24 @@ class AvatarProfileScreenModel internal constructor(
         return sessionToken
     }
 
+    private fun acceptsStylesResponse(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        operationGeneration: Long,
+    ): Boolean = acceptsMetadataTarget(sessionToken, avatarId) &&
+        stylesLoadGeneration == operationGeneration
+
     private fun acceptsMetadataResponse(
         sessionToken: AccountSessionToken,
         avatarId: String,
-    ): Boolean = favoriteSession.value?.token == sessionToken &&
+        operationGeneration: Long,
+    ): Boolean = acceptsMetadataTarget(sessionToken, avatarId) &&
+        metadataSaveGeneration == operationGeneration
+
+    private fun acceptsMetadataTarget(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): Boolean = favoriteSession.value?.token?.userId == sessionToken.userId &&
         avatarProfileState.value?.let { avatar ->
             avatar.avatarId == avatarId && avatar.authorId == sessionToken.userId
         } == true
