@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
@@ -87,6 +88,9 @@ class PresentationModuleTest : MainDispatcherTest() {
                 module {
                     single<AvatarProfileLoader> {
                         AvatarProfileLoader { Result.failure(IllegalStateException("unused")) }
+                    }
+                    single<AvatarGalleryLoader> {
+                        AvatarGalleryLoader { _, _, _ -> Result.success(emptyList()) }
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
