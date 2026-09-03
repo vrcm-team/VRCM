@@ -65,6 +65,29 @@ class UsersApi(private val client: HttpClient) {
             parameter("offset", offset)
         }.checkSuccess()
 
+    suspend fun hasWorldPersistence(userId: String, worldId: String): Boolean {
+        val response = client.get("$USERS_API_PREFIX/$userId/$worldId/persist/exists")
+        return when (response.status) {
+            HttpStatusCode.OK -> true
+            HttpStatusCode.NotFound -> false
+            else -> response.checkSuccess { true }
+        }
+    }
+
+    suspend fun deleteWorldPersistence(userId: String, worldId: String) {
+        val response = client.delete("$USERS_API_PREFIX/$userId/$worldId/persist")
+        when (response.status) {
+            HttpStatusCode.OK, HttpStatusCode.NotFound -> Unit
+            else -> response.checkSuccess { Unit }
+        }
+    }
+
+    suspend fun deleteAllWorldPersistence(userId: String) {
+        client.delete {
+            url { path(USERS_API_PREFIX, userId, "persist") }
+        }.checkSuccess { Unit }
+    }
+
     suspend fun saveUserNote(targetUserId: String, note: String): String =
         client.post(USER_NOTES_API_PREFIX) {
             setBody(mapOf("targetUserId" to targetUserId, "note" to note))

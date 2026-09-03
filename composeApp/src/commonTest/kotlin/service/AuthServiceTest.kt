@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -27,6 +28,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
@@ -77,6 +79,120 @@ class AuthServiceTest : MainDispatcherTest() {
         assertTrue(requests.single().first.orEmpty().contains("auth=cached-auth"))
         assertTrue(requests.single().first.orEmpty().contains("twoFactorAuth=cached-2fa"))
         assertEquals("usr_cached", fixture.service.currentUserState.value?.id)
+        fixture.client.close()
+    }
+
+    @Test
+    fun homeWorldUpdateRetriesAuthenticationAndPublishesServerResponse() = runTest {
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            when (request.method) {
+                HttpMethod.Put -> {
+                    updateRequests++
+                    if (updateRequests == 1) {
+                        respond(
+                            content = "expired",
+                            status = HttpStatusCode.Unauthorized,
+                        )
+                    } else {
+                        jsonResponse(
+                            currentUserJson(
+                                account = cachedAccount(),
+                                homeLocation = "wrld_server_authoritative",
+                            )
+                        )
+                    }
+                }
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+
+        val result = HomeWorldService(
+            usersApi = UsersApi(fixture.client),
+            authService = fixture.service,
+        ).updateHomeWorld("wrld_requested")
+
+        assertEquals("wrld_server_authoritative", result.getOrThrow())
+        assertEquals("wrld_server_authoritative", fixture.service.currentUserState.value?.homeLocation)
+        assertEquals(2, updateRequests)
+        fixture.client.close()
+    }
+
+    @Test
+    fun accountSwitchRejectsLateHomeWorldResponse() = runTest {
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            if (request.method == HttpMethod.Put) {
+                updateStarted.complete(Unit)
+                releaseUpdate.await()
+                jsonResponse(
+                    currentUserJson(
+                        account = cachedAccount(),
+                        homeLocation = "wrld_late",
+                    )
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val update = async(start = CoroutineStart.UNDISPATCHED) {
+            HomeWorldService(
+                usersApi = UsersApi(fixture.client),
+                authService = fixture.service,
+            ).updateHomeWorld("wrld_requested")
+        }
+        updateStarted.await()
+
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_other", username = "other"))
+        releaseUpdate.complete(Unit)
+
+        assertIs<HomeWorldSessionChangedException>(update.await().exceptionOrNull())
+        assertTrue(fixture.service.currentUserState.value?.homeLocation != "wrld_late")
+        fixture.client.close()
+    }
+
+    @Test
+    fun duplicateHomeWorldUpdateIsRejectedUntilTheFirstRequestFinishes() = runTest {
+        val firstUpdateStarted = CompletableDeferred<Unit>()
+        val releaseFirstUpdate = CompletableDeferred<Unit>()
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            if (request.method == HttpMethod.Put) {
+                updateRequests++
+                if (updateRequests == 1) {
+                    firstUpdateStarted.complete(Unit)
+                    releaseFirstUpdate.await()
+                }
+                jsonResponse(
+                    currentUserJson(
+                        account = cachedAccount(),
+                        homeLocation = "wrld_server_$updateRequests",
+                    )
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val homeWorldService = HomeWorldService(UsersApi(fixture.client), fixture.service)
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            homeWorldService.updateHomeWorld("wrld_first")
+        }
+        firstUpdateStarted.await()
+
+        assertIs<HomeWorldUpdateInFlightException>(
+            homeWorldService.updateHomeWorld("wrld_duplicate").exceptionOrNull()
+        )
+        releaseFirstUpdate.complete(Unit)
+        assertEquals("wrld_server_1", first.await().getOrThrow())
+        assertEquals(
+            "wrld_server_2",
+            homeWorldService.updateHomeWorld("wrld_after-completion").getOrThrow(),
+        )
+        assertEquals(2, updateRequests)
         fixture.client.close()
     }
 
@@ -702,6 +818,7 @@ class AuthServiceTest : MainDispatcherTest() {
         currentAvatar: String = "",
         presenceWorld: String = "",
         presenceInstance: String = "",
+        homeLocation: String = "",
     ): String = """
         {
           "requiresTwoFactorAuth":null,
@@ -715,7 +832,7 @@ class AuthServiceTest : MainDispatcherTest() {
           "fallbackAvatar":"","friendGroupNames":[],"friendKey":"","friends":[],
           "googleId":"","hasBirthday":true,"hasEmail":true,
           "hasLoggedInFromClient":true,"hasPendingEmail":false,
-          "hideContentFilterSettings":false,"homeLocation":"","id":"${account.userId}",
+          "hideContentFilterSettings":false,"homeLocation":"$homeLocation","id":"${account.userId}",
           "isFriend":false,"last_activity":"","last_login":"",
           "last_platform":"standalonewindows","obfuscatedEmail":"",
           "obfuscatedPendingEmail":"","oculusId":"","offlineFriends":[],

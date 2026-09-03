@@ -44,6 +44,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsS
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
+import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
@@ -52,6 +53,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreenMode
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.RecentWorldsScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldImageEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
@@ -114,7 +119,8 @@ val presentationModule: Module = module {
         )
     }
     singleOf(::PrintUploadService) bind PrintUploader::class
-    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get()) }
+    singleOf(::NetworkWorldImageEditor) bind WorldImageEditor::class
+    single<ImageEditorSubmitter> { NetworkImageEditorSubmitter(get(), get(), get(), get()) }
     viewModel { parameters ->
         val sessionId = parameters.get<String>()
         val sessionStore = get<PrintImageEditorSessionStore>()
@@ -129,6 +135,7 @@ val presentationModule: Module = module {
             processor = when (session.target) {
                 ImageEditorTarget.Print -> get()
                 is ImageEditorTarget.AvatarCover -> get(AvatarCoverImageProcessorQualifier)
+                is ImageEditorTarget.WorldCover -> get(AvatarCoverImageProcessorQualifier)
                 is ImageEditorTarget.Gallery -> DefaultPrintImageProcessor(
                     codec = get(),
                     spec = session.target.canvasSpec,
@@ -149,10 +156,12 @@ val presentationModule: Module = module {
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
     viewModelOf(::GroupProfileScreenModel)
+    viewModel { AllWorldPersistenceDeletionModel(get(), get()) }
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    singleOf(::NetworkWorldEditor) bind WorldEditor::class
     viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
     single<ImageLoader> { imageLoaderDefinition(it) }

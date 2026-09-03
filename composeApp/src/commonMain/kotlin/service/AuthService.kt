@@ -26,6 +26,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,8 +49,9 @@ class AuthService(
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
     private val accountCacheManager: AccountCacheManager,
-) : WebSocketSessionRecovery {
-    private var scope = CoroutineScope(Job())
+) : WebSocketSessionRecovery, AutoCloseable {
+    private val serviceJob = Job()
+    private val scope = CoroutineScope(serviceJob)
     private val authMutex = Mutex()
     private val currentUserLock = SynchronizedObject()
 
@@ -160,6 +162,17 @@ class AuthService(
             val existing = currentUser ?: return@synchronized
             publishCurrentUserLocked(existing.copy(currentAvatar = avatarId))
         }
+    }
+
+    internal fun applyCurrentUserHomeLocation(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        homeLocation: String,
+    ): Boolean = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+        val existing = currentUser?.takeIf { it.id == userId } ?: return@synchronized false
+        publishCurrentUserLocked(existing.copy(homeLocation = homeLocation))
+        true
     }
 
     fun applySocketUserUpdate(user: UserContent) {
@@ -465,6 +478,14 @@ class AuthService(
     suspend fun removeAccount(userId: String) = runCatching {
         accountCacheManager.clearAccount(userId)
         accountDao.removeAccount(userId)
+    }
+
+    override fun close() {
+        serviceJob.cancel()
+    }
+
+    internal suspend fun closeAndJoin() {
+        serviceJob.cancelAndJoin()
     }
 
     private fun publishCurrentUserLocked(user: CurrentUserData): CurrentUserData {
