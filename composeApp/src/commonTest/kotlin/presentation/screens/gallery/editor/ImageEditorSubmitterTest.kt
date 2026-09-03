@@ -8,6 +8,8 @@ import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFailure
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
 import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
@@ -162,10 +164,15 @@ private class FakeSubmissionAvatarEditor(
     var uploadedCover: AvatarCoverFile? = null
     val assignments = mutableListOf<Pair<String, String>>()
 
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Metadata update is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Metadata update is not used")
+    ): AvatarMetadataUpdateResponse? = error("Metadata update is not used")
 
     override suspend fun updatePublication(
         sessionToken: AccountSessionToken,
@@ -190,10 +197,15 @@ private data object UnusedPrintUploader : PrintUploader {
 }
 
 private data object UnusedAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("Avatar editing is not used")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = error("Avatar editing is not used")
+    ): AvatarMetadataUpdateResponse? = error("Avatar editing is not used")
 
     override suspend fun updatePublication(
         sessionToken: AccountSessionToken,

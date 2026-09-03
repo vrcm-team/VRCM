@@ -7,6 +7,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 class AvatarDataSerializationTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -33,6 +34,17 @@ class AvatarDataSerializationTest {
                 """{"id":"avtr_test","name":"Test","unityPackages":"unexpected"}"""
             )
         }
+    }
+
+    @Test
+    fun avatarStylesDecodeFromTheServerResponse() {
+        val avatar = json.decodeFromString<AvatarData>(
+            """{"id":"avtr_test","name":"Test","styles":{"primary":"Anime","secondary":"Robot","supplementary":["Cute"]}}"""
+        )
+
+        assertEquals("Anime", avatar.styles.primary)
+        assertEquals("Robot", avatar.styles.secondary)
+        assertEquals(listOf("Cute"), avatar.styles.supplementary)
     }
 
     @Test

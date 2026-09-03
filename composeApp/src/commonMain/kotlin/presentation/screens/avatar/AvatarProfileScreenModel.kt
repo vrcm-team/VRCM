@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.hasImpostor
@@ -22,6 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.updateAndGet
@@ -39,33 +43,6 @@ import org.koin.core.logger.Logger
 
 internal fun interface AvatarProfileLoader {
     suspend fun load(avatarId: String): Result<AvatarData>
-}
-
-internal sealed interface AvatarMetadataChange {
-    data object InvalidName : AvatarMetadataChange
-    data object NoChanges : AvatarMetadataChange
-    data class Update(val data: AvatarUpdateData) : AvatarMetadataChange
-}
-
-internal fun avatarMetadataChange(
-    currentName: String,
-    currentDescription: String,
-    editedName: String,
-    editedDescription: String,
-): AvatarMetadataChange {
-    val normalizedName = editedName.trim()
-    if (normalizedName.isEmpty()) return AvatarMetadataChange.InvalidName
-
-    val name = normalizedName.takeIf { it != currentName }
-    val description = editedDescription.takeIf { it != currentDescription }
-    if (name == null && description == null) return AvatarMetadataChange.NoChanges
-
-    return AvatarMetadataChange.Update(
-        AvatarUpdateData(
-            name = name,
-            description = description,
-        )
-    )
 }
 
 internal class NetworkAvatarProfileLoader(
@@ -140,9 +117,18 @@ internal data class AvatarActionState(
 internal data class AvatarEditState(
     val canEdit: Boolean = false,
     val isSavingMetadata: Boolean = false,
+    val styles: AvatarStylesLoadState = AvatarStylesLoadState.NotLoaded,
     val publication: AvatarPublicationStatus? = null,
     val isUpdatingPublication: Boolean = false,
 )
+
+internal sealed interface AvatarStylesLoadState {
+    data object NotLoaded : AvatarStylesLoadState
+    data object Loading : AvatarStylesLoadState
+    data object Empty : AvatarStylesLoadState
+    data class Ready(val options: List<AvatarStyle>) : AvatarStylesLoadState
+    data class Failed(val message: String?) : AvatarStylesLoadState
+}
 
 internal data class AvatarImpostorState(
     val canBuild: Boolean = false,
@@ -178,6 +164,9 @@ internal sealed interface AvatarProfileNotice {
     data object Copied : AvatarProfileNotice
     data class SelectionFailed(val message: String?) : AvatarProfileNotice
     data object InvalidName : AvatarProfileNotice
+    data object InvalidContentTags : AvatarProfileNotice
+    data object InvalidPrimaryStyle : AvatarProfileNotice
+    data object InvalidSecondaryStyle : AvatarProfileNotice
     data object NoMetadataChanges : AvatarProfileNotice
     data object MetadataSaved : AvatarProfileNotice
     data class MetadataSaveFailed(val message: String?) : AvatarProfileNotice
@@ -291,6 +280,9 @@ class AvatarProfileScreenModel internal constructor(
     )
 
     private val isSavingMetadata = MutableStateFlow(false)
+    private val stylesLoadState = MutableStateFlow<AvatarStylesLoadState>(
+        AvatarStylesLoadState.NotLoaded
+    )
     private val isUpdatingPublication = MutableStateFlow(false)
     private val isEditSubmissionInFlight = MutableStateFlow(false)
     private val editProgress = combine(
@@ -305,15 +297,15 @@ class AvatarProfileScreenModel internal constructor(
         favoriteSession,
         editProgress,
     ) { avatar, currentValidation, user, session, progress ->
-        val canEdit = currentValidation == AvatarValidation.Available &&
+        val canEdit = avatarEditor != null &&
+            currentValidation == AvatarValidation.Available &&
             avatar?.authorId?.isNotBlank() == true &&
-            avatar.authorId == user?.userId
-        val publication = if (
-            canEdit &&
-            session != null &&
-            session.account.userId == avatar.authorId &&
-            session.token.userId == avatar.authorId
-        ) {
+            avatar.authorId == user?.userId &&
+            session?.let { authenticated ->
+                avatar.authorId == authenticated.account.userId &&
+                    avatar.authorId == authenticated.token.userId
+            } == true
+        val publication = if (canEdit) {
             AvatarPublicationStatus.fromApiValue(avatar.releaseStatus)
         } else {
             null
@@ -324,6 +316,8 @@ class AvatarProfileScreenModel internal constructor(
             publication = publication,
             isUpdatingPublication = progress.second,
         )
+    }.combine(stylesLoadState) { state, styles ->
+        state.copy(styles = styles)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -376,8 +370,22 @@ class AvatarProfileScreenModel internal constructor(
     )
 
     private val latestRequestToken = MutableStateFlow(0L)
+    private var metadataSaveGeneration = 0L
+    private var stylesLoadGeneration = 0L
+    private var metadataSaveJob: Job? = null
+    private var stylesLoadJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            favoriteSession.map { it?.token?.userId }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { invalidateMetadataOperations() }
+        }
+    }
 
     fun refreshAvatarData(avatarProfileVo: AvatarProfileVo) {
+        invalidateMetadataOperations()
         val requestToken = latestRequestToken.updateAndGet { it + 1 }
         if (!impostorOperation.value.isSubmitting) {
             impostorOperation.value = AvatarImpostorOperation()
@@ -457,18 +465,75 @@ class AvatarProfileScreenModel internal constructor(
         }
     }
 
-    internal fun saveMetadata(name: String, description: String) {
+    internal fun loadAvatarStyles() {
         val avatar = avatarProfileState.value ?: return
         val editor = avatarEditor ?: return
-        val target = editableTarget(avatar) ?: return
-        when (val change = avatarMetadataChange(
-            currentName = avatar.avatarName,
-            currentDescription = avatar.avatarDescription,
-            editedName = name,
-            editedDescription = description,
-        )) {
+        val sessionToken = editableSessionToken(avatar) ?: return
+        if (stylesLoadState.value == AvatarStylesLoadState.Loading ||
+            stylesLoadState.value is AvatarStylesLoadState.Ready
+        ) return
+
+        val generation = ++stylesLoadGeneration
+        val avatarId = avatar.avatarId
+        stylesLoadState.value = AvatarStylesLoadState.Loading
+        stylesLoadJob = viewModelScope.launch(requestDispatcher) {
+            try {
+                val response = editor.loadStyles(sessionToken) ?: run {
+                    if (acceptsStylesRequest(sessionToken, avatarId, generation)) {
+                        stylesLoadState.value = AvatarStylesLoadState.Failed(null)
+                    }
+                    return@launch
+                }
+                if (!acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
+                    return@launch
+                }
+                response.result.fold(
+                    onSuccess = { styles ->
+                        if (!acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
+                            return@fold
+                        }
+                        val options = normalizedAvatarStyles(styles)
+                        stylesLoadState.value = if (options.isEmpty()) {
+                            AvatarStylesLoadState.Empty
+                        } else {
+                            AvatarStylesLoadState.Ready(options)
+                        }
+                    },
+                    onFailure = { error ->
+                        if (error is CancellationException) throw error
+                        if (acceptsStylesResponse(response.sessionToken, avatarId, generation)) {
+                            stylesLoadState.value = AvatarStylesLoadState.Failed(error.message)
+                        }
+                    },
+                )
+            } finally {
+                if (stylesLoadGeneration == generation) stylesLoadJob = null
+            }
+        }
+    }
+
+    internal fun saveMetadata(draft: AvatarMetadataDraft) {
+        val avatar = avatarProfileState.value ?: return
+        val editor = avatarEditor ?: return
+        val sessionToken = editableSessionToken(avatar) ?: return
+        val allowedStyles = (stylesLoadState.value as? AvatarStylesLoadState.Ready)
+            ?.options
+            .orEmpty()
+        when (val change = avatarMetadataChange(avatar, draft, allowedStyles)) {
             AvatarMetadataChange.InvalidName -> {
                 _notices.tryEmit(AvatarProfileNotice.InvalidName)
+                return
+            }
+            AvatarMetadataChange.InvalidContentTags -> {
+                _notices.tryEmit(AvatarProfileNotice.InvalidContentTags)
+                return
+            }
+            AvatarMetadataChange.InvalidPrimaryStyle -> {
+                _notices.tryEmit(AvatarProfileNotice.InvalidPrimaryStyle)
+                return
+            }
+            AvatarMetadataChange.InvalidSecondaryStyle -> {
+                _notices.tryEmit(AvatarProfileNotice.InvalidSecondaryStyle)
                 return
             }
             AvatarMetadataChange.NoChanges -> {
@@ -477,31 +542,52 @@ class AvatarProfileScreenModel internal constructor(
             }
             is AvatarMetadataChange.Update -> {
                 if (!isEditSubmissionInFlight.compareAndSet(expect = false, update = true)) return
-                isSavingMetadata.value = true
-                viewModelScope.launch(requestDispatcher) {
+                if (!isSavingMetadata.compareAndSet(expect = false, update = true)) return
+                val generation = ++metadataSaveGeneration
+                val avatarId = avatar.avatarId
+                metadataSaveJob = viewModelScope.launch(requestDispatcher) {
                     try {
-                        editor.updateMetadata(target.avatarId, change.data)
-                            .onSuccess { updated ->
-                                if (updated.id == target.avatarId && isCurrentTarget(target)) {
-                                    _avatarProfileState.value =
-                                        requireNotNull(_avatarProfileState.value).copy(
-                                            avatarName = updated.name,
-                                            avatarDescription = updated.description.orEmpty(),
-                                            updatedAt = updated.updatedAt,
-                                            version = updated.version,
-                                        )
+                        val response = editor.updateMetadata(
+                            sessionToken,
+                            avatarId,
+                            change.data,
+                        ) ?: return@launch
+                        if (!acceptsMetadataResponse(response.sessionToken, avatarId, generation)) {
+                            return@launch
+                        }
+                        response.result.fold(
+                            onSuccess = { updated ->
+                                if (updated.id == avatarId &&
+                                    acceptsMetadataResponse(
+                                        response.sessionToken,
+                                        avatarId,
+                                        generation,
+                                    )
+                                ) {
+                                    _avatarProfileState.value = AvatarProfileVo(updated)
+                                    validation.value = AvatarValidation.Available
                                     _notices.emit(AvatarProfileNotice.MetadataSaved)
                                 }
-                            }
-                            .onFailure { error ->
-                                if (isCurrentTarget(target)) {
+                            },
+                            onFailure = { error ->
+                                if (error is CancellationException) throw error
+                                if (acceptsMetadataResponse(
+                                        response.sessionToken,
+                                        avatarId,
+                                        generation,
+                                    )
+                                ) {
                                     _notices.emit(
                                         AvatarProfileNotice.MetadataSaveFailed(error.message)
                                     )
                                 }
-                            }
+                            },
+                        )
                     } finally {
-                        isSavingMetadata.value = false
+                        if (metadataSaveGeneration == generation) {
+                            metadataSaveJob = null
+                            isSavingMetadata.value = false
+                        }
                         isEditSubmissionInFlight.value = false
                     }
                 }
@@ -696,6 +782,51 @@ class AvatarProfileScreenModel internal constructor(
         return true
     }
 
+    private fun editableSessionToken(avatar: AvatarProfileVo): AccountSessionToken? {
+        val sessionToken = favoriteSession.value?.token ?: return null
+        if (!editState.value.canEdit || avatar.authorId != sessionToken.userId) return null
+        return sessionToken
+    }
+
+    private fun acceptsStylesResponse(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        operationGeneration: Long,
+    ): Boolean = acceptsStylesRequest(sessionToken, avatarId, operationGeneration)
+
+    private fun acceptsStylesRequest(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        operationGeneration: Long,
+    ): Boolean = acceptsMetadataTarget(sessionToken, avatarId) &&
+        stylesLoadGeneration == operationGeneration
+
+    private fun acceptsMetadataResponse(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        operationGeneration: Long,
+    ): Boolean = acceptsMetadataTarget(sessionToken, avatarId) &&
+        metadataSaveGeneration == operationGeneration
+
+    private fun acceptsMetadataTarget(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): Boolean = favoriteSession.value?.token?.userId == sessionToken.userId &&
+        avatarProfileState.value?.let { avatar ->
+            avatar.avatarId == avatarId && avatar.authorId == sessionToken.userId
+        } == true
+
+    private fun invalidateMetadataOperations() {
+        metadataSaveGeneration++
+        stylesLoadGeneration++
+        metadataSaveJob?.cancel()
+        stylesLoadJob?.cancel()
+        metadataSaveJob = null
+        stylesLoadJob = null
+        isSavingMetadata.value = false
+        isEditSubmissionInFlight.value = false
+        stylesLoadState.value = AvatarStylesLoadState.NotLoaded
+    }
     internal fun deleteImpostor(): Boolean = impostorDeletion.delete()
 
     internal fun retryImpostorVerification(): Boolean = impostorDeletion.retryVerification()

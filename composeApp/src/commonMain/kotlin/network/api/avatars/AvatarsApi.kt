@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorQueueStats
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
@@ -15,6 +16,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
 class AvatarsApi(private val client: HttpClient) {
+
+    suspend fun getAvatarStyles(): List<AvatarStyle> =
+        client.get("avatarStyles").checkSuccess()
 
     suspend fun getAvatarById(avatarId: String): AvatarData =
         client.get("$AVATARS_API_PREFIX/$avatarId").checkSuccess()

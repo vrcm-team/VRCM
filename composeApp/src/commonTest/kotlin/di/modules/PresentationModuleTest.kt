@@ -11,6 +11,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
@@ -236,10 +238,15 @@ private data object EmptyAvatarSelector : AvatarSelector {
 }
 
 private data object EmptyAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("unused")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+    ): AvatarMetadataUpdateResponse? = error("unused")
 
     override suspend fun updatePublication(
         sessionToken: AccountSessionToken,

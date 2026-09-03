@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +15,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -51,6 +57,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.SelectedImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.localizedMessage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.readBoundedBytes
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -66,13 +73,23 @@ internal fun AvatarEditSheet(
     impostorState: AvatarImpostorState,
     imageProcessor: PrintImageProcessor,
     onDismiss: () -> Unit,
-    onSaveMetadata: (String, String) -> Unit,
+    onSaveMetadata: (AvatarMetadataDraft) -> Unit,
+    onRetryStyles: () -> Unit,
     onEnqueueImpostor: () -> Unit,
     onUpdatePublication: (AvatarPublicationStatus) -> Unit,
     onEditCover: (SelectedImage, PreparedImage) -> Unit,
 ) {
-    var name by remember(avatar.avatarId) { mutableStateOf(avatar.avatarName) }
-    var description by remember(avatar.avatarId) { mutableStateOf(avatar.avatarDescription) }
+    val metadataKey = arrayOf(avatar.avatarId, avatar.version, avatar.updatedAt, avatar.tags)
+    var name by remember(*metadataKey) { mutableStateOf(avatar.avatarName) }
+    var description by remember(*metadataKey) { mutableStateOf(avatar.avatarDescription) }
+    var contentTags by remember(*metadataKey) { mutableStateOf(avatar.contentTags()) }
+    var authorTags by remember(*metadataKey) { mutableStateOf(avatar.authorTagsText()) }
+    var primaryStyle by remember(*metadataKey, avatar.primaryStyle) {
+        mutableStateOf<AvatarStyleChoice>(AvatarStyleChoice.Unchanged)
+    }
+    var secondaryStyle by remember(*metadataKey, avatar.secondaryStyle) {
+        mutableStateOf<AvatarStyleChoice>(AvatarStyleChoice.Unchanged)
+    }
     var coverError by remember(avatar.avatarId) { mutableStateOf<String?>(null) }
     var isPreparingCover by remember(avatar.avatarId) { mutableStateOf(false) }
     var showPublicConfirmation by remember(avatar.avatarId) { mutableStateOf(false) }
@@ -179,8 +196,104 @@ internal fun AvatarEditSheet(
                 maxLines = 6,
                 enabled = !isRemoteUpdateBusy,
             )
+
+            HorizontalDivider()
+
+            Text(
+                text = locale.avatarEditContentTags,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                AvatarContentTag.entries.forEach { tag ->
+                    FilterChip(
+                        selected = tag.apiValue in contentTags,
+                        onClick = {
+                            contentTags = if (tag.apiValue in contentTags) {
+                                contentTags - tag.apiValue
+                            } else {
+                                contentTags + tag.apiValue
+                            }
+                        },
+                        enabled = !state.isSavingMetadata,
+                        label = { Text(tag.localizedLabel(locale)) },
+                    )
+                }
+            }
+
+            Text(
+                text = locale.avatarEditStyles,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            when (val styles = state.styles) {
+                AvatarStylesLoadState.NotLoaded,
+                AvatarStylesLoadState.Loading -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(locale.avatarEditStylesLoading)
+                }
+                AvatarStylesLoadState.Empty -> StyleLoadMessage(
+                    message = locale.avatarEditStylesEmpty,
+                    retryLabel = locale.retry,
+                    enabled = !state.isSavingMetadata,
+                    onRetry = onRetryStyles,
+                )
+                is AvatarStylesLoadState.Failed -> StyleLoadMessage(
+                    message = locale.avatarEditStylesLoadFailed,
+                    retryLabel = locale.retry,
+                    enabled = !state.isSavingMetadata,
+                    onRetry = onRetryStyles,
+                )
+                is AvatarStylesLoadState.Ready -> {
+                    AvatarStyleDropdown(
+                        label = locale.avatarEditPrimaryStyle,
+                        currentStyle = avatar.primaryStyle,
+                        choice = primaryStyle,
+                        options = styles.options,
+                        noneLabel = locale.avatarEditNoStyle,
+                        enabled = !state.isSavingMetadata,
+                        onChoice = { primaryStyle = it },
+                    )
+                    AvatarStyleDropdown(
+                        label = locale.avatarEditSecondaryStyle,
+                        currentStyle = avatar.secondaryStyle,
+                        choice = secondaryStyle,
+                        options = styles.options,
+                        noneLabel = locale.avatarEditNoStyle,
+                        enabled = !state.isSavingMetadata,
+                        onChoice = { secondaryStyle = it },
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = authorTags,
+                onValueChange = { authorTags = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(locale.avatarEditAuthorTags) },
+                supportingText = { Text(locale.avatarEditAuthorTagsHint) },
+                minLines = 2,
+                maxLines = 5,
+                enabled = !state.isSavingMetadata,
+            )
+
             Button(
-                onClick = { onSaveMetadata(name, description) },
+                onClick = {
+                    onSaveMetadata(
+                        AvatarMetadataDraft(
+                            name = name,
+                            description = description,
+                            contentTags = contentTags,
+                            authorTags = authorTags,
+                            primaryStyle = primaryStyle,
+                            secondaryStyle = secondaryStyle,
+                        )
+                    )
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = name.isNotBlank() && !isRemoteUpdateBusy,
             ) {
@@ -453,4 +566,92 @@ private fun AvatarImpostorFailure.localizedMessage(
     AvatarImpostorFailure.Server -> locale.avatarImpostorServerFailed
     AvatarImpostorFailure.InvalidResponse,
     AvatarImpostorFailure.Unknown -> locale.avatarImpostorUnknownFailed
+}
+
+@Composable
+private fun StyleLoadMessage(
+    message: String,
+    retryLabel: String,
+    enabled: Boolean,
+    onRetry: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onRetry, enabled = enabled) {
+            Text(retryLabel)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AvatarStyleDropdown(
+    label: String,
+    currentStyle: String?,
+    choice: AvatarStyleChoice,
+    options: List<io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle>,
+    noneLabel: String,
+    enabled: Boolean,
+    onChoice: (AvatarStyleChoice) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedText = when (choice) {
+        AvatarStyleChoice.Unchanged -> options.firstOrNull {
+            it.id == currentStyle || it.styleName == currentStyle
+        }?.styleName ?: currentStyle.orEmpty().ifBlank { noneLabel }
+        AvatarStyleChoice.Clear -> noneLabel
+        is AvatarStyleChoice.Selected -> options.firstOrNull { it.id == choice.id }
+            ?.styleName
+            .orEmpty()
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = it },
+    ) {
+        OutlinedTextField(
+            value = selectedText,
+            onValueChange = {},
+            modifier = Modifier.fillMaxWidth().menuAnchor(
+                ExposedDropdownMenuAnchorType.PrimaryNotEditable
+            ),
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            readOnly = true,
+            enabled = enabled,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(noneLabel) },
+                onClick = {
+                    onChoice(AvatarStyleChoice.Clear)
+                    expanded = false
+                },
+            )
+            options.forEach { style ->
+                DropdownMenuItem(
+                    text = { Text(style.styleName) },
+                    onClick = {
+                        onChoice(AvatarStyleChoice.Selected(style.id))
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun AvatarContentTag.localizedLabel(locale: LocaleStrings): String = when (this) {
+    AvatarContentTag.Horror -> locale.avatarEditContentHorror
+    AvatarContentTag.Gore -> locale.avatarEditContentGore
+    AvatarContentTag.Violence -> locale.avatarEditContentViolence
+    AvatarContentTag.Adult -> locale.avatarEditContentAdult
+    AvatarContentTag.Sex -> locale.avatarEditContentSex
 }

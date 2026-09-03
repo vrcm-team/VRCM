@@ -6,6 +6,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
@@ -523,7 +524,13 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         val loader = ControlledAvatarProfileLoader()
         val selector = FakeAvatarSelector()
         val editor = FakeAvatarEditor()
-        val model = avatarModel(loader, selector, editor = editor)
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(
+            loader,
+            selector,
+            editor = editor,
+            favoriteSession = session,
+        )
         val notices = mutableListOf<AvatarProfileNotice>()
         val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
             model.notices.collect(notices::add)
@@ -536,9 +543,16 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         )
         yield()
 
-        model.saveMetadata("After", "Description")
+        model.saveMetadata(
+            AvatarMetadataDraft(
+                name = "After",
+                description = "Description",
+                contentTags = emptySet(),
+                authorTags = "",
+            )
+        )
         yield()
-        selector.switchAccount("usr_other")
+        session.value = authenticated("usr_other", 2)
         yield()
         editor.completeMetadata(
             Result.success(
@@ -556,6 +570,191 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         assertTrue(notices.isEmpty())
         noticeCollector.cancel()
     }
+
+    @Test
+    fun metadataSaveUsesServerResponseAsTheAuthoritativeState() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess(
+            avatarId = "avtr_owned",
+            avatarName = "Before",
+            authorId = "usr_current",
+        )
+        yield()
+
+        model.saveMetadata(
+            AvatarMetadataDraft(
+                name = "Requested",
+                description = "Requested description",
+                contentTags = setOf("content_horror"),
+                authorTags = "dance",
+            )
+        )
+        yield()
+        editor.completeMetadata(
+            Result.success(
+                AvatarData(
+                    id = "avtr_owned",
+                    name = "Server normalized",
+                    description = "Server description",
+                    authorId = "usr_current",
+                    tags = listOf("content_horror", "author_tag_dance"),
+                )
+            )
+        )
+        yield()
+
+        assertEquals("Server normalized", model.avatarProfileState.value?.avatarName)
+        assertEquals("Server description", model.avatarProfileState.value?.avatarDescription)
+        assertEquals(
+            listOf("content_horror", "author_tag_dance"),
+            model.avatarProfileState.value?.tags,
+        )
+    }
+
+    @Test
+    fun repeatedMetadataSaveOnlyStartsOneRequest() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Before", authorId = "usr_current")
+        yield()
+        val draft = AvatarMetadataDraft(
+            name = "After",
+            description = "Description",
+            contentTags = emptySet(),
+            authorTags = "",
+        )
+
+        model.saveMetadata(draft)
+        model.saveMetadata(draft)
+        yield()
+
+        assertEquals(1, editor.metadataRequests.size)
+        assertTrue(model.editState.value.isSavingMetadata)
+    }
+
+    @Test
+    fun sameAccountRenewalKeepsMetadataSaveLockedAndAcceptsRenewedResponse() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Before", authorId = "usr_current")
+        yield()
+
+        model.saveMetadata(
+            AvatarMetadataDraft(
+                name = "After",
+                description = "Description",
+                contentTags = emptySet(),
+                authorTags = "",
+            )
+        )
+        yield()
+
+        session.value = authenticated("usr_current", 2)
+        yield()
+        assertTrue(model.editState.value.isSavingMetadata)
+
+        editor.metadataResponseToken = AccountSessionToken("usr_current", 2)
+        editor.completeMetadata(
+            Result.success(
+                AvatarData(
+                    id = "avtr_owned",
+                    name = "After",
+                    description = "Description",
+                    authorId = "usr_current",
+                )
+            )
+        )
+        yield()
+
+        assertEquals("After", model.avatarProfileState.value?.avatarName)
+        assertFalse(model.editState.value.isSavingMetadata)
+    }
+
+    @Test
+    fun accountSwitchDiscardsAnInFlightStyleList() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Owned", authorId = "usr_current")
+        yield()
+
+        model.loadAvatarStyles()
+        yield()
+        assertEquals(AvatarStylesLoadState.Loading, model.editState.value.styles)
+
+        session.value = authenticated("usr_other", 2)
+        yield()
+        editor.completeStyles(
+            Result.success(listOf(AvatarStyle("avst_old", "Old session style")))
+        )
+        yield()
+
+        assertEquals(AvatarStylesLoadState.NotLoaded, model.editState.value.styles)
+        assertFalse(model.editState.value.canEdit)
+    }
+
+    @Test
+    fun sameAccountRenewalKeepsInFlightStyleListUsable() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Owned", authorId = "usr_current")
+        yield()
+
+        model.loadAvatarStyles()
+        yield()
+        assertEquals(AvatarStylesLoadState.Loading, model.editState.value.styles)
+
+        session.value = authenticated("usr_current", 2)
+        yield()
+        editor.stylesResponseToken = AccountSessionToken("usr_current", 2)
+        editor.completeStyles(
+            Result.success(listOf(AvatarStyle("avst_new", "Renewed style")))
+        )
+        yield()
+
+        assertEquals(
+            AvatarStylesLoadState.Ready(listOf(AvatarStyle("avst_new", "Renewed style"))),
+            model.editState.value.styles,
+        )
+    }
+
+    @Test
+    fun sameAccountRenewalNullStyleResponseBecomesRetryableFailure() = runBlocking {
+        val loader = ControlledAvatarProfileLoader()
+        val editor = FakeAvatarEditor()
+        val session = MutableStateFlow<AuthenticatedAccount?>(authenticated("usr_current", 1))
+        val model = avatarModel(loader, editor = editor, favoriteSession = session)
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_owned"))
+        loader.completeSuccess("avtr_owned", "Owned", authorId = "usr_current")
+        yield()
+
+        model.loadAvatarStyles()
+        yield()
+        assertEquals(AvatarStylesLoadState.Loading, model.editState.value.styles)
+
+        session.value = authenticated("usr_current", 2)
+        editor.returnNullStyles = true
+        editor.completeStyles(Result.success(emptyList()))
+        yield()
+
+        assertEquals(AvatarStylesLoadState.Failed(null), model.editState.value.styles)
+    }
+
 
     @Test
     fun publicationControlsRequireValidatedOwnedSupportedStatus() = runBlocking {
@@ -580,7 +779,11 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             val session = MutableStateFlow<AuthenticatedAccount?>(
                 authenticatedSession(case.sessionUserId, generation = index.toLong() + 1)
             )
-            val model = avatarModel(loader = loader, favoriteSession = session)
+            val model = avatarModel(
+                loader = loader,
+                editor = FakeAvatarEditor(),
+                favoriteSession = session,
+            )
 
             model.refreshAvatarData(
                 AvatarProfileVo(
@@ -671,7 +874,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     fun avatarRemoteWritesAreMutuallyExclusive() = runBlocking {
         val publicationFirst = publicationFixture()
         publicationFirst.model.updatePublication(AvatarPublicationStatus.Public)
-        publicationFirst.model.saveMetadata("Renamed", "Description")
+        publicationFirst.model.saveMetadata(AvatarMetadataDraft(name = "Renamed", description = "Description", contentTags = emptySet(), authorTags = ""))
         yield()
 
         assertEquals(1, publicationFirst.editor.publicationRequests.size)
@@ -680,7 +883,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         yield()
 
         val metadataFirst = publicationFixture(avatarId = "avtr_metadata_first")
-        metadataFirst.model.saveMetadata("Renamed", "Description")
+        metadataFirst.model.saveMetadata(AvatarMetadataDraft(name = "Renamed", description = "Description", contentTags = emptySet(), authorTags = ""))
         metadataFirst.model.updatePublication(AvatarPublicationStatus.Public)
         yield()
 
@@ -1189,16 +1392,35 @@ private class FakeAvatarSelector(
 
 private class FakeAvatarEditor : AvatarEditor {
     private val metadata = CompletableDeferred<Result<AvatarData>>()
+    private val styles = CompletableDeferred<Result<List<AvatarStyle>>>()
     private val publication = CompletableDeferred<AvatarPublicationResponse?>()
     val metadataRequests = mutableListOf<Pair<String, AvatarUpdateData>>()
     val publicationRequests = mutableListOf<PublicationRequest>()
+    var metadataResponseToken: AccountSessionToken? = null
+    var stylesResponseToken: AccountSessionToken? = null
+    var returnNullStyles: Boolean = false
+
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? {
+        val result = styles.await()
+        if (returnNullStyles) return null
+        return AvatarStylesResponse(
+            result,
+            stylesResponseToken ?: sessionToken,
+        )
+    }
 
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> {
+    ): AvatarMetadataUpdateResponse? {
         metadataRequests += avatarId to update
-        return metadata.await()
+        return AvatarMetadataUpdateResponse(
+            result = metadata.await(),
+            sessionToken = metadataResponseToken ?: sessionToken,
+        )
     }
 
     override suspend fun updatePublication(
@@ -1220,6 +1442,10 @@ private class FakeAvatarEditor : AvatarEditor {
         metadata.complete(result)
     }
 
+    fun completeStyles(result: Result<List<AvatarStyle>>) {
+        styles.complete(result)
+    }
+
     fun completePublication(
         result: Result<AvatarData>,
         responseToken: AccountSessionToken = publicationRequests.single().sessionToken,
@@ -1227,6 +1453,11 @@ private class FakeAvatarEditor : AvatarEditor {
         publication.complete(AvatarPublicationResponse(result, responseToken))
     }
 }
+
+private fun authenticated(userId: String, generation: Long) = AuthenticatedAccount(
+    account = AccountDto(userId = userId),
+    token = AccountSessionToken(userId = userId, generation = generation),
+)
 
 private data object EmptyAvatarImpostorDeletionSource : AvatarImpostorDeletionSource {
     override suspend fun delete(
