@@ -26,11 +26,16 @@ import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.yield
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -55,6 +60,12 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             .localizedToast(LocaleStringsEn)
         assertTrue(selectionFailure is ToastText.Error)
         assertEquals(LocaleStringsEn.avatarProfileSelectFailed, selectionFailure.text)
+        assertTrue(
+            AvatarProfileNotice.ModerationBlocked.localizedToast(LocaleStringsEn) is ToastText.Success
+        )
+        assertTrue(
+            AvatarProfileNotice.ModerationLoadFailed.localizedToast(LocaleStringsEn) is ToastText.Error
+        )
         assertTrue(
             AvatarProfileNotice.FallbackSelected.localizedToast(LocaleStringsEn) is ToastText.Success
         )
@@ -235,6 +246,253 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
 
         assertEquals(FavoriteEntryState.Unavailable, model.favoriteEntryState.value)
         assertEquals(0, favoriteSource.loadCount)
+    }
+
+    @Test
+    fun failedModerationLoadCanRetryWithoutLeavingTheProfile() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_retry"))
+        moderationSource.completeLoad(
+            avatarId = "avtr_retry",
+            result = Result.failure(IllegalStateException("offline")),
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.LoadFailed, model.moderationState.value.status)
+        assertEquals(
+            listOf<AvatarProfileNotice>(AvatarProfileNotice.ModerationLoadFailed),
+            notices,
+        )
+
+        model.retryAvatarModerationLoad()
+        moderationSource.completeLoad("avtr_retry", Result.success(true), requestIndex = 1)
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun staleModerationLoadCannotReplaceTheLatestAvatarState() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_old"))
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_new"))
+        moderationSource.completeLoad("avtr_new", Result.success(false))
+        moderationSource.completeLoad("avtr_old", Result.success(true))
+        yield()
+
+        assertEquals("avtr_new", model.moderationState.value.avatarId)
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+    }
+
+    @Test
+    fun moderationChangesIgnoreRepeatedClicksAndOfferStatusRetryAfterFailure() = runBlocking {
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+        )
+        val notices = mutableListOf<AvatarProfileNotice>()
+        val noticeCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            model.notices.collect(notices::add)
+        }
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+
+        model.setAvatarBlocked(true)
+        model.setAvatarBlocked(true)
+        yield()
+
+        assertEquals(listOf("avtr_target"), moderationSource.blockedAvatarIds)
+        assertTrue(model.moderationState.value.isUpdating)
+
+        moderationSource.completeBlock(Result.success(Unit))
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+
+        model.setAvatarBlocked(false)
+        model.setAvatarBlocked(false)
+        yield()
+        assertEquals(listOf("avtr_target"), moderationSource.unblockedAvatarIds)
+
+        moderationSource.completeUnblock(Result.failure(IllegalStateException("offline")))
+        yield()
+
+        assertEquals(AvatarModerationStatus.LoadFailed, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+        assertEquals(
+            listOf(
+                AvatarProfileNotice.ModerationBlocked,
+                AvatarProfileNotice.ModerationChangeFailed,
+            ),
+            notices,
+        )
+        noticeCollector.cancel()
+    }
+
+    @Test
+    fun accountSwitchReloadsModerationForTheCurrentAvatar() = runBlocking {
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = "usr_account_a"),
+                token = AccountSessionToken(userId = "usr_account_a", generation = 1),
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = "usr_account_b"),
+            token = AccountSessionToken(userId = "usr_account_b", generation = 2),
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+        moderationSource.completeLoad("avtr_target", Result.success(true), requestIndex = 1)
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun staleModerationResponseIsRejectedBeforeSessionCollectorRuns() = runTest {
+        val mainDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(mainDispatcher)
+        SharedFlowCentre.emitLogout()
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_a"))
+
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = SharedFlowCentre.currentSession,
+            sessionValidator = SharedFlowCentre::isCurrentSession,
+        )
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account_b"))
+        moderationSource.completeLoad("avtr_target", Result.success(true))
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        runCurrent()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+        SharedFlowCentre.emitLogout()
+    }
+
+    @Test
+    fun sessionRetryTokenRotationKeepsMutationValidWhenReloadFinishesFirst() = runBlocking {
+        val tokenA = AccountSessionToken(userId = "usr_account_a", generation = 1)
+        val tokenB = AccountSessionToken(userId = "usr_account_a", generation = 2)
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = tokenA.userId),
+                token = tokenA,
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        assertEquals(AvatarModerationStatus.NotBlocked, model.moderationState.value.status)
+
+        model.setAvatarBlocked(true)
+        yield()
+        assertTrue(model.moderationState.value.isUpdating)
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = tokenB.userId),
+            token = tokenB,
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        yield()
+        // The controlled source models AuthService retrying a 401 and returning tokenB.
+        moderationSource.completeSessionBoundBlock(
+            SessionBoundResponse(Result.success(Unit), tokenB)
+        )
+        yield()
+
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
+        assertEquals(listOf(tokenA), moderationSource.sessionBoundBlockTokens)
+    }
+
+    @Test
+    fun staleReloadCannotOverwriteMutationThatFinishedFirst() = runBlocking {
+        val tokenA = AccountSessionToken(userId = "usr_account_a", generation = 1)
+        val tokenB = AccountSessionToken(userId = "usr_account_a", generation = 2)
+        val session = MutableStateFlow(
+            AuthenticatedAccount(
+                account = AccountDto(userId = tokenA.userId),
+                token = tokenA,
+            )
+        )
+        val moderationSource = ControlledAvatarModerationSource()
+        val model = avatarModel(
+            loader = ControlledAvatarProfileLoader(),
+            moderationSource = moderationSource,
+            favoriteSession = session,
+        )
+
+        model.refreshAvatarData(AvatarProfileVo(avatarId = "avtr_target"))
+        moderationSource.completeLoad("avtr_target", Result.success(false))
+        yield()
+        model.setAvatarBlocked(true)
+        yield()
+
+        session.value = AuthenticatedAccount(
+            account = AccountDto(userId = tokenB.userId),
+            token = tokenB,
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Loading, model.moderationState.value.status)
+
+        moderationSource.completeSessionBoundBlock(
+            SessionBoundResponse(Result.success(Unit), tokenB)
+        )
+        yield()
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+
+        moderationSource.completeLoad("avtr_target", Result.success(false), requestIndex = 1)
+        yield()
+        assertEquals(AvatarModerationStatus.Blocked, model.moderationState.value.status)
+        assertFalse(model.moderationState.value.isUpdating)
     }
 
     @Test
@@ -1356,19 +1614,25 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
     private fun avatarModel(
         loader: AvatarProfileLoader,
         selector: AvatarSelector = FakeAvatarSelector(),
+        moderationSource: AvatarModerationSource = ImmediateAvatarModerationSource(),
         favoriteSource: FavoriteEntrySource = EmptyFavoriteEntrySource(),
         editor: AvatarEditor? = null,
         favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
+        sessionValidator: (AccountSessionToken) -> Boolean = { token ->
+            favoriteSession.value?.token == token
+        },
         fallbackSetter: AvatarFallbackSetter? = null,
     ): AvatarProfileScreenModel =
         AvatarProfileScreenModel(
             avatarProfileLoader = loader,
             avatarSelector = selector,
+            avatarModerationSource = moderationSource,
             favoriteEntrySource = favoriteSource,
             requestDispatcher = Dispatchers.Unconfined,
             avatarEditor = editor,
             avatarImpostorDeletionSource = EmptyAvatarImpostorDeletionSource,
             favoriteSession = favoriteSession,
+            sessionValidator = sessionValidator,
             avatarFallbackSetter = fallbackSetter,
         )
             .also(models::add)
@@ -1405,6 +1669,72 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         )
         yield()
         return PublicationFixture(model, selector, editor, session)
+    }
+}
+
+private class ImmediateAvatarModerationSource : AvatarModerationSource {
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> = Result.success(false)
+
+    override suspend fun block(avatarId: String): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unblock(avatarId: String): Result<Unit> = Result.success(Unit)
+}
+
+private class ControlledAvatarModerationSource : AvatarModerationSource {
+    private val loadRequests = mutableMapOf<String, MutableList<CompletableDeferred<Result<Boolean>>>>()
+    private val blockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
+    private val sessionBoundBlockRequests =
+        mutableListOf<CompletableDeferred<SessionBoundResponse<Unit>?>>()
+    private val unblockRequests = mutableListOf<CompletableDeferred<Result<Unit>>>()
+    val blockedAvatarIds = mutableListOf<String>()
+    val unblockedAvatarIds = mutableListOf<String>()
+    val sessionBoundBlockTokens = mutableListOf<AccountSessionToken>()
+
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> {
+        val request = CompletableDeferred<Result<Boolean>>()
+        loadRequests.getOrPut(avatarId, ::mutableListOf).add(request)
+        return request.await()
+    }
+
+    override suspend fun block(avatarId: String): Result<Unit> {
+        blockedAvatarIds += avatarId
+        return CompletableDeferred<Result<Unit>>().also(blockRequests::add).await()
+    }
+
+    override suspend fun block(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? {
+        blockedAvatarIds += avatarId
+        sessionBoundBlockTokens += sessionToken
+        return CompletableDeferred<SessionBoundResponse<Unit>?>()
+            .also(sessionBoundBlockRequests::add)
+            .await()
+    }
+
+    override suspend fun unblock(avatarId: String): Result<Unit> {
+        unblockedAvatarIds += avatarId
+        return CompletableDeferred<Result<Unit>>().also(unblockRequests::add).await()
+    }
+
+    fun completeLoad(
+        avatarId: String,
+        result: Result<Boolean>,
+        requestIndex: Int = 0,
+    ) {
+        loadRequests.getValue(avatarId)[requestIndex].complete(result)
+    }
+
+    fun completeBlock(result: Result<Unit>) {
+        blockRequests.single().complete(result)
+    }
+
+    fun completeSessionBoundBlock(response: SessionBoundResponse<Unit>?) {
+        sessionBoundBlockRequests.single().complete(response)
+    }
+
+    fun completeUnblock(result: Result<Unit>) {
+        unblockRequests.single().complete(result)
     }
 }
 

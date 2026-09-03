@@ -601,6 +601,23 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val avatarProfileActionSwitch = "このアバターに切り替える"
     override val avatarProfileActionNotCopyable = "このアバターはコピーできません"
     override val avatarProfileActionCheckFailed = "アバターの利用可否を確認できません"
+    override val avatarModerationChecking = "アバターのブロック状態を確認しています..."
+    override val avatarModerationBlock = "このアバターをブロック"
+    override val avatarModerationUnblock = "このアバターのブロックを解除"
+    override val avatarModerationRetry = "ブロック状態を再確認"
+    override val avatarModerationUnavailable = "アバターのブロック操作は利用できません"
+    override val avatarModerationBlocking = "ブロック中..."
+    override val avatarModerationUnblocking = "ブロック解除中..."
+    override val avatarModerationBlockConfirmTitle = "このアバターをブロックしますか？"
+    override val avatarModerationBlockConfirmMessage =
+        "VRChat 全体でこのアバターをブロックします。後で解除できます。"
+    override val avatarModerationUnblockConfirmTitle = "ブロックを解除しますか？"
+    override val avatarModerationUnblockConfirmMessage =
+        "このアバターのグローバルブロックを解除しますか？"
+    override val avatarModerationBlocked = "このアバターをブロックしました"
+    override val avatarModerationUnblocked = "このアバターのブロックを解除しました"
+    override val avatarModerationLoadFailed = "アバターのブロック状態を取得できませんでした"
+    override val avatarModerationChangeFailed = "アバターのブロック状態を変更できませんでした"
     override val avatarProfileFallbackSelected = "フォールバックアバターを更新しました"
     override val avatarProfileFallbackIneligible =
         "このアバターはフォールバックアバターとして使用できません"

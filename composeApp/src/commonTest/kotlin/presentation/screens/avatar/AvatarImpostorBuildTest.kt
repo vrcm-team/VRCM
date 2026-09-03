@@ -201,6 +201,7 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
         val model = AvatarProfileScreenModel(
             avatarProfileLoader = AvatarProfileLoader { Result.success(avatar) },
             avatarSelector = selector,
+            avatarModerationSource = EmptyAvatarModerationSourceForBuild,
             favoriteEntrySource = EmptyFavoriteSource,
             requestDispatcher = Dispatchers.Unconfined,
             favoriteSession = session,
@@ -212,6 +213,14 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
         assertTrue(model.impostorState.value.hasImpostor == AvatarProfileVo(avatar).hasImpostor)
         return model
     }
+}
+
+private data object EmptyAvatarModerationSourceForBuild : AvatarModerationSource {
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> = Result.success(false)
+
+    override suspend fun block(avatarId: String): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unblock(avatarId: String): Result<Unit> = Result.success(Unit)
 }
 
 private class ControlledImpostorBuilder(

@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarModerationSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
@@ -107,6 +108,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                         AvatarGalleryLoader { _, _, _ -> Result.success(emptyList()) }
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
+                    single<AvatarModerationSource> { EmptyAvatarModerationSource }
                     single<AvatarFallbackSetter> { EmptyAvatarFallbackSetter }
                     single<AvatarEditor> { EmptyAvatarEditor }
                     single<AvatarDeleter> { EmptyAvatarDeleter }
@@ -243,6 +245,17 @@ private data object EmptyAvatarSelector : AvatarSelector {
     override val currentUser = flowOf<AvatarUserContext?>(null)
 
     override suspend fun select(avatarId: String): Result<Unit> =
+        Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarModerationSource : AvatarModerationSource {
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> =
+        Result.failure(IllegalStateException("unused"))
+
+    override suspend fun block(avatarId: String): Result<Unit> =
+        Result.failure(IllegalStateException("unused"))
+
+    override suspend fun unblock(avatarId: String): Result<Unit> =
         Result.failure(IllegalStateException("unused"))
 }
 

@@ -386,6 +386,7 @@ private class AvatarDeletionFixture(
     val model = AvatarProfileScreenModel(
         avatarProfileLoader = StaticAvatarProfileLoader(avatarsById),
         avatarSelector = selector,
+        avatarModerationSource = EmptyAvatarModerationSourceForDeletion,
         favoriteEntrySource = DeletionFavoriteEntrySource(),
         avatarImpostorDeletionSource = EmptyImpostorDeletionSource,
         requestDispatcher = Dispatchers.Unconfined,
@@ -397,6 +398,14 @@ private class AvatarDeletionFixture(
     fun open(avatarId: String) {
         model.refreshAvatarData(AvatarProfileVo(avatarsById.getValue(avatarId)))
     }
+}
+
+private data object EmptyAvatarModerationSourceForDeletion : AvatarModerationSource {
+    override suspend fun isBlocked(avatarId: String): Result<Boolean> = Result.success(false)
+
+    override suspend fun block(avatarId: String): Result<Unit> = Result.success(Unit)
+
+    override suspend fun unblock(avatarId: String): Result<Unit> = Result.success(Unit)
 }
 
 private data object EmptyImpostorDeletionSource : AvatarImpostorDeletionSource {
