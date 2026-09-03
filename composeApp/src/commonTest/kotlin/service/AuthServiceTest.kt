@@ -1,12 +1,14 @@
 package io.github.vrcmteam.vrcm.service
 
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -27,6 +29,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
@@ -77,6 +80,120 @@ class AuthServiceTest : MainDispatcherTest() {
         assertTrue(requests.single().first.orEmpty().contains("auth=cached-auth"))
         assertTrue(requests.single().first.orEmpty().contains("twoFactorAuth=cached-2fa"))
         assertEquals("usr_cached", fixture.service.currentUserState.value?.id)
+        fixture.client.close()
+    }
+
+    @Test
+    fun homeWorldUpdateRetriesAuthenticationAndPublishesServerResponse() = runTest {
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            when (request.method) {
+                HttpMethod.Put -> {
+                    updateRequests++
+                    if (updateRequests == 1) {
+                        respond(
+                            content = "expired",
+                            status = HttpStatusCode.Unauthorized,
+                        )
+                    } else {
+                        jsonResponse(
+                            currentUserJson(
+                                account = cachedAccount(),
+                                homeLocation = "wrld_server_authoritative",
+                            )
+                        )
+                    }
+                }
+                else -> jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+
+        val result = HomeWorldService(
+            usersApi = UsersApi(fixture.client),
+            authService = fixture.service,
+        ).updateHomeWorld("wrld_requested")
+
+        assertEquals("wrld_server_authoritative", result.getOrThrow())
+        assertEquals("wrld_server_authoritative", fixture.service.currentUserState.value?.homeLocation)
+        assertEquals(2, updateRequests)
+        fixture.client.close()
+    }
+
+    @Test
+    fun accountSwitchRejectsLateHomeWorldResponse() = runTest {
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            if (request.method == HttpMethod.Put) {
+                updateStarted.complete(Unit)
+                releaseUpdate.await()
+                jsonResponse(
+                    currentUserJson(
+                        account = cachedAccount(),
+                        homeLocation = "wrld_late",
+                    )
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val update = async(start = CoroutineStart.UNDISPATCHED) {
+            HomeWorldService(
+                usersApi = UsersApi(fixture.client),
+                authService = fixture.service,
+            ).updateHomeWorld("wrld_requested")
+        }
+        updateStarted.await()
+
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_other", username = "other"))
+        releaseUpdate.complete(Unit)
+
+        assertIs<HomeWorldSessionChangedException>(update.await().exceptionOrNull())
+        assertTrue(fixture.service.currentUserState.value?.homeLocation != "wrld_late")
+        fixture.client.close()
+    }
+
+    @Test
+    fun duplicateHomeWorldUpdateIsRejectedUntilTheFirstRequestFinishes() = runTest {
+        val firstUpdateStarted = CompletableDeferred<Unit>()
+        val releaseFirstUpdate = CompletableDeferred<Unit>()
+        var updateRequests = 0
+        val fixture = fixture { request ->
+            if (request.method == HttpMethod.Put) {
+                updateRequests++
+                if (updateRequests == 1) {
+                    firstUpdateStarted.complete(Unit)
+                    releaseFirstUpdate.await()
+                }
+                jsonResponse(
+                    currentUserJson(
+                        account = cachedAccount(),
+                        homeLocation = "wrld_server_$updateRequests",
+                    )
+                )
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        val homeWorldService = HomeWorldService(UsersApi(fixture.client), fixture.service)
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            homeWorldService.updateHomeWorld("wrld_first")
+        }
+        firstUpdateStarted.await()
+
+        assertIs<HomeWorldUpdateInFlightException>(
+            homeWorldService.updateHomeWorld("wrld_duplicate").exceptionOrNull()
+        )
+        releaseFirstUpdate.complete(Unit)
+        assertEquals("wrld_server_1", first.await().getOrThrow())
+        assertEquals(
+            "wrld_server_2",
+            homeWorldService.updateHomeWorld("wrld_after-completion").getOrThrow(),
+        )
+        assertEquals(2, updateRequests)
         fixture.client.close()
     }
 
@@ -390,6 +507,78 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun fallbackAvatarUpdateRequiresMatchingSessionUserAndTarget() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount(), currentAvatar = "avtr_initial"))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        val response = fixture.service.currentUser().copy(
+            currentAvatar = "avtr_stale_response",
+            fallbackAvatar = "avtr_fallback",
+        )
+
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { error("stale session must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response.copy(id = "usr_other"),
+                commitIfCurrent = { error("invalid user must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_other",
+                response = response,
+                commitIfCurrent = { error("invalid target must not reach commit") },
+            ),
+        )
+
+        fixture.service.applyCurrentAvatarUpdate("avtr_newer")
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { _ -> false },
+            ),
+        )
+        assertEquals("", fixture.service.currentUserState.value?.fallbackAvatar)
+        var publishedInsideTargetCommit = false
+        assertEquals(
+            FallbackAvatarUpdateResult.Applied,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { update ->
+                    update()
+                    publishedInsideTargetCommit =
+                        fixture.service.currentUserState.value?.fallbackAvatar == "avtr_fallback"
+                    true
+                },
+            ),
+        )
+        assertTrue(publishedInsideTargetCommit)
+        assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
+        assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)
+        fixture.client.close()
+    }
+
+    @Test
     fun expiredRealtimeSessionReauthenticatesSavedAccount() = runTest {
         val requests = mutableListOf<Pair<String?, String?>>()
         var requestCount = 0
@@ -570,6 +759,70 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun avatarCopyingUpdateOnlyAppliesToTheActiveSession() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertTrue(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = false,
+            )
+        )
+        assertEquals(false, fixture.service.currentUserState.value?.allowAvatarCopying)
+
+        fixture.service.logout()
+
+        assertFalse(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = true,
+            )
+        )
+        assertNull(fixture.service.currentUserState.value)
+        fixture.client.close()
+    }
+
+    @Test
+    fun avatarCopyingUpdateWaitsForAuthenticationCommit() = runTest {
+        val loginStarted = CompletableDeferred<Unit>()
+        val finishLogin = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginStarted.complete(Unit)
+                finishLogin.await()
+                jsonResponse("""{"requiresTwoFactorAuth":null}""")
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        val login = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.login(cachedAccount().username, cachedAccount().password.orEmpty())
+        }
+        loginStarted.await()
+
+        val update = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = previousSession.token,
+                allowAvatarCopying = false,
+            )
+        }
+        assertFalse(update.isCompleted)
+
+        finishLogin.complete(Unit)
+        assertIs<AuthState.Authed>(login.await())
+        assertFalse(update.await())
+        assertEquals(true, fixture.service.currentUserState.value?.allowAvatarCopying)
+        fixture.client.close()
+    }
+
+    @Test
     fun networkAvatarSelectionFailureLogsResponseDetailsWithoutCredentials() = runTest {
         var requestCount = 0
         val responseBody = """{"error":{"message":"Avatar not available","status_code":403}}"""
@@ -674,6 +927,7 @@ class AuthServiceTest : MainDispatcherTest() {
         currentAvatar: String = "",
         presenceWorld: String = "",
         presenceInstance: String = "",
+        homeLocation: String = "",
     ): String = """
         {
           "requiresTwoFactorAuth":null,
@@ -687,7 +941,7 @@ class AuthServiceTest : MainDispatcherTest() {
           "fallbackAvatar":"","friendGroupNames":[],"friendKey":"","friends":[],
           "googleId":"","hasBirthday":true,"hasEmail":true,
           "hasLoggedInFromClient":true,"hasPendingEmail":false,
-          "hideContentFilterSettings":false,"homeLocation":"","id":"${account.userId}",
+          "hideContentFilterSettings":false,"homeLocation":"$homeLocation","id":"${account.userId}",
           "isFriend":false,"last_activity":"","last_login":"",
           "last_platform":"standalonewindows","obfuscatedEmail":"",
           "obfuscatedPendingEmail":"","oculusId":"","offlineFriends":[],

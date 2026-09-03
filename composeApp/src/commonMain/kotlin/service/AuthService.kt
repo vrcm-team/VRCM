@@ -26,6 +26,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,12 @@ internal data class SessionBoundResponse<T>(
     val sessionToken: AccountSessionToken,
 )
 
+internal enum class FallbackAvatarUpdateResult {
+    Applied,
+    Stale,
+    InvalidResponse,
+}
+
 /**
  * 负责辅助登录验证的类
  * 主要作用是统一验证失效时的重试逻辑
@@ -48,8 +55,9 @@ class AuthService(
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
     private val accountCacheManager: AccountCacheManager,
-) : WebSocketSessionRecovery {
-    private var scope = CoroutineScope(Job())
+) : WebSocketSessionRecovery, AutoCloseable {
+    private val serviceJob = Job()
+    private val scope = CoroutineScope(serviceJob)
     private val authMutex = Mutex()
     private val currentUserLock = SynchronizedObject()
 
@@ -162,12 +170,65 @@ class AuthService(
         }
     }
 
+    internal suspend fun applyFallbackAvatarUpdate(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        response: CurrentUserData,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
+    ): FallbackAvatarUpdateResult = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
+            return@withLock FallbackAvatarUpdateResult.Stale
+        }
+        synchronized(currentUserLock) {
+            val existing = currentUser ?: return@synchronized FallbackAvatarUpdateResult.Stale
+            if (existing.id != sessionToken.userId) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
+            }
+            if (sessionToken.userId != response.id || response.fallbackAvatar != avatarId) {
+                return@synchronized FallbackAvatarUpdateResult.InvalidResponse
+            }
+            val updated = existing.copy(fallbackAvatar = avatarId)
+            // The caller keeps its page-target lock until this update has been published.
+            if (!commitIfCurrent { publishCurrentUserLocked(updated) }) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
+            }
+            FallbackAvatarUpdateResult.Applied
+        }
+    }
+
+    internal suspend fun applyAvatarCopyingUpdate(
+        sessionToken: AccountSessionToken,
+        allowAvatarCopying: Boolean,
+    ): Boolean = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized false
+            publishCurrentUserLocked(
+                existing.copy(allowAvatarCopying = allowAvatarCopying),
+            )
+            true
+        }
+    }
+
+    internal fun applyCurrentUserHomeLocation(
+        sessionToken: AccountSessionToken,
+        userId: String,
+        homeLocation: String,
+    ): Boolean = synchronized(currentUserLock) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+        val existing = currentUser?.takeIf { it.id == userId } ?: return@synchronized false
+        publishCurrentUserLocked(existing.copy(homeLocation = homeLocation))
+        true
+    }
+
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
             val existing = currentUser ?: return@synchronized
             if (existing.id != user.id) return@synchronized
             publishCurrentUserLocked(
                 existing.copy(
+                    allowAvatarCopying = user.allowAvatarCopying,
                     currentAvatarImageUrl = user.currentAvatarImageUrl,
                     currentAvatarTags = user.currentAvatarTags,
                     currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
@@ -222,6 +283,7 @@ class AuthService(
             socketPresenceRevision++
             publishCurrentUserLocked(
                 existing.copy(
+                    allowAvatarCopying = user.allowAvatarCopying,
                     currentAvatarImageUrl = user.currentAvatarImageUrl,
                     currentAvatarTags = user.currentAvatarTags,
                     currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
@@ -465,6 +527,14 @@ class AuthService(
     suspend fun removeAccount(userId: String) = runCatching {
         accountCacheManager.clearAccount(userId)
         accountDao.removeAccount(userId)
+    }
+
+    override fun close() {
+        serviceJob.cancel()
+    }
+
+    internal suspend fun closeAndJoin() {
+        serviceJob.cancelAndJoin()
     }
 
     private fun publishCurrentUserLocked(user: CurrentUserData): CurrentUserData {

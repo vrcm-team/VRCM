@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import androidx.compose.ui.graphics.toPixelMap
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryTarget
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -274,7 +276,7 @@ abstract class PrintImageProcessorContractTest {
     fun galleryCanvasUsesTheConfirmedFourByThreeOutput() = runBlocking {
         val originalSize = ImageSize(1_600, 900)
         val codec = FakePlatformImageCodec(
-            encodedBytes = pngHeader(width = 2_000, height = 1_500),
+            encodedBytes = pngHeader(width = 2_048, height = 1_536),
         )
         val processor = DefaultPrintImageProcessor(
             codec = codec,
@@ -294,19 +296,19 @@ abstract class PrintImageProcessorContractTest {
                 CropRenderRequest(
                     originalSize = originalSize,
                     transform = CropTransform(),
-                    outputSize = ImageSize(2_000, 1_500),
+                    outputSize = ImageSize(2_048, 1_536),
                 ),
             ),
             codec.cropRequests,
         )
-        assertEquals(ImageSize(2_000, 1_500), codec.encodedSize)
+        assertEquals(ImageSize(2_048, 1_536), codec.encodedSize)
     }
 
     @Test
     fun squareGalleryCanvasUsesTheConfirmedSquareOutput() = runBlocking {
         val originalSize = ImageSize(1_600, 900)
         val codec = FakePlatformImageCodec(
-            encodedBytes = pngHeader(width = 2_000, height = 2_000),
+            encodedBytes = pngHeader(width = 1_024, height = 1_024),
         )
         val processor = DefaultPrintImageProcessor(
             codec = codec,
@@ -326,12 +328,12 @@ abstract class PrintImageProcessorContractTest {
                 CropRenderRequest(
                     originalSize = originalSize,
                     transform = CropTransform(),
-                    outputSize = ImageSize(2_000, 2_000),
+                    outputSize = ImageSize(1_024, 1_024),
                 ),
             ),
             codec.cropRequests,
         )
-        assertEquals(ImageSize(2_000, 2_000), codec.encodedSize)
+        assertEquals(ImageSize(1_024, 1_024), codec.encodedSize)
     }
 
     @Test
@@ -371,10 +373,10 @@ abstract class PrintImageProcessorContractTest {
     @Test
     fun galleryCategoriesUseTheConfirmedUploadCanvasesWithinTheRenderBudget() {
         val expected = mapOf(
-            FileTagType.Gallery to ImageSize(2_000, 1_500),
-            FileTagType.Icon to ImageSize(2_000, 2_000),
-            FileTagType.Emoji to ImageSize(2_000, 2_000),
-            FileTagType.Sticker to ImageSize(2_000, 2_000),
+            FileTagType.Gallery to ImageSize(2_048, 1_536),
+            FileTagType.Icon to ImageSize(1_024, 1_024),
+            FileTagType.Emoji to ImageSize(1_024, 1_024),
+            FileTagType.Sticker to ImageSize(1_024, 1_024),
         )
 
         expected.forEach { (tagType, size) ->
@@ -386,6 +388,19 @@ abstract class PrintImageProcessorContractTest {
                 tagType.value,
             )
         }
+
+        val avatarGalleryTarget = ImageEditorTarget.AvatarGallery(
+            AvatarGalleryTarget(
+                avatarId = "avtr_test",
+                ownerUserId = "usr_test",
+                sessionToken = AccountSessionToken("usr_test", 1),
+            ),
+        )
+        val avatarGallerySpec = avatarGalleryTarget.canvasSpec
+        assertEquals(
+            expected.getValue(FileTagType.Gallery),
+            ImageSize(avatarGallerySpec.canvasWidth, avatarGallerySpec.canvasHeight),
+        )
     }
 
     @Test
@@ -402,7 +417,7 @@ abstract class PrintImageProcessorContractTest {
                 name = "landscape fit",
                 originalSize = ImageSize(1_600, 900),
                 transform = CropTransform(),
-                expectedOutput = ImageSize(1_600, 1_600),
+                expectedOutput = ImageSize(1_024, 1_024),
             ),
             Case(
                 name = "landscape cover",
@@ -420,7 +435,7 @@ abstract class PrintImageProcessorContractTest {
                 name = "rotated portrait fit",
                 originalSize = ImageSize(900, 1_600),
                 transform = CropTransform(quarterTurns = 1),
-                expectedOutput = ImageSize(1_600, 1_600),
+                expectedOutput = ImageSize(1_024, 1_024),
             ),
         )
 
@@ -475,7 +490,7 @@ abstract class PrintImageProcessorContractTest {
 
         assertTrue(result.isSuccess, result.exceptionOrNull()?.stackTraceToString())
         assertEquals(
-            listOf(ImageSize(2_000, 2_000), ImageSize(1_975, 1_975)),
+            listOf(ImageSize(1_024, 1_024), ImageSize(999, 999)),
             codec.cropRequests.map(CropRenderRequest::outputSize),
         )
     }

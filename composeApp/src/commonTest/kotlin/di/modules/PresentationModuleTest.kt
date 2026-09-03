@@ -4,11 +4,24 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackSetter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackUserContext
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarFallbackResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AuthenticatedAvatarDeletion
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarDeleter
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarModerationSource
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
@@ -28,6 +41,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DecodeRequest
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.service.FallbackAvatarUpdateResult
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
@@ -89,9 +104,16 @@ class PresentationModuleTest : MainDispatcherTest() {
                     single<AvatarProfileLoader> {
                         AvatarProfileLoader { Result.failure(IllegalStateException("unused")) }
                     }
+                    single<AvatarGalleryLoader> {
+                        AvatarGalleryLoader { _, _, _ -> Result.success(emptyList()) }
+                    }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarModerationSource> { EmptyAvatarModerationSource }
+                    single<AvatarFallbackSetter> { EmptyAvatarFallbackSetter }
                     single<AvatarEditor> { EmptyAvatarEditor }
+                    single<AvatarDeleter> { EmptyAvatarDeleter }
+                    single<AvatarImpostorDeletionSource> { EmptyAvatarImpostorDeletionSource }
+                    single<AvatarImpostorBuilder> { EmptyAvatarImpostorBuilder }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
             )
@@ -237,11 +259,40 @@ private data object EmptyAvatarModerationSource : AvatarModerationSource {
         Result.failure(IllegalStateException("unused"))
 }
 
+private data object EmptyAvatarFallbackSetter : AvatarFallbackSetter {
+    override val currentUser = flowOf<AvatarFallbackUserContext?>(null)
+
+    override suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse? = null
+
+    override suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
+    ): FallbackAvatarUpdateResult = FallbackAvatarUpdateResult.Stale
+
+    override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean = false
+}
+
 private data object EmptyAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("unused")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+    ): AvatarMetadataUpdateResponse? = error("unused")
+
+    override suspend fun updatePublication(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        releaseStatus: String,
+    ): AvatarPublicationResponse? = null
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         Result.failure(IllegalStateException("unused"))
@@ -250,6 +301,42 @@ private data object EmptyAvatarEditor : AvatarEditor {
         avatarId: String,
         imageUrl: String,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarDeleter : AvatarDeleter {
+    override fun isCurrentSession(token: AccountSessionToken): Boolean = false
+
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): AuthenticatedAvatarDeletion? = null
+}
+
+private data object EmptyAvatarImpostorDeletionSource : AvatarImpostorDeletionSource {
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? = null
+
+    override suspend fun load(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<AvatarData>? = null
+}
+
+private data object EmptyAvatarImpostorBuilder : AvatarImpostorBuilder {
+    override suspend fun enqueue(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+        avatarId: String,
+    ) = null
+
+    override suspend fun queueStats(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = null
+
+    override fun isCurrentSession(
+        sessionToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken,
+    ) = false
 }
 
 private data object EmptyGalleryDataSource : GalleryDataSource {

@@ -28,13 +28,15 @@ fun OfficialUrlShareButton(
     url: String,
     modifier: Modifier = Modifier,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
+    forceSharePresentation: Boolean = false,
 ) {
     val platform = getAppPlatform()
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val markClipboardInspected = LocalOfficialLinkInspectionMarker.current
     val usesSystemShare = platform.supportsSystemShare
-    val actionDescription = if (usesSystemShare) strings.shareOfficialUrl else strings.copyOfficialUrl
+    val presentsShare = usesSystemShare || forceSharePresentation
+    val actionDescription = if (presentsShare) strings.shareOfficialUrl else strings.copyOfficialUrl
     val copiedMessage = strings.officialUrlCopied
     val failedMessage = if (usesSystemShare) {
         strings.officialUrlShareFailed
@@ -75,7 +77,7 @@ fun OfficialUrlShareButton(
             },
         ) {
             Icon(
-                imageVector = if (usesSystemShare) AppIcons.Share else AppIcons.ContentCopy,
+                imageVector = if (presentsShare) AppIcons.Share else AppIcons.ContentCopy,
                 contentDescription = actionDescription,
                 modifier = Modifier.size(20.dp),
             )
