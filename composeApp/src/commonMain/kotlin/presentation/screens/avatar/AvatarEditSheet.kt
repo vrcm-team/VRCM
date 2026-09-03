@@ -24,15 +24,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +78,12 @@ internal fun AvatarEditSheet(
     val locale = strings
     val isRemoteUpdateBusy = state.isSavingMetadata || state.isUpdatingPublication
     val isBusy = isRemoteUpdateBusy || isPreparingCover
+    val latestIsBusy = rememberUpdatedState(isBusy)
+    val sheetState = rememberModalBottomSheetState(
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || !latestIsBusy.value
+        },
+    )
 
     LaunchedEffect(state.publication) {
         if (state.publication != AvatarPublicationStatus.Private) {
@@ -128,6 +137,8 @@ internal fun AvatarEditSheet(
 
     ModalBottomSheet(
         onDismissRequest = { if (!isBusy) onDismiss() },
+        sheetState = sheetState,
+        sheetGesturesEnabled = !isBusy,
     ) {
         Column(
             modifier = Modifier
