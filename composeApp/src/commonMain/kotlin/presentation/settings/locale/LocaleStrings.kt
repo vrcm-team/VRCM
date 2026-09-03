@@ -58,6 +58,19 @@ sealed class LocaleStrings {
     open val stettingAbout: String = "About Application"
     open val stettingVersion: String = "Version"
     open val stettingClearCache: String = "Clear Cache"
+    open val settingWorldSaveDataTitle: String = "Remote world save data"
+    open val settingWorldSaveDataDescription: String =
+        "Manage data saved for your account by worlds. This is separate from the local cache."
+    open val settingWorldSaveDataDelete: String = "Delete all world save data"
+    open val settingWorldSaveDataDeleting: String = "Deleting..."
+    open val settingWorldSaveDataDeleted: String = "All world save data deleted"
+    open val settingWorldSaveDataFailed: String = "Could not delete world save data. Try again."
+    open val settingWorldSaveDataUnavailable: String =
+        "Sign in to manage remote world save data."
+    open val settingWorldSaveDataConfirmTitle: String = "Delete all world save data?"
+    open val settingWorldSaveDataConfirmMessage: String =
+        "This permanently deletes the data saved for your account by every world. " +
+            "This cannot be undone and does not clear the local app cache."
     open val stettingAlreadyLatest: String = "Already Latest"
     open val stettingFriendActivity: String = "Friend activity"
     open val stettingFriendPresenceNotifications: String = "Presence alerts"
@@ -196,6 +209,34 @@ sealed class LocaleStrings {
     open val instanceCreateSuccess: String = "Successfully created instance and sent invite"
     open val instanceCreateSuccessButInviteFailed: String = "Instance created successfully but invite failed"
     open val instanceCreateFailed: String = "Failed to create instance"
+    open val worldPublishAction: String = "Publish to Community Labs"
+    open val worldUnpublishAction: String = "Unpublish World"
+    open val worldPublishConfirmationTitle: String = "Publish World?"
+    open val worldUnpublishConfirmationTitle: String = "Unpublish World?"
+    open val worldPublishConfirmationMessage: String =
+        "Publish %s to Community Labs? Publishing is limited to one world per week."
+    open val worldUnpublishConfirmationMessage: String = "Unpublish %s and make it private?"
+    open val worldPublishSuccess: String = "World published"
+    open val worldUnpublishSuccess: String = "World unpublished"
+    open val worldPublishFailed: String = "Failed to publish world"
+    open val worldUnpublishFailed: String = "Failed to unpublish world"
+    open val worldPublishUnavailable: String =
+        "This world is not currently eligible for publishing. You can publish at most one world per week."
+    open val worldPublishAvailabilityCheckFailed: String =
+        "Could not check publishing availability. Refresh to try again."
+    open val worldPublicationRefreshRequired: String =
+        "The request completed, but the current status could not be confirmed. Refresh before trying again."
+    open val worldPublicationCacheSyncFailed: String =
+        "World status updated, but the cached data could not be saved. Refresh before trying again."
+    open val instanceCloseAction: String = "Close instance"
+    open val instanceCloseCheckingPermission: String = "Checking permission"
+    open val instanceCloseConfirmTitle: String = "Close this instance?"
+    open val instanceCloseConfirmMessage: String = "This instance will immediately stop accepting new users. This action cannot be undone."
+    open val instanceCloseInProgress: String = "Closing instance"
+    open val instanceCloseSuccess: String = "Instance closed"
+    open val instanceCloseFailed: String = "Failed to close instance"
+    open val instanceClosePermissionDenied: String = "You do not have permission to close this instance"
+    open val instanceCloseSessionChanged: String = "The account session changed. Open the instance and try again."
 
     // World Search
     open val worldSearchAdvancedOptions: String = "Advanced Search Options"
@@ -238,6 +279,12 @@ sealed class LocaleStrings {
 
     // WorldProfileScreen
     open val worldProfileDescription: String = "World Description"
+    open val worldProfileRooms: String = "Instances"
+    open val worldProfileActiveRooms: String = "Active Instances"
+    open val worldProfileInformation: String = "World Information"
+    open val worldProfileCapacityValue: String = "%count% people"
+    open val worldProfileCommunityLabs: String = "Community Labs"
+    open val worldProfileMoreActions: String = "More actions"
     open val worldProfileAuthorTags: String = "Author Tags"
     open val worldProfileCreateFirstInstance: String = "Create the first instance"
     open val worldProfileCreateFirstInstanceHint: String = "Select this stand to get started"
@@ -248,14 +295,117 @@ sealed class LocaleStrings {
     open val worldProfileHeat: String = "Heat"
     open val worldProfilePopularity: String = "Popularity"
     open val worldProfileVersion: String = "Version"
+    open val worldProfileCreatedDate: String = "Created Date"
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"
+    open val worldPersistenceTitle: String = "Saved world data"
+    open val worldPersistenceInitial: String =
+        "Check whether this world has saved data for your account."
+    open val worldPersistenceCheck: String = "Check"
+    open val worldPersistenceChecking: String = "Checking saved data..."
+    open val worldPersistenceExists: String = "This world has saved data for your account."
+    open val worldPersistenceMissing: String = "No saved data was found for your account in this world."
+    open val worldPersistenceDeleted: String = "The saved data for this world has been deleted."
+    open val worldPersistenceCheckFailed: String = "Couldn't check saved data. Try again."
+    open val worldPersistenceCheckAgain: String = "Check again"
+    open val worldPersistenceDelete: String = "Delete data"
+    open val worldPersistenceDeleting: String = "Deleting saved data..."
+    open val worldPersistenceDeleteFailed: String = "Couldn't delete saved data. Try again."
+    open val worldPersistenceDeleteConfirmTitle: String = "Delete saved world data?"
+    open val worldPersistenceDeleteConfirmMessage: String =
+        "This permanently deletes your account's saved data for this world. This action cannot be undone."
+    open val worldDeleteAction: String = "Delete world"
+    open val worldDeleteConfirmationTitle: String = "Delete this world?"
+    open val worldDeleteConfirmationMessage: String =
+        "Delete \"%name%\"? The world will become hidden, and associated files will be " +
+            "permanently deleted and cannot be recovered. The world ID will remain permanently reserved."
+    open val worldDeleteSuccess: String = "World deleted"
+    open val worldDeleteSuccessCacheCleanupFailed: String =
+        "World deleted, but its local cached details couldn't be removed."
+    open val worldDeleteFailed: String = "Couldn't delete this world. Try again."
+    open val worldProfileSetHomeWorld: String = "Set as Home World"
+    open val worldProfileResetHomeWorld: String = "Reset Home World"
+    open val worldProfileHomeWorldUnavailable: String = "Home World action unavailable"
+    open val worldProfileSetHomeWorldConfirmation: String = "Use this world as your Home World?"
+    open val worldProfileResetHomeWorldConfirmation: String =
+        "Remove your custom Home World and restore VRChat's default?"
+    open val worldProfileHomeWorldSetSuccess: String = "Home World updated"
+    open val worldProfileHomeWorldResetSuccess: String = "Home World reset"
+    open val worldProfileHomeWorldUpdateFailed: String = "Couldn't update Home World"
+    open val worldEditTitle: String = "Edit world"
+    open val worldEditName: String = "Name"
+    open val worldEditDescription: String = "Description"
+    open val worldEditCapacity: String = "Capacity"
+    open val worldEditRecommendedCapacity: String = "Recommended capacity"
+    open val worldEditCapacityHint: String =
+        "Capacity must be between 0 and 40; recommended capacity cannot exceed it."
+    open val worldEditTags: String = "Tags"
+    open val worldEditTagsHint: String = "Enter one complete VRChat tag per line."
+    open val worldEditAllowedDomains: String = "Allowed Domains"
+    open val worldEditAllowedDomainsHint: String =
+        "Enter one domain accepted by VRChat per line."
+    open val worldEditSave: String = "Save world details"
+    open val worldEditSaving: String = "Saving..."
+    open val worldEditInvalidName: String = "World name cannot be empty."
+    open val worldEditInvalidCapacity: String = "World capacity must be a whole number from 0 to 40."
+    open val worldEditInvalidRecommendedCapacity: String =
+        "Recommended capacity must be a whole number and cannot exceed capacity."
+    open val worldEditNoChanges: String = "World details have not changed."
+    open val worldEditSaved: String = "World details updated."
+    open val worldEditSaveFailed: String = "Failed to update world details."
+    open val worldImageEditTitle: String = "Manage World Image"
+    open val worldImageEditPreview: String = "Preview image"
+    open val worldImageEditThumbnail: String = "Cover thumbnail"
+    open val worldImageEditHint: String =
+        "Choose a JPEG, PNG, or WebP up to 10 MiB. The editor exports a 1920 x 1080 image; VRChat generates the cover thumbnail."
+    open val worldImageEditChoose: String = "Choose image"
+    open val worldImageEditUpload: String = "Update world image"
+    open val worldImageEditUploading: String = "Uploading world image..."
+    open val worldImageEditSaved: String = "World preview and cover updated"
+    open val worldImageEditUploadFailed: String = "World image upload failed"
+    open val worldImageEditAssignmentFailed: String =
+        "The image was uploaded, but VRChat could not assign it to the world. Try updating the image again."
+    open val worldImageEditRefreshFailed: String =
+        "The image was updated, but the latest world details could not be loaded. Refresh the world to verify it."
+    open val worldImageEditSessionChanged: String =
+        "Your account session changed. Reopen image management and try again."
+    open val worldImageEditUnsupportedFormat: String =
+        "The image format is unsupported or does not match its extension. Choose a valid JPEG, PNG, or WebP file."
+    open val worldImageEditFileTooLarge: String = "The selected image is larger than 10 MiB"
+    open val worldImageEditReadFailed: String = "The selected world image could not be read"
     open val unknown: String = "Unknown"
 
     // CreateInstanceDialog
     open val createInstanceStandardAccessType: String = "Standard Access Type"
     open val createInstanceEnableQueue: String = "Enable Queue Function"
+    open val createInstanceGroupAccessType: String = "Group Access Type"
+    open val createInstanceGroup: String = "Group"
+    open val createInstanceGroupsLoading: String = "Loading available groups..."
+    open val createInstanceGroupsFailed: String = "Unable to load available groups"
+    open val createInstanceNoEligibleGroups: String = "No groups allow you to create instances"
+    open val createInstanceGroupMembers: String = "Group Members"
+    open val createInstanceGroupPlus: String = "Group Plus"
+    open val createInstanceGroupPublic: String = "Group Public"
+    open val createInstanceRoleRestriction: String = "Allowed Roles"
+    open val createInstanceAgeGate: String = "Age Gate"
+    open val createInstanceDisplayName: String = "Custom Name"
+    open val createInstanceOptional: String = "Optional"
+    open val createInstanceMinimumPerformance: String = "Minimum Avatar Performance"
+    open val createInstancePerformanceDefault: String = "Group Default"
+    open val createInstancePerformancePoor: String = "Poor"
+    open val createInstancePerformanceMedium: String = "Medium"
+    open val createInstancePerformanceGood: String = "Good"
+    open val createInstanceGroupRequired: String = "Select an available group"
+    open val createInstanceAccessPermissionRequired: String =
+        "Your group roles do not allow this instance type"
+    open val createInstanceRoleRequired: String = "Select at least one allowed role"
+    open val createInstanceInvalidRole: String = "One or more selected roles are no longer available"
+    open val createInstanceAgeGatePermissionRequired: String =
+        "Your group roles do not allow age-gated instances"
+    open val createInstancePerformancePermissionRequired: String =
+        "Your group roles do not allow overriding avatar performance"
+    open val createInstanceSubmitting: String = "Creating..."
 
     // GalleryTabPager
     open val galleryTabNoFiles: String = "No %s Files"
