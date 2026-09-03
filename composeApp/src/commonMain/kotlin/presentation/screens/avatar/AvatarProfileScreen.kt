@@ -256,10 +256,13 @@ private fun AvatarProfileContent(
         onClick = onSelectAvatar,
     )
 
-    AvatarFallbackActionButton(
-        state = fallbackActionState,
-        onClick = onSelectFallbackAvatar,
-    )
+    if (fallbackActionState.availability != AvatarFallbackAvailability.Hidden) {
+        AvatarFallbackActionButton(
+            state = fallbackActionState,
+            onClick = onSelectFallbackAvatar,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
 
     OutlinedButton(
         onClick = {
@@ -433,7 +436,6 @@ private fun AvatarFallbackActionButton(
             textAlign = TextAlign.Center,
         )
     }
-    Spacer(modifier = Modifier.height(12.dp))
 }
 
 @Composable
