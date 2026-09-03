@@ -56,7 +56,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
         assertTrue(
             AvatarProfileNotice.FallbackSelected.localizedToast(LocaleStringsEn) is ToastText.Success
         )
-        val fallbackFailure = AvatarProfileNotice.FallbackSelectionFailed(message = null)
+        val fallbackFailure = AvatarProfileNotice.FallbackSelectionFailed
             .localizedToast(LocaleStringsEn)
         assertTrue(fallbackFailure is ToastText.Error)
         assertEquals(LocaleStringsEn.avatarProfileFallbackSelectFailed, fallbackFailure.text)

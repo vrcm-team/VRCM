@@ -261,7 +261,7 @@ internal sealed interface AvatarProfileNotice {
     data object FallbackIneligible : AvatarProfileNotice
     data object FallbackNotFound : AvatarProfileNotice
     data object FallbackUnauthorized : AvatarProfileNotice
-    data class FallbackSelectionFailed(val message: String?) : AvatarProfileNotice
+    data object FallbackSelectionFailed : AvatarProfileNotice
     data object InvalidName : AvatarProfileNotice
     data object NoMetadataChanges : AvatarProfileNotice
     data object MetadataSaved : AvatarProfileNotice
@@ -514,7 +514,7 @@ class AvatarProfileScreenModel internal constructor(
                                     setter = setter,
                                     target = target,
                                     responseSessionToken = response.sessionToken,
-                                    notice = AvatarProfileNotice.FallbackSelectionFailed(null),
+                                    notice = AvatarProfileNotice.FallbackSelectionFailed,
                                 )
                             FallbackAvatarUpdateResult.Stale -> Unit
                         }
@@ -656,7 +656,7 @@ class AvatarProfileScreenModel internal constructor(
                 error is VRCApiException && error.code == 401 -> {
                     AvatarProfileNotice.FallbackUnauthorized
                 }
-                else -> AvatarProfileNotice.FallbackSelectionFailed(error.message)
+                else -> AvatarProfileNotice.FallbackSelectionFailed
             }
             _notices.tryEmit(notice)
         }

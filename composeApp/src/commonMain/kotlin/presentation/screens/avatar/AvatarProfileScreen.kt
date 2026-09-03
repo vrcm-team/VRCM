@@ -67,9 +67,8 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
     AvatarProfileNotice.FallbackIneligible -> ToastText.Error(locale.avatarProfileFallbackIneligible)
     AvatarProfileNotice.FallbackNotFound -> ToastText.Error(locale.avatarProfileFallbackNotFound)
     AvatarProfileNotice.FallbackUnauthorized -> ToastText.Error(locale.avatarProfileFallbackUnauthorized)
-    is AvatarProfileNotice.FallbackSelectionFailed -> ToastText.Error(
-        message ?: locale.avatarProfileFallbackSelectFailed
-    )
+    AvatarProfileNotice.FallbackSelectionFailed ->
+        ToastText.Error(locale.avatarProfileFallbackSelectFailed)
     AvatarProfileNotice.InvalidName -> ToastText.Error(locale.avatarEditInvalidName)
     AvatarProfileNotice.NoMetadataChanges -> ToastText.Info(locale.avatarEditNoChanges)
     AvatarProfileNotice.MetadataSaved -> ToastText.Success(locale.avatarEditMetadataSaved)
