@@ -14,7 +14,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageFile
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
-import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import kotlinx.coroutines.runBlocking
