@@ -64,6 +64,12 @@ internal fun AvatarProfileNotice.localizedToast(locale: LocaleStrings): ToastTex
         message ?: locale.avatarProfileSelectFailed
     )
     AvatarProfileNotice.InvalidName -> ToastText.Error(locale.avatarEditInvalidName)
+    AvatarProfileNotice.InvalidContentTags ->
+        ToastText.Error(locale.avatarEditInvalidContentTags)
+    AvatarProfileNotice.InvalidPrimaryStyle ->
+        ToastText.Error(locale.avatarEditInvalidStyle)
+    AvatarProfileNotice.InvalidSecondaryStyle ->
+        ToastText.Error(locale.avatarEditInvalidStyle)
     AvatarProfileNotice.NoMetadataChanges -> ToastText.Info(locale.avatarEditNoChanges)
     AvatarProfileNotice.MetadataSaved -> ToastText.Success(locale.avatarEditMetadataSaved)
     is AvatarProfileNotice.MetadataSaveFailed -> ToastText.Error(
@@ -151,7 +157,10 @@ class AvatarProfileScreen(
                     favoriteEntryState = favoriteEntryState,
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
                     canEdit = editState.canEdit,
-                    onEdit = { showEditSheet = true },
+                    onEdit = {
+                        screenModel.loadAvatarStyles()
+                        showEditSheet = true
+                    },
                 )
             }
         }
@@ -168,6 +177,7 @@ class AvatarProfileScreen(
                 imageProcessor = imageProcessor,
                 onDismiss = { showEditSheet = false },
                 onSaveMetadata = screenModel::saveMetadata,
+                onRetryStyles = screenModel::loadAvatarStyles,
                 onEditCover = { source, prepared ->
                     handoffPreparedImageToEditor(
                         source = source,

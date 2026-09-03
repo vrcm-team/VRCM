@@ -46,6 +46,66 @@ class AvatarsApiTest {
     }
 
     @Test
+    fun updateAvatarSendsStyleIdsAndTheCompleteTagSet() = runBlocking {
+        var body = ""
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+                    respond(
+                        content = avatarJson(),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        AvatarsApi(client).updateAvatar(
+            avatarId = "avtr_owned",
+            update = AvatarUpdateData(
+                tags = listOf("content_horror", "author_tag_dance"),
+                primaryStyle = "avst_primary",
+                secondaryStyle = "",
+            ),
+        )
+
+        assertEquals(
+            """{"tags":["content_horror","author_tag_dance"],"primaryStyle":"avst_primary","secondaryStyle":""}""",
+            body,
+        )
+        client.close()
+    }
+
+    @Test
+    fun getAvatarStylesUsesTheServiceEndpointAndParsesIds() = runBlocking {
+        var path: String? = null
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    path = request.url.encodedPath
+                    respond(
+                        content = """[{"id":"avst_one","styleName":"Anime"}]""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val styles = AvatarsApi(client).getAvatarStyles()
+
+        assertEquals("/api/1/avatarStyles", path)
+        assertEquals("avst_one", styles.single().id)
+        assertEquals("Anime", styles.single().styleName)
+        client.close()
+    }
+
+    @Test
     fun selectAvatarUsesPutAndParsesPartialSelectionResponse() = runBlocking {
         var method: HttpMethod? = null
         var path: String? = null

@@ -8,10 +8,13 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverFile
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarMetadataUpdateResponse
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarStylesResponse
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarUserContext
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
@@ -225,10 +228,15 @@ private data object EmptyAvatarSelector : AvatarSelector {
 }
 
 private data object EmptyAvatarEditor : AvatarEditor {
+    override suspend fun loadStyles(
+        sessionToken: AccountSessionToken,
+    ): AvatarStylesResponse? = error("unused")
+
     override suspend fun updateMetadata(
+        sessionToken: AccountSessionToken,
         avatarId: String,
         update: AvatarUpdateData,
-    ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+    ): AvatarMetadataUpdateResponse? = error("unused")
 
     override suspend fun uploadCover(cover: AvatarCoverFile): Result<String> =
         Result.failure(IllegalStateException("unused"))
