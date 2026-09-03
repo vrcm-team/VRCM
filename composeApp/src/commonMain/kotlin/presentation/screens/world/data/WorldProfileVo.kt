@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.data
 
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformFileSize
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.supportedPlatforms
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -42,6 +44,7 @@ data class WorldProfileVo(
     @Transient val instances: List<InstanceVo> = emptyList(),
 
     // 平台文件大小信息
+    val supportedPlatforms: List<PlatformType> = emptyList(),
     val platformFileSizes: List<PlatformFileSize> = emptyList(),
 
 
@@ -49,9 +52,10 @@ data class WorldProfileVo(
 
     // 从WorldData构造，不包含实例信息
     constructor(
-        world: WorldData, 
+        world: WorldData,
         instancesList: List<InstanceVo> = emptyList(),
-        platformFileSizes: List<PlatformFileSize> = emptyList()
+        supportedPlatforms: List<PlatformType> = world.supportedPlatforms,
+        platformFileSizes: List<PlatformFileSize> = emptyList(),
     ): this(
         worldId = world.id,
         worldName = world.name,
@@ -80,6 +84,7 @@ data class WorldProfileVo(
         publicationDate = world.publicationDate,
         labsPublicationDate = world.labsPublicationDate,
         instances = instancesList,
+        supportedPlatforms = supportedPlatforms,
         platformFileSizes = platformFileSizes,
     )
 

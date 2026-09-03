@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.worlds.data
 
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -41,3 +42,7 @@ data class WorldData(
     val visits: Int?,
     val urlList: List<String>? = emptyList(),
 )
+
+/** 世界实际发布过 Unity 包的平台，不受文件元数据查询结果影响。 */
+val WorldData.supportedPlatforms: List<PlatformType>
+    get() = unityPackages.map { it.platform }.distinct()

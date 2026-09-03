@@ -256,6 +256,12 @@ internal object LocaleStringsZhHant : LocaleStrings() {
 
     // WorldProfileScreen
     override val worldProfileDescription = "世界描述"
+    override val worldProfileRooms = "房間"
+    override val worldProfileActiveRooms = "活躍房間"
+    override val worldProfileInformation = "世界資訊"
+    override val worldProfileCapacityValue = "%count% 人"
+    override val worldProfileCommunityLabs = "社群實驗室"
+    override val worldProfileMoreActions = "更多操作"
     override val worldProfileAuthorTags = "作者標籤"
     override val worldProfileCreateFirstInstance = "創建第一個房間"
     override val worldProfileCreateFirstInstanceHint = "點擊此展位開始創建"
@@ -266,6 +272,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val worldProfileHeat = "熱度"
     override val worldProfilePopularity = "知名度"
     override val worldProfileVersion = "版本"
+    override val worldProfileCreatedDate = "建立日期"
     override val worldProfilePublishDate = "發布日期"
     override val worldProfileUpdateDate = "更新日期"
     override val worldProfileLabReleaseDate = "實驗室發布日期"

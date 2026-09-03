@@ -279,6 +279,12 @@ sealed class LocaleStrings {
 
     // WorldProfileScreen
     open val worldProfileDescription: String = "World Description"
+    open val worldProfileRooms: String = "Instances"
+    open val worldProfileActiveRooms: String = "Active Instances"
+    open val worldProfileInformation: String = "World Information"
+    open val worldProfileCapacityValue: String = "%count% people"
+    open val worldProfileCommunityLabs: String = "Community Labs"
+    open val worldProfileMoreActions: String = "More actions"
     open val worldProfileAuthorTags: String = "Author Tags"
     open val worldProfileCreateFirstInstance: String = "Create the first instance"
     open val worldProfileCreateFirstInstanceHint: String = "Select this stand to get started"
@@ -289,6 +295,7 @@ sealed class LocaleStrings {
     open val worldProfileHeat: String = "Heat"
     open val worldProfilePopularity: String = "Popularity"
     open val worldProfileVersion: String = "Version"
+    open val worldProfileCreatedDate: String = "Created Date"
     open val worldProfilePublishDate: String = "Publish Date"
     open val worldProfileUpdateDate: String = "Update Date"
     open val worldProfileLabReleaseDate: String = "Lab Release Date"

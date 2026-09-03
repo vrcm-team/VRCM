@@ -3,6 +3,8 @@ package io.github.vrcmteam.vrcm.storage
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import io.github.vrcmteam.vrcm.core.shared.AuthenticationSessionRegistry
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
+import io.github.vrcmteam.vrcm.network.api.worlds.data.UnityPackage
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.data.WorldProfileCache
@@ -14,6 +16,29 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class RoomWorldProfileCacheStoreTest {
+    @Test
+    fun profileCacheRetainsSupportedPlatformsWhenUnityPackagesArePruned() = withStore { store ->
+        val world = worldData("world.png").copy(
+            unityPackages = listOf(
+                UnityPackage(
+                    assetUrl = "https://example.com/file/file_android/1/file",
+                    assetVersion = 1,
+                    createdAt = "2026-01-01T00:00:00Z",
+                    id = "unp_android",
+                    platform = PlatformType.Android,
+                    pluginUrl = null,
+                    unityVersion = "2022.3.22f1",
+                ),
+            )
+        )
+
+        store.save(WorldProfileCache(world, cachedAtEpochMilliseconds = 1L))
+
+        val cached = store.load(world.id)
+        assertEquals(emptyList(), cached?.world?.unityPackages)
+        assertEquals(listOf(PlatformType.Android), cached?.supportedPlatforms)
+    }
+
     @Test
     fun sessionInvalidatedBeforeStateCommitRestoresPreviousWorldCache() = withStore { store ->
         store.save(WorldProfileCache(worldData("old.png"), cachedAtEpochMilliseconds = 1L))

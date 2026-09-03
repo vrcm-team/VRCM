@@ -176,6 +176,10 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
             listOf(PlatformType.Windows, PlatformType.Ios),
             firstModel.worldProfileState.value.orEmptyPlatformSizes().map { it.platform },
         )
+        assertEquals(
+            listOf(PlatformType.Windows, PlatformType.Android, PlatformType.Ios),
+            firstModel.worldProfileState.value?.supportedPlatforms,
+        )
         assertNull(cache.value.value?.platformFileSizes)
 
         clearModel(firstModel)

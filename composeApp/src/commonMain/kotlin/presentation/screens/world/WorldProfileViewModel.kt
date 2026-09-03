@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.network.api.worlds.data.supportedPlatforms
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -149,6 +150,7 @@ class WorldProfileScreenModel internal constructor(
                         WorldProfileCache(
                             world = updated,
                             cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                            supportedPlatforms = updated.supportedPlatforms,
                             platformFileSizes = current.platformFileSizes,
                         )
                     )
@@ -424,6 +426,8 @@ class WorldProfileScreenModel internal constructor(
             _worldProfileState.value = WorldProfileVo(
                 world = cached.world,
                 instancesList = worldProfileVO.instances,
+                supportedPlatforms =
+                    cached.supportedPlatforms ?: worldProfileVO.supportedPlatforms,
                 platformFileSizes = cached.platformFileSizes ?: worldProfileVO.platformFileSizes,
             )
         }
@@ -431,6 +435,7 @@ class WorldProfileScreenModel internal constructor(
         val shouldRefreshProfile = cached == null ||
             cached.isExpired(Clock.System.now().toEpochMilliseconds()) ||
             cached.world.instances == null ||
+            cached.supportedPlatforms == null ||
             cached.platformFileSizes == null
         if (shouldRefreshProfile) {
             loadWorldInfo(worldId, loadGeneration)
@@ -453,6 +458,7 @@ class WorldProfileScreenModel internal constructor(
             WorldProfileCache(
                 world = update.world,
                 cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                supportedPlatforms = update.world.supportedPlatforms,
                 platformFileSizes = current?.platformFileSizes,
             ),
             canStart = {
@@ -611,6 +617,7 @@ class WorldProfileScreenModel internal constructor(
                     WorldProfileCache(
                         world = worldData,
                         cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                        supportedPlatforms = worldData.supportedPlatforms,
                         platformFileSizes = null,
                     )
                 )
@@ -669,6 +676,7 @@ class WorldProfileScreenModel internal constructor(
                         WorldProfileCache(
                             world = worldData,
                             cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                            supportedPlatforms = worldData.supportedPlatforms,
                             platformFileSizes = result.platformFileSizes,
                         )
                     )
@@ -701,6 +709,7 @@ class WorldProfileScreenModel internal constructor(
                     WorldProfileCache(
                         world = worldData,
                         cachedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                        supportedPlatforms = worldData.supportedPlatforms,
                         platformFileSizes = cachedPlatformFileSizes,
                     )
                 )
