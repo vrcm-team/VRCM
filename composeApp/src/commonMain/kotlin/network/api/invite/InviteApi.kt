@@ -24,6 +24,7 @@ class InviteApi(private val client: HttpClient) {
 
     suspend fun inviteUser(userId: String, instanceId: String, messageSlot: Int = 0): VRChatResponse {
         requireValidSlot(messageSlot)
+        requireValidInviteLocation(instanceId)
         return client.post("$INVITE_API_PREFIX/$userId") {
             contentType(ContentType.Application.Json)
             setBody(InviteUserRequest(instanceId = instanceId, messageSlot = messageSlot))
@@ -38,9 +39,7 @@ class InviteApi(private val client: HttpClient) {
         messageSlot: Int = 0,
     ) {
         require(userId.isNotBlank()) { "userId must not be blank" }
-        require(instanceId.isNotBlank() && instanceId != "offline") {
-            "instanceId must identify an active instance"
-        }
+        requireValidInviteLocation(instanceId)
         require(messageSlot in INVITE_MESSAGE_SLOT_RANGE) { "messageSlot must be between 0 and 11" }
         require(imageBytes.hasPngSignature()) { "Invite image must be a PNG file" }
         require(imageBytes.size <= MAX_INVITE_IMAGE_BYTES) {

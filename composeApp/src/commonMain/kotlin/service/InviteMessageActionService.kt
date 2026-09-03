@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.network.api.invite.inviteLocationOrNull
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageType
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -73,9 +74,9 @@ private class NetworkInviteMessageActionCall(
     ): SessionBoundResponse<Unit>? = authService.runSessionBoundCatching(sessionToken) {
         when (action) {
             InviteMessageAction.Invite -> {
-                val instance = authService.currentUser().presence.instance
-                if (instance.isBlank() || instance == "offline") throw NotInInstanceException
-                inviteApi.inviteUser(targetUserId, instance, slot)
+                val location = authService.currentUser().presence.inviteLocationOrNull()
+                    ?: throw NotInInstanceException
+                inviteApi.inviteUser(targetUserId, location, slot)
             }
 
             InviteMessageAction.RequestInvite -> inviteApi.requestInvite(targetUserId, slot)
