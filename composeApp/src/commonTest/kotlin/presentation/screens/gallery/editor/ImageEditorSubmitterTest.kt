@@ -10,6 +10,11 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverUpdateFail
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarPublicationResponse
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryDataSource
+import io.github.vrcmteam.vrcm.presentation.screens.world.SessionBoundValue
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageFile
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.network.api.prints.data.PrintData
 import kotlinx.coroutines.runBlocking
@@ -26,7 +31,12 @@ class ImageEditorSubmitterTest {
             uploadResult = Result.failure(IllegalStateException("unused")),
             assignmentResult = Result.failure(IllegalStateException("unused")),
         )
-        val submitter = NetworkImageEditorSubmitter(printUploader, avatarEditor, UnusedGalleryDataSource)
+        val submitter = NetworkImageEditorSubmitter(
+            printUploader,
+            avatarEditor,
+            UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
+        )
         val png = byteArrayOf(1, 2, 3)
 
         val result = submitter.submit(
@@ -56,6 +66,7 @@ class ImageEditorSubmitterTest {
             printUploader = UnusedPrintUploader,
             avatarEditor = avatarEditor,
             galleryDataSource = UnusedGalleryDataSource,
+            worldImageEditor = UnusedWorldImageEditor,
         )
         val png = byteArrayOf(1, 2, 3)
 
@@ -83,6 +94,7 @@ class ImageEditorSubmitterTest {
             UnusedPrintUploader,
             avatarEditor,
             UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
         )
 
         val result = submitter.submit(
@@ -106,6 +118,7 @@ class ImageEditorSubmitterTest {
             UnusedPrintUploader,
             avatarEditor,
             UnusedGalleryDataSource,
+            UnusedWorldImageEditor,
         )
 
         val result = submitter.submit(
@@ -125,6 +138,7 @@ class ImageEditorSubmitterTest {
             printUploader = UnusedPrintUploader,
             avatarEditor = UnusedAvatarEditor,
             galleryDataSource = galleryDataSource,
+            worldImageEditor = UnusedWorldImageEditor,
         )
         val png = byteArrayOf(1, 2, 3)
 
@@ -193,6 +207,24 @@ private data object UnusedAvatarEditor : AvatarEditor {
 
     override suspend fun assignCover(avatarId: String, imageUrl: String): Result<AvatarData> =
         error("Avatar editing is not used")
+}
+
+private data object UnusedWorldImageEditor : WorldImageEditor {
+    override suspend fun uploadImage(
+        sessionToken: AccountSessionToken,
+        image: WorldImageFile,
+    ): Result<SessionBoundValue<String>> = error("World image editing is not used")
+
+    override suspend fun assignImage(
+        sessionToken: AccountSessionToken,
+        worldId: String,
+        imageUrl: String,
+    ): Result<SessionBoundValue<Unit>> = error("World image editing is not used")
+
+    override suspend fun refreshWorld(
+        sessionToken: AccountSessionToken,
+        worldId: String,
+    ): Result<WorldImageUpdate> = error("World image editing is not used")
 }
 
 private data object UnusedGalleryDataSource : GalleryDataSource {
