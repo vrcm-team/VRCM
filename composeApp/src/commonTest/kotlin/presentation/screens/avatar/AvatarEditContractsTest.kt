@@ -47,7 +47,12 @@ class AvatarEditContractsTest {
     @Test
     fun managedTagsAndStylesUseAllowedValuesWhileRetainingSystemTags() {
         val current = avatar().copy(
-            tags = listOf("system_approved", "content_horror", "author_tag_old"),
+            tags = listOf(
+                "system_approved",
+                "content_horror",
+                "content_future",
+                "author_tag_old",
+            ),
             primaryStyle = "Anime",
             secondaryStyle = "Robot",
         )
@@ -73,6 +78,7 @@ class AvatarEditContractsTest {
                 AvatarUpdateData(
                     tags = listOf(
                         "system_approved",
+                        "content_future",
                         "content_gore",
                         "content_sex",
                         "author_tag_dance",

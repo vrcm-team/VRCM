@@ -5,7 +5,6 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 
 private const val AuthorTagPrefix = "author_tag_"
-private const val ContentTagPrefix = "content_"
 
 internal enum class AvatarContentTag(val apiValue: String) {
     Horror("content_horror"),
@@ -76,7 +75,7 @@ internal fun avatarMetadataChange(
     val updatedTags = if (tagsChanged) {
         buildList {
             addAll(current.tags.filterNot {
-                it.startsWith(ContentTagPrefix) || it.startsWith(AuthorTagPrefix)
+                it in allowedContentTags || it.startsWith(AuthorTagPrefix)
             })
             AvatarContentTag.entries.forEach { tag ->
                 if (tag.apiValue in draft.contentTags) add(tag.apiValue)
