@@ -408,7 +408,7 @@ class AuthServiceTest : MainDispatcherTest() {
                 sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
                 avatarId = "avtr_fallback",
                 response = response,
-                claimTarget = { true },
+                commitIfCurrent = { error("stale session must not reach commit") },
             ),
         )
         assertEquals(
@@ -417,7 +417,7 @@ class AuthServiceTest : MainDispatcherTest() {
                 sessionToken = session.token,
                 avatarId = "avtr_fallback",
                 response = response.copy(id = "usr_other"),
-                claimTarget = { true },
+                commitIfCurrent = { error("invalid user must not reach commit") },
             ),
         )
         assertEquals(
@@ -426,7 +426,7 @@ class AuthServiceTest : MainDispatcherTest() {
                 sessionToken = session.token,
                 avatarId = "avtr_other",
                 response = response,
-                claimTarget = { true },
+                commitIfCurrent = { error("invalid target must not reach commit") },
             ),
         )
 
@@ -437,19 +437,26 @@ class AuthServiceTest : MainDispatcherTest() {
                 sessionToken = session.token,
                 avatarId = "avtr_fallback",
                 response = response,
-                claimTarget = { false },
+                commitIfCurrent = { _ -> false },
             ),
         )
         assertEquals("", fixture.service.currentUserState.value?.fallbackAvatar)
+        var publishedInsideTargetCommit = false
         assertEquals(
             FallbackAvatarUpdateResult.Applied,
             fixture.service.applyFallbackAvatarUpdate(
                 sessionToken = session.token,
                 avatarId = "avtr_fallback",
                 response = response,
-                claimTarget = { true },
+                commitIfCurrent = { update ->
+                    update()
+                    publishedInsideTargetCommit =
+                        fixture.service.currentUserState.value?.fallbackAvatar == "avtr_fallback"
+                    true
+                },
             ),
         )
+        assertTrue(publishedInsideTargetCommit)
         assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
         assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)
         fixture.client.close()

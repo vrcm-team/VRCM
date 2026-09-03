@@ -138,7 +138,7 @@ internal interface AvatarFallbackSetter {
         avatarId: String,
         sessionToken: AccountSessionToken,
         response: CurrentUserData,
-        claimTarget: () -> Boolean,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
     ): FallbackAvatarUpdateResult
 
     fun isCurrentSession(sessionToken: AccountSessionToken): Boolean
@@ -181,12 +181,12 @@ internal class NetworkAvatarFallbackSetter(
         avatarId: String,
         sessionToken: AccountSessionToken,
         response: CurrentUserData,
-        claimTarget: () -> Boolean,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
     ): FallbackAvatarUpdateResult = authService.applyFallbackAvatarUpdate(
         sessionToken = sessionToken,
         avatarId = avatarId,
         response = response,
-        claimTarget = claimTarget,
+        commitIfCurrent = commitIfCurrent,
     )
 
     override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean =
@@ -338,7 +338,7 @@ class AvatarProfileScreenModel internal constructor(
     private val pendingFallbackTarget = MutableStateFlow<AvatarFallbackTarget?>(null)
     private val fallbackIneligibleTarget = MutableStateFlow<AvatarFallbackTargetKey?>(null)
     private val latestFallbackRequestToken = MutableStateFlow(0L)
-    // Page replacement and target creation must be ordered around the target's atomic claim.
+    // Serializes page replacement with target creation and final current-user publication.
     private val fallbackTargetLock = SynchronizedObject()
     internal val fallbackActionState: StateFlow<AvatarFallbackActionState> = combine(
         avatarProfileState,
@@ -501,7 +501,14 @@ class AvatarProfileScreenModel internal constructor(
                             avatarId = target.avatarId,
                             sessionToken = response.sessionToken,
                             response = currentUser,
-                            claimTarget = target::tryClaim,
+                            commitIfCurrent = { update ->
+                                commitFallbackIfCurrent(
+                                    setter = setter,
+                                    target = target,
+                                    responseSessionToken = response.sessionToken,
+                                    update = update,
+                                )
+                            },
                         )) {
                             FallbackAvatarUpdateResult.Applied -> emitFallbackNoticeIfCurrent(
                                 setter = setter,
@@ -621,6 +628,21 @@ class AvatarProfileScreenModel internal constructor(
         avatarProfileState.value?.avatarId == target.avatarId &&
         responseSessionToken.userId == target.userId &&
         setter.isCurrentSession(responseSessionToken)
+
+    private fun commitFallbackIfCurrent(
+        setter: AvatarFallbackSetter,
+        target: AvatarFallbackTarget,
+        responseSessionToken: AccountSessionToken,
+        update: () -> Unit,
+    ): Boolean = synchronized(fallbackTargetLock) {
+        if (!isCurrentFallbackTargetLocked(setter, target, responseSessionToken) ||
+            !target.tryClaim()
+        ) {
+            return@synchronized false
+        }
+        update()
+        true
+    }
 
     private fun emitFallbackNoticeIfCurrent(
         setter: AvatarFallbackSetter,

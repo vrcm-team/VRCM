@@ -243,7 +243,7 @@ private data object EmptyAvatarFallbackSetter : AvatarFallbackSetter {
         avatarId: String,
         sessionToken: AccountSessionToken,
         response: CurrentUserData,
-        claimTarget: () -> Boolean,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
     ): FallbackAvatarUpdateResult = FallbackAvatarUpdateResult.Stale
 
     override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean = false

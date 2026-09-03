@@ -172,7 +172,7 @@ class AuthService(
         sessionToken: AccountSessionToken,
         avatarId: String,
         response: CurrentUserData,
-        claimTarget: () -> Boolean,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
     ): FallbackAvatarUpdateResult = authMutex.withLock {
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
             return@withLock FallbackAvatarUpdateResult.Stale
@@ -185,12 +185,11 @@ class AuthService(
             if (sessionToken.userId != response.id || response.fallbackAvatar != avatarId) {
                 return@synchronized FallbackAvatarUpdateResult.InvalidResponse
             }
-            // Claim and merge share this non-suspending critical section, so a page
-            // invalidation cannot win after the response has been accepted.
-            if (!claimTarget()) {
+            val updated = existing.copy(fallbackAvatar = avatarId)
+            // The caller keeps its page-target lock until this update has been published.
+            if (!commitIfCurrent { publishCurrentUserLocked(updated) }) {
                 return@synchronized FallbackAvatarUpdateResult.Stale
             }
-            publishCurrentUserLocked(existing.copy(fallbackAvatar = avatarId))
             FallbackAvatarUpdateResult.Applied
         }
     }
