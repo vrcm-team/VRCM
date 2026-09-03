@@ -162,17 +162,19 @@ class AuthService(
         }
     }
 
-    internal fun applyAvatarCopyingUpdate(
+    internal suspend fun applyAvatarCopyingUpdate(
         sessionToken: AccountSessionToken,
         allowAvatarCopying: Boolean,
-    ): Boolean = synchronized(currentUserLock) {
-        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
-        val existing = currentUser?.takeIf { it.id == sessionToken.userId }
-            ?: return@synchronized false
-        publishCurrentUserLocked(
-            existing.copy(allowAvatarCopying = allowAvatarCopying),
-        )
-        true
+    ): Boolean = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized false
+            publishCurrentUserLocked(
+                existing.copy(allowAvatarCopying = allowAvatarCopying),
+            )
+            true
+        }
     }
 
     fun applySocketUserUpdate(user: UserContent) {
