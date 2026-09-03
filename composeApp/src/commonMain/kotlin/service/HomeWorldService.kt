@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.Flow
@@ -16,18 +17,31 @@ internal data class HomeWorldUserContext(
 internal interface HomeWorldManager {
     val currentUser: Flow<HomeWorldUserContext?>
 
-    /** A null target removes the custom Home World and restores VRChat's default. */
-    suspend fun updateHomeWorld(worldId: String?): Result<String>
+    suspend fun setHomeWorld(worldId: String): Result<String>
+
+    suspend fun resetHomeWorld(
+        expectedWorldId: String,
+        expectedSessionToken: AccountSessionToken,
+    ): Result<String>
 }
 
 internal class HomeWorldSessionChangedException : IllegalStateException(
     "The authenticated account changed while updating the Home World"
 )
 
+internal class HomeWorldStateChangedException : IllegalStateException(
+    "The Home World changed before the reset could be submitted"
+)
+
 internal class InvalidHomeWorldException : IllegalArgumentException("Invalid VRChat world ID")
 
 internal class HomeWorldUpdateInFlightException : IllegalStateException(
     "A Home World update is already in progress"
+)
+
+private data class PendingHomeWorldUpdate(
+    val user: CurrentUpdateUserData,
+    val stateRevision: Long,
 )
 
 /** Updates the authenticated user's Home World without allowing stale sessions to publish state. */
@@ -51,45 +65,98 @@ internal class HomeWorldService(
         }
     }
 
-    override suspend fun updateHomeWorld(worldId: String?): Result<String> {
-        val homeLocation = when {
-            worldId == null -> ""
-            isWorldId(worldId) -> worldId.trim()
-            else -> return Result.failure(InvalidHomeWorldException())
+    override suspend fun setHomeWorld(worldId: String): Result<String> {
+        if (!isWorldId(worldId)) return Result.failure(InvalidHomeWorldException())
+        return updateHomeLocation(worldId.trim())
+    }
+
+    override suspend fun resetHomeWorld(
+        expectedWorldId: String,
+        expectedSessionToken: AccountSessionToken,
+    ): Result<String> {
+        if (!isWorldId(expectedWorldId)) {
+            return Result.failure(InvalidHomeWorldException())
         }
+        return updateHomeLocation(
+            homeLocation = "",
+            expectedWorldId = expectedWorldId.trim(),
+            expectedSessionToken = expectedSessionToken,
+        )
+    }
+
+    private suspend fun updateHomeLocation(
+        homeLocation: String,
+        expectedWorldId: String? = null,
+        expectedSessionToken: AccountSessionToken? = null,
+    ): Result<String> {
         if (!updateInFlight.compareAndSet(expect = false, update = true)) {
             return Result.failure(HomeWorldUpdateInFlightException())
         }
         return try {
-            performHomeWorldUpdate(homeLocation)
+            performHomeWorldUpdate(
+                homeLocation = homeLocation,
+                expectedWorldId = expectedWorldId,
+                expectedSessionToken = expectedSessionToken,
+            )
         } finally {
             updateInFlight.value = false
         }
     }
 
-    private suspend fun performHomeWorldUpdate(homeLocation: String): Result<String> {
-        val session = SharedFlowCentre.currentSession.value
+    private suspend fun performHomeWorldUpdate(
+        homeLocation: String,
+        expectedWorldId: String?,
+        expectedSessionToken: AccountSessionToken?,
+    ): Result<String> {
+        val expectedUserId = expectedSessionToken?.userId
+            ?: SharedFlowCentre.currentSession.value?.account?.userId
             ?: return Result.failure(HomeWorldSessionChangedException())
-        val response = authService.runSessionBoundCatching(session.token) {
-            usersApi.updateUserInfo(
-                userId = session.account.userId,
-                updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
-            )
+        val response = authService.runSessionBoundCatchingForUser(expectedUserId) { activeSessionToken ->
+            authService.withHomeWorldMutation {
+                if (expectedSessionToken != null &&
+                    activeSessionToken.userId != expectedUserId
+                ) {
+                    throw HomeWorldSessionChangedException()
+                }
+                val stateRevision = when (val state = authService.homeWorldMutationState(
+                    sessionToken = activeSessionToken,
+                    expectedWorldId = expectedWorldId,
+                )) {
+                    is HomeWorldMutationState.Ready -> state.revision
+                    HomeWorldMutationState.SessionChanged ->
+                        throw HomeWorldSessionChangedException()
+                    HomeWorldMutationState.HomeWorldChanged ->
+                        throw HomeWorldStateChangedException()
+                }
+                PendingHomeWorldUpdate(
+                    user = usersApi.updateUserInfo(
+                        userId = activeSessionToken.userId,
+                        updateUserInfoData = UpdateUserInfoData(homeLocation = homeLocation),
+                    ),
+                    stateRevision = stateRevision,
+                )
+            }
         } ?: return Result.failure(HomeWorldSessionChangedException())
 
-        return response.result.mapCatching { updatedUser ->
-            check(updatedUser.id == response.sessionToken.userId) {
-                "Home World update returned a different user"
-            }
-            if (!authService.applyCurrentUserHomeLocation(
+        return authService.withHomeWorldMutation {
+            response.result.mapCatching { pendingUpdate ->
+                val updatedUser = pendingUpdate.user
+                check(updatedUser.id == response.sessionToken.userId) {
+                    "Home World update returned a different user"
+                }
+                when (authService.commitHomeWorldMutationLocked(
                     sessionToken = response.sessionToken,
                     userId = updatedUser.id,
+                    expectedRevision = pendingUpdate.stateRevision,
                     homeLocation = updatedUser.homeLocation,
-                )
-            ) {
-                throw HomeWorldSessionChangedException()
+                )) {
+                    HomeWorldMutationCommitResult.Applied -> updatedUser.homeLocation
+                    HomeWorldMutationCommitResult.SessionChanged ->
+                        throw HomeWorldSessionChangedException()
+                    HomeWorldMutationCommitResult.StateChanged ->
+                        throw HomeWorldStateChangedException()
+                }
             }
-            updatedUser.homeLocation
         }
     }
 }

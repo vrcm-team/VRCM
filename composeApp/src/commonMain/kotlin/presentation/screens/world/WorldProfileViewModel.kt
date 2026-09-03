@@ -32,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.HomeWorldManager
 import io.github.vrcmteam.vrcm.service.HomeWorldSessionChangedException
+import io.github.vrcmteam.vrcm.service.HomeWorldStateChangedException
 import io.github.vrcmteam.vrcm.service.HomeWorldUserContext
 import io.github.vrcmteam.vrcm.service.InstanceCreationResult
 import io.github.vrcmteam.vrcm.service.InstanceCreationService
@@ -57,10 +58,22 @@ internal enum class HomeWorldActionAvailability {
     Current,
 }
 
+internal enum class HomeWorldAction {
+    Set,
+    Reset,
+}
+
 internal data class HomeWorldActionState(
     val availability: HomeWorldActionAvailability = HomeWorldActionAvailability.Unavailable,
     val isUpdating: Boolean = false,
-)
+) {
+    val action: HomeWorldAction?
+        get() = when (availability) {
+            HomeWorldActionAvailability.Unavailable -> null
+            HomeWorldActionAvailability.CanSet -> HomeWorldAction.Set
+            HomeWorldActionAvailability.Current -> HomeWorldAction.Reset
+        }
+}
 
 internal sealed interface HomeWorldNotice {
     data object Set : HomeWorldNotice
@@ -332,22 +345,44 @@ class WorldProfileScreenModel internal constructor(
     internal fun dismissWorldPersistenceDeletion() = worldPersistence.dismissDeletionConfirmation()
 
     internal fun confirmWorldPersistenceDeletion() = worldPersistence.confirmDeletion()
-    internal fun updateHomeWorld() {
+    internal fun updateHomeWorld(action: HomeWorldAction) {
         val worldId = worldProfileState.value?.worldId ?: return
-        val reset = when (homeWorldActionState.value.availability) {
-            HomeWorldActionAvailability.CanSet -> false
-            HomeWorldActionAvailability.Current -> true
-            HomeWorldActionAvailability.Unavailable -> return
+        val availability = homeWorldActionState.value.availability
+        if (availability == HomeWorldActionAvailability.Unavailable ||
+            action == HomeWorldAction.Reset && availability != HomeWorldActionAvailability.Current
+        ) {
+            return
         }
         if (!isUpdatingHomeWorld.compareAndSet(expect = false, update = true)) return
 
+        val resetSessionToken = if (action == HomeWorldAction.Reset) {
+            currentHomeWorldUser.value
+                ?.takeIf { it.homeLocation == worldId }
+                ?.sessionToken
+        } else {
+            null
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                homeWorldManager.updateHomeWorld(worldId.takeUnless { reset })
+                val result = when (action) {
+                    HomeWorldAction.Set -> homeWorldManager.setHomeWorld(worldId)
+                    HomeWorldAction.Reset -> resetSessionToken?.let { sessionToken ->
+                        homeWorldManager.resetHomeWorld(
+                            expectedWorldId = worldId,
+                            expectedSessionToken = sessionToken,
+                        )
+                    } ?: Result.failure(HomeWorldStateChangedException())
+                }
+                result
                     .onSuccess {
                         if (_worldProfileState.value?.worldId == worldId) {
                             _homeWorldNotices.emit(
-                                if (reset) HomeWorldNotice.Reset else HomeWorldNotice.Set
+                                if (action == HomeWorldAction.Reset) {
+                                    HomeWorldNotice.Reset
+                                } else {
+                                    HomeWorldNotice.Set
+                                }
                             )
                         }
                     }
