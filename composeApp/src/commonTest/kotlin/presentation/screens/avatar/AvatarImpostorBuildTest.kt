@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableDeferred
@@ -203,6 +204,7 @@ class AvatarImpostorBuildTest : MainDispatcherTest() {
             favoriteEntrySource = EmptyFavoriteSource,
             requestDispatcher = Dispatchers.Unconfined,
             favoriteSession = session,
+            avatarImpostorDeletionSource = EmptyDeletionSourceForBuildTest,
             avatarImpostorBuilder = builder,
         ).also(models::add)
         model.refreshAvatarData(AvatarProfileVo(avatarId = avatar.id))
@@ -277,6 +279,18 @@ private data object EmptyFavoriteSource : FavoriteEntrySource {
     ): StateFlow<Map<FavoriteGroupData, List<FavoriteData>>> = favorites
 
     override suspend fun load(type: FavoriteType): Result<Unit> = Result.success(Unit)
+}
+
+private data object EmptyDeletionSourceForBuildTest : AvatarImpostorDeletionSource {
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? = null
+
+    override suspend fun load(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<AvatarData>? = null
 }
 
 private fun avatar(hasImpostor: Boolean): AvatarData = AvatarData(

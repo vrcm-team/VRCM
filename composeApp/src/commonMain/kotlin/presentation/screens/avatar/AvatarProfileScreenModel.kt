@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.hasImpostor
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
@@ -207,6 +208,7 @@ class AvatarProfileScreenModel internal constructor(
     favoriteEntrySource: FavoriteEntrySource,
     private val requestDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val avatarEditor: AvatarEditor? = null,
+    avatarImpostorDeletionSource: AvatarImpostorDeletionSource,
     private val favoriteSession: StateFlow<AuthenticatedAccount?> = SharedFlowCentre.currentSession,
     private val avatarImpostorBuilder: AvatarImpostorBuilder? = null,
     avatarGalleryLoader: AvatarGalleryLoader? = null,
@@ -214,6 +216,18 @@ class AvatarProfileScreenModel internal constructor(
 
     private val _avatarProfileState = MutableStateFlow<AvatarProfileVo?>(null)
     val avatarProfileState: StateFlow<AvatarProfileVo?> = _avatarProfileState.asStateFlow()
+
+    private val impostorDeletion = AvatarImpostorDeletionStateModel(
+        source = avatarImpostorDeletionSource,
+        scope = viewModelScope,
+        onAvatarReloaded = { updated -> _avatarProfileState.value = AvatarProfileVo(updated) },
+        requestDispatcher = requestDispatcher,
+        sessionFlow = favoriteSession,
+    )
+    internal val impostorDeletionState: StateFlow<AvatarImpostorDeletionUiState> =
+        impostorDeletion.state
+    internal val impostorDeletionNotices: SharedFlow<AvatarImpostorDeletionNotice> =
+        impostorDeletion.notices
 
     private val favoriteEntry = FavoriteEntryStateModel(
         favoriteType = FavoriteType.Avatar,
@@ -369,6 +383,7 @@ class AvatarProfileScreenModel internal constructor(
             impostorOperation.value = AvatarImpostorOperation()
         }
         validation.value = AvatarValidation.Checking
+        impostorDeletion.clearTarget()
         _avatarProfileState.value = avatarProfileVo
         val avatarId = avatarProfileVo.avatarId
         avatarGallery?.showAvatar(avatarId)
@@ -384,6 +399,11 @@ class AvatarProfileScreenModel internal constructor(
                 .onSuccess { avatarData ->
                     if (requestToken == latestRequestToken.value) {
                         _avatarProfileState.value = AvatarProfileVo(avatarData)
+                        impostorDeletion.setTarget(
+                            avatarId = avatarData.id,
+                            authorId = avatarData.authorId,
+                            hasImpostor = avatarData.hasImpostor,
+                        )
                         validation.value = AvatarValidation.Available
                     }
                 }
@@ -675,6 +695,10 @@ class AvatarProfileScreenModel internal constructor(
         _notices.tryEmit(AvatarProfileNotice.CoverSaved)
         return true
     }
+
+    internal fun deleteImpostor(): Boolean = impostorDeletion.delete()
+
+    internal fun retryImpostorVerification(): Boolean = impostorDeletion.retryVerification()
 
     private fun editableTarget(avatar: AvatarProfileVo): AvatarEditTarget? {
         val userId = currentUser.value?.userId ?: return null

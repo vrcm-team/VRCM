@@ -15,12 +15,14 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarCoverLimits
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarEditor
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarImpostorBuilder
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
@@ -161,6 +163,7 @@ val presentationModule: Module = module {
     singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class
     singleOf(::NetworkAvatarSelector) bind AvatarSelector::class
     singleOf(::NetworkAvatarEditor) bind AvatarEditor::class
+    singleOf(::NetworkAvatarImpostorDeletionSource) bind AvatarImpostorDeletionSource::class
     singleOf(::NetworkAvatarImpostorBuilder) bind AvatarImpostorBuilder::class
     singleOf(::NetworkWorldEditor) bind WorldEditor::class
     viewModel {
@@ -171,6 +174,7 @@ val presentationModule: Module = module {
             avatarEditor = get(),
             avatarImpostorBuilder = get(),
             avatarGalleryLoader = get(),
+            avatarImpostorDeletionSource = get(),
         )
     }
     viewModelOf(::RecentWorldsScreenModel)

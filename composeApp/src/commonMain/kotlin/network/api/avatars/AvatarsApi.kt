@@ -22,6 +22,10 @@ class AvatarsApi(private val client: HttpClient) {
     suspend fun selectAvatar(avatarId: String): AvatarSelectionData =
         client.put("$AVATARS_API_PREFIX/$avatarId/select").checkSuccess()
 
+    suspend fun deleteImpostor(avatarId: String) {
+        client.delete("$AVATARS_API_PREFIX/$avatarId/impostor").checkSuccess { Unit }
+    }
+
     suspend fun updateAvatar(avatarId: String, update: AvatarUpdateData): AvatarData =
         client.put("$AVATARS_API_PREFIX/$avatarId") {
             contentType(ContentType.Application.Json)

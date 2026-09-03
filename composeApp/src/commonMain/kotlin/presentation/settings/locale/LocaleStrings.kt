@@ -679,7 +679,21 @@ sealed class LocaleStrings {
     open val avatarEditFileTooLarge: String = "The selected cover exceeds 10 MiB."
     open val avatarEditReadFailed: String = "Failed to read the selected cover image."
     open val avatarImpostorTitle: String = "Impostor"
-    open val avatarImpostorAvailable: String = "Impostor available"
+    open val avatarImpostorAvailable: String = "This avatar has a generated Impostor."
+    open val avatarImpostorEmpty: String = "This avatar has no generated Impostor."
+    open val avatarImpostorDeleteAction: String = "Delete Impostor"
+    open val avatarImpostorDeleting: String = "Deleting Impostor..."
+    open val avatarImpostorVerifying: String = "Checking server status..."
+    open val avatarImpostorDeleteConfirmationTitle: String = "Delete this Impostor?"
+    open val avatarImpostorDeleteConfirmationMessage: String =
+        "Delete the generated Impostor for \"%name%\"? This cannot be undone. " +
+            "The avatar and its Unity packages will not be deleted."
+    open val avatarImpostorDeleteSuccess: String = "Impostor deleted."
+    open val avatarImpostorDeleteFailed: String =
+        "VRChat still reports this Impostor, or the deletion failed. Try again."
+    open val avatarImpostorVerificationFailed: String =
+        "The deletion was accepted, but its server status could not be checked."
+    open val avatarImpostorRetryVerification: String = "Check Impostor status again"
     open val avatarImpostorUnavailable: String = "No Impostor generated"
     open val avatarImpostorTaskStatus: String = "Generation task"
     open val avatarImpostorTaskEmpty: String = "No task submitted in this session"

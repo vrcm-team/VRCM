@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarImpostorDeletionSource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarGalleryLoader
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreenModel
@@ -31,6 +32,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.DecodeRequest
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageProcessor
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardState
 import io.github.vrcmteam.vrcm.service.meetup.MeetupPhotoCandidate
@@ -97,6 +99,7 @@ class PresentationModuleTest : MainDispatcherTest() {
                     }
                     single<AvatarSelector> { EmptyAvatarSelector }
                     single<AvatarEditor> { EmptyAvatarEditor }
+                    single<AvatarImpostorDeletionSource> { EmptyAvatarImpostorDeletionSource }
                     single<AvatarImpostorBuilder> { EmptyAvatarImpostorBuilder }
                     single<FavoriteEntrySource> { EmptyFavoriteEntrySource }
                 },
@@ -251,6 +254,18 @@ private data object EmptyAvatarEditor : AvatarEditor {
         avatarId: String,
         imageUrl: String,
     ): Result<AvatarData> = Result.failure(IllegalStateException("unused"))
+}
+
+private data object EmptyAvatarImpostorDeletionSource : AvatarImpostorDeletionSource {
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? = null
+
+    override suspend fun load(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<AvatarData>? = null
 }
 
 private data object EmptyAvatarImpostorBuilder : AvatarImpostorBuilder {

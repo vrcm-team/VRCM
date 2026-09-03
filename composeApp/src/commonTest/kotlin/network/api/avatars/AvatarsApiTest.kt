@@ -119,6 +119,29 @@ class AvatarsApiTest {
     }
 
     @Test
+    fun deleteImpostorUsesDeleteAndAcceptsAnEmptySuccessBody() = runBlocking {
+        var method: HttpMethod? = null
+        var path: String? = null
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    method = request.method
+                    path = request.url.encodedPath
+                    respond(content = "", status = HttpStatusCode.OK)
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        AvatarsApi(client).deleteImpostor("avtr_owned")
+
+        assertEquals(HttpMethod.Delete, method)
+        assertEquals("/api/1/avatars/avtr_owned/impostor", path)
+        client.close()
+    }
+
+    @Test
     fun impostorCreationUsesEnqueueAndReadsAuthoritativeQueueData() = runBlocking {
         val requests = mutableListOf<Pair<HttpMethod, String>>()
         val client = HttpClient(MockEngine) {
