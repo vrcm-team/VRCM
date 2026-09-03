@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -82,6 +84,15 @@ internal fun AvatarActionAvailability.localizedButtonText(locale: LocaleStrings)
     AvatarActionAvailability.CheckFailed -> locale.avatarProfileActionCheckFailed
 }
 
+internal fun AvatarImpostorDeletionNotice.localizedToast(locale: LocaleStrings): ToastText =
+    when (this) {
+        AvatarImpostorDeletionNotice.Deleted -> ToastText.Success(locale.avatarImpostorDeleteSuccess)
+        AvatarImpostorDeletionNotice.DeleteFailed ->
+            ToastText.Error(locale.avatarImpostorDeleteFailed)
+        AvatarImpostorDeletionNotice.VerificationFailed ->
+            ToastText.Error(locale.avatarImpostorVerificationFailed)
+    }
+
 @Serializable
 class AvatarProfileScreen(
     private val avatarProfileVo: AvatarProfileVo,
@@ -99,14 +110,21 @@ class AvatarProfileScreen(
         val refreshedAvatar by screenModel.avatarProfileState.collectAsState()
         val actionState by screenModel.actionState.collectAsState()
         val editState by screenModel.editState.collectAsState()
+        val impostorDeletionState by screenModel.impostorDeletionState.collectAsState()
         val avatarCoverUpdates by editorSessionStore.avatarCoverUpdates.collectAsState()
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
+        var showImpostorDeletionConfirmation by remember { mutableStateOf(false) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
+                SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
+            }
+        }
+        LaunchedEffect(screenModel, locale) {
+            screenModel.impostorDeletionNotices.collect { notice ->
                 SharedFlowCentre.toastText.emit(notice.localizedToast(locale))
             }
         }
@@ -117,6 +135,20 @@ class AvatarProfileScreen(
 
         LaunchedEffect(editState.canEdit) {
             if (!editState.canEdit) showEditSheet = false
+        }
+        LaunchedEffect(
+            impostorDeletionState.isAvailable,
+            impostorDeletionState.hasImpostor,
+            impostorDeletionState.deleteFailed,
+            impostorDeletionState.verificationFailed,
+        ) {
+            if (!impostorDeletionState.isAvailable ||
+                !impostorDeletionState.hasImpostor ||
+                impostorDeletionState.deleteFailed ||
+                impostorDeletionState.verificationFailed
+            ) {
+                showImpostorDeletionConfirmation = false
+            }
         }
 
         val displayedAvatar = refreshedAvatar ?: avatarProfileVo
@@ -152,6 +184,9 @@ class AvatarProfileScreen(
                     onRetryFavorite = screenModel::retryFavoriteEntryLoad,
                     canEdit = editState.canEdit,
                     onEdit = { showEditSheet = true },
+                    impostorDeletionState = impostorDeletionState,
+                    onDeleteImpostor = { showImpostorDeletionConfirmation = true },
+                    onRetryImpostorVerification = screenModel::retryImpostorVerification,
                 )
             }
         }
@@ -182,6 +217,18 @@ class AvatarProfileScreen(
                 },
             )
         }
+        if (showImpostorDeletionConfirmation &&
+            impostorDeletionState.isAvailable &&
+            impostorDeletionState.hasImpostor
+        ) {
+            AvatarImpostorDeletionConfirmationDialog(
+                avatarName = displayedAvatar.avatarName,
+                isDeleting = impostorDeletionState.isBusy,
+                enabled = impostorDeletionState.canDelete,
+                onDismiss = { showImpostorDeletionConfirmation = false },
+                onConfirm = { screenModel.deleteImpostor() },
+            )
+        }
     }
 }
 
@@ -197,6 +244,9 @@ private fun AvatarProfileContent(
     onRetryFavorite: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
+    impostorDeletionState: AvatarImpostorDeletionUiState,
+    onDeleteImpostor: () -> Unit,
+    onRetryImpostorVerification: () -> Unit,
 ) {
     val navigator = currentNavigator
 
@@ -283,6 +333,15 @@ private fun AvatarProfileContent(
         Spacer(Modifier.height(12.dp))
     }
 
+    if (impostorDeletionState.isAvailable) {
+        AvatarImpostorDeletionSection(
+            state = impostorDeletionState,
+            onDelete = onDeleteImpostor,
+            onRetryVerification = onRetryImpostorVerification,
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+
     // 描述
     if (avatarProfileVo.avatarDescription.isNotBlank()) {
         Surface(
@@ -315,6 +374,120 @@ private fun AvatarProfileContent(
         AvatarPlatformSection(knownPlatforms)
     }
 
+}
+
+@Composable
+private fun AvatarImpostorDeletionSection(
+    state: AvatarImpostorDeletionUiState,
+    onDelete: () -> Unit,
+    onRetryVerification: () -> Unit,
+) {
+    Text(
+        text = strings.avatarImpostorTitle,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = when {
+            state.verificationFailed -> strings.avatarImpostorVerificationFailed
+            state.deleteFailed -> strings.avatarImpostorDeleteFailed
+            state.hasImpostor -> strings.avatarImpostorAvailable
+            else -> strings.avatarImpostorEmpty
+        },
+        color = if (state.deleteFailed || state.verificationFailed) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    if (state.hasImpostor) {
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = if (state.verificationFailed) onRetryVerification else onDelete,
+            enabled = state.canDelete || state.canRetryVerification,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isBusy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                when {
+                    state.phase == AvatarImpostorDeletionPhase.Deleting ->
+                        strings.avatarImpostorDeleting
+                    state.phase == AvatarImpostorDeletionPhase.Verifying ->
+                        strings.avatarImpostorVerifying
+                    state.verificationFailed -> strings.avatarImpostorRetryVerification
+                    else -> strings.avatarImpostorDeleteAction
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AvatarImpostorDeletionConfirmationDialog(
+    avatarName: String,
+    isDeleting: Boolean,
+    enabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.DeleteOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.avatarImpostorDeleteConfirmationTitle) },
+        text = {
+            Text(strings.avatarImpostorDeleteConfirmationMessage.replace("%name%", avatarName))
+        },
+        confirmButton = {
+            Button(
+                enabled = enabled,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+                onClick = onConfirm,
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(strings.avatarImpostorDeleteAction)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isDeleting) {
+                Text(strings.cancel)
+            }
+        },
+    )
 }
 
 @Composable

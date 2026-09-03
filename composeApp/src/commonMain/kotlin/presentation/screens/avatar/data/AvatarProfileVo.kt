@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar.data
 
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.hasImpostor
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -18,6 +19,7 @@ data class AvatarProfileVo(
     val updatedAt: String? = null,
     val version: Int? = null,
     val platformInfos: List<AvatarPlatformInfo> = emptyList(),
+    val hasImpostor: Boolean = false,
 ) {
     constructor(avatar: AvatarData) : this(
         avatarId = avatar.id,
@@ -38,7 +40,8 @@ data class AvatarProfileVo(
                 unityVersion = pkg.unityVersion,
                 performanceRating = pkg.performanceRating,
             )
-        }.distinctBy { "${it.platform}/${it.unityVersion}" }
+        }.distinctBy { "${it.platform}/${it.unityVersion}" },
+        hasImpostor = avatar.hasImpostor,
     )
 }
 

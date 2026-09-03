@@ -613,6 +613,21 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val avatarEditUnsupportedFormat = "画像形式が未対応か、拡張子と内容が一致しません。有効な JPEG、PNG、WebP を選択してください"
     override val avatarEditFileTooLarge = "選択したカバー画像は 10 MiB を超えています"
     override val avatarEditReadFailed = "選択したカバー画像を読み込めませんでした"
+    override val avatarImpostorTitle = "Impostor"
+    override val avatarImpostorAvailable = "このアバターには生成済みの Impostor があります"
+    override val avatarImpostorEmpty = "このアバターには生成済みの Impostor がありません"
+    override val avatarImpostorDeleteAction = "Impostor を削除"
+    override val avatarImpostorDeleting = "Impostor を削除しています..."
+    override val avatarImpostorVerifying = "サーバーの状態を確認しています..."
+    override val avatarImpostorDeleteConfirmationTitle = "この Impostor を削除しますか？"
+    override val avatarImpostorDeleteConfirmationMessage =
+        "「%name%」の生成済み Impostor を削除しますか？この操作は元に戻せません。アバターと Unity パッケージは削除されません。"
+    override val avatarImpostorDeleteSuccess = "Impostor を削除しました"
+    override val avatarImpostorDeleteFailed =
+        "VRChat 上に Impostor が残っているか、削除に失敗しました。もう一度お試しください"
+    override val avatarImpostorVerificationFailed =
+        "削除は受け付けられましたが、サーバーの状態を確認できませんでした"
+    override val avatarImpostorRetryVerification = "Impostor の状態を再確認"
     override val hiddenModel = "非公開モデル"
     override val hiddenModelCannotView = "非公開モデルの情報は表示できません"
     override val hiddenWorld = "非公開ワールド"

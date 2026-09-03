@@ -16,6 +16,7 @@ import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStringsEn
+import io.github.vrcmteam.vrcm.service.SessionBoundResponse
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.coroutines.CompletableDeferred
@@ -607,6 +608,7 @@ class AvatarProfileRequestTest : MainDispatcherTest() {
             favoriteSource,
             Dispatchers.Unconfined,
             editor,
+            EmptyAvatarImpostorDeletionSource,
             favoriteSession,
         )
             .also(models::add)
@@ -810,4 +812,16 @@ private class FakeAvatarEditor : AvatarEditor {
         metadata.complete(result)
     }
 
+}
+
+private data object EmptyAvatarImpostorDeletionSource : AvatarImpostorDeletionSource {
+    override suspend fun delete(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<Unit>? = null
+
+    override suspend fun load(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+    ): SessionBoundResponse<AvatarData>? = null
 }
