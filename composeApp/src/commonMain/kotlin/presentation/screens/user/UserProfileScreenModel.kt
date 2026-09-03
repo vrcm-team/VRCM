@@ -838,36 +838,33 @@ class UserProfileScreenModel(
                 avatarCopyingPrivacyStateMachine.abandon(request)
                 return@launch
             }
-            response.result
-                .mapCatching { updatedUser ->
-                    check(updatedUser.id == response.sessionToken.userId) {
-                        "Profile update returned a different user"
-                    }
-                    check(updatedUser.allowAvatarCopying == isAllowed) {
-                        "Profile update did not apply the requested privacy value"
-                    }
-                    updatedUser.allowAvatarCopying
+            val updateResult = response.result.mapCatching { updatedUser ->
+                check(updatedUser.id == response.sessionToken.userId) {
+                    "Profile update returned a different user"
                 }
-                .fold(
-                    onSuccess = { acceptedValue ->
-                        if (!authService.applyAvatarCopyingUpdate(
-                                sessionToken = response.sessionToken,
-                                allowAvatarCopying = acceptedValue,
-                            )
-                        ) {
-                            avatarCopyingPrivacyStateMachine.abandon(request)
-                            return@fold
-                        }
-                        if (avatarCopyingPrivacyStateMachine.completeUpdate(request, acceptedValue)) {
-                            SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-                        }
-                    },
-                    onFailure = { error ->
-                        if (avatarCopyingPrivacyStateMachine.failUpdate(request)) {
-                            handleError(error)
-                        }
-                    },
+                check(updatedUser.allowAvatarCopying == isAllowed) {
+                    "Profile update did not apply the requested privacy value"
+                }
+                updatedUser.allowAvatarCopying
+            }
+            updateResult.exceptionOrNull()?.let { error ->
+                if (avatarCopyingPrivacyStateMachine.failUpdate(request)) {
+                    handleError(error)
+                }
+                return@launch
+            }
+            val acceptedValue = updateResult.getOrThrow()
+            if (!authService.applyAvatarCopyingUpdate(
+                    sessionToken = response.sessionToken,
+                    allowAvatarCopying = acceptedValue,
                 )
+            ) {
+                avatarCopyingPrivacyStateMachine.abandon(request)
+                return@launch
+            }
+            if (avatarCopyingPrivacyStateMachine.completeUpdate(request, acceptedValue)) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }
         }
     }
 
