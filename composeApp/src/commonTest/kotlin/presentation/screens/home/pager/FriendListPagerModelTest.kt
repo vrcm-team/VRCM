@@ -542,6 +542,103 @@ class FriendListPagerModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun batchRemovalReauthenticatesOnceAndRetriesOnlyUnauthorizedFriends() = runBlocking {
+        SharedFlowCentre.emitLogout()
+        val account = AccountDto(
+            userId = "usr_batch_auth_owner",
+            username = "batch-auth-owner",
+            password = "batch-auth-password",
+        )
+        SharedFlowCentre.emitAuthenticated(account)
+        val initialSession = assertNotNull(SharedFlowCentre.currentSession.value)
+        val json = Json { ignoreUnknownKeys = true }
+        val succeededId = "usr_batch_auth_succeeded"
+        val unauthorizedId = "usr_batch_auth_unauthorized"
+        val failedId = "usr_batch_auth_failed"
+        val friendIds = listOf(succeededId, unauthorizedId, failedId)
+        val requestCounts = friendIds.associateWith { atomic(0) }
+        val authenticationRequests = atomic(0)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete && path.startsWith("/auth/user/friends/") -> {
+                            val userId = path.substringAfterLast('/')
+                            val attempt = requestCounts.getValue(userId).incrementAndGet()
+                            when {
+                                userId == unauthorizedId && attempt == 1 ->
+                                    respond("expired", HttpStatusCode.Unauthorized)
+                                userId == failedId ->
+                                    respond("failed", HttpStatusCode.InternalServerError)
+                                else -> jsonResponse(successResponseJson())
+                            }
+                        }
+                        path == "/auth/user/friends" -> {
+                            val offset = request.url.parameters["offset"]?.toIntOrNull() ?: 0
+                            val offline = request.url.parameters["offline"] == "true"
+                            val friends = if (!offline && offset == 0) {
+                                listOf(cachedFriend(failedId, "Failed Batch Friend", UserStatus.Active))
+                            } else {
+                                emptyList()
+                            }
+                            jsonResponse(json.encodeToString(friends))
+                        }
+                        path == "/auth/user/favoritelimits" -> jsonResponse(favoriteLimitsJson())
+                        path == "/favorites" || path == "/favorite/groups" -> jsonResponse("[]")
+                        path == "/auth/user" -> {
+                            if (request.headers[HttpHeaders.Authorization] != null) {
+                                authenticationRequests.incrementAndGet()
+                            }
+                            jsonResponse(currentUserJson(account))
+                        }
+                        else -> error("Unexpected request: ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(json) }
+        }
+        val fixture = createRemovalFixture(account, client, json)
+
+        try {
+            fixture.model.activateFriendDirectory()
+            friendIds.forEach { userId ->
+                emitFriendUntilObserved(
+                    fixture.friendService,
+                    initialSession,
+                    userId,
+                    activeFriendEvent(json, userId, "Batch Auth Friend"),
+                )
+            }
+            awaitFriendIds(fixture.model, friendIds.toSet())
+
+            fixture.model.enterFriendSelectionMode()
+            fixture.model.toggleVisibleFriendSelection(friendIds.toSet())
+            fixture.model.requestFriendRemovalConfirmation()
+            fixture.model.confirmFriendRemoval()
+            awaitUntil {
+                val state = fixture.model.friendRemovalState.value
+                !state.isSubmitting && state.completedCount == friendIds.size
+            }
+
+            val renewedSession = assertNotNull(SharedFlowCentre.currentSession.value)
+            assertFalse(renewedSession.token == initialSession.token)
+            assertEquals(1, authenticationRequests.value)
+            assertEquals(1, requestCounts.getValue(succeededId).value)
+            assertEquals(2, requestCounts.getValue(unauthorizedId).value)
+            assertEquals(1, requestCounts.getValue(failedId).value)
+            val state = fixture.model.friendRemovalState.value
+            assertEquals(2, state.successCount)
+            assertEquals(1, state.failureCount)
+            assertEquals(setOf(failedId), state.selectedUserIds)
+            assertEquals(setOf(failedId), fixture.friendService.friendState.value.keys)
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
     fun accountSwitchCancelsRemovalAndRejectsLateSuccess() = runBlocking {
         SharedFlowCentre.emitLogout()
         val accountA = AccountDto(userId = "usr_removal_owner_a", username = "removal-owner-a")
@@ -676,7 +773,10 @@ class FriendListPagerModelTest : MainDispatcherTest() {
                 activeFriendEvent(json, oldFriendId, "Old Auth Friend"),
             )
             val removal = async {
-                fixture.friendService.unfriendBatch(listOf(oldFriendId)).getValue(oldFriendId)
+                fixture.friendService.unfriendBatch(sessionA.token, listOf(oldFriendId))
+                    ?.results
+                    ?.getValue(oldFriendId)
+                    ?: Result.failure(IllegalStateException("Session changed"))
             }
             withTimeout(3_000) { firstDeleteStarted.await() }
 

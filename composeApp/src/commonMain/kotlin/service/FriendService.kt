@@ -23,6 +23,7 @@ import io.github.vrcmteam.vrcm.storage.FriendListCacheStore
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
 import io.github.vrcmteam.vrcm.storage.data.FriendListCache
+import io.ktor.http.HttpStatusCode
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -56,6 +57,11 @@ import kotlinx.serialization.json.Json
 import org.koin.core.logger.Logger
 
 internal const val MAX_CONCURRENT_FRIEND_REMOVALS = 3
+
+internal data class FriendRemovalBatchResponse(
+    val results: Map<String, Result<VRChatResponse>>,
+    val sessionToken: AccountSessionToken,
+)
 
 class FriendService(
     private val friendsApi: FriendsApi,
@@ -681,49 +687,78 @@ class FriendService(
         return result
     }
 
-    /** Runs one account-bound group while preserving independent results for each friend. */
+    /**
+     * Runs one account-bound group and returns the exact session that owns its item results.
+     *
+     * A batch may renew authentication once. Successful and non-auth failures are retained, while
+     * only requests that returned 401 are retried under the renewed session.
+     */
     internal suspend fun unfriendBatch(
+        sessionToken: AccountSessionToken,
         requestedUserIds: List<String>,
-    ): Map<String, Result<VRChatResponse>> {
+    ): FriendRemovalBatchResponse? {
         val userIds = requestedUserIds.distinct()
-        if (userIds.isEmpty()) return emptyMap()
         require(userIds.size <= MAX_CONCURRENT_FRIEND_REMOVALS)
-        val sessionToken = synchronized(friendMapLock) { activeSessionToken }
-            ?: return friendSessionChangedResults(userIds)
         if (!isCurrentSession(sessionToken)) {
-            return friendSessionChangedResults(userIds)
+            return null
         }
+        if (userIds.isEmpty()) return FriendRemovalBatchResponse(emptyMap(), sessionToken)
 
+        val completedResults = mutableMapOf<String, Result<VRChatResponse>>()
+        var pendingUserIds = userIds
         val response = authService.runSessionBoundCatching(sessionToken) {
-            coroutineScope {
-                userIds.map { userId ->
-                    async {
-                        userId to try {
-                            Result.success(friendsApi.unfriend(userId))
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (error: Throwable) {
-                            Result.failure(error)
-                        }
-                    }
-                }.awaitAll().toMap()
+            val attemptResults = requestUnfriendBatch(pendingUserIds)
+            val unauthorizedUserIds = mutableListOf<String>()
+            var unauthorizedError: Throwable? = null
+            attemptResults.forEach { (userId, result) ->
+                val error = result.exceptionOrNull()
+                if (error is VRCApiException &&
+                    error.code == HttpStatusCode.Unauthorized.value
+                ) {
+                    unauthorizedUserIds += userId
+                    if (unauthorizedError == null) unauthorizedError = error
+                } else {
+                    completedResults[userId] = result
+                }
             }
-        } ?: return friendSessionChangedResults(userIds)
-        val results = response.result.getOrElse { error ->
-            return userIds.associateWith { Result.failure(error) }
+            pendingUserIds = unauthorizedUserIds
+            unauthorizedError?.let { throw it }
+        } ?: return null
+        response.result.exceptionOrNull()?.let { error ->
+            pendingUserIds.forEach { userId ->
+                completedResults[userId] = Result.failure(error)
+            }
+        }
+        val missingResultError = IllegalStateException("Missing friend removal result")
+        val results = userIds.associateWith { userId ->
+            completedResults[userId] ?: Result.failure(missingResultError)
         }
         val activeSessionToken = resolveActiveFriendSession(response.sessionToken)
-            ?: return friendSessionChangedResults(userIds)
+            ?: return null
         val succeededUserIds = results.filterValues { it.isSuccess }.keys
         if (succeededUserIds.isNotEmpty() && !removeFriends(activeSessionToken, succeededUserIds)) {
-            return results.mapValues { (_, result) ->
-                if (result.isSuccess) friendSessionChangedResult() else result
-            }
+            return null
         }
         succeededUserIds.forEach { userId ->
             emitFriendUpdate(activeSessionToken, FriendUpdateEvent.Delete(userId))
         }
-        return results
+        return FriendRemovalBatchResponse(results, response.sessionToken)
+    }
+
+    private suspend fun requestUnfriendBatch(
+        userIds: List<String>,
+    ): Map<String, Result<VRChatResponse>> = coroutineScope {
+        userIds.map { userId ->
+            async {
+                userId to try {
+                    Result.success(friendsApi.unfriend(userId))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    Result.failure(error)
+                }
+            }
+        }.awaitAll().toMap()
     }
 }
 
@@ -732,10 +767,6 @@ private data object FriendSessionChangedException :
 
 private fun friendSessionChangedResult(): Result<VRChatResponse> =
     Result.failure(FriendSessionChangedException)
-
-private fun friendSessionChangedResults(
-    userIds: Collection<String>,
-): Map<String, Result<VRChatResponse>> = userIds.associateWith { friendSessionChangedResult() }
 
 data class FriendPresence(val location: String, val travelingToLocation: String = "")
 

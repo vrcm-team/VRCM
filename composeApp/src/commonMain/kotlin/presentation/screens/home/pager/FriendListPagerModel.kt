@@ -25,6 +25,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteService
+import io.github.vrcmteam.vrcm.service.FriendRemovalBatchResponse
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
 import io.github.vrcmteam.vrcm.service.MAX_CONCURRENT_FRIEND_REMOVALS
@@ -279,9 +280,11 @@ class FriendListPagerModel(
         refreshJobsByTab.clear()
         directoryRefreshJob?.cancel()
         directoryRefreshJob = null
-        friendRemovalJob?.cancel()
-        friendRemovalJob = null
-        _friendRemovalState.value = FriendRemovalState()
+        if (userChanged) {
+            friendRemovalJob?.cancel()
+            friendRemovalJob = null
+            _friendRemovalState.value = FriendRemovalState()
+        }
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
         if (userChanged) {
@@ -399,7 +402,6 @@ class FriendListPagerModel(
         val state = _friendRemovalState.value
         if (!state.selectionMode || state.isSubmitting || !state.confirmationVisible) return
         val sessionToken = activeSessionToken ?: return
-        val generation = accountGeneration
         val currentFriendIds = friendService.friendStateSnapshot.value.friendsForSession(sessionToken)
             .mapTo(mutableSetOf(), FriendData::id)
         val selectedUserIds = state.selectedUserIds.filter { it in currentFriendIds }
@@ -419,18 +421,31 @@ class FriendListPagerModel(
             results = emptyMap(),
         )
         friendRemovalJob = viewModelScope.launch(Dispatchers.IO) {
+            val accountUserId = sessionToken.userId
+            var requestSessionToken = sessionToken
             try {
                 selectedUserIds.chunked(MAX_CONCURRENT_FRIEND_REMOVALS).forEach { batch ->
-                    val batchResults = try {
-                        friendService.unfriendBatch(batch)
+                    val batchResponse = try {
+                        friendService.unfriendBatch(requestSessionToken, batch)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Throwable) {
-                        batch.associateWith { Result.failure(error) }
+                        FriendRemovalBatchResponse(
+                            results = batch.associateWith { Result.failure(error) },
+                            sessionToken = requestSessionToken,
+                        )
                     }
-                    if (!acceptsAccount(sessionToken, generation)) return@launch
+                    if (batchResponse == null ||
+                        !acceptsFriendRemovalResponse(accountUserId, batchResponse.sessionToken)
+                    ) {
+                        if (SharedFlowCentre.currentSession.value?.token?.userId == accountUserId) {
+                            _friendRemovalState.value = FriendRemovalState()
+                        }
+                        return@launch
+                    }
+                    requestSessionToken = batchResponse.sessionToken
                     batch.forEach { userId ->
-                        val result = batchResults[userId]
+                        val result = batchResponse.results[userId]
                             ?: Result.failure(IllegalStateException("Missing removal result"))
                         val itemResult = FriendRemovalResult(
                             userId = userId,
@@ -452,7 +467,7 @@ class FriendListPagerModel(
                     }
                 }
 
-                if (!acceptsAccount(sessionToken, generation)) return@launch
+                if (!acceptsFriendRemovalResponse(accountUserId, requestSessionToken)) return@launch
                 val completed = _friendRemovalState.value
                 val failedIds = completed.results.values
                     .filterNot(FriendRemovalResult::succeeded)
@@ -465,12 +480,18 @@ class FriendListPagerModel(
                 )
                 showFriendRemovalSummary(completed.successCount, completed.failureCount)
             } finally {
-                if (acceptsAccount(sessionToken, generation)) {
+                if (acceptsFriendRemovalResponse(accountUserId, requestSessionToken)) {
                     friendRemovalJob = null
                 }
             }
         }
     }
+
+    private fun acceptsFriendRemovalResponse(
+        accountUserId: String,
+        sessionToken: AccountSessionToken,
+    ): Boolean = sessionToken.userId == accountUserId &&
+        SharedFlowCentre.currentSession.value?.token == sessionToken
 
     private fun retainExistingFriendSelections(friendIds: Set<String>) {
         _friendRemovalState.update { state ->
