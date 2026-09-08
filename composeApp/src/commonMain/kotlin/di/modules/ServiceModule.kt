@@ -41,8 +41,6 @@ val serviceModule: Module = module {
     singleOf(::ImageInviteService) bind ImageInviteRemote::class
     single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
     singleOf(::InvitePhotoResponseService)
-    singleOf(::NetworkRequestInviteCall) bind RequestInviteCall::class
-    singleOf(::RequestInviteService)
     singleOf(::HomeWorldService) bind HomeWorldManager::class
     singleOf(::NetworkInstanceCreationRequest) bind InstanceCreationRequest::class
     singleOf(::InstanceCreationService)
