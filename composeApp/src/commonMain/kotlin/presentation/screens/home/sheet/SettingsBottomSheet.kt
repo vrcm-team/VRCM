@@ -28,6 +28,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionModel
 import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistenceDeletionState
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
@@ -314,6 +315,25 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
                 } else {
                     strings.stettingClipboardReading
                 },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    navigator push InviteMessageSlotsScreen
+                    onDismissRequest()
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "${strings.inviteMessageSlotsTitle}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = strings.inviteMessageSettingsSummary,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

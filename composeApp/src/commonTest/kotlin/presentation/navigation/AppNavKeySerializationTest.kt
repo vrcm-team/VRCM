@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRout
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -61,6 +62,7 @@ class AppNavKeySerializationTest {
             MeetupCardDisplayRoute(ownerUserId = "usr_test"),
             MeetupCardEditorRoute(ownerUserId = "usr_test"),
             NotificationSettingsScreen,
+            InviteMessageSlotsScreen,
             NotificationScreen(targetNotificationId = "notification_test"),
         )
 

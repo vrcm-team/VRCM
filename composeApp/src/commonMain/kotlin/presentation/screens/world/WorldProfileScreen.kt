@@ -122,7 +122,10 @@ class WorldProfileScreen(
         val localeStrings = strings
         val homeWorldActionState by screenModel.homeWorldActionState.collectAsState()
         val locale = localeStrings
-        var showHomeWorldConfirmation by remember { mutableStateOf(false) }
+        val displayedWorld = profileVoState ?: worldProfileVO
+        var pendingHomeWorldAction by remember(displayedWorld.worldId) {
+            mutableStateOf<HomeWorldAction?>(null)
+        }
         val metadataEditState by screenModel.metadataEditState.collectAsState()
         var showMetadataEditor by remember { mutableStateOf(false) }
         val imageEditState by screenModel.imageEditState.collectAsState()
@@ -181,7 +184,7 @@ class WorldProfileScreen(
 
         LaunchedEffect(homeWorldActionState.availability) {
             if (homeWorldActionState.availability == HomeWorldActionAvailability.Unavailable) {
-                showHomeWorldConfirmation = false
+                pendingHomeWorldAction = null
             }
         }
 
@@ -192,7 +195,6 @@ class WorldProfileScreen(
             if (!metadataEditState.canEdit) showMetadataEditor = false
         }
 
-        val displayedWorld = profileVoState ?: worldProfileVO
         LaunchedEffect(displayedWorld.worldId, worldCoverUpdates) {
             val update = worldCoverUpdates[displayedWorld.worldId]
                 ?: return@LaunchedEffect
@@ -221,7 +223,7 @@ class WorldProfileScreen(
                 isDeleted = deletionState.isDeleted,
                 onDelete = { screenModel.deleteWorld() },
                 homeWorldActionState = homeWorldActionState,
-                onHomeWorldClick = { showHomeWorldConfirmation = true },
+                onHomeWorldClick = { action -> pendingHomeWorldAction = action },
                 canEditImage = imageEditState.canEdit,
                 onEditImage = {
                     showMetadataEditor = false
@@ -237,11 +239,15 @@ class WorldProfileScreen(
             )
         }
 
-        if (showHomeWorldConfirmation) {
-            val resetHomeWorld = homeWorldActionState.availability == HomeWorldActionAvailability.Current
+        pendingHomeWorldAction?.let { action ->
+            val resetHomeWorld = action == HomeWorldAction.Reset
+            val actionStillAllowed = homeWorldActionState.availability !=
+                HomeWorldActionAvailability.Unavailable &&
+                (action != HomeWorldAction.Reset ||
+                    homeWorldActionState.availability == HomeWorldActionAvailability.Current)
             AlertDialog(
                 onDismissRequest = {
-                    if (!homeWorldActionState.isUpdating) showHomeWorldConfirmation = false
+                    if (!homeWorldActionState.isUpdating) pendingHomeWorldAction = null
                 },
                 title = {
                     Text(
@@ -258,10 +264,10 @@ class WorldProfileScreen(
                 confirmButton = {
                     TextButton(
                         enabled = !homeWorldActionState.isUpdating &&
-                            homeWorldActionState.availability != HomeWorldActionAvailability.Unavailable,
+                            actionStillAllowed,
                         onClick = {
-                            showHomeWorldConfirmation = false
-                            screenModel.updateHomeWorld()
+                            pendingHomeWorldAction = null
+                            screenModel.updateHomeWorld(action)
                         },
                     ) {
                         Text(strings.confirm)
@@ -270,7 +276,7 @@ class WorldProfileScreen(
                 dismissButton = {
                     TextButton(
                         enabled = !homeWorldActionState.isUpdating,
-                        onClick = { showHomeWorldConfirmation = false },
+                        onClick = { pendingHomeWorldAction = null },
                     ) {
                         Text(strings.cancel)
                     }
@@ -331,7 +337,7 @@ class WorldProfileScreen(
         isDeleted: Boolean = false,
         onDelete: () -> Unit = {},
         homeWorldActionState: HomeWorldActionState = HomeWorldActionState(),
-        onHomeWorldClick: () -> Unit = {},
+        onHomeWorldClick: (HomeWorldAction) -> Unit = {},
         canEditImage: Boolean = false,
         onEditImage: () -> Unit = {},
         canEditMetadata: Boolean = false,
@@ -1232,7 +1238,7 @@ private fun WorldProfileTopBar(
     isDeleted: Boolean,
     onDelete: () -> Unit,
     homeWorldActionState: HomeWorldActionState,
-    onHomeWorldClick: () -> Unit,
+    onHomeWorldClick: (HomeWorldAction) -> Unit,
     canEditImage: Boolean,
     onEditImage: () -> Unit,
     canEditMetadata: Boolean,
@@ -1304,7 +1310,7 @@ private fun ColumnScope.WorldProfileActionSheet(
     isDeleted: Boolean,
     onDelete: () -> Unit,
     homeWorldActionState: HomeWorldActionState,
-    onHomeWorldClick: () -> Unit,
+    onHomeWorldClick: (HomeWorldAction) -> Unit,
     canEditImage: Boolean,
     onEditImage: () -> Unit,
     canEditMetadata: Boolean,
@@ -1360,10 +1366,13 @@ private fun ColumnScope.WorldProfileActionSheet(
     }
     WorldProfileSheetButton(
         text = homeWorldDescription,
-        enabled = homeWorldActionState.availability != HomeWorldActionAvailability.Unavailable &&
-            !homeWorldActionState.isUpdating,
+        enabled = homeWorldActionState.action != null && !homeWorldActionState.isUpdating,
         loading = homeWorldActionState.isUpdating,
-        onClick = { dismissAndRun(onHomeWorldClick) },
+        onClick = {
+            homeWorldActionState.action?.let { action ->
+                dismissAndRun { onHomeWorldClick(action) }
+            }
+        },
     )
     WorldProfileSheetButton(
         text = strings.worldPersistenceTitle,
