@@ -7,42 +7,75 @@ import kotlin.test.assertNull
 
 class InviteLocationTest {
     @Test
-    fun activePresenceUsesThePureInstanceWithoutDroppingInstanceTags() {
+    fun activePresenceIncludesTheWorldWithoutDroppingInstanceTags() {
         val presence = presence(
             world = "wrld_origin",
             instance = "12345~hidden(usr_owner)~region(use)~nonce(value)",
         )
 
         assertEquals(
-            "12345~hidden(usr_owner)~region(use)~nonce(value)",
+            "wrld_origin:12345~hidden(usr_owner)~region(use)~nonce(value)",
             presence.inviteLocationOrNull(),
         )
     }
 
     @Test
-    fun travelingPresenceUsesItsDestinationInstanceWithoutDroppingTags() {
+    fun travelingPresenceUsesItsDestinationWorldAndInstanceWithoutDroppingTags() {
         val presence = presence(
+            world = "wrld_origin",
             instance = "traveling",
             travelingToWorld = "wrld_destination",
             travelingToInstance = "67890~region(jp)",
         )
 
         assertEquals(
-            "67890~region(jp)",
+            "wrld_destination:67890~region(jp)",
             presence.inviteLocationOrNull(),
         )
     }
 
     @Test
     fun presenceWithoutAnActiveInstanceCannotBeInvitedTo() {
-        assertNull(presence(instance = "offline").inviteLocationOrNull())
-        assertNull(presence(instance = "private").inviteLocationOrNull())
+        listOf("", "offline", "private", "traveling").forEach { instance ->
+            assertNull(presence(world = "wrld_origin", instance = instance).inviteLocationOrNull())
+        }
+        assertNull(presence(instance = "12345~region(use)").inviteLocationOrNull())
+        assertNull(presence(world = "offline", instance = "12345").inviteLocationOrNull())
+    }
+
+    @Test
+    fun fullPresenceLocationsAreNotPrefixedWithAnotherWorld() {
         assertEquals(
-            "12345~region(use)",
-            presence(instance = "12345~region(use)").inviteLocationOrNull(),
+            "wrld_world:12345~region(use)",
+            presence(world = "wrld_origin", instance = "wrld_world:12345~region(use)")
+                .inviteLocationOrNull(),
         )
-        assertNull(presence(instance = "wrld_world:12345~region(use)").inviteLocationOrNull())
-        assertNull(presence(instance = "traveling").inviteLocationOrNull())
+        assertEquals(
+            "wrld_destination:67890~region(jp)",
+            presence(
+                world = "wrld_origin",
+                instance = "traveling",
+                travelingToInstance = "wrld_destination:67890~region(jp)",
+            ).inviteLocationOrNull(),
+        )
+    }
+
+    @Test
+    fun incompleteTravelDestinationDoesNotReuseTheOriginWorld() {
+        assertNull(
+            presence(
+                world = "wrld_origin",
+                instance = "traveling",
+                travelingToInstance = "67890~region(jp)",
+            ).inviteLocationOrNull(),
+        )
+        assertNull(
+            presence(
+                world = "wrld_origin",
+                instance = "traveling",
+                travelingToWorld = "wrld_destination",
+            ).inviteLocationOrNull(),
+        )
     }
 
     private fun presence(

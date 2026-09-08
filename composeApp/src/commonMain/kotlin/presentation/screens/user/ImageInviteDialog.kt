@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -58,7 +62,10 @@ internal fun ImageInviteDialog(
             Text(strings.imageInviteTitle.replace("%name%", targetName))
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 selection?.let {
                     AImage(
                         imageData = it.imageUrl,
@@ -85,6 +92,25 @@ internal fun ImageInviteDialog(
                             state is ImageInviteUiState.SessionChanged
                         ) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     )
+                }
+                if (state is ImageInviteUiState.Failed &&
+                    state.error !is ImageInviteNotInInstanceException
+                ) {
+                    val error = state.error
+                    val reason = if (error is VRCApiException && error.code > 0) {
+                        "[${error.code}] ${error.message.orEmpty()}".trimEnd()
+                    } else {
+                        error.message
+                    }
+                    if (!reason.isNullOrBlank()) {
+                        SelectionContainer {
+                            Text(
+                                text = reason,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 }
             }
         },

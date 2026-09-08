@@ -46,7 +46,7 @@ class InviteApiPhotoTest {
 
         InviteApi(client).inviteUserWithPhoto(
             userId = "usr_friend",
-            instanceId = "12345~region(use)",
+            instanceId = "wrld_world:12345~region(use)",
             imageBytes = PNG,
             messageSlot = 4,
         )
@@ -54,7 +54,7 @@ class InviteApiPhotoTest {
         assertEquals("/api/1/invite/usr_friend/photo", path)
         assertContains(body, "name=data")
         assertContains(body, "application/json")
-        assertContains(body, "\"instanceId\":\"12345~region(use)\"")
+        assertContains(body, "\"instanceId\":\"wrld_world:12345~region(use)\"")
         assertContains(body, "\"messageSlot\":4")
         assertContains(body, "name=image")
         assertContains(body, "image/png")
@@ -74,14 +74,15 @@ class InviteApiPhotoTest {
             }
         }
         val api = InviteApi(client)
-        assertFailsWith<IllegalArgumentException> {
-            api.inviteUserWithPhoto("usr_friend", "offline", PNG)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            api.inviteUserWithPhoto("usr_friend", "private", PNG)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            api.inviteUserWithPhoto("usr_friend", "wrld_world:12345", PNG)
+        listOf(
+            "", "offline", "private", "traveling", "12345~region(use)",
+            "wrld_world", "wrld_:12345", "wrld_world:", "wrld_world: ",
+            "wrld_world:offline", "wrld_world:private", "wrld_world:traveling",
+            "wrld_world:wrld_other:12345",
+        ).forEach { location ->
+            assertFailsWith<IllegalArgumentException>(location) {
+                api.inviteUserWithPhoto("usr_friend", location, PNG)
+            }
         }
         assertEquals(0, requestCount)
         client.close()
