@@ -26,6 +26,8 @@ internal const val AVATARS_API_PREFIX = "avatars"
 
 internal const val INVITE_API_PREFIX = "invite"
 
+internal const val REQUEST_INVITE_API_PREFIX = "requestInvite"
+
 internal const val NOTIFICATIONS_API_PREFIX = "notifications"
 
 internal const val FAVORITE_API_PREFIX = "favorite"
