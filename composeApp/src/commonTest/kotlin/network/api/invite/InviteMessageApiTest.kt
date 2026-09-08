@@ -137,6 +137,53 @@ class InviteMessageApiTest {
     }
 
     @Test
+    fun mutationResponsesRejectMalformedMessageCollections() = runBlocking {
+        val wrongTypeClient = testClient {
+            TestResponse(
+                """[{
+                    "canBeUpdated":true,
+                    "id":"request_3",
+                    "message":"Wrong collection",
+                    "messageType":"request",
+                    "remainingCooldownMinutes":0,
+                    "slot":3,
+                    "updatedAt":"2026-08-31T03:00:00.000Z"
+                }]"""
+            )
+        }
+        val duplicateSlotClient = testClient {
+            TestResponse(
+                """[
+                    {"canBeUpdated":true,"id":"response_a","message":"First","messageType":"response","remainingCooldownMinutes":0,"slot":4,"updatedAt":"2026-08-31T03:00:00.000Z"},
+                    {"canBeUpdated":true,"id":"response_b","message":"Second","messageType":"response","remainingCooldownMinutes":0,"slot":4,"updatedAt":"2026-08-31T03:00:00.000Z"}
+                ]"""
+            )
+        }
+
+        try {
+            assertFailsWith<IllegalStateException> {
+                InviteApi(wrongTypeClient).updateInviteMessage(
+                    userId = "usr_current",
+                    messageType = InviteMessageType.Message,
+                    slot = 3,
+                    message = "Updated",
+                )
+            }
+            assertFailsWith<IllegalStateException> {
+                InviteApi(duplicateSlotClient).resetInviteMessage(
+                    userId = "usr_current",
+                    messageType = InviteMessageType.Response,
+                    slot = 4,
+                )
+            }
+        } finally {
+            wrongTypeClient.close()
+            duplicateSlotClient.close()
+        }
+        Unit
+    }
+
+    @Test
     fun updateRejectsInvalidInputBeforeSendingAndPreservesRateLimitErrors() = runBlocking {
         var requestCount = 0
         val client = testClient { request ->

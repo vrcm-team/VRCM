@@ -153,7 +153,8 @@ class InviteApi(private val client: HttpClient) {
         return client.put("message/$userId/${messageType.pathValue}/$slot") {
             contentType(ContentType.Application.Json)
             setBody(UpdateInviteMessageRequest(message))
-        }.checkSuccess()
+        }.checkSuccess<List<InviteMessageData>>()
+            .also { validateInviteMessages(it, messageType) }
     }
 
     suspend fun resetInviteMessage(
@@ -163,7 +164,9 @@ class InviteApi(private val client: HttpClient) {
     ): List<InviteMessageData> {
         requireValidUserId(userId)
         requireValidSlot(slot)
-        return client.delete("message/$userId/${messageType.pathValue}/$slot").checkSuccess()
+        return client.delete("message/$userId/${messageType.pathValue}/$slot")
+            .checkSuccess<List<InviteMessageData>>()
+            .also { validateInviteMessages(it, messageType) }
     }
 
     private fun requireValidUserId(userId: String) {
