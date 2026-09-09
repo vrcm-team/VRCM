@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.FavoriteGroupClearDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.*
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
@@ -61,6 +62,7 @@ private fun FavoritesScreenContent(
     val avatarOptions by favoritesModel.avatarGroupOptions.collectAsState()
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
+    val clearState by favoritesModel.favoriteGroupClearState.collectAsState()
     val favoriteGroupEditState by favoritesModel.favoriteGroupEditState.collectAsState()
     val settledPage = pagerState.settledPage
     val modelTabIndex = settledPage + 1
@@ -139,8 +141,14 @@ private fun FavoritesScreenContent(
                     total = worldTotal,
                     defaultText = strings.friendListPagerAllWorlds,
                     onOptionsChanged = favoritesModel::updateWorldGroupOptions,
-                    getSelectedGroup = { it.selectedGroup },
+                    getSelectedGroup = WorldGroupOptions::selectedGroup,
                     updateOptions = { options, group -> options.copy(selectedGroup = group) },
+                    onClearGroup = favoritesModel::openFavoriteGroupClearConfirmation,
+                    clearGroupEnabled = worldOptions.selectedGroup
+                        ?.let(favoritesModel::canClearFavoriteGroup) == true,
+                    clearGroupInProgress = clearState.isClearing &&
+                        clearState.group?.type == FavoriteType.World.value,
+                    clearGroupContentDescription = strings.favoriteGroupClearAction,
                     onEditGroup = favoritesModel::openFavoriteGroupEditor,
                     editGroupContentDescription = strings.favoriteGroupEditAction,
                 )
@@ -151,8 +159,14 @@ private fun FavoritesScreenContent(
                     total = avatarTotal,
                     defaultText = strings.friendListPagerAllAvatars,
                     onOptionsChanged = favoritesModel::updateAvatarGroupOptions,
-                    getSelectedGroup = { it.selectedGroup },
+                    getSelectedGroup = AvatarGroupOptions::selectedGroup,
                     updateOptions = { options, group -> options.copy(selectedGroup = group) },
+                    onClearGroup = favoritesModel::openFavoriteGroupClearConfirmation,
+                    clearGroupEnabled = avatarOptions.selectedGroup
+                        ?.let(favoritesModel::canClearFavoriteGroup) == true,
+                    clearGroupInProgress = clearState.isClearing &&
+                        clearState.group?.type == FavoriteType.Avatar.value,
+                    clearGroupContentDescription = strings.favoriteGroupClearAction,
                     onEditGroup = favoritesModel::openFavoriteGroupEditor,
                     editGroupContentDescription = strings.favoriteGroupEditAction,
                 )
@@ -210,6 +224,17 @@ private fun FavoritesScreenContent(
                 }
             }
         }
+    }
+
+    clearState.group?.let { group ->
+        FavoriteGroupClearDialog(
+            groupDisplayName = group.displayName,
+            itemCount = clearState.itemCount,
+            isClearing = clearState.isClearing,
+            hasFailure = clearState.failure != null,
+            onConfirm = favoritesModel::confirmFavoriteGroupClear,
+            onDismiss = favoritesModel::dismissFavoriteGroupClearConfirmation,
+        )
     }
 
     FavoriteGroupEditDialog(

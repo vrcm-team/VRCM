@@ -28,6 +28,26 @@ internal class FavoriteGroupCache {
         flows.getValue(type).value = favorites
     }
 
+    fun clearGroupMembers(
+        type: FavoriteType,
+        ownerId: String,
+        groupName: String,
+    ): Pair<FavoriteGroupData, List<FavoriteData>>? {
+        val current = flow(type).value
+        val target = current.entries.firstOrNull { (group, _) ->
+            group.ownerId == ownerId && group.name == groupName && group.type == type.value
+        } ?: return null
+        replace(
+            type,
+            buildMap {
+                current.forEach { (group, favorites) ->
+                    put(group, if (group == target.key) emptyList() else favorites)
+                }
+            },
+        )
+        return target.key to target.value
+    }
+
     fun updateGroup(
         type: FavoriteType,
         ownerId: String,
@@ -53,6 +73,20 @@ internal class FavoriteGroupCache {
         flows.values.forEach { it.value = emptyMap() }
     }
 }
+
+internal data class FavoriteGroupClearRequest(
+    val favoriteType: FavoriteType,
+    val group: FavoriteGroupData,
+    val favorites: List<FavoriteData>,
+    val ownerId: String,
+) {
+    val groupName: String get() = group.name
+}
+
+internal data class FavoriteGroupClearCommit(
+    val group: FavoriteGroupData,
+    val removedFavorites: List<FavoriteData>,
+)
 
 internal data class FavoriteGroupUpdate(
     val favoriteType: FavoriteType,
@@ -283,6 +317,57 @@ class FavoriteService(
         } else {
             favoriteApi.deleteFavorite(id)
         }
+    }
+
+    internal suspend fun prepareFavoriteGroupClear(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        groupName: String,
+    ): FavoriteGroupClearRequest = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+            "Authenticated session changed before clearing the favorite group"
+        }
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        val target = favoritesByGroupCache.flow(favoriteType).value.entries.firstOrNull { (group, _) ->
+            group.ownerId == sessionToken.userId &&
+                group.ownerId != "local" &&
+                group.name == groupName &&
+                group.type == favoriteType.value
+        } ?: error("Favorite group is unavailable for the current account")
+        check(target.value.isNotEmpty()) { "Favorite group is already empty" }
+        FavoriteGroupClearRequest(
+            favoriteType = favoriteType,
+            group = target.key,
+            favorites = target.value,
+            ownerId = sessionToken.userId,
+        )
+    }
+
+    internal suspend fun sendFavoriteGroupClear(request: FavoriteGroupClearRequest) {
+        favoriteApi.clearFavoriteGroup(
+            favoriteType = request.favoriteType,
+            favoriteGroupName = request.groupName,
+            userId = request.ownerId,
+        )
+    }
+
+    internal suspend fun commitFavoriteGroupClear(
+        sessionToken: AccountSessionToken,
+        request: FavoriteGroupClearRequest,
+    ): FavoriteGroupClearCommit = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken) && request.ownerId == sessionToken.userId) {
+            "Authenticated session changed while clearing the favorite group"
+        }
+        // Authentication can publish a renewed token before this collector observes it.
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        requestGenerations[request.favoriteType] =
+            (requestGenerations[request.favoriteType] ?: 0L) + 1L
+        val (group, removedFavorites) = favoritesByGroupCache.clearGroupMembers(
+            type = request.favoriteType,
+            ownerId = request.ownerId,
+            groupName = request.groupName,
+        ) ?: (request.group to request.favorites)
+        FavoriteGroupClearCommit(group, removedFavorites)
     }
 
     internal suspend fun prepareFavoriteGroupUpdate(

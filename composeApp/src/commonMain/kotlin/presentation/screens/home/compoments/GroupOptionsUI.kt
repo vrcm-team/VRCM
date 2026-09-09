@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +44,10 @@ fun <T> GroupOptionsUI(
     onOptionsChanged: (T) -> Unit,
     getSelectedGroup: (T) -> FavoriteGroupData?,
     updateOptions: (T, FavoriteGroupData?) -> T,
+    onClearGroup: ((FavoriteGroupData) -> Unit)? = null,
+    clearGroupEnabled: Boolean = false,
+    clearGroupInProgress: Boolean = false,
+    clearGroupContentDescription: String = "",
     onEditGroup: ((FavoriteGroupData) -> Unit)? = null,
     editGroupContentDescription: String = "",
 ) {
@@ -119,6 +126,27 @@ fun <T> GroupOptionsUI(
                         onClick = { selectedGroup?.let(onEditGroup) },
                     ) {
                         Icon(AppIcons.Edit, contentDescription = editGroupContentDescription)
+                    }
+                }
+            }
+
+            if (onClearGroup != null) {
+                ATooltipBox(tooltip = { Text(clearGroupContentDescription) }) {
+                    IconButton(
+                        enabled = clearGroupEnabled && !clearGroupInProgress,
+                        onClick = { selectedGroup?.let(onClearGroup) },
+                    ) {
+                        if (clearGroupInProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = clearGroupContentDescription,
+                            )
+                        }
                     }
                 }
             }
