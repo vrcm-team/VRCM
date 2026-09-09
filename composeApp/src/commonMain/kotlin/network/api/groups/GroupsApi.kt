@@ -9,6 +9,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupPostData
 import io.github.vrcmteam.vrcm.network.api.groups.data.JoinGroupRequest
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
+import io.github.vrcmteam.vrcm.network.api.groups.data.UpdateGroupRepresentationRequest
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -48,6 +49,12 @@ class GroupsApi(private val client: HttpClient) {
     suspend fun leaveGroup(groupId: String) =
         client.post("$GROUPS_API_PREFIX/$groupId/leave")
             .checkSuccess { Unit }
+
+    suspend fun updateRepresentation(groupId: String, isRepresenting: Boolean) =
+        client.put("$GROUPS_API_PREFIX/$groupId/representation") {
+            contentType(ContentType.Application.Json)
+            setBody(UpdateGroupRepresentationRequest(isRepresenting))
+        }.checkSuccess { Unit }
 
     suspend fun getGroupMembers(
         groupId: String,
