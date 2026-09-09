@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class LocaleActionMessagesTest {
     @Test
-    fun boopInviteAndRetryMessagesArePresentInEveryLocale() {
+    fun profileActionMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,
             LocaleStringsJa,
@@ -22,8 +22,33 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileChatboxModerationMute,
+                locale.profileChatboxModerationUnmute,
+                locale.profileChatboxModerationChecking,
+                locale.profileChatboxModerationRetry,
+                locale.profileChatboxModerationMuting,
+                locale.profileChatboxModerationUnmuting,
+                locale.profileChatboxModerationMuted,
+                locale.profileChatboxModerationUnmuted,
+                locale.profileChatboxModerationUpdateFailed,
+                locale.profileBlock,
+                locale.profileUnblock,
+                locale.profileBlockStatusChecking,
+                locale.profileBlockStatusRetry,
+                locale.profileBlockStatusUnavailable,
+                locale.profileBlockConfirmTitle,
+                locale.profileBlockConfirmMessage,
+                locale.profileUnblockConfirmTitle,
+                locale.profileUnblockConfirmMessage,
+                locale.profileBlockSuccess,
+                locale.profileUnblockSuccess,
+                locale.profileBlockFailed,
+                locale.profileUnblockFailed,
+                locale.profileBlockStatusLoadFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileBlockConfirmMessage.contains("%name%"))
+            assertTrue(locale.profileUnblockConfirmMessage.contains("%name%"))
         }
     }
 
@@ -111,6 +136,37 @@ class LocaleActionMessagesTest {
             val message = formatFavoriteGroupClearMessage(locale.favoriteGroupClearMessage, 37)
             assertTrue("37" in message)
             assertTrue("%d" !in message)
+        }
+    }
+
+    @Test
+    fun playerInteractionMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.profileInteractionChecking,
+                locale.profileInteractionClose,
+                locale.profileInteractionRestore,
+                locale.profileInteractionClosing,
+                locale.profileInteractionRestoring,
+                locale.profileInteractionRetry,
+                locale.profileInteractionUnavailable,
+                locale.profileInteractionCloseConfirmTitle,
+                locale.profileInteractionRestoreConfirmTitle,
+                locale.profileInteractionClosedSuccess,
+                locale.profileInteractionRestoredSuccess,
+                locale.profileInteractionLoadFailed,
+                locale.profileInteractionUpdateFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileInteractionCloseConfirmMessage.contains("%s"))
+            assertTrue(locale.profileInteractionRestoreConfirmMessage.contains("%s"))
         }
     }
 

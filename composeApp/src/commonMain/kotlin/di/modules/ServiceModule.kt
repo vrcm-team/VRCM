@@ -39,6 +39,8 @@ val serviceModule: Module = module {
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
     singleOf(::NetworkRewardCodeRedeemer) bind RewardCodeRedeemer::class
+    singleOf(::NetworkBoopPrivacyRequest) bind BoopPrivacyRequest::class
+    single { BoopPrivacyService(get<AuthService>(), get<BoopPrivacyRequest>()) }
     singleOf(::ImageInviteService) bind ImageInviteRemote::class
     single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
     singleOf(::InvitePhotoResponseService)
@@ -47,6 +49,7 @@ val serviceModule: Module = module {
     singleOf(::InstanceCreationService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
+    singleOf(::AuthenticatedPlayerModerationCleanupSource) bind PlayerModerationCleanupSource::class
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class
     singleOf(::InventoryDecorationTemplateSource) bind DecorationTemplateSource::class
     singleOf(::DecorationResolver)

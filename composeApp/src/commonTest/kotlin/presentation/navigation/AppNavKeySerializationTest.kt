@@ -21,6 +21,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScr
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -67,6 +69,8 @@ class AppNavKeySerializationTest {
             NotificationSettingsScreen,
             RewardCodeScreen,
             InviteMessageSlotsScreen,
+            PlayerModerationListScreen,
+            PlayerModerationCleanupScreen,
             NotificationScreen(targetNotificationId = "notification_test"),
         )
 

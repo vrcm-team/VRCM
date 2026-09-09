@@ -30,6 +30,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.settings.AllWorldPersistence
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
@@ -350,6 +352,45 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(text = strings.rewardCodeEntry)
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    navigator push PlayerModerationListScreen
+                    onDismissRequest()
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "${strings.playerModerationTitle}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = strings.playerModerationEntryDescription,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .clickable {
+                    navigator push PlayerModerationCleanupScreen
+                    onDismissRequest()
+                }
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = strings.playerModerationCleanupTitle)
+                Text(
+                    text = strings.playerModerationCleanupEntrySummary,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         val diskCache = imageLoader.diskCache
