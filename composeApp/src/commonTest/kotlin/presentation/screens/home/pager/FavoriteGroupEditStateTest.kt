@@ -6,10 +6,12 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -34,6 +36,7 @@ import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
@@ -52,6 +55,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
@@ -65,6 +69,49 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FavoriteGroupEditStateTest : MainDispatcherTest() {
+    @Test
+    fun friendGroupSaveUsesFriendEndpointAndPreservesSelectedMembers() = runBlocking {
+        val fixture = createFavoriteGroupEditFixture(
+            scenario = FavoriteGroupEditScenario.FriendSuccess,
+            favoriteType = FavoriteType.Friend,
+        )
+        try {
+            val friendId = "usr_friend_member"
+            val group = fixture.favoriteService.favoritesByGroup(FavoriteType.Friend).value.keys
+                .single { it.ownerId != "local" }
+            awaitUntil {
+                fixture.model.friendDirectoryFriends.value.map { it.id } == listOf(friendId)
+            }
+            fixture.model.updateFriendGroupOptions(FriendGroupOptions(group))
+            awaitUntil {
+                fixture.model.friendDirectoryFriends.value.map { it.id } == listOf(friendId)
+            }
+
+            fixture.model.openFavoriteGroupEditor(group)
+            assertEquals(group, fixture.model.favoriteGroupEditState.value.group)
+            fixture.model.saveFavoriteGroup("Updated friends", FavoriteGroupVisibility.Friends)
+            awaitUntil { fixture.model.favoriteGroupEditState.value.group == null }
+
+            assertEquals(1, fixture.requests.updateCount.value)
+            assertEquals(
+                "/favorite/group/friend/group_0/usr_editor",
+                fixture.requests.lastUpdatePath.value,
+            )
+            val updatedEntry = fixture.favoriteService.favoritesByGroup(FavoriteType.Friend).value.entries
+                .single { it.key.ownerId != "local" }
+            assertEquals("Updated friends", updatedEntry.key.displayName)
+            assertEquals("friends", updatedEntry.key.visibility)
+            assertEquals(listOf(friendId), updatedEntry.value.map { it.favoriteId })
+            assertNotEquals(group, updatedEntry.key)
+            assertEquals(updatedEntry.key, fixture.model.friendGroupOptions.value.selectedGroup)
+            awaitUntil {
+                fixture.model.friendDirectoryFriends.value.map { it.id } == listOf(friendId)
+            }
+        } finally {
+            fixture.close()
+        }
+    }
+
     @Test
     fun failedSaveKeepsEditorRetryableAndSuccessfulRetryPublishesUpdatedGroup() = runBlocking {
         val fixture = createFavoriteGroupEditFixture()
@@ -282,6 +329,7 @@ private class FavoriteGroupEditFixture(
 }
 
 private enum class FavoriteGroupEditScenario {
+    FriendSuccess,
     FailureThenSuccess,
     UnauthorizedThenSuccess,
     SessionRenewalBeforeSuccess,
@@ -296,6 +344,7 @@ private class FavoriteGroupEditRequests(
     val cachePublicationCount = atomic(0)
     val firstPutGeneration = atomic(-1L)
     val secondPutGeneration = atomic(-1L)
+    val lastUpdatePath = atomic("")
     val firstUpdateStarted = CompletableDeferred<Unit>()
     val releaseFirstUpdate = CompletableDeferred<Unit>()
     val firstUpdateResponded = CompletableDeferred<Unit>()
@@ -303,6 +352,7 @@ private class FavoriteGroupEditRequests(
 
 private suspend fun createFavoriteGroupEditFixture(
     scenario: FavoriteGroupEditScenario = FavoriteGroupEditScenario.FailureThenSuccess,
+    favoriteType: FavoriteType = FavoriteType.Avatar,
 ): FavoriteGroupEditFixture {
     SharedFlowCentre.emitLogout()
     val account = AccountDto(
@@ -345,10 +395,10 @@ private suspend fun createFavoriteGroupEditFixture(
         favoriteApi = FavoriteApi(client),
         favoriteLocalDao = FavoriteLocalDao(MapSettings()),
     )
-    assertTrue(favoriteService.loadFavoriteByGroup(FavoriteType.Avatar).isSuccess)
+    assertTrue(favoriteService.loadFavoriteByGroup(favoriteType).isSuccess)
     val profileScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     profileScope.launch(start = CoroutineStart.UNDISPATCHED) {
-        favoriteService.favoritesByGroup(FavoriteType.Avatar).drop(1).collect {
+        favoriteService.favoritesByGroup(favoriteType).drop(1).collect {
             requests.cachePublicationCount.incrementAndGet()
         }
     }
@@ -380,16 +430,37 @@ private fun favoriteGroupEditClient(
         addHandler { request ->
             when (request.url.encodedPath) {
                 "/auth/user/favoritelimits" -> jsonResponse(FAVORITE_GROUP_EDIT_LIMITS)
-                "/auth/user/friends" -> jsonResponse("[]")
+                "/auth/user/friends" -> {
+                    val hasFriend = requests.scenario == FavoriteGroupEditScenario.FriendSuccess &&
+                        request.url.parameters["offline"] == "false" &&
+                        request.url.parameters["offset"] == "0"
+                    jsonResponse(
+                        if (hasFriend) {
+                            json.encodeToString(listOf(favoriteGroupEditFriend()))
+                        } else {
+                            "[]"
+                        }
+                    )
+                }
                 "/favorites" -> if (request.url.parameters["offset"] == "0") {
                     val ownerId = SharedFlowCentre.currentSession.value?.token?.userId.orEmpty()
-                    jsonResponse(favoriteGroupEditFavorites(ownerId))
+                    jsonResponse(
+                        favoriteGroupEditFavorites(
+                            ownerId = ownerId,
+                            favoriteType = request.url.parameters["type"].toFavoriteType(),
+                        )
+                    )
                 } else {
                     jsonResponse("[]")
                 }
                 "/favorite/groups" -> if (request.url.parameters["offset"] == "0") {
                     val ownerId = SharedFlowCentre.currentSession.value?.token?.userId.orEmpty()
-                    jsonResponse(favoriteGroupEditGroups(ownerId))
+                    jsonResponse(
+                        favoriteGroupEditGroups(
+                            ownerId = ownerId,
+                            favoriteType = request.url.parameters["type"].toFavoriteType(),
+                        )
+                    )
                 } else {
                     jsonResponse("[]")
                 }
@@ -405,9 +476,16 @@ private fun favoriteGroupEditClient(
                     jsonResponse(favoriteGroupEditCurrentUser(account))
                 }
                 else -> {
-                    if (!request.url.encodedPath.startsWith("/favorite/group/avatar/avatars1/")) {
+                    val expectedPathPrefix = when (requests.scenario) {
+                        FavoriteGroupEditScenario.FriendSuccess -> "/favorite/group/friend/group_0/"
+                        else -> "/favorite/group/avatar/avatars1/"
+                    }
+                    if (request.method != HttpMethod.Put ||
+                        !request.url.encodedPath.startsWith(expectedPathPrefix)
+                    ) {
                         error("Unexpected request: ${request.url}")
                     }
+                    requests.lastUpdatePath.value = request.url.encodedPath
                     val updateNumber = requests.updateCount.incrementAndGet()
                     val generation = SharedFlowCentre.currentSession.value?.token?.generation ?: -1L
                     if (updateNumber == 1) {
@@ -417,6 +495,7 @@ private fun favoriteGroupEditClient(
                         requests.secondPutGeneration.value = generation
                     }
                     when (requests.scenario) {
+                        FavoriteGroupEditScenario.FriendSuccess -> jsonResponse("")
                         FavoriteGroupEditScenario.FailureThenSuccess -> {
                             if (updateNumber == 1) {
                                 requests.releaseFirstUpdate.await()
@@ -480,20 +559,63 @@ private const val FAVORITE_GROUP_EDIT_LIMITS = """
     }
 """
 
-private fun favoriteGroupEditFavorites(ownerId: String) = """
-    [{
-      "favoriteId":"avtr_$ownerId","id":"fvrt_$ownerId",
-      "tags":["avatars1"],"type":"avatar"
-    }]
-""".trimIndent()
+private fun favoriteGroupEditFavorites(ownerId: String, favoriteType: FavoriteType) = when (favoriteType) {
+    FavoriteType.Friend -> """
+        [{
+          "favoriteId":"usr_friend_member","id":"fvrt_friend_$ownerId",
+          "tags":["group_0"],"type":"friend"
+        }]
+    """.trimIndent()
+    else -> """
+        [{
+          "favoriteId":"avtr_$ownerId","id":"fvrt_$ownerId",
+          "tags":["avatars1"],"type":"avatar"
+        }]
+    """.trimIndent()
+}
 
-private fun favoriteGroupEditGroups(ownerId: String) = """
-    [{
-      "id":"grp_avatars1_$ownerId","ownerId":"$ownerId","type":"avatar",
-      "visibility":"private","displayName":"Avatars","name":"avatars1",
-      "ownerDisplayName":"$ownerId","tags":[]
-    }]
-""".trimIndent()
+private fun favoriteGroupEditGroups(ownerId: String, favoriteType: FavoriteType) = when (favoriteType) {
+    FavoriteType.Friend -> """
+        [{
+          "id":"grp_group_0_$ownerId","ownerId":"$ownerId","type":"friend",
+          "visibility":"private","displayName":"Friends","name":"group_0",
+          "ownerDisplayName":"$ownerId","tags":[]
+        }]
+    """.trimIndent()
+    else -> """
+        [{
+          "id":"grp_avatars1_$ownerId","ownerId":"$ownerId","type":"avatar",
+          "visibility":"private","displayName":"Avatars","name":"avatars1",
+          "ownerDisplayName":"$ownerId","tags":[]
+        }]
+    """.trimIndent()
+}
+
+private fun favoriteGroupEditFriend() = FriendData(
+    bio = null,
+    currentAvatarImageUrl = "",
+    currentAvatarThumbnailImageUrl = "",
+    developerType = "none",
+    displayName = "Favorite Friend",
+    friendKey = "",
+    id = "usr_friend_member",
+    imageUrl = "",
+    isFriend = true,
+    lastLogin = "",
+    lastPlatform = "web",
+    location = "offline",
+    profilePicOverride = "",
+    status = UserStatus.Active,
+    statusDescription = "",
+    userIcon = "",
+    pronouns = null,
+)
+
+private fun String?.toFavoriteType(): FavoriteType = when (this) {
+    FavoriteType.Friend.value -> FavoriteType.Friend
+    FavoriteType.World.value -> FavoriteType.World
+    else -> FavoriteType.Avatar
+}
 
 private fun favoriteGroupEditCurrentUser(account: AccountDto) = """
     {

@@ -112,7 +112,7 @@ class WorldProfileInstanceCloseTest : MainDispatcherTest() {
                         worldId = WORLD_ID, location = LOCATION, ownerId = USER_ID)),
                 )
             )
-            refreshStarted.await()
+            withTimeout(2_000) { refreshStarted.await() }
 
             model.requestInstanceClose(model.worldProfileState.value!!.instances.single(), LocaleStringsZhHans)
             awaitUntil { model.instanceCloseState.value is InstanceCloseState.AwaitingConfirmation }
@@ -146,6 +146,7 @@ class WorldProfileInstanceCloseTest : MainDispatcherTest() {
             override suspend fun load(worldId: String) = WorldProfileCache(
                 world = worldData,
                 cachedAtEpochMilliseconds = Long.MAX_VALUE,
+                supportedPlatforms = emptyList(),
                 platformFileSizes = emptyList(),
             )
 

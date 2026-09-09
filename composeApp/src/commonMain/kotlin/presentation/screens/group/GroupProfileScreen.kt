@@ -191,6 +191,7 @@ class GroupProfileScreen(
                         )
                         GroupHeaderInfo(
                             group = group,
+                            isLoading = isLoading,
                             isActionLoading = isActionLoading,
                             isRepresentationUpdating = isRepresentationUpdating,
                             representationAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
@@ -252,7 +253,7 @@ class GroupProfileScreen(
                                 colors = colors,
                             )
                             IconButton(
-                                enabled = !isLoading,
+                                enabled = !isLoading && !isRepresentationUpdating,
                                 colors = colors,
                                 onClick = screenModel::refreshGroupData,
                             ) {
@@ -332,6 +333,7 @@ private fun GroupBanner(
 @Composable
 private fun GroupHeaderInfo(
     group: GroupProfileVo,
+    isLoading: Boolean,
     isActionLoading: Boolean,
     isRepresentationUpdating: Boolean,
     representationAvailable: Boolean,
@@ -419,7 +421,7 @@ private fun GroupHeaderInfo(
                 }
                 Switch(
                     checked = group.myMember?.isRepresenting == true,
-                    enabled = !isActionLoading && !isRepresentationUpdating,
+                    enabled = !isLoading && !isActionLoading && !isRepresentationUpdating,
                     onCheckedChange = onRepresentationChange,
                 )
             }

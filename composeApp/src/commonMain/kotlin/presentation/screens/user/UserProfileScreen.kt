@@ -137,6 +137,7 @@ data class UserProfileScreen(
         val playerChatboxModerationState by userProfileScreenModel.playerChatboxModerationState.collectAsState()
         val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
         val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
+        val creditsBalanceState by userProfileScreenModel.creditsBalanceState.collectAsState()
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
@@ -235,7 +236,7 @@ data class UserProfileScreen(
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
-                    creditsBalanceState = userProfileScreenModel.creditsBalanceState,
+                    creditsBalanceState = creditsBalanceState,
                     contentMinHeight = contentMinHeight,
                     animateGroupEntrance = animateGroupEntrance,
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
@@ -250,46 +251,52 @@ data class UserProfileScreen(
             sheetState = sheetState,
             onDismissRequest = { bottomSheetIsVisible = false }
         ) {
-            SheetItems(
-                currentUser = currentUser,
-                userProfileScreenModel = userProfileScreenModel,
-                hideSheet = { sheetState.hide() },
-                onHideCompletion = {
-                    if (!sheetState.isVisible) bottomSheetIsVisible = false
-                },
-                openAlertDialog = { openAlertDialog = true },
-                openEditProfileDialog = { openEditProfileDialog = true },
-                onManageFriendFavorite = { showFriendFavoriteSheet = true },
-                openEditNoteDialog = { openEditNoteDialog = true },
-                boopEnabled = userProfileScreenModel.isBoopAllowed,
-                openBoopDialog = { openBoopDialog = true },
-                playerChatboxModerationState = playerChatboxModerationState,
-                playerVoiceModerationState = playerVoiceModerationState,
-                playerInteractionState = playerInteractionState,
-                requestPlayerInteractionOverride = { pendingInteractionOverride = it },
-                retryPlayerInteractionLoad = {
-                    userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
-                },
-                playerBlockState = playerBlockState,
-                retryPlayerBlockStatus = {
-                    userProfileScreenModel.refreshPlayerBlockStatus(
-                        localeStrings.profileBlockStatusLoadFailed
-                    )
-                },
-                confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
-                openReportDialog = {
-                    userProfileScreenModel.resetUserReportState()
-                    openReportDialog = true
-                },
-                openImageInvitePicker = openImageInvitePicker,
-                openInviteMessageSelection = { action ->
-                    userProfileScreenModel.openInviteMessageSelection(
-                        action = action,
-                        targetUserId = currentUser.id,
-                        targetDisplayName = currentUser.displayName,
-                    )
-                },
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                SheetItems(
+                    currentUser = currentUser,
+                    userProfileScreenModel = userProfileScreenModel,
+                    hideSheet = { sheetState.hide() },
+                    onHideCompletion = {
+                        if (!sheetState.isVisible) bottomSheetIsVisible = false
+                    },
+                    openAlertDialog = { openAlertDialog = true },
+                    openEditProfileDialog = { openEditProfileDialog = true },
+                    onManageFriendFavorite = { showFriendFavoriteSheet = true },
+                    openEditNoteDialog = { openEditNoteDialog = true },
+                    boopEnabled = userProfileScreenModel.isBoopAllowed,
+                    openBoopDialog = { openBoopDialog = true },
+                    playerChatboxModerationState = playerChatboxModerationState,
+                    playerVoiceModerationState = playerVoiceModerationState,
+                    playerInteractionState = playerInteractionState,
+                    requestPlayerInteractionOverride = { pendingInteractionOverride = it },
+                    retryPlayerInteractionLoad = {
+                        userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
+                    },
+                    playerBlockState = playerBlockState,
+                    retryPlayerBlockStatus = {
+                        userProfileScreenModel.refreshPlayerBlockStatus(
+                            localeStrings.profileBlockStatusLoadFailed
+                        )
+                    },
+                    confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                    openReportDialog = {
+                        userProfileScreenModel.resetUserReportState()
+                        openReportDialog = true
+                    },
+                    openImageInvitePicker = openImageInvitePicker,
+                    openInviteMessageSelection = { action ->
+                        userProfileScreenModel.openInviteMessageSelection(
+                            action = action,
+                            targetUserId = currentUser.id,
+                            targetDisplayName = currentUser.displayName,
+                        )
+                    },
+                )
+            }
         }
         // Friend FavoriteType group management bottom sheet
         FavoriteGroupBottomSheet(

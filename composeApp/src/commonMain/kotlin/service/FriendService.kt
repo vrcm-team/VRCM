@@ -529,15 +529,16 @@ class FriendService(
         if (!isCurrentSessionLocked(sessionToken)) return@synchronized false
         val committed = friendStore.mergeRefresh(token, friends, replaceUntouched)
         if (committed) {
-            if (replaceUntouched) {
-                _initialRefreshCompleted.value = true
-            }
             publishFriendState()
             _friendLastActivitySource.value = FriendActivitySourceSnapshot(
                 token = sessionToken,
                 friends = friends.toList(),
                 selfLocation = null,
             )
+            if (replaceUntouched) {
+                _initialRefreshCompleted.value = true
+                publishFriendActivitySource()
+            }
         }
         committed
     }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +43,13 @@ fun FavoriteGroupClearDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = !isClearing, onClick = onConfirm) {
+            TextButton(
+                enabled = !isClearing,
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
                 if (isClearing) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

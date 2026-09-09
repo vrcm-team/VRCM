@@ -377,9 +377,6 @@ class FavoriteService(
         displayName: String,
         visibility: FavoriteGroupVisibility,
     ): FavoriteGroupUpdate {
-        require(favoriteType == FavoriteType.World || favoriteType == FavoriteType.Avatar) {
-            "Only world and avatar favorite groups can be edited here"
-        }
         val normalizedDisplayName = displayName.trim()
         require(normalizedDisplayName.isNotEmpty()) { "Favorite group display name cannot be blank" }
 

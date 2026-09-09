@@ -218,6 +218,7 @@ internal sealed interface AvatarFallbackAvailability {
 internal data class AvatarFallbackActionState(
     val availability: AvatarFallbackAvailability = AvatarFallbackAvailability.Hidden,
     val isSelecting: Boolean = false,
+    val isBlockedByDeletion: Boolean = false,
 )
 
 internal data class AvatarEditState(
@@ -412,18 +413,26 @@ class AvatarProfileScreenModel internal constructor(
         initialValue = AvatarActionState(),
     )
 
+    private val deletionOperation = MutableStateFlow(AvatarDeletionOperation())
     private val pendingFallbackTarget = MutableStateFlow<AvatarFallbackTarget?>(null)
     private val fallbackIneligibleTarget = MutableStateFlow<AvatarFallbackTargetKey?>(null)
     private val latestFallbackRequestToken = MutableStateFlow(0L)
-    // Serializes page replacement with target creation and final current-user publication.
-    private val fallbackTargetLock = SynchronizedObject()
+    // Serializes page replacement, conflicting avatar mutations, and final fallback publication.
+    private val avatarMutationLock = SynchronizedObject()
+    private val avatarMutationProgress = combine(
+        pendingFallbackTarget,
+        deletionOperation,
+        isSelecting,
+    ) { fallbackTarget, deletion, selecting ->
+        AvatarMutationProgress(fallbackTarget, deletion, selecting)
+    }
     internal val fallbackActionState: StateFlow<AvatarFallbackActionState> = combine(
         avatarProfileState,
         validation,
         fallbackCurrentUser,
-        pendingFallbackTarget,
+        avatarMutationProgress,
         fallbackIneligibleTarget,
-    ) { avatar, currentValidation, user, pending, ineligible ->
+    ) { avatar, currentValidation, user, progress, ineligible ->
         AvatarFallbackActionState(
             availability = avatarFallbackAvailability(
                 avatar = avatar,
@@ -432,7 +441,10 @@ class AvatarProfileScreenModel internal constructor(
                 ineligible = ineligible,
             ),
             isSelecting = avatar != null && user != null &&
-                pending?.avatarId == avatar.avatarId && pending.userId == user.userId,
+                progress.fallbackTarget?.avatarId == avatar.avatarId &&
+                progress.fallbackTarget.userId == user.userId,
+            isBlockedByDeletion = avatar != null &&
+                progress.deletion.target?.avatarId == avatar.avatarId,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -485,16 +497,15 @@ class AvatarProfileScreenModel internal constructor(
         initialValue = AvatarEditState(),
     )
 
-    private val deletionOperation = MutableStateFlow(AvatarDeletionOperation())
     internal val deletionState: StateFlow<AvatarDeletionState> = combine(
         avatarProfileState,
         validation,
         favoriteSession,
-        deletionOperation,
-        isSelecting,
-    ) { avatar, currentValidation, session, operation, selecting ->
+        avatarMutationProgress,
+    ) { avatar, currentValidation, session, progress ->
+        val operation = progress.deletion
         val canDelete = avatarDeleter != null && avatarDeletionResults != null &&
-            !selecting &&
+            !progress.isSelectingAvatar &&
             currentValidation == AvatarValidation.Available &&
             avatar?.avatarId?.isNotBlank() == true &&
             avatar.authorId.isNotBlank() &&
@@ -509,6 +520,8 @@ class AvatarProfileScreenModel internal constructor(
             canDelete = canDelete,
             confirmation = confirmation,
             isDeleting = operation.isDeleting,
+            isBlockedByFallback = avatar != null &&
+                progress.fallbackTarget?.avatarId == avatar.avatarId,
             failure = operation.failure.takeIf { confirmation != null },
         )
     }.stateIn(
@@ -624,7 +637,7 @@ class AvatarProfileScreenModel internal constructor(
             impostorOperation.value = AvatarImpostorOperation()
         }
         impostorDeletion.clearTarget()
-        synchronized(fallbackTargetLock) {
+        synchronized(avatarMutationLock) {
             pendingFallbackTarget.value?.invalidate()
             pendingFallbackTarget.value = null
             fallbackIneligibleTarget.value = null
@@ -966,9 +979,12 @@ class AvatarProfileScreenModel internal constructor(
 
     internal fun selectFallbackAvatar() {
         val setter = avatarFallbackSetter ?: return
-        val target = synchronized(fallbackTargetLock) {
+        val target = synchronized(avatarMutationLock) {
             val avatar = avatarProfileState.value ?: return@synchronized null
             val user = fallbackCurrentUser.value ?: return@synchronized null
+            if (deletionOperation.value.target?.avatarId == avatar.avatarId) {
+                return@synchronized null
+            }
             val availability = avatarFallbackAvailability(
                 avatar = avatar,
                 validation = validation.value,
@@ -1040,7 +1056,7 @@ class AvatarProfileScreenModel internal constructor(
                         )
                     }
             } finally {
-                synchronized(fallbackTargetLock) {
+                synchronized(avatarMutationLock) {
                     target.invalidate()
                     pendingFallbackTarget.compareAndSet(target, null)
                 }
@@ -1179,9 +1195,11 @@ class AvatarProfileScreenModel internal constructor(
     }
 
     internal fun requestAvatarDeletion() {
-        if (deletionOperation.value.isDeleting) return
-        val target = currentDeletionTarget() ?: return
-        deletionOperation.value = AvatarDeletionOperation(target = target)
+        synchronized(avatarMutationLock) {
+            if (deletionOperation.value.isDeleting) return
+            val target = currentDeletionTarget() ?: return
+            deletionOperation.value = AvatarDeletionOperation(target = target)
+        }
     }
 
     internal fun dismissAvatarDeletion() {
@@ -1427,6 +1445,8 @@ class AvatarProfileScreenModel internal constructor(
             update.sessionToken != session.token
         ) return false
 
+        if (avatarGallery?.applyAuthoritativeUpdate(update) != true) return false
+
         _notices.tryEmit(AvatarProfileNotice.GalleryUploaded)
         return true
     }
@@ -1494,7 +1514,7 @@ class AvatarProfileScreenModel internal constructor(
         setter: AvatarFallbackSetter,
         target: AvatarFallbackTarget,
         responseSessionToken: AccountSessionToken,
-    ): Boolean = synchronized(fallbackTargetLock) {
+    ): Boolean = synchronized(avatarMutationLock) {
         isCurrentFallbackTargetLocked(setter, target, responseSessionToken)
     }
 
@@ -1512,7 +1532,7 @@ class AvatarProfileScreenModel internal constructor(
         target: AvatarFallbackTarget,
         responseSessionToken: AccountSessionToken,
         update: () -> Unit,
-    ): Boolean = synchronized(fallbackTargetLock) {
+    ): Boolean = synchronized(avatarMutationLock) {
         if (!isCurrentFallbackTargetLocked(setter, target, responseSessionToken) ||
             !target.tryClaim()
         ) {
@@ -1528,7 +1548,7 @@ class AvatarProfileScreenModel internal constructor(
         responseSessionToken: AccountSessionToken,
         notice: AvatarProfileNotice,
     ) {
-        synchronized(fallbackTargetLock) {
+        synchronized(avatarMutationLock) {
             if (isCurrentFallbackTargetLocked(setter, target, responseSessionToken)) {
                 _notices.tryEmit(notice)
             }
@@ -1541,7 +1561,7 @@ class AvatarProfileScreenModel internal constructor(
         responseSessionToken: AccountSessionToken,
         error: Throwable,
     ) {
-        synchronized(fallbackTargetLock) {
+        synchronized(avatarMutationLock) {
             if (!isCurrentFallbackTargetLocked(setter, target, responseSessionToken)) return
 
             val notice = when {
@@ -1571,6 +1591,7 @@ class AvatarProfileScreenModel internal constructor(
         }
         val avatar = avatarProfileState.value ?: return null
         val sessionToken = favoriteSession.value?.token ?: return null
+        if (pendingFallbackTarget.value?.avatarId == avatar.avatarId) return null
         if (avatar.avatarId.isBlank() || avatar.authorId.isBlank() ||
             avatar.authorId != sessionToken.userId ||
             avatar.releaseStatus == DELETED_AVATAR_RELEASE_STATUS
@@ -1769,6 +1790,12 @@ private data class AvatarDeletionOperation(
     val target: AvatarDeletionTarget? = null,
     val isDeleting: Boolean = false,
     val failure: AvatarDeletionFailure? = null,
+)
+
+private data class AvatarMutationProgress(
+    val fallbackTarget: AvatarFallbackTarget?,
+    val deletion: AvatarDeletionOperation,
+    val isSelectingAvatar: Boolean,
 )
 
 private data class AvatarImpostorTarget(

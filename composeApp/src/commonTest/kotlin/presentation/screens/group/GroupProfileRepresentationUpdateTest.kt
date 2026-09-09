@@ -62,6 +62,7 @@ class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
 
             assertTrue(fixture.model.groupProfileState.value!!.myMember!!.isRepresenting)
             assertEquals(1, cache.saveCount)
+            assertEquals(listOf(REPRESENTATION_GROUP_ID), cache.deletedGroupIds)
         } finally {
             fixture.close()
             SharedFlowCentre.emitLogout()
@@ -110,6 +111,50 @@ class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
         }
     }
 
+    @Test
+    fun refreshIsIgnoredWhileRepresentationUpdateIsInFlight() = runBlocking {
+        val account = AccountDto(REPRESENTATION_USER_ID, username = "refresh-race")
+        SharedFlowCentre.emitAuthenticated(account)
+        val cache = BlockingGroupProfileCacheStore()
+        val putStarted = CompletableDeferred<Unit>()
+        val releasePut = CompletableDeferred<Unit>()
+        val fixture = createFixture(cache) { request ->
+            when (request.method) {
+                HttpMethod.Put -> {
+                    putStarted.complete(Unit)
+                    releasePut.await()
+                    respondJson("""{"success":{"message":"updated","status_code":200}}""")
+                }
+
+                HttpMethod.Get -> respondJson(representationGroupJson(isRepresenting = true))
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        try {
+            fixture.model.loadGroupData(representationProfile(isRepresenting = false))
+            cache.loadStarted.await()
+            fixture.model.updateRepresentation(
+                isRepresenting = true,
+                failureMessage = "update failed",
+                sessionChangedMessage = "session changed",
+            )
+            putStarted.await()
+
+            fixture.model.refreshGroupData()
+
+            assertFalse(fixture.model.isLoading.value)
+            assertFalse(fixture.model.groupProfileState.value!!.myMember!!.isRepresenting)
+
+            releasePut.complete(Unit)
+            awaitUntil { !fixture.model.isRepresentationUpdating.value }
+            assertTrue(fixture.model.groupProfileState.value!!.myMember!!.isRepresenting)
+        } finally {
+            releasePut.complete(Unit)
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
     private fun createFixture(
         cache: BlockingGroupProfileCacheStore,
         handler: MockRequestHandler,
@@ -151,6 +196,7 @@ private class BlockingGroupProfileCacheStore(
     val saveAttempted = CompletableDeferred<Unit>()
     var saveCount = 0
         private set
+    val deletedGroupIds = mutableListOf<String>()
 
     override suspend fun load(groupId: String): GroupProfileCache? {
         loadStarted.complete(Unit)
@@ -161,6 +207,10 @@ private class BlockingGroupProfileCacheStore(
         saveCount++
         saveAttempted.complete(Unit)
         saveFailure?.let { throw it }
+    }
+
+    override suspend fun delete(groupId: String) {
+        deletedGroupIds += groupId
     }
 
     override suspend fun clearAll() = Unit

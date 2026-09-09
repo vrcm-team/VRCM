@@ -1309,6 +1309,7 @@ class FriendListPagerModel(
     private fun FavoriteGroupData.editableFavoriteType(): FavoriteType? = when (type) {
         World.value -> World
         Avatar.value -> Avatar
+        Friend.value -> Friend
         else -> null
     }
 
@@ -1318,6 +1319,12 @@ class FriendListPagerModel(
 
     private fun updateSelectedFavoriteGroup(updatedGroup: FavoriteGroupData) {
         when (updatedGroup.type) {
+            Friend.value -> {
+                if (_friendGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
+                    _friendGroupOptions.value = FriendGroupOptions(updatedGroup)
+                }
+            }
+
             World.value -> {
                 if (_worldGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
                     _worldGroupOptions.value = WorldGroupOptions(updatedGroup)

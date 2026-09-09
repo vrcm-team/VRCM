@@ -19,8 +19,9 @@ import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.FavoriteGroupClearDialog
 import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoriteGroupEditDialog
+import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.FavoriteGroupClearDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -73,6 +74,7 @@ fun FriendsDirectoryContent(
     val refreshing by model.directoryRefreshing.collectAsState()
     val refreshFailed by model.directoryRefreshFailed.collectAsState()
     val clearState by model.favoriteGroupClearState.collectAsState()
+    val editState by model.favoriteGroupEditState.collectAsState()
     val removalState by model.friendRemovalState.collectAsState()
     val listState = rememberLazyListState()
     val localeStrings = strings
@@ -124,6 +126,8 @@ fun FriendsDirectoryContent(
                         clearGroupInProgress = clearState.isClearing &&
                             clearState.group?.type == FavoriteType.Friend.value,
                         clearGroupContentDescription = strings.favoriteGroupClearAction,
+                        onEditGroup = model::openFavoriteGroupEditor,
+                        editGroupContentDescription = strings.favoriteGroupEditAction,
                     )
                     if (removalState.selectionMode) {
                         Row(
@@ -211,6 +215,13 @@ fun FriendsDirectoryContent(
             onDismiss = model::dismissFavoriteGroupClearConfirmation,
         )
     }
+
+    FavoriteGroupEditDialog(
+        state = editState,
+        onDismiss = model::dismissFavoriteGroupEditor,
+        onClearFailure = model::clearFavoriteGroupEditFailure,
+        onSave = model::saveFavoriteGroup,
+    )
 
     if (removalState.confirmationVisible) {
         AlertDialog(

@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -507,7 +505,7 @@ private fun AvatarProfileContent(
     if (deletionState.canDelete) {
         OutlinedButton(
             onClick = onDelete,
-            enabled = !deletionState.isDeleting,
+            enabled = !deletionState.isDeleting && !deletionState.isBlockedByFallback,
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
@@ -592,7 +590,7 @@ private fun AvatarGallerySection(
 ) {
     if (!state.isAvailable) return
 
-    val (dialogContent, setDialogContent) = LocationDialogContent.current
+    val (_, setDialogContent) = LocationDialogContent.current
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -622,7 +620,6 @@ private fun AvatarGallerySection(
             else -> {
                 AvatarGalleryGrid(
                     files = state.files,
-                    dialogContent = dialogContent,
                     onOpen = { file, version ->
                         setDialogContent(
                             ImagePreviewDialog(
@@ -682,7 +679,6 @@ private fun AvatarGalleryMessage(
 @Composable
 private fun AvatarGalleryGrid(
     files: List<io.github.vrcmteam.vrcm.network.api.files.data.FileData>,
-    dialogContent: io.github.vrcmteam.vrcm.presentation.compoments.SharedDialog?,
     onOpen: (io.github.vrcmteam.vrcm.network.api.files.data.FileData, Int) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -697,40 +693,37 @@ private fun AvatarGalleryGrid(
                 ) {
                     row.forEach { file ->
                         val version = file.latestGalleryVersion()?.version
-                        val isDialogOpen = (dialogContent as? ImagePreviewDialog)?.fileId == file.id
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(16f / 9f),
                         ) {
-                            if (!isDialogOpen) {
-                                SubcomposeAsyncImage(
-                                    model = version?.let { FileApi.imageUrl(file.id, it, 256) },
-                                    contentDescription = file.name,
-                                    imageLoader = koinInject<ImageLoader>(),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .clickable(enabled = version != null) {
-                                            version?.let { selectedVersion -> onOpen(file, selectedVersion) }
-                                        },
-                                    loading = {
-                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            CircularProgressIndicator(modifier = Modifier.size(22.dp))
-                                        }
+                            SubcomposeAsyncImage(
+                                model = version?.let { FileApi.imageUrl(file.id, it, 256) },
+                                contentDescription = file.name,
+                                imageLoader = koinInject<ImageLoader>(),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(MaterialTheme.shapes.medium)
+                                    .clickable(enabled = version != null) {
+                                        version?.let { selectedVersion -> onOpen(file, selectedVersion) }
                                     },
-                                    error = {
-                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = strings.galleryTabLoadFailed,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.error,
-                                            )
-                                        }
-                                    },
-                                )
-                            }
+                                loading = {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                                    }
+                                },
+                                error = {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = strings.galleryTabLoadFailed,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                },
+                            )
                         }
                     }
                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
@@ -785,7 +778,7 @@ private fun AvatarImpostorDeletionSection(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Default.DeleteOutline,
+                    imageVector = AppIcons.Delete,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )
@@ -817,7 +810,7 @@ private fun AvatarImpostorDeletionConfirmationDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
         icon = {
             Icon(
-                imageVector = Icons.Default.DeleteOutline,
+                imageVector = AppIcons.Delete,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
             )
@@ -1097,7 +1090,9 @@ private fun AvatarFallbackActionButton(
     val availability = state.availability
     if (availability == AvatarFallbackAvailability.Hidden) return
 
-    val enabled = !state.isSelecting && availability == AvatarFallbackAvailability.Available
+    val enabled = !state.isSelecting &&
+        !state.isBlockedByDeletion &&
+        availability == AvatarFallbackAvailability.Available
     val icon = when (availability) {
         AvatarFallbackAvailability.Available -> AppIcons.Shield
         AvatarFallbackAvailability.Current -> AppIcons.CheckCircle

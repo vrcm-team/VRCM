@@ -82,6 +82,8 @@ interface GroupProfileCacheStore {
 
     suspend fun save(cache: GroupProfileCache)
 
+    suspend fun delete(groupId: String)
+
     suspend fun clearAll()
 }
 
@@ -295,6 +297,8 @@ internal class RoomGroupProfileCacheStore(
     override suspend fun load(groupId: String): GroupProfileCache? = cache.load(groupId)
 
     override suspend fun save(cache: GroupProfileCache) = this.cache.save(cache.group.id, cache)
+
+    override suspend fun delete(groupId: String) = cache.delete(groupId)
 
     override suspend fun clearAll() = cache.clear()
 }

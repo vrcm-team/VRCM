@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -143,7 +141,7 @@ fun <T> GroupOptionsUI(
                             )
                         } else {
                             Icon(
-                                imageVector = Icons.Default.DeleteOutline,
+                                imageVector = AppIcons.Delete,
                                 contentDescription = clearGroupContentDescription,
                             )
                         }

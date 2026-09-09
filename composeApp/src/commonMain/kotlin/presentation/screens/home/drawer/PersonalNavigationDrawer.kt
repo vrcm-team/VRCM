@@ -80,11 +80,11 @@ fun PersonalNavigationDrawer(
                         enabled = user != null,
                     )
                     DrawerItem(AppIcons.PersonSearch, strings.friendNetworkTitle, onFriendNetworkClick)
-                    DrawerItem(AppIcons.Dashboard, strings.galleryScreenTitle, onGalleryClick)
+                    DrawerItem(AppIcons.Gallery, strings.galleryScreenTitle, onGalleryClick)
                     DrawerItem(AppIcons.Favorite, strings.favoritesTitle, onFavoritesClick)
                     DrawerItem(AppIcons.Groups, strings.myGroups, onMyGroupsClick)
                     DrawerItem(AppIcons.Explore, strings.recentWorldsTitle, onRecentWorldsClick)
-                    DrawerItem(AppIcons.Dashboard, strings.inventoryTitle, onInventoryClick)
+                    DrawerItem(AppIcons.Inventory, strings.inventoryTitle, onInventoryClick)
                     DrawerItem(AppIcons.AccountCircle, strings.meetupCardTitle, onNameplateClick)
                     DrawerItem(AppIcons.Settings, strings.drawerSettings, onSettingsClick)
                     Spacer(Modifier.height(20.dp))

@@ -3,12 +3,14 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
@@ -190,9 +192,17 @@ private fun BoopPrivacyRow(
     state: BoopPrivacyUiState,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val enabled = !state.isLoading && !state.isUpdating
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(
+                value = state.isEnabled,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -206,7 +216,7 @@ private fun BoopPrivacyRow(
         Box(
             modifier = Modifier
                 .width(52.dp)
-                .height(32.dp),
+                .heightIn(min = 48.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (state.isLoading || state.isUpdating) {
@@ -217,7 +227,7 @@ private fun BoopPrivacyRow(
             } else {
                 Switch(
                     checked = state.isEnabled,
-                    onCheckedChange = onCheckedChange,
+                    onCheckedChange = null,
                 )
             }
         }

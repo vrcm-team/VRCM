@@ -8,9 +8,11 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntrySource
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
+import io.github.vrcmteam.vrcm.service.FallbackAvatarUpdateResult
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableDeferred
@@ -140,6 +142,34 @@ class AvatarDeletionTest : MainDispatcherTest() {
         deletingFixture.model.selectAvatar()
         assertEquals(1, deletingFixture.deleter.requests.size)
         assertTrue(deletingFixture.selector.selectedAvatarIds.isEmpty())
+    }
+
+    @Test
+    fun fallbackSelectionAndDeletionAreMutuallyExclusive() = runBlocking {
+        val fallbackFixture = fixture(listOf(deletionAvatar()))
+        fallbackFixture.open("avtr_owned")
+        yield()
+
+        fallbackFixture.model.selectFallbackAvatar()
+        yield()
+        assertEquals(listOf("avtr_owned"), fallbackFixture.fallbackSetter.requestedAvatarIds)
+        assertTrue(fallbackFixture.model.fallbackActionState.value.isSelecting)
+        assertTrue(fallbackFixture.model.deletionState.value.isBlockedByFallback)
+
+        fallbackFixture.model.requestAvatarDeletion()
+        assertNull(fallbackFixture.model.deletionState.value.confirmation)
+        assertTrue(fallbackFixture.deleter.requests.isEmpty())
+
+        val deletingFixture = fixture(listOf(deletionAvatar()))
+        deletingFixture.open("avtr_owned")
+        yield()
+        deletingFixture.model.requestAvatarDeletion()
+        assertNotNull(deletingFixture.model.deletionState.value.confirmation)
+        assertTrue(deletingFixture.model.fallbackActionState.value.isBlockedByDeletion)
+
+        deletingFixture.model.selectFallbackAvatar()
+        yield()
+        assertTrue(deletingFixture.fallbackSetter.requestedAvatarIds.isEmpty())
     }
 
     @Test
@@ -383,6 +413,7 @@ private class AvatarDeletionFixture(
     val deleter = ControlledAvatarDeleter { session.value?.token }
     val store = AvatarDeletionResultStore { session.value?.token }
     val selector = DeletionAvatarSelector(token.userId, currentAvatarId)
+    val fallbackSetter = ControlledDeletionFallbackSetter(token)
     val model = AvatarProfileScreenModel(
         avatarProfileLoader = StaticAvatarProfileLoader(avatarsById),
         avatarSelector = selector,
@@ -391,6 +422,7 @@ private class AvatarDeletionFixture(
         avatarImpostorDeletionSource = EmptyImpostorDeletionSource,
         requestDispatcher = Dispatchers.Unconfined,
         favoriteSession = session,
+        avatarFallbackSetter = fallbackSetter,
         avatarDeleter = deleter,
         avatarDeletionResults = store,
     )
@@ -425,6 +457,38 @@ private data class PendingAvatarDeletion(
     val avatarId: String,
     val response: CompletableDeferred<AuthenticatedAvatarDeletion?> = CompletableDeferred(),
 )
+
+private class ControlledDeletionFallbackSetter(
+    private val token: AccountSessionToken,
+) : AvatarFallbackSetter {
+    override val currentUser = MutableStateFlow<AvatarFallbackUserContext?>(
+        AvatarFallbackUserContext(
+            userId = token.userId,
+            fallbackAvatarId = "",
+            sessionToken = token,
+        )
+    )
+    val requestedAvatarIds = mutableListOf<String>()
+    private val response = CompletableDeferred<AvatarFallbackResponse?>()
+
+    override suspend fun set(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+    ): AvatarFallbackResponse? {
+        requestedAvatarIds += avatarId
+        return response.await()
+    }
+
+    override suspend fun apply(
+        avatarId: String,
+        sessionToken: AccountSessionToken,
+        response: CurrentUserData,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
+    ): FallbackAvatarUpdateResult = error("Fallback response is not completed in deletion tests")
+
+    override fun isCurrentSession(sessionToken: AccountSessionToken): Boolean =
+        sessionToken == token
+}
 
 private class ControlledAvatarDeleter(
     private val currentToken: () -> AccountSessionToken?,

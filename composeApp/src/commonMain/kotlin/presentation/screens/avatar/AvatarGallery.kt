@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
+private const val AVATAR_GALLERY_REFRESH_PAGE_SIZE = 100
+
 internal object AvatarGalleryLimits {
     const val MAX_FILE_BYTES: Long = 50L * 1024L * 1024L
     val ALLOWED_EXTENSIONS = listOf("jpg", "jpeg", "png", "webp", "heic", "heif")
@@ -137,7 +139,10 @@ internal class NetworkAvatarGalleryUploader(
         }
         onRefreshing()
         val refreshed = sessionBound(pending.sessionToken) {
-            fileApi.getAvatarGalleryFiles(pending.target.avatarId)
+            fileApi.getAvatarGalleryFiles(
+                avatarId = pending.target.avatarId,
+                n = AVATAR_GALLERY_REFRESH_PAGE_SIZE,
+            )
         }
         return refreshed.fold(
             onSuccess = { response ->
@@ -286,6 +291,26 @@ internal class AvatarGalleryStateController(
             current.initialLoadFailed -> requestPage(reset = true)
             current.loadMoreFailed -> requestPage(reset = false)
         }
+    }
+
+    fun applyAuthoritativeUpdate(update: AvatarGalleryUpdate): Boolean {
+        if (update.avatarId != mutableState.value.avatarId ||
+            update.sessionToken != session.value?.token
+        ) {
+            return false
+        }
+
+        latestRequestToken.updateAndGet { it + 1 }
+        nextOffset = update.files.size
+        mutableState.value = AvatarGalleryState(
+            avatarId = update.avatarId,
+            files = update.files
+                .distinctBy(FileData::id)
+                .sortedWith(compareBy { it.order ?: Int.MAX_VALUE }),
+            isAvailable = true,
+            hasMore = update.files.size >= AVATAR_GALLERY_REFRESH_PAGE_SIZE,
+        )
+        return true
     }
 
     private fun requestPage(reset: Boolean) {

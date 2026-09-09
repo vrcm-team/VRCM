@@ -350,8 +350,15 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
                 }
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(text = strings.rewardCodeEntry)
+            Text(text = "${strings.rewardCodeTitle}:")
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = strings.rewardCodeEntry,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         Row(

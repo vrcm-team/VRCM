@@ -68,7 +68,7 @@ internal class RewardCodeScreenModel(
             if (current.isSubmitting || current.sessionToken == null) {
                 current
             } else {
-                current.copy(code = code, failure = null)
+                current.copy(code = code, rewards = null, failure = null)
             }
         }
     }

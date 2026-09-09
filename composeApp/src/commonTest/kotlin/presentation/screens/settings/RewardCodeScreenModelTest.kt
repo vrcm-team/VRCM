@@ -59,6 +59,7 @@ class RewardCodeScreenModelTest : MainDispatcherTest() {
         assertEquals("badge", fixture.model.state.value.rewards?.single()?.type)
 
         fixture.model.updateCode("second-code")
+        assertNull(fixture.model.state.value.rewards)
         fixture.model.submit()
         val second = fixture.redeemer.requests.receive()
         second.complete(successResponse(second.token, "item"))
@@ -116,7 +117,7 @@ class RewardCodeScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
-    fun sameAccountTokenChangePreservesInputAndRewardsUntilLogout() = runBlocking {
+    fun enteringAnotherCodeClearsRewardsAndTokenRenewalPreservesTheNewInput() = runBlocking {
         val tokenA = AccountSessionToken("usr_a", 1)
         val fixture = fixture(tokenA)
         fixture.model.updateCode("completed-code")
@@ -133,7 +134,7 @@ class RewardCodeScreenModelTest : MainDispatcherTest() {
         val renewed = fixture.model.state.value
         assertEquals(tokenB, renewed.sessionToken)
         assertEquals("not-yet-submitted", renewed.code)
-        assertEquals("badge", renewed.rewards?.single()?.type)
+        assertNull(renewed.rewards)
 
         fixture.sessions.value = null
         yield()

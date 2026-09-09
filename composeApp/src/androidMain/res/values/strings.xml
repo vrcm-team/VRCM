@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VRCM</string>
+    <string name="app_name" translatable="false">VRCM</string>
     <string name="friend_social_channel">Friend activity alerts</string>
     <string name="friend_monitor_channel">Friend activity monitor</string>
     <string name="friend_monitor_title">Activity monitor</string>

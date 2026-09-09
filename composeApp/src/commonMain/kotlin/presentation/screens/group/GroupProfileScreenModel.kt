@@ -160,6 +160,9 @@ class GroupProfileScreenModel(
     }
 
     private fun refreshGroupData(refreshProfile: Boolean) {
+        val groupId = _groupProfileState.value?.groupId.orEmpty()
+        if (_isLoading.value || _isRepresentationUpdating.value || groupId.isBlank()) return
+
         _members.value = emptyList()
         _owner.value = null
         _galleryImages.value = emptyMap()
@@ -171,12 +174,6 @@ class GroupProfileScreenModel(
         _postsLoading.value = true
         _membersLoading.value = true
         _groupInstances.value = emptyList()
-        val groupId = _groupProfileState.value?.groupId.orEmpty()
-        if (_isLoading.value || groupId.isBlank()) {
-            _postsLoading.value = false
-            _membersLoading.value = false
-            return
-        }
         _isLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -262,6 +259,7 @@ class GroupProfileScreenModel(
         val group = _groupProfileState.value ?: return
         val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
         if (_isActionLoading.value ||
+            _isLoading.value ||
             _isRepresentationUpdating.value ||
             !group.hasActiveMembership(sessionToken)
         ) {
@@ -363,6 +361,13 @@ class GroupProfileScreenModel(
             throw cancellation
         } catch (error: Throwable) {
             logger.error("GroupRepresentationCache: ${error.message.orEmpty()}")
+            try {
+                groupProfileCacheStore.delete(groupId)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (deleteError: Throwable) {
+                logger.error("GroupRepresentationCacheDelete: ${deleteError.message.orEmpty()}")
+            }
         }
     }
 

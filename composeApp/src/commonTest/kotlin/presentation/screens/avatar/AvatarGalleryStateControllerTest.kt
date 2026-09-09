@@ -95,6 +95,60 @@ class AvatarGalleryStateControllerTest {
         assertEquals(2, loader.requests.count { it.avatarId == "avtr_a" && it.offset == 2 })
     }
 
+    @Test
+    fun authoritativeUpdateReplacesStateResetsPagingAndRejectsLatePage() = runBlocking {
+        val session = MutableStateFlow<AuthenticatedAccount?>(account("usr_a", 1))
+        val loader = ControlledAvatarGalleryLoader()
+        val controller = controller(loader, session, pageSize = 2)
+
+        controller.showAvatar("avtr_a")
+        loader.fail("avtr_a", 0)
+        assertTrue(controller.state.value.initialLoadFailed)
+
+        val firstSnapshot = (0 until 100)
+            .map { index -> file("file_$index", order = index) }
+            .reversed()
+        assertTrue(
+            controller.applyAuthoritativeUpdate(
+                AvatarGalleryUpdate(
+                    avatarId = "avtr_a",
+                    files = firstSnapshot,
+                    sessionToken = session.value!!.token,
+                )
+            )
+        )
+        assertEquals(
+            (0 until 100).map { "file_$it" },
+            controller.state.value.files.map(FileData::id),
+        )
+        assertTrue(controller.state.value.isAvailable)
+        assertTrue(controller.state.value.hasMore)
+        assertFalse(controller.state.value.isLoading)
+        assertFalse(controller.state.value.initialLoadFailed)
+        assertFalse(controller.state.value.loadMoreFailed)
+
+        controller.loadMore()
+        assertTrue(controller.state.value.isLoadingMore)
+        assertEquals(1, loader.requests.count { it.avatarId == "avtr_a" && it.offset == 100 })
+
+        val latestSnapshot = listOf(file("file_uploaded", order = 0))
+        assertTrue(
+            controller.applyAuthoritativeUpdate(
+                AvatarGalleryUpdate(
+                    avatarId = "avtr_a",
+                    files = latestSnapshot,
+                    sessionToken = session.value!!.token,
+                )
+            )
+        )
+        assertEquals(listOf("file_uploaded"), controller.state.value.files.map(FileData::id))
+        assertFalse(controller.state.value.hasMore)
+        assertFalse(controller.state.value.isLoadingMore)
+
+        loader.complete("avtr_a", 100, listOf(file("file_late")))
+        assertEquals(listOf("file_uploaded"), controller.state.value.files.map(FileData::id))
+    }
+
     private fun controller(
         loader: ControlledAvatarGalleryLoader,
         session: MutableStateFlow<AuthenticatedAccount?>,

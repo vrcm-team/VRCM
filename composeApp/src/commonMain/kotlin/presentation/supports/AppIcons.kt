@@ -6,8 +6,10 @@ import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FilterNone
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Minimize
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.graphics.*
@@ -28,6 +30,8 @@ object AppIcons {
     val WindowMaximize: ImageVector by lazy { Icons.Outlined.CropSquare }
     val WindowRestore: ImageVector by lazy { Icons.Outlined.FilterNone }
     val ScreenRotation: ImageVector by lazy { Icons.Outlined.ScreenRotation }
+    val Gallery: ImageVector by lazy { Icons.Outlined.PhotoLibrary }
+    val Inventory: ImageVector by lazy { Icons.Outlined.Inventory2 }
 
     val Mirror: ImageVector by lazy {
         ImageVector.Builder(

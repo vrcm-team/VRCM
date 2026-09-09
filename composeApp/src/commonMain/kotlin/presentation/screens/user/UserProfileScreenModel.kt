@@ -105,6 +105,44 @@ internal fun creditsBalanceFailureState(error: Throwable): CreditsBalanceState =
         CreditsBalanceState.Error
     }
 
+internal class CreditsBalanceStateMachine {
+    private val lock = SynchronizedObject()
+    private val _state = MutableStateFlow<CreditsBalanceState>(CreditsBalanceState.Loading)
+    val state: StateFlow<CreditsBalanceState> = _state.asStateFlow()
+    private var nextRequestId = 0L
+    private var activeRequestId: Long? = null
+
+    fun tryStart(): Long? = synchronized(lock) {
+        if (activeRequestId != null) return@synchronized null
+        (++nextRequestId).also { requestId ->
+            activeRequestId = requestId
+            _state.value = CreditsBalanceState.Loading
+        }
+    }
+
+    fun complete(requestId: Long, balance: Long): Boolean =
+        finish(requestId, CreditsBalanceState.Available(balance))
+
+    fun fail(requestId: Long, error: Throwable): Boolean =
+        finish(requestId, creditsBalanceFailureState(error))
+
+    fun failDropped(requestId: Long): Boolean =
+        finish(requestId, CreditsBalanceState.Error)
+
+    fun invalidate() = synchronized(lock) {
+        nextRequestId++
+        activeRequestId = null
+        _state.value = CreditsBalanceState.Unavailable
+    }
+
+    private fun finish(requestId: Long, result: CreditsBalanceState): Boolean = synchronized(lock) {
+        if (activeRequestId != requestId) return@synchronized false
+        activeRequestId = null
+        _state.value = result
+        true
+    }
+}
+
 private enum class UserLoadState {
     Idle,
     Loading,
@@ -722,8 +760,8 @@ class UserProfileScreenModel internal constructor(
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
 
-    private val _creditsBalanceState = mutableStateOf<CreditsBalanceState>(CreditsBalanceState.Loading)
-    internal val creditsBalanceState by _creditsBalanceState
+    private val creditsBalanceStateMachine = CreditsBalanceStateMachine()
+    internal val creditsBalanceState: StateFlow<CreditsBalanceState> = creditsBalanceStateMachine.state
     private var creditsBalanceJob: Job? = null
 
     private val _inviteMessageSelection = MutableStateFlow<InviteMessageSelectionState?>(null)
@@ -813,6 +851,11 @@ class UserProfileScreenModel internal constructor(
     init {
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
+                if (session?.account?.userId != cacheOwnerUserId) {
+                    creditsBalanceJob?.cancel()
+                    creditsBalanceJob = null
+                    creditsBalanceStateMachine.invalidate()
+                }
                 val shouldReload = playerInteractionController.onSessionChanged(session?.token)
                 if (shouldReload && userState.id != cacheOwnerUserId) {
                     refreshPlayerInteractionStatus()
@@ -1020,24 +1063,41 @@ class UserProfileScreenModel internal constructor(
     fun loadCreditsBalance() {
         val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
         if (!userState.isSelf || userState.id != sessionToken.userId) return
-        if (creditsBalanceJob?.isActive == true) return
+        val requestId = creditsBalanceStateMachine.tryStart() ?: return
 
-        _creditsBalanceState.value = CreditsBalanceState.Loading
         creditsBalanceJob = viewModelScope.launch(Dispatchers.IO) {
             val response = authService.runSessionBoundCatching(sessionToken) {
                 economyApi.getCreditsBalance(sessionToken.userId)
             }
-            if (response == null) return@launch
-            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+            if (response == null) {
+                finishDroppedCreditsRequest(requestId)
+                return@launch
+            }
 
-            response.result
-                .onSuccess { balance ->
-                    _creditsBalanceState.value = CreditsBalanceState.Available(balance.balance)
-                }
-                .onFailure { error ->
-                    logger.warn("Unable to load VRChat Credits balance")
-                    _creditsBalanceState.value = creditsBalanceFailureState(error)
-                }
+            val published = SharedFlowCentre.commitIfCurrentSession(response.sessionToken) { session ->
+                if (session.account.userId != cacheOwnerUserId) return@commitIfCurrentSession false
+                response.result.fold(
+                    onSuccess = { balance ->
+                        creditsBalanceStateMachine.complete(requestId, balance.balance)
+                    },
+                    onFailure = { error ->
+                        logger.warn("Unable to load VRChat Credits balance")
+                        creditsBalanceStateMachine.fail(requestId, error)
+                    },
+                )
+            }
+            if (!published) finishDroppedCreditsRequest(requestId)
+        }
+    }
+
+    private fun finishDroppedCreditsRequest(requestId: Long) {
+        val session = SharedFlowCentre.currentSession.value
+        if (session?.account?.userId == cacheOwnerUserId) {
+            if (creditsBalanceStateMachine.failDropped(requestId)) {
+                logger.warn("Unable to load VRChat Credits balance")
+            }
+        } else {
+            creditsBalanceStateMachine.invalidate()
         }
     }
 

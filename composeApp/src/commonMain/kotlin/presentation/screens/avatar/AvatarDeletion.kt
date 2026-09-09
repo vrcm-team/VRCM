@@ -65,6 +65,7 @@ internal data class AvatarDeletionState(
     val canDelete: Boolean = false,
     val confirmation: AvatarDeletionTarget? = null,
     val isDeleting: Boolean = false,
+    val isBlockedByFallback: Boolean = false,
     val failure: AvatarDeletionFailure? = null,
 )
 

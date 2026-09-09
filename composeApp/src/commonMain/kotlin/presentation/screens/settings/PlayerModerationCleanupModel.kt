@@ -8,6 +8,7 @@ import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModeratio
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupResponse
 import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupSource
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -58,7 +59,7 @@ class PlayerModerationCleanupModel(
     val state: StateFlow<PlayerModerationCleanupState> = _state.asStateFlow()
 
     private var activeSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
-    private var requestGeneration = 0L
+    private val requestGeneration = atomic(0L)
     private var refreshJob: Job? = null
     private var cleanupJob: Job? = null
 
@@ -66,31 +67,47 @@ class PlayerModerationCleanupModel(
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 val nextToken = session?.token
-                val previousToken = activeSessionToken
-                if (nextToken == previousToken) return@collect
-
-                val refreshRunning = refreshJob?.isActive == true
-                val cleanupRunning = cleanupJob?.isActive == true
-                val requestRunning = refreshRunning || cleanupRunning
-                activeSessionToken = nextToken
-
-                // A request may renew authentication for the same account. Its response token
-                // decides whether the request can continue; an unrelated replacement returns a
-                // stale token and is stopped before another API call.
-                if (requestRunning && previousToken?.userId == nextToken?.userId && nextToken != null) {
-                    _state.update {
-                        it.copy(sessionToken = nextToken, isSessionAvailable = true)
+                if (nextToken == null) {
+                    if (SharedFlowCentre.currentSession.value != null || activeSessionToken == null) {
+                        return@collect
                     }
+                    activeSessionToken = null
+                    requestGeneration.incrementAndGet()
+                    refreshJob?.cancel()
+                    cleanupJob?.cancel()
+                    refreshJob = null
+                    cleanupJob = null
+                    _state.value = PlayerModerationCleanupState(sessionToken = null)
                     return@collect
                 }
 
-                requestGeneration++
-                refreshJob?.cancel()
-                cleanupJob?.cancel()
-                refreshJob = null
-                cleanupJob = null
-                _state.value = PlayerModerationCleanupState(sessionToken = nextToken)
-                if (nextToken != null) refresh()
+                var shouldRefresh = false
+                SharedFlowCentre.commitIfCurrentSession(nextToken) {
+                    val previousToken = activeSessionToken
+                    if (nextToken == previousToken) return@commitIfCurrentSession true
+
+                    val requestRunning = refreshJob?.isActive == true || cleanupJob?.isActive == true
+                    activeSessionToken = nextToken
+
+                    // A request may renew authentication for the same account. Its response token
+                    // decides whether the request can continue; an unrelated replacement returns a
+                    // stale token and is stopped before another API call.
+                    if (requestRunning && previousToken?.userId == nextToken.userId) {
+                        _state.update {
+                            it.copy(sessionToken = nextToken, isSessionAvailable = true)
+                        }
+                    } else {
+                        requestGeneration.incrementAndGet()
+                        refreshJob?.cancel()
+                        cleanupJob?.cancel()
+                        refreshJob = null
+                        cleanupJob = null
+                        _state.value = PlayerModerationCleanupState(sessionToken = nextToken)
+                        shouldRefresh = true
+                    }
+                    true
+                }
+                if (shouldRefresh) refresh()
             }
         }
     }
@@ -106,40 +123,42 @@ class PlayerModerationCleanupModel(
             _state.value = PlayerModerationCleanupState(sessionToken = null)
             return
         }
-        activeSessionToken = token
-        val generation = ++requestGeneration
-        _state.update {
-            it.copy(
-                sessionToken = token,
-                isSessionAvailable = true,
-                isLoading = true,
-                loadFailed = false,
-                result = null,
-            )
+        val generation = requestGeneration.incrementAndGet()
+        if (!commitIfCurrent(token, generation) {
+                activeSessionToken = token
+                _state.update {
+                    it.copy(
+                        sessionToken = token,
+                        isSessionAvailable = true,
+                        isLoading = true,
+                        loadFailed = false,
+                        result = null,
+                    )
+                }
+            }
+        ) {
+            return
         }
         refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            var operationToken = token
             try {
                 val response = source.getAll(token)
                     ?: return@launch restartAfterStaleResponse(generation, wasCleanup = false)
-                if (adopt(response, generation) == null) {
-                    return@launch restartAfterStaleResponse(generation, wasCleanup = false)
-                }
-                response.result.fold(
-                    onSuccess = { records -> publishAvailable(records) },
+                operationToken = adopt(response, generation)
+                    ?: return@launch restartAfterStaleResponse(generation, wasCleanup = false)
+                val published = response.result.fold(
+                    onSuccess = { records -> publishAvailable(records, operationToken, generation) },
                     onFailure = { error ->
                         if (error is CancellationException) throw error
-                        _state.update {
-                            it.copy(isLoading = false, hasLoaded = true, loadFailed = true)
-                        }
+                        publishLoadFailure(operationToken, generation)
                     },
                 )
+                if (!published) restartAfterStaleResponse(generation, wasCleanup = false)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (isCurrent(token, generation)) {
-                    _state.update {
-                        it.copy(isLoading = false, hasLoaded = true, loadFailed = true)
-                    }
+                if (!publishLoadFailure(operationToken, generation)) {
+                    restartAfterStaleResponse(generation, wasCleanup = false)
                 }
             }
         }
@@ -163,15 +182,20 @@ class PlayerModerationCleanupModel(
         val token = expectedSessionToken
             ?.takeIf { it == current.sessionToken && SharedFlowCentre.isCurrentSession(it) }
             ?: return
-        activeSessionToken = token
-        val generation = ++requestGeneration
-        _state.update {
-            it.copy(
-                isClearing = true,
-                processedCount = 0,
-                totalCount = 0,
-                result = null,
-            )
+        val generation = requestGeneration.incrementAndGet()
+        if (!commitIfCurrent(token, generation) {
+                activeSessionToken = token
+                _state.update {
+                    it.copy(
+                        isClearing = true,
+                        processedCount = 0,
+                        totalCount = 0,
+                        result = null,
+                    )
+                }
+            }
+        ) {
+            return
         }
 
         cleanupJob = viewModelScope.launch(Dispatchers.IO) {
@@ -183,16 +207,23 @@ class PlayerModerationCleanupModel(
                     ?: return@launch restartAfterStaleResponse(generation, wasCleanup = true)
                 val records = authoritative.result.getOrElse { error ->
                     if (error is CancellationException) throw error
-                    publishCleanupFailure()
+                    if (!publishCleanupFailure(operationToken, generation)) {
+                        restartAfterStaleResponse(generation, wasCleanup = true)
+                    }
                     return@launch
                 }
                 val targets = records.targetsFor(type)
                 if (targets.isEmpty()) {
-                    publishNoRecords(type)
+                    if (!publishNoRecords(type, operationToken, generation)) {
+                        restartAfterStaleResponse(generation, wasCleanup = true)
+                    }
                     return@launch
                 }
 
-                _state.update { it.copy(totalCount = targets.size) }
+                if (!publishTotal(targets.size, operationToken, generation)) {
+                    restartAfterStaleResponse(generation, wasCleanup = true)
+                    return@launch
+                }
                 targets.forEachIndexed { index, targetUserId ->
                     val response = source.remove(operationToken, targetUserId, type)
                         ?: return@launch restartAfterStaleResponse(generation, wasCleanup = true)
@@ -201,7 +232,10 @@ class PlayerModerationCleanupModel(
                     response.result.exceptionOrNull()?.let { error ->
                         if (error is CancellationException) throw error
                     }
-                    _state.update { it.copy(processedCount = index + 1) }
+                    if (!publishProgress(index + 1, operationToken, generation)) {
+                        restartAfterStaleResponse(generation, wasCleanup = true)
+                        return@launch
+                    }
                 }
 
                 val verification = source.get(operationToken, type)
@@ -210,39 +244,88 @@ class PlayerModerationCleanupModel(
                     ?: return@launch restartAfterStaleResponse(generation, wasCleanup = true)
                 val remaining = verification.result.getOrElse { error ->
                     if (error is CancellationException) throw error
-                    publishCleanupFailure()
+                    if (!publishCleanupFailure(operationToken, generation)) {
+                        restartAfterStaleResponse(generation, wasCleanup = true)
+                    }
                     return@launch
                 }.targetsFor(type).toSet()
                 val removed = targets.count { it !in remaining }
-                publishVerifiedResult(type, removed = removed, remaining = remaining.size)
+                if (
+                    !publishVerifiedResult(
+                        type = type,
+                        removed = removed,
+                        remaining = remaining.size,
+                        token = operationToken,
+                        generation = generation,
+                    )
+                ) {
+                    restartAfterStaleResponse(generation, wasCleanup = true)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (isCurrent(operationToken, generation)) publishCleanupFailure()
+                if (!publishCleanupFailure(operationToken, generation)) {
+                    restartAfterStaleResponse(generation, wasCleanup = true)
+                }
             }
         }
     }
 
-    private fun publishAvailable(records: List<PlayerModerationData>) {
+    private fun publishAvailable(
+        records: List<PlayerModerationData>,
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean {
         val counts = PlayerModerationType.entries.mapNotNull { type ->
             records.targetsFor(type).size
                 .takeIf { it > 0 }
                 ?.let { PlayerModerationTypeCount(type, it) }
         }
-        _state.update { current ->
-            current.copy(
-                availableTypes = counts,
-                selectedType = current.selectedType
-                    ?.takeIf { selected -> counts.any { it.type == selected } }
-                    ?: counts.firstOrNull()?.type,
-                isLoading = false,
-                hasLoaded = true,
-                loadFailed = false,
-            )
+        return commitIfCurrent(token, generation) {
+            _state.update { current ->
+                current.copy(
+                    availableTypes = counts,
+                    selectedType = current.selectedType
+                        ?.takeIf { selected -> counts.any { it.type == selected } }
+                        ?: counts.firstOrNull()?.type,
+                    isLoading = false,
+                    hasLoaded = true,
+                    loadFailed = false,
+                )
+            }
         }
     }
 
-    private fun publishNoRecords(type: PlayerModerationType) {
+    private fun publishLoadFailure(
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean = commitIfCurrent(token, generation) {
+        _state.update {
+            it.copy(isLoading = false, hasLoaded = true, loadFailed = true)
+        }
+    }
+
+    private fun publishTotal(
+        total: Int,
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean = commitIfCurrent(token, generation) {
+        _state.update { it.copy(totalCount = total) }
+    }
+
+    private fun publishProgress(
+        processed: Int,
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean = commitIfCurrent(token, generation) {
+        _state.update { it.copy(processedCount = processed) }
+    }
+
+    private fun publishNoRecords(
+        type: PlayerModerationType,
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean = commitIfCurrent(token, generation) {
         _state.update { current ->
             val remainingTypes = current.availableTypes.filterNot { it.type == type }
             current.copy(
@@ -260,31 +343,42 @@ class PlayerModerationCleanupModel(
         }
     }
 
-    private fun publishVerifiedResult(type: PlayerModerationType, removed: Int, remaining: Int) {
+    private fun publishVerifiedResult(
+        type: PlayerModerationType,
+        removed: Int,
+        remaining: Int,
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean {
         val kind = when {
             remaining == 0 -> PlayerModerationCleanupResultKind.Success
             removed > 0 -> PlayerModerationCleanupResultKind.PartialFailure
             else -> PlayerModerationCleanupResultKind.Failure
         }
-        _state.update { current ->
-            val remainingTypes = if (remaining == 0) {
-                current.availableTypes.filterNot { it.type == type }
-            } else {
-                current.availableTypes.map {
-                    if (it.type == type) it.copy(targetCount = remaining) else it
+        return commitIfCurrent(token, generation) {
+            _state.update { current ->
+                val remainingTypes = if (remaining == 0) {
+                    current.availableTypes.filterNot { it.type == type }
+                } else {
+                    current.availableTypes.map {
+                        if (it.type == type) it.copy(targetCount = remaining) else it
+                    }
                 }
+                current.copy(
+                    availableTypes = remainingTypes,
+                    selectedType = type.takeIf { remaining > 0 }
+                        ?: remainingTypes.firstOrNull()?.type,
+                    isClearing = false,
+                    result = PlayerModerationCleanupResult(kind, removed, remaining),
+                )
             }
-            current.copy(
-                availableTypes = remainingTypes,
-                selectedType = type.takeIf { remaining > 0 }
-                    ?: remainingTypes.firstOrNull()?.type,
-                isClearing = false,
-                result = PlayerModerationCleanupResult(kind, removed, remaining),
-            )
         }
     }
 
-    private fun publishCleanupFailure() {
+    private fun publishCleanupFailure(
+        token: AccountSessionToken,
+        generation: Long,
+    ): Boolean = commitIfCurrent(token, generation) {
         _state.update {
             it.copy(
                 isClearing = false,
@@ -302,28 +396,40 @@ class PlayerModerationCleanupModel(
         generation: Long,
     ): AccountSessionToken? {
         val responseToken = response.sessionToken
-        if (requestGeneration != generation || !SharedFlowCentre.isCurrentSession(responseToken)) {
-            return null
+        val adopted = commitIfCurrent(responseToken, generation) {
+            activeSessionToken = responseToken
+            _state.update {
+                it.copy(sessionToken = responseToken, isSessionAvailable = true)
+            }
         }
-        activeSessionToken = responseToken
-        _state.update {
-            it.copy(sessionToken = responseToken, isSessionAvailable = true)
-        }
-        return responseToken
+        return responseToken.takeIf { adopted }
     }
 
     private fun restartAfterStaleResponse(generation: Long, wasCleanup: Boolean) {
-        if (requestGeneration != generation) return
-        requestGeneration++
-        if (wasCleanup) cleanupJob = null else refreshJob = null
-        val currentToken = SharedFlowCentre.currentSession.value?.token
-        activeSessionToken = currentToken
-        _state.value = PlayerModerationCleanupState(sessionToken = currentToken)
-        if (currentToken != null) viewModelScope.launch { refresh() }
+        viewModelScope.launch {
+            val currentToken = SharedFlowCentre.currentSession.value?.token ?: return@launch
+            val shouldRefresh = commitIfCurrent(currentToken, generation) {
+                requestGeneration.incrementAndGet()
+                if (wasCleanup) cleanupJob = null else refreshJob = null
+                activeSessionToken = currentToken
+                _state.value = PlayerModerationCleanupState(sessionToken = currentToken)
+            }
+            if (shouldRefresh) refresh()
+        }
     }
 
-    private fun isCurrent(token: AccountSessionToken, generation: Long): Boolean =
-        requestGeneration == generation && SharedFlowCentre.isCurrentSession(token)
+    private fun commitIfCurrent(
+        token: AccountSessionToken,
+        generation: Long,
+        commit: () -> Unit,
+    ): Boolean = SharedFlowCentre.commitIfCurrentSession(token) {
+        if (requestGeneration.value != generation) {
+            false
+        } else {
+            commit()
+            true
+        }
+    }
 }
 
 private fun List<PlayerModerationData>.targetsFor(type: PlayerModerationType): List<String> =
