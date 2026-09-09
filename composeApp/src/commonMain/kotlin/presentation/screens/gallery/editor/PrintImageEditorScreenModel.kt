@@ -357,5 +357,6 @@ private fun ImageSize.isValid(): Boolean = width > 0 && height > 0
 private fun ImageEditorTarget.uploadFileName(sourceFileName: String, nowMillis: Long): String = when (this) {
     ImageEditorTarget.Print -> "print-$nowMillis.png"
     is ImageEditorTarget.AvatarCover -> "avatar-cover-$nowMillis.png"
+    is ImageEditorTarget.WorldCover -> "world-cover-$nowMillis.png"
     is ImageEditorTarget.Gallery -> sourceFileName.ifBlank { "${tagType.value}-$nowMillis.png" }
 }

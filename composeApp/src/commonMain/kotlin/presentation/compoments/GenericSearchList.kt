@@ -176,6 +176,7 @@ fun <T> SearchResultItem(
     item: T,
     onClick: (T) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     leadingContent: @Composable () -> Unit,
     headlineContent: @Composable () -> Unit,
     supportingContent: @Composable (() -> Unit)? = null,
@@ -187,7 +188,7 @@ fun <T> SearchResultItem(
             .heightIn(min = 68.dp)
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
-            .clickable { onClick(item) },
+            .clickable(enabled = enabled) { onClick(item) },
         leadingContent = leadingContent,
         headlineContent = headlineContent,
         supportingContent = supportingContent ?: {},
