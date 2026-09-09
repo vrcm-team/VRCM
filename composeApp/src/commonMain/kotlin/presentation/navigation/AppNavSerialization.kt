@@ -19,6 +19,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRout
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -55,6 +56,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(MeetupCardDisplayRoute::class, MeetupCardDisplayRoute.serializer())
             subclass(MeetupCardEditorRoute::class, MeetupCardEditorRoute.serializer())
             subclass(NotificationSettingsScreen::class, NotificationSettingsScreen.serializer())
+            subclass(RewardCodeScreen::class, RewardCodeScreen.serializer())
             subclass(InviteMessageSlotsScreen::class, InviteMessageSlotsScreen.serializer())
             subclass(NotificationScreen::class, NotificationScreen.serializer())
         }

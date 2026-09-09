@@ -2,10 +2,16 @@ package io.github.vrcmteam.vrcm.network.api.inventory
 
 import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryData
 import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryTemplateData
+import io.github.vrcmteam.vrcm.network.api.inventory.data.RewardRedemptionRequestData
+import io.github.vrcmteam.vrcm.network.api.inventory.data.RewardRedemptionResult
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 
 enum class InventoryItemType(val value: String) {
     Bundle("bundle"),
@@ -24,7 +30,7 @@ enum class InventorySortOrder(val value: String) {
     OldestCreated("oldest_created"),
 }
 
-/** Retrieves inventory entries and template definitions. */
+/** Retrieves inventory entries and template definitions, and redeems reward codes. */
 class InventoryApi(private val client: HttpClient) {
     suspend fun getInventory(
         n: Int = DEFAULT_PAGE_SIZE,
@@ -50,6 +56,12 @@ class InventoryApi(private val client: HttpClient) {
 
         return client.get("inventory/template/$templateId").checkSuccess()
     }
+
+    suspend fun redeemReward(code: String): List<RewardRedemptionResult> =
+        client.post("reward/redeem") {
+            contentType(ContentType.Application.Json)
+            setBody(RewardRedemptionRequestData(code))
+        }.checkSuccess()
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 60
