@@ -104,9 +104,11 @@ data class UserProfileScreen(
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinViewModel { parametersOf(userProfileVO) }
         val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
+        val localeStrings = strings
 
         LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.refreshUser(userProfileVO.id)
+            userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
         }
 
         LaunchedEffect(Unit) {
@@ -116,6 +118,7 @@ data class UserProfileScreen(
         }
 
         val currentUser = userProfileScreenModel.userState
+        val playerBlockState by userProfileScreenModel.playerBlockState.collectAsState()
         val userGroups = userProfileScreenModel.userGroups
         val mutualGroups = userProfileScreenModel.mutualGroups
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
@@ -124,6 +127,7 @@ data class UserProfileScreen(
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var pendingPlayerBlockChange by remember { mutableStateOf<Boolean?>(null) }
         var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
         var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
@@ -237,6 +241,13 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                playerBlockState = playerBlockState,
+                retryPlayerBlockStatus = {
+                    userProfileScreenModel.refreshPlayerBlockStatus(
+                        localeStrings.profileBlockStatusLoadFailed
+                    )
+                },
+                confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
                 openReportDialog = {
                     userProfileScreenModel.resetUserReportState()
                     openReportDialog = true
@@ -327,6 +338,30 @@ data class UserProfileScreen(
                 }
             },
         )
+        PlayerBlockConfirmationDialog(
+            desiredBlockedState = pendingPlayerBlockChange,
+            currentState = playerBlockState,
+            displayName = currentUser.displayName,
+            onDismiss = { pendingPlayerBlockChange = null },
+            onConfirm = { blocked ->
+                actionScope.launch {
+                    val succeeded = userProfileScreenModel.setPlayerBlocked(
+                        blocked = blocked,
+                        successMessage = if (blocked) {
+                            localeStrings.profileBlockSuccess
+                        } else {
+                            localeStrings.profileUnblockSuccess
+                        },
+                        failureMessage = if (blocked) {
+                            localeStrings.profileBlockFailed
+                        } else {
+                            localeStrings.profileUnblockFailed
+                        },
+                    )
+                    if (succeeded) pendingPlayerBlockChange = null
+                }
+            },
+        )
         val userReportState by userProfileScreenModel.userReportState.collectAsState()
         LaunchedEffect(userReportState) {
             if (userReportState == UserReportState.Submitted) {
@@ -395,6 +430,9 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    playerBlockState: PlayerBlockState,
+    retryPlayerBlockStatus: () -> Unit,
+    confirmPlayerBlockChange: (Boolean) -> Unit,
     openReportDialog: () -> Unit,
     openImageInvitePicker: () -> Unit,
     openInviteMessageSelection: (InviteMessageAction) -> Unit,
@@ -440,6 +478,32 @@ private fun ColumnScope.SheetItems(
             scope.launch { hideSheet() }.invokeOnCompletion {
                 onHideCompletion()
                 openEditNoteDialog()
+            }
+        })
+
+        val blockActionText = when {
+            !playerBlockState.isSessionAvailable -> localeStrings.profileBlockStatusUnavailable
+            playerBlockState.isLoading -> localeStrings.profileBlockStatusChecking
+            playerBlockState.loadFailed -> localeStrings.profileBlockStatusRetry
+            playerBlockState.isBlocked == true -> localeStrings.profileUnblock
+            playerBlockState.isBlocked == false -> localeStrings.profileBlock
+            else -> localeStrings.profileBlockStatusChecking
+        }
+        val blockActionEnabled = when {
+            !playerBlockState.isSessionAvailable -> false
+            playerBlockState.isLoading || playerBlockState.isUpdating -> false
+            playerBlockState.loadFailed -> true
+            else -> playerBlockState.isBlocked != null
+        }
+        SheetButtonItem(text = blockActionText, enabled = blockActionEnabled, onClick = {
+            if (playerBlockState.loadFailed) {
+                retryPlayerBlockStatus()
+            } else {
+                val blocked = playerBlockState.isBlocked ?: return@SheetButtonItem
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    confirmPlayerBlockChange(!blocked)
+                }
             }
         })
 
@@ -512,6 +576,63 @@ private fun ColumnScope.SheetItems(
         )
     }
 
+}
+
+@Composable
+private fun PlayerBlockConfirmationDialog(
+    desiredBlockedState: Boolean?,
+    currentState: PlayerBlockState,
+    displayName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean) -> Unit,
+) {
+    val blocked = desiredBlockedState ?: return
+    val localeStrings = strings
+    val canSubmit = !currentState.isUpdating && currentState.isBlocked == !blocked
+    AlertDialog(
+        onDismissRequest = { if (!currentState.isUpdating) onDismiss() },
+        title = {
+            Text(
+                if (blocked) {
+                    localeStrings.profileBlockConfirmTitle
+                } else {
+                    localeStrings.profileUnblockConfirmTitle
+                }
+            )
+        },
+        text = {
+            Text(
+                (if (blocked) {
+                    localeStrings.profileBlockConfirmMessage
+                } else {
+                    localeStrings.profileUnblockConfirmMessage
+                }).replace("%name%", displayName)
+            )
+        },
+        confirmButton = {
+            Button(
+                enabled = canSubmit,
+                onClick = { onConfirm(blocked) },
+            ) {
+                if (currentState.isUpdating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(if (blocked) localeStrings.profileBlock else localeStrings.profileUnblock)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = !currentState.isUpdating,
+                onClick = onDismiss,
+            ) {
+                Text(localeStrings.cancel)
+            }
+        },
+    )
 }
 
 @Composable

@@ -20,8 +20,24 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileBlock,
+                locale.profileUnblock,
+                locale.profileBlockStatusChecking,
+                locale.profileBlockStatusRetry,
+                locale.profileBlockStatusUnavailable,
+                locale.profileBlockConfirmTitle,
+                locale.profileBlockConfirmMessage,
+                locale.profileUnblockConfirmTitle,
+                locale.profileUnblockConfirmMessage,
+                locale.profileBlockSuccess,
+                locale.profileUnblockSuccess,
+                locale.profileBlockFailed,
+                locale.profileUnblockFailed,
+                locale.profileBlockStatusLoadFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileBlockConfirmMessage.contains("%name%"))
+            assertTrue(locale.profileUnblockConfirmMessage.contains("%name%"))
         }
     }
 
