@@ -122,6 +122,7 @@ val presentationModule: Module = module {
             friendLocationPagerModel = get(),
             friendActivityService = get(),
             boopService = get(),
+            boopPrivacyService = get(),
         )
     }
     viewModelOf(::MutualFriendsScreenModel)
