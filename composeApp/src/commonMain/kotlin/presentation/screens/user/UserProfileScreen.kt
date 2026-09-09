@@ -124,6 +124,7 @@ data class UserProfileScreen(
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
         var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
         val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
@@ -236,6 +237,10 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                openReportDialog = {
+                    userProfileScreenModel.resetUserReportState()
+                    openReportDialog = true
+                },
                 openImageInvitePicker = openImageInvitePicker,
                 openInviteMessageSelection = { action ->
                     userProfileScreenModel.openInviteMessageSelection(
@@ -322,6 +327,31 @@ data class UserProfileScreen(
                 }
             },
         )
+        val userReportState by userProfileScreenModel.userReportState.collectAsState()
+        LaunchedEffect(userReportState) {
+            if (userReportState == UserReportState.Submitted) {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            }
+        }
+        val reportSuccessMessage = strings.profileReportSuccess
+        val reportFailureMessage = strings.profileReportFailed
+        UserReportDialog(
+            visible = openReportDialog,
+            targetName = currentUser.displayName,
+            state = userReportState,
+            onDismiss = {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            },
+            onSubmit = {
+                userProfileScreenModel.reportUser(
+                    userId = currentUser.id,
+                    successMessage = reportSuccessMessage,
+                    failureMessage = reportFailureMessage,
+                )
+            },
+        )
         ImageInviteDialog(
             state = imageInviteState,
             targetName = currentUser.displayName,
@@ -365,6 +395,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    openReportDialog: () -> Unit,
     openImageInvitePicker: () -> Unit,
     openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
@@ -466,6 +497,20 @@ private fun ColumnScope.SheetItems(
             openAlertDialog()
         }
     })
+    if (!currentUser.isSelf) {
+        SheetButtonItem(
+            text = localeStrings.profileReportUser,
+            onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openReportDialog()
+                }
+            },
+            content = { label ->
+                Text(label, color = MaterialTheme.colorScheme.error)
+            },
+        )
+    }
 
 }
 
