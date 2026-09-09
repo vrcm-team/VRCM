@@ -2,39 +2,93 @@ package io.github.vrcmteam.vrcm.network.api.playermoderation
 
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
-import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationRequest
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData as CleanupPlayerModerationData
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationRequest as CleanupPlayerModerationRequest
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
-import io.ktor.client.request.url
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import io.ktor.http.path
+import kotlinx.serialization.Serializable
 
-/** Reads and removes current-account player moderation overrides. */
+private const val PLAYER_MODERATIONS_PATH = "$AUTH_API_PREFIX/$USER_API_PREFIX/playermoderations"
+private const val UNPLAYER_MODERATE_PATH = "$AUTH_API_PREFIX/$USER_API_PREFIX/unplayermoderate"
+
+internal enum class VoiceModerationType(val apiValue: String) {
+    Mute("mute"),
+    Unmute("unmute"),
+    ;
+
+    companion object {
+        fun fromApiValue(value: String): VoiceModerationType? =
+            entries.firstOrNull { it.apiValue == value }
+    }
+}
+
+@Serializable
+internal data class PlayerModerationData(
+    val created: String = "",
+    val id: String = "",
+    val sourceDisplayName: String = "",
+    val sourceUserId: String = "",
+    val targetDisplayName: String = "",
+    val targetUserId: String = "",
+    val type: String = "",
+)
+
+@Serializable
+private data class ModeratePlayerRequest(
+    val moderated: String,
+    val type: String,
+)
+
+/** API operations for the account's player management records and voice overrides. */
 class PlayerModerationApi(private val client: HttpClient) {
-    suspend fun get(type: PlayerModerationType? = null): List<PlayerModerationData> =
-        client.get {
-            url { path(AUTH_API_PREFIX, USER_API_PREFIX, "playermoderations") }
+    internal suspend fun getAll(): List<PlayerModerationData> =
+        client.get(PLAYER_MODERATIONS_PATH).checkSuccess()
+
+    suspend fun get(type: PlayerModerationType? = null): List<CleanupPlayerModerationData> =
+        client.get(PLAYER_MODERATIONS_PATH) {
             type?.let { parameter("type", it.apiValue) }
         }.checkSuccess()
 
-    suspend fun remove(targetUserId: String, type: PlayerModerationType) {
-        require(USER_ID_PATTERN.matches(targetUserId)) { "Invalid target user ID" }
+    internal suspend fun getForTarget(targetUserId: String): List<PlayerModerationData> =
+        client.get(PLAYER_MODERATIONS_PATH) {
+            parameter("targetUserId", targetUserId)
+        }.checkSuccess()
 
-        client.put {
-            url { path(AUTH_API_PREFIX, USER_API_PREFIX, "unplayermoderate") }
+    internal suspend fun moderate(
+        targetUserId: String,
+        type: VoiceModerationType,
+    ): PlayerModerationData = client.post(PLAYER_MODERATIONS_PATH) {
+        contentType(ContentType.Application.Json)
+        setBody(ModeratePlayerRequest(moderated = targetUserId, type = type.apiValue))
+    }.checkSuccess()
+
+    internal suspend fun remove(
+        targetUserId: String,
+        type: VoiceModerationType,
+    ) {
+        client.put(UNPLAYER_MODERATE_PATH) {
             contentType(ContentType.Application.Json)
-            setBody(PlayerModerationRequest(moderated = targetUserId, type = type.apiValue))
-        }.checkSuccess<Unit> { Unit }
+            setBody(ModeratePlayerRequest(moderated = targetUserId, type = type.apiValue))
+        }.checkSuccess { Unit }
+    }
+
+    suspend fun remove(targetUserId: String, type: PlayerModerationType) {
+        require(CLEANUP_USER_ID_PATTERN.matches(targetUserId)) { "Invalid target user ID" }
+        client.put(UNPLAYER_MODERATE_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(CleanupPlayerModerationRequest(moderated = targetUserId, type = type.apiValue))
+        }.checkSuccess { Unit }
     }
 
     private companion object {
-        val USER_ID_PATTERN = Regex("usr_[A-Za-z0-9_-]+")
+        val CLEANUP_USER_ID_PATTERN = Regex("usr_[A-Za-z0-9_-]+")
     }
 }

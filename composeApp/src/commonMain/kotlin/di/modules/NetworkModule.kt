@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.di.modules
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
+import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
@@ -11,6 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
@@ -37,10 +39,12 @@ internal val networkModule = module(true) {
     singleOf(::InstancesApi)
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
+    singleOf(::PlayerChatboxModerationApi)
     singleOf(::PlayerModerationApi)
     singleOf(::InviteApi)
     singleOf(::WorldsApi)
     singleOf(::FavoriteApi)
+    singleOf(::FeedbackApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)

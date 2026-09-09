@@ -67,6 +67,15 @@ class FileApiUploadTest {
     }
 
     @Test
+    fun worldImageUploadUsesTheVrchatWorldImageTag() = runBlocking {
+        val capturedBody = captureUploadBody(FileTagType.WorldImage)
+
+        assertTrue(capturedBody.contains("filename=\"blob\""))
+        assertTrue(capturedBody.contains("worldimage"))
+        assertFalse(capturedBody.contains("name=maskTag"))
+    }
+
+    @Test
     fun animatedEmojiUploadUsesVrcxFilenameMetadata() = runBlocking {
         val capturedBody = captureUploadBody(
             tagType = FileTagType.Emoji,
