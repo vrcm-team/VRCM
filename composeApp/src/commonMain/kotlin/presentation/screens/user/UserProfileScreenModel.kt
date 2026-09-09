@@ -718,9 +718,10 @@ class UserProfileScreenModel internal constructor(
     internal val imageInviteState: StateFlow<ImageInviteUiState> = imageInviteCoordinator.state
 
     private val cacheOwnerUserId = authService.accountDto().userId
+    private val profileTargetUserId = userProfileVO.id
     private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
     private val playerChatboxModerationController = PlayerChatboxModerationController(
-        initialTargetUserId = userProfileVO.id,
+        initialTargetUserId = profileTargetUserId,
         authService = authService,
         moderationApi = playerChatboxModerationApi,
         scope = viewModelScope,
@@ -728,7 +729,7 @@ class UserProfileScreenModel internal constructor(
     internal val playerChatboxModerationState: StateFlow<PlayerChatboxModerationState> =
         playerChatboxModerationController.state
     private val playerVoiceModerationController = PlayerVoiceModerationController(
-        initialTargetUserId = userProfileVO.id,
+        initialTargetUserId = profileTargetUserId,
         authService = authService,
         playerModerationApi = playerModerationApi,
         scope = viewModelScope,
@@ -857,7 +858,7 @@ class UserProfileScreenModel internal constructor(
                     creditsBalanceStateMachine.invalidate()
                 }
                 val shouldReload = playerInteractionController.onSessionChanged(session?.token)
-                if (shouldReload && userState.id != cacheOwnerUserId) {
+                if (shouldReload && profileTargetUserId != cacheOwnerUserId) {
                     refreshPlayerInteractionStatus()
                 }
                 if (session?.account?.userId != cacheOwnerUserId) {
@@ -1102,13 +1103,13 @@ class UserProfileScreenModel internal constructor(
     }
 
     fun refreshPlayerBlockStatus(failureMessage: String) {
-        if (userState.id == cacheOwnerUserId) return
+        if (profileTargetUserId == cacheOwnerUserId) return
         val sessionToken = currentProfileSessionToken() ?: run {
             playerBlockStateMachine.invalidate()
             return
         }
         val operationId = playerBlockStateMachine.tryStartLoad() ?: return
-        val targetUserId = userState.id
+        val targetUserId = profileTargetUserId
         viewModelScope.launch(Dispatchers.IO) {
             val response = authService.runSessionBoundCatching(sessionToken) {
                 usersApi.isUserBlocked(targetUserId)
@@ -1132,13 +1133,13 @@ class UserProfileScreenModel internal constructor(
         successMessage: String,
         failureMessage: String,
     ): Boolean = viewModelScope.async(Dispatchers.IO) {
-        if (userState.id == cacheOwnerUserId) return@async false
+        if (profileTargetUserId == cacheOwnerUserId) return@async false
         val sessionToken = currentProfileSessionToken() ?: run {
             playerBlockStateMachine.invalidate()
             return@async false
         }
         val operationId = playerBlockStateMachine.tryStartUpdate(blocked) ?: return@async false
-        val targetUserId = userState.id
+        val targetUserId = profileTargetUserId
         val response = authService.runSessionBoundCatching(sessionToken) {
             if (blocked) usersApi.blockUser(targetUserId) else usersApi.unblockUser(targetUserId)
         }
@@ -1159,8 +1160,8 @@ class UserProfileScreenModel internal constructor(
     }.await()
 
     fun refreshPlayerInteractionStatus(failureMessage: String? = null) {
-        if (userState.id == cacheOwnerUserId) return
-        val targetUserId = userState.id
+        if (profileTargetUserId == cacheOwnerUserId) return
+        val targetUserId = profileTargetUserId
         viewModelScope.launch(Dispatchers.IO) {
             var result = playerInteractionController.refresh(targetUserId)
             if (result is PlayerInteractionRequestResult.Stale && result.canReload) {
@@ -1177,8 +1178,8 @@ class UserProfileScreenModel internal constructor(
         successMessage: String,
         failureMessage: String,
     ): Boolean = viewModelScope.async(Dispatchers.IO) {
-        if (userState.id == cacheOwnerUserId) return@async false
-        val targetUserId = userState.id
+        if (profileTargetUserId == cacheOwnerUserId) return@async false
+        val targetUserId = profileTargetUserId
         when (val result = playerInteractionController.setOverride(targetUserId, override)) {
             PlayerInteractionRequestResult.Succeeded -> {
                 SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))

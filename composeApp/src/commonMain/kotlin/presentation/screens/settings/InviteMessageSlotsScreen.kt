@@ -168,7 +168,7 @@ private fun InviteMessageSlotsContent(
                     ) {
                         items(
                             items = state.messages,
-                            key = { message -> message.id },
+                            key = { message -> message.slot },
                         ) { message ->
                             InviteMessageSlotCard(
                                 message = message,

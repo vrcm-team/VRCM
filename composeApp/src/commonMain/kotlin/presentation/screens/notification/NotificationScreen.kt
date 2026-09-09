@@ -365,7 +365,14 @@ private fun LazyItemScope.NotificationItem(
             navigator push GroupProfileScreen(GroupProfileVo(groupId = groupId, name = groupName))
         }
     }
-    val headline = item.announcementTitle ?: item.title ?: item.groupName ?: item.message
+    val isGroupInvite = item.type.equals("group.invite", ignoreCase = true)
+    val headline = if (isGroupInvite) {
+        groupName.takeIf(String::isNotBlank)
+            ?: item.title?.takeIf(String::isNotBlank)
+            ?: item.message
+    } else {
+        item.announcementTitle ?: item.title ?: item.groupName ?: item.message
+    }
     val boopReplyAction = item.boopReplyAction
     val ordinaryActions = item.displayActions.filter { action ->
         item.responseTarget(action) != NotificationResponseTarget.BOOP_USER_API
@@ -440,7 +447,7 @@ private fun LazyItemScope.NotificationItem(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    if (groupName.isNotEmpty()) Text(
+                    if (groupName.isNotEmpty() && !isGroupInvite) Text(
                         groupName,
                         Modifier.enableIf(groupId.isNotEmpty()) { clickable(onClick = openGroup) },
                         style = MaterialTheme.typography.labelMedium,
