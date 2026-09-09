@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.service.*
+import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.websocket.WebSocketSessionRecovery
 import io.github.vrcmteam.vrcm.service.meetup.DecorationResolver
 import io.github.vrcmteam.vrcm.service.meetup.DecorationTemplateSource
@@ -19,13 +20,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val serviceModule: Module = module {
     singleOf(::VersionService)
-    singleOf(::AuthService) bind WebSocketSessionRecovery::class
+    singleOf(::AuthService) {
+        onClose { it?.close() }
+    } bind WebSocketSessionRecovery::class
     single { UserProfileEnrichmentService(get()) }
     singleOf(::FavoriteService)
     singleOf(::FriendService)
@@ -34,6 +38,12 @@ val serviceModule: Module = module {
     singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
+    singleOf(::ImageInviteService) bind ImageInviteRemote::class
+    single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
+    singleOf(::InvitePhotoResponseService)
+    singleOf(::HomeWorldService) bind HomeWorldManager::class
+    singleOf(::NetworkInstanceCreationRequest) bind InstanceCreationRequest::class
+    singleOf(::InstanceCreationService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class

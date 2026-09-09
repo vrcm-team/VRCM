@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +46,22 @@ fun LazyListScope.renderUserItems(
     }
 }
 
+fun LazyListScope.renderSelectableUserItems(
+    users: List<IUser>,
+    selectedUserIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(users, key = { it.id }) { user ->
+        renderUserItem(
+            user = user,
+            onUserClick = { selectedUser, _ -> onSelectionToggle(selectedUser.id) },
+            selected = user.id in selectedUserIds,
+            enabled = enabled,
+        )
+    }
+}
+
 /**
  * 单个用户项渲染
  */
@@ -52,7 +69,9 @@ fun LazyListScope.renderUserItems(
 @Composable
 fun LazyItemScope.renderUserItem(
     user: IUser,
-    onUserClick: (IUser, String) -> Unit
+    onUserClick: (IUser, String) -> Unit,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("user:${user.id}")
         ?: LocalSharedSuffixKey.current
@@ -60,6 +79,7 @@ fun LazyItemScope.renderUserItem(
         item = user,
         onClick = { onUserClick(it, sharedSuffixKey) },
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier.sharedBoundsBy(
@@ -87,6 +107,14 @@ fun LazyItemScope.renderUserItem(
             )
         },
         trailingContent = {
+            if (selected != null) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 离线用户显示最后活动时间
             val lastSeenAt = user.lastSeenAt()
             if (user.status != UserStatus.Offline || lastSeenAt == null) return@SearchResultItem

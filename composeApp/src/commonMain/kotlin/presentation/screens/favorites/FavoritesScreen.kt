@@ -63,6 +63,7 @@ private fun FavoritesScreenContent(
     val worldTotal by favoritesModel.worldTotal.collectAsState()
     val avatarTotal by favoritesModel.avatarTotal.collectAsState()
     val clearState by favoritesModel.favoriteGroupClearState.collectAsState()
+    val favoriteGroupEditState by favoritesModel.favoriteGroupEditState.collectAsState()
     val settledPage = pagerState.settledPage
     val modelTabIndex = settledPage + 1
 
@@ -148,6 +149,8 @@ private fun FavoritesScreenContent(
                     clearGroupInProgress = clearState.isClearing &&
                         clearState.group?.type == FavoriteType.World.value,
                     clearGroupContentDescription = strings.favoriteGroupClearAction,
+                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
+                    editGroupContentDescription = strings.favoriteGroupEditAction,
                 )
                 1 -> GroupOptionsUI(
                     currentOptions = avatarOptions,
@@ -164,6 +167,8 @@ private fun FavoritesScreenContent(
                     clearGroupInProgress = clearState.isClearing &&
                         clearState.group?.type == FavoriteType.Avatar.value,
                     clearGroupContentDescription = strings.favoriteGroupClearAction,
+                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
+                    editGroupContentDescription = strings.favoriteGroupEditAction,
                 )
             }
             val loading = modelTabIndex in refreshingTabs
@@ -231,6 +236,13 @@ private fun FavoritesScreenContent(
             onDismiss = favoritesModel::dismissFavoriteGroupClearConfirmation,
         )
     }
+
+    FavoriteGroupEditDialog(
+        state = favoriteGroupEditState,
+        onDismiss = favoritesModel::dismissFavoriteGroupEditor,
+        onClearFailure = favoritesModel::clearFavoriteGroupEditFailure,
+        onSave = favoritesModel::saveFavoriteGroup,
+    )
 }
 
 @Composable

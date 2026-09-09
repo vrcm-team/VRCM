@@ -1,6 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.compoments
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.*
@@ -12,6 +18,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import org.koin.compose.koinInject
 
@@ -41,6 +48,8 @@ fun <T> GroupOptionsUI(
     clearGroupEnabled: Boolean = false,
     clearGroupInProgress: Boolean = false,
     clearGroupContentDescription: String = "",
+    onEditGroup: ((FavoriteGroupData) -> Unit)? = null,
+    editGroupContentDescription: String = "",
 ) {
     val selectedGroup = getSelectedGroup(currentOptions)
     Column(
@@ -103,6 +112,20 @@ fun <T> GroupOptionsUI(
                                 expandGroupMenu = false
                             },
                         )
+                    }
+                }
+            }
+
+            if (onEditGroup != null) {
+                val canEdit = selectedGroup != null &&
+                    selectedGroup.ownerId != "local" &&
+                    selectedGroup.type == favoriteType.value
+                ATooltipBox(tooltip = { Text(editGroupContentDescription) }) {
+                    IconButton(
+                        enabled = canEdit,
+                        onClick = { selectedGroup?.let(onEditGroup) },
+                    ) {
+                        Icon(AppIcons.Edit, contentDescription = editGroupContentDescription)
                     }
                 }
             }

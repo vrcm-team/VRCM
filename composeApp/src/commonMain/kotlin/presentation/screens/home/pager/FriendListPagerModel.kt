@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType.*
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.lastSeenAt
@@ -27,8 +28,10 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.FavoriteGroupClearCommit
 import io.github.vrcmteam.vrcm.service.FavoriteGroupClearRequest
 import io.github.vrcmteam.vrcm.service.FavoriteService
+import io.github.vrcmteam.vrcm.service.FriendRemovalBatchResponse
 import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendStateSnapshot
+import io.github.vrcmteam.vrcm.service.MAX_CONCURRENT_FRIEND_REMOVALS
 import io.github.vrcmteam.vrcm.service.UserProfileEnrichmentService
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.AccountCacheWriteToken
@@ -85,6 +88,37 @@ private data class FavoriteGroupClearKey(
     val type: String,
     val name: String,
 )
+
+internal enum class FavoriteGroupEditFailure {
+    InvalidName,
+    SaveFailed,
+}
+
+internal data class FavoriteGroupEditState(
+    val group: FavoriteGroupData? = null,
+    val isSaving: Boolean = false,
+    val failure: FavoriteGroupEditFailure? = null,
+)
+
+internal data class FriendRemovalResult(
+    val userId: String,
+    val errorMessage: String? = null,
+) {
+    val succeeded: Boolean get() = errorMessage == null
+}
+
+internal data class FriendRemovalState(
+    val selectionMode: Boolean = false,
+    val selectedUserIds: Set<String> = emptySet(),
+    val confirmationVisible: Boolean = false,
+    val isSubmitting: Boolean = false,
+    val completedCount: Int = 0,
+    val totalCount: Int = 0,
+    val results: Map<String, FriendRemovalResult> = emptyMap(),
+) {
+    val successCount: Int get() = results.values.count(FriendRemovalResult::succeeded)
+    val failureCount: Int get() = results.size - successCount
+}
 
 internal fun FriendStateSnapshot.friendsForSession(sessionToken: AccountSessionToken?): List<FriendData> =
     if (sessionToken != null && this.sessionToken == sessionToken) friends.values.toList() else emptyList()
@@ -211,6 +245,7 @@ class FriendListPagerModel(
         initialValue = friendService.hasRefreshError.value,
     )
     private var directoryRefreshJob: Job? = null
+    private var friendRemovalJob: Job? = null
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
@@ -223,6 +258,18 @@ class FriendListPagerModel(
     private var favoriteGroupClearJob: Job? = null
     private var favoriteGroupClearRequest = 0L
     private val unresolvedFavoriteGroupClears = MutableStateFlow<Set<FavoriteGroupClearKey>>(emptySet())
+
+    private val _favoriteGroupEditState = MutableStateFlow(FavoriteGroupEditState())
+    internal val favoriteGroupEditState: StateFlow<FavoriteGroupEditState> =
+        _favoriteGroupEditState.asStateFlow()
+    private var favoriteGroupEditJob: Job? = null
+    private var favoriteGroupEditRequest = 0L
+    private var favoriteGroupEditReauthenticationRequest: Long? = null
+
+    private var friendDirectoryLocale: LocaleStrings? = null
+
+    private val _friendRemovalState = MutableStateFlow(FriendRemovalState())
+    internal val friendRemovalState: StateFlow<FriendRemovalState> = _friendRemovalState.asStateFlow()
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendSnapshot,
@@ -271,20 +318,52 @@ class FriendListPagerModel(
                 val friends = snapshot.friendsForSession(token)
                 _friendTotal.value = friends.size
                 updateFriendSnapshot(friends)
+                retainExistingFriendSelections(friends.mapTo(mutableSetOf(), FriendData::id))
             }
         }
     }
 
     private fun activateAccount(sessionToken: AccountSessionToken?) {
-        val userChanged = activeSessionToken?.userId != sessionToken?.userId
+        val previousSessionToken = activeSessionToken
+        val userChanged = previousSessionToken?.userId != sessionToken?.userId
+        val sessionChanged = previousSessionToken != sessionToken
         accountGeneration++
         activeSessionToken = sessionToken
         refreshJobsByTab.values.forEach(Job::cancel)
         refreshJobsByTab.clear()
         directoryRefreshJob?.cancel()
         directoryRefreshJob = null
+        if (userChanged) {
+            friendRemovalJob?.cancel()
+            friendRemovalJob = null
+            _friendRemovalState.value = FriendRemovalState()
+        }
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
+        if (sessionChanged) {
+            if (userChanged) {
+                favoriteGroupEditRequest++
+                favoriteGroupEditJob?.cancel()
+                favoriteGroupEditJob = null
+                favoriteGroupEditReauthenticationRequest = null
+                _favoriteGroupEditState.value = FavoriteGroupEditState()
+            } else if (
+                // AuthService marks its own 401 retry before rotating the token; only an
+                // external rotation invalidates and cancels the current editor request.
+                _favoriteGroupEditState.value.isSaving &&
+                favoriteGroupEditReauthenticationRequest != favoriteGroupEditRequest
+            ) {
+                favoriteGroupEditRequest++
+                favoriteGroupEditJob?.cancel()
+                favoriteGroupEditJob = null
+                _favoriteGroupEditState.update { state ->
+                    state.copy(
+                        isSaving = false,
+                        failure = FavoriteGroupEditFailure.SaveFailed,
+                    )
+                }
+            }
+        }
         if (userChanged) {
             favoriteGroupClearRequest++
             favoriteGroupClearJob?.cancel()
@@ -329,6 +408,198 @@ class FriendListPagerModel(
 
     fun updateFavoriteLocale(locale: LocaleStrings) {
         favoriteLocale = locale
+    }
+
+    fun updateFriendDirectoryLocale(locale: LocaleStrings) {
+        friendDirectoryLocale = locale
+    }
+
+    fun enterFriendSelectionMode() {
+        if (_friendRemovalState.value.isSubmitting || _friendSnapshot.value.isEmpty()) return
+        _friendRemovalState.value = FriendRemovalState(selectionMode = true)
+    }
+
+    fun exitFriendSelectionMode() {
+        if (_friendRemovalState.value.isSubmitting) return
+        _friendRemovalState.value = FriendRemovalState()
+    }
+
+    fun toggleFriendSelection(userId: String) {
+        val availableIds = _friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id)
+        if (userId !in availableIds) return
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting) return@update state
+            val selected = if (userId in state.selectedUserIds) {
+                state.selectedUserIds - userId
+            } else {
+                state.selectedUserIds + userId
+            }
+            state.copy(
+                selectedUserIds = selected,
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun toggleVisibleFriendSelection(visibleUserIds: Set<String>) {
+        val availableIds = _friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id)
+        val selectableIds = visibleUserIds intersect availableIds
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting || selectableIds.isEmpty()) {
+                return@update state
+            }
+            val allVisibleSelected = selectableIds.all { it in state.selectedUserIds }
+            state.copy(
+                selectedUserIds = if (allVisibleSelected) {
+                    state.selectedUserIds - selectableIds
+                } else {
+                    state.selectedUserIds + selectableIds
+                },
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun requestFriendRemovalConfirmation() {
+        retainExistingFriendSelections(_friendSnapshot.value.mapTo(mutableSetOf(), FriendData::id))
+        _friendRemovalState.update { state ->
+            if (!state.selectionMode || state.isSubmitting || state.selectedUserIds.isEmpty()) state
+            else state.copy(confirmationVisible = true)
+        }
+    }
+
+    fun dismissFriendRemovalConfirmation() {
+        _friendRemovalState.update { state ->
+            if (state.isSubmitting) state else state.copy(confirmationVisible = false)
+        }
+    }
+
+    fun confirmFriendRemoval() {
+        val state = _friendRemovalState.value
+        if (!state.selectionMode || state.isSubmitting || !state.confirmationVisible) return
+        val sessionToken = activeSessionToken ?: return
+        val currentFriendIds = friendService.friendStateSnapshot.value.friendsForSession(sessionToken)
+            .mapTo(mutableSetOf(), FriendData::id)
+        val selectedUserIds = state.selectedUserIds.filter { it in currentFriendIds }
+        if (selectedUserIds.isEmpty()) {
+            _friendRemovalState.update {
+                it.copy(selectedUserIds = emptySet(), confirmationVisible = false)
+            }
+            return
+        }
+
+        _friendRemovalState.value = state.copy(
+            selectedUserIds = selectedUserIds.toSet(),
+            confirmationVisible = false,
+            isSubmitting = true,
+            completedCount = 0,
+            totalCount = selectedUserIds.size,
+            results = emptyMap(),
+        )
+        friendRemovalJob = viewModelScope.launch(Dispatchers.IO) {
+            val accountUserId = sessionToken.userId
+            var requestSessionToken = sessionToken
+            try {
+                selectedUserIds.chunked(MAX_CONCURRENT_FRIEND_REMOVALS).forEach { batch ->
+                    val batchResponse = try {
+                        friendService.unfriendBatch(requestSessionToken, batch)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Throwable) {
+                        FriendRemovalBatchResponse(
+                            results = batch.associateWith { Result.failure(error) },
+                            sessionToken = requestSessionToken,
+                        )
+                    }
+                    if (batchResponse == null ||
+                        !acceptsFriendRemovalResponse(accountUserId, batchResponse.sessionToken)
+                    ) {
+                        if (SharedFlowCentre.currentSession.value?.token?.userId == accountUserId) {
+                            _friendRemovalState.value = FriendRemovalState()
+                        }
+                        return@launch
+                    }
+                    requestSessionToken = batchResponse.sessionToken
+                    batch.forEach { userId ->
+                        val result = batchResponse.results[userId]
+                            ?: Result.failure(IllegalStateException("Missing removal result"))
+                        val itemResult = FriendRemovalResult(
+                            userId = userId,
+                            errorMessage = result.exceptionOrNull()?.message
+                                ?.ifBlank { "Request failed" }
+                                ?: if (result.isFailure) "Request failed" else null,
+                        )
+                        _friendRemovalState.update { current ->
+                            current.copy(
+                                selectedUserIds = if (itemResult.succeeded) {
+                                    current.selectedUserIds - userId
+                                } else {
+                                    current.selectedUserIds
+                                },
+                                completedCount = current.completedCount + 1,
+                                results = current.results + (userId to itemResult),
+                            )
+                        }
+                    }
+                }
+
+                if (!acceptsFriendRemovalResponse(accountUserId, requestSessionToken)) return@launch
+                val completed = _friendRemovalState.value
+                val failedIds = completed.results.values
+                    .filterNot(FriendRemovalResult::succeeded)
+                    .mapTo(mutableSetOf(), FriendRemovalResult::userId)
+                    .intersect(friendService.friendState.value.keys)
+                _friendRemovalState.value = completed.copy(
+                    selectionMode = failedIds.isNotEmpty(),
+                    selectedUserIds = failedIds,
+                    isSubmitting = false,
+                )
+                showFriendRemovalSummary(completed.successCount, completed.failureCount)
+            } finally {
+                if (acceptsFriendRemovalResponse(accountUserId, requestSessionToken)) {
+                    friendRemovalJob = null
+                }
+            }
+        }
+    }
+
+    private fun acceptsFriendRemovalResponse(
+        accountUserId: String,
+        sessionToken: AccountSessionToken,
+    ): Boolean = sessionToken.userId == accountUserId &&
+        SharedFlowCentre.currentSession.value?.token == sessionToken
+
+    private fun retainExistingFriendSelections(friendIds: Set<String>) {
+        _friendRemovalState.update { state ->
+            val retained = state.selectedUserIds intersect friendIds
+            if (retained == state.selectedUserIds) state
+            else state.copy(
+                selectedUserIds = retained,
+                confirmationVisible = state.confirmationVisible && retained.isNotEmpty(),
+            )
+        }
+    }
+
+    private suspend fun showFriendRemovalSummary(successCount: Int, failureCount: Int) {
+        val locale = friendDirectoryLocale ?: return
+        val message = when {
+            failureCount == 0 -> locale.friendDirectoryRemoveSuccess
+                .replaceFirst("%d", successCount.toString())
+            successCount == 0 -> locale.friendDirectoryRemoveFailed
+                .replaceFirst("%d", failureCount.toString())
+            else -> locale.friendDirectoryRemovePartialFailure
+                .replaceFirst("%d", successCount.toString())
+                .replaceFirst("%d", failureCount.toString())
+        }
+        SharedFlowCentre.toastText.emit(
+            if (failureCount == 0) ToastText.Success(message) else ToastText.Error(message)
+        )
     }
 
     /** Marks the Favorites page as active and refreshes its world and avatar tabs. */
@@ -903,6 +1174,165 @@ class FriendListPagerModel(
         requestId: Long,
     ): Boolean = favoriteGroupClearRequest == requestId &&
         SharedFlowCentre.isCurrentSession(sessionToken)
+
+    fun openFavoriteGroupEditor(group: FavoriteGroupData) {
+        if (_favoriteGroupEditState.value.isSaving) return
+        val type = group.editableFavoriteType() ?: return
+        val sessionToken = activeSessionToken ?: return
+        if (!SharedFlowCentre.isCurrentSession(sessionToken) || group.ownerId != sessionToken.userId) return
+        val currentGroup = favoriteService.favoritesByGroup(type).value.keys.firstOrNull {
+            it.ownerId == sessionToken.userId && it.name == group.name && it.type == group.type
+        } ?: return
+        _favoriteGroupEditState.value = FavoriteGroupEditState(group = currentGroup)
+    }
+
+    fun dismissFavoriteGroupEditor() {
+        if (_favoriteGroupEditState.value.isSaving) return
+        _favoriteGroupEditState.value = FavoriteGroupEditState()
+    }
+
+    fun clearFavoriteGroupEditFailure() {
+        _favoriteGroupEditState.update { state -> state.copy(failure = null) }
+    }
+
+    fun saveFavoriteGroup(
+        displayName: String,
+        visibility: FavoriteGroupVisibility,
+    ) {
+        val state = _favoriteGroupEditState.value
+        val group = state.group ?: return
+        if (state.isSaving || favoriteGroupEditJob?.isActive == true) return
+        val normalizedDisplayName = displayName.trim()
+        if (normalizedDisplayName.isEmpty()) {
+            _favoriteGroupEditState.value = state.copy(failure = FavoriteGroupEditFailure.InvalidName)
+            return
+        }
+        if (normalizedDisplayName == group.displayName && visibility.value == group.visibility) return
+
+        val type = group.editableFavoriteType() ?: return
+        val requestToken = activeSessionToken?.takeIf(SharedFlowCentre::isCurrentSession) ?: return
+        if (group.ownerId != requestToken.userId) return
+        val request = ++favoriteGroupEditRequest
+        _favoriteGroupEditState.value = state.copy(isSaving = true, failure = null)
+        favoriteGroupEditJob = viewModelScope.launch(Dispatchers.IO) {
+            val update = try {
+                favoriteService.prepareFavoriteGroupUpdate(
+                    sessionToken = requestToken,
+                    favoriteType = type,
+                    groupName = group.name,
+                    displayName = normalizedDisplayName,
+                    visibility = visibility,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (acceptsFavoriteGroupEdit(requestToken, request)) {
+                    publishFavoriteGroupEditFailure(error)
+                }
+                return@launch
+            }
+
+            val response = try {
+                authService.runSessionBoundCatchingWithReauthentication(
+                    sessionToken = requestToken,
+                    callback = { favoriteService.sendFavoriteGroupUpdate(update) },
+                    onReauthentication = {
+                        if (favoriteGroupEditRequest == request &&
+                            SharedFlowCentre.isCurrentSession(requestToken)
+                        ) {
+                            favoriteGroupEditReauthenticationRequest = request
+                        }
+                    },
+                )
+            } finally {
+                if (favoriteGroupEditReauthenticationRequest == request) {
+                    favoriteGroupEditReauthenticationRequest = null
+                }
+            } ?: run {
+                releaseStaleFavoriteGroupEdit(request)
+                return@launch
+            }
+            val requestError = response.result.exceptionOrNull()
+            val result = if (requestError != null) {
+                Result.failure(requestError)
+            } else {
+                runCatching {
+                    favoriteService.commitFavoriteGroupUpdate(response.sessionToken, update)
+                }
+            }
+            result.exceptionOrNull()?.let { error ->
+                if (error is CancellationException) throw error
+            }
+            if (!acceptsFavoriteGroupEdit(response.sessionToken, request)) {
+                releaseStaleFavoriteGroupEdit(request)
+                return@launch
+            }
+
+            val updatedGroup = result.getOrNull()
+            if (updatedGroup != null) {
+                updateSelectedFavoriteGroup(updatedGroup)
+                _favoriteGroupEditState.value = FavoriteGroupEditState()
+                favoriteLocale?.favoriteGroupEditSuccess?.let { message ->
+                    SharedFlowCentre.toastText.emit(ToastText.Success(message))
+                }
+            } else {
+                publishFavoriteGroupEditFailure(result.exceptionOrNull() ?: return@launch)
+            }
+        }
+    }
+
+    private suspend fun publishFavoriteGroupEditFailure(error: Throwable? = null) {
+        _favoriteGroupEditState.value = _favoriteGroupEditState.value.copy(
+            isSaving = false,
+            failure = FavoriteGroupEditFailure.SaveFailed,
+        )
+        if (error != null) {
+            showFavoriteError(favoriteLocale?.favoriteGroupEditFailed, error)
+        } else {
+            favoriteLocale?.favoriteGroupEditFailed?.let { message ->
+                SharedFlowCentre.toastText.emit(ToastText.Error(message))
+            }
+        }
+    }
+
+    private suspend fun releaseStaleFavoriteGroupEdit(request: Long) {
+        val state = _favoriteGroupEditState.value
+        val ownerId = state.group?.ownerId ?: return
+        if (favoriteGroupEditRequest != request ||
+            SharedFlowCentre.currentSession.value?.token?.userId != ownerId
+        ) {
+            return
+        }
+        publishFavoriteGroupEditFailure()
+    }
+
+    private fun FavoriteGroupData.editableFavoriteType(): FavoriteType? = when (type) {
+        World.value -> World
+        Avatar.value -> Avatar
+        else -> null
+    }
+
+    private fun acceptsFavoriteGroupEdit(sessionToken: AccountSessionToken, request: Long): Boolean =
+        favoriteGroupEditRequest == request &&
+            SharedFlowCentre.isCurrentSession(sessionToken)
+
+    private fun updateSelectedFavoriteGroup(updatedGroup: FavoriteGroupData) {
+        when (updatedGroup.type) {
+            World.value -> {
+                if (_worldGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
+                    _worldGroupOptions.value = WorldGroupOptions(updatedGroup)
+                    findWorldList(searchTexts[1])
+                }
+            }
+
+            Avatar.value -> {
+                if (_avatarGroupOptions.value.selectedGroup?.sameFavoriteGroup(updatedGroup) == true) {
+                    _avatarGroupOptions.value = AvatarGroupOptions(updatedGroup)
+                    findAvatarList(searchTexts[2])
+                }
+            }
+        }
+    }
 
     /** Updates the account-bound source snapshot without applying UI filters. */
     private fun updateFriendSnapshot(sourceFriends: List<FriendData>) {
