@@ -9,6 +9,7 @@ data class UpdateUserInfoData(
     val ageVerificationStatus: AgeVerificationStatus? = null,
     val bio: String? = null,
     val bioLinks: List<String>? = null,
+    val homeLocation: String? = null,
     val status: UserStatus? = null,
     val statusDescription: String? = null,
     val pronouns: String? = null,

@@ -44,6 +44,8 @@ fun TopMenuBar(
     color: Color = MaterialTheme.colorScheme.onPrimary,
     onReturn: () -> Unit,
     onMenu: (() -> Unit)?,
+    menuContentDescription: String = "MenuIcon",
+    centerContent: @Composable RowScope.() -> Unit = {},
     actions: @Composable RowScope.(IconButtonColors) -> Unit = {},
 ) {
     // image上滑反比例
@@ -65,6 +67,7 @@ fun TopMenuBar(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val rowScope = this
             val actionColors = topMenuActionColors(
                 ratio = ratio,
                 onPrimary = MaterialTheme.colorScheme.onPrimary,
@@ -89,7 +92,14 @@ fun TopMenuBar(
                     contentDescription = "ReturnIcon"
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center,
+            ) {
+                with(rowScope) { centerContent() }
+            }
             Row(
                 modifier = Modifier.padding(end = if (onMenu == null) 10.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -101,13 +111,13 @@ fun TopMenuBar(
                     modifier = Modifier
                         .padding(horizontal = 10.dp),
                     colors = iconButtonColors,
-                    onClick = it
-                    ) {
-                        Icon(
-                            imageVector = AppIcons.Menu,
-                            tint = actionColors.content,
-                            contentDescription = "MenuIcon"
-                        )
+                    onClick = it,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.Menu,
+                        tint = actionColors.content,
+                        contentDescription = menuContentDescription,
+                    )
                 }
             }
         }

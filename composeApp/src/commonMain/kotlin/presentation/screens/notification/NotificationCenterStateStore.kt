@@ -7,6 +7,7 @@ import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationIdentity
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationInboxState
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.NotificationItemData
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -20,14 +21,24 @@ internal data class NotificationCenterUiState(
     val sessionToken: AccountSessionToken? = null,
     val inboxState: NotificationInboxState = NotificationInboxState(),
     val pendingMutations: Map<NotificationIdentity, PendingNotificationMutation> = emptyMap(),
+    val failedPhotoResponses: Map<NotificationIdentity, GallerySelection> = emptyMap(),
     val isRefreshing: Boolean = false,
     val hasRefreshError: Boolean = false,
 )
 
 internal sealed interface PendingNotificationMutation {
     data class Action(val action: NotificationItemData.ActionData) : PendingNotificationMutation
+    data class PhotoResponse(
+        val selection: GallerySelection,
+        val phase: InvitePhotoResponsePhase,
+    ) : PendingNotificationMutation
     data object Read : PendingNotificationMutation
     data object Delete : PendingNotificationMutation
+}
+
+internal enum class InvitePhotoResponsePhase {
+    PREPARING,
+    RESPONDING,
 }
 
 /**
@@ -94,6 +105,41 @@ internal class NotificationCenterStateStore(
         } else {
             current.copy(
                 pendingMutations = current.pendingMutations + (identity to mutation),
+            ) to true
+        }
+    }
+
+    suspend fun transitionPhotoResponse(
+        sessionToken: AccountSessionToken,
+        identity: NotificationIdentity,
+        selection: GallerySelection,
+        phase: InvitePhotoResponsePhase,
+    ): Boolean = reduceWithResult { current ->
+        val existing = current.pendingMutations[identity]
+        if (
+            current.sessionToken != sessionToken ||
+            existing != null && existing !is PendingNotificationMutation.PhotoResponse
+        ) {
+            current to false
+        } else {
+            current.copy(
+                pendingMutations = current.pendingMutations + (
+                        identity to PendingNotificationMutation.PhotoResponse(selection, phase)
+                        ),
+                failedPhotoResponses = current.failedPhotoResponses + (identity to selection),
+            ) to true
+        }
+    }
+
+    suspend fun finishMutation(
+        sessionToken: AccountSessionToken,
+        identity: NotificationIdentity,
+    ): Boolean = reduceWithResult { current ->
+        if (current.sessionToken != sessionToken) {
+            current to false
+        } else {
+            current.copy(
+                pendingMutations = current.pendingMutations - identity,
             ) to true
         }
     }
