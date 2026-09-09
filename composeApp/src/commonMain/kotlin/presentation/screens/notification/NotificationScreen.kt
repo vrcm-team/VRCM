@@ -365,7 +365,7 @@ private fun LazyItemScope.NotificationItem(
             navigator push GroupProfileScreen(GroupProfileVo(groupId = groupId, name = groupName))
         }
     }
-    val isGroupInvite = item.type.equals("group.invite", ignoreCase = true)
+    val isGroupInvite = item.isGroupInvite
     val headline = if (isGroupInvite) {
         groupName.takeIf(String::isNotBlank)
             ?: item.title?.takeIf(String::isNotBlank)
@@ -374,7 +374,7 @@ private fun LazyItemScope.NotificationItem(
         item.announcementTitle ?: item.title ?: item.groupName ?: item.message
     }
     val boopReplyAction = item.boopReplyAction
-    val ordinaryActions = item.displayActions.filter { action ->
+    val ordinaryActions = item.responseActionsForDisplay.filter { action ->
         item.responseTarget(action) != NotificationResponseTarget.BOOP_USER_API
     }
     val openActionTarget: (NotificationActionTarget) -> Unit = { target ->
@@ -472,7 +472,7 @@ private fun LazyItemScope.NotificationItem(
             if (
                 ordinaryActions.isNotEmpty() || boopReplyAction != null ||
                 item.supportsInvitePhotoResponse ||
-                !item.seen || item.canDelete
+                item.showStandaloneReadAction || item.canDelete
             ) {
                 FlowRow(
                     Modifier.fillMaxWidth(),
@@ -540,7 +540,7 @@ private fun LazyItemScope.NotificationItem(
                             }
                         }
                     }
-                    if (!item.seen) IconButton(enabled = !pending, onClick = onRead) {
+                    if (item.showStandaloneReadAction) IconButton(enabled = !pending, onClick = onRead) {
                         Icon(Icons.Outlined.MarkEmailRead, strings.notificationMarkRead)
                     }
                     if (item.canDelete) IconButton(enabled = !pending, onClick = onDelete) {
@@ -604,6 +604,12 @@ private fun notificationActionLabel(
     item: NotificationItemData,
     action: NotificationItemData.ActionData,
 ) = when {
+    item.groupInviteActionKind(action) == GroupInviteActionKind.ACCEPT ->
+        strings.notificationAccept
+    item.groupInviteActionKind(action) == GroupInviteActionKind.IGNORE ->
+        strings.notificationIgnore
+    item.groupInviteActionKind(action) == GroupInviteActionKind.BLOCK ->
+        strings.notificationBlock
     item.type == NotificationType.FriendRequest.value && action.type.equals("Accept", true) ->
         strings.notificationAccept
     item.type == NotificationType.FriendRequest.value -> strings.notificationIgnore
@@ -621,7 +627,8 @@ private fun notificationActionIcon(action: NotificationItemData.ActionData): Ima
     action.type.equals("unsubscribe", true) || action.icon.equals("bell-slash", true) ->
         Icons.Outlined.NotificationsOff
     action.icon.equals("bell", true) -> Icons.Outlined.Notifications
-    action.icon.equals("ban", true) -> Icons.Outlined.Block
+    action.type.equals("block", true) || action.type.equals("ban", true) ||
+        action.icon.equals("ban", true) -> Icons.Outlined.Block
     action.icon.equals("reply", true) -> Icons.AutoMirrored.Outlined.Reply
     else -> Icons.Outlined.Tag
 }
@@ -637,6 +644,7 @@ private fun NotificationTypeLabel(item: NotificationItemData) {
     } else Text(
         when {
             item.type == NotificationType.FriendRequest.value -> strings.notificationFriendRequestAlert
+            item.isGroupInvite -> strings.notificationGroupInvite
             isGroupNotificationType(item.type) -> strings.notificationGroupAnnouncement
             else -> item.type
         },

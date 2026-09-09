@@ -555,6 +555,7 @@ class PlayerVoiceModerationControllerTest {
                 initialTargetUserId = TARGET_ONE,
                 authService = authService,
                 playerModerationApi = PlayerModerationApi(client),
+                moderationCache = ProfilePlayerModerationCache(PlayerModerationApi(client)),
                 scope = controllerScope,
             ),
             controllerJob = controllerJob,

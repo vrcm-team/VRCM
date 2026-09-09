@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
@@ -493,6 +494,7 @@ class PlayerChatboxModerationControllerTest {
                 initialTargetUserId = TARGET_ONE,
                 authService = authService,
                 moderationApi = PlayerChatboxModerationApi(client),
+                moderationCache = ProfilePlayerModerationCache(PlayerModerationApi(client)),
                 scope = controllerScope,
             ),
             controllerScope = controllerScope,

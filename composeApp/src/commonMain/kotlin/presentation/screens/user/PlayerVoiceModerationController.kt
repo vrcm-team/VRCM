@@ -55,6 +55,7 @@ internal class PlayerVoiceModerationController(
     initialTargetUserId: String,
     private val authService: AuthService,
     private val playerModerationApi: PlayerModerationApi,
+    private val moderationCache: ProfilePlayerModerationCache,
     private val scope: CoroutineScope,
 ) {
     private val targetUserId = atomic(initialTargetUserId)
@@ -124,6 +125,7 @@ internal class PlayerVoiceModerationController(
         scope.launch {
             try {
                 val response = authService.runSessionBoundCatching(ready.sessionToken) {
+                    moderationCache.invalidate(ready.sessionToken, ready.targetUserId)
                     VoiceModerationType.entries
                         .filter { it in ready.activeTypes }
                         .forEach { playerModerationApi.remove(ready.targetUserId, it) }
@@ -231,7 +233,7 @@ internal class PlayerVoiceModerationController(
             val checking = PlayerVoiceModerationState.Checking(context.targetUserId)
             _state.value = checking
             val response = authService.runSessionBoundCatching(context.sessionToken) {
-                playerModerationApi.getForTarget(context.targetUserId)
+                moderationCache.get(context.sessionToken, context.targetUserId)
             }
             val acceptedResponse = response?.takeIf {
                 isCurrentResponse(context.targetUserId, it.sessionToken)

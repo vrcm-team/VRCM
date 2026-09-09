@@ -1,5 +1,7 @@
 package io.github.vrcmteam.vrcm.network.api.playermoderation
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData as CleanupPlayerModerationData
@@ -14,6 +16,9 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.Serializable
 
 private const val PLAYER_MODERATIONS_PATH = "$AUTH_API_PREFIX/$USER_API_PREFIX/playermoderations"
@@ -49,6 +54,9 @@ private data class ModeratePlayerRequest(
 
 /** API operations for the account's player management records and voice overrides. */
 class PlayerModerationApi(private val client: HttpClient) {
+    private val targetReadLock = SynchronizedObject()
+    private val inFlightTargetReads = mutableMapOf<TargetReadKey, CompletableDeferred<List<PlayerModerationData>>>()
+
     internal suspend fun getAll(): List<PlayerModerationData> =
         client.get(PLAYER_MODERATIONS_PATH).checkSuccess()
 
@@ -57,10 +65,34 @@ class PlayerModerationApi(private val client: HttpClient) {
             type?.let { parameter("type", it.apiValue) }
         }.checkSuccess()
 
-    internal suspend fun getForTarget(targetUserId: String): List<PlayerModerationData> =
-        client.get(PLAYER_MODERATIONS_PATH) {
-            parameter("targetUserId", targetUserId)
-        }.checkSuccess()
+    internal suspend fun getForTarget(targetUserId: String): List<PlayerModerationData> {
+        val key = TargetReadKey(
+            sessionToken = SharedFlowCentre.currentSession.value?.token,
+            targetUserId = targetUserId,
+        )
+        var ownsRequest = false
+        val request = synchronized(targetReadLock) {
+            inFlightTargetReads[key] ?: CompletableDeferred<List<PlayerModerationData>>().also {
+                ownsRequest = true
+                inFlightTargetReads[key] = it
+            }
+        }
+        if (!ownsRequest) return request.await()
+
+        try {
+            val result = client.get(PLAYER_MODERATIONS_PATH) {
+                parameter("targetUserId", targetUserId)
+            }.checkSuccess<List<PlayerModerationData>>()
+            request.complete(result)
+        } catch (error: Throwable) {
+            request.completeExceptionally(error)
+        } finally {
+            synchronized(targetReadLock) {
+                if (inFlightTargetReads[key] === request) inFlightTargetReads.remove(key)
+            }
+        }
+        return request.await()
+    }
 
     internal suspend fun moderate(
         targetUserId: String,
@@ -91,4 +123,9 @@ class PlayerModerationApi(private val client: HttpClient) {
     private companion object {
         val CLEANUP_USER_ID_PATTERN = Regex("usr_[A-Za-z0-9_-]+")
     }
+
+    private data class TargetReadKey(
+        val sessionToken: AccountSessionToken?,
+        val targetUserId: String,
+    )
 }

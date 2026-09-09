@@ -83,6 +83,34 @@ class NotificationItemDataTest {
     }
 
     @Test
+    fun groupInviteShowsOnlyCanonicalDecisionsAndOneIndependentDeleteAction() {
+        val responses = listOf(
+            response(type = "link", icon = "link"),
+            response(type = "decline", icon = "ban"),
+            response(type = "decline", icon = "cancel"),
+            response(type = "accept", icon = "check"),
+            response(type = "hide", icon = "cancel"),
+            response(type = "delete", icon = "trash"),
+            response(type = "unsubscribe", icon = "bell-slash"),
+        )
+        val item = NotificationItemData(
+            pipelineNotification(type = "group.invite", responses = responses),
+        )
+
+        assertEquals(
+            listOf(
+                GroupInviteActionKind.ACCEPT,
+                GroupInviteActionKind.IGNORE,
+                GroupInviteActionKind.BLOCK,
+            ),
+            item.responseActionsForDisplay.map(item::groupInviteActionKind),
+        )
+        assertEquals(listOf("check", "cancel", "ban"), item.responseActionsForDisplay.map { it.icon })
+        assertEquals(false, item.showStandaloneReadAction)
+        assertEquals(true, item.canDelete)
+    }
+
+    @Test
     fun groupTargetFallsBackToOwnerIdAndOfficialLink() {
         val ownerItem = NotificationItemData(
             pipelineNotification(details = NotificationData.Data(ownerId = "grp_owner")),
@@ -253,6 +281,14 @@ class NotificationItemDataTest {
         type = type,
         updatedAt = "2026-08-30T00:00:00Z",
         version = 2,
+    )
+
+    private fun response(type: String, icon: String) = ResponseData(
+        responseData = "$type-data",
+        icon = icon,
+        text = type,
+        textKey = null,
+        type = type,
     )
 
     private fun friendRequest(id: String, seen: Boolean) = NotificationItemData(

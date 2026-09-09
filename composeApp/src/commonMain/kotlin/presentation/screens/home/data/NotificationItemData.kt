@@ -265,6 +265,43 @@ internal val NotificationItemData.displayActions: List<NotificationItemData.Acti
         return actions + topLevelAction
     }
 
+internal enum class GroupInviteActionKind {
+    ACCEPT,
+    IGNORE,
+    BLOCK,
+}
+
+internal val NotificationItemData.isGroupInvite: Boolean
+    get() = type.equals("group.invite", ignoreCase = true)
+
+internal fun NotificationItemData.groupInviteActionKind(
+    action: NotificationItemData.ActionData,
+): GroupInviteActionKind? {
+    if (!isGroupInvite) return null
+    val type = action.type.trim().lowercase()
+    if (type == "block" || type == "ban" || action.icon.equals("ban", ignoreCase = true)) {
+        return GroupInviteActionKind.BLOCK
+    }
+    return when (type) {
+        "accept" -> GroupInviteActionKind.ACCEPT
+        "decline", "hide", "ignore", "reject" -> GroupInviteActionKind.IGNORE
+        else -> null
+    }
+}
+
+/** Group invitations expose one canonical response for each supported decision. */
+internal val NotificationItemData.responseActionsForDisplay: List<NotificationItemData.ActionData>
+    get() {
+        val availableActions = displayActions
+        if (!isGroupInvite) return availableActions
+        return GroupInviteActionKind.entries.mapNotNull { kind ->
+            availableActions.firstOrNull { action -> groupInviteActionKind(action) == kind }
+        }
+    }
+
+internal val NotificationItemData.showStandaloneReadAction: Boolean
+    get() = !seen && !isGroupInvite
+
 private fun NotificationActionTarget.isSameDestinationAs(other: NotificationActionTarget?): Boolean {
     if (other == null) return false
     if (this !is NotificationActionTarget.External || other !is NotificationActionTarget.External) {

@@ -27,6 +27,7 @@ import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
@@ -682,6 +683,19 @@ internal fun WorldData.detailRevision() = WorldDetailRevision(
 private fun WorldDetailRevision.matches(world: WorldData): Boolean =
     (updatedAt != null || version != null) && updatedAt == world.updatedAt && version == world.version
 
+internal data class ProfileSessionBinding(
+    val ownerUserId: String,
+    val sessionToken: AccountSessionToken?,
+)
+
+internal fun resolveProfileSessionBinding(
+    activeSessionToken: AccountSessionToken?,
+    persistedOwnerUserId: String,
+) = ProfileSessionBinding(
+    ownerUserId = activeSessionToken?.userId ?: persistedOwnerUserId,
+    sessionToken = activeSessionToken,
+)
+
 class UserProfileScreenModel internal constructor(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
@@ -717,13 +731,19 @@ class UserProfileScreenModel internal constructor(
     )
     internal val imageInviteState: StateFlow<ImageInviteUiState> = imageInviteCoordinator.state
 
-    private val cacheOwnerUserId = authService.accountDto().userId
+    private val profileSessionBinding = resolveProfileSessionBinding(
+        activeSessionToken = SharedFlowCentre.currentSession.value?.token,
+        persistedOwnerUserId = authService.accountDto().userId,
+    )
+    private val profileSessionToken = profileSessionBinding.sessionToken
+    private val cacheOwnerUserId = profileSessionBinding.ownerUserId
     private val profileTargetUserId = userProfileVO.id
-    private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
+    private val playerModerationCache = ProfilePlayerModerationCache(playerModerationApi)
     private val playerChatboxModerationController = PlayerChatboxModerationController(
         initialTargetUserId = profileTargetUserId,
         authService = authService,
         moderationApi = playerChatboxModerationApi,
+        moderationCache = playerModerationCache,
         scope = viewModelScope,
     )
     internal val playerChatboxModerationState: StateFlow<PlayerChatboxModerationState> =
@@ -732,6 +752,7 @@ class UserProfileScreenModel internal constructor(
         initialTargetUserId = profileTargetUserId,
         authService = authService,
         playerModerationApi = playerModerationApi,
+        moderationCache = playerModerationCache,
         scope = viewModelScope,
     )
     internal val playerVoiceModerationState: StateFlow<PlayerVoiceModerationState> =
@@ -829,6 +850,7 @@ class UserProfileScreenModel internal constructor(
         initialSessionToken = profileSessionToken,
         authService = authService,
         usersApi = usersApi,
+        moderationCache = playerModerationCache,
     )
     internal val playerInteractionState: StateFlow<PlayerInteractionState> =
         playerInteractionController.state
@@ -850,6 +872,7 @@ class UserProfileScreenModel internal constructor(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        var observedBlockSessionToken = profileSessionToken
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
                 if (session?.account?.userId != cacheOwnerUserId) {
@@ -861,8 +884,14 @@ class UserProfileScreenModel internal constructor(
                 if (shouldReload && profileTargetUserId != cacheOwnerUserId) {
                     refreshPlayerInteractionStatus()
                 }
+                val nextBlockSessionToken = session?.token
+                val blockSessionChanged = nextBlockSessionToken != observedBlockSessionToken
+                observedBlockSessionToken = nextBlockSessionToken
                 if (session?.account?.userId != cacheOwnerUserId) {
                     playerBlockStateMachine.invalidate()
+                } else if (blockSessionChanged && profileTargetUserId != cacheOwnerUserId) {
+                    playerBlockStateMachine.invalidate()
+                    refreshPlayerBlockStatus()
                 }
                 if (_inviteMessageSelection.value != null && session?.account?.userId != cacheOwnerUserId) {
                     clearInviteMessageSelection(force = true)
@@ -1102,7 +1131,7 @@ class UserProfileScreenModel internal constructor(
         }
     }
 
-    fun refreshPlayerBlockStatus(failureMessage: String) {
+    fun refreshPlayerBlockStatus(failureMessage: String? = null) {
         if (profileTargetUserId == cacheOwnerUserId) return
         val sessionToken = currentProfileSessionToken() ?: run {
             playerBlockStateMachine.invalidate()
@@ -1112,7 +1141,10 @@ class UserProfileScreenModel internal constructor(
         val targetUserId = profileTargetUserId
         viewModelScope.launch(Dispatchers.IO) {
             val response = authService.runSessionBoundCatching(sessionToken) {
-                usersApi.isUserBlocked(targetUserId)
+                playerModerationCache.get(sessionToken, targetUserId).any { moderation ->
+                    moderation.targetUserId == targetUserId &&
+                        moderation.type == PlayerModerationType.Block.apiValue
+                }
             }
             if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
                 playerBlockStateMachine.invalidate()
@@ -1122,7 +1154,7 @@ class UserProfileScreenModel internal constructor(
                 playerBlockStateMachine.completeLoad(operationId, isBlocked)
             }.onFailure { error ->
                 if (playerBlockStateMachine.failLoad(operationId)) {
-                    handleActionError(error, failureMessage)
+                    failureMessage?.let { handleActionError(error, it) }
                 }
             }
         }
@@ -1141,6 +1173,7 @@ class UserProfileScreenModel internal constructor(
         val operationId = playerBlockStateMachine.tryStartUpdate(blocked) ?: return@async false
         val targetUserId = profileTargetUserId
         val response = authService.runSessionBoundCatching(sessionToken) {
+            playerModerationCache.invalidate(sessionToken, targetUserId)
             if (blocked) usersApi.blockUser(targetUserId) else usersApi.unblockUser(targetUserId)
         }
         if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {

@@ -4,6 +4,7 @@ import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -545,6 +546,7 @@ class PlayerInteractionOverrideControllerTest : MainDispatcherTest() {
                 initialSessionToken = sessionToken,
                 authService = authService,
                 usersApi = UsersApi(client),
+                moderationCache = ProfilePlayerModerationCache(PlayerModerationApi(client)),
             ),
             client = client,
             account = account,

@@ -3,8 +3,10 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionModerationData
 import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionSnapshot
+import io.github.vrcmteam.vrcm.network.api.users.data.resolvePlayerInteractionSnapshot
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -51,6 +53,7 @@ internal class PlayerInteractionOverrideController(
     initialSessionToken: AccountSessionToken?,
     private val authService: AuthService,
     private val usersApi: UsersApi,
+    private val moderationCache: ProfilePlayerModerationCache,
     private val currentSessionToken: () -> AccountSessionToken? = {
         SharedFlowCentre.currentSession.value?.token
     },
@@ -90,7 +93,7 @@ internal class PlayerInteractionOverrideController(
             ?: return PlayerInteractionRequestResult.Ignored
         return when (
             val step = runBoundRequest(operation.id, operation.sessionToken) {
-                usersApi.getPlayerInteractionSnapshot(targetUserId)
+                loadSnapshot(operation.sessionToken, targetUserId)
             }
         ) {
             is BoundStep.Success -> {
@@ -120,12 +123,13 @@ internal class PlayerInteractionOverrideController(
                 PlayerInteractionRequestResult.Stale(canReload = true)
             } else {
                 PlayerInteractionRequestResult.Ignored
-            }
+        }
         var sessionToken = operation.sessionToken
 
         for (existingOverride in operation.snapshot.explicitOverrides) {
             when (
                 val removal = runBoundRequest(operation.id, sessionToken) {
+                    moderationCache.invalidate(sessionToken, targetUserId)
                     usersApi.removePlayerInteractionOverride(
                         targetUserId,
                         existingOverride,
@@ -144,6 +148,7 @@ internal class PlayerInteractionOverrideController(
 
         return when (
             val creation = runBoundRequest(operation.id, sessionToken) {
+                moderationCache.invalidate(sessionToken, targetUserId)
                 usersApi.createPlayerInteractionOverride(targetUserId, requestedOverride)
             }
         ) {
@@ -173,7 +178,7 @@ internal class PlayerInteractionOverrideController(
         originalError: Throwable,
     ): PlayerInteractionRequestResult = when (
         val authority = runBoundRequest(operation.id, sessionToken) {
-            usersApi.getPlayerInteractionSnapshot(operation.targetUserId)
+            loadSnapshot(sessionToken, operation.targetUserId)
         }
     ) {
         is BoundStep.Success -> {
@@ -228,6 +233,22 @@ internal class PlayerInteractionOverrideController(
             onFailure = { BoundStep.Failure(it, response.sessionToken) },
         )
     }
+
+    private suspend fun loadSnapshot(
+        sessionToken: AccountSessionToken,
+        targetUserId: String,
+    ): PlayerInteractionSnapshot =
+        resolvePlayerInteractionSnapshot(
+            targetUserId = targetUserId,
+            moderations = moderationCache.get(sessionToken, targetUserId).map { moderation ->
+                PlayerInteractionModerationData(
+                    created = moderation.created,
+                    id = moderation.id,
+                    targetUserId = moderation.targetUserId,
+                    type = moderation.type,
+                )
+            },
+        )
 
     private fun startLoad(targetUserId: String): Operation? {
         val currentToken = validCurrentSessionToken() ?: run {

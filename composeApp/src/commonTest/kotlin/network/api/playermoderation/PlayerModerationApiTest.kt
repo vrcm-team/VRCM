@@ -13,7 +13,12 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -23,6 +28,46 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class PlayerModerationApiTest {
+    @Test
+    fun concurrentTargetReadsShareOneHttpRequest() = runTest {
+        val requestCount = atomic(0)
+        val requestStarted = CompletableDeferred<Unit>()
+        val releaseResponse = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    requestCount.incrementAndGet()
+                    requestStarted.complete(Unit)
+                    releaseResponse.await()
+                    respond(
+                        content = "[${moderationJson("mute")} ]",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        val api = PlayerModerationApi(client)
+
+        try {
+            val reads = List(4) {
+                async { api.getForTarget(TARGET_USER_ID) }
+            }
+            requestStarted.await()
+            repeat(10) { yield() }
+            releaseResponse.complete(Unit)
+
+            reads.awaitAll()
+            assertEquals(1, requestCount.value)
+        } finally {
+            client.close()
+        }
+    }
+
     @Test
     fun getAllRequestsTheCompleteRecordCollectionWithoutFilters() = runTest {
         lateinit var capturedRequest: HttpRequestData

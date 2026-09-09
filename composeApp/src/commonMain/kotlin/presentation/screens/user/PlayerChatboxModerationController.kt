@@ -49,6 +49,7 @@ internal class PlayerChatboxModerationController(
     initialTargetUserId: String,
     private val authService: AuthService,
     private val moderationApi: PlayerChatboxModerationApi,
+    private val moderationCache: ProfilePlayerModerationCache,
     private val scope: CoroutineScope,
 ) {
     private val targetUserId = atomic(initialTargetUserId)
@@ -117,6 +118,7 @@ internal class PlayerChatboxModerationController(
         scope.launch {
             try {
                 val response = authService.runSessionBoundCatching(ready.sessionToken) {
+                    moderationCache.invalidate(ready.sessionToken, ready.targetUserId)
                     ChatboxModerationType.entries
                         .filter { it in ready.activeTypes }
                         .forEach { moderationApi.remove(ready.targetUserId, it) }
@@ -235,7 +237,17 @@ internal class PlayerChatboxModerationController(
 
             _state.value = PlayerChatboxModerationState.Checking
             val response = authService.runSessionBoundCatching(context.sessionToken) {
-                moderationApi.getForTarget(context.targetUserId)
+                moderationCache.get(context.sessionToken, context.targetUserId).map { moderation ->
+                    PlayerChatboxModerationData(
+                        created = moderation.created,
+                        id = moderation.id,
+                        sourceDisplayName = moderation.sourceDisplayName,
+                        sourceUserId = moderation.sourceUserId,
+                        targetDisplayName = moderation.targetDisplayName,
+                        targetUserId = moderation.targetUserId,
+                        type = moderation.type,
+                    )
+                }
             }
             val acceptedResponse = response?.takeIf {
                 isCurrentResponse(context.targetUserId, it.sessionToken)

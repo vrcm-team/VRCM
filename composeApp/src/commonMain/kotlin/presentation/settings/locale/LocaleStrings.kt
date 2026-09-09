@@ -180,6 +180,7 @@ sealed class LocaleStrings {
     open val notificationPhotoPreparationFailed: String = "Gallery photo could not be prepared. Try again."
     open val notificationAccept: String = "Accept"
     open val notificationIgnore: String = "Ignore"
+    open val notificationBlock: String = "Block"
     open val notificationExternalLinkTitle: String = "Open external link?"
     open val notificationExternalLinkMessage: String = "This notification will open %s in your browser."
     open val notificationExternalLinkFailed: String = "The external link could not be opened."
@@ -189,6 +190,7 @@ sealed class LocaleStrings {
     open val notificationBoopDescription: String = "Alerts for every Boop you receive"
     open val notificationFriendRequestAlert: String = "Friend requests"
     open val notificationFriendRequestAlertDescription: String = "Alerts for every incoming friend request"
+    open val notificationGroupInvite: String = "Group invitation"
     open val notificationGroupAnnouncement: String = "Group notifications"
     open val notificationGroupAnnouncementDescription: String =
         "Alerts for announcements, events, and management messages from groups you joined"
