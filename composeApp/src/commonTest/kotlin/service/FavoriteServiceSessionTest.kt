@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.service
 import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import io.github.vrcmteam.vrcm.storage.FavoriteLocalDao
@@ -19,9 +20,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FavoriteServiceSessionTest {
@@ -140,6 +144,70 @@ class FavoriteServiceSessionTest {
             SharedFlowCentre.emitLogout()
         }
     }
+
+    @Test
+    fun lateGroupUpdateCannotPublishIntoAnotherAccountsCache() = runBlocking {
+        val accountA = AccountDto(userId = "usr_owner_a", username = "owner-a")
+        val accountB = AccountDto(userId = "usr_owner_b", username = "owner-b")
+        SharedFlowCentre.emitAuthenticated(accountA)
+        val updateStarted = CompletableDeferred<Unit>()
+        val releaseUpdate = CompletableDeferred<Unit>()
+        val client = favoriteClient { requestPath, offset ->
+            val ownerId = SharedFlowCentre.currentSession.value?.token?.userId.orEmpty()
+            when (requestPath) {
+                "/favorites" -> if (offset == "0") {
+                    jsonResponse(favoriteJson(ownerId))
+                } else {
+                    jsonResponse("[]")
+                }
+                "/favorite/groups" -> if (offset == "0") {
+                    jsonResponse(groupJson("grp_$ownerId", ownerId))
+                } else {
+                    jsonResponse("[]")
+                }
+                "/favorite/group/world/worlds1/usr_owner_a" -> {
+                    updateStarted.complete(Unit)
+                    releaseUpdate.await()
+                    jsonResponse("")
+                }
+                else -> error("Unexpected favorites request: $requestPath")
+            }
+        }
+        val service = favoriteService(client)
+        try {
+            assertTrue(service.loadFavoriteByGroup(FavoriteType.World).isSuccess)
+            val requestToken = assertNotNull(SharedFlowCentre.currentSession.value).token
+            val update = service.prepareFavoriteGroupUpdate(
+                sessionToken = requestToken,
+                favoriteType = FavoriteType.World,
+                groupName = "worlds1",
+                displayName = "Account A update",
+                visibility = FavoriteGroupVisibility.Public,
+            )
+            supervisorScope {
+                val oldUpdate = async(start = CoroutineStart.UNDISPATCHED) {
+                    service.sendFavoriteGroupUpdate(update)
+                    service.commitFavoriteGroupUpdate(requestToken, update)
+                }
+                updateStarted.await()
+
+                SharedFlowCentre.emitAuthenticated(accountB)
+                assertTrue(service.loadFavoriteByGroup(FavoriteType.World).isSuccess)
+                releaseUpdate.complete(Unit)
+                assertFailsWith<IllegalStateException> { oldUpdate.await() }
+            }
+
+            val currentRemoteGroup = service.favoritesByGroup(FavoriteType.World).value.keys
+                .single { it.ownerId != "local" }
+            assertEquals(accountB.userId, currentRemoteGroup.ownerId)
+            assertEquals("Worlds", currentRemoteGroup.displayName)
+        } finally {
+            releaseUpdate.complete(Unit)
+            service.dispose()
+            client.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
 }
 
 private fun favoriteService(client: HttpClient) = FavoriteService(
@@ -168,10 +236,17 @@ private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
     headers = headersOf(HttpHeaders.ContentType, "application/json"),
 )
 
-private fun groupJson(id: String) = """
+private fun groupJson(id: String, ownerId: String = "usr_owner") = """
     [{
-      "id":"$id","ownerId":"usr_owner","type":"world","visibility":"private",
+      "id":"$id","ownerId":"$ownerId","type":"world","visibility":"private",
       "displayName":"Worlds","name":"worlds1","ownerDisplayName":"owner","tags":[]
+    }]
+""".trimIndent()
+
+private fun favoriteJson(ownerId: String) = """
+    [{
+      "favoriteId":"wrld_$ownerId","id":"fvrt_$ownerId",
+      "tags":["worlds1"],"type":"world"
     }]
 """.trimIndent()
 

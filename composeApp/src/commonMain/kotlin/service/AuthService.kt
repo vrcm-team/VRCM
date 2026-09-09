@@ -482,6 +482,18 @@ class AuthService(
         callback = { _: AccountSessionToken -> callback() },
     )
 
+    internal suspend fun <T> runSessionBoundCatchingWithReauthentication(
+        sessionToken: AccountSessionToken,
+        onReauthentication: (() -> Unit)?,
+        callback: suspend () -> T,
+    ): SessionBoundResponse<T>? = authMutex.withLock {
+        runSessionBoundCatchingLocked(
+            sessionToken = sessionToken,
+            callback = { _: AccountSessionToken -> callback() },
+            onReauthentication = onReauthentication,
+        )
+    }
+
     internal suspend fun <T> runSessionBoundCatchingForUser(
         userId: String,
         callback: suspend (AccountSessionToken) -> T,
@@ -503,6 +515,7 @@ class AuthService(
     private suspend fun <T> runSessionBoundCatchingLocked(
         sessionToken: AccountSessionToken,
         callback: suspend (AccountSessionToken) -> T,
+        onReauthentication: (() -> Unit)? = null,
     ): SessionBoundResponse<T>? {
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) return null
 
@@ -514,6 +527,7 @@ class AuthService(
             return SessionBoundResponse(first, sessionToken)
         }
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) return null
+        onReauthentication?.invoke()
         val reauthenticated = runRequestCatching {
             doReTryAuthLocked(sessionToken.userId)
         }

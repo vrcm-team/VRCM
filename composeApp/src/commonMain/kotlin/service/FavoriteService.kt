@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.service
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
@@ -26,10 +28,39 @@ internal class FavoriteGroupCache {
         flows.getValue(type).value = favorites
     }
 
+    fun updateGroup(
+        type: FavoriteType,
+        ownerId: String,
+        groupName: String,
+        transform: (FavoriteGroupData) -> FavoriteGroupData,
+    ): FavoriteGroupData? {
+        var updatedGroup: FavoriteGroupData? = null
+        val updated = buildMap {
+            flow(type).value.forEach { (group, favorites) ->
+                val nextGroup = if (group.ownerId == ownerId && group.name == groupName) {
+                    transform(group).also { updatedGroup = it }
+                } else {
+                    group
+                }
+                put(nextGroup, favorites)
+            }
+        }
+        if (updatedGroup != null) replace(type, updated)
+        return updatedGroup
+    }
+
     fun clear() {
         flows.values.forEach { it.value = emptyMap() }
     }
 }
+
+internal data class FavoriteGroupUpdate(
+    val favoriteType: FavoriteType,
+    val groupName: String,
+    val ownerId: String,
+    val displayName: String,
+    val visibility: FavoriteGroupVisibility,
+)
 
 /**
  * 收藏服务类
@@ -44,7 +75,7 @@ class FavoriteService(
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val favoritesByGroupCache = FavoriteGroupCache()
     private var favoritesOwnerUserId: String? = SharedFlowCentre.currentSession.value?.token?.userId
-    private var favoritesOwnerToken: io.github.vrcmteam.vrcm.core.shared.AccountSessionToken? =
+    private var favoritesOwnerToken: AccountSessionToken? =
         SharedFlowCentre.currentSession.value?.token
     private val cacheMutex = Mutex()
     private val requestGenerations = mutableMapOf<FavoriteType, Long>()
@@ -55,19 +86,21 @@ class FavoriteService(
     init {
         serviceScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
-                val nextUserId = session?.token?.userId
                 cacheMutex.withLock {
-                    val nextToken = session?.token
-                    if (favoritesOwnerToken != nextToken) {
-                        if (favoritesOwnerUserId != nextUserId) favoritesByGroupCache.clear()
-                        favoritesOwnerUserId = nextUserId
-                        favoritesOwnerToken = nextToken
-                        FavoriteType.entries.forEach { type ->
-                            requestGenerations[type] = (requestGenerations[type] ?: 0L) + 1L
-                        }
-                    }
+                    synchronizeFavoritesOwnerLocked(session?.token)
                 }
             }
+        }
+    }
+
+    private fun synchronizeFavoritesOwnerLocked(nextToken: AccountSessionToken?) {
+        if (favoritesOwnerToken == nextToken) return
+        val nextUserId = nextToken?.userId
+        if (favoritesOwnerUserId != nextUserId) favoritesByGroupCache.clear()
+        favoritesOwnerUserId = nextUserId
+        favoritesOwnerToken = nextToken
+        FavoriteType.entries.forEach { type ->
+            requestGenerations[type] = (requestGenerations[type] ?: 0L) + 1L
         }
     }
 
@@ -153,11 +186,7 @@ class FavoriteService(
             val sessionToken = cacheMutex.withLock {
                 val currentToken = SharedFlowCentre.currentSession.value?.token
                     ?: error("No authenticated session")
-                if (favoritesOwnerToken?.userId != currentToken.userId) {
-                    favoritesByGroupCache.clear()
-                }
-                favoritesOwnerUserId = currentToken.userId
-                favoritesOwnerToken = currentToken
+                synchronizeFavoritesOwnerLocked(currentToken)
                 requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
                 currentToken to requestGenerations.getValue(favoriteType)
             }
@@ -253,6 +282,73 @@ class FavoriteService(
             favoriteLocalDao.save(type, current.filterNot { it == favoriteId })
         } else {
             favoriteApi.deleteFavorite(id)
+        }
+    }
+
+    internal suspend fun prepareFavoriteGroupUpdate(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        groupName: String,
+        displayName: String,
+        visibility: FavoriteGroupVisibility,
+    ): FavoriteGroupUpdate {
+        require(favoriteType == FavoriteType.World || favoriteType == FavoriteType.Avatar) {
+            "Only world and avatar favorite groups can be edited here"
+        }
+        val normalizedDisplayName = displayName.trim()
+        require(normalizedDisplayName.isNotEmpty()) { "Favorite group display name cannot be blank" }
+
+        return cacheMutex.withLock {
+            check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+                "Authenticated session changed before updating the favorite group"
+            }
+            synchronizeFavoritesOwnerLocked(sessionToken)
+            val group = favoritesByGroupCache.flow(favoriteType).value.keys.firstOrNull {
+                it.ownerId == sessionToken.userId && it.name == groupName &&
+                    it.type == favoriteType.value
+            } ?: error("Favorite group is unavailable for the current account")
+            FavoriteGroupUpdate(
+                favoriteType = favoriteType,
+                groupName = group.name,
+                ownerId = sessionToken.userId,
+                displayName = normalizedDisplayName,
+                visibility = visibility,
+            )
+        }
+    }
+
+    internal suspend fun sendFavoriteGroupUpdate(update: FavoriteGroupUpdate) {
+        favoriteApi.updateFavoriteGroup(
+            favoriteType = update.favoriteType,
+            favoriteGroupName = update.groupName,
+            userId = update.ownerId,
+            displayName = update.displayName,
+            visibility = update.visibility,
+        )
+    }
+
+    internal suspend fun commitFavoriteGroupUpdate(
+        sessionToken: AccountSessionToken,
+        update: FavoriteGroupUpdate,
+    ): FavoriteGroupData {
+        return cacheMutex.withLock {
+            check(SharedFlowCentre.isCurrentSession(sessionToken) && update.ownerId == sessionToken.userId) {
+                "Authenticated session changed while updating the favorite group"
+            }
+            // The auth flow can publish a renewed token before this service collector observes it.
+            synchronizeFavoritesOwnerLocked(sessionToken)
+            requestGenerations[update.favoriteType] =
+                (requestGenerations[update.favoriteType] ?: 0L) + 1L
+            favoritesByGroupCache.updateGroup(
+                type = update.favoriteType,
+                ownerId = sessionToken.userId,
+                groupName = update.groupName,
+            ) { currentGroup ->
+                currentGroup.copy(
+                    displayName = update.displayName,
+                    visibility = update.visibility.value,
+                )
+            } ?: error("Favorite group disappeared while the update was in progress")
         }
     }
 

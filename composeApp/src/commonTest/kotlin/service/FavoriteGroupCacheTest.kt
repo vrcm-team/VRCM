@@ -5,6 +5,8 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class FavoriteGroupCacheTest {
@@ -23,6 +25,31 @@ class FavoriteGroupCacheTest {
 
         cache.replace(FavoriteType.Avatar, secondSession)
         assertEquals(secondSession, observedFlow.value)
+    }
+
+    @Test
+    fun updatingGroupMetadataReplacesMapKeyAndPreservesMembership() {
+        val cache = FavoriteGroupCache()
+        val original = favorites("avtr_member")
+        val originalGroup = original.keys.single()
+        val originalMembership = original.values.single()
+        cache.replace(FavoriteType.Avatar, original)
+
+        val updatedGroup = cache.updateGroup(
+            type = FavoriteType.Avatar,
+            ownerId = originalGroup.ownerId,
+            groupName = originalGroup.name,
+        ) { group ->
+            group.copy(displayName = "Updated", visibility = "friends")
+        }
+
+        val updated = cache.flow(FavoriteType.Avatar).value
+        val publishedGroup = assertNotNull(updatedGroup)
+        assertEquals("Updated", publishedGroup.displayName)
+        assertEquals("friends", publishedGroup.visibility)
+        assertFalse(originalGroup in updated)
+        assertSame(originalMembership, updated.getValue(publishedGroup))
+        assertEquals(listOf(originalGroup.name), updated.getValue(publishedGroup).single().tags)
     }
 
     private fun favorites(avatarId: String): Map<FavoriteGroupData, List<FavoriteData>> {
