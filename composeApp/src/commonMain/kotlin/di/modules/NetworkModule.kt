@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.di.modules
 
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.economy.EconomyApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
@@ -46,6 +47,7 @@ internal val networkModule = module(true) {
     singleOf(::ProfileAppearanceApi)
     singleOf(::VrchatStatusApi)
     singleOf(::InventoryApi)
+    singleOf(::EconomyApi)
     singleOf(::ApiNoticeCenter)
     single<HttpClient> { apiClientDefinition(it) }
     single { createNetworkJson() }

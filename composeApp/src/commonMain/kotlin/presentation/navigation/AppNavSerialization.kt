@@ -14,10 +14,12 @@ import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEditorScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -36,6 +38,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(AuthScreen::class, AuthScreen.serializer())
             subclass(AuthAnimeScreen::class, AuthAnimeScreen.serializer())
             subclass(HomeScreen::class, HomeScreen.serializer())
+            subclass(InventoryScreen::class, InventoryScreen.serializer())
             subclass(FriendActivityTimelineScreen::class, FriendActivityTimelineScreen.serializer())
             subclass(GalleryScreen::class, GalleryScreen.serializer())
             subclass(FavoritesScreen::class, FavoritesScreen.serializer())
@@ -53,6 +56,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(MeetupCardDisplayRoute::class, MeetupCardDisplayRoute.serializer())
             subclass(MeetupCardEditorRoute::class, MeetupCardEditorRoute.serializer())
             subclass(NotificationSettingsScreen::class, NotificationSettingsScreen.serializer())
+            subclass(RewardCodeScreen::class, RewardCodeScreen.serializer())
             subclass(InviteMessageSlotsScreen::class, InviteMessageSlotsScreen.serializer())
             subclass(NotificationScreen::class, NotificationScreen.serializer())
         }

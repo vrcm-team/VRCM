@@ -38,6 +38,7 @@ val serviceModule: Module = module {
     singleOf(::VrchatStatusNotificationService)
     singleOf(::NetworkBoopRequest) bind BoopRequest::class
     singleOf(::BoopService)
+    singleOf(::NetworkRewardCodeRedeemer) bind RewardCodeRedeemer::class
     singleOf(::ImageInviteService) bind ImageInviteRemote::class
     single { InviteMessageActionService(get<AuthService>(), get<InviteApi>()) }
     singleOf(::InvitePhotoResponseService)

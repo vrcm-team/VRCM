@@ -36,8 +36,10 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImagePro
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.canvasSpec
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.settings.AuthenticatedInviteMessageSlotsSource
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsModel
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsSource
@@ -62,10 +64,15 @@ import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
 import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
+import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
+import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.ktor.client.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import okio.FileSystem
 import org.koin.core.definition.Definition
 import org.koin.core.module.Module
@@ -87,6 +94,12 @@ val presentationModule: Module = module {
     viewModelOf(::AuthScreenModel)
     viewModel { FriendActivityTimelineModel(get<FriendActivityService>()) }
     viewModelOf(::HomeScreenModel)
+    viewModel {
+        InventoryScreenModel(
+            authService = get<AuthService>(),
+            inventoryApi = get<InventoryApi>(),
+        )
+    }
     singleOf(::NotificationCenterModel) {
         onClose { it?.close() }
     }
@@ -164,6 +177,13 @@ val presentationModule: Module = module {
     singleOf(::NetworkWorldEditor) bind WorldEditor::class
     viewModel { AvatarProfileScreenModel(get(), get(), get(), avatarEditor = get()) }
     viewModelOf(::RecentWorldsScreenModel)
+    viewModel {
+        RewardCodeScreenModel(
+            redeemer = get(),
+            sessions = SharedFlowCentre.currentSession,
+            requestDispatcher = Dispatchers.IO,
+        )
+    }
     single<ImageLoader> { imageLoaderDefinition(it) }
     configThemeColor()
 }
