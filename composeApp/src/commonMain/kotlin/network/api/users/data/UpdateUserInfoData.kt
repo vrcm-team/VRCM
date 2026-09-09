@@ -10,6 +10,7 @@ data class UpdateUserInfoData(
     val bio: String? = null,
     val bioLinks: List<String>? = null,
     val isBoopingEnabled: Boolean? = null,
+    val homeLocation: String? = null,
     val status: UserStatus? = null,
     val statusDescription: String? = null,
     val pronouns: String? = null,

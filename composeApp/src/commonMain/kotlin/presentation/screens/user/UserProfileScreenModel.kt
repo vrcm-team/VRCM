@@ -16,20 +16,26 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
+import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
@@ -39,10 +45,15 @@ import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityService
 import io.github.vrcmteam.vrcm.service.FriendActivitySummary
+import io.github.vrcmteam.vrcm.service.ImageInviteRemote
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.BoopService
 import io.github.vrcmteam.vrcm.service.BoopPrivacyService
 import io.github.vrcmteam.vrcm.service.BoopPrivacyUpdateResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
+import io.github.vrcmteam.vrcm.service.InviteMessageActionService
+import io.github.vrcmteam.vrcm.service.InviteMessageLoadResult
+import io.github.vrcmteam.vrcm.service.InviteMessageSendResult
 import io.github.vrcmteam.vrcm.storage.AccountCacheManager
 import io.github.vrcmteam.vrcm.storage.FavoriteListCacheStore
 import io.github.vrcmteam.vrcm.storage.UserProfileCacheStore
@@ -68,6 +79,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import org.koin.core.logger.Logger
 
 internal const val MAX_PROFILE_BIO_LINKS = 3
@@ -77,6 +90,16 @@ private enum class UserLoadState {
     Loading,
     Loaded,
 }
+
+data class InviteMessageSelectionState(
+    val action: InviteMessageAction,
+    val targetUserId: String,
+    val targetDisplayName: String,
+    val messages: List<InviteMessageData> = emptyList(),
+    val isLoading: Boolean = true,
+    val loadFailed: Boolean = false,
+    val sendingSlot: Int? = null,
+)
 
 internal class UserProfileLoadGate {
     private val mutex = Mutex()
@@ -216,6 +239,129 @@ internal class BioLinksUpdateStateMachine {
     }
 }
 
+internal data class PlayerBlockState(
+    val isBlocked: Boolean? = null,
+    val isLoading: Boolean = false,
+    val isUpdating: Boolean = false,
+    val loadFailed: Boolean = false,
+    val isSessionAvailable: Boolean = true,
+)
+
+/** Serializes profile block reads and writes so stale completions cannot replace newer state. */
+internal class PlayerBlockStateMachine {
+    private val lock = SynchronizedObject()
+    private val _state = MutableStateFlow(PlayerBlockState())
+    val state: StateFlow<PlayerBlockState> = _state.asStateFlow()
+    private var revision = 0L
+    private var pendingBlockedState: Boolean? = null
+
+    fun tryStartLoad(): Long? = synchronized(lock) {
+        val current = _state.value
+        if (current.isLoading || current.isUpdating) return@synchronized null
+        (++revision).also {
+            pendingBlockedState = null
+            _state.value = current.copy(
+                isLoading = true,
+                loadFailed = false,
+                isSessionAvailable = true,
+            )
+        }
+    }
+
+    fun completeLoad(operationId: Long, isBlocked: Boolean): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isLoading) return@synchronized false
+        _state.value = PlayerBlockState(isBlocked = isBlocked)
+        true
+    }
+
+    fun failLoad(operationId: Long): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isLoading) return@synchronized false
+        _state.value = _state.value.copy(
+            isBlocked = null,
+            isLoading = false,
+            loadFailed = true,
+        )
+        true
+    }
+
+    fun tryStartUpdate(blocked: Boolean): Long? = synchronized(lock) {
+        val current = _state.value
+        if (!current.isSessionAvailable ||
+            current.isLoading ||
+            current.isUpdating ||
+            current.isBlocked == null ||
+            current.isBlocked == blocked
+        ) {
+            return@synchronized null
+        }
+        (++revision).also {
+            pendingBlockedState = blocked
+            _state.value = current.copy(isUpdating = true)
+        }
+    }
+
+    fun completeUpdate(operationId: Long): Boolean = synchronized(lock) {
+        val blocked = pendingBlockedState
+        if (operationId != revision || !_state.value.isUpdating || blocked == null) {
+            return@synchronized false
+        }
+        pendingBlockedState = null
+        _state.value = PlayerBlockState(isBlocked = blocked)
+        true
+    }
+
+    fun failUpdate(operationId: Long): Boolean = synchronized(lock) {
+        if (operationId != revision || !_state.value.isUpdating) return@synchronized false
+        pendingBlockedState = null
+        _state.value = _state.value.copy(isUpdating = false)
+        true
+    }
+
+    fun invalidate() = synchronized(lock) {
+        revision++
+        pendingBlockedState = null
+        _state.value = PlayerBlockState(isSessionAvailable = false)
+    }
+}
+
+internal enum class UserReportState {
+    Idle,
+    Submitting,
+    Submitted,
+    Failed,
+}
+
+internal class UserReportStateMachine {
+    private val _state = MutableStateFlow(UserReportState.Idle)
+    val state: StateFlow<UserReportState> = _state.asStateFlow()
+
+    fun tryStart(): Boolean {
+        while (true) {
+            val current = _state.value
+            if (current == UserReportState.Submitting || current == UserReportState.Submitted) {
+                return false
+            }
+            if (_state.compareAndSet(current, UserReportState.Submitting)) return true
+        }
+    }
+
+    fun complete() = finish(UserReportState.Submitted)
+
+    fun fail() = finish(UserReportState.Failed)
+
+    fun reset() {
+        while (true) {
+            val current = _state.value
+            if (current == UserReportState.Idle || current == UserReportState.Submitting) return
+            if (_state.compareAndSet(current, UserReportState.Idle)) return
+        }
+    }
+
+    private fun finish(result: UserReportState) {
+        _state.compareAndSet(UserReportState.Submitting, result)
+    }
+}
+
 internal fun resolveFriendLocation(
     userId: String,
     location: String?,
@@ -340,19 +486,25 @@ internal fun WorldData.detailRevision() = WorldDetailRevision(
 private fun WorldDetailRevision.matches(world: WorldData): Boolean =
     (updatedAt != null || version != null) && updatedAt == world.updatedAt && version == world.version
 
-class UserProfileScreenModel(
+class UserProfileScreenModel internal constructor(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
     private val usersApi: UsersApi,
     private val groupsApi: GroupsApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
+    private val playerChatboxModerationApi: PlayerChatboxModerationApi,
+    private val playerModerationApi: PlayerModerationApi,
     private val logger: Logger,
     private val instancesApi: InstancesApi,
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
+    private val feedbackApi: FeedbackApi,
     private val inviteApi: InviteApi,
+    gallerySelectionSessionStore: GallerySelectionSessionStore,
+    imageInviteRemote: ImageInviteRemote,
+    private val inviteMessageActionService: InviteMessageActionService,
     private val userProfileCacheStore: UserProfileCacheStore,
     private val favoriteListCacheStore: FavoriteListCacheStore,
     private val accountCacheManager: AccountCacheManager,
@@ -362,8 +514,30 @@ class UserProfileScreenModel(
     private val boopPrivacyService: BoopPrivacyService,
 ) : ViewModel() {
 
+    private val imageInviteCoordinator = ImageInviteCoordinator(
+        gallerySessions = gallerySelectionSessionStore,
+        remote = imageInviteRemote,
+    )
+    internal val imageInviteState: StateFlow<ImageInviteUiState> = imageInviteCoordinator.state
+
     private val cacheOwnerUserId = authService.accountDto().userId
     private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
+    private val playerChatboxModerationController = PlayerChatboxModerationController(
+        initialTargetUserId = userProfileVO.id,
+        authService = authService,
+        moderationApi = playerChatboxModerationApi,
+        scope = viewModelScope,
+    )
+    internal val playerChatboxModerationState: StateFlow<PlayerChatboxModerationState> =
+        playerChatboxModerationController.state
+    private val playerVoiceModerationController = PlayerVoiceModerationController(
+        initialTargetUserId = userProfileVO.id,
+        authService = authService,
+        playerModerationApi = playerModerationApi,
+        scope = viewModelScope,
+    )
+    internal val playerVoiceModerationState: StateFlow<PlayerVoiceModerationState> =
+        playerVoiceModerationController.state
     private val favoriteCacheWriteToken = accountCacheManager.captureWriteToken(cacheOwnerUserId)
     private val _userState = mutableStateOf(userProfileVO.withSelfIdentity())
     val userState by _userState
@@ -388,6 +562,11 @@ class UserProfileScreenModel(
 
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
+
+    private val _inviteMessageSelection = MutableStateFlow<InviteMessageSelectionState?>(null)
+    val inviteMessageSelection: StateFlow<InviteMessageSelectionState?> =
+        _inviteMessageSelection.asStateFlow()
+    private var inviteMessageSelectionGeneration = 0L
 
     private val _createdWorlds = mutableStateOf<List<WorldData>>(emptyList())
     val createdWorlds by _createdWorlds
@@ -443,6 +622,19 @@ class UserProfileScreenModel(
             updatingUserId = boopPrivacyService.updatingUserId.value,
         ),
     )
+    private val playerInteractionController = PlayerInteractionOverrideController(
+        ownerUserId = cacheOwnerUserId,
+        initialSessionToken = profileSessionToken,
+        authService = authService,
+        usersApi = usersApi,
+    )
+    internal val playerInteractionState: StateFlow<PlayerInteractionState> =
+        playerInteractionController.state
+    private val playerBlockStateMachine = PlayerBlockStateMachine()
+    internal val playerBlockState: StateFlow<PlayerBlockState> =
+        playerBlockStateMachine.state
+    private val userReportStateMachine = UserReportStateMachine()
+    internal val userReportState: StateFlow<UserReportState> = userReportStateMachine.state
 
     /**
      * The user endpoint does not reliably include the fields used by
@@ -453,6 +645,20 @@ class UserProfileScreenModel(
         copy(isSelf = id == cacheOwnerUserId)
 
     init {
+        viewModelScope.launch {
+            SharedFlowCentre.currentSession.collect { session ->
+                val shouldReload = playerInteractionController.onSessionChanged(session?.token)
+                if (shouldReload && userState.id != cacheOwnerUserId) {
+                    refreshPlayerInteractionStatus()
+                }
+                if (session?.account?.userId != cacheOwnerUserId) {
+                    playerBlockStateMachine.invalidate()
+                }
+                if (_inviteMessageSelection.value != null && session?.account?.userId != cacheOwnerUserId) {
+                    clearInviteMessageSelection(force = true)
+                }
+            }
+        }
         viewModelScope.launch {
             authService.currentUserState.collect { currentUser ->
                 _isBoopAllowed.value = currentUser?.isBoopingEnabled != false
@@ -593,34 +799,141 @@ class UserProfileScreenModel(
             loadCoordinator.runLoads(
                 forceRefresh = forceRefresh,
                 loadUser = {
-                    var userLoaded = false
-                    authService.reTryAuthCatching {
+                    val responseResult = authService.reTryAuthCatching {
                         usersApi.fetchUserResponse(userId)
-                    }.onFailure {
-                        handleError(it)
-                    }.onSuccess { response ->
-                        // 防止body序列化异常
-                        runCatching { response.body<UserData>() }
-                            .onSuccess {
-                                if (it.id == cacheOwnerUserId) {
-                                    authService.applyOwnProfileRefresh(it)
-                                }
-                                val profile = UserProfileVo(it).withSelfIdentity()
-                                if (_userState.value != profile) {
-                                    _userState.value = profile
-                                    computeFriendLocation(profile.location)
-                                }
-                                saveCache(it)
-                                userLoaded = true
-                            }
-                            .onFailure { handleError(it) }
-                        _userJson.value = response.bodyAsText().pretty()
                     }
-                    userLoaded
+                    responseResult.exceptionOrNull()?.let { error -> handleError(error) }
+                    val response = responseResult.getOrNull()
+                    if (response != null) {
+                        // 防止body序列化异常
+                        val userResult = runCatching { response.body<UserData>() }
+                        userResult.exceptionOrNull()?.let { error -> handleError(error) }
+                        val user = userResult.getOrNull()
+                        if (user != null) {
+                            if (user.id == cacheOwnerUserId) {
+                                authService.applyOwnProfileRefresh(user)
+                            }
+                            val profile = UserProfileVo(user).withSelfIdentity()
+                            if (_userState.value != profile) {
+                                _userState.value = profile
+                                computeFriendLocation(profile.location)
+                            }
+                            saveCache(user)
+                        }
+                        _userJson.value = response.bodyAsText().pretty()
+                        user != null
+                    } else {
+                        false
+                    }
                 },
                 loadGroups = { loadUserGroups(userId) },
             )
         }
+
+    fun refreshPlayerBlockStatus(failureMessage: String) {
+        if (userState.id == cacheOwnerUserId) return
+        val sessionToken = currentProfileSessionToken() ?: run {
+            playerBlockStateMachine.invalidate()
+            return
+        }
+        val operationId = playerBlockStateMachine.tryStartLoad() ?: return
+        val targetUserId = userState.id
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                usersApi.isUserBlocked(targetUserId)
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                playerBlockStateMachine.invalidate()
+                return@launch
+            }
+            response.result.onSuccess { isBlocked ->
+                playerBlockStateMachine.completeLoad(operationId, isBlocked)
+            }.onFailure { error ->
+                if (playerBlockStateMachine.failLoad(operationId)) {
+                    handleActionError(error, failureMessage)
+                }
+            }
+        }
+    }
+
+    suspend fun setPlayerBlocked(
+        blocked: Boolean,
+        successMessage: String,
+        failureMessage: String,
+    ): Boolean = viewModelScope.async(Dispatchers.IO) {
+        if (userState.id == cacheOwnerUserId) return@async false
+        val sessionToken = currentProfileSessionToken() ?: run {
+            playerBlockStateMachine.invalidate()
+            return@async false
+        }
+        val operationId = playerBlockStateMachine.tryStartUpdate(blocked) ?: return@async false
+        val targetUserId = userState.id
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            if (blocked) usersApi.blockUser(targetUserId) else usersApi.unblockUser(targetUserId)
+        }
+        if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+            playerBlockStateMachine.invalidate()
+            return@async false
+        }
+        val error = response.result.exceptionOrNull()
+        if (error != null) {
+            if (playerBlockStateMachine.failUpdate(operationId)) {
+                handleActionError(error, failureMessage)
+            }
+            return@async false
+        }
+        if (!playerBlockStateMachine.completeUpdate(operationId)) return@async false
+        SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+        true
+    }.await()
+
+    fun refreshPlayerInteractionStatus(failureMessage: String? = null) {
+        if (userState.id == cacheOwnerUserId) return
+        val targetUserId = userState.id
+        viewModelScope.launch(Dispatchers.IO) {
+            var result = playerInteractionController.refresh(targetUserId)
+            if (result is PlayerInteractionRequestResult.Stale && result.canReload) {
+                result = playerInteractionController.refresh(targetUserId)
+            }
+            if (result is PlayerInteractionRequestResult.Failed && failureMessage != null) {
+                handleActionError(result.error, failureMessage)
+            }
+        }
+    }
+
+    internal suspend fun setPlayerInteractionOverride(
+        override: PlayerInteractionOverride,
+        successMessage: String,
+        failureMessage: String,
+    ): Boolean = viewModelScope.async(Dispatchers.IO) {
+        if (userState.id == cacheOwnerUserId) return@async false
+        val targetUserId = userState.id
+        when (val result = playerInteractionController.setOverride(targetUserId, override)) {
+            PlayerInteractionRequestResult.Succeeded -> {
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+                true
+            }
+            is PlayerInteractionRequestResult.Failed -> {
+                handleActionError(result.error, failureMessage)
+                false
+            }
+            is PlayerInteractionRequestResult.Stale -> {
+                if (result.canReload) playerInteractionController.refresh(targetUserId)
+                false
+            }
+            PlayerInteractionRequestResult.Ignored -> false
+        }
+    }.await()
+
+    private fun currentProfileSessionToken(): AccountSessionToken? =
+        SharedFlowCentre.currentSession.value
+            ?.takeIf { it.account.userId == cacheOwnerUserId }
+            ?.token
+
+    private suspend fun handleActionError(error: Throwable, message: String) {
+        logger.error(error.message.toString())
+        SharedFlowCentre.toastText.emit(ToastText.Error(message))
+    }
 
     fun updateBioLinks(
         bioLinks: List<String>,
@@ -738,6 +1051,58 @@ class UserProfileScreenModel(
         friendAction(message) {
             friendService.sendFriendRequest(userId)
         }
+
+    fun setPlayerChatboxModerationTarget(userId: String) {
+        playerChatboxModerationController.setTargetUserId(userId)
+    }
+
+    fun retryPlayerChatboxModeration() {
+        playerChatboxModerationController.retry()
+    }
+
+    fun togglePlayerChatboxModeration(
+        mutedMessage: String,
+        unmutedMessage: String,
+        failureMessage: String,
+    ) {
+        playerChatboxModerationController.toggle(
+            onSuccess = { isMuted ->
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Success(if (isMuted) mutedMessage else unmutedMessage),
+                )
+            },
+            onFailure = { error ->
+                logger.error(error.message.orEmpty())
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            },
+        )
+    }
+
+    fun setPlayerVoiceModerationTarget(userId: String) {
+        playerVoiceModerationController.setTargetUserId(userId)
+    }
+
+    fun retryPlayerVoiceModeration() {
+        playerVoiceModerationController.retry()
+    }
+
+    fun togglePlayerVoiceModeration(
+        mutedMessage: String,
+        unmutedMessage: String,
+        failureMessage: String,
+    ) {
+        playerVoiceModerationController.toggle(
+            onSuccess = { isMuted ->
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Success(if (isMuted) mutedMessage else unmutedMessage),
+                )
+            },
+            onFailure = { error ->
+                logger.error(error.message.orEmpty())
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            },
+        )
+    }
 
     suspend fun deleteFriendRequest(userId: String, message: String): Boolean = friendAction(message) {
         friendService.deleteFriendRequest(userId)
@@ -957,6 +1322,41 @@ class UserProfileScreenModel(
         }
     }
 
+    fun reportUser(
+        userId: String,
+        successMessage: String,
+        failureMessage: String,
+    ) {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (userId == cacheOwnerUserId ||
+            userId == sessionToken.userId ||
+            !userReportStateMachine.tryStart()
+        ) {
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                feedbackApi.reportUser(userId)
+            }
+            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
+                userReportStateMachine.fail()
+                return@launch
+            }
+
+            response.result.onSuccess {
+                userReportStateMachine.complete()
+                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
+            }.onFailure { error ->
+                logger.error(error.message.toString())
+                userReportStateMachine.fail()
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            }
+        }
+    }
+
+    fun resetUserReportState() = userReportStateMachine.reset()
+
     suspend fun boop(
         userId: String,
         emojiId: String?,
@@ -977,24 +1377,162 @@ class UserProfileScreenModel(
         BoopResult.InFlight, BoopResult.SessionChanged -> result
     }
 
-    fun inviteToMyInstance(
-        userId: String,
+    fun openInviteMessageSelection(
+        action: InviteMessageAction,
+        targetUserId: String,
+        targetDisplayName: String,
+    ) {
+        if (_inviteMessageSelection.value?.sendingSlot != null) return
+        val generation = ++inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = InviteMessageSelectionState(
+            action = action,
+            targetUserId = targetUserId,
+            targetDisplayName = targetDisplayName,
+        )
+        loadInviteMessages(generation, action, targetUserId)
+    }
+
+    fun retryInviteMessageSelection() {
+        val selection = _inviteMessageSelection.value ?: return
+        if (selection.isLoading || selection.sendingSlot != null) return
+        val generation = ++inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = selection.copy(
+            messages = emptyList(),
+            isLoading = true,
+            loadFailed = false,
+        )
+        loadInviteMessages(generation, selection.action, selection.targetUserId)
+    }
+
+    fun dismissInviteMessageSelection() {
+        clearInviteMessageSelection(force = false)
+    }
+
+    fun sendInviteMessage(
+        slot: Int,
         successMessage: String,
         notInInstanceMessage: String,
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            authService.reTryAuthCatching {
-                val instanceLocation = authService.currentUser().presence.instance
-                require(instanceLocation.isNotBlank() && instanceLocation != "offline") {
-                    notInInstanceMessage
+        val selection = _inviteMessageSelection.value ?: return
+        if (selection.isLoading || selection.loadFailed || selection.sendingSlot != null) return
+        if (selection.messages.none { it.slot == slot }) return
+        val generation = inviteMessageSelectionGeneration
+        _inviteMessageSelection.value = selection.copy(sendingSlot = slot)
+        viewModelScope.launch {
+            when (
+                val result = inviteMessageActionService.send(
+                    targetUserId = selection.targetUserId,
+                    action = selection.action,
+                    slot = slot,
+                )
+            ) {
+                is InviteMessageSendResult.Sent -> {
+                    if (generation != inviteMessageSelectionGeneration ||
+                        !SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        return@launch
+                    }
+                    clearInviteMessageSelection(force = true)
+                    SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
                 }
-                inviteApi.inviteUser(userId, instanceLocation)
-            }.onSuccess {
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure {
-                handleError(it)
+
+                is InviteMessageSendResult.Failed -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value
+                            ?.takeIf { it.targetUserId == selection.targetUserId && it.action == selection.action }
+                            ?.copy(sendingSlot = null)
+                        handleError(result.error)
+                    }
+                }
+
+                is InviteMessageSendResult.NotInInstance -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value?.copy(sendingSlot = null)
+                        SharedFlowCentre.toastText.emit(ToastText.Error(notInInstanceMessage))
+                    }
+                }
+
+                InviteMessageSendResult.InFlight -> {
+                    if (generation == inviteMessageSelectionGeneration) {
+                        _inviteMessageSelection.value = _inviteMessageSelection.value?.copy(sendingSlot = null)
+                    }
+                }
+
+                InviteMessageSendResult.SessionChanged -> clearInviteMessageSelection(force = true)
             }
         }
+    }
+
+    internal fun beginImageInvite(userId: String): String? =
+        imageInviteCoordinator.beginSelection(userId)
+
+    internal fun isImageInviteSelectionPending(selectionSessionId: String): Boolean =
+        imageInviteCoordinator.isSelectionPending(selectionSessionId)
+
+    internal suspend fun finishImageInviteSelection(selectionSessionId: String) =
+        imageInviteCoordinator.finishSelection(selectionSessionId)
+
+    internal fun retryImageInvitePreparation() {
+        viewModelScope.launch(Dispatchers.IO) {
+            imageInviteCoordinator.retryPreparation()
+        }
+    }
+
+    internal fun sendImageInvite() {
+        viewModelScope.launch(Dispatchers.IO) {
+            imageInviteCoordinator.send()
+        }
+    }
+
+    internal fun dismissImageInvite() = imageInviteCoordinator.dismiss()
+    private fun loadInviteMessages(
+        generation: Long,
+        action: InviteMessageAction,
+        targetUserId: String,
+    ) {
+        viewModelScope.launch {
+            when (val result = inviteMessageActionService.load(action)) {
+                is InviteMessageLoadResult.Loaded -> {
+                    if (generation != inviteMessageSelectionGeneration ||
+                        !SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        return@launch
+                    }
+                    val current = _inviteMessageSelection.value
+                        ?.takeIf { it.action == action && it.targetUserId == targetUserId }
+                        ?: return@launch
+                    _inviteMessageSelection.value = current.copy(
+                        messages = result.messages
+                            .sortedBy { it.slot },
+                        isLoading = false,
+                        loadFailed = false,
+                    )
+                }
+
+                is InviteMessageLoadResult.Failed -> {
+                    if (generation == inviteMessageSelectionGeneration &&
+                        SharedFlowCentre.isCurrentSession(result.sessionToken)
+                    ) {
+                        logger.error(result.error.message.toString())
+                        _inviteMessageSelection.value = _inviteMessageSelection.value
+                            ?.takeIf { it.action == action && it.targetUserId == targetUserId }
+                            ?.copy(isLoading = false, loadFailed = true)
+                    }
+                }
+
+                InviteMessageLoadResult.SessionChanged -> clearInviteMessageSelection(force = true)
+            }
+        }
+    }
+
+    private fun clearInviteMessageSelection(force: Boolean) {
+        if (!force && _inviteMessageSelection.value?.sendingSlot != null) return
+        inviteMessageSelectionGeneration++
+        _inviteMessageSelection.value = null
     }
 
     fun computeFriendLocation(location: String) {
