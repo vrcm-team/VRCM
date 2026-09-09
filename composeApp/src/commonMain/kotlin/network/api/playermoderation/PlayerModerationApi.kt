@@ -29,13 +29,13 @@ internal enum class VoiceModerationType(val apiValue: String) {
 
 @Serializable
 internal data class PlayerModerationData(
-    val created: String,
-    val id: String,
-    val sourceDisplayName: String,
-    val sourceUserId: String,
-    val targetDisplayName: String,
-    val targetUserId: String,
-    val type: String,
+    val created: String = "",
+    val id: String = "",
+    val sourceDisplayName: String = "",
+    val sourceUserId: String = "",
+    val targetDisplayName: String = "",
+    val targetUserId: String = "",
+    val type: String = "",
 )
 
 @Serializable
@@ -44,8 +44,11 @@ private data class ModeratePlayerRequest(
     val type: String,
 )
 
-/** API operations needed to read and update per-player voice overrides. */
+/** API operations for the account's player management records and voice overrides. */
 class PlayerModerationApi(private val client: HttpClient) {
+    internal suspend fun getAll(): List<PlayerModerationData> =
+        client.get(PLAYER_MODERATIONS_PATH).checkSuccess()
+
     internal suspend fun getForTarget(targetUserId: String): List<PlayerModerationData> =
         client.get(PLAYER_MODERATIONS_PATH) {
             parameter("targetUserId", targetUserId)

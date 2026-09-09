@@ -41,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.AuthenticatedInviteMessageSlotsSource
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsModel
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsSource
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoPreparer
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSelectionCoordinator
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
@@ -92,6 +93,7 @@ val presentationModule: Module = module {
     }
     singleOf(::AuthenticatedInviteMessageSlotsSource) bind InviteMessageSlotsSource::class
     viewModel { InviteMessageSlotsModel(get()) }
+    viewModelOf(::PlayerModerationListScreenModel)
     viewModel { parameters ->
         UserProfileScreenModel(
             userProfileVO = parameters.get(),
