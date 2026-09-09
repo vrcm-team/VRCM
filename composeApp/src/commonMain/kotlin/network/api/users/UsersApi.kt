@@ -11,6 +11,10 @@ import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.api.users.data.CurrentUpdateUserData
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.network.api.users.data.BoopData
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionModerationData
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
+import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionSnapshot
+import io.github.vrcmteam.vrcm.network.api.users.data.resolvePlayerInteractionSnapshot
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -106,6 +110,41 @@ class UsersApi(private val client: HttpClient) {
             }
         }.checkSuccess()
 
+    internal suspend fun getPlayerInteractionSnapshot(userId: String): PlayerInteractionSnapshot {
+        requireValidModerationUserId(userId)
+        val moderations = client.get(PLAYER_MODERATIONS_PATH) {
+            parameter("targetUserId", userId)
+        }.checkSuccess<List<PlayerInteractionModerationData>>()
+        return resolvePlayerInteractionSnapshot(userId, moderations)
+    }
+
+    internal suspend fun removePlayerInteractionOverride(
+        userId: String,
+        override: PlayerInteractionOverride,
+    ) {
+        requireValidModerationUserId(userId)
+        requireExplicitInteractionOverride(override)
+        client.put(UNPLAYER_MODERATE_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(PlayerModerationRequest(userId, override.apiValue!!))
+        }.checkSuccess<VRChatResponse>().toResult().getOrThrow()
+    }
+
+    internal suspend fun createPlayerInteractionOverride(
+        userId: String,
+        override: PlayerInteractionOverride,
+    ) {
+        requireValidModerationUserId(userId)
+        requireExplicitInteractionOverride(override)
+        val moderation = client.post(PLAYER_MODERATIONS_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(PlayerModerationRequest(userId, override.apiValue!!))
+        }.checkSuccess<PlayerInteractionModerationData>()
+        check(moderation.targetUserId == userId && moderation.type == override.apiValue) {
+            "Player interaction moderation response did not match the request"
+        }
+    }
+
     suspend fun isUserBlocked(userId: String): Boolean {
         requireValidModerationUserId(userId)
         val moderations = client.get(PLAYER_MODERATIONS_PATH) {
@@ -138,6 +177,12 @@ class UsersApi(private val client: HttpClient) {
 
     private fun requireValidModerationUserId(userId: String) {
         require(USER_ID_PATTERN.matches(userId)) { "Invalid user ID" }
+    }
+
+    private fun requireExplicitInteractionOverride(override: PlayerInteractionOverride) {
+        require(override != PlayerInteractionOverride.Default) {
+            "The default interaction setting cannot be written as a moderation"
+        }
     }
 
     private companion object {
