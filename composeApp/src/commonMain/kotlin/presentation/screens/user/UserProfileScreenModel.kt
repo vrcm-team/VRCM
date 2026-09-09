@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.economy.EconomyApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
@@ -30,6 +31,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
@@ -56,10 +58,12 @@ import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldDetailRevision
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
@@ -74,6 +78,22 @@ import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
 
 internal const val MAX_PROFILE_BIO_LINKS = 3
+
+internal sealed interface CreditsBalanceState {
+    data object Loading : CreditsBalanceState
+    data class Available(val balance: Long) : CreditsBalanceState
+    data object Unavailable : CreditsBalanceState
+    data object Error : CreditsBalanceState
+}
+
+internal fun creditsBalanceFailureState(error: Throwable): CreditsBalanceState =
+    if (error is VRCApiException &&
+        (error.code == HttpStatusCode.Forbidden.value || error.code == HttpStatusCode.NotFound.value)
+    ) {
+        CreditsBalanceState.Unavailable
+    } else {
+        CreditsBalanceState.Error
+    }
 
 private enum class UserLoadState {
     Idle,
@@ -343,6 +363,7 @@ class UserProfileScreenModel internal constructor(
     private val instancesApi: InstancesApi,
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
+    private val economyApi: EconomyApi,
     private val favoriteApi: FavoriteApi,
     private val inviteApi: InviteApi,
     gallerySelectionSessionStore: GallerySelectionSessionStore,
@@ -388,6 +409,10 @@ class UserProfileScreenModel internal constructor(
 
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
+
+    private val _creditsBalanceState = mutableStateOf<CreditsBalanceState>(CreditsBalanceState.Loading)
+    internal val creditsBalanceState by _creditsBalanceState
+    private var creditsBalanceJob: Job? = null
 
     private val _inviteMessageSelection = MutableStateFlow<InviteMessageSelectionState?>(null)
     val inviteMessageSelection: StateFlow<InviteMessageSelectionState?> =
@@ -614,6 +639,30 @@ class UserProfileScreenModel internal constructor(
                 loadGroups = { loadUserGroups(userId) },
             )
         }
+
+    fun loadCreditsBalance() {
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (!userState.isSelf || userState.id != sessionToken.userId) return
+        if (creditsBalanceJob?.isActive == true) return
+
+        _creditsBalanceState.value = CreditsBalanceState.Loading
+        creditsBalanceJob = viewModelScope.launch(Dispatchers.IO) {
+            val response = authService.runSessionBoundCatching(sessionToken) {
+                economyApi.getCreditsBalance(sessionToken.userId)
+            }
+            if (response == null) return@launch
+            if (!SharedFlowCentre.isCurrentSession(response.sessionToken)) return@launch
+
+            response.result
+                .onSuccess { balance ->
+                    _creditsBalanceState.value = CreditsBalanceState.Available(balance.balance)
+                }
+                .onFailure { error ->
+                    logger.warn("Unable to load VRChat Credits balance")
+                    _creditsBalanceState.value = creditsBalanceFailureState(error)
+                }
+        }
+    }
 
     fun updateBioLinks(
         bioLinks: List<String>,
