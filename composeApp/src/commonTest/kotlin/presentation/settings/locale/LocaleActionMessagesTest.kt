@@ -26,6 +26,25 @@ class LocaleActionMessagesTest {
     }
 
     @Test
+    fun creditsBalanceMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.profileCreditsTitle,
+                locale.profileCreditsUnavailable,
+                locale.profileCreditsLoadFailed,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+        }
+    }
+
+    @Test
     fun printEditorMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,
@@ -65,4 +84,33 @@ class LocaleActionMessagesTest {
             assertTrue(locale.printEditorReadFailed.contains("%s"))
         }
     }
+
+    @Test
+    fun friendRemovalMessagesKeepTheirCountPlaceholders() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.friendDirectorySelect,
+                locale.friendDirectorySelectAll,
+                locale.friendDirectoryClearSelection,
+                locale.friendDirectoryRemoveSelected,
+                locale.friendDirectoryRemoveConfirmTitle,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.friendDirectorySelectedCount.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemoveConfirmMessage.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovingProgress.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveSuccess.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovePartialFailure.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveFailed.countPlaceholderCount() == 1)
+        }
+    }
 }
+
+private fun String.countPlaceholderCount(): Int = windowed(size = 2).count { it == "%d" }

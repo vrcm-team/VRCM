@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.StateFlow
 data class InstanceVo(
     val id: String ,
     val instanceId: String = "",
+    val worldId: String = "",
+    val location: String = "",
+    val ownerId: String? = null,
     val instanceName: String = "unknown",
     val currentUsers: Int? = null,
     val pcUsers: Int? = null,
@@ -34,6 +37,9 @@ data class InstanceVo(
     constructor(instance: InstanceData, owner: StateFlow<Owner?> = MutableStateFlow(null)) : this(
         id = instance.id,
         instanceId = instance.instanceId,
+        worldId = instance.worldId,
+        location = instance.location,
+        ownerId = instance.ownerId,
         instanceName = instance.name,
         currentUsers = instance.nUsers,
         pcUsers = instance.platforms.standaloneWindows,
@@ -53,6 +59,9 @@ data class InstanceVo(
     constructor(instants: HomeInstanceVo) : this(
         id = instants.id,
         instanceId = instants.instanceId,
+        worldId = instants.worldId,
+        location = instants.id,
+        ownerId = instants.owner?.id,
         instanceName = instants.name,
         currentUsers = instants.userCount.substringBefore("/").toIntOrNull(),
         regionType = instants.region,
@@ -75,4 +84,4 @@ data class InstanceVo(
     ) {
         val iconVector: ImageVector get() = if (type == BlueprintType.User) AppIcons.Person else AppIcons.Groups
     }
-} 
+}

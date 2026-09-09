@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -59,6 +61,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -122,6 +125,10 @@ data class UserProfileScreen(
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
+        var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
+        val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
+        val imageInviteSentMessage = strings.imageInviteSent
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -152,6 +159,30 @@ data class UserProfileScreen(
             }
         }
 
+        // Compact navigation recreates this entry after Gallery returns; consume the result once.
+        LaunchedEffect(pendingImageInviteSelection) {
+            val sessionId = pendingImageInviteSelection ?: return@LaunchedEffect
+            userProfileScreenModel.finishImageInviteSelection(sessionId)
+            if (!userProfileScreenModel.isImageInviteSelectionPending(sessionId)) {
+                pendingImageInviteSelection = null
+            }
+        }
+
+        LaunchedEffect(imageInviteState) {
+            if (imageInviteState is ImageInviteUiState.Sent) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(imageInviteSentMessage))
+                userProfileScreenModel.dismissImageInvite()
+            }
+        }
+
+        val openImageInvitePicker = {
+            userProfileScreenModel.beginImageInvite(currentUser.id)?.let { sessionId ->
+                pendingImageInviteSelection = sessionId
+                currentNavigator.push(GalleryPickerScreen(sessionId))
+            }
+            Unit
+        }
+
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             ProfileScaffold(
                 imageModifier = Modifier.sharedBoundsBy("${userProfileVO.id}UserIcon"),
@@ -179,11 +210,13 @@ data class UserProfileScreen(
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
+                    creditsBalanceState = userProfileScreenModel.creditsBalanceState,
                     contentMinHeight = contentMinHeight,
                     animateGroupEntrance = animateGroupEntrance,
                     onLoadWorlds = { userProfileScreenModel.loadCreatedWorlds(userProfileVO.id) },
                     onLoadAvatars = { userProfileScreenModel.loadCreatedAvatars() },
                     onLoadFavoritedWorlds = { userProfileScreenModel.loadFavoritedWorlds(userProfileVO.id) },
+                    onLoadCreditsBalance = userProfileScreenModel::loadCreditsBalance,
                 )
             }
         }
@@ -205,6 +238,14 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                openImageInvitePicker = openImageInvitePicker,
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
+                    )
+                },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -283,6 +324,33 @@ data class UserProfileScreen(
                 }
             },
         )
+        ImageInviteDialog(
+            state = imageInviteState,
+            targetName = currentUser.displayName,
+            onSend = userProfileScreenModel::sendImageInvite,
+            onRetryPreparation = userProfileScreenModel::retryImageInvitePreparation,
+            onChooseAnother = openImageInvitePicker,
+            onDismiss = userProfileScreenModel::dismissImageInvite,
+        )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -299,6 +367,8 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    openImageInvitePicker: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -351,14 +421,22 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
+                }
+            })
+            SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openImageInvitePicker()
                 }
             })
         }
@@ -522,11 +600,13 @@ private fun ColumnScope.ProfileContent(
     favoritedWorlds: List<Pair<String, List<FavoritedWorld>>>,
     friendActivitySummary: io.github.vrcmteam.vrcm.service.FriendActivitySummary?,
     friendActivityEvents: List<io.github.vrcmteam.vrcm.service.FriendActivityEvent>,
+    creditsBalanceState: CreditsBalanceState,
     contentMinHeight: Dp,
     animateGroupEntrance: Boolean,
     onLoadWorlds: () -> Unit,
     onLoadAvatars: () -> Unit,
     onLoadFavoritedWorlds: () -> Unit,
+    onLoadCreditsBalance: () -> Unit,
 ) {
     if (currentUser == null) return
     val sharedSuffixKey = LocalSharedSuffixKey.current
@@ -540,6 +620,7 @@ private fun ColumnScope.ProfileContent(
         onLoadFavoritedWorlds()
         if (currentUser.isSelf) {
             onLoadAvatars()
+            onLoadCreditsBalance()
         }
     }
 
@@ -547,6 +628,13 @@ private fun ColumnScope.ProfileContent(
         userProfileVO = currentUser,
         sharedUserId = sharedUserId,
     )
+
+    if (currentUser.isSelf) {
+        CreditsBalanceCard(
+            state = creditsBalanceState,
+            onRefresh = onLoadCreditsBalance,
+        )
+    }
 
     var isSelected by remember { mutableStateOf(false) }
     // LocationCard: show the room of this user and friends in the same room
@@ -1432,6 +1520,80 @@ private fun UserFavoritedWorldsSection(
                         )
                     }
                 )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun CreditsBalanceCard(
+    state: CreditsBalanceState,
+    onRefresh: () -> Unit,
+) {
+    val localeStrings = strings
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = localeStrings.profileCreditsTitle,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                when (state) {
+                    CreditsBalanceState.Loading -> Text(
+                        text = localeStrings.loading,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                    is CreditsBalanceState.Available -> Text(
+                        text = state.balance.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+
+                    CreditsBalanceState.Unavailable -> Text(
+                        text = localeStrings.profileCreditsUnavailable,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    CreditsBalanceState.Error -> Text(
+                        text = localeStrings.profileCreditsLoadFailed,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            if (state == CreditsBalanceState.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        imageVector = AppIcons.Update,
+                        contentDescription = if (state == CreditsBalanceState.Error) {
+                            localeStrings.retry
+                        } else {
+                            localeStrings.refresh
+                        },
+                    )
+                }
             }
         }
     }
