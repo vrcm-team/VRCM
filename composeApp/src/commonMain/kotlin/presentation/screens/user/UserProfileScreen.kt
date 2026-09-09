@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -59,6 +61,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -125,7 +128,12 @@ data class UserProfileScreen(
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
         var pendingPlayerBlockChange by remember { mutableStateOf<Boolean?>(null) }
+        var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
+        var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
+        val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
+        val imageInviteSentMessage = strings.imageInviteSent
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -154,6 +162,30 @@ data class UserProfileScreen(
             innerScrollRestorer.consume(innerScrollState.maxValue)?.let {
                 innerScrollState.scrollTo(it)
             }
+        }
+
+        // Compact navigation recreates this entry after Gallery returns; consume the result once.
+        LaunchedEffect(pendingImageInviteSelection) {
+            val sessionId = pendingImageInviteSelection ?: return@LaunchedEffect
+            userProfileScreenModel.finishImageInviteSelection(sessionId)
+            if (!userProfileScreenModel.isImageInviteSelectionPending(sessionId)) {
+                pendingImageInviteSelection = null
+            }
+        }
+
+        LaunchedEffect(imageInviteState) {
+            if (imageInviteState is ImageInviteUiState.Sent) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(imageInviteSentMessage))
+                userProfileScreenModel.dismissImageInvite()
+            }
+        }
+
+        val openImageInvitePicker = {
+            userProfileScreenModel.beginImageInvite(currentUser.id)?.let { sessionId ->
+                pendingImageInviteSelection = sessionId
+                currentNavigator.push(GalleryPickerScreen(sessionId))
+            }
+            Unit
         }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -216,6 +248,18 @@ data class UserProfileScreen(
                     )
                 },
                 confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                openReportDialog = {
+                    userProfileScreenModel.resetUserReportState()
+                    openReportDialog = true
+                },
+                openImageInvitePicker = openImageInvitePicker,
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
+                    )
+                },
             )
         }
         // Friend FavoriteType group management bottom sheet
@@ -318,6 +362,58 @@ data class UserProfileScreen(
                 }
             },
         )
+        val userReportState by userProfileScreenModel.userReportState.collectAsState()
+        LaunchedEffect(userReportState) {
+            if (userReportState == UserReportState.Submitted) {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            }
+        }
+        val reportSuccessMessage = strings.profileReportSuccess
+        val reportFailureMessage = strings.profileReportFailed
+        UserReportDialog(
+            visible = openReportDialog,
+            targetName = currentUser.displayName,
+            state = userReportState,
+            onDismiss = {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            },
+            onSubmit = {
+                userProfileScreenModel.reportUser(
+                    userId = currentUser.id,
+                    successMessage = reportSuccessMessage,
+                    failureMessage = reportFailureMessage,
+                )
+            },
+        )
+        ImageInviteDialog(
+            state = imageInviteState,
+            targetName = currentUser.displayName,
+            onSend = userProfileScreenModel::sendImageInvite,
+            onRetryPreparation = userProfileScreenModel::retryImageInvitePreparation,
+            onChooseAnother = openImageInvitePicker,
+            onDismiss = userProfileScreenModel::dismissImageInvite,
+        )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -337,6 +433,9 @@ private fun ColumnScope.SheetItems(
     playerBlockState: PlayerBlockState,
     retryPlayerBlockStatus: () -> Unit,
     confirmPlayerBlockChange: (Boolean) -> Unit,
+    openReportDialog: () -> Unit,
+    openImageInvitePicker: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -415,14 +514,22 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
+                }
+            })
+            SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openImageInvitePicker()
                 }
             })
         }
@@ -454,6 +561,20 @@ private fun ColumnScope.SheetItems(
             openAlertDialog()
         }
     })
+    if (!currentUser.isSelf) {
+        SheetButtonItem(
+            text = localeStrings.profileReportUser,
+            onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openReportDialog()
+                }
+            },
+            content = { label ->
+                Text(label, color = MaterialTheme.colorScheme.error)
+            },
+        )
+    }
 
 }
 

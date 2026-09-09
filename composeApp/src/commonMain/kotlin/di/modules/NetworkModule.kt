@@ -3,6 +3,7 @@ package io.github.vrcmteam.vrcm.di.modules
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
+import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.network.api.friends.FriendsApi
 import io.github.vrcmteam.vrcm.network.api.github.GitHubApi
@@ -39,6 +40,7 @@ internal val networkModule = module(true) {
     singleOf(::InviteApi)
     singleOf(::WorldsApi)
     singleOf(::FavoriteApi)
+    singleOf(::FeedbackApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
     singleOf(::GroupsApi)
