@@ -10,6 +10,9 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -84,7 +87,8 @@ object HomeScreen : AppListRoute {
         val scope = rememberCoroutineScope()
         val drawerState = rememberDrawerState(DrawerValue.Closed)
         val drawerCoordinator = remember { HomeDrawerStateCoordinator() }
-        val useRail = LocalAppWindowWidthClass.current != AppWindowWidthClass.Compact
+        val windowWidthClass = LocalAppWindowWidthClass.current
+        val useRail = windowWidthClass != AppWindowWidthClass.Compact
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
@@ -93,7 +97,9 @@ object HomeScreen : AppListRoute {
         } else {
             null
         }
-        val showMainNavigation = navigator.lastItem == HomeScreen
+        val topRoute = navigator.lastItem
+        val showMainNavigation = topRoute == HomeScreen ||
+            (windowWidthClass == AppWindowWidthClass.Expanded && topRoute is AppDetailRoute)
         var statusVisible by remember { mutableStateOf(true) }
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
             if (model.selectDestination(destination)) {
@@ -152,7 +158,7 @@ object HomeScreen : AppListRoute {
                         ) {
                             when (selectedDestination) {
                                 HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
-                                HomeDestination.Friends -> FriendRefreshAction(requireNotNull(friendListModel))
+                                HomeDestination.Friends -> FriendDirectoryActions(requireNotNull(friendListModel))
                                 else -> Unit
                             }
                         }
@@ -473,14 +479,51 @@ private fun NotificationRefreshAction(model: NotificationCenterModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FriendRefreshAction(model: FriendListPagerModel) {
+private fun FriendDirectoryActions(model: FriendListPagerModel) {
     val isRefreshing by model.directoryRefreshing.collectAsState()
-    IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
-        if (isRefreshing) {
-            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-        } else {
-            Icon(AppIcons.Update, strings.refresh)
+    val total by model.friendTotal.collectAsState()
+    val removalState by model.friendRemovalState.collectAsState()
+
+    if (removalState.selectionMode) {
+        ATooltipBox(tooltip = { Text(strings.cancel) }) {
+            IconButton(
+                enabled = !removalState.isSubmitting,
+                onClick = model::exitFriendSelectionMode,
+            ) {
+                Icon(AppIcons.Close, strings.cancel)
+            }
+        }
+        ATooltipBox(tooltip = { Text(strings.friendDirectoryRemoveSelected) }) {
+            IconButton(
+                enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
+                onClick = model::requestFriendRemovalConfirmation,
+            ) {
+                if (removalState.isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Outlined.DeleteOutline, strings.friendDirectoryRemoveSelected)
+                }
+            }
+        }
+    } else {
+        ATooltipBox(tooltip = { Text(strings.friendDirectorySelect) }) {
+            IconButton(
+                enabled = total > 0 && !isRefreshing,
+                onClick = model::enterFriendSelectionMode,
+            ) {
+                Icon(Icons.Outlined.PersonRemove, strings.friendDirectorySelect)
+            }
+        }
+        ATooltipBox(tooltip = { Text(strings.refresh) }) {
+            IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(AppIcons.Update, strings.refresh)
+                }
+            }
         }
     }
 }

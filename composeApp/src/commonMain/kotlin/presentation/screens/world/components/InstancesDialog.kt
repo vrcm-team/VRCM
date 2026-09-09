@@ -15,13 +15,20 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.InstanceCloseState
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreenModel
+import io.github.vrcmteam.vrcm.presentation.screens.world.canOfferInstanceClose
+import io.github.vrcmteam.vrcm.presentation.screens.world.closeTargetOrNull
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceVo
+import io.github.vrcmteam.vrcm.presentation.screens.world.requestOrNull
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -31,9 +38,10 @@ import org.koin.compose.koinInject
 class InstancesDialog(
     private val instance: InstanceVo,
     private val sharedSuffixKey: String,
+    private val screenModel: WorldProfileScreenModel,
     private val onClose: () -> Unit = {},
 ) : SharedDialog {
-    @OptIn(ExperimentalSharedTransitionApi::class)
+    @OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content(animatedVisibilityScope: AnimatedVisibilityScope) {
         val currentNavigator = currentNavigator
@@ -48,6 +56,25 @@ class InstancesDialog(
         var isInvited by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val localeStrings = strings
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
+        val instanceCloseState by screenModel.instanceCloseState.collectAsState()
+        val closeTarget = instance.closeTargetOrNull()
+        val closeLocation = closeTarget?.location
+        val isCurrentClose = closeLocation != null &&
+            instanceCloseState.requestOrNull?.target?.location == closeLocation
+        val isAuthorizingClose = isCurrentClose && instanceCloseState is InstanceCloseState.Authorizing
+        val isAwaitingCloseConfirmation = isCurrentClose &&
+            instanceCloseState is InstanceCloseState.AwaitingConfirmation
+        val isSubmittingClose = isCurrentClose && instanceCloseState is InstanceCloseState.Submitting
+        val canOfferClose = instance.canOfferInstanceClose(currentSession?.token)
+
+        LaunchedEffect(closeLocation) {
+            if (closeLocation == null) return@LaunchedEffect
+            screenModel.closedInstanceLocations.collect { closedLocation ->
+                if (closedLocation == closeLocation) close()
+            }
+        }
+
         val onClickInvite = {
             scope.launch(Dispatchers.IO) {
                 authService.reTryAuthCatching { inviteApi.inviteMyselfToInstance(instance.id) }.onSuccess {
@@ -119,6 +146,7 @@ class InstancesDialog(
 //                                onClickUserIcon(it)
 //                            }
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -134,6 +162,46 @@ class InstancesDialog(
                                 TextLabel(
                                     text = "${instance.currentUsers ?: "0"}",
                                 )
+                            }
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                itemVerticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (canOfferClose) {
+                                    OutlinedButton(
+                                        enabled = instanceCloseState is InstanceCloseState.Idle,
+                                        onClick = {
+                                            screenModel.requestInstanceClose(instance, localeStrings)
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                    ) {
+                                        if (isAuthorizingClose) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                color = LocalContentColor.current,
+                                                strokeWidth = 2.dp,
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        } else {
+                                            Icon(
+                                                imageVector = AppIcons.Close,
+                                                contentDescription = null,
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Text(
+                                            if (isAuthorizingClose) {
+                                                localeStrings.instanceCloseCheckingPermission
+                                            } else {
+                                                localeStrings.instanceCloseAction
+                                            }
+                                        )
+                                    }
+                                }
                                 Button(
                                     modifier = Modifier.animateContentSize(),
                                     enabled = !isInvited,
@@ -147,7 +215,57 @@ class InstancesDialog(
                 }
             }
         }
+
+        if (isAwaitingCloseConfirmation || isSubmittingClose) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isSubmittingClose) {
+                        closeLocation?.let(screenModel::abandonInstanceClose)
+                    }
+                },
+                title = { Text(localeStrings.instanceCloseConfirmTitle) },
+                text = { Text(localeStrings.instanceCloseConfirmMessage) },
+                confirmButton = {
+                    TextButton(
+                        enabled = !isSubmittingClose,
+                        onClick = { screenModel.confirmInstanceClose(localeStrings) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                    ) {
+                        if (isSubmittingClose) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = LocalContentColor.current,
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            if (isSubmittingClose) {
+                                localeStrings.instanceCloseInProgress
+                            } else {
+                                localeStrings.instanceCloseAction
+                            }
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        enabled = !isSubmittingClose,
+                        onClick = {
+                            closeLocation?.let(screenModel::abandonInstanceClose)
+                        },
+                    ) {
+                        Text(localeStrings.cancel)
+                    }
+                },
+            )
+        }
     }
 
-    override fun close() = onClose()
+    override fun close() {
+        instance.closeTargetOrNull()?.location?.let(screenModel::abandonInstanceClose)
+        onClose()
+    }
 }

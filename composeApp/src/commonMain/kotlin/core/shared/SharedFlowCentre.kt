@@ -46,6 +46,15 @@ internal class AuthenticationSessionRegistry {
     fun isCurrent(token: AccountSessionToken): Boolean = synchronized(lock) {
         _currentSession.value?.token == token
     }
+
+    /** 在认证状态锁内校验 [token] 并完成不可挂起的状态提交。 */
+    fun commitIfCurrent(
+        token: AccountSessionToken,
+        commit: (AuthenticatedAccount) -> Boolean,
+    ): Boolean = synchronized(lock) {
+        val session = _currentSession.value ?: return@synchronized false
+        session.token == token && commit(session)
+    }
 }
 
 object SharedFlowCentre {
@@ -80,4 +89,9 @@ object SharedFlowCentre {
 
     fun isCurrentSession(token: AccountSessionToken): Boolean =
         sessionRegistry.isCurrent(token)
+
+    internal fun commitIfCurrentSession(
+        token: AccountSessionToken,
+        commit: (AuthenticatedAccount) -> Boolean,
+    ): Boolean = sessionRegistry.commitIfCurrent(token, commit)
 }
