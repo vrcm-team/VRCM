@@ -20,6 +20,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScr
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreen
@@ -56,6 +57,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(NotificationSettingsScreen::class, NotificationSettingsScreen.serializer())
             subclass(InviteMessageSlotsScreen::class, InviteMessageSlotsScreen.serializer())
             subclass(PlayerModerationListScreen::class, PlayerModerationListScreen.serializer())
+            subclass(PlayerModerationCleanupScreen::class, PlayerModerationCleanupScreen.serializer())
             subclass(NotificationScreen::class, NotificationScreen.serializer())
         }
     }

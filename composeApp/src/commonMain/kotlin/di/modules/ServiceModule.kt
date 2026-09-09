@@ -46,6 +46,7 @@ val serviceModule: Module = module {
     singleOf(::InstanceCreationService)
     singleOf(::WorldPlatformService)
     singleOf(::OfficialLinkService)
+    singleOf(::AuthenticatedPlayerModerationCleanupSource) bind PlayerModerationCleanupSource::class
     singleOf(::HttpMeetupRemoteBytesLoader) bind MeetupRemoteBytesLoader::class
     singleOf(::InventoryDecorationTemplateSource) bind DecorationTemplateSource::class
     singleOf(::DecorationResolver)

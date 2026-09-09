@@ -2,6 +2,9 @@ package io.github.vrcmteam.vrcm.network.api.playermoderation
 
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData as CleanupPlayerModerationData
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationRequest as CleanupPlayerModerationRequest
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -49,6 +52,11 @@ class PlayerModerationApi(private val client: HttpClient) {
     internal suspend fun getAll(): List<PlayerModerationData> =
         client.get(PLAYER_MODERATIONS_PATH).checkSuccess()
 
+    suspend fun get(type: PlayerModerationType? = null): List<CleanupPlayerModerationData> =
+        client.get(PLAYER_MODERATIONS_PATH) {
+            type?.let { parameter("type", it.apiValue) }
+        }.checkSuccess()
+
     internal suspend fun getForTarget(targetUserId: String): List<PlayerModerationData> =
         client.get(PLAYER_MODERATIONS_PATH) {
             parameter("targetUserId", targetUserId)
@@ -70,5 +78,17 @@ class PlayerModerationApi(private val client: HttpClient) {
             contentType(ContentType.Application.Json)
             setBody(ModeratePlayerRequest(moderated = targetUserId, type = type.apiValue))
         }.checkSuccess { Unit }
+    }
+
+    suspend fun remove(targetUserId: String, type: PlayerModerationType) {
+        require(CLEANUP_USER_ID_PATTERN.matches(targetUserId)) { "Invalid target user ID" }
+        client.put(UNPLAYER_MODERATE_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(CleanupPlayerModerationRequest(moderated = targetUserId, type = type.apiValue))
+        }.checkSuccess { Unit }
+    }
+
+    private companion object {
+        val CLEANUP_USER_ID_PATTERN = Regex("usr_[A-Za-z0-9_-]+")
     }
 }
