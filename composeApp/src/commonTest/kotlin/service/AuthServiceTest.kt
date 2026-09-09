@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.service
 
 import com.russhwolf.settings.MapSettings
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
@@ -699,6 +700,78 @@ class AuthServiceTest : MainDispatcherTest() {
     }
 
     @Test
+    fun fallbackAvatarUpdateRequiresMatchingSessionUserAndTarget() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount(), currentAvatar = "avtr_initial"))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+        val response = fixture.service.currentUser().copy(
+            currentAvatar = "avtr_stale_response",
+            fallbackAvatar = "avtr_fallback",
+        )
+
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = AccountSessionToken(session.account.userId, session.token.generation + 1),
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { error("stale session must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response.copy(id = "usr_other"),
+                commitIfCurrent = { error("invalid user must not reach commit") },
+            ),
+        )
+        assertEquals(
+            FallbackAvatarUpdateResult.InvalidResponse,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_other",
+                response = response,
+                commitIfCurrent = { error("invalid target must not reach commit") },
+            ),
+        )
+
+        fixture.service.applyCurrentAvatarUpdate("avtr_newer")
+        assertEquals(
+            FallbackAvatarUpdateResult.Stale,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { _ -> false },
+            ),
+        )
+        assertEquals("", fixture.service.currentUserState.value?.fallbackAvatar)
+        var publishedInsideTargetCommit = false
+        assertEquals(
+            FallbackAvatarUpdateResult.Applied,
+            fixture.service.applyFallbackAvatarUpdate(
+                sessionToken = session.token,
+                avatarId = "avtr_fallback",
+                response = response,
+                commitIfCurrent = { update ->
+                    update()
+                    publishedInsideTargetCommit =
+                        fixture.service.currentUserState.value?.fallbackAvatar == "avtr_fallback"
+                    true
+                },
+            ),
+        )
+        assertTrue(publishedInsideTargetCommit)
+        assertEquals("avtr_fallback", fixture.service.currentUserState.value?.fallbackAvatar)
+        assertEquals("avtr_newer", fixture.service.currentUserState.value?.currentAvatar)
+        fixture.client.close()
+    }
+
+    @Test
     fun sessionBoundRequestReturnsRefreshedSessionAfterRetryFailure() = runTest {
         val retryError = IllegalStateException("photo response failed after reauthentication")
         val fixture = fixture {
@@ -903,6 +976,70 @@ class AuthServiceTest : MainDispatcherTest() {
             "avtr_selected",
             fixture.service.currentUserState.value?.currentAvatar,
         )
+        fixture.client.close()
+    }
+
+    @Test
+    fun avatarCopyingUpdateOnlyAppliesToTheActiveSession() = runTest {
+        val fixture = fixture {
+            jsonResponse(currentUserJson(cachedAccount()))
+        }
+        fixture.service.restoreAuth()
+        val session = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        assertTrue(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = false,
+            )
+        )
+        assertEquals(false, fixture.service.currentUserState.value?.allowAvatarCopying)
+
+        fixture.service.logout()
+
+        assertFalse(
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = session.token,
+                allowAvatarCopying = true,
+            )
+        )
+        assertNull(fixture.service.currentUserState.value)
+        fixture.client.close()
+    }
+
+    @Test
+    fun avatarCopyingUpdateWaitsForAuthenticationCommit() = runTest {
+        val loginStarted = CompletableDeferred<Unit>()
+        val finishLogin = CompletableDeferred<Unit>()
+        val fixture = fixture { request ->
+            if (request.headers[HttpHeaders.Authorization] != null) {
+                loginStarted.complete(Unit)
+                finishLogin.await()
+                jsonResponse("""{"requiresTwoFactorAuth":null}""")
+            } else {
+                jsonResponse(currentUserJson(cachedAccount()))
+            }
+        }
+        fixture.service.restoreAuth()
+        val previousSession = assertNotNull(SharedFlowCentre.currentSession.value)
+
+        val login = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.login(cachedAccount().username, cachedAccount().password.orEmpty())
+        }
+        loginStarted.await()
+
+        val update = async(start = CoroutineStart.UNDISPATCHED) {
+            fixture.service.applyAvatarCopyingUpdate(
+                sessionToken = previousSession.token,
+                allowAvatarCopying = false,
+            )
+        }
+        assertFalse(update.isCompleted)
+
+        finishLogin.complete(Unit)
+        assertIs<AuthState.Authed>(login.await())
+        assertFalse(update.await())
+        assertEquals(true, fixture.service.currentUserState.value?.allowAvatarCopying)
         fixture.client.close()
     }
 

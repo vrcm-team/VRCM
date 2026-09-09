@@ -124,19 +124,19 @@ internal val AvatarCoverCanvasSpec = PrintCanvasSpec(
 )
 
 internal val GalleryCanvasSpec = PrintCanvasSpec(
-    canvasWidth = 2_000,
-    canvasHeight = 1_500,
-    contentWidth = 2_000,
-    contentHeight = 1_500,
+    canvasWidth = 2_048,
+    canvasHeight = 1_536,
+    contentWidth = 2_048,
+    contentHeight = 1_536,
     contentOffsetX = 0,
     contentOffsetY = 0,
 )
 
 internal val SquareCanvasSpec = PrintCanvasSpec(
-    canvasWidth = 2_000,
-    canvasHeight = 2_000,
-    contentWidth = 2_000,
-    contentHeight = 2_000,
+    canvasWidth = 1_024,
+    canvasHeight = 1_024,
+    contentWidth = 1_024,
+    contentHeight = 1_024,
     contentOffsetX = 0,
     contentOffsetY = 0,
 )

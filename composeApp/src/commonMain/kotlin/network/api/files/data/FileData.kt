@@ -46,7 +46,8 @@ data class FileData(
     val extension: String,
     val animationStyle: String?,
     val tags: List<String>,
-    val versions: List<FileVersion>
+    val versions: List<FileVersion>,
+    val order: Int? = null,
 )
 
 /**

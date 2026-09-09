@@ -30,6 +30,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -77,6 +78,10 @@ fun StandardSearchList(
     val coroutineScope = rememberCoroutineScope()
     val currentNavigator = currentNavigator
     val retryLoadMore = onRetryLoadMore
+    val deletedAvatarIds = currentSessionDeletedAvatarIds()
+    val visibleAvatarList = remember(avatarList, deletedAvatarIds) {
+        avatarList.filterNot { it.id in deletedAvatarIds }
+    }
     var hiddenWorldToManage by remember { mutableStateOf<WorldData?>(null) }
     var showHiddenWorldFavoriteSheet by remember { mutableStateOf(false) }
     var hiddenAvatarToManage by remember { mutableStateOf<AvatarData?>(null) }
@@ -195,7 +200,7 @@ fun StandardSearchList(
                     }
                 } else {
                     renderAvatarItems(
-                        avatars = avatarList,
+                        avatars = visibleAvatarList,
                         onAvatarClick = onAvatarClick
                     )
                 }

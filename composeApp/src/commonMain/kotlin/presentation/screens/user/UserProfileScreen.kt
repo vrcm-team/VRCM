@@ -60,6 +60,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
 import io.github.vrcmteam.vrcm.service.InviteMessageAction
@@ -110,6 +111,10 @@ data class UserProfileScreen(
         val interactionClosedSuccessMessage = localeStrings.profileInteractionClosedSuccess
         val interactionRestoredSuccessMessage = localeStrings.profileInteractionRestoredSuccess
         val interactionUpdateFailedMessage = localeStrings.profileInteractionUpdateFailed
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleCreatedAvatars = remember(userProfileScreenModel.createdAvatars, deletedAvatarIds) {
+            userProfileScreenModel.createdAvatars.filterNot { it.id in deletedAvatarIds }
+        }
 
         LaunchedEffect(userProfileVO.id) {
             userProfileScreenModel.setPlayerChatboxModerationTarget(userProfileVO.id)
@@ -226,7 +231,7 @@ data class UserProfileScreen(
                     userGroups = userGroups,
                     mutualGroups = mutualGroups,
                     createdWorlds = userProfileScreenModel.createdWorlds,
-                    createdAvatars = userProfileScreenModel.createdAvatars,
+                    createdAvatars = visibleCreatedAvatars,
                     favoritedWorlds = userProfileScreenModel.favoritedWorlds,
                     friendActivitySummary = userProfileScreenModel.friendActivitySummary,
                     friendActivityEvents = userProfileScreenModel.friendActivityEvents,
@@ -302,13 +307,19 @@ data class UserProfileScreen(
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
         val editFailureMsg = strings.editProfileUpdateFailed
+        val avatarCopyingEnabledMessage = strings.editProfileAvatarCopyingEnabled
+        val avatarCopyingDisabledMessage = strings.editProfileAvatarCopyingDisabled
         val bioLinksUpdateState by userProfileScreenModel.bioLinksUpdateState.collectAsState()
         val boopPrivacyState by userProfileScreenModel.boopPrivacyState.collectAsState()
+        val avatarCopyingPrivacyState by userProfileScreenModel
+            .avatarCopyingPrivacyState
+            .collectAsState()
         EditProfileSheet(
             isVisible = openEditProfileDialog,
             currentUser = currentUser,
             bioLinksUpdateState = bioLinksUpdateState,
             boopPrivacyState = boopPrivacyState,
+            avatarCopyingPrivacyState = avatarCopyingPrivacyState,
             onDismiss = { openEditProfileDialog = false },
             onStatusSave = { status, statusDescription ->
                 userProfileScreenModel.updateUserProfile(status = status, statusDescription = statusDescription, successMessage = editSuccessMsg)
@@ -335,6 +346,17 @@ data class UserProfileScreen(
                     failureMessage = editFailureMsg,
                 )
             },
+            onAvatarCopyingChange = { isAllowed ->
+                userProfileScreenModel.updateAvatarCopyingPrivacy(
+                    isAllowed = isAllowed,
+                    successMessage = if (isAllowed) {
+                        avatarCopyingEnabledMessage
+                    } else {
+                        avatarCopyingDisabledMessage
+                    },
+                )
+            },
+            onAvatarCopyingRetry = userProfileScreenModel::retryAvatarCopyingPrivacyLoad,
         )
         // 编辑备注弹窗
         val noteSavedMsg = strings.userNoteSaved
@@ -1625,6 +1647,14 @@ class CardListDetailScreen(
         val navigator = currentNavigator
         val scope = rememberCoroutineScope()
         val animateListEntrance = remember { entranceAnimationGate.consume() }
+        val deletedAvatarIds = currentSessionDeletedAvatarIds()
+        val visibleItems = remember(items, screenType, deletedAvatarIds) {
+            if (screenType == CardScreenType.AVATAR) {
+                items.filterNot { it.id in deletedAvatarIds }
+            } else {
+                items
+            }
+        }
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -1639,7 +1669,7 @@ class CardListDetailScreen(
                         onReturn = { navigator.pop() }
                     )
                     CardListContent(
-                        items = items,
+                        items = visibleItems,
                         key = { it.listKey },
                         imageUrl = { it.imageUrl ?: it.thumbnailUrl },
                         itemTitle = { it.title },

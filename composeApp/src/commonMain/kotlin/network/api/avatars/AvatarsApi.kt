@@ -3,8 +3,12 @@ package io.github.vrcmteam.vrcm.network.api.avatars
 import io.github.vrcmteam.vrcm.core.extensions.fetchDataList
 import io.github.vrcmteam.vrcm.network.api.attributes.AVATARS_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorQueueStats
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarImpostorServiceStatus
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarSelectionData
+import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarStyle
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarUpdateData
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -14,17 +18,36 @@ import kotlinx.coroutines.flow.flow
 
 class AvatarsApi(private val client: HttpClient) {
 
+    suspend fun getAvatarStyles(): List<AvatarStyle> =
+        client.get("avatarStyles").checkSuccess()
+
     suspend fun getAvatarById(avatarId: String): AvatarData =
         client.get("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
 
     suspend fun selectAvatar(avatarId: String): AvatarSelectionData =
         client.put("$AVATARS_API_PREFIX/$avatarId/select").checkSuccess()
 
+    suspend fun selectFallbackAvatar(avatarId: String): CurrentUserData =
+        client.put("$AVATARS_API_PREFIX/$avatarId/selectFallback").checkSuccess()
+
+    suspend fun deleteImpostor(avatarId: String) {
+        client.delete("$AVATARS_API_PREFIX/$avatarId/impostor").checkSuccess { Unit }
+    }
+
     suspend fun updateAvatar(avatarId: String, update: AvatarUpdateData): AvatarData =
         client.put("$AVATARS_API_PREFIX/$avatarId") {
             contentType(ContentType.Application.Json)
             setBody(update)
         }.checkSuccess()
+
+    suspend fun deleteAvatar(avatarId: String): AvatarData =
+        client.delete("$AVATARS_API_PREFIX/$avatarId").checkSuccess()
+
+    suspend fun enqueueImpostor(avatarId: String): AvatarImpostorServiceStatus =
+        client.post("$AVATARS_API_PREFIX/$avatarId/impostor/enqueue").checkSuccess()
+
+    suspend fun getImpostorQueueStats(): AvatarImpostorQueueStats =
+        client.get("$AVATARS_API_PREFIX/impostor/queue/stats").checkSuccess()
 
     suspend fun getFavoritedAvatars(
         n: Int = 50,

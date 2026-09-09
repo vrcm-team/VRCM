@@ -39,6 +39,12 @@ internal data class SessionBoundResponse<T>(
     val sessionToken: AccountSessionToken,
 )
 
+internal enum class FallbackAvatarUpdateResult {
+    Applied,
+    Stale,
+    InvalidResponse,
+}
+
 internal sealed interface HomeWorldMutationState {
     data class Ready(val revision: Long) : HomeWorldMutationState
     data object SessionChanged : HomeWorldMutationState
@@ -197,6 +203,47 @@ class AuthService(
         }
     }
 
+    internal suspend fun applyFallbackAvatarUpdate(
+        sessionToken: AccountSessionToken,
+        avatarId: String,
+        response: CurrentUserData,
+        commitIfCurrent: (update: () -> Unit) -> Boolean,
+    ): FallbackAvatarUpdateResult = authMutex.withLock {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) {
+            return@withLock FallbackAvatarUpdateResult.Stale
+        }
+        synchronized(currentUserLock) {
+            val existing = currentUser ?: return@synchronized FallbackAvatarUpdateResult.Stale
+            if (existing.id != sessionToken.userId) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
+            }
+            if (sessionToken.userId != response.id || response.fallbackAvatar != avatarId) {
+                return@synchronized FallbackAvatarUpdateResult.InvalidResponse
+            }
+            val updated = existing.copy(fallbackAvatar = avatarId)
+            // The caller keeps its page-target lock until this update has been published.
+            if (!commitIfCurrent { publishCurrentUserLocked(updated) }) {
+                return@synchronized FallbackAvatarUpdateResult.Stale
+            }
+            FallbackAvatarUpdateResult.Applied
+        }
+    }
+
+    internal suspend fun applyAvatarCopyingUpdate(
+        sessionToken: AccountSessionToken,
+        allowAvatarCopying: Boolean,
+    ): Boolean = authMutex.withLock {
+        synchronized(currentUserLock) {
+            if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@synchronized false
+            val existing = currentUser?.takeIf { it.id == sessionToken.userId }
+                ?: return@synchronized false
+            publishCurrentUserLocked(
+                existing.copy(allowAvatarCopying = allowAvatarCopying),
+            )
+            true
+        }
+    }
+
     internal suspend fun applyCurrentUserHomeLocation(
         sessionToken: AccountSessionToken,
         userId: String,
@@ -290,6 +337,7 @@ class AuthService(
                 socketPresenceRevision++
                 publishCurrentUserLocked(
                     existing.copy(
+                        allowAvatarCopying = user.allowAvatarCopying,
                         currentAvatarImageUrl = user.currentAvatarImageUrl,
                         currentAvatarTags = user.currentAvatarTags,
                         currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
@@ -317,6 +365,7 @@ class AuthService(
             if (existing.id != user.id) return@synchronized
             publishCurrentUserLocked(
                 existing.copy(
+                    allowAvatarCopying = user.allowAvatarCopying,
                     currentAvatarImageUrl = user.currentAvatarImageUrl,
                     currentAvatarTags = user.currentAvatarTags,
                     currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
