@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageEdi
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -61,6 +62,7 @@ class AppRoutePanePolicyTest {
             MyGroupsScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
+            InventoryScreen,
             StartupAnimeScreen,
             AuthScreen,
             AuthAnimeScreen(isAuthed = true),
@@ -81,5 +83,6 @@ class AppRoutePanePolicyTest {
         assertTrue(FavoritesScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(MyGroupsScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FriendNetworkScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(InventoryScreen.adaptivePaneMetadata().isEmpty())
     }
 }

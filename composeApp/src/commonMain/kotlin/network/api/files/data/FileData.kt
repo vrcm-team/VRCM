@@ -23,6 +23,9 @@ enum class FileTagType(val value: String) {
     @SerialName("avatarimage")
     AvatarImage("avatarimage"),
 
+    @SerialName("worldimage")
+    WorldImage("worldimage"),
+
     @SerialName("print")
     Print("print");
     

@@ -6,6 +6,8 @@ import androidx.compose.ui.graphics.colorspace.ColorSpace
 import androidx.compose.ui.graphics.colorspace.ColorSpaces
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
+import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageUpdate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -85,6 +87,52 @@ class PrintImageEditorSessionStoreTest {
 
         assertEquals(FileTagType.Emoji, store.galleryUploadCompletions.first())
         assertNull(store.get(id))
+    }
+
+    @Test
+    fun worldCoverCompletionIsConsumedOnlyByTheMatchingWorld() {
+        val store = PrintImageEditorSessionStore()
+        val token = io.github.vrcmteam.vrcm.core.shared.AccountSessionToken("usr_owner", 1)
+        val target = ImageEditorTarget.WorldCover("wrld_test", token)
+        val id = store.create(
+            source = SelectedImage("source.jpg", byteArrayOf(1)),
+            prepared = PreparedImage(SessionTestImageBitmap, ImageSize(16, 9)),
+            target = target,
+        )
+        val world = WorldData(
+            authorId = "usr_owner",
+            authorName = "Owner",
+            capacity = 16,
+            createdAt = null,
+            description = null,
+            favorites = null,
+            featured = null,
+            heat = 0,
+            id = "wrld_test",
+            imageUrl = "https://example.test/original.png",
+            labsPublicationDate = "",
+            name = "World",
+            namespace = null,
+            organization = "vrchat",
+            popularity = 0,
+            publicationDate = "",
+            recommendedCapacity = 8,
+            releaseStatus = "private",
+            tags = emptyList(),
+            thumbnailImageUrl = "https://example.test/thumbnail.png",
+            udonProducts = emptyList(),
+            unityPackages = emptyList(),
+            updatedAt = null,
+            version = 1,
+            visits = 0,
+        )
+        val update = WorldImageUpdate(world, token)
+
+        store.complete(id, ImageEditorSubmission.WorldCover(update))
+
+        assertEquals(null, store.consumeWorldCoverUpdate("wrld_other"))
+        assertEquals(update, store.consumeWorldCoverUpdate("wrld_test"))
+        assertEquals(null, store.consumeWorldCoverUpdate("wrld_test"))
     }
 }
 
