@@ -70,6 +70,29 @@ class UsersApi(private val client: HttpClient) {
             parameter("offset", offset)
         }.checkSuccess()
 
+    suspend fun hasWorldPersistence(userId: String, worldId: String): Boolean {
+        val response = client.get("$USERS_API_PREFIX/$userId/$worldId/persist/exists")
+        return when (response.status) {
+            HttpStatusCode.OK -> true
+            HttpStatusCode.NotFound -> false
+            else -> response.checkSuccess { true }
+        }
+    }
+
+    suspend fun deleteWorldPersistence(userId: String, worldId: String) {
+        val response = client.delete("$USERS_API_PREFIX/$userId/$worldId/persist")
+        when (response.status) {
+            HttpStatusCode.OK, HttpStatusCode.NotFound -> Unit
+            else -> response.checkSuccess { Unit }
+        }
+    }
+
+    suspend fun deleteAllWorldPersistence(userId: String) {
+        client.delete {
+            url { path(USERS_API_PREFIX, userId, "persist") }
+        }.checkSuccess { Unit }
+    }
+
     suspend fun saveUserNote(targetUserId: String, note: String): String =
         client.post(USER_NOTES_API_PREFIX) {
             setBody(mapOf("targetUserId" to targetUserId, "note" to note))
@@ -103,7 +126,7 @@ class UsersApi(private val client: HttpClient) {
         requireExplicitInteractionOverride(override)
         client.put(UNPLAYER_MODERATE_PATH) {
             contentType(ContentType.Application.Json)
-            setBody(PlayerInteractionModerationRequest(userId, override.apiValue!!))
+            setBody(PlayerModerationRequest(userId, override.apiValue!!))
         }.checkSuccess<VRChatResponse>().toResult().getOrThrow()
     }
 
@@ -115,11 +138,41 @@ class UsersApi(private val client: HttpClient) {
         requireExplicitInteractionOverride(override)
         val moderation = client.post(PLAYER_MODERATIONS_PATH) {
             contentType(ContentType.Application.Json)
-            setBody(PlayerInteractionModerationRequest(userId, override.apiValue!!))
+            setBody(PlayerModerationRequest(userId, override.apiValue!!))
         }.checkSuccess<PlayerInteractionModerationData>()
         check(moderation.targetUserId == userId && moderation.type == override.apiValue) {
             "Player interaction moderation response did not match the request"
         }
+    }
+
+    suspend fun isUserBlocked(userId: String): Boolean {
+        requireValidModerationUserId(userId)
+        val moderations = client.get(PLAYER_MODERATIONS_PATH) {
+            parameter("type", PLAYER_BLOCK_TYPE)
+            parameter("targetUserId", userId)
+        }.checkSuccess<List<PlayerModerationData>>()
+        return moderations.any {
+            it.targetUserId == userId && it.type == PLAYER_BLOCK_TYPE
+        }
+    }
+
+    suspend fun blockUser(userId: String) {
+        requireValidModerationUserId(userId)
+        val moderation = client.post(PLAYER_MODERATIONS_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(PlayerModerationRequest(moderated = userId, type = PLAYER_BLOCK_TYPE))
+        }.checkSuccess<PlayerModerationData>()
+        check(moderation.targetUserId == userId && moderation.type == PLAYER_BLOCK_TYPE) {
+            "Player moderation response did not match the request"
+        }
+    }
+
+    suspend fun unblockUser(userId: String) {
+        requireValidModerationUserId(userId)
+        client.put(UNPLAYER_MODERATE_PATH) {
+            contentType(ContentType.Application.Json)
+            setBody(PlayerModerationRequest(moderated = userId, type = PLAYER_BLOCK_TYPE))
+        }.checkSuccess<VRChatResponse>().toResult().getOrThrow()
     }
 
     private fun requireValidModerationUserId(userId: String) {
@@ -135,13 +188,20 @@ class UsersApi(private val client: HttpClient) {
     private companion object {
         const val PLAYER_MODERATIONS_PATH = "auth/user/playermoderations"
         const val UNPLAYER_MODERATE_PATH = "auth/user/unplayermoderate"
+        const val PLAYER_BLOCK_TYPE = "block"
         val USER_ID_PATTERN = Regex("[A-Za-z0-9_-]+")
     }
 
 }
 
 @Serializable
-private data class PlayerInteractionModerationRequest(
+private data class PlayerModerationRequest(
     val moderated: String,
+    val type: String,
+)
+
+@Serializable
+private data class PlayerModerationData(
+    val targetUserId: String,
     val type: String,
 )

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
@@ -60,6 +62,7 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
 import kotlinx.coroutines.launch
@@ -102,13 +105,17 @@ data class UserProfileScreen(
         val currentNavigator = currentNavigator
         val userProfileScreenModel: UserProfileScreenModel = koinViewModel { parametersOf(userProfileVO) }
         val animateGroupEntrance = remember { groupEntranceAnimationGate.consume() }
-        val interactionLoadFailedMessage = strings.profileInteractionLoadFailed
-        val interactionClosedSuccessMessage = strings.profileInteractionClosedSuccess
-        val interactionRestoredSuccessMessage = strings.profileInteractionRestoredSuccess
-        val interactionUpdateFailedMessage = strings.profileInteractionUpdateFailed
+        val localeStrings = strings
+        val interactionLoadFailedMessage = localeStrings.profileInteractionLoadFailed
+        val interactionClosedSuccessMessage = localeStrings.profileInteractionClosedSuccess
+        val interactionRestoredSuccessMessage = localeStrings.profileInteractionRestoredSuccess
+        val interactionUpdateFailedMessage = localeStrings.profileInteractionUpdateFailed
 
         LaunchedEffect(userProfileVO.id) {
+            userProfileScreenModel.setPlayerChatboxModerationTarget(userProfileVO.id)
+            userProfileScreenModel.setPlayerVoiceModerationTarget(userProfileVO.id)
             userProfileScreenModel.refreshUser(userProfileVO.id)
+            userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
             userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
         }
 
@@ -119,20 +126,29 @@ data class UserProfileScreen(
         }
 
         val currentUser = userProfileScreenModel.userState
+        val playerBlockState by userProfileScreenModel.playerBlockState.collectAsState()
         val userGroups = userProfileScreenModel.userGroups
         val mutualGroups = userProfileScreenModel.mutualGroups
+        val playerChatboxModerationState by userProfileScreenModel.playerChatboxModerationState.collectAsState()
+        val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
+        val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
         var openBoopDialog by remember { mutableStateOf(false) }
+        var pendingPlayerBlockChange by remember { mutableStateOf<Boolean?>(null) }
+        var openReportDialog by remember { mutableStateOf(false) }
         var boopSending by remember { mutableStateOf(false) }
         var pendingInteractionOverride by remember(userProfileVO.id) {
             mutableStateOf<PlayerInteractionOverride?>(null)
         }
         var interactionSubmitting by remember(userProfileVO.id) { mutableStateOf(false) }
-        val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
+        var pendingImageInviteSelection by rememberSaveable { mutableStateOf<String?>(null) }
+        val imageInviteState by userProfileScreenModel.imageInviteState.collectAsState()
+        val imageInviteSentMessage = strings.imageInviteSent
+        val inviteMessageSelection by userProfileScreenModel.inviteMessageSelection.collectAsState()
         val actionScope = rememberCoroutineScope()
         // Control showing favorite group management for Friend type
         var showFriendFavoriteSheet by remember { mutableStateOf(false) }
@@ -161,6 +177,30 @@ data class UserProfileScreen(
             innerScrollRestorer.consume(innerScrollState.maxValue)?.let {
                 innerScrollState.scrollTo(it)
             }
+        }
+
+        // Compact navigation recreates this entry after Gallery returns; consume the result once.
+        LaunchedEffect(pendingImageInviteSelection) {
+            val sessionId = pendingImageInviteSelection ?: return@LaunchedEffect
+            userProfileScreenModel.finishImageInviteSelection(sessionId)
+            if (!userProfileScreenModel.isImageInviteSelectionPending(sessionId)) {
+                pendingImageInviteSelection = null
+            }
+        }
+
+        LaunchedEffect(imageInviteState) {
+            if (imageInviteState is ImageInviteUiState.Sent) {
+                SharedFlowCentre.toastText.emit(ToastText.Success(imageInviteSentMessage))
+                userProfileScreenModel.dismissImageInvite()
+            }
+        }
+
+        val openImageInvitePicker = {
+            userProfileScreenModel.beginImageInvite(currentUser.id)?.let { sessionId ->
+                pendingImageInviteSelection = sessionId
+                currentNavigator.push(GalleryPickerScreen(sessionId))
+            }
+            Unit
         }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -216,10 +256,31 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                playerChatboxModerationState = playerChatboxModerationState,
+                playerVoiceModerationState = playerVoiceModerationState,
                 playerInteractionState = playerInteractionState,
                 requestPlayerInteractionOverride = { pendingInteractionOverride = it },
                 retryPlayerInteractionLoad = {
                     userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
+                },
+                playerBlockState = playerBlockState,
+                retryPlayerBlockStatus = {
+                    userProfileScreenModel.refreshPlayerBlockStatus(
+                        localeStrings.profileBlockStatusLoadFailed
+                    )
+                },
+                confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                openReportDialog = {
+                    userProfileScreenModel.resetUserReportState()
+                    openReportDialog = true
+                },
+                openImageInvitePicker = openImageInvitePicker,
+                openInviteMessageSelection = { action ->
+                    userProfileScreenModel.openInviteMessageSelection(
+                        action = action,
+                        targetUserId = currentUser.id,
+                        targetDisplayName = currentUser.displayName,
+                    )
                 },
             )
         }
@@ -324,6 +385,82 @@ data class UserProfileScreen(
                 }
             },
         )
+        PlayerBlockConfirmationDialog(
+            desiredBlockedState = pendingPlayerBlockChange,
+            currentState = playerBlockState,
+            displayName = currentUser.displayName,
+            onDismiss = { pendingPlayerBlockChange = null },
+            onConfirm = { blocked ->
+                actionScope.launch {
+                    val succeeded = userProfileScreenModel.setPlayerBlocked(
+                        blocked = blocked,
+                        successMessage = if (blocked) {
+                            localeStrings.profileBlockSuccess
+                        } else {
+                            localeStrings.profileUnblockSuccess
+                        },
+                        failureMessage = if (blocked) {
+                            localeStrings.profileBlockFailed
+                        } else {
+                            localeStrings.profileUnblockFailed
+                        },
+                    )
+                    if (succeeded) pendingPlayerBlockChange = null
+                }
+            },
+        )
+        val userReportState by userProfileScreenModel.userReportState.collectAsState()
+        LaunchedEffect(userReportState) {
+            if (userReportState == UserReportState.Submitted) {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            }
+        }
+        val reportSuccessMessage = strings.profileReportSuccess
+        val reportFailureMessage = strings.profileReportFailed
+        UserReportDialog(
+            visible = openReportDialog,
+            targetName = currentUser.displayName,
+            state = userReportState,
+            onDismiss = {
+                openReportDialog = false
+                userProfileScreenModel.resetUserReportState()
+            },
+            onSubmit = {
+                userProfileScreenModel.reportUser(
+                    userId = currentUser.id,
+                    successMessage = reportSuccessMessage,
+                    failureMessage = reportFailureMessage,
+                )
+            },
+        )
+        ImageInviteDialog(
+            state = imageInviteState,
+            targetName = currentUser.displayName,
+            onSend = userProfileScreenModel::sendImageInvite,
+            onRetryPreparation = userProfileScreenModel::retryImageInvitePreparation,
+            onChooseAnother = openImageInvitePicker,
+            onDismiss = userProfileScreenModel::dismissImageInvite,
+        )
+        val inviteSentMessage = strings.profileInviteSent
+        val requestInviteSentMessage = strings.profileRequestInviteSent
+        val notInInstanceMessage = strings.profileInviteNotInInstance
+        InviteMessageSelectorDialog(
+            state = inviteMessageSelection,
+            onDismiss = userProfileScreenModel::dismissInviteMessageSelection,
+            onRetry = userProfileScreenModel::retryInviteMessageSelection,
+            onSend = { slot ->
+                userProfileScreenModel.sendInviteMessage(
+                    slot = slot,
+                    successMessage = if (inviteMessageSelection?.action == InviteMessageAction.RequestInvite) {
+                        requestInviteSentMessage
+                    } else {
+                        inviteSentMessage
+                    },
+                    notInInstanceMessage = notInInstanceMessage,
+                )
+            },
+        )
     }
 
 }
@@ -340,9 +477,17 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    playerChatboxModerationState: PlayerChatboxModerationState,
+    playerVoiceModerationState: PlayerVoiceModerationState,
     playerInteractionState: PlayerInteractionState,
     requestPlayerInteractionOverride: (PlayerInteractionOverride) -> Unit,
     retryPlayerInteractionLoad: () -> Unit,
+    playerBlockState: PlayerBlockState,
+    retryPlayerBlockStatus: () -> Unit,
+    confirmPlayerBlockChange: (Boolean) -> Unit,
+    openReportDialog: () -> Unit,
+    openImageInvitePicker: () -> Unit,
+    openInviteMessageSelection: (InviteMessageAction) -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val localeStrings = strings
@@ -397,6 +542,32 @@ private fun ColumnScope.SheetItems(
             retryLoad = retryPlayerInteractionLoad,
         )
 
+        val blockActionText = when {
+            !playerBlockState.isSessionAvailable -> localeStrings.profileBlockStatusUnavailable
+            playerBlockState.isLoading -> localeStrings.profileBlockStatusChecking
+            playerBlockState.loadFailed -> localeStrings.profileBlockStatusRetry
+            playerBlockState.isBlocked == true -> localeStrings.profileUnblock
+            playerBlockState.isBlocked == false -> localeStrings.profileBlock
+            else -> localeStrings.profileBlockStatusChecking
+        }
+        val blockActionEnabled = when {
+            !playerBlockState.isSessionAvailable -> false
+            playerBlockState.isLoading || playerBlockState.isUpdating -> false
+            playerBlockState.loadFailed -> true
+            else -> playerBlockState.isBlocked != null
+        }
+        SheetButtonItem(text = blockActionText, enabled = blockActionEnabled, onClick = {
+            if (playerBlockState.loadFailed) {
+                retryPlayerBlockStatus()
+            } else {
+                val blocked = playerBlockState.isBlocked ?: return@SheetButtonItem
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    confirmPlayerBlockChange(!blocked)
+                }
+            }
+        })
+
         if (currentUser.isFriend) {
             SheetButtonItem(text = localeStrings.profileBoop, enabled = boopEnabled, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
@@ -404,17 +575,34 @@ private fun ColumnScope.SheetItems(
                     openBoopDialog()
                 }
             })
+            SheetButtonItem(text = localeStrings.profileRequestInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openInviteMessageSelection(InviteMessageAction.RequestInvite)
+                }
+            })
             SheetButtonItem(text = localeStrings.profileInviteToMyInstance, onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()
-                    userProfileScreenModel.inviteToMyInstance(
-                        userId = currentUser.id,
-                        successMessage = localeStrings.profileInviteSent,
-                        notInInstanceMessage = localeStrings.profileInviteNotInInstance,
-                    )
+                    openInviteMessageSelection(InviteMessageAction.Invite)
+                }
+            })
+            SheetButtonItem(text = localeStrings.profileImageInvite, onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openImageInvitePicker()
                 }
             })
         }
+
+        PlayerChatboxModerationSheetItem(
+            state = playerChatboxModerationState,
+            screenModel = userProfileScreenModel,
+        )
+        PlayerVoiceModerationSheetItem(
+            state = playerVoiceModerationState,
+            screenModel = userProfileScreenModel,
+        )
     }
 
     SheetButtonItem(
@@ -443,6 +631,20 @@ private fun ColumnScope.SheetItems(
             openAlertDialog()
         }
     })
+    if (!currentUser.isSelf) {
+        SheetButtonItem(
+            text = localeStrings.profileReportUser,
+            onClick = {
+                scope.launch { hideSheet() }.invokeOnCompletion {
+                    onHideCompletion()
+                    openReportDialog()
+                }
+            },
+            content = { label ->
+                Text(label, color = MaterialTheme.colorScheme.error)
+            },
+        )
+    }
 
 }
 
@@ -569,6 +771,147 @@ private fun PlayerInteractionOverrideDialog(
         },
         dismissButton = {
             TextButton(enabled = !submitting, onClick = onDismiss) {
+                Text(localeStrings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColumnScope.PlayerChatboxModerationSheetItem(
+    state: PlayerChatboxModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerChatboxModerationState.Unavailable -> return
+        PlayerChatboxModerationState.Checking -> localeStrings.profileChatboxModerationChecking
+        is PlayerChatboxModerationState.Failed -> localeStrings.profileChatboxModerationRetry
+        is PlayerChatboxModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileChatboxModerationUnmute
+        } else {
+            localeStrings.profileChatboxModerationMute
+        }
+        is PlayerChatboxModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileChatboxModerationMuting
+        } else {
+            localeStrings.profileChatboxModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerChatboxModerationState.Ready ||
+        state is PlayerChatboxModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerChatboxModerationState.Failed ->
+                    screenModel.retryPlayerChatboxModeration()
+                is PlayerChatboxModerationState.Ready ->
+                    screenModel.togglePlayerChatboxModeration(
+                        mutedMessage = localeStrings.profileChatboxModerationMuted,
+                        unmutedMessage = localeStrings.profileChatboxModerationUnmuted,
+                        failureMessage = localeStrings.profileChatboxModerationUpdateFailed,
+                    )
+                else -> Unit
+            }
+        },
+    )
+}
+
+@Composable
+private fun ColumnScope.PlayerVoiceModerationSheetItem(
+    state: PlayerVoiceModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerVoiceModerationState.Unavailable -> return
+        is PlayerVoiceModerationState.Checking -> localeStrings.profileVoiceModerationChecking
+        is PlayerVoiceModerationState.Failed -> localeStrings.profileVoiceModerationRetry
+        is PlayerVoiceModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileVoiceModerationUnmute
+        } else {
+            localeStrings.profileVoiceModerationMute
+        }
+        is PlayerVoiceModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileVoiceModerationMuting
+        } else {
+            localeStrings.profileVoiceModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerVoiceModerationState.Ready ||
+        state is PlayerVoiceModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerVoiceModerationState.Failed -> screenModel.retryPlayerVoiceModeration()
+                is PlayerVoiceModerationState.Ready -> screenModel.togglePlayerVoiceModeration(
+                    mutedMessage = localeStrings.profileVoiceModerationMuted,
+                    unmutedMessage = localeStrings.profileVoiceModerationUnmuted,
+                    failureMessage = localeStrings.profileVoiceModerationUpdateFailed,
+                )
+                else -> Unit
+            }
+        },
+    )
+}
+
+@Composable
+private fun PlayerBlockConfirmationDialog(
+    desiredBlockedState: Boolean?,
+    currentState: PlayerBlockState,
+    displayName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Boolean) -> Unit,
+) {
+    val blocked = desiredBlockedState ?: return
+    val localeStrings = strings
+    val canSubmit = !currentState.isUpdating && currentState.isBlocked == !blocked
+    AlertDialog(
+        onDismissRequest = { if (!currentState.isUpdating) onDismiss() },
+        title = {
+            Text(
+                if (blocked) {
+                    localeStrings.profileBlockConfirmTitle
+                } else {
+                    localeStrings.profileUnblockConfirmTitle
+                }
+            )
+        },
+        text = {
+            Text(
+                (if (blocked) {
+                    localeStrings.profileBlockConfirmMessage
+                } else {
+                    localeStrings.profileUnblockConfirmMessage
+                }).replace("%name%", displayName)
+            )
+        },
+        confirmButton = {
+            Button(
+                enabled = canSubmit,
+                onClick = { onConfirm(blocked) },
+            ) {
+                if (currentState.isUpdating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(if (blocked) localeStrings.profileBlock else localeStrings.profileUnblock)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                enabled = !currentState.isUpdating,
+                onClick = onDismiss,
+            ) {
                 Text(localeStrings.cancel)
             }
         },

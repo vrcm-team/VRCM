@@ -5,7 +5,7 @@ import kotlin.test.assertTrue
 
 class LocaleActionMessagesTest {
     @Test
-    fun boopInviteAndRetryMessagesArePresentInEveryLocale() {
+    fun profileActionMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,
             LocaleStringsJa,
@@ -20,8 +20,33 @@ class LocaleActionMessagesTest {
                 locale.profileBoopDisabled,
                 locale.profileInviteSent,
                 locale.profileInviteNotInInstance,
+                locale.profileChatboxModerationMute,
+                locale.profileChatboxModerationUnmute,
+                locale.profileChatboxModerationChecking,
+                locale.profileChatboxModerationRetry,
+                locale.profileChatboxModerationMuting,
+                locale.profileChatboxModerationUnmuting,
+                locale.profileChatboxModerationMuted,
+                locale.profileChatboxModerationUnmuted,
+                locale.profileChatboxModerationUpdateFailed,
+                locale.profileBlock,
+                locale.profileUnblock,
+                locale.profileBlockStatusChecking,
+                locale.profileBlockStatusRetry,
+                locale.profileBlockStatusUnavailable,
+                locale.profileBlockConfirmTitle,
+                locale.profileBlockConfirmMessage,
+                locale.profileUnblockConfirmTitle,
+                locale.profileUnblockConfirmMessage,
+                locale.profileBlockSuccess,
+                locale.profileUnblockSuccess,
+                locale.profileBlockFailed,
+                locale.profileUnblockFailed,
+                locale.profileBlockStatusLoadFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.profileBlockConfirmMessage.contains("%name%"))
+            assertTrue(locale.profileUnblockConfirmMessage.contains("%name%"))
         }
     }
 
@@ -96,4 +121,33 @@ class LocaleActionMessagesTest {
             assertTrue(locale.profileInteractionRestoreConfirmMessage.contains("%s"))
         }
     }
+
+    @Test
+    fun friendRemovalMessagesKeepTheirCountPlaceholders() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.friendDirectorySelect,
+                locale.friendDirectorySelectAll,
+                locale.friendDirectoryClearSelection,
+                locale.friendDirectoryRemoveSelected,
+                locale.friendDirectoryRemoveConfirmTitle,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+            assertTrue(locale.friendDirectorySelectedCount.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemoveConfirmMessage.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovingProgress.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveSuccess.countPlaceholderCount() == 1)
+            assertTrue(locale.friendDirectoryRemovePartialFailure.countPlaceholderCount() == 2)
+            assertTrue(locale.friendDirectoryRemoveFailed.countPlaceholderCount() == 1)
+        }
+    }
 }
+
+private fun String.countPlaceholderCount(): Int = windowed(size = 2).count { it == "%d" }
