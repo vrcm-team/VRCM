@@ -92,7 +92,33 @@ val presentationModule: Module = module {
     }
     singleOf(::AuthenticatedInviteMessageSlotsSource) bind InviteMessageSlotsSource::class
     viewModel { InviteMessageSlotsModel(get()) }
-    viewModelOf(::UserProfileScreenModel)
+    viewModel { parameters ->
+        UserProfileScreenModel(
+            userProfileVO = parameters.get(),
+            authService = get(),
+            usersApi = get(),
+            groupsApi = get(),
+            friendService = get(),
+            notificationApi = get(),
+            playerModerationApi = get(),
+            logger = get(),
+            instancesApi = get(),
+            worldsApi = get(),
+            avatarsApi = get(),
+            favoriteApi = get(),
+            feedbackApi = get(),
+            inviteApi = get(),
+            gallerySelectionSessionStore = get(),
+            imageInviteRemote = get(),
+            inviteMessageActionService = get(),
+            userProfileCacheStore = get(),
+            favoriteListCacheStore = get(),
+            accountCacheManager = get(),
+            friendLocationPagerModel = get(),
+            friendActivityService = get(),
+            boopService = get(),
+        )
+    }
     viewModelOf(::MutualFriendsScreenModel)
     viewModelOf(::FriendNetworkScreenModel)
     singleOf(::NetworkGalleryDataSource) bind GalleryDataSource::class

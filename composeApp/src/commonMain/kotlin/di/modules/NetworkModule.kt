@@ -12,6 +12,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.prints.PrintsApi
 import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.status.VrchatStatusApi
@@ -37,6 +38,7 @@ internal val networkModule = module(true) {
     singleOf(::InstancesApi)
     singleOf(::UsersApi)
     singleOf(::NotificationApi)
+    singleOf(::PlayerModerationApi)
     singleOf(::InviteApi)
     singleOf(::WorldsApi)
     singleOf(::FavoriteApi)

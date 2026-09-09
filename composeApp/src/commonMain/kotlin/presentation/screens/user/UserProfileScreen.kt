@@ -107,6 +107,7 @@ data class UserProfileScreen(
         val localeStrings = strings
 
         LaunchedEffect(userProfileVO.id) {
+            userProfileScreenModel.setPlayerVoiceModerationTarget(userProfileVO.id)
             userProfileScreenModel.refreshUser(userProfileVO.id)
             userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
         }
@@ -121,6 +122,7 @@ data class UserProfileScreen(
         val playerBlockState by userProfileScreenModel.playerBlockState.collectAsState()
         val userGroups = userProfileScreenModel.userGroups
         val mutualGroups = userProfileScreenModel.mutualGroups
+        val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         var openAlertDialog by remember { mutableStateOf(false) }
@@ -241,6 +243,7 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                playerVoiceModerationState = playerVoiceModerationState,
                 playerBlockState = playerBlockState,
                 retryPlayerBlockStatus = {
                     userProfileScreenModel.refreshPlayerBlockStatus(
@@ -430,6 +433,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    playerVoiceModerationState: PlayerVoiceModerationState,
     playerBlockState: PlayerBlockState,
     retryPlayerBlockStatus: () -> Unit,
     confirmPlayerBlockChange: (Boolean) -> Unit,
@@ -533,6 +537,11 @@ private fun ColumnScope.SheetItems(
                 }
             })
         }
+
+        PlayerVoiceModerationSheetItem(
+            state = playerVoiceModerationState,
+            screenModel = userProfileScreenModel,
+        )
     }
 
     SheetButtonItem(
@@ -576,6 +585,47 @@ private fun ColumnScope.SheetItems(
         )
     }
 
+}
+
+@Composable
+private fun ColumnScope.PlayerVoiceModerationSheetItem(
+    state: PlayerVoiceModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerVoiceModerationState.Unavailable -> return
+        is PlayerVoiceModerationState.Checking -> localeStrings.profileVoiceModerationChecking
+        is PlayerVoiceModerationState.Failed -> localeStrings.profileVoiceModerationRetry
+        is PlayerVoiceModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileVoiceModerationUnmute
+        } else {
+            localeStrings.profileVoiceModerationMute
+        }
+        is PlayerVoiceModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileVoiceModerationMuting
+        } else {
+            localeStrings.profileVoiceModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerVoiceModerationState.Ready ||
+        state is PlayerVoiceModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerVoiceModerationState.Failed -> screenModel.retryPlayerVoiceModeration()
+                is PlayerVoiceModerationState.Ready -> screenModel.togglePlayerVoiceModeration(
+                    mutedMessage = localeStrings.profileVoiceModerationMuted,
+                    unmutedMessage = localeStrings.profileVoiceModerationUnmuted,
+                    failureMessage = localeStrings.profileVoiceModerationUpdateFailed,
+                )
+                else -> Unit
+            }
+        },
+    )
 }
 
 @Composable
