@@ -45,6 +45,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.network.api.groups.data.Gallery
@@ -140,12 +142,16 @@ class GroupProfileScreen(
         val groupInstances by screenModel.groupInstances.collectAsState()
         val isLoading by screenModel.isLoading.collectAsState()
         val isActionLoading by screenModel.isActionLoading.collectAsState()
+        val isRepresentationUpdating by screenModel.isRepresentationUpdating.collectAsState()
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
 
         LaunchedEffect(groupProfileVo.groupId) {
             screenModel.loadGroupData(groupProfileVo)
         }
 
         val group = groupState ?: groupProfileVo
+        val representationUpdateFailedMessage = strings.groupRepresentationUpdateFailed
+        val representationSessionChangedMessage = strings.groupRepresentationSessionChanged
         val scrollState = rememberScrollState()
         var selectedTabIndex by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(0) }
 
@@ -186,8 +192,17 @@ class GroupProfileScreen(
                         GroupHeaderInfo(
                             group = group,
                             isActionLoading = isActionLoading,
+                            isRepresentationUpdating = isRepresentationUpdating,
+                            representationAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
                             onJoin = { screenModel.joinGroup() },
-                            onLeave = { screenModel.leaveGroup() }
+                            onLeave = { screenModel.leaveGroup() },
+                            onRepresentationChange = { isRepresenting ->
+                                screenModel.updateRepresentation(
+                                    isRepresenting = isRepresenting,
+                                    failureMessage = representationUpdateFailedMessage,
+                                    sessionChangedMessage = representationSessionChangedMessage,
+                                )
+                            },
                         )
                         TabRow(
                             selectedTabIndex = selectedTabIndex,
@@ -318,8 +333,11 @@ private fun GroupBanner(
 private fun GroupHeaderInfo(
     group: GroupProfileVo,
     isActionLoading: Boolean,
+    isRepresentationUpdating: Boolean,
+    representationAvailable: Boolean,
     onJoin: () -> Unit,
     onLeave: () -> Unit,
+    onRepresentationChange: (Boolean) -> Unit,
 ) {
     val membershipStatus = group.membershipStatus.lowercase()
     val joinState = group.joinState.lowercase()
@@ -367,10 +385,49 @@ private fun GroupHeaderInfo(
                 }
             }
         }
+        if (representationAvailable) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = strings.groupRepresentation,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = when {
+                            isRepresentationUpdating -> strings.groupRepresentationUpdating
+                            group.myMember?.isRepresenting == true -> strings.groupRepresentationEnabled
+                            else -> strings.groupRepresentationDisabled
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isRepresentationUpdating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                Switch(
+                    checked = group.myMember?.isRepresenting == true,
+                    enabled = !isActionLoading && !isRepresentationUpdating,
+                    onCheckedChange = onRepresentationChange,
+                )
+            }
+        }
         LoadingButton(
             modifier = Modifier.fillMaxWidth(),
             text = actionLabel,
-            enabled = actionEnabled,
+            enabled = actionEnabled && !isRepresentationUpdating,
             isLoading = isActionLoading,
             onClick = { if (isMember) onLeave() else onJoin() }
         )
