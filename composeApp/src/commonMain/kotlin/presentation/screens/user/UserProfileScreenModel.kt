@@ -24,6 +24,7 @@ import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerChatboxModerationApi
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
@@ -466,6 +467,7 @@ class UserProfileScreenModel internal constructor(
     private val groupsApi: GroupsApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
+    private val playerChatboxModerationApi: PlayerChatboxModerationApi,
     private val playerModerationApi: PlayerModerationApi,
     private val logger: Logger,
     private val instancesApi: InstancesApi,
@@ -493,6 +495,14 @@ class UserProfileScreenModel internal constructor(
 
     private val cacheOwnerUserId = authService.accountDto().userId
     private val profileSessionToken: AccountSessionToken? = SharedFlowCentre.currentSession.value?.token
+    private val playerChatboxModerationController = PlayerChatboxModerationController(
+        initialTargetUserId = userProfileVO.id,
+        authService = authService,
+        moderationApi = playerChatboxModerationApi,
+        scope = viewModelScope,
+    )
+    internal val playerChatboxModerationState: StateFlow<PlayerChatboxModerationState> =
+        playerChatboxModerationController.state
     private val playerVoiceModerationController = PlayerVoiceModerationController(
         initialTargetUserId = userProfileVO.id,
         authService = authService,
@@ -920,6 +930,32 @@ class UserProfileScreenModel internal constructor(
         friendAction(message) {
             friendService.sendFriendRequest(userId)
         }
+
+    fun setPlayerChatboxModerationTarget(userId: String) {
+        playerChatboxModerationController.setTargetUserId(userId)
+    }
+
+    fun retryPlayerChatboxModeration() {
+        playerChatboxModerationController.retry()
+    }
+
+    fun togglePlayerChatboxModeration(
+        mutedMessage: String,
+        unmutedMessage: String,
+        failureMessage: String,
+    ) {
+        playerChatboxModerationController.toggle(
+            onSuccess = { isMuted ->
+                SharedFlowCentre.toastText.emit(
+                    ToastText.Success(if (isMuted) mutedMessage else unmutedMessage),
+                )
+            },
+            onFailure = { error ->
+                logger.error(error.message.orEmpty())
+                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+            },
+        )
+    }
 
     fun setPlayerVoiceModerationTarget(userId: String) {
         playerVoiceModerationController.setTargetUserId(userId)

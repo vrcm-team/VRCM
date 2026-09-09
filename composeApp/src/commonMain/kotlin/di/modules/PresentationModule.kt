@@ -100,6 +100,7 @@ val presentationModule: Module = module {
             groupsApi = get(),
             friendService = get(),
             notificationApi = get(),
+            playerChatboxModerationApi = get(),
             playerModerationApi = get(),
             logger = get(),
             instancesApi = get(),

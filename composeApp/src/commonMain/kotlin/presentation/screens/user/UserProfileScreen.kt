@@ -107,6 +107,7 @@ data class UserProfileScreen(
         val localeStrings = strings
 
         LaunchedEffect(userProfileVO.id) {
+            userProfileScreenModel.setPlayerChatboxModerationTarget(userProfileVO.id)
             userProfileScreenModel.setPlayerVoiceModerationTarget(userProfileVO.id)
             userProfileScreenModel.refreshUser(userProfileVO.id)
             userProfileScreenModel.refreshPlayerBlockStatus(localeStrings.profileBlockStatusLoadFailed)
@@ -122,6 +123,7 @@ data class UserProfileScreen(
         val playerBlockState by userProfileScreenModel.playerBlockState.collectAsState()
         val userGroups = userProfileScreenModel.userGroups
         val mutualGroups = userProfileScreenModel.mutualGroups
+        val playerChatboxModerationState by userProfileScreenModel.playerChatboxModerationState.collectAsState()
         val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
@@ -243,6 +245,7 @@ data class UserProfileScreen(
                 openEditNoteDialog = { openEditNoteDialog = true },
                 boopEnabled = userProfileScreenModel.isBoopAllowed,
                 openBoopDialog = { openBoopDialog = true },
+                playerChatboxModerationState = playerChatboxModerationState,
                 playerVoiceModerationState = playerVoiceModerationState,
                 playerBlockState = playerBlockState,
                 retryPlayerBlockStatus = {
@@ -433,6 +436,7 @@ private fun ColumnScope.SheetItems(
     openEditNoteDialog: () -> Unit,
     boopEnabled: Boolean,
     openBoopDialog: () -> Unit,
+    playerChatboxModerationState: PlayerChatboxModerationState,
     playerVoiceModerationState: PlayerVoiceModerationState,
     playerBlockState: PlayerBlockState,
     retryPlayerBlockStatus: () -> Unit,
@@ -538,6 +542,10 @@ private fun ColumnScope.SheetItems(
             })
         }
 
+        PlayerChatboxModerationSheetItem(
+            state = playerChatboxModerationState,
+            screenModel = userProfileScreenModel,
+        )
         PlayerVoiceModerationSheetItem(
             state = playerVoiceModerationState,
             screenModel = userProfileScreenModel,
@@ -585,6 +593,49 @@ private fun ColumnScope.SheetItems(
         )
     }
 
+}
+
+@Composable
+private fun ColumnScope.PlayerChatboxModerationSheetItem(
+    state: PlayerChatboxModerationState,
+    screenModel: UserProfileScreenModel,
+) {
+    val localeStrings = strings
+    val text = when (state) {
+        PlayerChatboxModerationState.Unavailable -> return
+        PlayerChatboxModerationState.Checking -> localeStrings.profileChatboxModerationChecking
+        is PlayerChatboxModerationState.Failed -> localeStrings.profileChatboxModerationRetry
+        is PlayerChatboxModerationState.Ready -> if (state.isMuted) {
+            localeStrings.profileChatboxModerationUnmute
+        } else {
+            localeStrings.profileChatboxModerationMute
+        }
+        is PlayerChatboxModerationState.Updating -> if (state.willMute) {
+            localeStrings.profileChatboxModerationMuting
+        } else {
+            localeStrings.profileChatboxModerationUnmuting
+        }
+    }
+    val enabled = state is PlayerChatboxModerationState.Ready ||
+        state is PlayerChatboxModerationState.Failed
+
+    SheetButtonItem(
+        text = text,
+        enabled = enabled,
+        onClick = {
+            when (state) {
+                is PlayerChatboxModerationState.Failed ->
+                    screenModel.retryPlayerChatboxModeration()
+                is PlayerChatboxModerationState.Ready ->
+                    screenModel.togglePlayerChatboxModeration(
+                        mutedMessage = localeStrings.profileChatboxModerationMuted,
+                        unmutedMessage = localeStrings.profileChatboxModerationUnmuted,
+                        failureMessage = localeStrings.profileChatboxModerationUpdateFailed,
+                    )
+                else -> Unit
+            }
+        },
+    )
 }
 
 @Composable
