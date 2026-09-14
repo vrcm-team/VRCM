@@ -14,7 +14,7 @@ class ProfilePlayerModerationCacheTest {
             targetUserId = TARGET_USER_ID,
             type = "block",
         )
-        val cache = ProfilePlayerModerationCache {
+        val cache = ProfilePlayerModerationCache { _, _ ->
             reads++
             listOf(moderation)
         }

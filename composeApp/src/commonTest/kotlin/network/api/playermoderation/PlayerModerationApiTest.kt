@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.playermoderation
 
+import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -29,7 +30,44 @@ import kotlin.test.assertTrue
 
 class PlayerModerationApiTest {
     @Test
-    fun concurrentTargetReadsShareOneHttpRequest() = runTest {
+    fun targetReadUsesAccountCollectionAndFiltersBySourceAndTarget() = runTest {
+        lateinit var capturedRequest: HttpRequestData
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    capturedRequest = request
+                    respond(
+                        content = "[" +
+                            moderationJson("mute") + "," +
+                            moderationJson("block", targetUserId = OTHER_TARGET_USER_ID) + "," +
+                            moderationJson("interactOff", sourceUserId = OTHER_SOURCE_USER_ID) +
+                            "]",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            }
+            defaultRequest { url("https://api.vrchat.cloud/api/1/") }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        try {
+            val result = PlayerModerationApi(client).getForTarget(
+                sessionToken = CURRENT_SESSION,
+                targetUserId = TARGET_USER_ID,
+            )
+
+            assertTrue(capturedRequest.url.parameters.isEmpty())
+            assertEquals(listOf("mute"), result.map { it.type })
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun concurrentTargetReadsForOneSessionShareOneHttpRequest() = runTest {
         val requestCount = atomic(0)
         val requestStarted = CompletableDeferred<Unit>()
         val releaseResponse = CompletableDeferred<Unit>()
@@ -40,7 +78,10 @@ class PlayerModerationApiTest {
                     requestStarted.complete(Unit)
                     releaseResponse.await()
                     respond(
-                        content = "[${moderationJson("mute")} ]",
+                        content = "[" +
+                            moderationJson("mute") + "," +
+                            moderationJson("block", targetUserId = OTHER_TARGET_USER_ID) +
+                            "]",
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json"),
                     )
@@ -54,8 +95,17 @@ class PlayerModerationApiTest {
         val api = PlayerModerationApi(client)
 
         try {
-            val reads = List(4) {
-                async { api.getForTarget(TARGET_USER_ID) }
+            val reads = List(4) { index ->
+                async {
+                    api.getForTarget(
+                        sessionToken = CURRENT_SESSION,
+                        targetUserId = if (index % 2 == 0) {
+                            TARGET_USER_ID
+                        } else {
+                            OTHER_TARGET_USER_ID
+                        },
+                    )
+                }
             }
             requestStarted.await()
             repeat(10) { yield() }
@@ -218,7 +268,7 @@ class PlayerModerationApiTest {
         val api = PlayerModerationApi(client)
 
         try {
-            val existing = api.getForTarget(TARGET_USER_ID)
+            val existing = api.getForTarget(CURRENT_SESSION, TARGET_USER_ID)
             api.remove(TARGET_USER_ID, VoiceModerationType.Mute)
             val created = api.moderate(TARGET_USER_ID, VoiceModerationType.Unmute)
 
@@ -228,7 +278,7 @@ class PlayerModerationApiTest {
 
             assertEquals(HttpMethod.Get, requests[0].method)
             assertEquals("/api/1/auth/user/playermoderations", requests[0].url.encodedPath)
-            assertEquals(TARGET_USER_ID, requests[0].url.parameters["targetUserId"])
+            assertTrue(requests[0].url.parameters.isEmpty())
 
             assertEquals(HttpMethod.Put, requests[1].method)
             assertEquals("/api/1/auth/user/unplayermoderate", requests[1].url.encodedPath)
@@ -265,19 +315,27 @@ class PlayerModerationApiTest {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
     }
 
-    private fun moderationJson(type: String) = """
+    private fun moderationJson(
+        type: String,
+        sourceUserId: String = CURRENT_USER_ID,
+        targetUserId: String = TARGET_USER_ID,
+    ) = """
         {
           "created":"2026-08-31T00:00:00.000Z",
           "id":"pmod_1",
           "sourceDisplayName":"Current User",
-          "sourceUserId":"usr_current",
+          "sourceUserId":"$sourceUserId",
           "targetDisplayName":"Target User",
-          "targetUserId":"$TARGET_USER_ID",
+          "targetUserId":"$targetUserId",
           "type":"$type"
         }
     """.trimIndent()
 
     private companion object {
+        const val CURRENT_USER_ID = "usr_current"
+        val CURRENT_SESSION = AccountSessionToken(CURRENT_USER_ID, generation = 1)
+        const val OTHER_SOURCE_USER_ID = "usr_other_source"
         const val TARGET_USER_ID = "usr_target"
+        const val OTHER_TARGET_USER_ID = "usr_other_target"
     }
 }

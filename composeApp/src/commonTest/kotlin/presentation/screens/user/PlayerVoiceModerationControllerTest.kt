@@ -135,17 +135,20 @@ class PlayerVoiceModerationControllerTest {
     fun targetChangeRejectsOldCheckAndLoadsNewTarget() = runTest {
         val firstRequestStarted = CompletableDeferred<Unit>()
         val finishFirstRequest = CompletableDeferred<Unit>()
-        val queriedTargets = mutableListOf<String?>()
+        var moderationGets = 0
         val fixture = fixture(this) { request ->
-            val target = request.url.parameters["targetUserId"]
-            queriedTargets += target
-            if (queriedTargets.size == 1) {
+            check(request.url.parameters.isEmpty())
+            moderationGets++
+            if (moderationGets == 1) {
                 firstRequestStarted.complete(Unit)
                 finishFirstRequest.await()
-                jsonResponse("[${moderationJson(TARGET_ONE, "mute")}]")
-            } else {
-                jsonResponse("[${moderationJson(TARGET_TWO, "unmute")}]")
             }
+            jsonResponse(
+                "[" +
+                    moderationJson(TARGET_ONE, "mute") + "," +
+                    moderationJson(TARGET_TWO, "unmute") +
+                    "]",
+            )
         }
 
         try {
@@ -162,7 +165,7 @@ class PlayerVoiceModerationControllerTest {
 
             assertEquals(TARGET_TWO, ready.targetUserId)
             assertFalse(ready.isMuted)
-            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+            assertEquals(2, moderationGets)
         } finally {
             fixture.close()
         }
@@ -172,18 +175,17 @@ class PlayerVoiceModerationControllerTest {
     fun targetChangeDuringMutationRunsDeferredRefreshWithoutPublishingOldResult() = runTest {
         val mutationStarted = CompletableDeferred<Unit>()
         val finishMutation = CompletableDeferred<Unit>()
-        val queriedTargets = mutableListOf<String?>()
+        var moderationGets = 0
         val fixture = fixture(this) { request ->
             when (request.method) {
                 HttpMethod.Get -> {
-                    val target = request.url.parameters["targetUserId"]
-                    queriedTargets += target
+                    check(request.url.parameters.isEmpty())
+                    moderationGets++
                     jsonResponse(
-                        if (target == TARGET_ONE) {
-                            "[${moderationJson(TARGET_ONE, "mute")}]"
-                        } else {
-                            "[${moderationJson(TARGET_TWO, "unmute")}]"
-                        },
+                        "[" +
+                            moderationJson(TARGET_ONE, "mute") + "," +
+                            moderationJson(TARGET_TWO, "unmute") +
+                            "]",
                     )
                 }
                 HttpMethod.Put -> jsonResponse(SUCCESS_JSON)
@@ -215,7 +217,7 @@ class PlayerVoiceModerationControllerTest {
             assertFalse(ready.isMuted)
             assertEquals(0, successes)
             assertEquals(0, failures)
-            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+            assertEquals(2, moderationGets)
         } finally {
             fixture.close()
         }
@@ -225,18 +227,17 @@ class PlayerVoiceModerationControllerTest {
     fun targetChangeDuringFailingMutationDoesNotReportOldFailure() = runTest {
         val mutationStarted = CompletableDeferred<Unit>()
         val finishMutation = CompletableDeferred<Unit>()
-        val queriedTargets = mutableListOf<String?>()
+        var moderationGets = 0
         val fixture = fixture(this) { request ->
             when (request.method) {
                 HttpMethod.Get -> {
-                    val target = request.url.parameters["targetUserId"]
-                    queriedTargets += target
+                    check(request.url.parameters.isEmpty())
+                    moderationGets++
                     jsonResponse(
-                        if (target == TARGET_ONE) {
-                            "[${moderationJson(TARGET_ONE, "mute")}]"
-                        } else {
-                            "[${moderationJson(TARGET_TWO, "unmute")}]"
-                        },
+                        "[" +
+                            moderationJson(TARGET_ONE, "mute") + "," +
+                            moderationJson(TARGET_TWO, "unmute") +
+                            "]",
                     )
                 }
                 HttpMethod.Put -> jsonResponse(SUCCESS_JSON)
@@ -263,7 +264,7 @@ class PlayerVoiceModerationControllerTest {
             assertFalse(ready.isMuted)
             assertEquals(0, successes)
             assertEquals(0, failures)
-            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+            assertEquals(2, moderationGets)
         } finally {
             fixture.close()
         }
@@ -341,29 +342,23 @@ class PlayerVoiceModerationControllerTest {
     @Test
     fun conflictingOverridesUseParsedTimeAndStableInvalidFallback() = runTest {
         val fixture = fixture(this) { request ->
-            when (request.url.parameters["targetUserId"]) {
-                TARGET_ONE -> jsonResponse(
-                    "[" +
-                        moderationJson(
-                            TARGET_ONE,
-                            "unmute",
-                            created = "2026-08-31T00:30:00Z",
-                        ) + "," +
-                        moderationJson(
-                            TARGET_ONE,
-                            "mute",
-                            created = "2026-08-31T01:00:00+02:00",
-                        ) +
-                        "]",
-                )
-                TARGET_TWO -> jsonResponse(
-                    "[" +
-                        moderationJson(TARGET_TWO, "unmute", created = "invalid-first") + "," +
-                        moderationJson(TARGET_TWO, "mute", created = "invalid-last") +
-                        "]",
-                )
-                else -> error("Unexpected request: ${request.method} ${request.url}")
-            }
+            check(request.url.parameters.isEmpty())
+            jsonResponse(
+                "[" +
+                    moderationJson(
+                        TARGET_ONE,
+                        "unmute",
+                        created = "2026-08-31T00:30:00Z",
+                    ) + "," +
+                    moderationJson(
+                        TARGET_ONE,
+                        "mute",
+                        created = "2026-08-31T01:00:00+02:00",
+                    ) + "," +
+                    moderationJson(TARGET_TWO, "unmute", created = "invalid-first") + "," +
+                    moderationJson(TARGET_TWO, "mute", created = "invalid-last") +
+                    "]",
+            )
         }
 
         try {

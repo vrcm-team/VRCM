@@ -8,7 +8,7 @@ import kotlinx.coroutines.sync.withLock
 
 /** Shares one authoritative moderation snapshot across the controls on a single profile. */
 internal class ProfilePlayerModerationCache(
-    private val loadTarget: suspend (String) -> List<PlayerModerationData>,
+    private val loadTarget: suspend (AccountSessionToken, String) -> List<PlayerModerationData>,
 ) {
     constructor(api: PlayerModerationApi) : this(api::getForTarget)
 
@@ -20,9 +20,8 @@ internal class ProfilePlayerModerationCache(
         targetUserId: String,
     ): List<PlayerModerationData> = mutex.withLock {
         val key = Key(sessionToken, targetUserId)
-        cachedEntry?.takeIf { it.key == key }?.moderations ?: loadTarget(targetUserId).also {
-            cachedEntry = Entry(key, it)
-        }
+        cachedEntry?.takeIf { it.key == key }?.moderations
+            ?: loadTarget(sessionToken, targetUserId).also { cachedEntry = Entry(key, it) }
     }
 
     suspend fun invalidate(

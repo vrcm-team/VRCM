@@ -393,15 +393,20 @@ class PlayerInteractionOverrideControllerTest : MainDispatcherTest() {
     fun targetSwitchPreventsTheOlderReadFromPublishingIntoTheNewProfile() = runTest {
         val firstReadStarted = CompletableDeferred<Unit>()
         val finishFirstRead = CompletableDeferred<Unit>()
+        var moderationGets = 0
         val fixture = fixture { request ->
-            val target = request.url.parameters["targetUserId"]
-            if (target == TARGET_USER_ID) {
+            check(request.url.parameters.isEmpty())
+            moderationGets++
+            if (moderationGets == 1) {
                 firstReadStarted.complete(Unit)
                 finishFirstRead.await()
-                jsonResponse(moderationList("interactOff", TARGET_USER_ID))
-            } else {
-                jsonResponse(moderationList("interactOn", SECOND_TARGET_USER_ID))
             }
+            jsonResponse(
+                "[" +
+                    moderation("interactOff", targetUserId = TARGET_USER_ID) + "," +
+                    moderation("interactOn", targetUserId = SECOND_TARGET_USER_ID) +
+                    "]",
+            )
         }
         val firstRead = async(start = CoroutineStart.UNDISPATCHED) {
             fixture.controller.refresh(TARGET_USER_ID)
@@ -421,6 +426,7 @@ class PlayerInteractionOverrideControllerTest : MainDispatcherTest() {
         val ready = assertIs<PlayerInteractionState.Ready>(fixture.controller.state.value)
         assertEquals(SECOND_TARGET_USER_ID, ready.targetUserId)
         assertEquals(PlayerInteractionOverride.InteractOn, ready.snapshot.effectiveOverride)
+        assertEquals(2, moderationGets)
         fixture.client.close()
     }
 
@@ -450,13 +456,12 @@ class PlayerInteractionOverrideControllerTest : MainDispatcherTest() {
         val fixture = fixture { request ->
             when (request.method) {
                 HttpMethod.Get -> {
-                    val target = request.url.parameters["targetUserId"]
+                    check(request.url.parameters.isEmpty())
                     jsonResponse(
-                        if (target == TARGET_USER_ID) {
-                            moderationList("interactOff", TARGET_USER_ID)
-                        } else {
-                            moderationList("interactOn", SECOND_TARGET_USER_ID)
-                        },
+                        "[" +
+                            moderation("interactOff", targetUserId = TARGET_USER_ID) + "," +
+                            moderation("interactOn", targetUserId = SECOND_TARGET_USER_ID) +
+                            "]",
                     )
                 }
                 HttpMethod.Put -> {
@@ -568,7 +573,8 @@ class PlayerInteractionOverrideControllerTest : MainDispatcherTest() {
         type: String,
         created: String = "2026-08-31T12:00:00Z",
         targetUserId: String = TARGET_USER_ID,
-    ) = """{"targetUserId":"$targetUserId","type":"$type","created":"$created"}"""
+        sourceUserId: String = OWNER_USER_ID,
+    ) = """{"sourceUserId":"$sourceUserId","targetUserId":"$targetUserId","type":"$type","created":"$created"}"""
 
     private fun HttpRequestData.bodyTextOrEmpty(): String =
         (body as? OutgoingContent.ByteArrayContent)?.bytes()?.decodeToString().orEmpty()

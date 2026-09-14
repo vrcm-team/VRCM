@@ -226,17 +226,20 @@ class PlayerChatboxModerationControllerTest {
     fun targetChangeRejectsOldCheckAndLoadsNewTarget() = runBlocking {
         val firstRequestStarted = CompletableDeferred<Unit>()
         val finishFirstRequest = CompletableDeferred<Unit>()
-        val queriedTargets = mutableListOf<String?>()
+        var moderationGets = 0
         val fixture = fixture { request ->
-            val target = request.url.parameters["targetUserId"]
-            queriedTargets += target
-            if (queriedTargets.size == 1) {
+            check(request.url.parameters.isEmpty())
+            moderationGets++
+            if (moderationGets == 1) {
                 firstRequestStarted.complete(Unit)
                 finishFirstRequest.await()
-                jsonResponse("[${moderationJson(TARGET_ONE, "muteChat")}]")
-            } else {
-                jsonResponse("[${moderationJson(TARGET_TWO, "unmuteChat")}]")
             }
+            jsonResponse(
+                "[" +
+                    moderationJson(TARGET_ONE, "muteChat") + "," +
+                    moderationJson(TARGET_TWO, "unmuteChat") +
+                    "]",
+            )
         }
 
         try {
@@ -250,7 +253,7 @@ class PlayerChatboxModerationControllerTest {
             }
             assertEquals(TARGET_TWO, ready.targetUserId)
             assertFalse(ready.isMuted)
-            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+            assertEquals(2, moderationGets)
         } finally {
             fixture.close()
         }
@@ -260,18 +263,17 @@ class PlayerChatboxModerationControllerTest {
     fun targetChangeDuringMutationImmediatelyChecksNewTargetAndRejectsOldCompletion() = runBlocking {
         val removalStarted = CompletableDeferred<Unit>()
         val finishRemoval = CompletableDeferred<Unit>()
-        val queriedTargets = mutableListOf<String?>()
+        var moderationGets = 0
         val fixture = fixture { request ->
             when (request.method) {
                 HttpMethod.Get -> {
-                    val target = request.url.parameters["targetUserId"]
-                    queriedTargets += target
+                    check(request.url.parameters.isEmpty())
+                    moderationGets++
                     jsonResponse(
-                        if (target == TARGET_ONE) {
-                            "[${moderationJson(TARGET_ONE, "muteChat")}]"
-                        } else {
-                            "[${moderationJson(TARGET_TWO, "unmuteChat")}]"
-                        },
+                        "[" +
+                            moderationJson(TARGET_ONE, "muteChat") + "," +
+                            moderationJson(TARGET_TWO, "unmuteChat") +
+                            "]",
                     )
                 }
                 HttpMethod.Put -> {
@@ -307,7 +309,7 @@ class PlayerChatboxModerationControllerTest {
             assertFalse(ready.isMuted)
             assertEquals(0, successes)
             assertEquals(0, failures)
-            assertEquals(listOf<String?>(TARGET_ONE, TARGET_TWO), queriedTargets)
+            assertEquals(2, moderationGets)
         } finally {
             fixture.close()
         }
