@@ -22,6 +22,7 @@ import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.VrcPlusIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -33,6 +34,7 @@ data class PersonalDrawerUser(
     val avatarUrl: String?,
     val displayName: String,
     val pronouns: String?,
+    val isSupporter: Boolean,
     val status: UserStatus,
     val statusDescription: String,
 )
@@ -142,22 +144,32 @@ private fun PersonalHeader(
                 iconUrl = user?.avatarUrl,
             )
             Column(Modifier.weight(1f).clickable(enabled = loaded, onClick = onProfileClick)) {
-                Text(
-                    text = user?.displayName ?: strings.loading,
-                    modifier = Modifier.enableIf(loaded && sharedElementsEnabled) {
-                        sharedBoundsBy(
-                            key = "${userId}UserName",
-                            suffixKey = sharedSuffixKey,
-                            resizeMode = SharedTextBoundsResizeMode,
-                            boundsTransform = TextBoundsTransform,
-                            clipInOverlayDuringTransition = NoClip,
-                        )
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = user?.displayName ?: strings.loading,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .enableIf(loaded && sharedElementsEnabled) {
+                                sharedBoundsBy(
+                                    key = "${userId}UserName",
+                                    suffixKey = sharedSuffixKey,
+                                    resizeMode = SharedTextBoundsResizeMode,
+                                    boundsTransform = TextBoundsTransform,
+                                    clipInOverlayDuringTransition = NoClip,
+                                )
+                            },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (user?.isSupporter == true) {
+                        VrcPlusIcon(Modifier.size(16.dp))
+                    }
+                }
                 user?.pronouns?.takeIf { it.isNotBlank() }?.let { pronouns ->
                     Text(
                         pronouns,

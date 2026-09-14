@@ -277,18 +277,7 @@ fun UserInfoRow(
                 )
             }
             if (isSupporter) {
-                Canvas(modifier = Modifier.size(iconSize * 0.8f)) {
-                    drawOval(
-                        color = GameColor.Supporter,
-                        topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
-                        size = Size(size.width * 0.2f, size.height * 0.8f)
-                    )
-                    drawOval(
-                        color = GameColor.Supporter,
-                        topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
-                        size = Size(size.width * 0.8f, size.height * 0.2f)
-                    )
-                }
+                VrcPlusIcon(modifier = Modifier.size(iconSize * 0.8f))
             }
         },
     ) { measurables, constraints ->
@@ -355,6 +344,22 @@ fun UserInfoRow(
                 it.placeRelative(x, 0)
             }
         }
+    }
+}
+
+@Composable
+fun VrcPlusIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        drawOval(
+            color = GameColor.Supporter,
+            topLeft = Offset(size.width / 2f - (size.width * 0.2f / 2), size.height * 0.1f),
+            size = Size(size.width * 0.2f, size.height * 0.8f),
+        )
+        drawOval(
+            color = GameColor.Supporter,
+            topLeft = Offset(size.width * 0.1f, size.height / 2f - (size.height * 0.2f / 2)),
+            size = Size(size.width * 0.8f, size.height * 0.2f),
+        )
     }
 }
 

@@ -611,6 +611,7 @@ private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
     avatarUrl = iconUrl,
     displayName = displayName,
     pronouns = pronouns,
+    isSupporter = isSupporter,
     status = status,
     statusDescription = statusDescription,
 )
