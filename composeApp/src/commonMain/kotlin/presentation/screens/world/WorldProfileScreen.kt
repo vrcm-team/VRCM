@@ -14,10 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -552,66 +550,71 @@ private fun WorldProfileCompactLayout(
     onFavoriteWorld: () -> Unit,
     onOpenRoom: (InstanceVo) -> Unit,
 ) {
-    Box(
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter,
+        contentPadding = PaddingValues(bottom = sysBottomPadding + 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LazyColumn(
-            // 保持窄屏信息层级，并将 4:3 封面在宽窗口中的高度限制为 540dp。
-            modifier = Modifier
-                .widthIn(max = WorldProfileCompactContentMaxWidth)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = sysBottomPadding + 24.dp),
-        ) {
-            item(key = "hero") {
-                WorldProfileHero(
+        item(key = "hero") {
+            WorldProfileHero(
+                worldProfileVo = worldProfileVo,
+                favoriteEntryState = favoriteEntryState,
+                worldIdForSharedElement = worldIdForSharedElement,
+                sharedKeyPrefix = sharedKeyPrefix,
+                sharedImageCacheKey = sharedImageCacheKey,
+                onCreateRoom = onCreateRoom,
+                onFavoriteWorld = onFavoriteWorld,
+                showRooms = showRooms,
+                onShowDetails = onShowDetails,
+                onShowRooms = onShowRooms,
+            )
+        }
+
+        if (!showRooms) {
+            item(key = "details") {
+                WorldDetails(
                     worldProfileVo = worldProfileVo,
-                    favoriteEntryState = favoriteEntryState,
-                    worldIdForSharedElement = worldIdForSharedElement,
-                    sharedKeyPrefix = sharedKeyPrefix,
-                    sharedImageCacheKey = sharedImageCacheKey,
-                    onCreateRoom = onCreateRoom,
-                    onFavoriteWorld = onFavoriteWorld,
-                    showRooms = showRooms,
-                    onShowDetails = onShowDetails,
-                    onShowRooms = onShowRooms,
+                    modifier = Modifier
+                        .widthIn(max = WorldProfileCompactContentMaxWidth)
+                        .fillMaxWidth()
+                        .padding(16.dp),
                 )
             }
-
-            if (!showRooms) {
-                item(key = "details") {
-                    WorldDetails(
-                        worldProfileVo = worldProfileVo,
-                        modifier = Modifier.padding(16.dp),
+        } else {
+            item(key = "rooms-heading") {
+                WorldRoomsHeading(
+                    count = activeInstances.size,
+                    modifier = Modifier
+                        .widthIn(max = WorldProfileCompactContentMaxWidth)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                )
+            }
+            if (activeInstances.isEmpty()) {
+                item(key = "rooms-empty") {
+                    EmptyInstanceCard(
+                        onCreateInstance = onCreateRoom,
+                        enabled = true,
+                        modifier = Modifier
+                            .widthIn(max = WorldProfileCompactContentMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                     )
                 }
             } else {
-                item(key = "rooms-heading") {
-                    WorldRoomsHeading(
-                        count = activeInstances.size,
-                        modifier = Modifier.padding(16.dp),
+                itemsIndexed(
+                    items = activeInstances,
+                    key = { _, instance -> instance.id },
+                ) { _, instance ->
+                    WorldRoomListItem(
+                        instance = instance,
+                        capacity = worldProfileVo.capacity,
+                        onClick = { onOpenRoom(instance) },
+                        modifier = Modifier
+                            .widthIn(max = WorldProfileCompactContentMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     )
-                }
-                if (activeInstances.isEmpty()) {
-                    item(key = "rooms-empty") {
-                        EmptyInstanceCard(
-                            onCreateInstance = onCreateRoom,
-                            enabled = true,
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                        )
-                    }
-                } else {
-                    itemsIndexed(
-                        items = activeInstances,
-                        key = { _, instance -> instance.id },
-                    ) { _, instance ->
-                        WorldRoomListItem(
-                            instance = instance,
-                            capacity = worldProfileVo.capacity,
-                            onClick = { onOpenRoom(instance) },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                        )
-                    }
                 }
             }
         }
@@ -635,141 +638,125 @@ private fun WorldProfileHero(
     val navigator = LocalNavigator.currentOrThrow
     val panelCornerRadius = 24.dp
     val tabPanelHeight = 64.dp
-    val bottomScrim = Brush.verticalGradient(
-        colors = listOf(
-            Color.Transparent,
-            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.9f),
-        ),
-        endY = with(LocalDensity.current) { 100.dp.toPx() },
-    )
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val heroHeight = maxOf(maxWidth * 3f / 4f, 400.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // VRChat 世界封面为 16:9；高度随可用页宽计算，确保原图完整显示。
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(heroHeight + tabPanelHeight - panelCornerRadius),
+                .aspectRatio(16f / 9f),
         ) {
-            Box(
+            AImage(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(heroHeight)
-                    .align(Alignment.TopCenter),
-            ) {
-                AImage(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .sharedBoundsBy(
-                            key = sharedKeyPrefix + worldIdForSharedElement + "WorldImage",
-                            renderInOverlayDuringTransition = false,
-                        ),
-                    imageData = worldProfileVo.worldImageUrl.orEmpty(),
-                    loadOriginalSize = true,
-                    cachedPlaceholderKey = sharedImageCacheKey,
-                )
+                    .matchParentSize()
+                    .sharedBoundsBy(
+                        key = sharedKeyPrefix + worldIdForSharedElement + "WorldImage",
+                        renderInOverlayDuringTransition = false,
+                    ),
+                imageData = worldProfileVo.worldImageUrl.orEmpty(),
+                contentScale = ContentScale.Fit,
+                loadOriginalSize = true,
+                cachedPlaceholderKey = sharedImageCacheKey,
+            )
 
-                WorldPlatformBadges(
-                    worldProfileVo = worldProfileVo,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = getInsetPadding(WindowInsets::getTop) + 72.dp, end = 12.dp),
-                )
+            WorldPlatformBadges(
+                worldProfileVo = worldProfileVo,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = getInsetPadding(WindowInsets::getTop) + 72.dp, end = 12.dp),
+            )
+        }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomStart)
-                        .background(bottomScrim)
-                        .padding(
-                            start = 8.dp,
-                            top = 48.dp,
-                            end = 8.dp,
-                            bottom = panelCornerRadius + 16.dp,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    ATooltipBox(tooltip = { Text(worldProfileVo.worldName) }) {
-                        SelectionContainer {
-                            Text(
-                                text = worldProfileVo.worldName,
-                                color = MaterialTheme.colorScheme.secondary,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    HorizontalDivider(
-                        thickness = 2.dp,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                    Box(
-                        modifier = Modifier.enableIf(worldProfileVo.authorName != null) {
-                            simpleClickable {
-                                worldProfileVo.authorID?.let { authorId ->
-                                    navigator.push(
-                                        UserProfileScreen(
-                                            userProfileVO = UserProfileVo(
-                                                id = authorId,
-                                                displayName = worldProfileVo.authorName.orEmpty(),
-                                            )
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    ) {
-                        Text(
-                            text = worldProfileVo.authorName ?: strings.unknown,
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.labelMedium,
-                            textDecoration = TextDecoration.Underline,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    WorldProfileSummary(
-                        worldProfileVo = worldProfileVo,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                    WorldProfilePrimaryActions(
-                        favoriteEntryState = favoriteEntryState,
-                        onCreateRoom = onCreateRoom,
-                        onFavoriteWorld = onFavoriteWorld,
-                        modifier = Modifier.padding(horizontal = 8.dp),
+        Column(
+            modifier = Modifier
+                .widthIn(max = WorldProfileCompactContentMaxWidth)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
+            ATooltipBox(tooltip = { Text(worldProfileVo.worldName) }) {
+                SelectionContainer {
+                    Text(
+                        text = worldProfileVo.worldName,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(tabPanelHeight)
-                    .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(
-                    topStart = panelCornerRadius,
-                    topEnd = panelCornerRadius,
-                ),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 16.dp,
-            ) {
-                PrimaryTabRow(
-                    selectedTabIndex = if (showRooms) 1 else 0,
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    Tab(
-                        selected = !showRooms,
-                        onClick = onShowDetails,
-                        text = { Text(strings.groupTabDetails) },
-                    )
-                    Tab(
-                        selected = showRooms,
-                        onClick = onShowRooms,
-                        text = { Text(strings.worldProfileRooms) },
-                    )
+            HorizontalDivider(
+                thickness = 2.dp,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            Box(
+                modifier = Modifier.enableIf(worldProfileVo.authorName != null) {
+                    simpleClickable {
+                        worldProfileVo.authorID?.let { authorId ->
+                            navigator.push(
+                                UserProfileScreen(
+                                    userProfileVO = UserProfileVo(
+                                        id = authorId,
+                                        displayName = worldProfileVo.authorName.orEmpty(),
+                                    )
+                                )
+                            )
+                        }
+                    }
                 }
+            ) {
+                Text(
+                    text = worldProfileVo.authorName ?: strings.unknown,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    textDecoration = TextDecoration.Underline,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            WorldProfileSummary(
+                worldProfileVo = worldProfileVo,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            WorldProfilePrimaryActions(
+                favoriteEntryState = favoriteEntryState,
+                onCreateRoom = onCreateRoom,
+                onFavoriteWorld = onFavoriteWorld,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
+
+        Surface(
+            modifier = Modifier
+                .widthIn(max = WorldProfileCompactContentMaxWidth)
+                .fillMaxWidth()
+                .height(tabPanelHeight),
+            shape = RoundedCornerShape(
+                topStart = panelCornerRadius,
+                topEnd = panelCornerRadius,
+            ),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 16.dp,
+        ) {
+            PrimaryTabRow(
+                selectedTabIndex = if (showRooms) 1 else 0,
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                Tab(
+                    selected = !showRooms,
+                    onClick = onShowDetails,
+                    text = { Text(strings.groupTabDetails) },
+                )
+                Tab(
+                    selected = showRooms,
+                    onClick = onShowRooms,
+                    text = { Text(strings.worldProfileRooms) },
+                )
             }
         }
     }
