@@ -189,6 +189,7 @@ class FriendOnlineNotificationService(
                                 notification.data.groupId,
                                 notification.details?.ownerId,
                                 notification.data.ownerId,
+                                notification.senderUserId,
                             ),
                         ),
                 )
@@ -362,6 +363,7 @@ class FriendOnlineNotificationService(
                                 notification.data.groupId,
                                 notification.details?.ownerId,
                                 notification.data.ownerId,
+                                notification.senderUserId,
                             ),
                         ),
                 )
@@ -432,8 +434,10 @@ private val GROUP_NOTIFICATION_TYPES = setOf(
     "group.event.starting",
     "group.informative",
     "group.joinrequest",
+    "group.post",
     "group.transfer",
     "group.queueready",
+    "moderation.warning.group",
 )
 
 private fun NotificationContent.senderName(): String =

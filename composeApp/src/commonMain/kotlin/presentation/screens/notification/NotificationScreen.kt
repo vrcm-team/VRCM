@@ -354,6 +354,7 @@ private fun LazyItemScope.NotificationItem(
     val identity = item.identity
     var expanded by remember(identity.stableKey) { mutableStateOf(false) }
     val isFriendRequest = item.type == NotificationType.FriendRequest.value
+    val isBoop = item.type.equals("boop", ignoreCase = true)
     val senderId = item.senderId.orEmpty()
     val groupId = item.groupId.orEmpty()
     val groupName = item.groupName.orEmpty()
@@ -375,7 +376,10 @@ private fun LazyItemScope.NotificationItem(
     }
     val boopReplyAction = item.boopReplyAction
     val ordinaryActions = item.responseActionsForDisplay.filter { action ->
-        item.responseTarget(action) != NotificationResponseTarget.BOOP_USER_API
+        if (item.responseTarget(action) == NotificationResponseTarget.BOOP_USER_API) return@filter false
+        if (item.canDelete && action.type.equals("delete", ignoreCase = true)) return@filter false
+        val actionTarget = item.actionTarget(action)
+        actionTarget == null || actionTarget is NotificationActionTarget.External
     }
     val openActionTarget: (NotificationActionTarget) -> Unit = { target ->
         when (target) {
@@ -398,6 +402,12 @@ private fun LazyItemScope.NotificationItem(
             is NotificationActionTarget.External -> onExternalLink(target)
         }
     }
+    val profileTarget = item.displayActions.asSequence()
+        .mapNotNull(item::actionTarget)
+        .firstOrNull { it !is NotificationActionTarget.External }
+        ?: groupId.takeIf(String::isNotEmpty)?.let { NotificationActionTarget.Group(it) }
+        ?: senderId.takeIf(String::isNotEmpty)?.let { NotificationActionTarget.User(it) }
+    val profileUserId = (profileTarget as? NotificationActionTarget.User)?.id
     Box(
         Modifier.fillMaxWidth().animateItem().clip(MaterialTheme.shapes.large)
             .background(
@@ -413,17 +423,15 @@ private fun LazyItemScope.NotificationItem(
             Row(Modifier.fillMaxWidth().heightIn(min = 80.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AImage(
                     modifier = Modifier
-                        .enableIf(senderId.isNotEmpty() || groupId.isNotEmpty()) {
-                            clickable {
-                                if (groupId.isNotEmpty()) openGroup() else navigator push UserProfileScreen(
-                                    UserProfileVo(id = senderId, profileImageUrl = item.imageUrl),
-                                    sharedSuffixKey,
-                                )
+                        .enableIf(profileTarget != null) {
+                            clickable(enabled = !pending) {
+                                if (!item.seen) onRead()
+                                profileTarget?.let(openActionTarget)
                             }
                         }
-                        .enableIf(senderId.isNotEmpty() && groupId.isEmpty()) {
+                        .enableIf(profileUserId != null) {
                             sharedBoundsBy(
-                                key = "${senderId}UserIcon",
+                                key = "${profileUserId}UserIcon",
                                 suffixKey = sharedSuffixKey,
                             )
                         }
@@ -479,6 +487,25 @@ private fun LazyItemScope.NotificationItem(
                     horizontalArrangement = Arrangement.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    if (isBoop && item.showStandaloneReadAction) {
+                        NotificationCommandButton(
+                            label = strings.notificationAccept,
+                            icon = Icons.Outlined.Check,
+                            loading = false,
+                            enabled = !pending,
+                            onClick = onRead,
+                        )
+                    }
+                    if (boopReplyAction != null) {
+                        NotificationResponseButton(
+                            item = item,
+                            action = boopReplyAction,
+                            loading = loadingAction == boopReplyAction,
+                            enabled = !pending && senderId.isNotEmpty(),
+                            unavailableLink = false,
+                            onClick = { onResponse(item, boopReplyAction) },
+                        )
+                    }
                     ordinaryActions.forEach { action ->
                         val isLink = action.type.equals("link", ignoreCase = true)
                         val actionTarget = if (isLink) item.actionTarget(action) else null
@@ -497,19 +524,6 @@ private fun LazyItemScope.NotificationItem(
                                 }
                             },
                         )
-                    }
-                    if (boopReplyAction != null) {
-                        val loading = loadingAction == boopReplyAction
-                        IconButton(
-                            enabled = !pending && senderId.isNotEmpty(),
-                            onClick = { onResponse(item, boopReplyAction) },
-                        ) {
-                            if (loading) {
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.AutoMirrored.Outlined.Reply, strings.notificationReplyBoop)
-                            }
-                        }
                     }
                     if (item.supportsInvitePhotoResponse) {
                         val photoLabel = when {
@@ -540,7 +554,7 @@ private fun LazyItemScope.NotificationItem(
                             }
                         }
                     }
-                    if (item.showStandaloneReadAction) IconButton(enabled = !pending, onClick = onRead) {
+                    if (item.showStandaloneReadAction && !isBoop) IconButton(enabled = !pending, onClick = onRead) {
                         Icon(Icons.Outlined.MarkEmailRead, strings.notificationMarkRead)
                     }
                     if (item.canDelete) IconButton(enabled = !pending, onClick = onDelete) {
@@ -574,28 +588,45 @@ private fun NotificationResponseButton(
 ) {
     val label = notificationActionLabel(item, action)
     val button = @Composable {
-        FilledTonalButton(
-            onClick = onClick,
+        NotificationCommandButton(
+            label = label,
+            icon = notificationActionIcon(action),
+            loading = loading,
             enabled = enabled,
-            modifier = Modifier.padding(start = 6.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Row(
-                    Modifier.alpha(if (loading) 0f else 1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(notificationActionIcon(action), contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            }
-        }
+            onClick = onClick,
+        )
     }
     if (unavailableLink) {
         ATooltipBox(tooltip = { Text(strings.notificationUnsupportedLink) }, content = button)
     } else {
         button()
+    }
+}
+
+@Composable
+private fun NotificationCommandButton(
+    label: String,
+    icon: ImageVector,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    FilledTonalButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.padding(start = 6.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Row(
+                Modifier.alpha(if (loading) 0f else 1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        }
     }
 }
 
@@ -613,8 +644,17 @@ private fun notificationActionLabel(
     item.type == NotificationType.FriendRequest.value && action.type.equals("Accept", true) ->
         strings.notificationAccept
     item.type == NotificationType.FriendRequest.value -> strings.notificationIgnore
-    action.label.isNotBlank() -> action.label
+    item.responseTarget(action) == NotificationResponseTarget.BOOP_USER_API -> strings.notificationReply
+    action.type.equals("accept", true) -> strings.notificationAccept
+    action.type.equals("decline", true) -> strings.notificationDecline
+    action.type.equals("delete", true) -> strings.notificationDelete
+    action.type.equals("unsubscribe", true) -> strings.notificationUnsubscribe
+    action.type.equals("hide", true) || action.type.equals("ignore", true) ||
+        action.type.equals("reject", true) -> strings.notificationIgnore
+    action.type.equals("block", true) || action.type.equals("ban", true) -> strings.notificationBlock
     action.type.equals("link", true) -> strings.officialLinkOpen
+    action.type.equals("boop", true) || action.icon.equals("reply", true) -> strings.notificationReply
+    action.label.isNotBlank() -> action.label
     else -> action.type.capitalizeFirst()
 }
 
@@ -629,7 +669,7 @@ private fun notificationActionIcon(action: NotificationItemData.ActionData): Ima
     action.icon.equals("bell", true) -> Icons.Outlined.Notifications
     action.type.equals("block", true) || action.type.equals("ban", true) ||
         action.icon.equals("ban", true) -> Icons.Outlined.Block
-    action.icon.equals("reply", true) -> Icons.AutoMirrored.Outlined.Reply
+    action.type.equals("boop", true) || action.icon.equals("reply", true) -> Icons.AutoMirrored.Outlined.Reply
     else -> Icons.Outlined.Tag
 }
 

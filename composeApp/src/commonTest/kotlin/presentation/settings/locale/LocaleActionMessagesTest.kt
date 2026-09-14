@@ -7,6 +7,29 @@ import kotlin.test.assertTrue
 
 class LocaleActionMessagesTest {
     @Test
+    fun notificationActionMessagesArePresentInEveryLocale() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            val messages = listOf(
+                locale.notificationAccept,
+                locale.notificationReply,
+                locale.notificationDecline,
+                locale.notificationIgnore,
+                locale.notificationBlock,
+                locale.notificationUnsubscribe,
+                locale.notificationDelete,
+            )
+            assertTrue(messages.all { it.isNotBlank() })
+        }
+    }
+
+    @Test
     fun profileActionMessagesArePresentInEveryLocale() {
         val locales = listOf(
             LocaleStringsEn,

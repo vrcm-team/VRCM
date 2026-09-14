@@ -83,6 +83,7 @@ data class NotificationItemData(
             n.data.groupId,
             n.details?.ownerId,
             n.data.ownerId,
+            n.senderUserId,
         ),
         groupName = n.details?.groupName ?: n.data.groupName,
         announcementTitle = n.details?.announcementTitle ?: n.data.announcementTitle,

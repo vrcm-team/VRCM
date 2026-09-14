@@ -124,6 +124,15 @@ class NotificationItemDataTest {
     }
 
     @Test
+    fun groupTargetFallsBackToGroupSenderId() {
+        val item = NotificationItemData(
+            pipelineNotification(senderUserId = "grp_sender"),
+        )
+
+        assertEquals("grp_sender", item.groupId)
+    }
+
+    @Test
     fun currentNotificationMapsResponsesAndAddsTopLevelLinkOnce() {
         val response = Json.decodeFromString<ResponseData>(
             """{"data":"group:grp_123","icon":"check","text":"Open group","textKey":null,"type":"link"}""",
@@ -252,6 +261,7 @@ class NotificationItemDataTest {
         linkText: String? = null,
         responses: List<ResponseData> = emptyList(),
         type: String = "group.announcement",
+        senderUserId: String? = null,
     ) = NotificationData(
         canDelete = true,
         category = "group",
@@ -274,7 +284,7 @@ class NotificationItemDataTest {
         requireSeen = true,
         responses = responses,
         seen = false,
-        senderUserId = null,
+        senderUserId = senderUserId,
         senderUsername = null,
         title = null,
         titleKey = null,
