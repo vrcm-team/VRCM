@@ -105,30 +105,35 @@ private fun PersonalHeader(
 ) {
     val loaded = user != null
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-        UserStateIcon(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .clickable(enabled = loaded, onClick = onProfileClick),
-            iconUrl = user?.avatarUrl,
-        )
-        Spacer(Modifier.height(12.dp))
-        Column(Modifier.fillMaxWidth().clickable(enabled = loaded, onClick = onProfileClick)) {
-            Text(
-                user?.displayName ?: strings.loading,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            UserStateIcon(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .clickable(enabled = loaded, onClick = onProfileClick),
+                iconUrl = user?.avatarUrl,
             )
-            user?.pronouns?.takeIf { it.isNotBlank() }?.let { pronouns ->
+            Column(Modifier.weight(1f).clickable(enabled = loaded, onClick = onProfileClick)) {
                 Text(
-                    pronouns,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    user?.displayName ?: strings.loading,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                user?.pronouns?.takeIf { it.isNotBlank() }?.let { pronouns ->
+                    Text(
+                        pronouns,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
