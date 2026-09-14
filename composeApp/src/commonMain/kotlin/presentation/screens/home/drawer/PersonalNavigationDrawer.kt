@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.drawer
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,12 +18,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.presentation.animations.NoClip
+import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 data class PersonalDrawerUser(
+    val id: String,
     val avatarUrl: String?,
     val displayName: String,
     val pronouns: String?,
@@ -36,6 +43,7 @@ fun PersonalNavigationDrawer(
     drawerState: DrawerState,
     gesturesEnabled: Boolean,
     user: PersonalDrawerUser?,
+    profileSharedSuffixKey: String,
     onProfileClick: () -> Unit,
     onStatusClick: () -> Unit,
     onFriendNetworkClick: () -> Unit,
@@ -71,7 +79,13 @@ fun PersonalNavigationDrawer(
                         .verticalScroll(rememberScrollState())
                         .padding(vertical = 12.dp),
                 ) {
-                    PersonalHeader(user, onProfileClick, onStatusClick)
+                    PersonalHeader(
+                        user = user,
+                        sharedSuffixKey = profileSharedSuffixKey,
+                        sharedElementsEnabled = gesturesEnabled,
+                        onProfileClick = onProfileClick,
+                        onStatusClick = onStatusClick,
+                    )
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     DrawerItem(
                         AppIcons.Person,
@@ -97,13 +111,17 @@ fun PersonalNavigationDrawer(
     )
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PersonalHeader(
     user: PersonalDrawerUser?,
+    sharedSuffixKey: String,
+    sharedElementsEnabled: Boolean,
     onProfileClick: () -> Unit,
     onStatusClick: () -> Unit,
 ) {
     val loaded = user != null
+    val userId = user?.id
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -112,6 +130,12 @@ private fun PersonalHeader(
         ) {
             UserStateIcon(
                 modifier = Modifier
+                    .enableIf(loaded && sharedElementsEnabled) {
+                        sharedBoundsBy(
+                            key = "${userId}UserIcon",
+                            suffixKey = sharedSuffixKey,
+                        )
+                    }
                     .size(64.dp)
                     .clip(CircleShape)
                     .clickable(enabled = loaded, onClick = onProfileClick),
@@ -119,7 +143,16 @@ private fun PersonalHeader(
             )
             Column(Modifier.weight(1f).clickable(enabled = loaded, onClick = onProfileClick)) {
                 Text(
-                    user?.displayName ?: strings.loading,
+                    text = user?.displayName ?: strings.loading,
+                    modifier = Modifier.enableIf(loaded && sharedElementsEnabled) {
+                        sharedBoundsBy(
+                            key = "${userId}UserName",
+                            suffixKey = sharedSuffixKey,
+                            resizeMode = SharedTextBoundsResizeMode,
+                            boundsTransform = TextBoundsTransform,
+                            clipInOverlayDuringTransition = NoClip,
+                        )
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -151,7 +184,17 @@ private fun PersonalHeader(
                 text = user?.statusDescription.orEmpty().ifBlank {
                     user?.status?.localizedLabel() ?: strings.loading
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .enableIf(loaded && sharedElementsEnabled) {
+                        sharedBoundsBy(
+                            key = "${userId}UserStatusRow",
+                            suffixKey = sharedSuffixKey,
+                            resizeMode = SharedTextBoundsResizeMode,
+                            boundsTransform = TextBoundsTransform,
+                            clipInOverlayDuringTransition = NoClip,
+                        )
+                    }
+                    .weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,

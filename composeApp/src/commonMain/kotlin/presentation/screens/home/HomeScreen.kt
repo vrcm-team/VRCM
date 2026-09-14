@@ -554,13 +554,11 @@ private fun HomePersonalDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
         user = currentUser?.toPersonalDrawerUser(),
+        profileSharedSuffixKey = suffix,
         onProfileClick = {
             currentUser?.let {
-                scope.launch {
-                    drawerState.close()
-                    model.hideDrawer()
-                    navigator push UserProfileScreen(UserProfileVo(it), suffix)
-                }
+                navigator push UserProfileScreen(UserProfileVo(it), suffix)
+                model.hideDrawer()
             }
         },
         onStatusClick = {
@@ -609,6 +607,7 @@ private fun HomePersonalDrawer(
 }
 
 private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
+    id = id,
     avatarUrl = iconUrl,
     displayName = displayName,
     pronouns = pronouns,
