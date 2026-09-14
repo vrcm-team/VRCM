@@ -58,7 +58,7 @@ fun UserStateIcon(
     location: String? = null,
     cachedPlaceholderKey: String? = null,
 ) {
-    val isHollow = userStatus != UserStatus.Offline && location != null && LocationType.fromValue(location) == LocationType.Offline
+    val isHollow = isHollowUserStatus(userStatus, location)
     AImage(
         modifier = Modifier
             .then(modifier)
@@ -69,6 +69,36 @@ fun UserStateIcon(
         contentDescription = "UserStateIcon",
         cachedPlaceholderKey = cachedPlaceholderKey,
     )
+}
+
+private fun isHollowUserStatus(userStatus: UserStatus?, location: String?): Boolean =
+    userStatus != null &&
+        userStatus != UserStatus.Offline &&
+        location != null &&
+        LocationType.fromValue(location) == LocationType.Offline
+
+@Composable
+internal fun UserStatusIndicator(
+    modifier: Modifier = Modifier,
+    userStatus: UserStatus?,
+    location: String?,
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+) {
+    val isHollow = isHollowUserStatus(userStatus, location)
+    Canvas(modifier = modifier) {
+        val statusColor = GameColor.Status.fromValue(userStatus)
+        if (isHollow) {
+            val strokeWidth = size.minDimension * 0.25f
+            drawCircle(backgroundColor, radius = size.minDimension / 2)
+            drawCircle(
+                color = statusColor,
+                radius = size.minDimension / 2 - strokeWidth / 2,
+                style = Stroke(strokeWidth),
+            )
+        } else {
+            drawCircle(statusColor)
+        }
+    }
 }
 
 @Composable
@@ -458,9 +488,7 @@ fun UserStatusRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacedBy)
     ) {
-        val isHollow = user != null && user.status != UserStatus.Offline && LocationType.fromValue(user.location) == LocationType.Offline
-        val bgColor = MaterialTheme.colorScheme.surface
-        Canvas(
+        UserStatusIndicator(
             modifier = Modifier
                 .size(iconSize)
                 .enableIf(animatedVisibilityScope != null){
@@ -469,17 +497,10 @@ fun UserStatusRow(
                         sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                         animatedVisibilityScope = animatedVisibilityScope!!
                     )
-                }
-        ) {
-            val statusColor = GameColor.Status.fromValue(user?.status)
-            if (isHollow) {
-                val strokeWidth = size.minDimension * 0.25f
-                drawCircle(bgColor, radius = size.minDimension / 2)
-                drawCircle(statusColor, radius = size.minDimension / 2 - strokeWidth / 2, style = Stroke(strokeWidth))
-            } else {
-                drawCircle(statusColor)
-            }
-        }
+                },
+            userStatus = user?.status,
+            location = user?.location,
+        )
         if (canCopy) {
             SelectionContainer {
                 statusText()

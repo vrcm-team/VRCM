@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home.drawer
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,14 +21,15 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDialogScope
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
+import io.github.vrcmteam.vrcm.presentation.compoments.UserStatusIndicator
 import io.github.vrcmteam.vrcm.presentation.compoments.VrcPlusIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 data class PersonalDrawerUser(
     val id: String,
@@ -37,6 +39,7 @@ data class PersonalDrawerUser(
     val isSupporter: Boolean,
     val status: UserStatus,
     val statusDescription: String,
+    val location: String,
 )
 
 /** Personal navigation drawer shell. Services and navigation remain owned by its caller. */
@@ -46,6 +49,7 @@ fun PersonalNavigationDrawer(
     gesturesEnabled: Boolean,
     user: PersonalDrawerUser?,
     profileSharedSuffixKey: String,
+    statusVisible: Boolean,
     onProfileClick: () -> Unit,
     onStatusClick: () -> Unit,
     onFriendNetworkClick: () -> Unit,
@@ -85,6 +89,7 @@ fun PersonalNavigationDrawer(
                         user = user,
                         sharedSuffixKey = profileSharedSuffixKey,
                         sharedElementsEnabled = gesturesEnabled,
+                        statusVisible = statusVisible,
                         onProfileClick = onProfileClick,
                         onStatusClick = onStatusClick,
                     )
@@ -119,6 +124,7 @@ private fun PersonalHeader(
     user: PersonalDrawerUser?,
     sharedSuffixKey: String,
     sharedElementsEnabled: Boolean,
+    statusVisible: Boolean,
     onProfileClick: () -> Unit,
     onStatusClick: () -> Unit,
 ) {
@@ -182,35 +188,59 @@ private fun PersonalHeader(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .clickable(enabled = loaded, onClick = onStatusClick)
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Surface(Modifier.size(10.dp), shape = CircleShape, color = GameColor.Status.fromValue(user?.status)) {}
-            Text(
-                text = user?.statusDescription.orEmpty().ifBlank {
-                    user?.status?.localizedLabel() ?: strings.loading
-                },
-                modifier = Modifier
-                    .enableIf(loaded && sharedElementsEnabled) {
-                        sharedBoundsBy(
-                            key = "${userId}UserStatusRow",
-                            suffixKey = sharedSuffixKey,
-                            resizeMode = SharedTextBoundsResizeMode,
-                            boundsTransform = TextBoundsTransform,
-                            clipInOverlayDuringTransition = NoClip,
-                        )
-                    }
-                    .weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+        AnimatedVisibility(visible = statusVisible) {
+            val visibilityScope = this
+            val dialogSharedUserId = userId?.let(::drawerStatusSharedUserId).orEmpty()
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable(enabled = loaded, onClick = onStatusClick)
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                UserStatusIndicator(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .enableIf(loaded && sharedElementsEnabled) {
+                            sharedBoundsBy(
+                                key = "${dialogSharedUserId}UserStatusIcon",
+                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                animatedVisibilityScope = visibilityScope,
+                            )
+                        },
+                    userStatus = user?.status,
+                    location = user?.location,
+                    backgroundColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                )
+                Text(
+                    text = user?.statusDescription.orEmpty().ifBlank {
+                        user?.status?.localizedLabel() ?: strings.loading
+                    },
+                    modifier = Modifier
+                        .enableIf(loaded && sharedElementsEnabled) {
+                            sharedBoundsBy(
+                                key = "${userId}UserStatusRow",
+                                suffixKey = sharedSuffixKey,
+                                resizeMode = SharedTextBoundsResizeMode,
+                                boundsTransform = TextBoundsTransform,
+                                clipInOverlayDuringTransition = NoClip,
+                            )
+                        }
+                        .enableIf(loaded && sharedElementsEnabled) {
+                            sharedBoundsBy(
+                                key = "${dialogSharedUserId}UserStatusText",
+                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                animatedVisibilityScope = visibilityScope,
+                            )
+                        }
+                        .weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -253,3 +283,5 @@ private fun UserStatus.localizedLabel(): String = when (this) {
     UserStatus.Busy -> strings.editProfileStatusBusy
     UserStatus.Offline -> strings.friendDirectoryOffline
 }
+
+internal fun drawerStatusSharedUserId(userId: String): String = "${userId}Drawer"

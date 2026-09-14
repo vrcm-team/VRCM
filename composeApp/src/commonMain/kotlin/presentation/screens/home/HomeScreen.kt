@@ -53,6 +53,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUser
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
+import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusSharedUserId
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
@@ -101,7 +102,6 @@ object HomeScreen : AppListRoute {
         val topRoute = navigator.lastItem
         val showMainNavigation = topRoute == HomeScreen ||
             (windowWidthClass == AppWindowWidthClass.Expanded && topRoute is AppDetailRoute)
-        var statusVisible by remember { mutableStateOf(true) }
         val onDestinationSelected: (HomeDestination) -> Unit = { destination ->
             if (model.selectDestination(destination)) {
                 if (destination == HomeDestination.Notifications) {
@@ -146,7 +146,6 @@ object HomeScreen : AppListRoute {
             model = model,
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
-            onStatusVisibilityChanged = { statusVisible = it },
         ) {
             Scaffold(
                 contentColor = MaterialTheme.colorScheme.primary,
@@ -155,7 +154,6 @@ object HomeScreen : AppListRoute {
                         HomeIdentityTopBar(
                             model = model,
                             hazeState = hazeState,
-                            statusVisible = statusVisible,
                         ) {
                             when (selectedDestination) {
                                 HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
@@ -364,7 +362,6 @@ private fun ActivityTimelinePreview() {
 private fun HomeIdentityTopBar(
     model: HomeScreenModel,
     hazeState: HazeState?,
-    statusVisible: Boolean,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -389,7 +386,6 @@ private fun HomeIdentityTopBar(
             Box(Modifier.weight(1f)) {
                 HomeIdentity(
                     model = model,
-                    statusVisible = statusVisible,
                     modifier = Modifier.widthIn(max = 286.dp),
                 )
             }
@@ -402,13 +398,14 @@ private fun HomeIdentityTopBar(
 @Composable
 private fun HomeIdentity(
     model: HomeScreenModel,
-    statusVisible: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val userId = model.userId
     val currentUser = model.currentUser
     val navigator = currentNavigator
     val suffix = rememberContainerTransformToken("home-user:$userId") ?: LocalSharedSuffixKey.current
+    var currentDialog by LocationDialogContent.current
+    var statusVisible by remember(userId) { mutableStateOf(true) }
     val onLongClick = {
         val last = navigator.lastItem
         val alreadyOpen = (last as? MeetupCardDisplayRoute)?.ownerUserId == userId ||
@@ -417,21 +414,21 @@ private fun HomeIdentity(
     }
     Row(
         modifier
-            .testTag("home-user-avatar")
             .sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
-            .clip(MaterialTheme.shapes.medium)
-            .simpleCombinedClickable(onClick = model::showDrawer, onLongClick = onLongClick),
+            .clip(MaterialTheme.shapes.medium),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             Modifier
+                .testTag("home-user-avatar")
                 .sharedBoundsBy(
                     key = "${userId}UserIcon",
                     suffixKey = AuthHomeSharedSuffixKey,
                     boundsTransform = IconBoundsTransform,
                 )
-                .size(54.dp),
+                .size(54.dp)
+                .simpleCombinedClickable(onClick = model::showDrawer, onLongClick = onLongClick),
         ) {
             UserStateIcon(
                 modifier = Modifier.fillMaxSize().sharedBoundsBy(
@@ -444,7 +441,17 @@ private fun HomeIdentity(
             )
         }
         Column(
-            modifier = Modifier.widthIn(max = 220.dp),
+            modifier = Modifier
+                .widthIn(max = 220.dp)
+                .simpleClickable {
+                    currentUser?.let { user ->
+                        statusVisible = false
+                        currentDialog = UserStatusDialog(user) {
+                            currentDialog = null
+                            statusVisible = true
+                        }
+                    }
+                },
             horizontalAlignment = Alignment.Start,
         ) {
             UserInfoRow(
@@ -534,12 +541,12 @@ private fun HomePersonalDrawer(
     model: HomeScreenModel,
     drawerState: DrawerState,
     gesturesEnabled: Boolean,
-    onStatusVisibilityChanged: (Boolean) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val navigator = currentNavigator
     val currentUser = model.currentUser
     var currentDialog by LocationDialogContent.current
+    var statusVisible by remember(currentUser?.id) { mutableStateOf(true) }
     var showLogoutConfirmation by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val suffix = rememberContainerTransformToken("home-user:${model.userId}") ?: LocalSharedSuffixKey.current
@@ -555,6 +562,7 @@ private fun HomePersonalDrawer(
         gesturesEnabled = gesturesEnabled,
         user = currentUser?.toPersonalDrawerUser(),
         profileSharedSuffixKey = suffix,
+        statusVisible = statusVisible,
         onProfileClick = {
             currentUser?.let {
                 navigator push UserProfileScreen(UserProfileVo(it), suffix)
@@ -563,14 +571,13 @@ private fun HomePersonalDrawer(
         },
         onStatusClick = {
             currentUser?.let { user ->
-                scope.launch {
-                    drawerState.close()
-                    model.hideDrawer()
-                    onStatusVisibilityChanged(false)
-                    currentDialog = UserStatusDialog(user) {
-                        currentDialog = null
-                        onStatusVisibilityChanged(true)
-                    }
+                statusVisible = false
+                currentDialog = UserStatusDialog(
+                    currentUser = user,
+                    sharedUserId = drawerStatusSharedUserId(user.id),
+                ) {
+                    currentDialog = null
+                    statusVisible = true
                 }
             }
         },
@@ -614,6 +621,7 @@ private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
     isSupporter = isSupporter,
     status = status,
     statusDescription = statusDescription,
+    location = location,
 )
 
 @Composable

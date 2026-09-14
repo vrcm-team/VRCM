@@ -29,6 +29,7 @@ import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 
 class UserStatusDialog(
     private val currentUser: CurrentUserData,
+    private val sharedUserId: String = currentUser.id,
     private val onConfirmClick: () -> Unit,
 ) : SharedDialog {
     @Composable
@@ -57,7 +58,7 @@ class UserStatusDialog(
 
                     // 状态下拉菜单
                     StatusDropdownMenu(
-                        id = currentUser.id,
+                        id = sharedUserId,
                         currentStatus = currentStatus,
                         animatedVisibilityScope = animatedVisibilityScope,
                         onStatusSelected = setCurrentStatus,
@@ -66,7 +67,7 @@ class UserStatusDialog(
 
                     // 状态描述输入框
                     StatusInput(
-                        id = currentUser.id,
+                        id = sharedUserId,
                         statusDescriptionText = statusDescriptionText,
                         animatedVisibilityScope = animatedVisibilityScope,
                         setStatusDescriptionText = setStatusDescriptionText
