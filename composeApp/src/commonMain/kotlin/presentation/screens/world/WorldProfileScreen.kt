@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +49,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.handoffPrepar
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.CreateInstanceDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.EmptyInstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGroupBottomSheet
+import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstanceCard
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.InstancesDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.components.WorldPersistenceDialog
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.*
@@ -421,7 +424,6 @@ class WorldProfileScreen(
         var showFavoriteGroupBottomSheet by rememberSaveable(worldProfileVo.worldId) {
             mutableStateOf(false)
         }
-        var showRooms by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(false) }
         var currentDialog by LocationDialogContent.current
         val sharedSuffixKey = LocalSharedSuffixKey.current
         val localeStrings = strings
@@ -493,13 +495,10 @@ class WorldProfileScreen(
                     worldProfileVo = worldProfileVo,
                     activeInstances = activeInstances,
                     favoriteEntryState = favoriteEntryState,
-                    showRooms = showRooms,
                     sysBottomPadding = sysBottomPadding,
                     worldIdForSharedElement = location ?: worldProfileVo.worldId,
                     sharedKeyPrefix = sharedKeyPrefix,
                     sharedImageCacheKey = sharedImageCacheKey,
-                    onShowDetails = { showRooms = false },
-                    onShowRooms = { showRooms = true },
                     onCreateRoom = createRoom,
                     onFavoriteWorld = favoriteWorld,
                     onOpenRoom = openRoom,
@@ -541,39 +540,34 @@ private fun WorldProfileCompactLayout(
     worldProfileVo: WorldProfileVo,
     activeInstances: List<InstanceVo>,
     favoriteEntryState: FavoriteEntryState,
-    showRooms: Boolean,
     sysBottomPadding: Dp,
     worldIdForSharedElement: String,
     sharedKeyPrefix: String,
     sharedImageCacheKey: String?,
-    onShowDetails: () -> Unit,
-    onShowRooms: () -> Unit,
     onCreateRoom: () -> Unit,
     onFavoriteWorld: () -> Unit,
     onOpenRoom: (InstanceVo) -> Unit,
 ) {
-    // Hero 使用完整页面宽度；正文和房间列表仍保持适合阅读的最大宽度。
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = sysBottomPadding + 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        item(key = "hero") {
-            WorldProfileHero(
-                worldProfileVo = worldProfileVo,
-                favoriteEntryState = favoriteEntryState,
-                worldIdForSharedElement = worldIdForSharedElement,
-                sharedKeyPrefix = sharedKeyPrefix,
-                sharedImageCacheKey = sharedImageCacheKey,
-                onCreateRoom = onCreateRoom,
-                onFavoriteWorld = onFavoriteWorld,
-                showRooms = showRooms,
-                onShowDetails = onShowDetails,
-                onShowRooms = onShowRooms,
-            )
-        }
+    var roomsExpanded by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(false) }
 
-        if (!showRooms) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Hero 使用完整页面宽度；正文和房间仍保持适合阅读的最大宽度。
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item(key = "hero") {
+                WorldProfileHero(
+                    worldProfileVo = worldProfileVo,
+                    worldIdForSharedElement = worldIdForSharedElement,
+                    sharedKeyPrefix = sharedKeyPrefix,
+                    sharedImageCacheKey = sharedImageCacheKey,
+                )
+            }
+
             item(key = "details") {
                 WorldDetails(
                     worldProfileVo = worldProfileVo,
@@ -583,16 +577,7 @@ private fun WorldProfileCompactLayout(
                         .padding(16.dp),
                 )
             }
-        } else {
-            item(key = "rooms-heading") {
-                WorldRoomsHeading(
-                    count = activeInstances.size,
-                    modifier = Modifier
-                        .widthIn(max = WorldProfileCompactContentMaxWidth)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                )
-            }
+
             if (activeInstances.isEmpty()) {
                 item(key = "rooms-empty") {
                     EmptyInstanceCard(
@@ -604,23 +589,73 @@ private fun WorldProfileCompactLayout(
                             .padding(horizontal = 16.dp),
                     )
                 }
+            } else if (activeInstances.size > 1 && !roomsExpanded) {
+                item(key = "rooms-stack") {
+                    WorldRoomStack(
+                        instances = activeInstances,
+                        onExpand = { roomsExpanded = true },
+                        modifier = Modifier
+                            .widthIn(max = WorldProfileCompactContentMaxWidth)
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    )
+                }
             } else {
                 itemsIndexed(
                     items = activeInstances,
                     key = { _, instance -> instance.id },
-                ) { _, instance ->
-                    WorldRoomListItem(
-                        instance = instance,
-                        capacity = worldProfileVo.capacity,
-                        onClick = { onOpenRoom(instance) },
+                ) { index, instance ->
+                    Box(
                         modifier = Modifier
                             .widthIn(max = WorldProfileCompactContentMaxWidth)
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        InstanceCard(
+                            instance = instance,
+                            size = activeInstances.size,
+                            index = index,
+                            unfold = true,
+                            expandProgress = 1f,
+                            onClick = { onOpenRoom(instance) },
+                        )
+                    }
                 }
             }
         }
+
+        WorldProfileBottomActions(
+            favoriteEntryState = favoriteEntryState,
+            sysBottomPadding = sysBottomPadding,
+            onCreateRoom = onCreateRoom,
+            onFavoriteWorld = onFavoriteWorld,
+        )
+    }
+}
+
+@Composable
+private fun WorldProfileBottomActions(
+    favoriteEntryState: FavoriteEntryState,
+    sysBottomPadding: Dp,
+    onCreateRoom: () -> Unit,
+    onFavoriteWorld: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = sysBottomPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        WorldProfilePrimaryActions(
+            favoriteEntryState = favoriteEntryState,
+            onCreateRoom = onCreateRoom,
+            onFavoriteWorld = onFavoriteWorld,
+            modifier = Modifier
+                .widthIn(max = WorldProfileCompactContentMaxWidth)
+                .fillMaxWidth()
+                .height(80.dp)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -628,19 +663,12 @@ private fun WorldProfileCompactLayout(
 @Composable
 private fun WorldProfileHero(
     worldProfileVo: WorldProfileVo,
-    favoriteEntryState: FavoriteEntryState,
     worldIdForSharedElement: String,
     sharedKeyPrefix: String,
     sharedImageCacheKey: String?,
-    onCreateRoom: () -> Unit,
-    onFavoriteWorld: () -> Unit,
-    showRooms: Boolean,
-    onShowDetails: () -> Unit,
-    onShowRooms: () -> Unit,
 ) {
     val navigator = LocalNavigator.currentOrThrow
-    val panelCornerRadius = 24.dp
-    val tabPanelHeight = 64.dp
+    val contentCornerRadius = 24.dp
     val bottomScrim = Brush.verticalGradient(
         colors = listOf(
             Color.Transparent,
@@ -649,134 +677,106 @@ private fun WorldProfileHero(
         endY = with(LocalDensity.current) { 100.dp.toPx() },
     )
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val heroHeight = maxOf(maxWidth * 3f / 4f, 400.dp)
+        val heroHeight = maxWidth * 3f / 4f
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(heroHeight + tabPanelHeight - panelCornerRadius),
+                .height(heroHeight),
         ) {
-            Box(
+            AImage(
+                modifier = Modifier
+                    .matchParentSize()
+                    .sharedBoundsBy(
+                        key = sharedKeyPrefix + worldIdForSharedElement + "WorldImage",
+                        renderInOverlayDuringTransition = false,
+                    ),
+                imageData = worldProfileVo.worldImageUrl.orEmpty(),
+                contentScale = ContentScale.Fit,
+                loadOriginalSize = true,
+                cachedPlaceholderKey = sharedImageCacheKey,
+            )
+
+            WorldPlatformBadges(
+                worldProfileVo = worldProfileVo,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = getInsetPadding(WindowInsets::getTop) + 72.dp, end = 12.dp),
+            )
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(heroHeight)
-                    .align(Alignment.TopCenter),
+                    .align(Alignment.BottomStart)
+                    .background(bottomScrim)
+                    .padding(
+                        start = 8.dp,
+                        top = 48.dp,
+                        end = 8.dp,
+                        bottom = contentCornerRadius + 16.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.Start,
             ) {
-                AImage(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .sharedBoundsBy(
-                            key = sharedKeyPrefix + worldIdForSharedElement + "WorldImage",
-                            renderInOverlayDuringTransition = false,
-                        ),
-                    imageData = worldProfileVo.worldImageUrl.orEmpty(),
-                    loadOriginalSize = true,
-                    cachedPlaceholderKey = sharedImageCacheKey,
-                )
-
-                WorldPlatformBadges(
-                    worldProfileVo = worldProfileVo,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = getInsetPadding(WindowInsets::getTop) + 72.dp, end = 12.dp),
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomStart)
-                        .background(bottomScrim)
-                        .padding(
-                            start = 8.dp,
-                            top = 48.dp,
-                            end = 8.dp,
-                            bottom = panelCornerRadius + 16.dp,
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    ATooltipBox(tooltip = { Text(worldProfileVo.worldName) }) {
-                        SelectionContainer {
-                            Text(
-                                text = worldProfileVo.worldName,
-                                color = MaterialTheme.colorScheme.secondary,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    HorizontalDivider(
-                        thickness = 2.dp,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                    Box(
-                        modifier = Modifier.enableIf(worldProfileVo.authorName != null) {
-                            simpleClickable {
-                                worldProfileVo.authorID?.let { authorId ->
-                                    navigator.push(
-                                        UserProfileScreen(
-                                            userProfileVO = UserProfileVo(
-                                                id = authorId,
-                                                displayName = worldProfileVo.authorName.orEmpty(),
-                                            )
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    ) {
+                ATooltipBox(tooltip = { Text(worldProfileVo.worldName) }) {
+                    SelectionContainer {
                         Text(
-                            text = worldProfileVo.authorName ?: strings.unknown,
+                            text = worldProfileVo.worldName,
                             color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.labelMedium,
-                            textDecoration = TextDecoration.Underline,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    WorldProfileSummary(
-                        worldProfileVo = worldProfileVo,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    )
-                    WorldProfilePrimaryActions(
-                        favoriteEntryState = favoriteEntryState,
-                        onCreateRoom = onCreateRoom,
-                        onFavoriteWorld = onFavoriteWorld,
-                        modifier = Modifier.padding(horizontal = 8.dp),
+                }
+                HorizontalDivider(
+                    thickness = 2.dp,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                Box(
+                    modifier = Modifier.enableIf(worldProfileVo.authorName != null) {
+                        simpleClickable {
+                            worldProfileVo.authorID?.let { authorId ->
+                                navigator.push(
+                                    UserProfileScreen(
+                                        userProfileVO = UserProfileVo(
+                                            id = authorId,
+                                            displayName = worldProfileVo.authorName.orEmpty(),
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = worldProfileVo.authorName ?: strings.unknown,
+                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.labelMedium,
+                        textDecoration = TextDecoration.Underline,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+                WorldProfileSummary(
+                    worldProfileVo = worldProfileVo,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
             }
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(tabPanelHeight)
+                    .height(contentCornerRadius)
                     .align(Alignment.BottomCenter),
                 shape = RoundedCornerShape(
-                    topStart = panelCornerRadius,
-                    topEnd = panelCornerRadius,
+                    topStart = contentCornerRadius,
+                    topEnd = contentCornerRadius,
                 ),
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 16.dp,
-            ) {
-                PrimaryTabRow(
-                    selectedTabIndex = if (showRooms) 1 else 0,
-                    modifier = Modifier.padding(top = 8.dp),
-                ) {
-                    Tab(
-                        selected = !showRooms,
-                        onClick = onShowDetails,
-                        text = { Text(strings.groupTabDetails) },
-                    )
-                    Tab(
-                        selected = showRooms,
-                        onClick = onShowRooms,
-                        text = { Text(strings.worldProfileRooms) },
-                    )
-                }
-            }
+            ) {}
         }
     }
 }
@@ -924,22 +924,13 @@ private fun WorldProfilePrimaryActions(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(
             onClick = onCreateRoom,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp),
+            modifier = Modifier.weight(1f),
         ) {
-            Icon(
-                imageVector = AppIcons.Add,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = strings.createInstance,
                 maxLines = 1,
@@ -951,17 +942,8 @@ private fun WorldProfilePrimaryActions(
             onClick = onFavoriteWorld,
             enabled = favoriteEntryState != FavoriteEntryState.Loading &&
                 favoriteEntryState != FavoriteEntryState.Unavailable,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 48.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp),
+            modifier = Modifier.weight(1f),
         ) {
-            Icon(
-                imageVector = AppIcons.Favorite,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = when (favoriteEntryState) {
                     FavoriteEntryState.Loading -> strings.loading
@@ -978,79 +960,61 @@ private fun WorldProfilePrimaryActions(
 }
 
 @Composable
-private fun WorldRoomsHeading(
-    count: Int,
+private fun WorldRoomStack(
+    instances: List<InstanceVo>,
+    onExpand: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = strings.worldProfileActiveRooms,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun WorldRoomListItem(
-    instance: InstanceVo,
-    capacity: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        onClick = onClick,
+    val visibleInstances = instances.take(3)
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp,
+            .height(140.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp),
         ) {
-            RegionIcon(
-                size = 22.dp,
-                region = instance.regionType,
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Text(
-                    text = "#${instance.instanceName}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "${instance.accessType.displayName} · ${instance.regionName.uppercase()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            for (index in visibleInstances.lastIndex downTo 1) {
+                InstanceCard(
+                    instance = visibleInstances[index],
+                    size = instances.size,
+                    index = index,
+                    verticalOffset = 10.dp * index,
+                    scaleEffect = 1f - 0.1f * index,
+                    alphaEffect = 1f - 0.25f * index,
+                    expandProgress = 0f,
                 )
             }
-            Text(
-                text = "${instance.currentUsers ?: 0} / $capacity",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
+
+            InstanceCard(
+                instance = visibleInstances.first(),
+                size = instances.size,
+                index = 0,
+                verticalOffset = 0.dp,
+                scaleEffect = 1f,
+                alphaEffect = 1f,
+                expandProgress = 0f,
+                onClick = onExpand,
             )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 12.dp, end = 16.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiary,
+                        shape = CircleShape,
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    text = "+${instances.size - 1}",
+                    color = MaterialTheme.colorScheme.onTertiary,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }
