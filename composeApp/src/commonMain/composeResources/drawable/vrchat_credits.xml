@@ -1,0 +1,17 @@
+<!-- Source: https://creators.vrchat.com/img/economy/Icons_Credits@20.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="20dp"
+    android:height="12dp"
+    android:viewportWidth="30"
+    android:viewportHeight="52">
+    <group
+        android:translateX="-12"
+        android:translateY="-12">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M50.4899,6.5L42.7299,26.78L31.1599,6.5H22.5799L44.1299,44.29L58.5699,6.5H50.4899Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M13.9899,6.5H5.42993L37.2499,62.26L40.6899,53.28L13.9899,6.5Z" />
+    </group>
+</vector>
