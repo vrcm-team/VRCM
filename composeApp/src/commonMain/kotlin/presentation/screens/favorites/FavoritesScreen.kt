@@ -200,9 +200,9 @@ private fun FavoritesScreenContent(
                             0 -> renderWorldItems(worlds) { world, suffix ->
                                 if (!world.isHiddenWorld()) {
                                     navigator push WorldProfileScreen(
-                                        WorldProfileVo(world),
-                                        suffix,
-                                        world.safeImageUrl().orEmpty(),
+                                        worldProfileVO = WorldProfileVo(world),
+                                        sharedSuffixKey = suffix,
+                                        sharedImageCacheKey = world.safeImageUrl(),
                                     )
                                 }
                             }
