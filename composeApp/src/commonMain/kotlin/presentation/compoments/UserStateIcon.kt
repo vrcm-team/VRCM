@@ -107,6 +107,33 @@ fun UserIconsRow(
     }
 }
 
+@Composable
+fun UserIconsFlowRow(
+    modifier: Modifier = Modifier,
+    friends: List<State<FriendData>>,
+    onClickUserIcon: (FriendData, String) -> Unit,
+) {
+    if (friends.isEmpty()) return
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        friends.forEach { friendState ->
+            val friend = friendState.value
+            key(friend.id) {
+                LocationFriendContent(
+                    id = friend.id,
+                    iconUrl = friend.iconUrl,
+                    name = friend.displayName,
+                    userStatus = friend.status,
+                    location = friend.location,
+                ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LazyItemScope.InviteSelf(
@@ -166,12 +193,37 @@ fun LazyItemScope.LocationFriend(
     isTraveling: Boolean = false,
     onClickUserIcon: (String) -> Unit,
 ) {
+    LocationFriendContent(
+        modifier = Modifier.animateItem(),
+        id = id,
+        iconUrl = iconUrl,
+        name = name,
+        userStatus = userStatus,
+        location = location,
+        isTraveling = isTraveling,
+        onClickUserIcon = onClickUserIcon,
+    )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun LocationFriendContent(
+    modifier: Modifier = Modifier,
+    id: String,
+    iconUrl: String,
+    name: String,
+    userStatus: UserStatus,
+    location: String? = null,
+    isTraveling: Boolean = false,
+    onClickUserIcon: (String) -> Unit,
+) {
     val sharedSuffixKey = rememberContainerTransformToken("location-user:$id")
         ?: LocalSharedSuffixKey.current
     Column(
         modifier = Modifier.width(60.dp)
             .clip(MaterialTheme.shapes.small)
-            .clickable { onClickUserIcon(sharedSuffixKey) }.animateItem(),
+            .clickable { onClickUserIcon(sharedSuffixKey) }
+            .then(modifier),
         verticalArrangement = Arrangement.Center
     ) {
         Box {

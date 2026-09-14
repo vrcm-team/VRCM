@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationCard
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
+import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsFlowRow
 import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
@@ -231,9 +232,11 @@ private fun LazyListScope.SimpleCLocationCard(
         LocationTitle(text())
     }
     item(key = locationType.value) {
-        UserIconsRow(
+        UserIconsFlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
             friends = friendList,
-            contentPadding = PaddingValues(horizontal = 16.dp),
             onClickUserIcon = onClickUserIcon
         )
     }
