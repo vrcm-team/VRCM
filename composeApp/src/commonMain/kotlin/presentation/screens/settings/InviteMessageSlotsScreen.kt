@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -163,8 +162,8 @@ private fun InviteMessageSlotsContent(
 
                     else -> LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         items(
                             items = state.messages,
@@ -258,69 +257,72 @@ private fun InviteMessageSlotCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = locale.inviteMessageSlotLabel.replace("%d", message.slot.toString()),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = message.message,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 when {
                     message.remainingCooldownMinutes > 0 -> Text(
                         text = locale.inviteMessageCooldownRemaining.replace(
                             "%d",
                             message.remainingCooldownMinutes.toString(),
                         ),
-                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
 
                     !message.canBeUpdated -> Text(
                         text = locale.inviteMessageUnavailable,
-                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Text(
-                text = message.message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (isPending) {
-                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    }
-                } else {
-                    ATooltipBox(tooltip = { Text(locale.inviteMessageEdit) }) {
-                        IconButton(onClick = onEdit, enabled = actionsEnabled) {
-                            Icon(
-                                imageVector = AppIcons.Edit,
-                                contentDescription = locale.inviteMessageEdit,
-                            )
-                        }
-                    }
+            if (isPending) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
-                ATooltipBox(tooltip = { Text(locale.inviteMessageReset) }) {
-                    IconButton(onClick = onReset, enabled = actionsEnabled) {
+            } else {
+                ATooltipBox(tooltip = { Text(locale.inviteMessageEdit) }) {
+                    IconButton(onClick = onEdit, enabled = actionsEnabled) {
                         Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = locale.inviteMessageReset,
+                            imageVector = AppIcons.Edit,
+                            contentDescription = locale.inviteMessageEdit,
                         )
                     }
+                }
+            }
+            ATooltipBox(tooltip = { Text(locale.inviteMessageReset) }) {
+                IconButton(onClick = onReset, enabled = actionsEnabled) {
+                    Icon(
+                        imageVector = Icons.Default.RestartAlt,
+                        contentDescription = locale.inviteMessageReset,
+                    )
                 }
             }
         }
