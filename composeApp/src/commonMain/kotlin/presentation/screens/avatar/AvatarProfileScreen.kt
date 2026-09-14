@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.avatar
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +34,7 @@ import io.github.vrcmteam.vrcm.core.extensions.toLocalDate
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
+import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
@@ -41,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleFormat
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
@@ -61,6 +63,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGro
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -153,7 +156,7 @@ class AvatarProfileScreen(
     private val sharedImageCacheKey: String? = null,
 ) : AppDetailRoute {
 
-    @OptIn(ExperimentalSharedTransitionApi::class)
+    @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val navigator = currentNavigator
@@ -176,6 +179,8 @@ class AvatarProfileScreen(
         val locale = strings
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
+        var actionSheetIsVisible by remember { mutableStateOf(false) }
+        val actionSheetState = rememberModalBottomSheetState()
         var pendingModerationChange by remember { mutableStateOf<Boolean?>(null) }
         var showImpostorDeletionConfirmation by remember { mutableStateOf(false) }
 
@@ -244,50 +249,86 @@ class AvatarProfileScreen(
             }
         }
 
-        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
-            ProfileScaffold(
-                imageModifier = Modifier.sharedBoundsBy("${displayedAvatar.avatarId}AvatarImage"),
-                profileImageUrl = displayedAvatar.avatarImageUrl,
-                iconUrl = displayedAvatar.avatarImageUrl,
-                sharedImageCacheKey = sharedImageCacheKey,
-                onReturn = { navigator.pop() },
-                topBarActions = { colors ->
-                    OfficialUrlShareButton(
-                        url = "https://vrchat.com/home/avatar/${displayedAvatar.avatarId}",
-                        colors = colors,
-                    )
-                },
-            ) { ratio, contentMinHeight ->
-                AvatarProfileContent(
-                    avatarProfileVo = displayedAvatar,
-                    contentMinHeight = contentMinHeight,
-                    actionState = actionState,
-                    onSelectAvatar = screenModel::selectAvatar,
-                    fallbackActionState = fallbackActionState,
-                    onSelectFallbackAvatar = screenModel::selectFallbackAvatar,
-                    onFavorite = { showFavoriteSheet = true },
-                    favoriteEntryState = favoriteEntryState,
-                    onRetryFavorite = screenModel::retryFavoriteEntryLoad,
-                    moderationState = moderationState,
-                    onRetryModeration = screenModel::retryAvatarModerationLoad,
-                    onModerationChangeRequested = { blocked ->
-                        pendingModerationChange = blocked
-                    },
-                    canEdit = editState.canEdit,
-                    onEdit = {
-                        screenModel.loadAvatarStyles()
-                        showEditSheet = true
-                    },
-                    deletionState = deletionState,
-                    onDelete = screenModel::requestAvatarDeletion,
-                    impostorDeletionState = impostorDeletionState,
-                    onDeleteImpostor = { showImpostorDeletionConfirmation = true },
-                    onRetryImpostorVerification = screenModel::retryImpostorVerification,
-                    avatarGalleryState = avatarGalleryState,
-                    onLoadMoreAvatarGallery = screenModel::loadMoreAvatarGallery,
-                    onRetryAvatarGallery = screenModel::retryAvatarGallery,
-                )
+        val favoriteAvatar = {
+            if (favoriteEntryState == FavoriteEntryState.LoadFailed) {
+                screenModel.retryFavoriteEntryLoad()
+            } else {
+                showFavoriteSheet = true
             }
+        }
+        val editAvatar = {
+            screenModel.loadAvatarStyles()
+            showEditSheet = true
+        }
+
+        CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ProfileScaffold(
+                        modifier = Modifier.weight(1f),
+                        imageModifier = Modifier.sharedBoundsBy(
+                            "${displayedAvatar.avatarId}AvatarImage"
+                        ),
+                        profileImageUrl = displayedAvatar.avatarImageUrl,
+                        iconUrl = displayedAvatar.avatarImageUrl,
+                        sharedImageCacheKey = sharedImageCacheKey,
+                        onReturn = { navigator.pop() },
+                        onMenu = { actionSheetIsVisible = true },
+                        menuContentDescription = strings.avatarProfileMoreActions,
+                        topBarActions = { colors ->
+                            OfficialUrlShareButton(
+                                url = "https://vrchat.com/home/avatar/${displayedAvatar.avatarId}",
+                                colors = colors,
+                            )
+                        },
+                    ) { _, _ ->
+                        AvatarProfileContent(
+                            avatarProfileVo = displayedAvatar,
+                            avatarGalleryState = avatarGalleryState,
+                            onLoadMoreAvatarGallery = screenModel::loadMoreAvatarGallery,
+                            onRetryAvatarGallery = screenModel::retryAvatarGallery,
+                        )
+                    }
+
+                    AvatarProfileBottomActions(
+                        actionState = actionState,
+                        favoriteEntryState = favoriteEntryState,
+                        sysBottomPadding = getInsetPadding(WindowInsets::getBottom),
+                        onSelectAvatar = screenModel::selectAvatar,
+                        onFavoriteAvatar = favoriteAvatar,
+                    )
+                }
+            }
+        }
+        ABottomSheet(
+            isVisible = actionSheetIsVisible,
+            sheetState = actionSheetState,
+            onDismissRequest = { actionSheetIsVisible = false },
+        ) {
+            AvatarProfileActionSheet(
+                hideSheet = { actionSheetState.hide() },
+                onHideCompletion = {
+                    if (!actionSheetState.isVisible) actionSheetIsVisible = false
+                },
+                fallbackActionState = fallbackActionState,
+                onSelectFallbackAvatar = screenModel::selectFallbackAvatar,
+                moderationState = moderationState,
+                onRetryModeration = screenModel::retryAvatarModerationLoad,
+                onModerationChangeRequested = { blocked ->
+                    pendingModerationChange = blocked
+                },
+                canEdit = editState.canEdit,
+                onEdit = editAvatar,
+                deletionState = deletionState,
+                onDelete = screenModel::requestAvatarDeletion,
+                impostorDeletionState = impostorDeletionState,
+                onDeleteImpostor = { showImpostorDeletionConfirmation = true },
+                onRetryImpostorVerification = screenModel::retryImpostorVerification,
+            )
         }
         FavoriteGroupBottomSheet(
             isVisible = showFavoriteSheet,
@@ -378,24 +419,6 @@ class AvatarProfileScreen(
 @Composable
 private fun AvatarProfileContent(
     avatarProfileVo: AvatarProfileVo,
-    contentMinHeight: Dp,
-    actionState: AvatarActionState,
-    onSelectAvatar: () -> Unit,
-    fallbackActionState: AvatarFallbackActionState,
-    onSelectFallbackAvatar: () -> Unit,
-    onFavorite: () -> Unit,
-    favoriteEntryState: FavoriteEntryState,
-    onRetryFavorite: () -> Unit,
-    moderationState: AvatarModerationState,
-    onRetryModeration: () -> Unit,
-    onModerationChangeRequested: (Boolean) -> Unit,
-    canEdit: Boolean,
-    onEdit: () -> Unit,
-    deletionState: AvatarDeletionState,
-    onDelete: () -> Unit,
-    impostorDeletionState: AvatarImpostorDeletionUiState,
-    onDeleteImpostor: () -> Unit,
-    onRetryImpostorVerification: () -> Unit,
     avatarGalleryState: AvatarGalleryState,
     onLoadMoreAvatarGallery: () -> Unit,
     onRetryAvatarGallery: () -> Unit,
@@ -433,113 +456,6 @@ private fun AvatarProfileContent(
                 )
             }
         )
-    }
-
-    AvatarActionButton(
-        state = actionState,
-        onClick = onSelectAvatar,
-    )
-
-    if (fallbackActionState.availability != AvatarFallbackAvailability.Hidden) {
-        AvatarFallbackActionButton(
-            state = fallbackActionState,
-            onClick = onSelectFallbackAvatar,
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-
-    OutlinedButton(
-        onClick = {
-            if (favoriteEntryState == FavoriteEntryState.LoadFailed) {
-                onRetryFavorite()
-            } else {
-                onFavorite()
-            }
-        },
-        enabled = favoriteEntryState != FavoriteEntryState.Loading &&
-            favoriteEntryState != FavoriteEntryState.Unavailable,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Icon(
-            imageVector = AppIcons.Favorite,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            when (favoriteEntryState) {
-                FavoriteEntryState.Loading -> strings.loading
-                FavoriteEntryState.Favorited -> strings.editFavorite
-                FavoriteEntryState.NotFavorited -> strings.favoriteAvatar
-                FavoriteEntryState.LoadFailed -> strings.retry
-                FavoriteEntryState.Unavailable -> strings.favoriteAvatar
-            }
-        )
-    }
-
-    Spacer(Modifier.height(8.dp))
-
-    AvatarModerationButton(
-        state = moderationState,
-        onRetry = onRetryModeration,
-        onChangeRequested = onModerationChangeRequested,
-    )
-
-    if (canEdit) {
-        Spacer(Modifier.height(8.dp))
-        FilledTonalButton(
-            onClick = onEdit,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(
-                imageVector = AppIcons.Settings,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(strings.avatarEditTitle)
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-
-    if (deletionState.canDelete) {
-        OutlinedButton(
-            onClick = onDelete,
-            enabled = !deletionState.isDeleting && !deletionState.isBlockedByFallback,
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (deletionState.isDeleting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = LocalContentColor.current,
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    imageVector = AppIcons.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (deletionState.isDeleting) strings.avatarDeleteDeleting
-                else strings.avatarDeleteAction
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-
-    if (impostorDeletionState.isAvailable) {
-        AvatarImpostorDeletionSection(
-            state = impostorDeletionState,
-            onDelete = onDeleteImpostor,
-            onRetryVerification = onRetryImpostorVerification,
-        )
-        Spacer(Modifier.height(12.dp))
     }
 
     // 描述
@@ -580,6 +496,252 @@ private fun AvatarProfileContent(
         onRetry = onRetryAvatarGallery,
     )
 
+}
+
+private val AvatarProfileContentMaxWidth = 720.dp
+
+@Composable
+private fun AvatarProfileBottomActions(
+    actionState: AvatarActionState,
+    favoriteEntryState: FavoriteEntryState,
+    sysBottomPadding: Dp,
+    onSelectAvatar: () -> Unit,
+    onFavoriteAvatar: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = sysBottomPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        AvatarProfilePrimaryActions(
+            actionState = actionState,
+            favoriteEntryState = favoriteEntryState,
+            onSelectAvatar = onSelectAvatar,
+            onFavoriteAvatar = onFavoriteAvatar,
+            modifier = Modifier
+                .widthIn(max = AvatarProfileContentMaxWidth)
+                .fillMaxWidth()
+                .height(80.dp)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun AvatarProfilePrimaryActions(
+    actionState: AvatarActionState,
+    favoriteEntryState: FavoriteEntryState,
+    onSelectAvatar: () -> Unit,
+    onFavoriteAvatar: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AvatarActionButton(
+            state = actionState,
+            onClick = onSelectAvatar,
+            modifier = Modifier.weight(1f),
+        )
+
+        OutlinedButton(
+            onClick = onFavoriteAvatar,
+            enabled = favoriteEntryState != FavoriteEntryState.Loading &&
+                favoriteEntryState != FavoriteEntryState.Unavailable,
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = AppIcons.Favorite,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = when (favoriteEntryState) {
+                    FavoriteEntryState.Loading -> strings.loading
+                    FavoriteEntryState.Favorited -> strings.editFavorite
+                    FavoriteEntryState.NotFavorited -> strings.favoriteAvatar
+                    FavoriteEntryState.LoadFailed -> strings.retry
+                    FavoriteEntryState.Unavailable -> strings.favoriteAvatar
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.AvatarProfileActionSheet(
+    hideSheet: suspend () -> Unit,
+    onHideCompletion: () -> Unit,
+    fallbackActionState: AvatarFallbackActionState,
+    onSelectFallbackAvatar: () -> Unit,
+    moderationState: AvatarModerationState,
+    onRetryModeration: () -> Unit,
+    onModerationChangeRequested: (Boolean) -> Unit,
+    canEdit: Boolean,
+    onEdit: () -> Unit,
+    deletionState: AvatarDeletionState,
+    onDelete: () -> Unit,
+    impostorDeletionState: AvatarImpostorDeletionUiState,
+    onDeleteImpostor: () -> Unit,
+    onRetryImpostorVerification: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val dismissAndRun: (() -> Unit) -> Unit = { action ->
+        scope.launch {
+            hideSheet()
+            onHideCompletion()
+            action()
+        }
+    }
+
+    if (canEdit) {
+        AvatarProfileSheetButton(
+            text = strings.avatarEditTitle,
+            onClick = { dismissAndRun(onEdit) },
+        )
+    }
+
+    val fallbackAvailability = fallbackActionState.availability
+    if (fallbackAvailability != AvatarFallbackAvailability.Hidden) {
+        AvatarProfileSheetButton(
+            text = if (fallbackActionState.isSelecting) {
+                strings.avatarProfileFallbackActionSetting
+            } else {
+                fallbackAvailability.localizedButtonText(strings)
+            },
+            enabled = !fallbackActionState.isSelecting &&
+                !fallbackActionState.isBlockedByDeletion &&
+                fallbackAvailability == AvatarFallbackAvailability.Available,
+            loading = fallbackActionState.isSelecting,
+            onClick = { dismissAndRun(onSelectFallbackAvatar) },
+        )
+    }
+
+    val moderationStatus = moderationState.status
+    val isBlockAction = moderationStatus == AvatarModerationStatus.NotBlocked
+    val moderationEnabled = !moderationState.isUpdating && (
+        isBlockAction ||
+            moderationStatus == AvatarModerationStatus.Blocked ||
+            moderationStatus == AvatarModerationStatus.LoadFailed
+        )
+    val moderationText = when {
+        moderationState.isUpdating && isBlockAction -> strings.avatarModerationBlocking
+        moderationState.isUpdating && moderationStatus == AvatarModerationStatus.Blocked ->
+            strings.avatarModerationUnblocking
+        moderationStatus == AvatarModerationStatus.Unavailable ->
+            strings.avatarModerationUnavailable
+        moderationStatus == AvatarModerationStatus.Loading -> strings.avatarModerationChecking
+        moderationStatus == AvatarModerationStatus.Blocked -> strings.avatarModerationUnblock
+        moderationStatus == AvatarModerationStatus.NotBlocked -> strings.avatarModerationBlock
+        else -> strings.avatarModerationRetry
+    }
+    AvatarProfileSheetButton(
+        text = moderationText,
+        enabled = moderationEnabled,
+        loading = moderationState.isUpdating ||
+            moderationStatus == AvatarModerationStatus.Loading,
+        isDestructive = isBlockAction,
+        onClick = {
+            when (moderationStatus) {
+                AvatarModerationStatus.Blocked -> dismissAndRun {
+                    onModerationChangeRequested(false)
+                }
+                AvatarModerationStatus.NotBlocked -> dismissAndRun {
+                    onModerationChangeRequested(true)
+                }
+                AvatarModerationStatus.LoadFailed -> dismissAndRun(onRetryModeration)
+                AvatarModerationStatus.Unavailable,
+                AvatarModerationStatus.Loading -> Unit
+            }
+        },
+    )
+
+    if (impostorDeletionState.isAvailable && impostorDeletionState.hasImpostor) {
+        AvatarProfileSheetButton(
+            text = when {
+                impostorDeletionState.phase == AvatarImpostorDeletionPhase.Deleting ->
+                    strings.avatarImpostorDeleting
+                impostorDeletionState.phase == AvatarImpostorDeletionPhase.Verifying ->
+                    strings.avatarImpostorVerifying
+                impostorDeletionState.verificationFailed ->
+                    strings.avatarImpostorRetryVerification
+                else -> strings.avatarImpostorDeleteAction
+            },
+            enabled = impostorDeletionState.canDelete ||
+                impostorDeletionState.canRetryVerification,
+            loading = impostorDeletionState.isBusy,
+            isDestructive = true,
+            onClick = {
+                dismissAndRun(
+                    if (impostorDeletionState.verificationFailed) {
+                        onRetryImpostorVerification
+                    } else {
+                        onDeleteImpostor
+                    }
+                )
+            },
+        )
+    }
+
+    if (deletionState.canDelete) {
+        AvatarProfileSheetButton(
+            text = if (deletionState.isDeleting) {
+                strings.avatarDeleteDeleting
+            } else {
+                strings.avatarDeleteAction
+            },
+            enabled = !deletionState.isDeleting && !deletionState.isBlockedByFallback,
+            loading = deletionState.isDeleting,
+            isDestructive = true,
+            onClick = { dismissAndRun(onDelete) },
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.AvatarProfileSheetButton(
+    text: String,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    isDestructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val colors = if (isDestructive) {
+        ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.error,
+            disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
+        )
+    } else {
+        ButtonDefaults.textButtonColors()
+    }
+    TextButton(
+        modifier = Modifier
+            .align(Alignment.CenterHorizontally)
+            .fillMaxWidth()
+            .padding(vertical = 2.dp, horizontal = 24.dp),
+        enabled = enabled,
+        colors = colors,
+        onClick = onClick,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -734,71 +896,6 @@ private fun AvatarGalleryGrid(
 }
 
 @Composable
-private fun AvatarImpostorDeletionSection(
-    state: AvatarImpostorDeletionUiState,
-    onDelete: () -> Unit,
-    onRetryVerification: () -> Unit,
-) {
-    Text(
-        text = strings.avatarImpostorTitle,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text = when {
-            state.verificationFailed -> strings.avatarImpostorVerificationFailed
-            state.deleteFailed -> strings.avatarImpostorDeleteFailed
-            state.hasImpostor -> strings.avatarImpostorAvailable
-            else -> strings.avatarImpostorEmpty
-        },
-        color = if (state.deleteFailed || state.verificationFailed) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        style = MaterialTheme.typography.bodyMedium,
-    )
-    if (state.hasImpostor) {
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = if (state.verificationFailed) onRetryVerification else onDelete,
-            enabled = state.canDelete || state.canRetryVerification,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (state.isBusy) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = LocalContentColor.current,
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    imageVector = AppIcons.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                when {
-                    state.phase == AvatarImpostorDeletionPhase.Deleting ->
-                        strings.avatarImpostorDeleting
-                    state.phase == AvatarImpostorDeletionPhase.Verifying ->
-                        strings.avatarImpostorVerifying
-                    state.verificationFailed -> strings.avatarImpostorRetryVerification
-                    else -> strings.avatarImpostorDeleteAction
-                }
-            )
-        }
-    }
-}
-
-@Composable
 private fun AvatarImpostorDeletionConfirmationDialog(
     avatarName: String,
     isDeleting: Boolean,
@@ -910,77 +1007,6 @@ private fun AvatarDeletionDialog(
 }
 
 @Composable
-private fun AvatarModerationButton(
-    state: AvatarModerationState,
-    onRetry: () -> Unit,
-    onChangeRequested: (Boolean) -> Unit,
-) {
-    val status = state.status
-    val isBlockAction = status == AvatarModerationStatus.NotBlocked
-    val isUnblockAction = status == AvatarModerationStatus.Blocked
-    val enabled = !state.isUpdating && (
-        isBlockAction ||
-            isUnblockAction ||
-            status == AvatarModerationStatus.LoadFailed
-    )
-    val contentColor = if (isBlockAction) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    val label = when {
-        state.isUpdating && isBlockAction -> strings.avatarModerationBlocking
-        state.isUpdating && isUnblockAction -> strings.avatarModerationUnblocking
-        status == AvatarModerationStatus.Unavailable -> strings.avatarModerationUnavailable
-        status == AvatarModerationStatus.Loading -> strings.avatarModerationChecking
-        status == AvatarModerationStatus.Blocked -> strings.avatarModerationUnblock
-        status == AvatarModerationStatus.NotBlocked -> strings.avatarModerationBlock
-        else -> strings.avatarModerationRetry
-    }
-
-    OutlinedButton(
-        onClick = {
-            when (status) {
-                AvatarModerationStatus.Blocked -> onChangeRequested(false)
-                AvatarModerationStatus.NotBlocked -> onChangeRequested(true)
-                AvatarModerationStatus.LoadFailed -> onRetry()
-                AvatarModerationStatus.Unavailable,
-                AvatarModerationStatus.Loading -> Unit
-            }
-        },
-        enabled = enabled,
-        border = BorderStroke(
-            1.dp,
-            if (enabled) contentColor else MaterialTheme.colorScheme.outlineVariant,
-        ),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        if (state.isUpdating || status == AvatarModerationStatus.Loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = LocalContentColor.current,
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Icon(
-                imageVector = when (status) {
-                    AvatarModerationStatus.Blocked -> AppIcons.CheckCircle
-                    AvatarModerationStatus.LoadFailed -> AppIcons.QuestionMark
-                    AvatarModerationStatus.Unavailable,
-                    AvatarModerationStatus.Loading,
-                    AvatarModerationStatus.NotBlocked -> AppIcons.Block
-                },
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(label, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
 private fun AvatarModerationConfirmationDialog(
     blocked: Boolean,
     onDismiss: () -> Unit,
@@ -1037,6 +1063,7 @@ private fun AvatarModerationConfirmationDialog(
 private fun AvatarActionButton(
     state: AvatarActionState,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val availability = state.availability
     val enabled = !state.isSelecting && (
@@ -1055,9 +1082,7 @@ private fun AvatarActionButton(
     }
 
     Button(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
+        modifier = modifier,
         enabled = enabled,
         onClick = onClick,
     ) {
@@ -1078,54 +1103,8 @@ private fun AvatarActionButton(
         Text(
             text = availability.localizedButtonText(strings),
             textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun AvatarFallbackActionButton(
-    state: AvatarFallbackActionState,
-    onClick: () -> Unit,
-) {
-    val availability = state.availability
-    if (availability == AvatarFallbackAvailability.Hidden) return
-
-    val enabled = !state.isSelecting &&
-        !state.isBlockedByDeletion &&
-        availability == AvatarFallbackAvailability.Available
-    val icon = when (availability) {
-        AvatarFallbackAvailability.Available -> AppIcons.Shield
-        AvatarFallbackAvailability.Current -> AppIcons.CheckCircle
-        AvatarFallbackAvailability.Ineligible -> AppIcons.Block
-        AvatarFallbackAvailability.Hidden -> AppIcons.Shield
-    }
-
-    OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
-        enabled = enabled,
-        onClick = onClick,
-    ) {
-        if (state.isSelecting) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = LocalContentColor.current,
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = if (state.isSelecting) {
-                strings.avatarProfileFallbackActionSetting
-            } else {
-                availability.localizedButtonText(strings)
-            },
-            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

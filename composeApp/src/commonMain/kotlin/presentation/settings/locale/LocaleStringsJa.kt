@@ -801,6 +801,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val avatarProfileSwitched = "このアバターに切り替えました"
     override val avatarProfileCopied = "このアバターをコピーして切り替えました"
     override val avatarProfileSelectFailed = "このアバターを適用できませんでした。しばらくしてからもう一度お試しください"
+    override val avatarProfileMoreActions = "その他の操作"
     override val avatarProfileActionChecking = "アバターの利用可否を確認しています..."
     override val avatarProfileActionCurrent = "現在このアバターを使用しています"
     override val avatarProfileActionSwitch = "このアバターに切り替える"

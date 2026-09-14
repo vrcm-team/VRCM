@@ -97,10 +97,12 @@ internal class ProfileScrollToTopController(
 
 /**
  * 详情页面脚手架
+ * @param modifier 页面脚手架的外部布局约束
  * @param profileImageUrl 详情页背景图
  * @param iconUrl 详情页头像
  * @param onReturn 返回按钮点击事件
  * @param onMenu 菜单按钮点击事件
+ * @param menuContentDescription 菜单按钮的无障碍说明
  * @param outerScrollState 外层滚动状态（控制头部视差），可从外部传入以保存/恢复滚动位置
  * @param innerScrollState 内层滚动状态（控制卡片内容滚动），可从外部传入以保存/恢复滚动位置
  * @param topBarActions 顶部栏右侧操作，复用顶部栏随滚动变化的按钮配色
@@ -108,18 +110,20 @@ internal class ProfileScrollToTopController(
  */
 @Composable
 fun ProfileScaffold(
+    modifier: Modifier = Modifier,
     imageModifier: Modifier = Modifier,
     profileImageUrl: String?,
     iconUrl: String?,
     sharedImageCacheKey: String? = null,
     onReturn: () -> Unit,
     onMenu:  (() -> Unit)? = null,
+    menuContentDescription: String = "MenuIcon",
     outerScrollState: ScrollState = rememberScrollState(),
     innerScrollState: ScrollState = rememberScrollState(),
     topBarActions: @Composable RowScope.(IconButtonColors) -> Unit = {},
     content: @Composable ColumnScope.(Float, Dp) -> Unit
 ) {
-    BoxWithConstraints {
+    BoxWithConstraints(modifier = modifier) {
         val scrollState = outerScrollState
 
         val imageHeight = remember { maxHeight / 2.5f }
@@ -193,6 +197,7 @@ fun ProfileScaffold(
                 ratio,
                 onReturn = onReturn,
                 onMenu = onMenu,
+                menuContentDescription = menuContentDescription,
                 actions = topBarActions,
             )
             // 用户icon

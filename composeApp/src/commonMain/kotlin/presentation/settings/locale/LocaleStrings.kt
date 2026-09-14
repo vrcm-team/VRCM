@@ -828,6 +828,7 @@ sealed class LocaleStrings {
     open val avatarProfileSwitched: String = "Switched to this avatar."
     open val avatarProfileCopied: String = "Copied and switched to this avatar."
     open val avatarProfileSelectFailed: String = "Failed to apply this avatar. Please try again later."
+    open val avatarProfileMoreActions: String = "More actions"
     open val avatarProfileActionChecking: String = "Checking avatar availability..."
     open val avatarProfileActionCurrent: String = "Currently using this avatar"
     open val avatarProfileActionSwitch: String = "Switch to this avatar"

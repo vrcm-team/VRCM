@@ -788,6 +788,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val avatarProfileSwitched = "已切換到該模型"
     override val avatarProfileCopied = "已複製並切換到該模型"
     override val avatarProfileSelectFailed = "套用該模型失敗，請稍後再試"
+    override val avatarProfileMoreActions = "更多操作"
     override val avatarProfileActionChecking = "正在檢查模型狀態..."
     override val avatarProfileActionCurrent = "目前已經是這個模型"
     override val avatarProfileActionSwitch = "切換到這個模型"
