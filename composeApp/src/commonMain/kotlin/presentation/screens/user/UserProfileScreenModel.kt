@@ -15,7 +15,6 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
-import io.github.vrcmteam.vrcm.network.api.economy.EconomyApi
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
 import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -36,7 +35,6 @@ import io.github.vrcmteam.vrcm.network.api.users.data.PlayerInteractionOverride
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
-import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelectionSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
@@ -65,7 +63,6 @@ import io.github.vrcmteam.vrcm.storage.data.UserProfileCache
 import io.github.vrcmteam.vrcm.storage.data.WorldDetailRevision
 import io.ktor.client.call.*
 import io.ktor.client.statement.*
-import io.ktor.http.HttpStatusCode
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
@@ -89,60 +86,6 @@ import kotlinx.coroutines.withContext
 import org.koin.core.logger.Logger
 
 internal const val MAX_PROFILE_BIO_LINKS = 3
-
-internal sealed interface CreditsBalanceState {
-    data object Loading : CreditsBalanceState
-    data class Available(val balance: Long) : CreditsBalanceState
-    data object Unavailable : CreditsBalanceState
-    data object Error : CreditsBalanceState
-}
-
-internal fun creditsBalanceFailureState(error: Throwable): CreditsBalanceState =
-    if (error is VRCApiException &&
-        (error.code == HttpStatusCode.Forbidden.value || error.code == HttpStatusCode.NotFound.value)
-    ) {
-        CreditsBalanceState.Unavailable
-    } else {
-        CreditsBalanceState.Error
-    }
-
-internal class CreditsBalanceStateMachine {
-    private val lock = SynchronizedObject()
-    private val _state = MutableStateFlow<CreditsBalanceState>(CreditsBalanceState.Loading)
-    val state: StateFlow<CreditsBalanceState> = _state.asStateFlow()
-    private var nextRequestId = 0L
-    private var activeRequestId: Long? = null
-
-    fun tryStart(): Long? = synchronized(lock) {
-        if (activeRequestId != null) return@synchronized null
-        (++nextRequestId).also { requestId ->
-            activeRequestId = requestId
-            _state.value = CreditsBalanceState.Loading
-        }
-    }
-
-    fun complete(requestId: Long, balance: Long): Boolean =
-        finish(requestId, CreditsBalanceState.Available(balance))
-
-    fun fail(requestId: Long, error: Throwable): Boolean =
-        finish(requestId, creditsBalanceFailureState(error))
-
-    fun failDropped(requestId: Long): Boolean =
-        finish(requestId, CreditsBalanceState.Error)
-
-    fun invalidate() = synchronized(lock) {
-        nextRequestId++
-        activeRequestId = null
-        _state.value = CreditsBalanceState.Unavailable
-    }
-
-    private fun finish(requestId: Long, result: CreditsBalanceState): Boolean = synchronized(lock) {
-        if (activeRequestId != requestId) return@synchronized false
-        activeRequestId = null
-        _state.value = result
-        true
-    }
-}
 
 private enum class UserLoadState {
     Idle,
@@ -709,7 +652,6 @@ class UserProfileScreenModel internal constructor(
     private val instancesApi: InstancesApi,
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
-    private val economyApi: EconomyApi,
     private val favoriteApi: FavoriteApi,
     private val feedbackApi: FeedbackApi,
     private val inviteApi: InviteApi,
@@ -781,10 +723,6 @@ class UserProfileScreenModel internal constructor(
 
     private val _isBoopAllowed = mutableStateOf(authService.currentUserState.value?.isBoopingEnabled != false)
     val isBoopAllowed by _isBoopAllowed
-
-    private val creditsBalanceStateMachine = CreditsBalanceStateMachine()
-    internal val creditsBalanceState: StateFlow<CreditsBalanceState> = creditsBalanceStateMachine.state
-    private var creditsBalanceJob: Job? = null
 
     private val _inviteMessageSelection = MutableStateFlow<InviteMessageSelectionState?>(null)
     val inviteMessageSelection: StateFlow<InviteMessageSelectionState?> =
@@ -875,11 +813,6 @@ class UserProfileScreenModel internal constructor(
         var observedBlockSessionToken = profileSessionToken
         viewModelScope.launch {
             SharedFlowCentre.currentSession.collect { session ->
-                if (session?.account?.userId != cacheOwnerUserId) {
-                    creditsBalanceJob?.cancel()
-                    creditsBalanceJob = null
-                    creditsBalanceStateMachine.invalidate()
-                }
                 val shouldReload = playerInteractionController.onSessionChanged(session?.token)
                 if (shouldReload && profileTargetUserId != cacheOwnerUserId) {
                     refreshPlayerInteractionStatus()
@@ -1089,47 +1022,6 @@ class UserProfileScreenModel internal constructor(
                 loadGroups = { loadUserGroups(userId) },
             )
         }
-
-    fun loadCreditsBalance() {
-        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
-        if (!userState.isSelf || userState.id != sessionToken.userId) return
-        val requestId = creditsBalanceStateMachine.tryStart() ?: return
-
-        creditsBalanceJob = viewModelScope.launch(Dispatchers.IO) {
-            val response = authService.runSessionBoundCatching(sessionToken) {
-                economyApi.getCreditsBalance(sessionToken.userId)
-            }
-            if (response == null) {
-                finishDroppedCreditsRequest(requestId)
-                return@launch
-            }
-
-            val published = SharedFlowCentre.commitIfCurrentSession(response.sessionToken) { session ->
-                if (session.account.userId != cacheOwnerUserId) return@commitIfCurrentSession false
-                response.result.fold(
-                    onSuccess = { balance ->
-                        creditsBalanceStateMachine.complete(requestId, balance.balance)
-                    },
-                    onFailure = { error ->
-                        logger.warn("Unable to load VRChat Credits balance")
-                        creditsBalanceStateMachine.fail(requestId, error)
-                    },
-                )
-            }
-            if (!published) finishDroppedCreditsRequest(requestId)
-        }
-    }
-
-    private fun finishDroppedCreditsRequest(requestId: Long) {
-        val session = SharedFlowCentre.currentSession.value
-        if (session?.account?.userId == cacheOwnerUserId) {
-            if (creditsBalanceStateMachine.failDropped(requestId)) {
-                logger.warn("Unable to load VRChat Credits balance")
-            }
-        } else {
-            creditsBalanceStateMachine.invalidate()
-        }
-    }
 
     fun refreshPlayerBlockStatus(failureMessage: String? = null) {
         if (profileTargetUserId == cacheOwnerUserId) return

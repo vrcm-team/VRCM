@@ -1,4 +1,4 @@
-package io.github.vrcmteam.vrcm.presentation.screens.user
+package io.github.vrcmteam.vrcm.presentation.screens.inventory
 
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import kotlin.test.Test

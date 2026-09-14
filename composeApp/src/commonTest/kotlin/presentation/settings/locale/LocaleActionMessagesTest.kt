@@ -63,9 +63,9 @@ class LocaleActionMessagesTest {
 
         locales.forEach { locale ->
             val messages = listOf(
-                locale.profileCreditsTitle,
-                locale.profileCreditsUnavailable,
-                locale.profileCreditsLoadFailed,
+                locale.inventoryCreditsTitle,
+                locale.inventoryCreditsUnavailable,
+                locale.inventoryCreditsLoadFailed,
             )
             assertTrue(messages.all { it.isNotBlank() })
         }

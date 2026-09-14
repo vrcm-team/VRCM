@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -59,7 +61,10 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
+import vrcm.composeapp.generated.resources.Res
+import vrcm.composeapp.generated.resources.vrchat_credits
 
 @Serializable
 object InventoryScreen : AppRoute {
@@ -77,6 +82,7 @@ private fun InventoryScreenContent(
     val navigator = currentNavigator
     val filters by model.filters.collectAsState()
     val state by model.state.collectAsState()
+    val creditsBalanceState by model.creditsBalanceState.collectAsState()
     val content = state as? InventoryScreenState.Content
 
     Scaffold(
@@ -89,6 +95,10 @@ private fun InventoryScreenContent(
                     }
                 },
                 actions = {
+                    CreditsBalanceAction(
+                        state = creditsBalanceState,
+                        onRetry = model::refreshCreditsBalance,
+                    )
                     IconButton(
                         enabled = content != null &&
                             !content.isRefreshing &&
@@ -135,6 +145,75 @@ private fun InventoryScreenContent(
                 onRetryLoadMore = model::retryLoadMore,
                 modifier = Modifier.weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun CreditsBalanceAction(
+    state: CreditsBalanceState,
+    onRetry: () -> Unit,
+) {
+    val icon = painterResource(Res.drawable.vrchat_credits)
+    val iconModifier = Modifier.size(20.dp)
+    Box(
+        modifier = Modifier.width(112.dp).height(48.dp),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        when (state) {
+            CreditsBalanceState.Loading -> Row(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = icon,
+                    contentDescription = strings.inventoryCreditsTitle,
+                    modifier = iconModifier,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+
+            is CreditsBalanceState.Available -> Row(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = icon,
+                    contentDescription = strings.inventoryCreditsTitle,
+                    modifier = iconModifier,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = state.balance.toString(),
+                    modifier = Modifier.widthIn(max = 72.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            CreditsBalanceState.Unavailable -> Icon(
+                painter = icon,
+                contentDescription = strings.inventoryCreditsUnavailable,
+                modifier = Modifier.padding(end = 8.dp).size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            )
+
+            CreditsBalanceState.Error -> IconButton(onClick = onRetry) {
+                Icon(
+                    painter = icon,
+                    contentDescription = strings.inventoryCreditsLoadFailed,
+                    modifier = iconModifier,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }

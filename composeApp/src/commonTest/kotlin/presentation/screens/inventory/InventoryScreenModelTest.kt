@@ -9,9 +9,11 @@ import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryItemData
 import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -238,6 +240,51 @@ class InventoryScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun openingInventoryLoadsCreditsForTheCurrentSession() = runTest {
+        val token = AccountSessionToken("usr_a", 1L)
+        val source = FakeInventorySource(token)
+        source.creditsHandler = { requestToken ->
+            creditsResponse(requestToken, balance = 2400)
+        }
+
+        val model = model(source)
+        advanceUntilIdle()
+
+        assertEquals(listOf(token), source.creditsRequests)
+        assertEquals(CreditsBalanceState.Available(2400), model.creditsBalanceState.value)
+    }
+
+    @Test
+    fun lateOldAccountCreditsCannotOverwriteTheNewAccountBalance() = runTest {
+        val tokenA = AccountSessionToken("usr_a", 1L)
+        val tokenB = AccountSessionToken("usr_b", 2L)
+        val source = FakeInventorySource(tokenA)
+        val requestAStarted = CompletableDeferred<Unit>()
+        val releaseRequestA = CompletableDeferred<Unit>()
+        source.creditsHandler = { requestToken ->
+            if (requestToken == tokenA) {
+                requestAStarted.complete(Unit)
+                withContext(NonCancellable) { releaseRequestA.await() }
+                creditsResponse(requestToken, balance = 100)
+            } else {
+                creditsResponse(requestToken, balance = 900)
+            }
+        }
+        val model = model(source)
+        requestAStarted.await()
+
+        source.sessionTokens.value = tokenB
+        advanceUntilIdle()
+        assertEquals(CreditsBalanceState.Available(900), model.creditsBalanceState.value)
+
+        releaseRequestA.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(CreditsBalanceState.Available(900), model.creditsBalanceState.value)
+        assertEquals(listOf(tokenA, tokenB), source.creditsRequests)
+    }
+
+    @Test
     fun unrelatedSameAccountTokenChangeReloadsAfterTheOldRequestFinishes() = runTest {
         val firstToken = AccountSessionToken("usr_a", 1L)
         val replacementToken = AccountSessionToken("usr_a", 2L)
@@ -327,6 +374,14 @@ class InventoryScreenModelTest : MainDispatcherTest() {
         result = Result.success(InventoryData(items, totalCount)),
         sessionToken = token,
     )
+
+    private fun creditsResponse(
+        token: AccountSessionToken,
+        balance: Long,
+    ) = AuthenticatedCreditsBalance(
+        result = Result.success(balance),
+        sessionToken = token,
+    )
 }
 
 private class FakeInventorySource(
@@ -334,10 +389,13 @@ private class FakeInventorySource(
 ) : InventorySource {
     override val sessionTokens = MutableStateFlow(initialToken)
     val requests = mutableListOf<Pair<AccountSessionToken, InventoryPageRequest>>()
+    val creditsRequests = mutableListOf<AccountSessionToken>()
     var handler: suspend (AccountSessionToken, InventoryPageRequest) -> AuthenticatedInventoryPage? =
         { token, _ ->
             AuthenticatedInventoryPage(Result.success(InventoryData()), token)
         }
+    var creditsHandler: suspend (AccountSessionToken) -> AuthenticatedCreditsBalance? =
+        { token -> AuthenticatedCreditsBalance(Result.success(0), token) }
 
     override fun isCurrentSession(token: AccountSessionToken): Boolean =
         sessionTokens.value == token
@@ -348,5 +406,12 @@ private class FakeInventorySource(
     ): AuthenticatedInventoryPage? {
         requests += sessionToken to request
         return handler(sessionToken, request)
+    }
+
+    override suspend fun loadCreditsBalance(
+        sessionToken: AccountSessionToken,
+    ): AuthenticatedCreditsBalance? {
+        creditsRequests += sessionToken
+        return creditsHandler(sessionToken)
     }
 }

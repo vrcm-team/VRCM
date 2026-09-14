@@ -115,6 +115,7 @@ val presentationModule: Module = module {
         InventoryScreenModel(
             authService = get<AuthService>(),
             inventoryApi = get<InventoryApi>(),
+            economyApi = get(),
         )
     }
     singleOf(::NotificationCenterModel) {
@@ -138,7 +139,6 @@ val presentationModule: Module = module {
             instancesApi = get(),
             worldsApi = get(),
             avatarsApi = get(),
-            economyApi = get(),
             favoriteApi = get(),
             feedbackApi = get(),
             inviteApi = get(),

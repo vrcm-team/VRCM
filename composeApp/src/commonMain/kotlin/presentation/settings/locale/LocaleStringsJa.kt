@@ -630,9 +630,9 @@ internal object LocaleStringsJa : LocaleStrings() {
 
     // Local profile actions
     override val userMutualGroups = "共通グループ"
-    override val profileCreditsTitle = "VRChat クレジット"
-    override val profileCreditsUnavailable = "このアカウントではVRChatクレジットを利用できません"
-    override val profileCreditsLoadFailed = "VRChatクレジットを読み込めませんでした"
+    override val inventoryCreditsTitle = "VRChat クレジット"
+    override val inventoryCreditsUnavailable = "このアカウントではVRChatクレジットを利用できません"
+    override val inventoryCreditsLoadFailed = "VRChatクレジットを読み込めませんでした"
     override val profileBoop = "Boop"
     override val profileBoopSuccess = "Boopを送信しました"
     override val profileBoopAlreadySent = "すでにBoopを送信しています"

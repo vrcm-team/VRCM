@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.economy.EconomyApi
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryItemType
 import io.github.vrcmteam.vrcm.network.api.inventory.InventorySortOrder
@@ -62,6 +63,11 @@ internal data class AuthenticatedInventoryPage(
     val sessionToken: AccountSessionToken,
 )
 
+internal data class AuthenticatedCreditsBalance(
+    val result: Result<Long>,
+    val sessionToken: AccountSessionToken,
+)
+
 internal interface InventorySource {
     val sessionTokens: Flow<AccountSessionToken?>
 
@@ -71,11 +77,16 @@ internal interface InventorySource {
         sessionToken: AccountSessionToken,
         request: InventoryPageRequest,
     ): AuthenticatedInventoryPage?
+
+    suspend fun loadCreditsBalance(
+        sessionToken: AccountSessionToken,
+    ): AuthenticatedCreditsBalance?
 }
 
 internal class NetworkInventorySource(
     private val authService: AuthService,
     private val inventoryApi: InventoryApi,
+    private val economyApi: EconomyApi,
 ) : InventorySource {
     override val sessionTokens: Flow<AccountSessionToken?> = SharedFlowCentre.currentSession
         .map { it?.token }
@@ -98,6 +109,18 @@ internal class NetworkInventorySource(
             )
         } ?: return null
         return AuthenticatedInventoryPage(response.result, response.sessionToken)
+    }
+
+    override suspend fun loadCreditsBalance(
+        sessionToken: AccountSessionToken,
+    ): AuthenticatedCreditsBalance? {
+        val response = authService.runSessionBoundCatching(sessionToken) {
+            economyApi.getCreditsBalance(sessionToken.userId)
+        } ?: return null
+        return AuthenticatedCreditsBalance(
+            result = response.result.map { it.balance },
+            sessionToken = response.sessionToken,
+        )
     }
 }
 
@@ -140,8 +163,12 @@ class InventoryScreenModel internal constructor(
     private val source: InventorySource,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
 ) : ViewModel() {
-    constructor(authService: AuthService, inventoryApi: InventoryApi) : this(
-        source = NetworkInventorySource(authService, inventoryApi),
+    constructor(
+        authService: AuthService,
+        inventoryApi: InventoryApi,
+        economyApi: EconomyApi,
+    ) : this(
+        source = NetworkInventorySource(authService, inventoryApi, economyApi),
     )
 
     private val _filters = MutableStateFlow(InventoryFilters())
@@ -150,12 +177,17 @@ class InventoryScreenModel internal constructor(
     val filters = _filters.asStateFlow()
     val state = _state.asStateFlow()
 
+    private val creditsBalanceStateMachine = CreditsBalanceStateMachine()
+    internal val creditsBalanceState = creditsBalanceStateMachine.state
+
     private var activeToken: AccountSessionToken? = null
     private var sessionObserved = false
     private var requestGeneration = 0L
     private var paging = InventoryPagingSnapshot()
     private var activeRequest: Job? = null
     private var pendingSessionReload: AccountSessionToken? = null
+    private var creditsBalanceRequest: Job? = null
+    private var pendingCreditsSessionReload: AccountSessionToken? = null
 
     init {
         require(pageSize > 0) { "Inventory page size must be positive" }
@@ -177,6 +209,7 @@ class InventoryScreenModel internal constructor(
     }
 
     fun refresh() {
+        refreshCreditsBalance()
         if (activeRequest?.isActive == true) return
         val token = activeToken ?: return
         val content = _state.value as? InventoryScreenState.Content
@@ -191,7 +224,15 @@ class InventoryScreenModel internal constructor(
         startInitialRequest(token, requestGeneration, _filters.value, preserveContent = content != null)
     }
 
+    fun refreshCreditsBalance() {
+        val token = activeToken ?: return
+        startCreditsBalanceRequest(token)
+    }
+
     fun retry() {
+        if (creditsBalanceState.value == CreditsBalanceState.Error) {
+            refreshCreditsBalance()
+        }
         when (val current = _state.value) {
             InventoryScreenState.Error -> restartForCurrentContext()
             is InventoryScreenState.Content -> if (current.refreshError) refresh()
@@ -245,6 +286,14 @@ class InventoryScreenModel internal constructor(
         if (sessionObserved && previous == token) return
         sessionObserved = true
         activeToken = token
+
+        if (previous != null && token != null && previous.userId == token.userId &&
+            creditsBalanceRequest?.isActive == true
+        ) {
+            pendingCreditsSessionReload = token
+        } else {
+            restartCreditsBalanceForCurrentContext(token)
+        }
 
         if (previous != null && token != null && previous.userId == token.userId &&
             activeRequest?.isActive == true
@@ -323,6 +372,65 @@ class InventoryScreenModel internal constructor(
         }
     }
 
+    private fun restartCreditsBalanceForCurrentContext(token: AccountSessionToken?) {
+        cancelCreditsBalanceRequest()
+        pendingCreditsSessionReload = null
+        creditsBalanceStateMachine.invalidate()
+        if (token != null) startCreditsBalanceRequest(token)
+    }
+
+    private fun startCreditsBalanceRequest(token: AccountSessionToken) {
+        val requestId = creditsBalanceStateMachine.tryStart() ?: return
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val response = loadCreditsBalance(token)
+                if (response == null) {
+                    if (source.isCurrentSession(token) && activeToken?.userId == token.userId) {
+                        creditsBalanceStateMachine.failDropped(requestId)
+                    }
+                    return@launch
+                }
+                if (!acceptCreditsBalanceResponse(response)) return@launch
+                response.result.fold(
+                    onSuccess = { balance ->
+                        creditsBalanceStateMachine.complete(requestId, balance)
+                    },
+                    onFailure = { error ->
+                        creditsBalanceStateMachine.fail(requestId, error)
+                    },
+                )
+            } finally {
+                finishCreditsBalanceRequest(coroutineContext.job)
+            }
+        }
+        creditsBalanceRequest = job
+        job.start()
+    }
+
+    private suspend fun loadCreditsBalance(
+        token: AccountSessionToken,
+    ): AuthenticatedCreditsBalance? = try {
+        source.loadCreditsBalance(token)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        if (source.isCurrentSession(token)) {
+            AuthenticatedCreditsBalance(Result.failure(error), token)
+        } else {
+            null
+        }
+    }
+
+    private fun acceptCreditsBalanceResponse(response: AuthenticatedCreditsBalance): Boolean {
+        if (!source.isCurrentSession(response.sessionToken)) return false
+        if (activeToken?.userId != response.sessionToken.userId) return false
+        activeToken = response.sessionToken
+        if (pendingCreditsSessionReload == response.sessionToken) {
+            pendingCreditsSessionReload = null
+        }
+        return true
+    }
+
     private fun acceptResponse(
         response: AuthenticatedInventoryPage,
         generation: Long,
@@ -358,9 +466,25 @@ class InventoryScreenModel internal constructor(
         }
     }
 
+    private fun finishCreditsBalanceRequest(job: Job) {
+        if (creditsBalanceRequest !== job) return
+        creditsBalanceRequest = null
+        val pending = pendingCreditsSessionReload ?: return
+        if (activeToken == pending && source.isCurrentSession(pending)) {
+            pendingCreditsSessionReload = null
+            restartCreditsBalanceForCurrentContext(pending)
+        }
+    }
+
     private fun cancelActiveRequest() {
         val request = activeRequest
         activeRequest = null
+        request?.cancel()
+    }
+
+    private fun cancelCreditsBalanceRequest() {
+        val request = creditsBalanceRequest
+        creditsBalanceRequest = null
         request?.cancel()
     }
 
