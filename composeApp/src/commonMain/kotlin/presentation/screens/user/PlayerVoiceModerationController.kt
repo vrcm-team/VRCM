@@ -3,8 +3,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationApi
-import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationData
 import io.github.vrcmteam.vrcm.network.api.playermoderation.VoiceModerationType
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
 import io.github.vrcmteam.vrcm.service.AuthService
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope

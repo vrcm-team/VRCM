@@ -29,7 +29,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
         val source = FakePlayerModerationCleanupSource().apply {
             allRecords = listOf(record("current", "usr_a", "mute"))
         }
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             assertFalse(model.state.value.isSessionAvailable)
@@ -37,7 +37,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_account", username = "account"))
             awaitUntil { model.state.value.hasLoaded }
 
-            assertEquals(PlayerModerationType.Mute, model.state.value.selectedType)
+            assertEquals(PlayerModerationType.Mute, model.state.value.selectedCleanupType)
         } finally {
             close(model)
             SharedFlowCentre.emitLogout()
@@ -57,7 +57,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             )
         }
         SharedFlowCentre.emitAuthenticated(account)
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             awaitUntil { model.state.value.hasLoaded }
@@ -69,7 +69,8 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
                 ),
                 model.state.value.availableTypes,
             )
-            assertEquals(PlayerModerationType.Block, model.state.value.selectedType)
+            assertEquals(PlayerModerationType.Block, model.state.value.selectedCleanupType)
+            assertEquals(source.allRecords, model.state.value.records)
             assertFalse(model.state.value.loadFailed)
         } finally {
             close(model)
@@ -106,11 +107,12 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             }
         }
         SharedFlowCentre.emitAuthenticated(account)
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             awaitUntil { model.state.value.hasLoaded }
 
+            model.selectFilter(PlayerModerationType.Block.apiValue)
             model.clearSelected()
             firstRemoveStarted.await()
             model.clearSelected()
@@ -131,6 +133,11 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
                 PlayerModerationTypeCount(PlayerModerationType.Block, 1),
                 model.state.value.availableTypes.first(),
             )
+            assertEquals(
+                listOf("usr_b"),
+                model.state.value.visibleRecords.map { it.record.targetUserId },
+            )
+            assertEquals(PlayerModerationType.Block.apiValue, model.state.value.selectedFilter)
             assertFalse(model.state.value.isClearing)
         } finally {
             releaseFirstRemove.complete(Unit)
@@ -163,10 +170,11 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
         }
         SharedFlowCentre.emitAuthenticated(account)
         val initialToken = requireNotNull(SharedFlowCentre.currentSession.value?.token)
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             awaitUntil { model.state.value.hasLoaded }
+            model.selectFilter(PlayerModerationType.Block.apiValue)
             model.clearSelected()
             awaitUntil { model.state.value.result != null }
 
@@ -180,6 +188,8 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
                 PlayerModerationCleanupResultKind.Success,
                 model.state.value.result?.kind,
             )
+            assertEquals(emptyList(), model.state.value.records)
+            assertNull(model.state.value.selectedFilter)
         } finally {
             close(model)
             SharedFlowCentre.emitLogout()
@@ -206,7 +216,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             }
         }
         SharedFlowCentre.emitAuthenticated(account)
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             awaitUntil { model.state.value.hasLoaded }
@@ -223,7 +233,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             }
 
             assertEquals(listOf("usr_a"), source.removedTargets)
-            assertEquals(PlayerModerationType.Mute, model.state.value.selectedType)
+            assertEquals(PlayerModerationType.Mute, model.state.value.selectedCleanupType)
             assertNull(model.state.value.result)
             assertFalse(model.state.value.isClearing)
         } finally {
@@ -254,7 +264,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             }
         }
         SharedFlowCentre.emitAuthenticated(accountA)
-        val model = PlayerModerationCleanupModel(source)
+        val model = PlayerModerationListScreenModel(source)
         try {
             model.loadIfNeeded()
             awaitUntil { model.state.value.hasLoaded }
@@ -270,7 +280,7 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
             yield()
 
             assertEquals(listOf("usr_a"), source.removedTargets)
-            assertEquals(PlayerModerationType.InteractOn, model.state.value.selectedType)
+            assertEquals(PlayerModerationType.InteractOn, model.state.value.selectedCleanupType)
             assertNull(model.state.value.result)
             assertFalse(model.state.value.isClearing)
         } finally {
@@ -332,7 +342,7 @@ private fun record(id: String, target: String, type: String) = PlayerModerationD
     type = type,
 )
 
-private fun close(model: PlayerModerationCleanupModel) {
+private fun close(model: PlayerModerationListScreenModel) {
     ViewModelStore().apply {
         put("test", model)
         clear()

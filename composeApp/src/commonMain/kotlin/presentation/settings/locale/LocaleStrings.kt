@@ -117,7 +117,7 @@ sealed class LocaleStrings {
     open val inviteMessageResetFailed: String = "Message could not be reset."
     open val notificationSettingsTitle: String = "Notifications"
     open val playerModerationTitle: String = "Player management"
-    open val playerModerationEntryDescription: String = "View records"
+    open val playerModerationEntryDescription: String = "View and clear records"
     open val playerModerationRefresh: String = "Refresh player management records"
     open val playerModerationSignedOut: String = "Sign in to view player management records"
     open val playerModerationLoadFailed: String = "Player management records could not be loaded"
@@ -1068,7 +1068,6 @@ sealed class LocaleStrings {
 
     // Player moderation cleanup
     open val playerModerationCleanupTitle: String = "Player moderation cleanup"
-    open val playerModerationCleanupEntrySummary: String = "Per-player overrides"
     open val playerModerationCleanupDescription: String =
         "Choose one server-backed override type to remove for this account. This cannot be undone."
     open val playerModerationCleanupSelectType: String = "Override type"
@@ -1085,9 +1084,6 @@ sealed class LocaleStrings {
         "Cleared %removed% targets; %failed% could not be cleared."
     open val playerModerationCleanupFailure: String =
         "Could not confirm that all selected records were cleared. Refresh to check the current state."
-    open val playerModerationCleanupEmpty: String = "No supported player moderation records were found."
-    open val playerModerationCleanupLoadFailed: String = "Player moderation records could not be loaded."
-    open val playerModerationCleanupSessionUnavailable: String = "Sign in again to manage these records."
 }
 
 val strings: LocaleStrings

@@ -3,8 +3,7 @@ package io.github.vrcmteam.vrcm.network.api.playermoderation
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_API_PREFIX
 import io.github.vrcmteam.vrcm.network.api.attributes.USER_API_PREFIX
-import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData as CleanupPlayerModerationData
-import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationRequest as CleanupPlayerModerationRequest
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.HttpClient
@@ -35,17 +34,6 @@ internal enum class VoiceModerationType(val apiValue: String) {
 }
 
 @Serializable
-internal data class PlayerModerationData(
-    val created: String = "",
-    val id: String = "",
-    val sourceDisplayName: String = "",
-    val sourceUserId: String = "",
-    val targetDisplayName: String = "",
-    val targetUserId: String = "",
-    val type: String = "",
-)
-
-@Serializable
 private data class ModeratePlayerRequest(
     val moderated: String,
     val type: String,
@@ -58,9 +46,9 @@ class PlayerModerationApi(private val client: HttpClient) {
         mutableMapOf<AccountSessionToken, CompletableDeferred<List<PlayerModerationData>>>()
 
     internal suspend fun getAll(): List<PlayerModerationData> =
-        client.get(PLAYER_MODERATIONS_PATH).checkSuccess()
+        get()
 
-    suspend fun get(type: PlayerModerationType? = null): List<CleanupPlayerModerationData> =
+    suspend fun get(type: PlayerModerationType? = null): List<PlayerModerationData> =
         client.get(PLAYER_MODERATIONS_PATH) {
             type?.let { parameter("type", it.apiValue) }
         }.checkSuccess()
@@ -122,7 +110,7 @@ class PlayerModerationApi(private val client: HttpClient) {
         require(CLEANUP_USER_ID_PATTERN.matches(targetUserId)) { "Invalid target user ID" }
         client.put(UNPLAYER_MODERATE_PATH) {
             contentType(ContentType.Application.Json)
-            setBody(CleanupPlayerModerationRequest(moderated = targetUserId, type = type.apiValue))
+            setBody(ModeratePlayerRequest(moderated = targetUserId, type = type.apiValue))
         }.checkSuccess { Unit }
     }
 

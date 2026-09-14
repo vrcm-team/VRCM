@@ -106,7 +106,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val inviteMessageResetFailed = "メッセージをリセットできませんでした。"
     override val notificationSettingsTitle = "通知設定"
     override val playerModerationTitle = "プレイヤー管理"
-    override val playerModerationEntryDescription = "履歴を表示"
+    override val playerModerationEntryDescription = "履歴の表示と消去"
     override val playerModerationRefresh = "プレイヤー管理履歴を更新"
     override val playerModerationSignedOut = "プレイヤー管理履歴を表示するにはログインしてください"
     override val playerModerationLoadFailed = "プレイヤー管理履歴を読み込めませんでした"
@@ -1023,7 +1023,6 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val meetupCardSaveFailed = "変更を保存できませんでした。"
     override val meetupCardSessionExpired = "写真の選択が期限切れです。もう一度選択してください。"
     override val playerModerationCleanupTitle = "プレイヤー管理記録の消去"
-    override val playerModerationCleanupEntrySummary = "プレイヤー別の上書き設定"
     override val playerModerationCleanupDescription =
         "このアカウントのサーバー保存済み上書き設定を、種類ごとに消去します。この操作は元に戻せません。"
     override val playerModerationCleanupSelectType = "上書き設定の種類"
@@ -1040,7 +1039,4 @@ internal object LocaleStringsJa : LocaleStrings() {
         "%removed% 人分を消去しました。%failed% 人分は消去できませんでした。"
     override val playerModerationCleanupFailure =
         "選択した記録がすべて消去されたことを確認できません。更新して現在の状態を確認してください。"
-    override val playerModerationCleanupEmpty = "対応しているプレイヤー管理記録はありません。"
-    override val playerModerationCleanupLoadFailed = "プレイヤー管理記録を読み込めませんでした。"
-    override val playerModerationCleanupSessionUnavailable = "記録を管理するには、もう一度ログインしてください。"
 }

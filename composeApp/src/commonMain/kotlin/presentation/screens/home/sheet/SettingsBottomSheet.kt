@@ -29,7 +29,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSetting
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
-import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationCleanupScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
 import io.github.vrcmteam.vrcm.presentation.settings.LocalResolvedDarkTheme
 import io.github.vrcmteam.vrcm.presentation.settings.LocalSettingsState
@@ -268,26 +267,6 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .clickable {
-                    navigator push PlayerModerationCleanupScreen
-                    onDismissRequest()
-                }
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = strings.playerModerationCleanupTitle)
-                Text(
-                    text = strings.playerModerationCleanupEntrySummary,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
         val diskCache = imageLoader.diskCache

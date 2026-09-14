@@ -1,97 +1,122 @@
 package io.github.vrcmteam.vrcm.presentation.screens.settings
 
+import androidx.lifecycle.ViewModelStore
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
-import io.github.vrcmteam.vrcm.core.shared.AuthenticatedAccount
-import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationData
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
+import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupResponse
+import io.github.vrcmteam.vrcm.service.PlayerModerationCleanupSource
 import io.github.vrcmteam.vrcm.service.data.AccountDto
+import io.github.vrcmteam.vrcm.testing.MainDispatcherTest
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalCoroutinesApi::class)
-class PlayerModerationListScreenModelTest {
+class PlayerModerationListScreenModelTest : MainDispatcherTest() {
     @Test
-    fun staleAccountResponseCannotReplaceTheCurrentAccountRecords() = runTest {
-        val first = accountSession("usr_first", generation = 1)
-        val second = accountSession("usr_second", generation = 2)
-        val sessions = MutableStateFlow<AuthenticatedAccount?>(first)
-        val firstResponse = CompletableDeferred<PlayerModerationListResponse>()
-        val secondResponse = CompletableDeferred<PlayerModerationListResponse>()
-        val controller = PlayerModerationListController(
-            scope = backgroundScope,
-            sessions = sessions,
-            isCurrentSession = { sessions.value?.token == it },
-            load = { token ->
-                withContext(NonCancellable) {
-                    if (token == first.token) firstResponse.await() else secondResponse.await()
-                }
-            },
-        )
-        runCurrent()
+    fun staleAccountResponseCannotReplaceTheCurrentAccountRecords() = runBlocking {
+        val firstAccount = AccountDto(userId = "usr_first", username = "first")
+        val secondAccount = AccountDto(userId = "usr_second", username = "second")
+        val firstRequestStarted = CompletableDeferred<Unit>()
+        val firstResponse =
+            CompletableDeferred<PlayerModerationCleanupResponse<List<PlayerModerationData>>>()
+        val secondResponse =
+            CompletableDeferred<PlayerModerationCleanupResponse<List<PlayerModerationData>>>()
+        SharedFlowCentre.emitAuthenticated(firstAccount)
+        val firstToken = requireNotNull(SharedFlowCentre.currentSession.value?.token)
+        val source = ListTestPlayerModerationSource { token ->
+            if (token == firstToken) {
+                firstRequestStarted.complete(Unit)
+                withContext(NonCancellable) { firstResponse.await() }
+            } else {
+                secondResponse.await()
+            }
+        }
+        val model = PlayerModerationListScreenModel(source)
+        try {
+            model.loadIfNeeded()
+            firstRequestStarted.await()
 
-        sessions.value = second
-        runCurrent()
-        secondResponse.complete(
-            successfulResponse(second.token, moderation(id = "pmod_second", target = "usr_second_target")),
-        )
-        runCurrent()
+            SharedFlowCentre.emitAuthenticated(secondAccount)
+            val secondToken = requireNotNull(SharedFlowCentre.currentSession.value?.token)
+            secondResponse.complete(
+                successfulResponse(
+                    secondToken,
+                    moderation(id = "pmod_second", target = "usr_second_target"),
+                ),
+            )
+            awaitUntil {
+                model.state.value.records.singleOrNull()?.id == "pmod_second"
+            }
 
-        val current = assertIs<PlayerModerationListState.Ready>(controller.state.value)
-        assertEquals("pmod_second", current.records.single().id)
+            firstResponse.complete(
+                successfulResponse(
+                    firstToken,
+                    moderation(id = "pmod_first", target = "usr_first_target"),
+                ),
+            )
+            yield()
 
-        firstResponse.complete(
-            successfulResponse(first.token, moderation(id = "pmod_first", target = "usr_first_target")),
-        )
-        advanceUntilIdle()
-
-        val afterStaleResponse = assertIs<PlayerModerationListState.Ready>(controller.state.value)
-        assertEquals("pmod_second", afterStaleResponse.records.single().id)
+            assertEquals("pmod_second", model.state.value.records.single().id)
+        } finally {
+            firstResponse.complete(successfulResponse(firstToken))
+            secondResponse.complete(successfulResponse(firstToken))
+            close(model)
+            SharedFlowCentre.emitLogout()
+        }
     }
 
     @Test
-    fun failedLoadCanRetryAndFilterTheCompleteResult() = runTest {
-        val session = accountSession("usr_current", generation = 1)
-        val sessions = MutableStateFlow<AuthenticatedAccount?>(session)
-        var attempts = 0
+    fun failedLoadCanRetryAndFilterTheCompleteResult() = runBlocking {
         val records = listOf(
             moderation(id = "pmod_mute", type = "mute"),
             moderation(id = "pmod_block", type = "block"),
             moderation(id = "pmod_future", type = "futureType"),
         )
-        val controller = PlayerModerationListController(
-            scope = backgroundScope,
-            sessions = sessions,
-            isCurrentSession = { sessions.value?.token == it },
-            load = { token ->
-                attempts++
-                if (attempts == 1) {
-                    PlayerModerationListResponse(Result.failure(IllegalStateException("offline")), token)
-                } else {
-                    PlayerModerationListResponse(Result.success(records), token)
-                }
-            },
-        )
-        runCurrent()
-        assertIs<PlayerModerationListState.Failed>(controller.state.value)
+        var attempts = 0
+        SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_current", username = "current"))
+        val source = ListTestPlayerModerationSource { token ->
+            attempts++
+            if (attempts == 1) {
+                PlayerModerationCleanupResponse(
+                    Result.failure(IllegalStateException("offline")),
+                    token,
+                )
+            } else {
+                PlayerModerationCleanupResponse(Result.success(records), token)
+            }
+        }
+        val model = PlayerModerationListScreenModel(source)
+        try {
+            model.loadIfNeeded()
+            awaitUntil { model.state.value.loadFailed }
 
-        controller.retry()
-        runCurrent()
-        controller.selectType("futureType")
+            model.refresh()
+            awaitUntil { model.state.value.records.size == records.size }
+            model.selectFilter("mute")
 
-        val ready = assertIs<PlayerModerationListState.Ready>(controller.state.value)
-        assertEquals(2, attempts)
-        assertEquals(listOf("mute", "block", "futureType"), ready.availableTypes)
-        assertEquals(listOf("pmod_future"), ready.visibleRecords.map { it.record.id })
+            assertEquals(PlayerModerationType.Mute, model.state.value.selectedCleanupType)
+
+            model.selectFilter("futureType")
+
+            val state = model.state.value
+            assertEquals(2, attempts)
+            assertEquals(listOf("mute", "block", "futureType"), state.availableFilterTypes)
+            assertEquals(listOf("pmod_future"), state.visibleRecords.map { it.record.id })
+            assertFalse(state.loadFailed)
+        } finally {
+            close(model)
+            SharedFlowCentre.emitLogout()
+        }
     }
 
     @Test
@@ -128,8 +153,8 @@ class PlayerModerationListScreenModelTest {
             moderation(id = "pmod_duplicate", type = "block", target = "usr_b"),
             moderation(id = "", type = "block", target = "usr_c"),
         )
-        val all = PlayerModerationListState.Ready(records)
-        val muted = PlayerModerationListState.Ready(records, selectedType = "mute")
+        val all = PlayerModerationState(records = records)
+        val muted = PlayerModerationState(records = records, selectedFilter = "mute")
 
         assertEquals("pmod_unique", all.visibleRecords.first().key)
         assertTrue(all.visibleRecords.drop(1).all { it.key.startsWith("fallback:") })
@@ -140,18 +165,34 @@ class PlayerModerationListScreenModelTest {
     }
 }
 
-private fun accountSession(userId: String, generation: Long): AuthenticatedAccount = AuthenticatedAccount(
-    account = AccountDto(userId = userId),
-    token = AccountSessionToken(userId = userId, generation = generation),
-)
+private class ListTestPlayerModerationSource(
+    private val load: suspend (
+        AccountSessionToken,
+    ) -> PlayerModerationCleanupResponse<List<PlayerModerationData>>?,
+) : PlayerModerationCleanupSource {
+    override suspend fun getAll(
+        sessionToken: AccountSessionToken,
+    ): PlayerModerationCleanupResponse<List<PlayerModerationData>>? = load(sessionToken)
+
+    override suspend fun get(
+        sessionToken: AccountSessionToken,
+        type: PlayerModerationType,
+    ): PlayerModerationCleanupResponse<List<PlayerModerationData>> =
+        PlayerModerationCleanupResponse(Result.success(emptyList()), sessionToken)
+
+    override suspend fun remove(
+        sessionToken: AccountSessionToken,
+        targetUserId: String,
+        type: PlayerModerationType,
+    ): PlayerModerationCleanupResponse<Unit> =
+        PlayerModerationCleanupResponse(Result.success(Unit), sessionToken)
+}
 
 private fun successfulResponse(
     token: AccountSessionToken,
     vararg records: PlayerModerationData,
-): PlayerModerationListResponse = PlayerModerationListResponse(
-    result = Result.success(records.toList()),
-    sessionToken = token,
-)
+): PlayerModerationCleanupResponse<List<PlayerModerationData>> =
+    PlayerModerationCleanupResponse(Result.success(records.toList()), token)
 
 private fun moderation(
     id: String,
@@ -167,3 +208,16 @@ private fun moderation(
     targetUserId = target,
     type = type,
 )
+
+private fun close(model: PlayerModerationListScreenModel) {
+    ViewModelStore().apply {
+        put("test", model)
+        clear()
+    }
+}
+
+private suspend fun awaitUntil(predicate: () -> Boolean) {
+    withTimeout(3_000) {
+        while (!predicate()) yield()
+    }
+}

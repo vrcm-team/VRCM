@@ -1,7 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
-import io.github.vrcmteam.vrcm.network.api.playermoderation.PlayerModerationData
+import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

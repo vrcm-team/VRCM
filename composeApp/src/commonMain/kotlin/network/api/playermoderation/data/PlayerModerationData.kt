@@ -21,13 +21,11 @@ enum class PlayerModerationType(val apiValue: String) {
 
 @Serializable
 data class PlayerModerationData(
-    val id: String,
-    val targetUserId: String,
-    val type: String,
-)
-
-@Serializable
-internal data class PlayerModerationRequest(
-    val moderated: String,
-    val type: String,
+    val created: String = "",
+    val id: String = "",
+    val sourceDisplayName: String = "",
+    val sourceUserId: String = "",
+    val targetDisplayName: String = "",
+    val targetUserId: String = "",
+    val type: String = "",
 )
