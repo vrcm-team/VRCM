@@ -494,7 +494,7 @@ class SearchListPagerModelTest : MainDispatcherTest() {
         val releaseOld = CompletableDeferred<Unit>()
         val fixture = createFixture { request ->
             when (request.url.parameters["sort"]) {
-                "popularity" -> {
+                "relevance" -> {
                     oldStarted.complete(Unit)
                     releaseOld.await()
                     jsonResponse(worldJson("wrld_old"))
