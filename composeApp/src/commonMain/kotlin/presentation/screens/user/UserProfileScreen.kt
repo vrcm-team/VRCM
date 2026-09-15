@@ -1290,7 +1290,7 @@ private fun ColumnScope.ProfileContent(
     )
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun UserGroupsSection(
     groups: List<LimitedUserGroup>,
@@ -1336,18 +1336,37 @@ private fun UserGroupsSection(
                                 modifier = Modifier.sharedBoundsBy("${group.groupId}GroupIcon")
                             )
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                Text(
-                                    modifier = Modifier.sharedBoundsBy(
-                                        key = groupNameSharedKey(group.groupId),
-                                        resizeMode = SharedTextBoundsResizeMode,
-                                    ),
-                                    text = group.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .sharedBoundsBy(
+                                                key = groupNameSharedKey(group.groupId),
+                                                resizeMode = SharedTextBoundsResizeMode,
+                                            ),
+                                        text = group.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (group.isRepresenting) {
+                                        ATooltipBox(
+                                            tooltip = { Text(strings.groupRepresentationEnabled) },
+                                        ) {
+                                            Icon(
+                                                imageVector = AppIcons.CheckCircle,
+                                                contentDescription = strings.groupRepresentationEnabled,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.tertiary,
+                                            )
+                                        }
+                                    }
+                                }
                                 if (group.shortCode.isNotBlank()) {
                                     Text(
                                         text = "#${group.shortCode}",

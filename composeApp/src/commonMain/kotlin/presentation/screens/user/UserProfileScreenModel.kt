@@ -925,8 +925,15 @@ class UserProfileScreenModel internal constructor(
         ).withSelfIdentity()
         _userState.value = profile
         computeFriendLocation(profile.location)
-        _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
-        _mutualGroups.value = cache.mutualGroups
+        val cachedVisibleGroups = visibleUserGroups(cache.groups, profile.isSelf)
+        _userGroups.value = prioritizeRepresentedGroup(
+            groups = cachedVisibleGroups,
+            representedGroup = cachedVisibleGroups.firstOrNull { it.isRepresenting },
+        )
+        _mutualGroups.value = prioritizeRepresentedGroup(
+            groups = cache.mutualGroups,
+            representedGroup = cache.mutualGroups.firstOrNull { it.isRepresenting },
+        )
         _createdWorlds.value = cache.createdWorlds
         createdWorldDetailRevisions = cache.createdWorldDetailRevisions
         _createdAvatars.value = cache.createdAvatars
@@ -1440,20 +1447,32 @@ class UserProfileScreenModel internal constructor(
     }
 
     private suspend fun loadUserGroups(userId: String): Boolean {
-        var groupsLoaded = false
-        authService.reTryAuthCatching {
+        val groupsResult = authService.reTryAuthCatching {
             usersApi.getUserGroups(userId)
-        }.onSuccess { groups ->
-            val visibleGroups = visibleUserGroups(groups, userState.isSelf)
-            val mutual = groups.filter { it.mutualGroup }
-            if (_userGroups.value != visibleGroups) _userGroups.value = visibleGroups
-            if (_mutualGroups.value != mutual) _mutualGroups.value = mutual
-            saveCache()
-            groupsLoaded = true
-        }.onFailure {
-            handleError(it)
         }
-        return groupsLoaded
+        val groups = groupsResult.getOrNull()
+        if (groups == null) {
+            groupsResult.exceptionOrNull()?.let { handleError(it) }
+            return false
+        }
+
+        val representedResult = authService.reTryAuthCatching {
+            usersApi.getRepresentedGroup(userId)
+        }
+        representedResult.exceptionOrNull()?.let {
+            logger.error("Loading represented group failed: ${it.message}")
+        }
+
+        val mergedGroups = prioritizeRepresentedGroup(
+            groups = groups,
+            representedGroup = representedResult.getOrNull(),
+        )
+        val visibleGroups = visibleUserGroups(mergedGroups, userState.isSelf)
+        val mutual = mergedGroups.filter { it.mutualGroup }
+        if (_userGroups.value != visibleGroups) _userGroups.value = visibleGroups
+        if (_mutualGroups.value != mutual) _mutualGroups.value = mutual
+        saveCache()
+        return true
     }
 
     /**
@@ -1902,6 +1921,32 @@ internal fun visibleUserGroups(
     groups: List<LimitedUserGroup>,
     isSelf: Boolean,
 ): List<LimitedUserGroup> = if (isSelf) groups else groups.filterNot { it.mutualGroup }
+
+internal fun prioritizeRepresentedGroup(
+    groups: List<LimitedUserGroup>,
+    representedGroup: LimitedUserGroup?,
+): List<LimitedUserGroup> {
+    val representedGroupId = representedGroup?.groupId?.takeIf { it.isNotBlank() }
+        ?: groups.firstOrNull { it.isRepresenting }?.stableGroupId()
+        ?: return groups
+    val existing = groups.firstOrNull { it.stableGroupId() == representedGroupId }
+    val prioritizedSource = existing ?: representedGroup ?: return groups
+    val prioritized = prioritizedSource.copy(
+        groupId = representedGroupId,
+        isRepresenting = true,
+    )
+    return buildList {
+        add(prioritized)
+        groups
+            .filterNot { it.stableGroupId() == representedGroupId }
+            .map { group ->
+                if (group.isRepresenting) group.copy(isRepresenting = false) else group
+            }
+            .forEach(::add)
+    }
+}
+
+private fun LimitedUserGroup.stableGroupId(): String = groupId.ifBlank { id }
 
 private fun UserProfileVo.toFriendData() =
     FriendData(

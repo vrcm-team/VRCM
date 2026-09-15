@@ -60,6 +60,14 @@ class UsersApi(private val client: HttpClient) {
     suspend fun getUserGroups(userId: String): List<LimitedUserGroup> =
         client.get("$USERS_API_PREFIX/$userId/groups").checkSuccess()
 
+    suspend fun getRepresentedGroup(userId: String): LimitedUserGroup? {
+        val response = client.get("$USERS_API_PREFIX/$userId/groups/represented")
+        return when (response.status) {
+            HttpStatusCode.NotFound, HttpStatusCode.NoContent -> null
+            else -> response.checkSuccess<LimitedUserGroup?>()
+        }
+    }
+
     suspend fun getMutualFriends(
         userId: String,
         n: Int = 100,
