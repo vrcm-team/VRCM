@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +55,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -139,6 +141,8 @@ data class UserProfileScreen(
         val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
+        val actionMenuNestedScrollConnection =
+            rememberConsumeRemainingVerticalScrollConnection()
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }
@@ -251,6 +255,7 @@ data class UserProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .nestedScroll(actionMenuNestedScrollConnection)
                     .verticalScroll(rememberScrollState()),
             ) {
                 SheetItems(

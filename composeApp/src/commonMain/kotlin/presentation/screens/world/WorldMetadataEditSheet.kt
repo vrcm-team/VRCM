@@ -28,12 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
 
 private const val WorldNameMaxLength = 64
 private const val WorldDescriptionMaxLength = 256
@@ -87,6 +89,7 @@ internal fun WorldMetadataEditSheet(
         world.allowedDomains,
     ) { mutableStateOf(world.allowedDomains.joinToString("\n")) }
     val locale = strings
+    val formNestedScrollConnection = rememberConsumeRemainingVerticalScrollConnection()
 
     ModalBottomSheet(
         onDismissRequest = { if (!state.isSaving) onDismiss() },
@@ -95,6 +98,7 @@ internal fun WorldMetadataEditSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 720.dp)
+                .nestedScroll(formNestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

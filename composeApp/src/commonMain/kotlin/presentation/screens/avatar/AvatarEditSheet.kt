@@ -45,6 +45,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -60,6 +61,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.readSelectedImage
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -108,6 +110,7 @@ internal fun AvatarEditSheet(
             targetValue != SheetValue.Hidden || !latestIsBusy.value
         },
     )
+    val formNestedScrollConnection = rememberConsumeRemainingVerticalScrollConnection()
     LaunchedEffect(state.publication) {
         if (state.publication != AvatarPublicationStatus.Private) {
             showPublicConfirmation = false
@@ -204,6 +207,7 @@ internal fun AvatarEditSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 720.dp)
+                .nestedScroll(formNestedScrollConnection)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
