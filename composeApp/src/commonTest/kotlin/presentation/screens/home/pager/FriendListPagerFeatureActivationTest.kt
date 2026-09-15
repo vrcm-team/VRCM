@@ -95,6 +95,8 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
             val avatarGroupsBeforeSwitch = fixture.requests.favoriteGroups(FavoriteType.Avatar)
             val worldsBeforeSwitch = fixture.requests.worldLists
             val avatarsBeforeSwitch = fixture.requests.avatarLists
+            val createdWorldsBeforeSwitch = fixture.requests.createdWorldLists
+            val createdAvatarsBeforeSwitch = fixture.requests.createdAvatarLists
 
             SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_b", username = "b"))
             awaitUntil {
@@ -102,6 +104,8 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
                     fixture.requests.favoriteGroups(FavoriteType.Avatar) > avatarGroupsBeforeSwitch &&
                     fixture.requests.worldLists > worldsBeforeSwitch &&
                     fixture.requests.avatarLists > avatarsBeforeSwitch &&
+                    fixture.requests.createdWorldLists > createdWorldsBeforeSwitch &&
+                    fixture.requests.createdAvatarLists > createdAvatarsBeforeSwitch &&
                     1 !in fixture.model.refreshingTabs.value &&
                     2 !in fixture.model.refreshingTabs.value &&
                     !fixture.model.directoryRefreshing.value
@@ -116,6 +120,8 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
             val avatarGroupsBeforeSecondSwitch = fixture.requests.favoriteGroups(FavoriteType.Avatar)
             val worldsBeforeSecondSwitch = fixture.requests.worldLists
             val avatarsBeforeSecondSwitch = fixture.requests.avatarLists
+            val createdWorldsBeforeSecondSwitch = fixture.requests.createdWorldLists
+            val createdAvatarsBeforeSecondSwitch = fixture.requests.createdAvatarLists
 
             SharedFlowCentre.emitAuthenticated(AccountDto(userId = "usr_c", username = "c"))
             awaitUntil {
@@ -124,6 +130,8 @@ class FriendListPagerFeatureActivationTest : MainDispatcherTest() {
                     fixture.requests.favoriteGroups(FavoriteType.Avatar) > avatarGroupsBeforeSecondSwitch &&
                     fixture.requests.worldLists > worldsBeforeSecondSwitch &&
                     fixture.requests.avatarLists > avatarsBeforeSecondSwitch &&
+                    fixture.requests.createdWorldLists > createdWorldsBeforeSecondSwitch &&
+                    fixture.requests.createdAvatarLists > createdAvatarsBeforeSecondSwitch &&
                     1 !in fixture.model.refreshingTabs.value &&
                     2 !in fixture.model.refreshingTabs.value &&
                     !fixture.model.directoryRefreshing.value
@@ -166,6 +174,8 @@ private class FeatureActivationFixture(
         awaitUntil {
             requests.favoriteGroups(FavoriteType.World) > 0 &&
                 requests.favoriteGroups(FavoriteType.Avatar) > 0 &&
+                requests.createdWorldLists > 0 &&
+                requests.createdAvatarLists > 0 &&
                 1 !in model.refreshingTabs.value &&
                 2 !in model.refreshingTabs.value &&
                 !model.directoryRefreshing.value
@@ -274,12 +284,16 @@ private class FeatureRequestRecorder(
     private val friendListRequests = atomic(0)
     private val worldListRequests = atomic(0)
     private val avatarListRequests = atomic(0)
+    private val createdWorldListRequests = atomic(0)
+    private val createdAvatarListRequests = atomic(0)
     private val firstFriendFavoriteGroupRequestStarted = CompletableDeferred<Unit>()
     private val releaseFirstFriendFavoriteGroupRequest = CompletableDeferred<Unit>()
 
     val friendLists: Int get() = friendListRequests.value
     val worldLists: Int get() = worldListRequests.value
     val avatarLists: Int get() = avatarListRequests.value
+    val createdWorldLists: Int get() = createdWorldListRequests.value
+    val createdAvatarLists: Int get() = createdAvatarListRequests.value
 
     suspend fun recordFavoriteGroup(type: FavoriteType) {
         when (type) {
@@ -315,6 +329,14 @@ private class FeatureRequestRecorder(
         avatarListRequests.incrementAndGet()
     }
 
+    fun recordCreatedWorldList() {
+        createdWorldListRequests.incrementAndGet()
+    }
+
+    fun recordCreatedAvatarList() {
+        createdAvatarListRequests.incrementAndGet()
+    }
+
     fun favoriteGroups(type: FavoriteType): Int = when (type) {
         FavoriteType.Friend -> friendFavoriteGroups.value
         FavoriteType.World -> worldFavoriteGroups.value
@@ -346,6 +368,14 @@ private fun featureActivationClient(
                 }
                 "/avatars/favorites" -> {
                     requests.recordAvatarList()
+                    jsonResponse("[]")
+                }
+                "/worlds" -> {
+                    requests.recordCreatedWorldList()
+                    jsonResponse("[]")
+                }
+                "/avatars" -> {
+                    requests.recordCreatedAvatarList()
                     jsonResponse("[]")
                 }
                 "/auth/user/favoritelimits" -> jsonResponse(FAVORITE_LIMITS_JSON)

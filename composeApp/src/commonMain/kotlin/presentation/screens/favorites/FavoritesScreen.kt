@@ -1,232 +1,233 @@
 package io.github.vrcmteam.vrcm.presentation.screens.favorites
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.PersonRemove
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
-import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
+import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
+import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
+import io.github.vrcmteam.vrcm.presentation.compoments.renderAvatarItems
+import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
+import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
+import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.FavoriteGroupClearDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.compoments.GroupOptionsUI
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.*
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.AvatarGroupOptions
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendsDirectoryContent
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.WorldGroupOptions
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
-import kotlinx.serialization.Serializable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
 object FavoritesScreen : AppRoute {
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        FavoritesScreenContent()
+        val navigator = currentNavigator
+        val favoritesModel: FriendListPagerModel = koinViewModel()
+        val groupsModel: FavoritesGroupsModel = koinViewModel()
+        var selectedTabIndex by rememberSaveable { mutableIntStateOf(FavoritesTab.Player.ordinal) }
+        val selectedTab = FavoritesTab.entries[selectedTabIndex]
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.favoritesTitle) },
+                    navigationIcon = {
+                        IconButton(onClick = navigator::pop) {
+                            Icon(AppIcons.ArrowBackIosNew, strings.back)
+                        }
+                    },
+                    actions = {
+                        FavoritesHubTopBarActions(
+                            selectedTab = selectedTab,
+                            favoritesModel = favoritesModel,
+                            groupsModel = groupsModel,
+                            onSearch = { navigator push GlobalSearchScreen },
+                        )
+                    },
+                )
+            },
+        ) { padding ->
+            FavoritesHubContent(
+                selectedTab = selectedTab,
+                onSelectedTab = { selectedTabIndex = it.ordinal },
+                favoritesModel = favoritesModel,
+                groupsModel = groupsModel,
+                contentBottomPadding = 24.dp,
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FavoritesScreenContent(
-    favoritesModel: FriendListPagerModel = koinViewModel(),
+internal fun FavoritesHubContent(
+    selectedTab: FavoritesTab,
+    onSelectedTab: (FavoritesTab) -> Unit,
+    favoritesModel: FriendListPagerModel,
+    groupsModel: FavoritesGroupsModel,
+    contentBottomPadding: Dp,
+    modifier: Modifier = Modifier,
 ) {
-    val navigator = currentNavigator
     val favoriteLocale = strings
-    val pagerState = rememberPagerState(pageCount = { 2 })
-    val coroutineScope = rememberCoroutineScope()
-    val searchText by favoritesModel.searchText.collectAsState()
-    val refreshingTabs by favoritesModel.refreshingTabs.collectAsState()
-    val refreshErrors by favoritesModel.refreshErrors.collectAsState()
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = selectedTab.ordinal,
+        pageCount = { FavoritesTab.entries.size },
+    )
     val worldListState = rememberLazyListState()
     val avatarListState = rememberLazyListState()
-
-    val worlds by favoritesModel.worldList.collectAsState()
-    val avatars by favoritesModel.avatarList.collectAsState()
-    val deletedAvatarIds = currentSessionDeletedAvatarIds()
-    val visibleAvatars = remember(avatars, deletedAvatarIds) {
-        avatars.filterNot { it.id in deletedAvatarIds }
-    }
-    val worldGroups by favoritesModel.worldFavoriteGroupsFlow.collectAsState()
-    val avatarGroups by favoritesModel.avatarFavoriteGroupsFlow.collectAsState()
-    val worldOptions by favoritesModel.worldGroupOptions.collectAsState()
-    val avatarOptions by favoritesModel.avatarGroupOptions.collectAsState()
-    val worldTotal by favoritesModel.worldTotal.collectAsState()
-    val avatarTotal by favoritesModel.avatarTotal.collectAsState()
+    val groupListState = rememberLazyListState()
     val clearState by favoritesModel.favoriteGroupClearState.collectAsState()
-    val favoriteGroupEditState by favoritesModel.favoriteGroupEditState.collectAsState()
-    val settledPage = pagerState.settledPage
-    val modelTabIndex = settledPage + 1
+    val editState by favoritesModel.favoriteGroupEditState.collectAsState()
 
-    SideEffect {
-        favoritesModel.updateFavoriteLocale(favoriteLocale)
-    }
-    LaunchedEffect(Unit) {
-        favoritesModel.activateFavoritesPage()
+    SideEffect { favoritesModel.updateFavoriteLocale(favoriteLocale) }
+    LaunchedEffect(favoritesModel) { favoritesModel.activateFavoritesPage() }
+    LaunchedEffect(groupsModel) { groupsModel.loadIfNeeded() }
+    LaunchedEffect(selectedTab, favoritesModel, pagerState) {
+        selectedTab.favoriteModelTabIndex?.let(favoritesModel::syncSelectedTabIndex)
+        if (pagerState.currentPage != selectedTab.ordinal) {
+            pagerState.scrollToPage(selectedTab.ordinal)
+        }
     }
     LaunchedEffect(pagerState, favoritesModel) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
-            .collect { page -> favoritesModel.syncSelectedTabIndex(page + 1) }
+            .collect { page ->
+                val tab = FavoritesTab.entries[page]
+                tab.favoriteModelTabIndex?.let(favoritesModel::syncSelectedTabIndex)
+                onSelectedTab(tab)
+            }
     }
     LaunchedEffect(pagerState, favoritesModel) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .drop(1)
             .collect { page ->
-                favoritesModel.refreshCurrentTabCacheData(
-                    showRefreshing = false,
-                    tabIndex = page + 1,
-                )
+                FavoritesTab.entries[page].favoriteModelTabIndex
+                    ?.takeIf { it != FavoritesTab.Player.favoriteModelTabIndex }
+                    ?.let { favoritesModel.refreshCurrentTabCacheData(showRefreshing = false, tabIndex = it) }
             }
     }
+    LaunchedEffect(pagerState, worldListState, avatarListState, groupListState) {
+        SharedFlowCentre.toPagerTop.collect {
+            when (FavoritesTab.entries[pagerState.settledPage]) {
+                FavoritesTab.Player -> Unit
+                FavoritesTab.World -> launch { worldListState.animateScrollToFirst() }
+                FavoritesTab.Avatar -> launch { avatarListState.animateScrollToFirst() }
+                FavoritesTab.Group -> launch { groupListState.animateScrollToFirst() }
+            }
+        }
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(strings.favoritesTitle) },
-                navigationIcon = {
-                    IconButton(onClick = { navigator.pop() }) {
-                        Icon(AppIcons.ArrowBackIosNew, strings.back)
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = modelTabIndex !in refreshingTabs,
-                        onClick = { favoritesModel.refreshCurrentTabCacheData(tabIndex = modelTabIndex) },
-                    ) { Icon(AppIcons.Update, strings.refresh) }
-                },
-            )
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            val tabs = listOf(strings.worlds, strings.avatars)
-            PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            coroutineScope.launch { pagerState.animateScrollToTab(index) }
-                        },
-                        text = {
-                            Text(
-                                title,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.Center,
-                            )
-                        },
-                    )
-                }
-            }
-            SearchTextField(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                value = searchText,
-                onValueChange = favoritesModel::setSearchText,
-            )
-            when (settledPage) {
-                0 -> GroupOptionsUI(
-                    currentOptions = worldOptions,
-                    favoriteType = FavoriteType.World,
-                    favoriteGroups = worldGroups,
-                    total = worldTotal,
-                    defaultText = strings.friendListPagerAllWorlds,
-                    onOptionsChanged = favoritesModel::updateWorldGroupOptions,
-                    getSelectedGroup = WorldGroupOptions::selectedGroup,
-                    updateOptions = { options, group -> options.copy(selectedGroup = group) },
-                    onClearGroup = favoritesModel::openFavoriteGroupClearConfirmation,
-                    clearGroupEnabled = worldOptions.selectedGroup
-                        ?.let(favoritesModel::canClearFavoriteGroup) == true,
-                    clearGroupInProgress = clearState.isClearing &&
-                        clearState.group?.type == FavoriteType.World.value,
-                    clearGroupContentDescription = strings.favoriteGroupClearAction,
-                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
-                    editGroupContentDescription = strings.favoriteGroupEditAction,
-                )
-                1 -> GroupOptionsUI(
-                    currentOptions = avatarOptions,
-                    favoriteType = FavoriteType.Avatar,
-                    favoriteGroups = avatarGroups,
-                    total = avatarTotal,
-                    defaultText = strings.friendListPagerAllAvatars,
-                    onOptionsChanged = favoritesModel::updateAvatarGroupOptions,
-                    getSelectedGroup = AvatarGroupOptions::selectedGroup,
-                    updateOptions = { options, group -> options.copy(selectedGroup = group) },
-                    onClearGroup = favoritesModel::openFavoriteGroupClearConfirmation,
-                    clearGroupEnabled = avatarOptions.selectedGroup
-                        ?.let(favoritesModel::canClearFavoriteGroup) == true,
-                    clearGroupInProgress = clearState.isClearing &&
-                        clearState.group?.type == FavoriteType.Avatar.value,
-                    clearGroupContentDescription = strings.favoriteGroupClearAction,
-                    onEditGroup = favoritesModel::openFavoriteGroupEditor,
-                    editGroupContentDescription = strings.favoriteGroupEditAction,
+    Column(modifier.fillMaxSize()) {
+        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+            FavoritesTab.entries.forEachIndexed { index, tab ->
+                Tab(
+                    selected = index == pagerState.currentPage,
+                    onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
+                    text = {
+                        Text(
+                            text = tab.title(),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    },
                 )
             }
-            val loading = modelTabIndex in refreshingTabs
-            Box(Modifier.fillMaxWidth().height(4.dp)) {
-                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f),
-                key = { if (it == 0) "favorites-worlds" else "favorites-avatars" },
-            ) { page ->
-                val pageModelTabIndex = page + 1
-                val pageLoading = pageModelTabIndex in refreshingTabs
-                val pageError = refreshErrors[pageModelTabIndex]
-                val pageItemsEmpty = if (page == 0) worlds.isEmpty() else visibleAvatars.isEmpty()
-                Box(Modifier.fillMaxSize()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = if (page == 0) worldListState else avatarListState,
-                        contentPadding = PaddingValues(bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        when (page) {
-                            0 -> renderWorldItems(worlds) { world, suffix ->
-                                if (!world.isHiddenWorld()) {
-                                    navigator push WorldProfileScreen(
-                                        worldProfileVO = WorldProfileVo(world),
-                                        sharedSuffixKey = suffix,
-                                        sharedImageCacheKey = world.safeImageUrl(),
-                                    )
-                                }
-                            }
-                            1 -> renderAvatarItems(visibleAvatars) { avatar, suffix ->
-                                if (avatar.releaseStatus != "hidden") {
-                                    navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
-                                }
-                            }
-                        }
-                    }
-                    if (pageLoading && pageItemsEmpty) {
-                        CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    } else if (pageError != null && pageItemsEmpty) {
-                        StateMessage(strings.favoritesLoadFailed, strings.retry) {
-                            favoritesModel.refreshCurrentTabCacheData(tabIndex = pageModelTabIndex)
-                        }
-                    } else if (pageItemsEmpty) {
-                        StateMessage(strings.favoritesEmpty, null, null)
-                    } else if (pageError != null) {
-                        ErrorBanner(strings.favoritesLoadFailed) {
-                            favoritesModel.refreshCurrentTabCacheData(tabIndex = pageModelTabIndex)
-                        }
-                    }
-                }
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            key = { FavoritesTab.entries[it].name },
+        ) { page ->
+            when (FavoritesTab.entries[page]) {
+                FavoritesTab.Player -> FriendsDirectoryContent(
+                    contentPadding = PaddingValues(top = 12.dp, bottom = contentBottomPadding),
+                    showFavoriteGroupDialogs = false,
+                    model = favoritesModel,
+                )
+                FavoritesTab.World -> FavoriteWorldsContent(
+                    model = favoritesModel,
+                    listState = worldListState,
+                    contentBottomPadding = contentBottomPadding,
+                )
+                FavoritesTab.Avatar -> FavoriteAvatarsContent(
+                    model = favoritesModel,
+                    listState = avatarListState,
+                    contentBottomPadding = contentBottomPadding,
+                )
+                FavoritesTab.Group -> MyGroupsContent(
+                    contentBottomPadding = contentBottomPadding,
+                    listState = groupListState,
+                    model = groupsModel,
+                )
             }
         }
     }
@@ -241,9 +242,8 @@ private fun FavoritesScreenContent(
             onDismiss = favoritesModel::dismissFavoriteGroupClearConfirmation,
         )
     }
-
     FavoriteGroupEditDialog(
-        state = favoriteGroupEditState,
+        state = editState,
         onDismiss = favoritesModel::dismissFavoriteGroupEditor,
         onClearFailure = favoritesModel::clearFavoriteGroupEditFailure,
         onSave = favoritesModel::saveFavoriteGroup,
@@ -251,9 +251,310 @@ private fun FavoritesScreenContent(
 }
 
 @Composable
-internal fun BoxScope.ErrorBanner(message: String, onRetry: () -> Unit) {
+private fun FavoritesTab.title(): String = when (this) {
+    FavoritesTab.Player -> strings.favoritesPlayers
+    FavoritesTab.World -> strings.worlds
+    FavoritesTab.Avatar -> strings.avatars
+    FavoritesTab.Group -> strings.groups
+}
+
+@Composable
+private fun FavoriteWorldsContent(
+    model: FriendListPagerModel,
+    listState: LazyListState,
+    contentBottomPadding: Dp,
+) {
+    val navigator = currentNavigator
+    val searchText by model.searchText.collectAsState()
+    val worlds by model.worldList.collectAsState()
+    val createdWorlds by model.createdWorldList.collectAsState()
+    val groups by model.worldFavoriteGroupsFlow.collectAsState()
+    val options by model.worldGroupOptions.collectAsState()
+    val total by model.worldContentTotal.collectAsState()
+    val refreshingTabs by model.refreshingTabs.collectAsState()
+    val refreshErrors by model.refreshErrors.collectAsState()
+    val clearState by model.favoriteGroupClearState.collectAsState()
+    val createdIds = remember(createdWorlds) { createdWorlds.mapTo(mutableSetOf()) { it.id } }
+    val favoriteOnlyWorlds = remember(worlds, createdIds) { worlds.filterNot { it.id in createdIds } }
+    val tabIndex = FavoritesTab.World.favoriteModelTabIndex!!
+    val loading = tabIndex in refreshingTabs
+    val error = refreshErrors[tabIndex]
+    val empty = favoriteOnlyWorlds.isEmpty() && createdWorlds.isEmpty()
+
+    Column(Modifier.fillMaxSize()) {
+        SearchTextField(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            value = searchText,
+            onValueChange = model::setSearchText,
+        )
+        GroupOptionsUI(
+            currentOptions = options,
+            favoriteType = FavoriteType.World,
+            favoriteGroups = groups,
+            total = total,
+            defaultText = strings.friendListPagerAllWorlds,
+            onOptionsChanged = model::updateWorldGroupOptions,
+            getSelectedGroup = WorldGroupOptions::selectedGroup,
+            updateOptions = { current, group -> current.copy(selectedGroup = group) },
+            onClearGroup = model::openFavoriteGroupClearConfirmation,
+            clearGroupEnabled = options.selectedGroup?.let(model::canClearFavoriteGroup) == true,
+            clearGroupInProgress = clearState.isClearing && clearState.group?.type == FavoriteType.World.value,
+            clearGroupContentDescription = strings.favoriteGroupClearAction,
+            onEditGroup = model::openFavoriteGroupEditor,
+            editGroupContentDescription = strings.favoriteGroupEditAction,
+        )
+        Box(Modifier.fillMaxWidth().height(4.dp)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(bottom = contentBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (favoriteOnlyWorlds.isNotEmpty()) {
+                    item(key = "favorite-worlds-heading") { LibrarySectionHeader(strings.userFavoritedWorlds) }
+                    renderWorldItems(favoriteOnlyWorlds) { world, suffix ->
+                        if (!world.isHiddenWorld()) {
+                            navigator push WorldProfileScreen(
+                                worldProfileVO = WorldProfileVo(world),
+                                sharedSuffixKey = suffix,
+                                sharedImageCacheKey = world.safeImageUrl(),
+                            )
+                        }
+                    }
+                }
+                if (createdWorlds.isNotEmpty()) {
+                    item(key = "created-worlds-heading") { LibrarySectionHeader(strings.userCreatedWorlds) }
+                    renderWorldItems(createdWorlds) { world, suffix ->
+                        if (!world.isHiddenWorld()) {
+                            navigator push WorldProfileScreen(
+                                worldProfileVO = WorldProfileVo(world),
+                                sharedSuffixKey = suffix,
+                                sharedKeyPrefix = "Created_",
+                                sharedImageCacheKey = world.safeImageUrl(),
+                            )
+                        }
+                    }
+                }
+            }
+            when {
+                loading && empty -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                error != null && empty -> StateMessage(strings.favoritesLoadFailed, strings.retry) {
+                    model.refreshCurrentTabCacheData(tabIndex = tabIndex)
+                }
+                empty -> StateMessage(strings.favoritesEmpty, null, null)
+                error != null -> ErrorBanner(
+                    message = strings.favoritesLoadFailed,
+                    bottomPadding = contentBottomPadding,
+                    onRetry = { model.refreshCurrentTabCacheData(tabIndex = tabIndex) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteAvatarsContent(
+    model: FriendListPagerModel,
+    listState: LazyListState,
+    contentBottomPadding: Dp,
+) {
+    val navigator = currentNavigator
+    val searchText by model.searchText.collectAsState()
+    val avatars by model.avatarList.collectAsState()
+    val createdAvatars by model.createdAvatarList.collectAsState()
+    val groups by model.avatarFavoriteGroupsFlow.collectAsState()
+    val options by model.avatarGroupOptions.collectAsState()
+    val total by model.avatarContentTotal.collectAsState()
+    val refreshingTabs by model.refreshingTabs.collectAsState()
+    val refreshErrors by model.refreshErrors.collectAsState()
+    val clearState by model.favoriteGroupClearState.collectAsState()
+    val deletedAvatarIds = currentSessionDeletedAvatarIds()
+    val visibleCreatedAvatars = remember(createdAvatars, deletedAvatarIds) {
+        createdAvatars.filterNot { it.id in deletedAvatarIds }
+    }
+    val createdIds = remember(visibleCreatedAvatars) {
+        visibleCreatedAvatars.mapTo(mutableSetOf()) { it.id }
+    }
+    val favoriteOnlyAvatars = remember(avatars, deletedAvatarIds, createdIds) {
+        avatars.filterNot { it.id in deletedAvatarIds || it.id in createdIds }
+    }
+    val tabIndex = FavoritesTab.Avatar.favoriteModelTabIndex!!
+    val loading = tabIndex in refreshingTabs
+    val error = refreshErrors[tabIndex]
+    val empty = favoriteOnlyAvatars.isEmpty() && visibleCreatedAvatars.isEmpty()
+
+    Column(Modifier.fillMaxSize()) {
+        SearchTextField(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            value = searchText,
+            onValueChange = model::setSearchText,
+        )
+        GroupOptionsUI(
+            currentOptions = options,
+            favoriteType = FavoriteType.Avatar,
+            favoriteGroups = groups,
+            total = total,
+            defaultText = strings.friendListPagerAllAvatars,
+            onOptionsChanged = model::updateAvatarGroupOptions,
+            getSelectedGroup = AvatarGroupOptions::selectedGroup,
+            updateOptions = { current, group -> current.copy(selectedGroup = group) },
+            onClearGroup = model::openFavoriteGroupClearConfirmation,
+            clearGroupEnabled = options.selectedGroup?.let(model::canClearFavoriteGroup) == true,
+            clearGroupInProgress = clearState.isClearing && clearState.group?.type == FavoriteType.Avatar.value,
+            clearGroupContentDescription = strings.favoriteGroupClearAction,
+            onEditGroup = model::openFavoriteGroupEditor,
+            editGroupContentDescription = strings.favoriteGroupEditAction,
+        )
+        Box(Modifier.fillMaxWidth().height(4.dp)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(bottom = contentBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (favoriteOnlyAvatars.isNotEmpty()) {
+                    item(key = "favorite-avatars-heading") { LibrarySectionHeader(strings.userFavoritedAvatars) }
+                    renderAvatarItems(favoriteOnlyAvatars) { avatar, suffix ->
+                        if (avatar.releaseStatus != "hidden") {
+                            navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
+                        }
+                    }
+                }
+                if (visibleCreatedAvatars.isNotEmpty()) {
+                    item(key = "created-avatars-heading") { LibrarySectionHeader(strings.userCreatedAvatars) }
+                    renderAvatarItems(visibleCreatedAvatars) { avatar, suffix ->
+                        navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
+                    }
+                }
+            }
+            when {
+                loading && empty -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                error != null && empty -> StateMessage(strings.favoritesLoadFailed, strings.retry) {
+                    model.refreshCurrentTabCacheData(tabIndex = tabIndex)
+                }
+                empty -> StateMessage(strings.favoritesEmpty, null, null)
+                error != null -> ErrorBanner(
+                    message = strings.favoritesLoadFailed,
+                    bottomPadding = contentBottomPadding,
+                    onRetry = { model.refreshCurrentTabCacheData(tabIndex = tabIndex) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibrarySectionHeader(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun RowScope.FavoritesHubTopBarActions(
+    selectedTab: FavoritesTab,
+    favoritesModel: FriendListPagerModel,
+    groupsModel: FavoritesGroupsModel,
+    onSearch: () -> Unit,
+) {
+    when (selectedTab) {
+        FavoritesTab.Player -> FriendDirectoryActions(favoritesModel)
+        FavoritesTab.World, FavoritesTab.Avatar -> {
+            val refreshingTabs by favoritesModel.refreshingTabs.collectAsState()
+            val tabIndex = selectedTab.favoriteModelTabIndex!!
+            IconButton(
+                enabled = tabIndex !in refreshingTabs,
+                onClick = { favoritesModel.refreshCurrentTabCacheData(tabIndex = tabIndex) },
+            ) {
+                if (tabIndex in refreshingTabs) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(AppIcons.Update, strings.refresh)
+                }
+            }
+        }
+        FavoritesTab.Group -> {
+            val state by groupsModel.state.collectAsState()
+            IconButton(enabled = !state.isLoading, onClick = groupsModel::refresh) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(AppIcons.Update, strings.refresh)
+                }
+            }
+        }
+    }
+    ATooltipBox(tooltip = { Text(strings.fiendListPagerSearch) }) {
+        IconButton(onClick = onSearch) {
+            Icon(AppIcons.Search, strings.fiendListPagerSearch)
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun FriendDirectoryActions(model: FriendListPagerModel) {
+    val isRefreshing by model.directoryRefreshing.collectAsState()
+    val total by model.friendTotal.collectAsState()
+    val removalState by model.friendRemovalState.collectAsState()
+
+    if (removalState.selectionMode) {
+        ATooltipBox(tooltip = { Text(strings.cancel) }) {
+            IconButton(enabled = !removalState.isSubmitting, onClick = model::exitFriendSelectionMode) {
+                Icon(AppIcons.Close, strings.cancel)
+            }
+        }
+        ATooltipBox(tooltip = { Text(strings.friendDirectoryRemoveSelected) }) {
+            IconButton(
+                enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
+                onClick = model::requestFriendRemovalConfirmation,
+            ) {
+                if (removalState.isSubmitting) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Outlined.DeleteOutline, strings.friendDirectoryRemoveSelected)
+                }
+            }
+        }
+    } else {
+        ATooltipBox(tooltip = { Text(strings.friendDirectorySelect) }) {
+            IconButton(enabled = total > 0 && !isRefreshing, onClick = model::enterFriendSelectionMode) {
+                Icon(Icons.Outlined.PersonRemove, strings.friendDirectorySelect)
+            }
+        }
+        ATooltipBox(tooltip = { Text(strings.refresh) }) {
+            IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(AppIcons.Update, strings.refresh)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun BoxScope.ErrorBanner(
+    message: String,
+    bottomPadding: Dp = 12.dp,
+    onRetry: () -> Unit,
+) {
     Surface(
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = bottomPadding),
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         shape = MaterialTheme.shapes.medium,
@@ -270,7 +571,10 @@ internal fun BoxScope.ErrorBanner(message: String, onRetry: () -> Unit) {
 
 @Composable
 internal fun BoxScope.StateMessage(message: String, action: String?, onAction: (() -> Unit)?) {
-    Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        Modifier.align(Alignment.Center).padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         if (action != null && onAction != null) TextButton(onClick = onAction) { Text(action) }
     }

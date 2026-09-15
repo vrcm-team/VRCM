@@ -1,6 +1,7 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.material3.DrawerValue
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,10 +23,12 @@ class HomeShellStateTest {
         val state = HomeShellState()
         state.selectHomeTab(HomeTab.Activity)
 
-        assertFalse(state.selectDestination(HomeDestination.Search))
-        assertEquals(HomeDestination.Search.ordinal, state.selectedDestinationIndex)
+        state.selectFavoritesTab(FavoritesTab.Group)
+        assertFalse(state.selectDestination(HomeDestination.Favorites))
+        assertEquals(HomeDestination.Favorites.ordinal, state.selectedDestinationIndex)
         assertEquals(HomeTab.Activity.ordinal, state.selectedHomeTabIndex)
-        assertTrue(state.selectDestination(HomeDestination.Search))
+        assertEquals(FavoritesTab.Group.ordinal, state.selectedFavoritesTabIndex)
+        assertTrue(state.selectDestination(HomeDestination.Favorites))
     }
 
     @Test

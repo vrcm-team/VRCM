@@ -779,6 +779,7 @@ sealed class LocaleStrings {
     open val avatars: String = "Avatars"
     open val friendListPagerAllAvatars: String = "All Avatars"
     open val favoritesTitle: String = "Favorites"
+    open val favoritesPlayers: String = "Players"
     open val favoritesFriends: String = "Friends"
     open val myGroups: String = "My Groups"
     open val myGroupsEmpty: String = "You haven't joined any groups yet"
@@ -823,6 +824,7 @@ sealed class LocaleStrings {
     open val userCreatedLoading: String = "Loading..."
     open val userCreatedEmpty: String = "No items"
     open val userFavoritedWorlds: String = "Favorited Worlds"
+    open val userFavoritedAvatars: String = "Favorited Avatars"
 
     // Avatar Profile
     open val avatarProfileVersion: String = "Version"

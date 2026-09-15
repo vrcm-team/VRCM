@@ -752,6 +752,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val avatars = "アバター"
     override val friendListPagerAllAvatars = "すべてのアバター"
     override val favoritesTitle = "お気に入り"
+    override val favoritesPlayers = "プレイヤー"
     override val favoritesFriends = "フレンド"
     override val myGroups = "マイグループ"
     override val myGroupsEmpty = "参加しているグループはまだありません"
@@ -796,6 +797,7 @@ internal object LocaleStringsJa : LocaleStrings() {
     override val userCreatedLoading = "読み込み中..."
     override val userCreatedEmpty = "アイテムなし"
     override val userFavoritedWorlds = "お気に入りのワールド"
+    override val userFavoritedAvatars = "お気に入りのアバター"
 
     // Avatar Profile
     override val avatarProfileVersion = "バージョン"

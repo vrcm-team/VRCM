@@ -62,6 +62,7 @@ object FriendListPager : Pager {
 fun FriendsDirectoryContent(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = 24.dp),
+    showFavoriteGroupDialogs: Boolean = true,
     model: FriendListPagerModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
@@ -175,9 +176,10 @@ fun FriendsDirectoryContent(
                     onSelectionToggle = model::toggleFriendSelection,
                 )
             } else {
-                renderUserItems(friends) { friend, suffix ->
-                    navigator push UserProfileScreen(UserProfileVo(friend), suffix)
-                }
+                renderUserItems(
+                    users = friends,
+                    onUserLongClick = { friend -> model.beginFriendSelection(friend.id) },
+                ) { friend, suffix -> navigator push UserProfileScreen(UserProfileVo(friend), suffix) }
             }
         }
 
@@ -205,23 +207,25 @@ fun FriendsDirectoryContent(
         }
     }
 
-    clearState.group?.let { group ->
-        FavoriteGroupClearDialog(
-            groupDisplayName = group.displayName,
-            itemCount = clearState.itemCount,
-            isClearing = clearState.isClearing,
-            hasFailure = clearState.failure != null,
-            onConfirm = model::confirmFavoriteGroupClear,
-            onDismiss = model::dismissFavoriteGroupClearConfirmation,
+    if (showFavoriteGroupDialogs) {
+        clearState.group?.let { group ->
+            FavoriteGroupClearDialog(
+                groupDisplayName = group.displayName,
+                itemCount = clearState.itemCount,
+                isClearing = clearState.isClearing,
+                hasFailure = clearState.failure != null,
+                onConfirm = model::confirmFavoriteGroupClear,
+                onDismiss = model::dismissFavoriteGroupClearConfirmation,
+            )
+        }
+
+        FavoriteGroupEditDialog(
+            state = editState,
+            onDismiss = model::dismissFavoriteGroupEditor,
+            onClearFailure = model::clearFavoriteGroupEditFailure,
+            onSave = model::saveFavoriteGroup,
         )
     }
-
-    FavoriteGroupEditDialog(
-        state = editState,
-        onDismiss = model::dismissFavoriteGroupEditor,
-        onClearFailure = model::clearFavoriteGroupEditFailure,
-        onSave = model::saveFavoriteGroup,
-    )
 
     if (removalState.confirmationVisible) {
         AlertDialog(

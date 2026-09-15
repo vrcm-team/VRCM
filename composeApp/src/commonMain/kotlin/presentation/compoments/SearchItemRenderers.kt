@@ -39,10 +39,11 @@ import io.github.vrcmteam.vrcm.service.platformPackages
  */
 fun LazyListScope.renderUserItems(
     users: List<IUser>,
+    onUserLongClick: ((IUser) -> Unit)? = null,
     onUserClick: (IUser, String) -> Unit
 ) {
     items(users, key = { it.id }) { user ->
-        renderUserItem(user, onUserClick)
+        renderUserItem(user, onUserLongClick, onUserClick)
     }
 }
 
@@ -69,6 +70,7 @@ fun LazyListScope.renderSelectableUserItems(
 @Composable
 fun LazyItemScope.renderUserItem(
     user: IUser,
+    onUserLongClick: ((IUser) -> Unit)? = null,
     onUserClick: (IUser, String) -> Unit,
     selected: Boolean? = null,
     enabled: Boolean = true,
@@ -78,6 +80,7 @@ fun LazyItemScope.renderUserItem(
     SearchResultItem(
         item = user,
         onClick = { onUserClick(it, sharedSuffixKey) },
+        onLongClick = onUserLongClick,
         modifier = Modifier.animateItem(),
         enabled = enabled,
         leadingContent = {

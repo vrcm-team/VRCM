@@ -14,6 +14,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardListDetailScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.CardScreenType
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
@@ -60,6 +61,7 @@ class AppRoutePanePolicyTest {
             GalleryScreen,
             FavoritesScreen,
             MyGroupsScreen,
+            GlobalSearchScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,
             InventoryScreen,
@@ -82,6 +84,7 @@ class AppRoutePanePolicyTest {
         assertTrue(GalleryScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FavoritesScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(MyGroupsScreen.adaptivePaneMetadata().isEmpty())
+        assertTrue(GlobalSearchScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(FriendNetworkScreen.adaptivePaneMetadata().isEmpty())
         assertTrue(InventoryScreen.adaptivePaneMetadata().isEmpty())
     }

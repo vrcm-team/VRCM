@@ -10,9 +10,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -46,7 +43,11 @@ import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.navigation.*
 import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubContent
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTopBarActions
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
@@ -55,14 +56,13 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalDrawerUs
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigationDrawer
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusSharedUserId
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
-import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPager
 import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -94,8 +94,14 @@ object HomeScreen : AppListRoute {
         val supportBlur = getAppPlatform().isSupportBlur
         val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
-        val friendListModel = if (selectedDestination == HomeDestination.Friends) {
+        val selectedFavoritesTab = FavoritesTab.entries[model.selectedFavoritesTabIndex]
+        val friendListModel = if (selectedDestination == HomeDestination.Favorites) {
             koinViewModel<FriendListPagerModel>()
+        } else {
+            null
+        }
+        val groupsModel = if (selectedDestination == HomeDestination.Favorites) {
+            koinViewModel<FavoritesGroupsModel>()
         } else {
             null
         }
@@ -157,7 +163,12 @@ object HomeScreen : AppListRoute {
                         ) {
                             when (selectedDestination) {
                                 HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
-                                HomeDestination.Friends -> FriendDirectoryActions(requireNotNull(friendListModel))
+                                HomeDestination.Favorites -> FavoritesHubTopBarActions(
+                                    selectedTab = selectedFavoritesTab,
+                                    favoritesModel = requireNotNull(friendListModel),
+                                    groupsModel = requireNotNull(groupsModel),
+                                    onSearch = { navigator push GlobalSearchScreen },
+                                )
                                 else -> Unit
                             }
                         }
@@ -200,13 +211,17 @@ object HomeScreen : AppListRoute {
                                         model,
                                         hasBottomNavigation = !useRail && showMainNavigation,
                                     )
-                                    HomeDestination.Search -> SearchListPager.Content()
+                                    HomeDestination.Favorites -> FavoritesHubContent(
+                                        selectedTab = selectedFavoritesTab,
+                                        onSelectedTab = model::selectFavoritesTab,
+                                        favoritesModel = requireNotNull(friendListModel),
+                                        groupsModel = requireNotNull(groupsModel),
+                                        contentBottomPadding = getInsetPadding(12, WindowInsets::getBottom) +
+                                            if (!useRail && showMainNavigation) 80.dp else 0.dp,
+                                    )
                                     HomeDestination.Notifications -> NotificationCenterContent(
                                         bottomNavigationPadding = if (!useRail && showMainNavigation) 80.dp else 0.dp,
                                         showTopBar = false,
-                                    )
-                                    HomeDestination.Friends -> FriendListPager.Content(
-                                        requireNotNull(friendListModel),
                                     )
                                 }
                             }
@@ -487,55 +502,6 @@ private fun NotificationRefreshAction(model: NotificationCenterModel) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FriendDirectoryActions(model: FriendListPagerModel) {
-    val isRefreshing by model.directoryRefreshing.collectAsState()
-    val total by model.friendTotal.collectAsState()
-    val removalState by model.friendRemovalState.collectAsState()
-
-    if (removalState.selectionMode) {
-        ATooltipBox(tooltip = { Text(strings.cancel) }) {
-            IconButton(
-                enabled = !removalState.isSubmitting,
-                onClick = model::exitFriendSelectionMode,
-            ) {
-                Icon(AppIcons.Close, strings.cancel)
-            }
-        }
-        ATooltipBox(tooltip = { Text(strings.friendDirectoryRemoveSelected) }) {
-            IconButton(
-                enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
-                onClick = model::requestFriendRemovalConfirmation,
-            ) {
-                if (removalState.isSubmitting) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Outlined.DeleteOutline, strings.friendDirectoryRemoveSelected)
-                }
-            }
-        }
-    } else {
-        ATooltipBox(tooltip = { Text(strings.friendDirectorySelect) }) {
-            IconButton(
-                enabled = total > 0 && !isRefreshing,
-                onClick = model::enterFriendSelectionMode,
-            ) {
-                Icon(Icons.Outlined.PersonRemove, strings.friendDirectorySelect)
-            }
-        }
-        ATooltipBox(tooltip = { Text(strings.refresh) }) {
-            IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(AppIcons.Update, strings.refresh)
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun HomePersonalDrawer(
     model: HomeScreenModel,
@@ -776,7 +742,6 @@ internal class HomeDrawerStateCoordinator {
 @Composable
 private fun HomeDestination.presentation(): MainDestinationPresentation = when (this) {
     HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Explore)
-    HomeDestination.Search -> MainDestinationPresentation(strings.mainNavigationSearch, AppIcons.Search)
+    HomeDestination.Favorites -> MainDestinationPresentation(strings.favoritesTitle, AppIcons.Favorite)
     HomeDestination.Notifications -> MainDestinationPresentation(strings.mainNavigationNotifications, AppIcons.Notifications)
-    HomeDestination.Friends -> MainDestinationPresentation(strings.mainNavigationFriends, AppIcons.Person)
 }

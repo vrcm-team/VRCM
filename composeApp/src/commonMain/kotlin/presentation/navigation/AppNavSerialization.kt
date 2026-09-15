@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
@@ -45,6 +46,7 @@ internal val appSavedStateConfiguration = SavedStateConfiguration {
             subclass(GalleryScreen::class, GalleryScreen.serializer())
             subclass(FavoritesScreen::class, FavoritesScreen.serializer())
             subclass(MyGroupsScreen::class, MyGroupsScreen.serializer())
+            subclass(GlobalSearchScreen::class, GlobalSearchScreen.serializer())
             subclass(GalleryPickerScreen::class, GalleryPickerScreen.serializer())
             subclass(PrintImageEditorScreen::class, PrintImageEditorScreen.serializer())
             subclass(FriendNetworkScreen::class, FriendNetworkScreen.serializer())

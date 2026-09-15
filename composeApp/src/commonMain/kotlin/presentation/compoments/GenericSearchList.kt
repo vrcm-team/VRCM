@@ -1,7 +1,9 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -170,25 +172,35 @@ fun GenericSearchList(
 /**
  * 用于显示搜索结果列表项的组件
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun <T> SearchResultItem(
     item: T,
     onClick: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    onLongClick: ((T) -> Unit)? = null,
     leadingContent: @Composable () -> Unit,
     headlineContent: @Composable () -> Unit,
     supportingContent: @Composable (() -> Unit)? = null,
     trailingContent: @Composable (() -> Unit)? = null
 ) {
+    val interactionModifier = if (onLongClick == null) {
+        Modifier.clickable(enabled = enabled) { onClick(item) }
+    } else {
+        Modifier.combinedClickable(
+            enabled = enabled,
+            onClick = { onClick(item) },
+            onLongClick = { onLongClick(item) },
+        )
+    }
     ListItem(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
             .padding(horizontal = 6.dp)
             .clip(MaterialTheme.shapes.large)
-            .clickable(enabled = enabled) { onClick(item) },
+            .then(interactionModifier),
         leadingContent = leadingContent,
         headlineContent = headlineContent,
         supportingContent = supportingContent ?: {},

@@ -168,8 +168,14 @@ class FriendListPagerModel(
     private val _worldList = MutableStateFlow(emptyList<WorldData>())
     val worldList: StateFlow<List<WorldData>> = _worldList.asStateFlow()
 
+    private val createdWorldMap = mutableMapOf<String, WorldData>()
+    private val _createdWorldList = MutableStateFlow(emptyList<WorldData>())
+    val createdWorldList: StateFlow<List<WorldData>> = _createdWorldList.asStateFlow()
+
     private val _worldTotal = MutableStateFlow(0)
     val worldTotal: StateFlow<Int> = _worldTotal.asStateFlow()
+    private val _worldContentTotal = MutableStateFlow(0)
+    val worldContentTotal: StateFlow<Int> = _worldContentTotal.asStateFlow()
 
     // 缓存模型数据，以ID为键
     private val favoritedAvatarMap: MutableMap<String, AvatarData> = mutableStateMapOf()
@@ -177,8 +183,14 @@ class FriendListPagerModel(
     private val _avatarList = MutableStateFlow(emptyList<AvatarData>())
     val avatarList: StateFlow<List<AvatarData>> = _avatarList.asStateFlow()
 
+    private val createdAvatarMap = mutableMapOf<String, AvatarData>()
+    private val _createdAvatarList = MutableStateFlow(emptyList<AvatarData>())
+    val createdAvatarList: StateFlow<List<AvatarData>> = _createdAvatarList.asStateFlow()
+
     private val _avatarTotal = MutableStateFlow(0)
     val avatarTotal: StateFlow<Int> = _avatarTotal.asStateFlow()
+    private val _avatarContentTotal = MutableStateFlow(0)
+    val avatarContentTotal: StateFlow<Int> = _avatarContentTotal.asStateFlow()
 
     /**
      * 模型组选项状态
@@ -371,16 +383,22 @@ class FriendListPagerModel(
             _favoriteGroupClearState.value = FavoriteGroupClearState()
             unresolvedFavoriteGroupClears.value = emptySet()
             favoritedWorldMap.clear()
+            createdWorldMap.clear()
             favoritedAvatarMap.clear()
+            createdAvatarMap.clear()
             offlineStatusDescriptions.clear()
             val currentState = friendService.friendStateSnapshot.value
             val currentFriends = currentState.friendsForSession(sessionToken)
             _friendSnapshot.value = currentFriends
             _friendTotal.value = currentFriends.size
             _worldList.value = emptyList()
+            _createdWorldList.value = emptyList()
             _worldTotal.value = 0
+            _worldContentTotal.value = 0
             _avatarList.value = emptyList()
+            _createdAvatarList.value = emptyList()
             _avatarTotal.value = 0
+            _avatarContentTotal.value = 0
             _friendGroupOptions.value = FriendGroupOptions()
             _worldGroupOptions.value = WorldGroupOptions()
             _avatarGroupOptions.value = AvatarGroupOptions()
@@ -417,6 +435,14 @@ class FriendListPagerModel(
     fun enterFriendSelectionMode() {
         if (_friendRemovalState.value.isSubmitting || _friendSnapshot.value.isEmpty()) return
         _friendRemovalState.value = FriendRemovalState(selectionMode = true)
+    }
+
+    fun beginFriendSelection(userId: String) {
+        if (_friendRemovalState.value.isSubmitting || _friendSnapshot.value.none { it.id == userId }) return
+        _friendRemovalState.value = FriendRemovalState(
+            selectionMode = true,
+            selectedUserIds = setOf(userId),
+        )
     }
 
     fun exitFriendSelectionMode() {
@@ -666,9 +692,11 @@ class FriendListPagerModel(
                             sessionToken = sessionToken,
                             generation = generation,
                         )
-                        if (groupsResult.isFailure) return@launch
+                        if (groupsResult.isSuccess && acceptsAccount(sessionToken, generation)) {
+                            doRefreshWorldList(sessionToken, generation)
+                        }
                         if (!acceptsAccount(sessionToken, generation)) return@launch
-                        doRefreshWorldList(sessionToken, generation)
+                        doRefreshCreatedWorldList(sessionToken, generation)
                     }
 
                     Avatar -> {
@@ -681,9 +709,11 @@ class FriendListPagerModel(
                             sessionToken = sessionToken,
                             generation = generation,
                         )
-                        if (groupsResult.isFailure) return@launch
+                        if (groupsResult.isSuccess && acceptsAccount(sessionToken, generation)) {
+                            doRefreshAvatarList(sessionToken, generation)
+                        }
                         if (!acceptsAccount(sessionToken, generation)) return@launch
-                        doRefreshAvatarList(sessionToken, generation)
+                        doRefreshCreatedAvatarList(sessionToken, generation)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -1436,6 +1466,18 @@ class FriendListPagerModel(
 
         // 将FavoritedWorld列表转换为WorldData列表
         _worldList.value = filteredWorlds.map { it.toSearchWorldData() }
+        _createdWorldList.value = if (selectedGroup == null) {
+            createdWorldMap.values
+                .filter { world ->
+                    name.isEmpty() || world.name.contains(name, ignoreCase = true) ||
+                        world.id.contains(name, ignoreCase = true)
+                }
+                .sortedBy { it.name.lowercase() }
+        } else {
+            emptyList()
+        }
+        _worldTotal.value = favoritedWorldMap.size
+        _worldContentTotal.value = (favoritedWorldMap.keys + createdWorldMap.keys).size
     }
 
     /**
@@ -1462,6 +1504,70 @@ class FriendListPagerModel(
         }.sortedWith(compareBy<AvatarData> { it.releaseStatus == "hidden" }.thenBy { it.name })
 
         _avatarList.value = filteredAvatars
+        _createdAvatarList.value = if (selectedGroup == null) {
+            createdAvatarMap.values
+                .filter { avatar ->
+                    name.isEmpty() || avatar.name.contains(name, ignoreCase = true) ||
+                        avatar.id.contains(name, ignoreCase = true)
+                }
+                .sortedBy { it.name.lowercase() }
+        } else {
+            emptyList()
+        }
+        _avatarTotal.value = favoritedAvatarMap.size
+        _avatarContentTotal.value = (favoritedAvatarMap.keys + createdAvatarMap.keys).size
+    }
+
+    private suspend fun doRefreshCreatedWorldList(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ) {
+        authService.reTryAuthCatching {
+            worldsApi.userWorldsFlow(
+                user = "me",
+                sort = "updated",
+                order = "descending",
+                releaseStatus = "all",
+                n = 100,
+            ).toList().flatten()
+        }.onSuccess { worlds ->
+            if (!acceptsAccount(sessionToken, generation)) return@onSuccess
+            createdWorldMap.clear()
+            createdWorldMap.putAll(worlds.filter { it.id.isNotBlank() }.associateBy { it.id })
+            findWorldList(searchTexts[1])
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            if (acceptsAccount(sessionToken, generation)) {
+                _refreshErrors.update { it + (1 to error.message.orEmpty()) }
+                showFavoriteError(favoriteLocale?.favoritesLoadFailed, error)
+            }
+        }
+    }
+
+    private suspend fun doRefreshCreatedAvatarList(
+        sessionToken: AccountSessionToken,
+        generation: Long,
+    ) {
+        authService.reTryAuthCatching {
+            avatarsApi.avatarsFlow(
+                user = "me",
+                sort = "updated",
+                order = "descending",
+                releaseStatus = "all",
+                n = 50,
+            ).toList().flatten()
+        }.onSuccess { avatars ->
+            if (!acceptsAccount(sessionToken, generation)) return@onSuccess
+            createdAvatarMap.clear()
+            createdAvatarMap.putAll(avatars.filter { it.id.isNotBlank() }.associateBy { it.id })
+            findAvatarList(searchTexts[2])
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            if (acceptsAccount(sessionToken, generation)) {
+                _refreshErrors.update { it + (2 to error.message.orEmpty()) }
+                showFavoriteError(favoriteLocale?.favoritesLoadFailed, error)
+            }
+        }
     }
 
     /**

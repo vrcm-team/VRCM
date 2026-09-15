@@ -15,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.extensions.onApiFailure
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.service.AuthService
@@ -38,6 +39,9 @@ class HomeScreenModel(
 
     val selectedHomeTabIndex: Int
         get() = shellState.selectedHomeTabIndex
+
+    val selectedFavoritesTabIndex: Int
+        get() = shellState.selectedFavoritesTabIndex
 
     val drawerVisible: Boolean
         get() = shellState.drawerVisible
@@ -68,6 +72,10 @@ class HomeScreenModel(
 
     internal fun selectHomeTab(tab: HomeTab) {
         shellState.selectHomeTab(tab)
+    }
+
+    internal fun selectFavoritesTab(tab: FavoritesTab) {
+        shellState.selectFavoritesTab(tab)
     }
 
     fun showDrawer() {
@@ -141,9 +149,8 @@ class HomeScreenModel(
 
 internal enum class HomeDestination {
     Home,
-    Search,
+    Favorites,
     Notifications,
-    Friends,
 }
 
 internal enum class HomeTab {
@@ -157,6 +164,9 @@ internal class HomeShellState {
         private set
 
     var selectedHomeTabIndex by mutableIntStateOf(HomeTab.Location.ordinal)
+        private set
+
+    var selectedFavoritesTabIndex by mutableIntStateOf(FavoritesTab.Player.ordinal)
         private set
 
     var drawerVisible by mutableStateOf(false)
@@ -173,6 +183,10 @@ internal class HomeShellState {
 
     fun selectHomeTab(tab: HomeTab) {
         selectedHomeTabIndex = tab.ordinal
+    }
+
+    fun selectFavoritesTab(tab: FavoritesTab) {
+        selectedFavoritesTabIndex = tab.ordinal
     }
 
     fun showDrawer() {

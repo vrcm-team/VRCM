@@ -83,13 +83,20 @@ object SearchListPager : Pager {
 
     @Composable
     override fun Content() {
-        PublicSearchContent()
+        val bottomNavigationPadding = if (
+            LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
+        ) 80.dp else 0.dp
+        PublicSearchContent(
+            bottomContentPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding,
+        )
     }
 }
 
 /** 可直接嵌入一级页面的公开玩家、世界与群组搜索内容。 */
 @Composable
 fun PublicSearchContent(
+    modifier: Modifier = Modifier,
+    bottomContentPadding: Dp = 24.dp,
     model: SearchListPagerModel = koinViewModel(),
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -119,10 +126,6 @@ fun PublicSearchContent(
         pageCount = { PublicSearchTab.entries.size },
     )
     var showAdvancedOptions by remember { mutableStateOf(false) }
-    val bottomNavigationPadding = if (
-        LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
-    ) 80.dp else 0.dp
-
     LaunchedEffect(pagerState, model) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
@@ -170,15 +173,15 @@ fun PublicSearchContent(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize()) {
+        PublicSearchTabRow(
+            pagerState = pagerState,
+            tabs = listOf(strings.users, strings.worlds, strings.groups),
+        )
         SearchTextField(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 16.dp),
             value = searchText,
             onValueChange = model::setSearchText,
-        )
-        PublicSearchTabRow(
-            pagerState = pagerState,
-            tabs = listOf(strings.users, strings.worlds, strings.groups),
         )
         HorizontalPager(
             state = pagerState,
@@ -203,7 +206,7 @@ fun PublicSearchContent(
                 loadState = loadState,
                 resultCount = resultCount,
                 lazyListState = listState,
-                bottomNavigationPadding = bottomNavigationPadding,
+                bottomContentPadding = bottomContentPadding,
                 promptText = promptText,
                 noResultsText = noResultsText,
                 failedText = failedText,
@@ -303,7 +306,7 @@ private fun PublicSearchPage(
     loadState: PublicSearchLoadState,
     resultCount: Int,
     lazyListState: LazyListState,
-    bottomNavigationPadding: Dp,
+    bottomContentPadding: Dp,
     promptText: String,
     noResultsText: String,
     failedText: String,
@@ -313,13 +316,12 @@ private fun PublicSearchPage(
     advancedOptionsContent: (@Composable () -> Unit)?,
     itemContent: LazyListScope.() -> Unit,
 ) {
-    val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = lazyListState,
         contentPadding = PaddingValues(
             top = 8.dp,
-            bottom = bottomPadding,
+            bottom = bottomContentPadding,
         ),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

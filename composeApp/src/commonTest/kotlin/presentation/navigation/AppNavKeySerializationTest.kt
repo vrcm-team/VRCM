@@ -18,6 +18,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardDisplayRoute
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardEditorRoute
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationScreen
+import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
@@ -49,6 +50,7 @@ class AppNavKeySerializationTest {
             FriendActivityTimelineScreen,
             FavoritesScreen,
             MyGroupsScreen,
+            GlobalSearchScreen,
             GalleryScreen,
             PrintImageEditorScreen(sessionId = "session_test"),
             FriendNetworkScreen,

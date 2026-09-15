@@ -740,6 +740,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val avatars = "模型"
     override val friendListPagerAllAvatars = "全部模型"
     override val favoritesTitle = "收藏"
+    override val favoritesPlayers = "玩家"
     override val favoritesFriends = "好友"
     override val myGroups = "我的群組"
     override val myGroupsEmpty = "你還沒有加入任何群組"
@@ -783,6 +784,7 @@ internal object LocaleStringsZhHant : LocaleStrings() {
     override val userCreatedLoading = "載入中..."
     override val userCreatedEmpty = "暫無內容"
     override val userFavoritedWorlds = "收藏的世界"
+    override val userFavoritedAvatars = "收藏的模型"
 
     // Avatar Profile
     override val avatarProfileVersion = "版本"
