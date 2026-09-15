@@ -94,9 +94,13 @@ internal class OneShotEntranceAnimationGate {
 data class UserProfileScreen(
     private val userProfileVO: UserProfileVo,
     private val sharedSuffixKey: String = "",
+    private val openActionMenuOnEntry: Boolean = false,
 ) : AppDetailRoute {
     @Transient
     private val groupEntranceAnimationGate = OneShotEntranceAnimationGate()
+
+    @Transient
+    private val actionMenuEntranceGate = OneShotEntranceAnimationGate()
 
     // Keep dialog/shared-element state distinct for profiles with different IDs.
     override val key = "UserProfileScreen:${userProfileVO.id}"
@@ -139,7 +143,9 @@ data class UserProfileScreen(
         val playerChatboxModerationState by userProfileScreenModel.playerChatboxModerationState.collectAsState()
         val playerVoiceModerationState by userProfileScreenModel.playerVoiceModerationState.collectAsState()
         val playerInteractionState by userProfileScreenModel.playerInteractionState.collectAsState()
-        var bottomSheetIsVisible by remember { mutableStateOf(false) }
+        var bottomSheetIsVisible by remember {
+            mutableStateOf(openActionMenuOnEntry && actionMenuEntranceGate.consume())
+        }
         val sheetState = rememberModalBottomSheetState()
         val actionMenuNestedScrollConnection =
             rememberConsumeRemainingUpwardScrollConnection()

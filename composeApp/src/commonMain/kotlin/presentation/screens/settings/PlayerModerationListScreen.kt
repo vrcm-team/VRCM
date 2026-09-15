@@ -21,6 +21,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +49,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
@@ -55,6 +59,8 @@ import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
+import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
+import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -77,8 +83,16 @@ internal fun PlayerModerationScreenContent(
     val navigator = LocalNavigator.currentOrThrow
     val state by model.state.collectAsState()
     var showCleanupDialog by remember { mutableStateOf(false) }
+    var pendingRecordCleanup by remember { mutableStateOf<PlayerModerationData?>(null) }
+    var refreshAfterManagingPlayer by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { model.loadIfNeeded() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (refreshAfterManagingPlayer) {
+            refreshAfterManagingPlayer = false
+            model.refresh()
+        }
+    }
     LaunchedEffect(
         state.sessionToken,
         state.isSessionAvailable,
@@ -90,6 +104,20 @@ internal fun PlayerModerationScreenContent(
             state.availableTypes.isEmpty()
         ) {
             showCleanupDialog = false
+        }
+    }
+    LaunchedEffect(
+        state.sessionToken,
+        state.isSessionAvailable,
+        state.isLoading,
+        state.isClearing,
+        state.records,
+    ) {
+        pendingRecordCleanup = pendingRecordCleanup?.takeIf { pending ->
+            state.isSessionAvailable && !state.isLoading && !state.isClearing &&
+                state.records.any { record ->
+                    record.targetUserId == pending.targetUserId && record.type == pending.type
+                }
         }
     }
     BlockBackNavigation(blocked = state.isClearing)
@@ -104,6 +132,18 @@ internal fun PlayerModerationScreenContent(
                 val token = state.sessionToken
                 showCleanupDialog = false
                 if (type != null && token != null) model.clearSelected(type, token)
+            },
+        )
+    }
+
+    pendingRecordCleanup?.let { record ->
+        PlayerModerationRecordCleanupDialog(
+            record = record,
+            onDismiss = { pendingRecordCleanup = null },
+            onConfirm = {
+                val token = state.sessionToken
+                pendingRecordCleanup = null
+                if (token != null) model.clearRecord(record, token)
             },
         )
     }
@@ -154,6 +194,19 @@ internal fun PlayerModerationScreenContent(
             state = state,
             contentPadding = contentPadding,
             onSelectFilter = model::selectFilter,
+            onManagePlayer = { record ->
+                refreshAfterManagingPlayer = true
+                navigator.push(
+                    UserProfileScreen(
+                        UserProfileVo(
+                            id = record.targetUserId,
+                            displayName = record.targetDisplayName,
+                        ),
+                        openActionMenuOnEntry = true,
+                    ),
+                )
+            },
+            onClearRecord = { pendingRecordCleanup = it },
             onRetry = model::refresh,
         )
     }
@@ -164,6 +217,8 @@ private fun PlayerModerationContent(
     state: PlayerModerationState,
     contentPadding: PaddingValues,
     onSelectFilter: (String?) -> Unit,
+    onManagePlayer: (PlayerModerationData) -> Unit,
+    onClearRecord: (PlayerModerationData) -> Unit,
     onRetry: () -> Unit,
 ) {
     when {
@@ -191,6 +246,8 @@ private fun PlayerModerationContent(
             state = state,
             contentPadding = contentPadding,
             onSelectFilter = onSelectFilter,
+            onManagePlayer = onManagePlayer,
+            onClearRecord = onClearRecord,
             onRetry = onRetry,
         )
     }
@@ -201,6 +258,8 @@ private fun PlayerModerationLoadedContent(
     state: PlayerModerationState,
     contentPadding: PaddingValues,
     onSelectFilter: (String?) -> Unit,
+    onManagePlayer: (PlayerModerationData) -> Unit,
+    onClearRecord: (PlayerModerationData) -> Unit,
     onRetry: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
@@ -280,7 +339,12 @@ private fun PlayerModerationLoadedContent(
                     if (index > 0) {
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     }
-                    PlayerModerationRecordItem(item.record)
+                    PlayerModerationRecordItem(
+                        record = item.record,
+                        enabled = !state.isLoading && !state.isClearing,
+                        onManage = { onManagePlayer(item.record) },
+                        onClear = { onClearRecord(item.record) },
+                    )
                 }
             }
         }
@@ -444,12 +508,62 @@ private fun CleanupResultMessage(result: PlayerModerationCleanupResult) {
 }
 
 @Composable
-private fun PlayerModerationRecordItem(record: PlayerModerationData) {
-    val target = record.targetDisplayName.ifBlank {
-        record.targetUserId.ifBlank { strings.playerModerationUnknownPlayer }
-    }
+private fun PlayerModerationRecordCleanupDialog(
+    record: PlayerModerationData,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = AppIcons.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = { Text(strings.playerModerationRemoveConfirmTitle) },
+        text = {
+            Text(
+                strings.playerModerationRemoveConfirmMessage
+                    .replace("%player%", record.targetLabel(strings))
+                    .replace("%type%", strings.playerModerationTypeLabel(record.type)),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = strings.playerModerationRemoveSetting,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        },
+    )
+}
+
+@Composable
+private fun PlayerModerationRecordItem(
+    record: PlayerModerationData,
+    enabled: Boolean,
+    onManage: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val target = record.targetLabel(strings)
     val created = record.created.toLocalDateTime()?.ignoredFormat
         ?: record.created.ifBlank { strings.unknown }
+    val canManage = record.targetUserId.isNotBlank()
+    val canClear = PlayerModerationType.fromApiValue(record.type) != null &&
+        canManage
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(enabled) {
+        if (!enabled) menuExpanded = false
+    }
 
     ListItem(
         headlineContent = {
@@ -471,6 +585,62 @@ private fun PlayerModerationRecordItem(record: PlayerModerationData) {
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
+        },
+        trailingContent = if (canManage) {
+            {
+                Box {
+                    IconButton(
+                        enabled = enabled,
+                        onClick = { menuExpanded = true },
+                    ) {
+                        Icon(
+                            imageVector = AppIcons.MoreVert,
+                            contentDescription = strings.playerModerationPlayerActions,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(strings.playerModerationManagePlayer) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = AppIcons.Person,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onManage()
+                            },
+                        )
+                        if (canClear) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = strings.playerModerationRemoveSetting,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = AppIcons.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    onClear()
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            null
         },
     )
 }
@@ -497,6 +667,11 @@ private fun MessageState(
 
 private fun PlayerModerationType.localizedName(locale: LocaleStrings): String =
     locale.playerModerationTypeLabel(apiValue)
+
+private fun PlayerModerationData.targetLabel(locale: LocaleStrings): String =
+    targetDisplayName.ifBlank {
+        targetUserId.ifBlank { locale.playerModerationUnknownPlayer }
+    }
 
 private fun LocaleStrings.playerModerationTypeLabel(type: String): String = when (type) {
     "mute" -> playerModerationTypeMute

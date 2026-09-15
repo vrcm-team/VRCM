@@ -147,6 +147,90 @@ class PlayerModerationCleanupModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun individualCleanupRemovesOnlyTheSelectedPlayersSetting() = runBlocking {
+        val account = AccountDto(userId = "usr_account", username = "account")
+        val selected = record("selected", "usr_a", "block")
+        val otherBlock = record("other-block", "usr_b", "block")
+        val otherSetting = record("other-setting", "usr_a", "mute")
+        val source = FakePlayerModerationCleanupSource().apply {
+            allRecords = listOf(selected, otherBlock, otherSetting)
+            typedRecords = listOf(selected, otherBlock)
+            removeHandler = { token, target, type ->
+                typedRecords = typedRecords.filterNot {
+                    it.targetUserId == target && it.type == type.apiValue
+                }
+                PlayerModerationCleanupResponse(Result.success(Unit), token)
+            }
+        }
+        SharedFlowCentre.emitAuthenticated(account)
+        val model = PlayerModerationListScreenModel(source)
+        try {
+            model.loadIfNeeded()
+            awaitUntil { model.state.value.hasLoaded }
+
+            model.clearRecord(selected)
+            awaitUntil { model.state.value.result != null }
+
+            assertEquals(listOf("usr_a"), source.removedTargets)
+            assertEquals(2, source.typedRequestCount)
+            assertEquals(
+                PlayerModerationCleanupResult(
+                    kind = PlayerModerationCleanupResultKind.Success,
+                    removedCount = 1,
+                    failedCount = 0,
+                ),
+                model.state.value.result,
+            )
+            assertEquals(
+                setOf("usr_b:block", "usr_a:mute"),
+                model.state.value.records.map { "${it.targetUserId}:${it.type}" }.toSet(),
+            )
+            assertEquals(
+                listOf(
+                    PlayerModerationTypeCount(PlayerModerationType.Block, 1),
+                    PlayerModerationTypeCount(PlayerModerationType.Mute, 1),
+                ),
+                model.state.value.availableTypes,
+            )
+        } finally {
+            close(model)
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
+    fun individualCleanupReconcilesWhenTheSelectedSettingIsAlreadyGone() = runBlocking {
+        val account = AccountDto(userId = "usr_account", username = "account")
+        val selected = record("selected", "usr_a", "block")
+        val remaining = record("remaining", "usr_b", "block")
+        val source = FakePlayerModerationCleanupSource().apply {
+            allRecords = listOf(selected, remaining)
+            typedRecords = listOf(remaining)
+        }
+        SharedFlowCentre.emitAuthenticated(account)
+        val model = PlayerModerationListScreenModel(source)
+        try {
+            model.loadIfNeeded()
+            awaitUntil { model.state.value.hasLoaded }
+
+            model.clearRecord(selected)
+            awaitUntil { model.state.value.result != null }
+
+            assertEquals(emptyList(), source.removedTargets)
+            assertEquals(1, source.typedRequestCount)
+            assertEquals(PlayerModerationCleanupResultKind.NoRecords, model.state.value.result?.kind)
+            assertEquals(listOf("usr_b"), model.state.value.records.map { it.targetUserId })
+            assertEquals(
+                PlayerModerationTypeCount(PlayerModerationType.Block, 1),
+                model.state.value.availableTypes.single(),
+            )
+        } finally {
+            close(model)
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
     fun renewedResponseTokenContinuesRemainingRequests() = runBlocking {
         val account = AccountDto(userId = "usr_account", username = "account")
         val source = FakePlayerModerationCleanupSource().apply {

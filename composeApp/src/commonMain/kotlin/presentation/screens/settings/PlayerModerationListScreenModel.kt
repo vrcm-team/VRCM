@@ -65,7 +65,7 @@ internal data class PlayerModerationState(
     } ?: keyedRecords
 }
 
-/** Owns the session-bound record list and confirmed cleanup flow for player moderation. */
+/** Owns the session-bound record list and confirmed per-record or bulk cleanup flows. */
 internal class PlayerModerationListScreenModel(
     private val source: PlayerModerationCleanupSource,
 ) : ViewModel() {
@@ -206,15 +206,44 @@ internal class PlayerModerationListScreenModel(
         expectedSessionToken: AccountSessionToken? = _state.value.sessionToken,
     ) {
         val current = _state.value
+        val type = expectedType
+            ?.takeIf { it == current.selectedCleanupType }
+            ?.takeIf { selected -> current.availableTypes.any { it.type == selected } }
+            ?: return
+        startCleanup(
+            type = type,
+            requestedTargets = null,
+            expectedSessionToken = expectedSessionToken,
+        )
+    }
+
+    fun clearRecord(
+        expectedRecord: PlayerModerationData,
+        expectedSessionToken: AccountSessionToken? = _state.value.sessionToken,
+    ) {
+        val current = _state.value
+        val type = PlayerModerationType.fromApiValue(expectedRecord.type) ?: return
+        val targetUserId = expectedRecord.targetUserId.takeIf(String::isNotBlank) ?: return
+        if (current.records.none { record ->
+                record.targetUserId == targetUserId && record.type == type.apiValue
+            }
+        ) {
+            return
+        }
+        startCleanup(type, setOf(targetUserId), expectedSessionToken)
+    }
+
+    private fun startCleanup(
+        type: PlayerModerationType,
+        requestedTargets: Set<String>?,
+        expectedSessionToken: AccountSessionToken?,
+    ) {
+        val current = _state.value
         if (current.isLoading || current.isClearing ||
             refreshJob?.isActive == true || cleanupJob?.isActive == true
         ) {
             return
         }
-        val type = expectedType
-            ?.takeIf { it == current.selectedCleanupType }
-            ?.takeIf { selected -> current.availableTypes.any { it.type == selected } }
-            ?: return
         val token = expectedSessionToken
             ?.takeIf { it == current.sessionToken && SharedFlowCentre.isCurrentSession(it) }
             ?: return
@@ -247,10 +276,12 @@ internal class PlayerModerationListScreenModel(
                         restartAfterStaleResponse(generation, wasCleanup = true)
                     }
                     return@launch
+                }.filter { it.type == type.apiValue }
+                val targets = records.targetsFor(type).filter { targetUserId ->
+                    requestedTargets == null || targetUserId in requestedTargets
                 }
-                val targets = records.targetsFor(type)
                 if (targets.isEmpty()) {
-                    if (!publishNoRecords(type, operationToken, generation)) {
+                    if (!publishNoRecords(type, records, operationToken, generation)) {
                         restartAfterStaleResponse(generation, wasCleanup = true)
                     }
                     return@launch
@@ -285,12 +316,10 @@ internal class PlayerModerationListScreenModel(
                     }
                     return@launch
                 }.filter { it.type == type.apiValue }
-                val remainingTargets = remainingRecords.targetsFor(type).toSet()
-                val removed = targets.count { it !in remainingTargets }
                 if (
                     !publishVerifiedResult(
                         type = type,
-                        removed = removed,
+                        requestedTargets = targets,
                         remainingRecords = remainingRecords,
                         token = operationToken,
                         generation = generation,
@@ -361,18 +390,21 @@ internal class PlayerModerationListScreenModel(
 
     private fun publishNoRecords(
         type: PlayerModerationType,
+        remainingRecords: List<PlayerModerationData>,
         token: AccountSessionToken,
         generation: Long,
     ): Boolean = commitIfCurrent(token, generation) {
         _state.update { current ->
-            val remainingRecords = current.records.filterNot { it.type == type.apiValue }
-            val remainingTypes = remainingRecords.cleanupTypeCounts()
+            val records = current.records.replaceTypeRecords(type, remainingRecords)
+            val remainingTypes = records.cleanupTypeCounts()
             current.copy(
-                records = remainingRecords,
+                records = records,
                 selectedFilter = current.selectedFilter
-                    ?.takeIf { selected -> remainingRecords.any { it.type == selected } },
+                    ?.takeIf { selected -> records.any { it.type == selected } },
                 availableTypes = remainingTypes,
-                selectedCleanupType = remainingTypes.firstOrNull()?.type,
+                selectedCleanupType = current.selectedCleanupType
+                    ?.takeIf { selected -> remainingTypes.any { it.type == selected } }
+                    ?: remainingTypes.firstOrNull()?.type,
                 isClearing = false,
                 processedCount = 0,
                 totalCount = 0,
@@ -387,12 +419,14 @@ internal class PlayerModerationListScreenModel(
 
     private fun publishVerifiedResult(
         type: PlayerModerationType,
-        removed: Int,
+        requestedTargets: List<String>,
         remainingRecords: List<PlayerModerationData>,
         token: AccountSessionToken,
         generation: Long,
     ): Boolean {
-        val remaining = remainingRecords.targetsFor(type).size
+        val remainingTargets = remainingRecords.targetsFor(type).toSet()
+        val remaining = requestedTargets.count { it in remainingTargets }
+        val removed = requestedTargets.size - remaining
         val kind = when {
             remaining == 0 -> PlayerModerationCleanupResultKind.Success
             removed > 0 -> PlayerModerationCleanupResultKind.PartialFailure
@@ -400,16 +434,15 @@ internal class PlayerModerationListScreenModel(
         }
         return commitIfCurrent(token, generation) {
             _state.update { current ->
-                val records = (
-                    current.records.filterNot { it.type == type.apiValue } + remainingRecords
-                ).stableNewestFirst()
+                val records = current.records.replaceTypeRecords(type, remainingRecords)
                 val remainingTypes = records.cleanupTypeCounts()
                 current.copy(
                     records = records,
                     selectedFilter = current.selectedFilter
                         ?.takeIf { selected -> records.any { it.type == selected } },
                     availableTypes = remainingTypes,
-                    selectedCleanupType = type.takeIf { remaining > 0 }
+                    selectedCleanupType = current.selectedCleanupType
+                        ?.takeIf { selected -> remainingTypes.any { it.type == selected } }
                         ?: remainingTypes.firstOrNull()?.type,
                     isClearing = false,
                     result = PlayerModerationCleanupResult(kind, removed, remaining),
@@ -488,6 +521,12 @@ private fun List<PlayerModerationData>.cleanupTypeCounts(): List<PlayerModeratio
             .takeIf { it > 0 }
             ?.let { PlayerModerationTypeCount(type, it) }
     }
+
+private fun List<PlayerModerationData>.replaceTypeRecords(
+    type: PlayerModerationType,
+    replacement: List<PlayerModerationData>,
+): List<PlayerModerationData> =
+    (filterNot { it.type == type.apiValue } + replacement).stableNewestFirst()
 
 /** Sorts only when every record has a valid time; otherwise preserves the complete server order. */
 @OptIn(kotlin.time.ExperimentalTime::class)
