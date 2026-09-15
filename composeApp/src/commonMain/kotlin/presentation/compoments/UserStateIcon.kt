@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 private val FriendIconItemWidth = 60.dp
-private val FriendIconSpacing = 16.dp
+private val FriendIconVerticalSpacing = 16.dp
 
 @Composable
 fun UserStateIcon(
@@ -148,19 +148,14 @@ fun UserIconsFlowRow(
 ) {
     if (friends.isEmpty()) return
     BoxWithConstraints(modifier = modifier) {
-        // 以满行首尾贴边为基准固定列间距，未满行继续沿用相同列位。
-        val maxItemsInEachRow = (
-            (maxWidth + FriendIconSpacing) / (FriendIconItemWidth + FriendIconSpacing)
-        ).toInt().coerceAtLeast(1)
-        val horizontalSpacing = if (maxItemsInEachRow > 1) {
-            (maxWidth - FriendIconItemWidth * maxItemsInEachRow) / (maxItemsInEachRow - 1)
-        } else {
-            0.dp
-        }
+        // 按头像宽度确定最大列数，再补齐末行，让每一行复用同一组列位。
+        val maxItemsInEachRow = (maxWidth / FriendIconItemWidth).toInt().coerceAtLeast(1)
+        val trailingSlotCount =
+            (maxItemsInEachRow - friends.size % maxItemsInEachRow) % maxItemsInEachRow
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
-            verticalArrangement = Arrangement.spacedBy(FriendIconSpacing),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(FriendIconVerticalSpacing),
             maxItemsInEachRow = maxItemsInEachRow,
         ) {
             friends.forEach { friendState ->
@@ -174,6 +169,9 @@ fun UserIconsFlowRow(
                         location = friend.location,
                     ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
                 }
+            }
+            repeat(trailingSlotCount) {
+                Spacer(modifier = Modifier.width(FriendIconItemWidth))
             }
         }
     }
