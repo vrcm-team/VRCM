@@ -150,10 +150,33 @@ fun WorldData.hiddenWorldDisplayName(): String = favoriteId ?: name
  */
 fun LazyListScope.renderWorldItems(
     worlds: List<WorldData>,
+    onWorldLongClick: ((WorldData) -> Unit)? = null,
     onWorldClick: (WorldData, String) -> Unit
 ) {
     items(worlds, key = { it.favoriteId ?: it.id }) { world ->
-        renderWorldItem(world, onWorldClick)
+        renderWorldItem(
+            world = world,
+            onWorldClick = onWorldClick,
+            onWorldLongClick = onWorldLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableWorldItems(
+    worlds: List<WorldData>,
+    selectedWorldIds: Set<String>,
+    selectableWorldIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(worlds, key = { it.favoriteId ?: it.id }) { world ->
+        val selectionId = world.favoriteId ?: world.id
+        renderWorldItem(
+            world = world,
+            onWorldClick = { _, _ -> onSelectionToggle(selectionId) },
+            selected = selectionId in selectedWorldIds,
+            enabled = enabled && selectionId in selectableWorldIds,
+        )
     }
 }
 
@@ -164,14 +187,19 @@ fun LazyListScope.renderWorldItems(
 @Composable
 fun LazyItemScope.renderWorldItem(
     world: WorldData,
-    onWorldClick: (WorldData, String) -> Unit
+    onWorldClick: (WorldData, String) -> Unit,
+    onWorldLongClick: ((WorldData) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("world:${world.favoriteId ?: world.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = world,
         onClick = { onWorldClick(it, sharedSuffixKey) },
+        onLongClick = onWorldLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             if (world.isHiddenWorld()) {
                 Box(
@@ -217,6 +245,14 @@ fun LazyItemScope.renderWorldItem(
             )
         },
         trailingContent = {
+            if (selected != null) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示世界平台类型
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -245,10 +281,32 @@ fun LazyItemScope.renderWorldItem(
  */
 fun LazyListScope.renderAvatarItems(
     avatars: List<AvatarData>,
+    onAvatarLongClick: ((AvatarData) -> Unit)? = null,
     onAvatarClick: (AvatarData, String) -> Unit
 ) {
     items(avatars, key = { it.id }) { avatar ->
-        renderAvatarItem(avatar, onAvatarClick)
+        renderAvatarItem(
+            avatar = avatar,
+            onAvatarClick = onAvatarClick,
+            onAvatarLongClick = onAvatarLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableAvatarItems(
+    avatars: List<AvatarData>,
+    selectedAvatarIds: Set<String>,
+    selectableAvatarIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(avatars, key = { it.id }) { avatar ->
+        renderAvatarItem(
+            avatar = avatar,
+            onAvatarClick = { selectedAvatar, _ -> onSelectionToggle(selectedAvatar.id) },
+            selected = avatar.id in selectedAvatarIds,
+            enabled = enabled && avatar.id in selectableAvatarIds,
+        )
     }
 }
 
@@ -259,14 +317,19 @@ fun LazyListScope.renderAvatarItems(
 @Composable
 fun LazyItemScope.renderAvatarItem(
     avatar: AvatarData,
-    onAvatarClick: (AvatarData, String) -> Unit
+    onAvatarClick: (AvatarData, String) -> Unit,
+    onAvatarLongClick: ((AvatarData) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("avatar:${avatar.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = avatar,
         onClick = { onAvatarClick(it, sharedSuffixKey) },
+        onLongClick = onAvatarLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             if (avatar.releaseStatus == "hidden") {
                 Box(
@@ -312,6 +375,14 @@ fun LazyItemScope.renderAvatarItem(
             )
         },
         trailingContent = {
+            if (selected != null) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示模型平台类型
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -348,10 +419,31 @@ fun LazyItemScope.renderAvatarItem(
  */
 fun LazyListScope.renderGroupItems(
     groups: List<LimitedGroup>,
+    onGroupLongClick: ((LimitedGroup) -> Unit)? = null,
     onGroupClick: (LimitedGroup, String) -> Unit
 ) {
     items(groups, key = { it.id }) { group ->
-        renderGroupItem(group, onGroupClick)
+        renderGroupItem(
+            group = group,
+            onGroupClick = onGroupClick,
+            onGroupLongClick = onGroupLongClick,
+        )
+    }
+}
+
+fun LazyListScope.renderSelectableGroupItems(
+    groups: List<LimitedGroup>,
+    selectedGroupIds: Set<String>,
+    enabled: Boolean,
+    onSelectionToggle: (String) -> Unit,
+) {
+    items(groups, key = { it.id }) { group ->
+        renderGroupItem(
+            group = group,
+            onGroupClick = { selectedGroup, _ -> onSelectionToggle(selectedGroup.id) },
+            selected = group.id in selectedGroupIds,
+            enabled = enabled,
+        )
     }
 }
 
@@ -362,14 +454,19 @@ fun LazyListScope.renderGroupItems(
 @Composable
 fun LazyItemScope.renderGroupItem(
     group: LimitedGroup,
-    onGroupClick: (LimitedGroup, String) -> Unit
+    onGroupClick: (LimitedGroup, String) -> Unit,
+    onGroupLongClick: ((LimitedGroup) -> Unit)? = null,
+    selected: Boolean? = null,
+    enabled: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("group:${group.id}")
         ?: LocalSharedSuffixKey.current
     SearchResultItem(
         item = group,
         onClick = { onGroupClick(it, sharedSuffixKey) },
+        onLongClick = onGroupLongClick,
         modifier = Modifier.animateItem(),
+        enabled = enabled,
         leadingContent = {
             GroupIcon(
                 iconUrl = group.iconUrl,
@@ -402,6 +499,14 @@ fun LazyItemScope.renderGroupItem(
             )
         },
         trailingContent = {
+            if (selected != null) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = null,
+                    enabled = enabled,
+                )
+                return@SearchResultItem
+            }
             // 显示成员数量
             Text(
                 text = "${group.memberCount}",

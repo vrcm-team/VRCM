@@ -112,7 +112,7 @@ class FavoriteApi(private val client: HttpClient) {
     /**
      * 删除收藏
      *
-     * @param favoriteId 收藏记录ID（注意：这是FavoriteData的favoriteId）
+     * @param favoriteId 收藏记录 ID（FavoriteData.id）
      */
     suspend fun deleteFavorite(favoriteId: String) {
         client.delete("$FAVORITES_API_PREFIX/$favoriteId").checkSuccess<Unit>()

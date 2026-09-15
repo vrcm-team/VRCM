@@ -4,10 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -21,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -31,8 +35,10 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
+import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableGroupItems
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.group.data.GroupProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -54,7 +60,6 @@ private fun MyGroupsScreenContent(
     model: FavoritesGroupsModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
-    val state by model.state.collectAsState()
 
     Scaffold(
         topBar = {
@@ -66,12 +71,7 @@ private fun MyGroupsScreenContent(
                     }
                 },
                 actions = {
-                    IconButton(
-                        enabled = !state.isLoading,
-                        onClick = model::refresh,
-                    ) {
-                        Icon(AppIcons.Update, strings.refresh)
-                    }
+                    MyGroupsActions(model)
                 },
             )
         },
@@ -92,8 +92,21 @@ internal fun MyGroupsContent(
 ) {
     val navigator = currentNavigator
     val state by model.state.collectAsState()
+    val removalState by model.removalState.collectAsState()
+    val locale = strings
+    val visibleGroups = remember(state.visibleGroups) {
+        state.visibleGroups.map { it.toLimitedGroup() }
+    }
+    val visibleGroupIds = remember(visibleGroups) {
+        visibleGroups.mapTo(mutableSetOf()) { it.id }
+    }
 
     LaunchedEffect(model) { model.loadIfNeeded() }
+    SideEffect { model.updateLocale(locale) }
+    HandleBackNavigation(
+        enabled = removalState.selectionMode && !removalState.isSubmitting,
+        onBack = model::exitGroupSelectionMode,
+    )
 
     Column(modifier) {
         SearchTextField(
@@ -101,6 +114,17 @@ internal fun MyGroupsContent(
             value = state.searchText,
             onValueChange = model::setSearchText,
         )
+        if (removalState.selectionMode) {
+            SelectionRemovalStatusRow(
+                state = removalState,
+                visibleIds = visibleGroupIds,
+                selectedCountText = locale.favoriteSelectionSelectedCount,
+                progressText = locale.groupSelectionLeavingProgress,
+                selectAllText = locale.favoriteSelectionSelectAll,
+                clearSelectionText = locale.favoriteSelectionClearSelection,
+                onToggleVisibleSelection = model::toggleVisibleGroupSelection,
+            )
+        }
         Box(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 16.dp)) {
             if (state.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -111,8 +135,20 @@ internal fun MyGroupsContent(
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                renderGroupItems(state.visibleGroups.map { it.toLimitedGroup() }) { group, suffix ->
-                    navigator push GroupProfileScreen(GroupProfileVo(group), suffix)
+                if (removalState.selectionMode) {
+                    renderSelectableGroupItems(
+                        groups = visibleGroups,
+                        selectedGroupIds = removalState.selectedIds,
+                        enabled = !removalState.isSubmitting,
+                        onSelectionToggle = model::toggleGroupSelection,
+                    )
+                } else {
+                    renderGroupItems(
+                        groups = visibleGroups,
+                        onGroupLongClick = { model.beginGroupSelection(it.id) },
+                    ) { group, suffix ->
+                        navigator push GroupProfileScreen(GroupProfileVo(group), suffix)
+                    }
                 }
             }
 
@@ -129,6 +165,41 @@ internal fun MyGroupsContent(
                     bottomPadding = contentBottomPadding,
                     onRetry = model::refresh,
                 )
+            }
+        }
+    }
+
+    SelectionRemovalConfirmationDialog(
+        state = removalState,
+        title = locale.groupSelectionLeaveConfirmTitle,
+        message = locale.groupSelectionLeaveConfirmMessage,
+        confirmLabel = locale.groupSelectionLeaveSelected,
+        cancelLabel = locale.cancel,
+        onConfirm = model::confirmGroupLeave,
+        onDismiss = model::dismissGroupLeaveConfirmation,
+    )
+}
+
+@Composable
+internal fun RowScope.MyGroupsActions(model: FavoritesGroupsModel) {
+    val state by model.state.collectAsState()
+    val removalState by model.removalState.collectAsState()
+    SelectionRemovalActions(
+        state = removalState,
+        canEnterSelection = state.groups.isNotEmpty() && !state.isLoading,
+        enterSelectionDescription = strings.groupSelectionAction,
+        removeSelectedDescription = strings.groupSelectionLeaveSelected,
+        cancelDescription = strings.cancel,
+        onEnterSelection = model::enterGroupSelectionMode,
+        onExitSelection = model::exitGroupSelectionMode,
+        onRequestRemoval = model::requestGroupLeaveConfirmation,
+    )
+    if (!removalState.selectionMode) {
+        IconButton(enabled = !state.isLoading, onClick = model::refresh) {
+            if (state.isLoading) {
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(AppIcons.Update, strings.refresh)
             }
         }
     }

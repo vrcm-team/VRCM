@@ -270,7 +270,7 @@ private suspend fun doChangeFavoriteGroup(
     suspend fun removeFavorite() {
         if (favorite != null) {
             try {
-                favoriteService.removeFavorite(id = favorite.id)
+                favoriteService.removeFavorite(favorite)
                 if (groupName == currentGroupName) {
                     val successMessage = strings.favoriteRemoveSuccess
                     SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))

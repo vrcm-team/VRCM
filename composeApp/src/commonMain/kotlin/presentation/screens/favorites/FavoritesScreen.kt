@@ -57,11 +57,14 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
 import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
 import io.github.vrcmteam.vrcm.presentation.compoments.renderAvatarItems
+import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableAvatarItems
+import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
@@ -274,12 +277,31 @@ private fun FavoriteWorldsContent(
     val refreshingTabs by model.refreshingTabs.collectAsState()
     val refreshErrors by model.refreshErrors.collectAsState()
     val clearState by model.favoriteGroupClearState.collectAsState()
+    val removalStates by model.favoriteRemovalStates.collectAsState()
+    val removalState = removalStates.getValue(FavoriteType.World)
     val createdIds = remember(createdWorlds) { createdWorlds.mapTo(mutableSetOf()) { it.id } }
     val favoriteOnlyWorlds = remember(worlds, createdIds) { worlds.filterNot { it.id in createdIds } }
+    val favoriteRecordIdByWorldId = remember(groups) {
+        groups.values.flatten().associate { it.favoriteId to it.id }
+    }
+    val displayedFavoriteWorlds = if (removalState.selectionMode) worlds else favoriteOnlyWorlds
+    val selectableWorldIds = remember(groups) {
+        groups.values.flatten().mapTo(mutableSetOf()) { it.id }
+    }
+    val visibleSelectionIds = remember(displayedFavoriteWorlds, selectableWorldIds) {
+        displayedFavoriteWorlds.mapNotNullTo(mutableSetOf()) { world ->
+            (world.favoriteId ?: world.id).takeIf { it in selectableWorldIds }
+        }
+    }
     val tabIndex = FavoritesTab.World.favoriteModelTabIndex!!
     val loading = tabIndex in refreshingTabs
     val error = refreshErrors[tabIndex]
     val empty = favoriteOnlyWorlds.isEmpty() && createdWorlds.isEmpty()
+
+    HandleBackNavigation(
+        enabled = removalState.selectionMode && !removalState.isSubmitting,
+        onBack = { model.exitFavoriteSelectionMode(FavoriteType.World) },
+    )
 
     Column(Modifier.fillMaxSize()) {
         SearchTextField(
@@ -303,6 +325,19 @@ private fun FavoriteWorldsContent(
             onEditGroup = model::openFavoriteGroupEditor,
             editGroupContentDescription = strings.favoriteGroupEditAction,
         )
+        if (removalState.selectionMode) {
+            SelectionRemovalStatusRow(
+                state = removalState,
+                visibleIds = visibleSelectionIds,
+                selectedCountText = strings.favoriteSelectionSelectedCount,
+                progressText = strings.favoriteSelectionRemovingProgress,
+                selectAllText = strings.favoriteSelectionSelectAll,
+                clearSelectionText = strings.favoriteSelectionClearSelection,
+                onToggleVisibleSelection = {
+                    model.toggleVisibleFavoriteSelection(FavoriteType.World, it)
+                },
+            )
+        }
         Box(Modifier.fillMaxWidth().height(4.dp)) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -313,21 +348,48 @@ private fun FavoriteWorldsContent(
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (favoriteOnlyWorlds.isNotEmpty()) {
+                if (displayedFavoriteWorlds.isNotEmpty()) {
                     item(key = "favorite-worlds-heading") { LibrarySectionHeader(strings.userFavoritedWorlds) }
-                    renderWorldItems(favoriteOnlyWorlds) { world, suffix ->
-                        if (!world.isHiddenWorld()) {
-                            navigator push WorldProfileScreen(
-                                worldProfileVO = WorldProfileVo(world),
-                                sharedSuffixKey = suffix,
-                                sharedImageCacheKey = world.safeImageUrl(),
-                            )
+                    if (removalState.selectionMode) {
+                        renderSelectableWorldItems(
+                            worlds = displayedFavoriteWorlds,
+                            selectedWorldIds = removalState.selectedIds,
+                            selectableWorldIds = selectableWorldIds,
+                            enabled = !removalState.isSubmitting,
+                            onSelectionToggle = {
+                                model.toggleFavoriteSelection(FavoriteType.World, it)
+                            },
+                        )
+                    } else {
+                        renderWorldItems(
+                            worlds = displayedFavoriteWorlds,
+                            onWorldLongClick = { world ->
+                                model.beginFavoriteSelection(
+                                    FavoriteType.World,
+                                    world.favoriteId ?: world.id,
+                                )
+                            },
+                        ) { world, suffix ->
+                            if (!world.isHiddenWorld()) {
+                                navigator push WorldProfileScreen(
+                                    worldProfileVO = WorldProfileVo(world),
+                                    sharedSuffixKey = suffix,
+                                    sharedImageCacheKey = world.safeImageUrl(),
+                                )
+                            }
                         }
                     }
                 }
-                if (createdWorlds.isNotEmpty()) {
+                if (createdWorlds.isNotEmpty() && !removalState.selectionMode) {
                     item(key = "created-worlds-heading") { LibrarySectionHeader(strings.userCreatedWorlds) }
-                    renderWorldItems(createdWorlds) { world, suffix ->
+                    renderWorldItems(
+                        worlds = createdWorlds,
+                        onWorldLongClick = { world ->
+                            favoriteRecordIdByWorldId[world.id]?.let { favoriteRecordId ->
+                                model.beginFavoriteSelection(FavoriteType.World, favoriteRecordId)
+                            }
+                        },
+                    ) { world, suffix ->
                         if (!world.isHiddenWorld()) {
                             navigator push WorldProfileScreen(
                                 worldProfileVO = WorldProfileVo(world),
@@ -353,6 +415,16 @@ private fun FavoriteWorldsContent(
             }
         }
     }
+
+    SelectionRemovalConfirmationDialog(
+        state = removalState,
+        title = strings.favoriteSelectionRemoveConfirmTitle,
+        message = strings.favoriteSelectionRemoveConfirmMessage,
+        confirmLabel = strings.favoriteSelectionRemoveSelected,
+        cancelLabel = strings.cancel,
+        onConfirm = { model.confirmFavoriteRemoval(FavoriteType.World) },
+        onDismiss = { model.dismissFavoriteRemovalConfirmation(FavoriteType.World) },
+    )
 }
 
 @Composable
@@ -371,6 +443,8 @@ private fun FavoriteAvatarsContent(
     val refreshingTabs by model.refreshingTabs.collectAsState()
     val refreshErrors by model.refreshErrors.collectAsState()
     val clearState by model.favoriteGroupClearState.collectAsState()
+    val removalStates by model.favoriteRemovalStates.collectAsState()
+    val removalState = removalStates.getValue(FavoriteType.Avatar)
     val deletedAvatarIds = currentSessionDeletedAvatarIds()
     val visibleCreatedAvatars = remember(createdAvatars, deletedAvatarIds) {
         createdAvatars.filterNot { it.id in deletedAvatarIds }
@@ -381,10 +455,24 @@ private fun FavoriteAvatarsContent(
     val favoriteOnlyAvatars = remember(avatars, deletedAvatarIds, createdIds) {
         avatars.filterNot { it.id in deletedAvatarIds || it.id in createdIds }
     }
+    val selectableAvatarIds = remember(groups) {
+        groups.values.flatten().mapTo(mutableSetOf()) { it.favoriteId }
+    }
+    val displayedFavoriteAvatars = if (removalState.selectionMode) avatars else favoriteOnlyAvatars
+    val visibleSelectionIds = remember(displayedFavoriteAvatars, selectableAvatarIds) {
+        displayedFavoriteAvatars.mapNotNullTo(mutableSetOf()) { avatar ->
+            avatar.id.takeIf { it in selectableAvatarIds }
+        }
+    }
     val tabIndex = FavoritesTab.Avatar.favoriteModelTabIndex!!
     val loading = tabIndex in refreshingTabs
     val error = refreshErrors[tabIndex]
     val empty = favoriteOnlyAvatars.isEmpty() && visibleCreatedAvatars.isEmpty()
+
+    HandleBackNavigation(
+        enabled = removalState.selectionMode && !removalState.isSubmitting,
+        onBack = { model.exitFavoriteSelectionMode(FavoriteType.Avatar) },
+    )
 
     Column(Modifier.fillMaxSize()) {
         SearchTextField(
@@ -408,6 +496,19 @@ private fun FavoriteAvatarsContent(
             onEditGroup = model::openFavoriteGroupEditor,
             editGroupContentDescription = strings.favoriteGroupEditAction,
         )
+        if (removalState.selectionMode) {
+            SelectionRemovalStatusRow(
+                state = removalState,
+                visibleIds = visibleSelectionIds,
+                selectedCountText = strings.favoriteSelectionSelectedCount,
+                progressText = strings.favoriteSelectionRemovingProgress,
+                selectAllText = strings.favoriteSelectionSelectAll,
+                clearSelectionText = strings.favoriteSelectionClearSelection,
+                onToggleVisibleSelection = {
+                    model.toggleVisibleFavoriteSelection(FavoriteType.Avatar, it)
+                },
+            )
+        }
         Box(Modifier.fillMaxWidth().height(4.dp)) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -418,17 +519,41 @@ private fun FavoriteAvatarsContent(
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (favoriteOnlyAvatars.isNotEmpty()) {
+                if (displayedFavoriteAvatars.isNotEmpty()) {
                     item(key = "favorite-avatars-heading") { LibrarySectionHeader(strings.userFavoritedAvatars) }
-                    renderAvatarItems(favoriteOnlyAvatars) { avatar, suffix ->
-                        if (avatar.releaseStatus != "hidden") {
-                            navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
+                    if (removalState.selectionMode) {
+                        renderSelectableAvatarItems(
+                            avatars = displayedFavoriteAvatars,
+                            selectedAvatarIds = removalState.selectedIds,
+                            selectableAvatarIds = selectableAvatarIds,
+                            enabled = !removalState.isSubmitting,
+                            onSelectionToggle = {
+                                model.toggleFavoriteSelection(FavoriteType.Avatar, it)
+                            },
+                        )
+                    } else {
+                        renderAvatarItems(
+                            avatars = displayedFavoriteAvatars,
+                            onAvatarLongClick = { avatar ->
+                                model.beginFavoriteSelection(FavoriteType.Avatar, avatar.id)
+                            },
+                        ) { avatar, suffix ->
+                            if (avatar.releaseStatus != "hidden") {
+                                navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
+                            }
                         }
                     }
                 }
-                if (visibleCreatedAvatars.isNotEmpty()) {
+                if (visibleCreatedAvatars.isNotEmpty() && !removalState.selectionMode) {
                     item(key = "created-avatars-heading") { LibrarySectionHeader(strings.userCreatedAvatars) }
-                    renderAvatarItems(visibleCreatedAvatars) { avatar, suffix ->
+                    renderAvatarItems(
+                        avatars = visibleCreatedAvatars,
+                        onAvatarLongClick = { avatar ->
+                            if (avatar.id in selectableAvatarIds) {
+                                model.beginFavoriteSelection(FavoriteType.Avatar, avatar.id)
+                            }
+                        },
+                    ) { avatar, suffix ->
                         navigator push AvatarProfileScreen(AvatarProfileVo(avatar), suffix)
                     }
                 }
@@ -447,6 +572,16 @@ private fun FavoriteAvatarsContent(
             }
         }
     }
+
+    SelectionRemovalConfirmationDialog(
+        state = removalState,
+        title = strings.favoriteSelectionRemoveConfirmTitle,
+        message = strings.favoriteSelectionRemoveConfirmMessage,
+        confirmLabel = strings.favoriteSelectionRemoveSelected,
+        cancelLabel = strings.cancel,
+        onConfirm = { model.confirmFavoriteRemoval(FavoriteType.Avatar) },
+        onDismiss = { model.dismissFavoriteRemovalConfirmation(FavoriteType.Avatar) },
+    )
 }
 
 @Composable
@@ -471,28 +606,45 @@ internal fun RowScope.FavoritesHubTopBarActions(
         FavoritesTab.Player -> FriendDirectoryActions(favoritesModel)
         FavoritesTab.World, FavoritesTab.Avatar -> {
             val refreshingTabs by favoritesModel.refreshingTabs.collectAsState()
+            val removalStates by favoritesModel.favoriteRemovalStates.collectAsState()
             val tabIndex = selectedTab.favoriteModelTabIndex!!
-            IconButton(
-                enabled = tabIndex !in refreshingTabs,
-                onClick = { favoritesModel.refreshCurrentTabCacheData(tabIndex = tabIndex) },
-            ) {
-                if (tabIndex in refreshingTabs) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(AppIcons.Update, strings.refresh)
+            val favoriteType = when (selectedTab) {
+                FavoritesTab.World -> FavoriteType.World
+                FavoritesTab.Avatar -> FavoriteType.Avatar
+                else -> error("Unsupported favorite removal tab")
+            }
+            val removalState = removalStates.getValue(favoriteType)
+            val total by if (favoriteType == FavoriteType.World) {
+                favoritesModel.worldTotal.collectAsState()
+            } else {
+                favoritesModel.avatarTotal.collectAsState()
+            }
+            SelectionRemovalActions(
+                state = removalState,
+                canEnterSelection = total > 0 && tabIndex !in refreshingTabs,
+                enterSelectionDescription = strings.favoriteSelectionAction,
+                removeSelectedDescription = strings.favoriteSelectionRemoveSelected,
+                cancelDescription = strings.cancel,
+                onEnterSelection = { favoritesModel.enterFavoriteSelectionMode(favoriteType) },
+                onExitSelection = { favoritesModel.exitFavoriteSelectionMode(favoriteType) },
+                onRequestRemoval = {
+                    favoritesModel.requestFavoriteRemovalConfirmation(favoriteType)
+                },
+            )
+            if (!removalState.selectionMode) {
+                IconButton(
+                    enabled = tabIndex !in refreshingTabs,
+                    onClick = { favoritesModel.refreshCurrentTabCacheData(tabIndex = tabIndex) },
+                ) {
+                    if (tabIndex in refreshingTabs) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(AppIcons.Update, strings.refresh)
+                    }
                 }
             }
         }
-        FavoritesTab.Group -> {
-            val state by groupsModel.state.collectAsState()
-            IconButton(enabled = !state.isLoading, onClick = groupsModel::refresh) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(AppIcons.Update, strings.refresh)
-                }
-            }
-        }
+        FavoritesTab.Group -> MyGroupsActions(groupsModel)
     }
     ATooltipBox(tooltip = { Text(strings.fiendListPagerSearch) }) {
         IconButton(onClick = onSearch) {

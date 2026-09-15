@@ -219,6 +219,42 @@ class LocaleActionMessagesTest {
             assertTrue(locale.friendDirectoryRemoveFailed.countPlaceholderCount() == 1)
         }
     }
+
+    @Test
+    fun favoriteAndGroupRemovalMessagesKeepTheirCountPlaceholders() {
+        val locales = listOf(
+            LocaleStringsEn,
+            LocaleStringsJa,
+            LocaleStringsZhHans,
+            LocaleStringsZhHant,
+        )
+
+        locales.forEach { locale ->
+            assertTrue(
+                listOf(
+                    locale.favoriteSelectionAction,
+                    locale.favoriteSelectionSelectAll,
+                    locale.favoriteSelectionClearSelection,
+                    locale.favoriteSelectionRemoveSelected,
+                    locale.favoriteSelectionRemoveConfirmTitle,
+                    locale.groupSelectionAction,
+                    locale.groupSelectionLeaveSelected,
+                    locale.groupSelectionLeaveConfirmTitle,
+                ).all { it.isNotBlank() }
+            )
+            assertEquals(1, locale.favoriteSelectionSelectedCount.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveConfirmMessage.countPlaceholderCount())
+            assertEquals(2, locale.favoriteSelectionRemovingProgress.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveSuccess.countPlaceholderCount())
+            assertEquals(2, locale.favoriteSelectionRemovePartialFailure.countPlaceholderCount())
+            assertEquals(1, locale.favoriteSelectionRemoveFailed.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveConfirmMessage.countPlaceholderCount())
+            assertEquals(2, locale.groupSelectionLeavingProgress.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveSuccess.countPlaceholderCount())
+            assertEquals(2, locale.groupSelectionLeavePartialFailure.countPlaceholderCount())
+            assertEquals(1, locale.groupSelectionLeaveFailed.countPlaceholderCount())
+        }
+    }
 }
 
 private fun String.countPlaceholderCount(): Int = windowed(size = 2).count { it == "%d" }

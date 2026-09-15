@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class FavoriteGroupCacheTest {
     @Test
@@ -75,6 +76,26 @@ class FavoriteGroupCacheTest {
         assertFalse(originalGroup in updated)
         assertSame(originalMembership, updated.getValue(publishedGroup))
         assertEquals(listOf(originalGroup.name), updated.getValue(publishedGroup).single().tags)
+    }
+
+    @Test
+    fun removingOneFavoriteKeepsOtherGroupsAndMemberships() {
+        val cache = FavoriteGroupCache()
+        val firstGroup = group("group_avatars1", "avatars1")
+        val secondGroup = group("group_avatars2", "avatars2")
+        val removed = favorite("avtr_removed", firstGroup.name)
+        val retained = favorite("avtr_retained", firstGroup.name)
+        val other = favorite("avtr_other", secondGroup.name)
+        cache.replace(
+            FavoriteType.Avatar,
+            linkedMapOf(firstGroup to listOf(removed, retained), secondGroup to listOf(other)),
+        )
+
+        assertTrue(cache.removeFavorite(FavoriteType.Avatar, removed))
+        assertEquals(
+            linkedMapOf(firstGroup to listOf(retained), secondGroup to listOf(other)),
+            cache.flow(FavoriteType.Avatar).value,
+        )
     }
 
     private fun favorites(avatarId: String): Map<FavoriteGroupData, List<FavoriteData>> {

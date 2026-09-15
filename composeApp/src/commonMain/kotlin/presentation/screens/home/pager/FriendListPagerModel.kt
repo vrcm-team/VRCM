@@ -22,11 +22,16 @@ import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.SelectionRemovalResult
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.SelectionRemovalState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.service.AuthService
+import io.github.vrcmteam.vrcm.service.FavoriteBulkRemovalService
 import io.github.vrcmteam.vrcm.service.FavoriteGroupClearCommit
 import io.github.vrcmteam.vrcm.service.FavoriteGroupClearRequest
+import io.github.vrcmteam.vrcm.service.FavoriteRemovalResult
+import io.github.vrcmteam.vrcm.service.FavoriteRemovalSelection
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import io.github.vrcmteam.vrcm.service.FriendRemovalBatchResponse
 import io.github.vrcmteam.vrcm.service.FriendService
@@ -258,6 +263,9 @@ class FriendListPagerModel(
     )
     private var directoryRefreshJob: Job? = null
     private var friendRemovalJob: Job? = null
+    private val favoriteBulkRemovalService = FavoriteBulkRemovalService(authService, favoriteService)
+    private val favoriteRemovalJobs = mutableMapOf<FavoriteType, Job>()
+    private val favoriteRemovalRequests = mutableMapOf(World to 0L, Avatar to 0L)
     private val refreshJobsByTab = mutableMapOf<Int, Job>()
     private var activeSessionToken: AccountSessionToken? = null
     private var accountGeneration = 0L
@@ -282,6 +290,14 @@ class FriendListPagerModel(
 
     private val _friendRemovalState = MutableStateFlow(FriendRemovalState())
     internal val friendRemovalState: StateFlow<FriendRemovalState> = _friendRemovalState.asStateFlow()
+    private val _favoriteRemovalStates = MutableStateFlow(
+        mapOf(
+            World to SelectionRemovalState(),
+            Avatar to SelectionRemovalState(),
+        )
+    )
+    internal val favoriteRemovalStates: StateFlow<Map<FavoriteType, SelectionRemovalState>> =
+        _favoriteRemovalStates.asStateFlow()
 
     val friendDirectoryFriends: StateFlow<List<FriendData>> = combine(
         _friendSnapshot,
@@ -333,6 +349,23 @@ class FriendListPagerModel(
                 retainExistingFriendSelections(friends.mapTo(mutableSetOf(), FriendData::id))
             }
         }
+        viewModelScope.launch {
+            worldFavoriteGroupsFlow.collect { groups ->
+                retainExistingFavoriteSelections(
+                    favoriteType = World,
+                    availableIds = groups.values.flatten().mapTo(mutableSetOf(), FavoriteData::id),
+                )
+            }
+        }
+        viewModelScope.launch {
+            avatarFavoriteGroupsFlow.collect { groups ->
+                retainExistingFavoriteSelections(
+                    favoriteType = Avatar,
+                    availableIds = groups.values.flatten()
+                        .mapTo(mutableSetOf(), FavoriteData::favoriteId),
+                )
+            }
+        }
     }
 
     private fun activateAccount(sessionToken: AccountSessionToken?) {
@@ -349,6 +382,15 @@ class FriendListPagerModel(
             friendRemovalJob?.cancel()
             friendRemovalJob = null
             _friendRemovalState.value = FriendRemovalState()
+            favoriteRemovalJobs.values.forEach(Job::cancel)
+            favoriteRemovalJobs.clear()
+            favoriteRemovalRequests.keys.forEach { type ->
+                favoriteRemovalRequests[type] = favoriteRemovalRequests.getValue(type) + 1L
+            }
+            _favoriteRemovalStates.value = mapOf(
+                World to SelectionRemovalState(),
+                Avatar to SelectionRemovalState(),
+            )
         }
         friendSnapshotJob?.cancel()
         friendSnapshotJob = null
@@ -421,7 +463,11 @@ class FriendListPagerModel(
         if (sessionToken != null && friendDirectoryActivated) {
             startFriendDirectoryRefresh(refreshFriends = false)
         }
-        if (sessionToken != null && favoritesPageActivated) refreshFavoritesTabs()
+        if (sessionToken != null && favoritesPageActivated &&
+            favoriteRemovalJobs.values.none { it.isActive }
+        ) {
+            refreshFavoritesTabs()
+        }
     }
 
     fun updateFavoriteLocale(locale: LocaleStrings) {
@@ -620,6 +666,329 @@ class FriendListPagerModel(
             successCount == 0 -> locale.friendDirectoryRemoveFailed
                 .replaceFirst("%d", failureCount.toString())
             else -> locale.friendDirectoryRemovePartialFailure
+                .replaceFirst("%d", successCount.toString())
+                .replaceFirst("%d", failureCount.toString())
+        }
+        SharedFlowCentre.toastText.emit(
+            if (failureCount == 0) ToastText.Success(message) else ToastText.Error(message)
+        )
+    }
+
+    fun enterFavoriteSelectionMode(favoriteType: FavoriteType) {
+        val current = favoriteRemovalState(favoriteType) ?: return
+        if (current.isSubmitting || availableFavoriteSelections(favoriteType).isEmpty()) return
+        updateFavoriteRemovalState(favoriteType) { SelectionRemovalState(selectionMode = true) }
+    }
+
+    fun beginFavoriteSelection(favoriteType: FavoriteType, selectionId: String) {
+        val current = favoriteRemovalState(favoriteType) ?: return
+        if (current.isSubmitting || selectionId !in availableFavoriteSelections(favoriteType)) return
+        updateFavoriteRemovalState(favoriteType) {
+            SelectionRemovalState(selectionMode = true, selectedIds = setOf(selectionId))
+        }
+    }
+
+    fun exitFavoriteSelectionMode(favoriteType: FavoriteType) {
+        val current = favoriteRemovalState(favoriteType) ?: return
+        if (current.isSubmitting) return
+        updateFavoriteRemovalState(favoriteType) { SelectionRemovalState() }
+    }
+
+    fun toggleFavoriteSelection(favoriteType: FavoriteType, selectionId: String) {
+        val availableIds = availableFavoriteSelections(favoriteType).keys
+        if (selectionId !in availableIds) return
+        updateFavoriteRemovalState(favoriteType) { state ->
+            if (!state.selectionMode || state.isSubmitting) return@updateFavoriteRemovalState state
+            state.copy(
+                selectedIds = if (selectionId in state.selectedIds) {
+                    state.selectedIds - selectionId
+                } else {
+                    state.selectedIds + selectionId
+                },
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun toggleVisibleFavoriteSelection(
+        favoriteType: FavoriteType,
+        visibleSelectionIds: Set<String>,
+    ) {
+        val selectableIds = visibleSelectionIds intersect availableFavoriteSelections(favoriteType).keys
+        updateFavoriteRemovalState(favoriteType) { state ->
+            if (!state.selectionMode || state.isSubmitting || selectableIds.isEmpty()) {
+                return@updateFavoriteRemovalState state
+            }
+            val allVisibleSelected = selectableIds.all { it in state.selectedIds }
+            state.copy(
+                selectedIds = if (allVisibleSelected) {
+                    state.selectedIds - selectableIds
+                } else {
+                    state.selectedIds + selectableIds
+                },
+                confirmationVisible = false,
+                completedCount = 0,
+                totalCount = 0,
+                results = emptyMap(),
+            )
+        }
+    }
+
+    fun requestFavoriteRemovalConfirmation(favoriteType: FavoriteType) {
+        retainExistingFavoriteSelections(favoriteType, availableFavoriteSelections(favoriteType).keys)
+        updateFavoriteRemovalState(favoriteType) { state ->
+            if (!state.selectionMode || state.isSubmitting || state.selectedIds.isEmpty()) state
+            else state.copy(confirmationVisible = true)
+        }
+    }
+
+    fun dismissFavoriteRemovalConfirmation(favoriteType: FavoriteType) {
+        updateFavoriteRemovalState(favoriteType) { state ->
+            if (state.isSubmitting) state else state.copy(confirmationVisible = false)
+        }
+    }
+
+    fun confirmFavoriteRemoval(favoriteType: FavoriteType) {
+        val state = favoriteRemovalState(favoriteType) ?: return
+        if (!state.selectionMode || state.isSubmitting || !state.confirmationVisible) return
+        val sessionToken = activeSessionToken?.takeIf(SharedFlowCentre::isCurrentSession) ?: return
+        val available = availableFavoriteSelections(favoriteType)
+        val selections = state.selectedIds.mapNotNull(available::get)
+        if (selections.isEmpty()) {
+            updateFavoriteRemovalState(favoriteType) {
+                it.copy(selectedIds = emptySet(), confirmationVisible = false)
+            }
+            return
+        }
+
+        val requestId = favoriteRemovalRequests.getValue(favoriteType) + 1L
+        favoriteRemovalRequests[favoriteType] = requestId
+        refreshJobsByTab.remove(favoriteType.tabIndex)?.cancel()
+        _refreshingTabs.update { it - favoriteType.tabIndex }
+        updateFavoriteRemovalState(favoriteType) {
+            state.copy(
+                selectedIds = selections.mapTo(mutableSetOf(), FavoriteRemovalSelection::selectionId),
+                confirmationVisible = false,
+                isSubmitting = true,
+                completedCount = 0,
+                totalCount = selections.size,
+                results = emptyMap(),
+            )
+        }
+        favoriteRemovalJobs[favoriteType] = viewModelScope.launch(Dispatchers.IO) {
+            val ownerId = sessionToken.userId
+            try {
+                val response = favoriteBulkRemovalService.remove(
+                    sessionToken = sessionToken,
+                    selections = selections,
+                    onResult = onResult@{ result ->
+                        if (!acceptsFavoriteRemoval(favoriteType, ownerId, requestId)) return@onResult
+                        if (result.succeeded) applyFavoriteRemoval(result.selection)
+                        recordFavoriteRemovalResult(favoriteType, result)
+                    },
+                )
+                if (response == null ||
+                    !SharedFlowCentre.isCurrentSession(response.sessionToken) ||
+                    !acceptsFavoriteRemoval(favoriteType, ownerId, requestId)
+                ) {
+                    finishInterruptedFavoriteRemoval(favoriteType, ownerId, requestId)
+                    return@launch
+                }
+
+                response.results.filter(FavoriteRemovalResult::succeeded).forEach { result ->
+                    applyFavoriteRemoval(result.selection)
+                }
+                if (favoriteRemovalState(favoriteType)?.successCount != 0) {
+                    persistFavoriteRemovalCache(favoriteType, response.sessionToken)
+                }
+                val completed = favoriteRemovalState(favoriteType) ?: return@launch
+                val failedIds = completed.results.values
+                    .filterNot(SelectionRemovalResult::succeeded)
+                    .mapTo(mutableSetOf(), SelectionRemovalResult::itemId)
+                    .intersect(availableFavoriteSelections(favoriteType).keys)
+                updateFavoriteRemovalState(favoriteType) {
+                    completed.copy(
+                        selectionMode = failedIds.isNotEmpty(),
+                        selectedIds = failedIds,
+                        isSubmitting = false,
+                    )
+                }
+                showFavoriteRemovalSummary(completed.successCount, completed.failureCount)
+            } finally {
+                if (favoriteRemovalRequests[favoriteType] == requestId) {
+                    favoriteRemovalJobs.remove(favoriteType)
+                }
+            }
+        }
+    }
+
+    private fun favoriteRemovalState(favoriteType: FavoriteType): SelectionRemovalState? =
+        _favoriteRemovalStates.value[favoriteType]
+
+    private fun updateFavoriteRemovalState(
+        favoriteType: FavoriteType,
+        transform: (SelectionRemovalState) -> SelectionRemovalState,
+    ) {
+        _favoriteRemovalStates.update { states ->
+            val current = states[favoriteType] ?: return@update states
+            states + (favoriteType to transform(current))
+        }
+    }
+
+    private fun availableFavoriteSelections(
+        favoriteType: FavoriteType,
+    ): Map<String, FavoriteRemovalSelection> {
+        if (favoriteType != World && favoriteType != Avatar) return emptyMap()
+        return favoriteService.favoritesByGroup(favoriteType).value.values
+            .flatten()
+            .asSequence()
+            .filter { it.type == favoriteType.value }
+            .map { favorite ->
+                val selectionId = when (favoriteType) {
+                    World -> favorite.id
+                    Avatar -> favorite.favoriteId
+                    Friend -> error("Friend favorites use the friend removal flow")
+                }
+                FavoriteRemovalSelection(selectionId, favoriteType, favorite)
+            }
+            .associateBy(FavoriteRemovalSelection::selectionId)
+    }
+
+    private fun retainExistingFavoriteSelections(
+        favoriteType: FavoriteType,
+        availableIds: Set<String>,
+    ) {
+        updateFavoriteRemovalState(favoriteType) { state ->
+            val retained = state.selectedIds intersect availableIds
+            if (retained == state.selectedIds) state else state.copy(
+                selectedIds = retained,
+                confirmationVisible = state.confirmationVisible && retained.isNotEmpty(),
+            )
+        }
+    }
+
+    private fun recordFavoriteRemovalResult(
+        favoriteType: FavoriteType,
+        result: FavoriteRemovalResult,
+    ) {
+        val selectionId = result.selection.selectionId
+        val itemResult = SelectionRemovalResult(selectionId, result.errorMessage)
+        updateFavoriteRemovalState(favoriteType) { state ->
+            state.copy(
+                selectedIds = if (itemResult.succeeded) {
+                    state.selectedIds - selectionId
+                } else {
+                    state.selectedIds
+                },
+                completedCount = state.completedCount + 1,
+                results = state.results + (selectionId to itemResult),
+            )
+        }
+    }
+
+    private fun applyFavoriteRemoval(selection: FavoriteRemovalSelection) {
+        val favorite = selection.favorite
+        val stillFavorited = favoriteService.favoritesByGroup(selection.favoriteType).value.values
+            .flatten()
+            .any { it.favoriteId == favorite.favoriteId }
+        when (selection.favoriteType) {
+            World -> {
+                if (!stillFavorited) {
+                    favoritedWorldMap.entries.removeAll { (_, world) ->
+                        world.favoriteId == favorite.id || world.id == favorite.favoriteId
+                    }
+                }
+                _worldTotal.value = favoritedWorldMap.size
+                findWorldList(searchTexts[1])
+            }
+
+            Avatar -> {
+                if (!stillFavorited) favoritedAvatarMap.remove(favorite.favoriteId)
+                _avatarTotal.value = favoritedAvatarMap.size
+                findAvatarList(searchTexts[2])
+            }
+
+            Friend -> Unit
+        }
+    }
+
+    private suspend fun finishInterruptedFavoriteRemoval(
+        favoriteType: FavoriteType,
+        ownerId: String,
+        requestId: Long,
+    ) {
+        if (!acceptsFavoriteRemoval(favoriteType, ownerId, requestId)) return
+        val current = favoriteRemovalState(favoriteType) ?: return
+        val interruptedIds = current.selectedIds - current.results.keys
+        val interruptedResults = interruptedIds.associateWith { selectionId ->
+            SelectionRemovalResult(selectionId, "Session changed")
+        }
+        val completed = current.copy(
+            completedCount = current.totalCount,
+            results = current.results + interruptedResults,
+        )
+        updateFavoriteRemovalState(favoriteType) {
+            completed.copy(
+                selectionMode = completed.selectedIds.isNotEmpty(),
+                isSubmitting = false,
+            )
+        }
+        showFavoriteRemovalSummary(completed.successCount, completed.failureCount)
+    }
+
+    private fun acceptsFavoriteRemoval(
+        favoriteType: FavoriteType,
+        ownerId: String,
+        requestId: Long,
+    ): Boolean = favoriteRemovalRequests[favoriteType] == requestId &&
+        SharedFlowCentre.currentSession.value?.token?.userId == ownerId
+
+    private suspend fun persistFavoriteRemovalCache(
+        favoriteType: FavoriteType,
+        sessionToken: AccountSessionToken,
+    ) {
+        if (!SharedFlowCentre.isCurrentSession(sessionToken)) return
+        val writeToken = accountCacheManager.captureWriteToken(sessionToken.userId)
+        try {
+            when (favoriteType) {
+                World -> accountCacheManager.saveFavoriteWorldsIfCurrent(
+                    writeToken,
+                    groupFavoritedWorlds(
+                        worlds = favoritedWorldMap.values.toList(),
+                        favoriteGroups = worldFavoriteGroupsFlow.value,
+                    ),
+                )
+
+                Avatar -> accountCacheManager.saveFavoriteAvatarsIfCurrent(
+                    writeToken,
+                    favoritedAvatarMap.values.toList(),
+                )
+
+                Friend -> Unit
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            val message = when (favoriteType) {
+                World -> favoriteLocale?.favoriteWorldCacheSaveFailed
+                Avatar -> favoriteLocale?.favoriteAvatarCacheSaveFailed
+                Friend -> null
+            }
+            showFavoriteError(message, error)
+        }
+    }
+
+    private suspend fun showFavoriteRemovalSummary(successCount: Int, failureCount: Int) {
+        val locale = favoriteLocale ?: return
+        val message = when {
+            failureCount == 0 -> locale.favoriteSelectionRemoveSuccess
+                .replaceFirst("%d", successCount.toString())
+            successCount == 0 -> locale.favoriteSelectionRemoveFailed
+                .replaceFirst("%d", failureCount.toString())
+            else -> locale.favoriteSelectionRemovePartialFailure
                 .replaceFirst("%d", successCount.toString())
                 .replaceFirst("%d", failureCount.toString())
         }

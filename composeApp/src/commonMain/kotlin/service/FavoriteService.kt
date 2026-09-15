@@ -48,6 +48,19 @@ internal class FavoriteGroupCache {
         return target.key to target.value
     }
 
+    fun removeFavorite(type: FavoriteType, favorite: FavoriteData): Boolean {
+        var removed = false
+        val updated = buildMap {
+            flow(type).value.forEach { (group, favorites) ->
+                val remaining = favorites.filterNot { current -> current.id == favorite.id }
+                if (remaining.size != favorites.size) removed = true
+                put(group, remaining)
+            }
+        }
+        if (removed) replace(type, updated)
+        return removed
+    }
+
     fun updateGroup(
         type: FavoriteType,
         ownerId: String,
@@ -305,18 +318,31 @@ class FavoriteService(
     /**
      * 移除收藏
      *
-     * @param id 收藏记录ID（注意：这是FavoriteData.id）
+     * @param favorite 收藏数据；远端和本地删除均以收藏记录 ID 为准
      */
     suspend fun removeFavorite(
-        id: String,
+        favorite: FavoriteData,
     ) {
-        val (isLocal, type, favoriteId) = parseLocalFavoriteId(id)
+        val (isLocal, type, favoriteId) = parseLocalFavoriteId(favorite.id)
         if (isLocal && type != null && favoriteId != null) {
             val current = favoriteLocalDao.load(type)
             favoriteLocalDao.save(type, current.filterNot { it == favoriteId })
         } else {
-            favoriteApi.deleteFavorite(id)
+            favoriteApi.deleteFavorite(favorite.id)
         }
+    }
+
+    internal suspend fun commitFavoriteRemoval(
+        sessionToken: AccountSessionToken,
+        favoriteType: FavoriteType,
+        favorite: FavoriteData,
+    ): Boolean = cacheMutex.withLock {
+        check(SharedFlowCentre.isCurrentSession(sessionToken)) {
+            "Authenticated session changed while removing a favorite"
+        }
+        synchronizeFavoritesOwnerLocked(sessionToken)
+        requestGenerations[favoriteType] = (requestGenerations[favoriteType] ?: 0L) + 1L
+        favoritesByGroupCache.removeFavorite(favoriteType, favorite)
     }
 
     internal suspend fun prepareFavoriteGroupClear(

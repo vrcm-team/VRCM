@@ -5,6 +5,7 @@ import com.russhwolf.settings.MapSettings
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.supports.PersistentCookiesStorage
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.data.AccountDto
@@ -22,6 +23,7 @@ import io.ktor.client.engine.mock.MockRequestHandler
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
@@ -36,6 +38,7 @@ import okio.fakefilesystem.FakeFileSystem
 import org.koin.core.logger.EmptyLogger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -59,12 +62,14 @@ class FavoritesGroupsModelTest : MainDispatcherTest() {
         try {
             fixture.model.loadIfNeeded()
             awaitUntil { fixture.model.state.value.groups.singleOrNull()?.groupId == "grp_a" }
+            fixture.model.beginGroupSelection("grp_a")
 
             SharedFlowCentre.emitAuthenticated(accountB)
             awaitUntil { fixture.model.state.value.groups.isEmpty() }
 
             assertTrue(fixture.model.state.value.groups.isEmpty())
             assertEquals("", fixture.model.state.value.searchText)
+            assertEquals(SelectionRemovalState(), fixture.model.removalState.value)
             releaseAccountB.complete(Unit)
             awaitUntil { fixture.model.state.value.groups.singleOrNull()?.groupId == "grp_b" }
         } finally {
@@ -142,6 +147,64 @@ class FavoritesGroupsModelTest : MainDispatcherTest() {
             SharedFlowCentre.emitLogout()
         }
     }
+
+    @Test
+    fun groupLeaveRemovesSuccessesAndKeepsFailuresSelected() = runBlocking {
+        val account = AccountDto(userId = "usr_owner", username = "owner")
+        val leaveRequests = mutableListOf<String>()
+        SharedFlowCentre.emitAuthenticated(account)
+        val fixture = createFixture(account) { request ->
+            when (request.url.encodedPath) {
+                "/users/usr_owner/groups" -> jsonResponse(
+                    """
+                    [
+                      {"id":"membership_ok","groupId":"grp_ok","name":"Okay","shortCode":"OK"},
+                      {"id":"membership_failed","groupId":"grp_failed","name":"Failed","shortCode":"NO"}
+                    ]
+                    """.trimIndent()
+                )
+
+                "/groups/grp_ok/leave" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    leaveRequests += "grp_ok"
+                    respond("", HttpStatusCode.OK)
+                }
+
+                "/groups/grp_failed/leave" -> {
+                    assertEquals(HttpMethod.Post, request.method)
+                    leaveRequests += "grp_failed"
+                    respond("unavailable", HttpStatusCode.InternalServerError)
+                }
+
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+        try {
+            fixture.model.loadIfNeeded()
+            awaitUntil { fixture.model.state.value.groups.size == 2 }
+
+            fixture.model.beginGroupSelection("grp_ok")
+            fixture.model.toggleGroupSelection("grp_failed")
+            fixture.model.requestGroupLeaveConfirmation()
+            fixture.model.confirmGroupLeave()
+            awaitUntil {
+                val removal = fixture.model.removalState.value
+                !removal.isSubmitting && removal.completedCount == 2
+            }
+
+            assertEquals(listOf("grp_ok", "grp_failed"), leaveRequests)
+            assertEquals(listOf("grp_failed"), fixture.model.state.value.groups.map { it.groupId })
+            val removal = fixture.model.removalState.value
+            assertTrue(removal.selectionMode)
+            assertEquals(setOf("grp_failed"), removal.selectedIds)
+            assertEquals(1, removal.successCount)
+            assertEquals(1, removal.failureCount)
+            assertFalse(removal.confirmationVisible)
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
 }
 
 private class FavoritesGroupsFixture(
@@ -182,7 +245,7 @@ private fun createFixture(
         ),
     )
     return FavoritesGroupsFixture(
-        FavoritesGroupsModel(UsersApi(client), authService),
+        FavoritesGroupsModel(UsersApi(client), authService, GroupsApi(client)),
         client,
     )
 }
