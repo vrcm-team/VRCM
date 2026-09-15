@@ -831,7 +831,7 @@ sealed class LocaleStrings {
     open val avatarProfileMoreActions: String = "More actions"
     open val avatarProfileActionChecking: String = "Checking avatar availability..."
     open val avatarProfileActionCurrent: String = "Currently using this avatar"
-    open val avatarProfileActionSwitch: String = "Switch to this avatar"
+    open val avatarProfileActionSwitch: String = "Switch avatar"
     open val avatarProfileActionNotCopyable: String = "This avatar cannot be copied"
     open val avatarProfileActionCheckFailed: String = "Unable to verify avatar availability"
     open val avatarModerationChecking: String = "Checking avatar block status..."

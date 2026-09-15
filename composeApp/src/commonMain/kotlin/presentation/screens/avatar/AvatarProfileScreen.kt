@@ -264,7 +264,7 @@ class AvatarProfileScreen(
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.surface,
+                color = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {

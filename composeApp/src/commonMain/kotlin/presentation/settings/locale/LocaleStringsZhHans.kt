@@ -791,7 +791,7 @@ internal object LocaleStringsZhHans : LocaleStrings() {
     override val avatarProfileMoreActions = "更多操作"
     override val avatarProfileActionChecking = "正在检查模型状态..."
     override val avatarProfileActionCurrent = "当前已经是这个模型"
-    override val avatarProfileActionSwitch = "切换到这个模型"
+    override val avatarProfileActionSwitch = "切换模型"
     override val avatarProfileActionNotCopyable = "该模型不允许复制"
     override val avatarProfileActionCheckFailed = "暂时无法验证模型状态"
     override val avatarModerationChecking = "正在检查模型屏蔽状态..."
