@@ -314,8 +314,9 @@ private fun HomeTabRow(
                 selected = index == pagerState.currentPage,
                 onClick = {
                     if (tab == HomeTab.Activity) {
-                        activityFilterMenuExpanded = true
-                        if (index != pagerState.currentPage || pagerState.isScrollInProgress) {
+                        if (index == pagerState.settledPage && !pagerState.isScrollInProgress) {
+                            activityFilterMenuExpanded = true
+                        } else {
                             scope.launch { pagerState.animateScrollToTab(index) }
                         }
                     } else if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
