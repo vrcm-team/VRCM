@@ -765,18 +765,19 @@ private fun WorldProfileHero(
                 )
             }
 
-            Surface(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(contentCornerRadius)
-                    .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(
-                    topStart = contentCornerRadius,
-                    topEnd = contentCornerRadius,
-                ),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 16.dp,
-            ) {}
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(
+                            topStart = contentCornerRadius,
+                            topEnd = contentCornerRadius,
+                        ),
+                    ),
+            )
         }
     }
 }
