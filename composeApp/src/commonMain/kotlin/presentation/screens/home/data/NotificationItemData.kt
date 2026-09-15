@@ -290,12 +290,15 @@ internal fun NotificationItemData.groupInviteActionKind(
     }
 }
 
-/** Group invitations expose one canonical response for each supported decision. */
+/** Group invitations expose only the accept and ignore decisions. */
 internal val NotificationItemData.responseActionsForDisplay: List<NotificationItemData.ActionData>
     get() {
         val availableActions = displayActions
         if (!isGroupInvite) return availableActions
-        return GroupInviteActionKind.entries.mapNotNull { kind ->
+        return listOf(
+            GroupInviteActionKind.ACCEPT,
+            GroupInviteActionKind.IGNORE,
+        ).mapNotNull { kind ->
             availableActions.firstOrNull { action -> groupInviteActionKind(action) == kind }
         }
     }

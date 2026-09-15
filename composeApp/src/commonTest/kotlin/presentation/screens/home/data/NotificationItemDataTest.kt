@@ -83,7 +83,7 @@ class NotificationItemDataTest {
     }
 
     @Test
-    fun groupInviteShowsOnlyCanonicalDecisionsAndOneIndependentDeleteAction() {
+    fun groupInviteShowsOnlyAcceptAndIgnoreWithOneIndependentDeleteAction() {
         val responses = listOf(
             response(type = "link", icon = "link"),
             response(type = "decline", icon = "ban"),
@@ -101,11 +101,10 @@ class NotificationItemDataTest {
             listOf(
                 GroupInviteActionKind.ACCEPT,
                 GroupInviteActionKind.IGNORE,
-                GroupInviteActionKind.BLOCK,
             ),
             item.responseActionsForDisplay.map(item::groupInviteActionKind),
         )
-        assertEquals(listOf("check", "cancel", "ban"), item.responseActionsForDisplay.map { it.icon })
+        assertEquals(listOf("check", "cancel"), item.responseActionsForDisplay.map { it.icon })
         assertEquals(false, item.showStandaloneReadAction)
         assertEquals(true, item.canDelete)
     }

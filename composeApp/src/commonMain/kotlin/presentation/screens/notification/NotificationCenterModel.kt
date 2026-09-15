@@ -187,8 +187,8 @@ class NotificationCenterModel(
                     imageUrl = user?.profileImageUrl.orEmpty(),
                     title = user?.displayName ?: notification.senderUserId,
                     actions = listOf(
-                        NotificationItemData.ActionData(data = "", type = "Hide"),
                         NotificationItemData.ActionData(data = "", type = "Accept"),
+                        NotificationItemData.ActionData(data = "", type = "Hide"),
                     ),
                 )
             }
