@@ -712,7 +712,7 @@ private fun WorldProfileHero(
                         start = 8.dp,
                         top = 48.dp,
                         end = 8.dp,
-                        bottom = contentCornerRadius + 16.dp,
+                        bottom = contentCornerRadius + 8.dp,
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.Start,
