@@ -55,7 +55,7 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.supports.LanguageIcons
 import io.github.vrcmteam.vrcm.presentation.supports.WebIcons
-import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingUpwardScrollConnection
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -142,7 +142,7 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember { mutableStateOf(false) }
         val sheetState = rememberModalBottomSheetState()
         val actionMenuNestedScrollConnection =
-            rememberConsumeRemainingVerticalScrollConnection()
+            rememberConsumeRemainingUpwardScrollConnection()
         var openAlertDialog by remember { mutableStateOf(false) }
         var openEditProfileDialog by remember { mutableStateOf(false) }
         var openEditNoteDialog by remember { mutableStateOf(false) }

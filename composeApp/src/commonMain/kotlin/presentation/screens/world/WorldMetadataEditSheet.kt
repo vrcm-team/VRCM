@@ -35,7 +35,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
-import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingUpwardScrollConnection
 
 private const val WorldNameMaxLength = 64
 private const val WorldDescriptionMaxLength = 256
@@ -89,7 +89,7 @@ internal fun WorldMetadataEditSheet(
         world.allowedDomains,
     ) { mutableStateOf(world.allowedDomains.joinToString("\n")) }
     val locale = strings
-    val formNestedScrollConnection = rememberConsumeRemainingVerticalScrollConnection()
+    val formNestedScrollConnection = rememberConsumeRemainingUpwardScrollConnection()
 
     ModalBottomSheet(
         onDismissRequest = { if (!state.isSaving) onDismiss() },

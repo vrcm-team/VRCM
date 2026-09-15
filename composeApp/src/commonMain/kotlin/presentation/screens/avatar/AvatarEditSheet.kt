@@ -61,7 +61,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.gallery.readSelectedImage
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
-import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingVerticalScrollConnection
+import io.github.vrcmteam.vrcm.presentation.supports.rememberConsumeRemainingUpwardScrollConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -110,7 +110,7 @@ internal fun AvatarEditSheet(
             targetValue != SheetValue.Hidden || !latestIsBusy.value
         },
     )
-    val formNestedScrollConnection = rememberConsumeRemainingVerticalScrollConnection()
+    val formNestedScrollConnection = rememberConsumeRemainingUpwardScrollConnection()
     LaunchedEffect(state.publication) {
         if (state.publication != AvatarPublicationStatus.Private) {
             showPublicConfirmation = false

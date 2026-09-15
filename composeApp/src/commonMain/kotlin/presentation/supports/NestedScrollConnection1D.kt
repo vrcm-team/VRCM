@@ -69,20 +69,29 @@ fun commonNestedScrollConnection(
 }
 
 /**
- * 消费子滚动容器剩余的垂直位移与速度，避免其继续驱动外层可拖拽容器。
+ * 消费子滚动容器剩余的上滑位移与速度，避免其在内容底部继续驱动外层容器。
+ * 下滑方向保持未消费，使外层弹层仍可响应下滑关闭手势。
  */
 @Composable
-fun rememberConsumeRemainingVerticalScrollConnection(): NestedScrollConnection = remember {
+fun rememberConsumeRemainingUpwardScrollConnection(): NestedScrollConnection = remember {
     object : NestedScrollConnection {
         override fun onPostScroll(
             consumed: Offset,
             available: Offset,
             source: NestedScrollSource,
-        ): Offset = Offset(x = 0f, y = available.y)
+        ): Offset = if (available.y < 0f) {
+            Offset(x = 0f, y = available.y)
+        } else {
+            Offset.Zero
+        }
 
         override suspend fun onPostFling(
             consumed: Velocity,
             available: Velocity,
-        ): Velocity = Velocity(x = 0f, y = available.y)
+        ): Velocity = if (available.y < 0f) {
+            Velocity(x = 0f, y = available.y)
+        } else {
+            Velocity.Zero
+        }
     }
 }
