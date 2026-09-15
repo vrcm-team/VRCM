@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -247,38 +245,35 @@ private fun InventoryFilterBar(
     onArchivedSelected: (InventoryArchivedFilter) -> Unit,
     onOrderSelected: (InventorySortOrder) -> Unit,
 ) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        item(key = "inventory-type-filter") {
-            InventoryDropdown(
-                label = strings.inventoryFilterType,
-                selected = filters.type,
-                options = listOf<InventoryItemType?>(null) + InventoryItemType.entries,
-                optionLabel = { it?.localizedLabel() ?: strings.inventoryFilterAll },
-                onSelected = onTypeSelected,
-            )
-        }
-        item(key = "inventory-archive-filter") {
-            InventoryDropdown(
-                label = strings.inventoryFilterArchived,
-                selected = filters.archived,
-                options = InventoryArchivedFilter.entries,
-                optionLabel = InventoryArchivedFilter::localizedLabel,
-                onSelected = onArchivedSelected,
-            )
-        }
-        item(key = "inventory-order-filter") {
-            InventoryDropdown(
-                label = strings.inventorySortLabel,
-                selected = filters.order,
-                options = InventorySortOrder.entries,
-                optionLabel = InventorySortOrder::localizedLabel,
-                onSelected = onOrderSelected,
-            )
-        }
+        InventoryDropdown(
+            label = strings.inventoryFilterType,
+            selected = filters.type,
+            options = listOf<InventoryItemType?>(null) + InventoryItemType.entries,
+            optionLabel = { it?.localizedLabel() ?: strings.inventoryFilterAll },
+            onSelected = onTypeSelected,
+            modifier = Modifier.weight(1f),
+        )
+        InventoryDropdown(
+            label = strings.inventoryFilterArchived,
+            selected = filters.archived,
+            options = InventoryArchivedFilter.entries,
+            optionLabel = InventoryArchivedFilter::localizedLabel,
+            onSelected = onArchivedSelected,
+            modifier = Modifier.weight(1f),
+        )
+        InventoryDropdown(
+            label = strings.inventorySortLabel,
+            selected = filters.order,
+            options = InventorySortOrder.entries,
+            optionLabel = InventorySortOrder::localizedLabel,
+            onSelected = onOrderSelected,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -289,27 +284,54 @@ private fun <T> InventoryDropdown(
     options: List<T>,
     optionLabel: @Composable (T) -> String,
     onSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.widthIn(min = 152.dp, max = 232.dp),
+    Box(modifier) {
+        TextButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
         ) {
             Text(
                 text = "$label: ${optionLabel(selected)}",
+                modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(AppIcons.ExpandMore, contentDescription = null)
+            Icon(
+                imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 200.dp),
+            shape = MaterialTheme.shapes.medium,
+        ) {
             options.forEach { option ->
+                val isSelected = option == selected
                 DropdownMenuItem(
                     text = { Text(optionLabel(option)) },
                     onClick = {
                         expanded = false
                         onSelected(option)
+                    },
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier.size(20.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = AppIcons.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
                     },
                 )
             }
