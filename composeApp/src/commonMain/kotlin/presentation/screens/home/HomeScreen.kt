@@ -244,6 +244,12 @@ private fun HomeDestinationContent(
     val stateHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     var activityActivated by rememberSaveable { mutableStateOf(false) }
+    var activityFilterIndex by rememberSaveable {
+        mutableIntStateOf(FriendActivityTimelineFilter.All.ordinal)
+    }
+    val activityFilter = FriendActivityTimelineFilter.entries.getOrElse(activityFilterIndex) {
+        FriendActivityTimelineFilter.All
+    }
     val pagerState = rememberPagerState(
         initialPage = model.selectedHomeTabIndex,
         pageCount = { HomeTab.entries.size },
@@ -260,6 +266,8 @@ private fun HomeDestinationContent(
     Column(Modifier.fillMaxSize()) {
         HomeTabRow(
             pagerState = pagerState,
+            activityFilter = activityFilter,
+            onActivityFilterSelected = { activityFilterIndex = it.ordinal },
             onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
         )
         HorizontalPager(
@@ -280,6 +288,7 @@ private fun HomeDestinationContent(
                         FriendActivityTimelineDestination(
                             hasBottomNavigation = hasBottomNavigation,
                             isActive = { pagerState.settledPage == HomeTab.Activity.ordinal },
+                            selectedFilter = activityFilter,
                         )
                     } else {
                         ActivityTimelinePreview()
@@ -293,26 +302,89 @@ private fun HomeDestinationContent(
 @Composable
 private fun HomeTabRow(
     pagerState: PagerState,
+    activityFilter: FriendActivityTimelineFilter,
+    onActivityFilterSelected: (FriendActivityTimelineFilter) -> Unit,
     onReselect: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    var activityFilterMenuExpanded by remember { mutableStateOf(false) }
     PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
         HomeTab.entries.forEachIndexed { index, tab ->
             Tab(
                 selected = index == pagerState.currentPage,
                 onClick = {
-                    if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                    if (tab == HomeTab.Activity) {
+                        activityFilterMenuExpanded = true
+                        if (index != pagerState.currentPage || pagerState.isScrollInProgress) {
+                            scope.launch { pagerState.animateScrollToTab(index) }
+                        }
+                    } else if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
                         onReselect()
                     } else {
                         scope.launch { pagerState.animateScrollToTab(index) }
                     }
                 },
                 text = {
-                    Text(
-                        if (tab == HomeTab.Location) strings.homeTabLocation else strings.homeTabActivity,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (tab == HomeTab.Location) {
+                        Text(
+                            strings.homeTabLocation,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text(
+                                    strings.homeTabActivity,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Icon(
+                                    imageVector = if (activityFilterMenuExpanded) {
+                                        AppIcons.ExpandLess
+                                    } else {
+                                        AppIcons.ExpandMore
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = activityFilterMenuExpanded,
+                                onDismissRequest = { activityFilterMenuExpanded = false },
+                                modifier = Modifier.widthIn(min = 200.dp),
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                FriendActivityTimelineFilter.entries.forEach { option ->
+                                    val isSelected = option == activityFilter
+                                    DropdownMenuItem(
+                                        text = { Text(option.label()) },
+                                        onClick = {
+                                            activityFilterMenuExpanded = false
+                                            onActivityFilterSelected(option)
+                                        },
+                                        leadingIcon = {
+                                            Box(
+                                                modifier = Modifier.size(20.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = AppIcons.Check,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 },
             )
         }
@@ -323,10 +395,10 @@ private fun HomeTabRow(
 private fun FriendActivityTimelineDestination(
     hasBottomNavigation: Boolean,
     isActive: () -> Boolean,
+    selectedFilter: FriendActivityTimelineFilter,
 ) {
     val model: FriendActivityTimelineModel = koinViewModel()
     val state by model.state.collectAsState()
-    val filter by model.filter.collectAsState()
     val listState = rememberLazyListState()
     val navigator = currentNavigator
     val currentIsActive by rememberUpdatedState(isActive)
@@ -338,10 +410,14 @@ private fun FriendActivityTimelineDestination(
             }
         }
     }
+    LaunchedEffect(model, selectedFilter) {
+        model.selectFilter(selectedFilter)
+        listState.scrollToItem(0)
+    }
 
     FriendActivityTimelineContent(
         state = state,
-        filter = filter,
+        filter = selectedFilter,
         onFilterSelected = model::selectFilter,
         onLoadMore = model::loadMore,
         onRetry = model::retry,
@@ -363,6 +439,7 @@ private fun FriendActivityTimelineDestination(
         },
         listState = listState,
         controlsInList = true,
+        showFilterControls = false,
         bottomNavigationPadding = if (hasBottomNavigation) 80.dp else 0.dp,
     )
 }

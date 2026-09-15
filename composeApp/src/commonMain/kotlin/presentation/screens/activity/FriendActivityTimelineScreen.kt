@@ -132,6 +132,7 @@ fun FriendActivityTimelineContent(
     listState: LazyListState = rememberLazyListState(),
     headerContent: (@Composable () -> Unit)? = null,
     controlsInList: Boolean = headerContent != null,
+    showFilterControls: Boolean = true,
     bottomNavigationPadding: Dp = 0.dp,
 ) {
     val contentState = state as? FriendActivityTimelineState.Content
@@ -154,7 +155,9 @@ fun FriendActivityTimelineContent(
 
     if (!controlsInList) {
         Column(modifier = modifier.fillMaxSize()) {
-            ActivityTimelineFilters(filter, onFilterSelected)
+            if (showFilterControls) {
+                ActivityTimelineFilters(filter, onFilterSelected)
+            }
             ActivityTimelineObservedHint()
             ActivityTimelineList(
                 state = state,
@@ -168,6 +171,7 @@ fun FriendActivityTimelineContent(
                 modifier = Modifier.weight(1f),
                 headerContent = headerContent,
                 includeControls = false,
+                showFilterControls = showFilterControls,
                 bottomNavigationPadding = bottomNavigationPadding,
             )
         }
@@ -184,6 +188,7 @@ fun FriendActivityTimelineContent(
             modifier = modifier,
             headerContent = headerContent,
             includeControls = true,
+            showFilterControls = showFilterControls,
             bottomNavigationPadding = bottomNavigationPadding,
         )
     }
@@ -202,6 +207,7 @@ private fun ActivityTimelineList(
     modifier: Modifier,
     headerContent: (@Composable () -> Unit)? = null,
     includeControls: Boolean,
+    showFilterControls: Boolean,
     bottomNavigationPadding: Dp,
 ) {
     LazyColumn(
@@ -218,10 +224,12 @@ private fun ActivityTimelineList(
                 headerContent()
             }
         }
-        if (includeControls) {
+        if (includeControls && showFilterControls) {
             item(key = "activity-filters") {
                 ActivityTimelineFilters(filter, onFilterSelected)
             }
+        }
+        if (includeControls) {
             item(key = "activity-observed-hint") {
                 ActivityTimelineObservedHint()
             }
@@ -404,7 +412,7 @@ private fun FriendTimelineEvent(
 }
 
 @Composable
-private fun FriendActivityTimelineFilter.label(): String = when (this) {
+internal fun FriendActivityTimelineFilter.label(): String = when (this) {
     FriendActivityTimelineFilter.All -> strings.friendActivityFilterAll
     FriendActivityTimelineFilter.Presence -> strings.friendActivityFilterPresence
     FriendActivityTimelineFilter.Location -> strings.friendActivityFilterLocation
