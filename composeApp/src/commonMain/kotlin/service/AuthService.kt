@@ -352,6 +352,8 @@ class AuthService(
                         tags = user.tags,
                         userIcon = user.userIcon,
                         pronouns = user.pronouns,
+                        bannerType = user.bannerType,
+                        bannerUrl = user.bannerUrl,
                         presence = updatedPresence,
                     )
                 )

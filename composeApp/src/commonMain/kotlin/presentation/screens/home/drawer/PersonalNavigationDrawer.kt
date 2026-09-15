@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.drawer
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDialogScope
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTextBoundsResizeMode
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
@@ -34,6 +37,7 @@ import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 data class PersonalDrawerUser(
     val id: String,
     val avatarUrl: String?,
+    val customBannerUrl: String?,
     val displayName: String,
     val pronouns: String?,
     val isSupporter: Boolean,
@@ -85,14 +89,16 @@ fun PersonalNavigationDrawer(
                         .verticalScroll(rememberScrollState())
                         .padding(vertical = 12.dp),
                 ) {
-                    PersonalHeader(
-                        user = user,
-                        sharedSuffixKey = profileSharedSuffixKey,
-                        sharedElementsEnabled = gesturesEnabled,
-                        statusVisible = statusVisible,
-                        onProfileClick = onProfileClick,
-                        onStatusClick = onStatusClick,
-                    )
+                    PersonalHeaderBackground(user?.customBannerUrl) {
+                        PersonalHeader(
+                            user = user,
+                            sharedSuffixKey = profileSharedSuffixKey,
+                            sharedElementsEnabled = gesturesEnabled,
+                            statusVisible = statusVisible,
+                            onProfileClick = onProfileClick,
+                            onStatusClick = onStatusClick,
+                        )
+                    }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     DrawerItem(
                         AppIcons.Person,
@@ -116,6 +122,31 @@ fun PersonalNavigationDrawer(
         },
         content = content,
     )
+}
+
+@Composable
+private fun PersonalHeaderBackground(
+    customBannerUrl: String?,
+    content: @Composable () -> Unit,
+) {
+    if (customBannerUrl == null) {
+        content()
+        return
+    }
+    Box(Modifier.fillMaxWidth()) {
+        AImage(
+            modifier = Modifier.matchParentSize(),
+            imageData = customBannerUrl,
+            contentDescription = null,
+            contentScale = ContentScale.FillWidth,
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f)),
+        )
+        content()
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

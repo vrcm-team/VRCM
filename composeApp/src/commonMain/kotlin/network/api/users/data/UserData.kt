@@ -41,6 +41,8 @@ data class UserData(
     override val userIcon: String,
     val worldId: String,
     override val pronouns: String?,
+    val bannerType: String? = null,
+    val bannerUrl: String? = null,
 ) : IUser, IAccessType {
     override val accessType: AccessType
         get() =

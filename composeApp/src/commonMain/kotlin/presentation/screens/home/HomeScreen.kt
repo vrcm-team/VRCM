@@ -660,6 +660,9 @@ private fun HomePersonalDrawer(
 private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
     id = id,
     avatarUrl = iconUrl,
+    customBannerUrl = bannerUrl?.takeIf {
+        bannerType == "customImage" && it.isNotBlank()
+    },
     displayName = displayName,
     pronouns = pronouns,
     isSupporter = isSupporter,

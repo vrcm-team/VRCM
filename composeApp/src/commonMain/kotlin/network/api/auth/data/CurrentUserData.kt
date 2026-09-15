@@ -75,7 +75,9 @@ data class CurrentUserData(
     val userLanguageCode: String?,
     val username: String,
     val viveId: String,
-    override val pronouns: String?
+    override val pronouns: String?,
+    val bannerType: String? = null,
+    val bannerUrl: String? = null,
 ): IUser {
     override val location: String
         get() = presenceLocation(presence.world, presence.instance)
