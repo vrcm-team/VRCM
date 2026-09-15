@@ -50,6 +50,9 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
+private val FriendIconItemWidth = 60.dp
+private val FriendIconSpacing = 16.dp
+
 @Composable
 fun UserStateIcon(
     modifier: Modifier = Modifier,
@@ -144,21 +147,33 @@ fun UserIconsFlowRow(
     onClickUserIcon: (FriendData, String) -> Unit,
 ) {
     if (friends.isEmpty()) return
-    FlowRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        friends.forEach { friendState ->
-            val friend = friendState.value
-            key(friend.id) {
-                LocationFriendContent(
-                    id = friend.id,
-                    iconUrl = friend.iconUrl,
-                    name = friend.displayName,
-                    userStatus = friend.status,
-                    location = friend.location,
-                ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
+    BoxWithConstraints(modifier = modifier) {
+        // 以满行首尾贴边为基准固定列间距，未满行继续沿用相同列位。
+        val maxItemsInEachRow = (
+            (maxWidth + FriendIconSpacing) / (FriendIconItemWidth + FriendIconSpacing)
+        ).toInt().coerceAtLeast(1)
+        val horizontalSpacing = if (maxItemsInEachRow > 1) {
+            (maxWidth - FriendIconItemWidth * maxItemsInEachRow) / (maxItemsInEachRow - 1)
+        } else {
+            0.dp
+        }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
+            verticalArrangement = Arrangement.spacedBy(FriendIconSpacing),
+            maxItemsInEachRow = maxItemsInEachRow,
+        ) {
+            friends.forEach { friendState ->
+                val friend = friendState.value
+                key(friend.id) {
+                    LocationFriendContent(
+                        id = friend.id,
+                        iconUrl = friend.iconUrl,
+                        name = friend.displayName,
+                        userStatus = friend.status,
+                        location = friend.location,
+                    ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
+                }
             }
         }
     }
@@ -250,7 +265,7 @@ private fun LocationFriendContent(
     val sharedSuffixKey = rememberContainerTransformToken("location-user:$id")
         ?: LocalSharedSuffixKey.current
     Column(
-        modifier = Modifier.width(60.dp)
+        modifier = Modifier.width(FriendIconItemWidth)
             .clip(MaterialTheme.shapes.small)
             .clickable { onClickUserIcon(sharedSuffixKey) }
             .then(modifier),
