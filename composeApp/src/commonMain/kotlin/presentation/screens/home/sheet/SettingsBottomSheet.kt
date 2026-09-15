@@ -26,7 +26,6 @@ import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.settings.NotificationSettingsScreen
-import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
@@ -226,25 +225,6 @@ private fun AboutBlock(onDismissRequest: () -> Unit) {
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = strings.inviteMessageSettingsSummary,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
-        Row(
-            modifier = Modifier.fillMaxWidth()
-                .clickable {
-                    navigator push RewardCodeScreen
-                    onDismissRequest()
-                }
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(text = "${strings.rewardCodeTitle}:")
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = strings.rewardCodeEntry,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

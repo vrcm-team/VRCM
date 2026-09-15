@@ -73,6 +73,11 @@ internal class RewardCodeScreenModel(
         }
     }
 
+    fun reset() {
+        if (_state.value.isSubmitting) return
+        _state.value = RewardCodeUiState(sessionToken = sessions.value?.token)
+    }
+
     fun submit() {
         val current = _state.value
         if (current.isSubmitting) return

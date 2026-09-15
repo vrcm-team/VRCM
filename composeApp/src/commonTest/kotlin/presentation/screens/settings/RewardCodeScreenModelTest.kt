@@ -43,6 +43,21 @@ class RewardCodeScreenModelTest : MainDispatcherTest() {
     }
 
     @Test
+    fun resetClearsDraftBeforeDialogIsReopened() {
+        val fixture = fixture()
+        fixture.model.updateCode("one-time-sensitive-code")
+
+        fixture.model.reset()
+
+        val state = fixture.model.state.value
+        assertEquals(fixture.sessions.value?.token, state.sessionToken)
+        assertEquals("", state.code)
+        assertNull(state.rewards)
+        assertNull(state.failure)
+        assertFalse(state.isSubmitting)
+    }
+
+    @Test
     fun duplicateSubmissionIsIgnoredAndAnotherCodeCanBeRedeemedAfterSuccess() = runBlocking {
         val fixture = fixture()
         fixture.model.updateCode("first-code")

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Minimize
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Redeem
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.graphics.*
@@ -32,6 +33,7 @@ object AppIcons {
     val ScreenRotation: ImageVector by lazy { Icons.Outlined.ScreenRotation }
     val Gallery: ImageVector by lazy { Icons.Outlined.PhotoLibrary }
     val Inventory: ImageVector by lazy { Icons.Outlined.Inventory2 }
+    val Redeem: ImageVector by lazy { Icons.Outlined.Redeem }
 
     val Mirror: ImageVector by lazy {
         ImageVector.Builder(

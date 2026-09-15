@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -27,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -181,6 +184,117 @@ private fun RewardCodeContent(
             }
         }
     }
+}
+
+@Composable
+internal fun RewardCodeDialog(
+    state: RewardCodeUiState,
+    onCodeChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val failureText = when (state.failure) {
+        RewardCodeFailure.EmptyCode -> strings.rewardCodeRequired
+        RewardCodeFailure.RequestFailed -> strings.rewardCodeFailed
+        RewardCodeFailure.SessionUnavailable -> strings.rewardCodeSessionUnavailable
+        null -> null
+    }
+    val rewards = state.rewards
+
+    AlertDialog(
+        onDismissRequest = { if (!state.isSubmitting) onDismiss() },
+        icon = {
+            Icon(
+                imageVector = AppIcons.Redeem,
+                contentDescription = null,
+            )
+        },
+        title = { Text(strings.rewardCodeTitle) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "reward-code-dialog-input") {
+                    OutlinedTextField(
+                        value = state.code,
+                        onValueChange = onCodeChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = state.sessionToken != null && !state.isSubmitting,
+                        label = { Text(strings.rewardCodeInputLabel) },
+                        singleLine = true,
+                        isError = failureText != null,
+                        supportingText = failureText?.let { message ->
+                            { Text(message) }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                    )
+                }
+                if (rewards != null) {
+                    item(key = "reward-code-dialog-success") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = strings.rewardCodeSuccess,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                    itemsIndexed(
+                        items = rewards,
+                        key = { index, reward -> "dialog:${reward.type}:$index" },
+                    ) { _, reward ->
+                        RewardResultCard(
+                            reward = reward,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onSubmit,
+                enabled = state.sessionToken != null &&
+                    state.code.isNotBlank() &&
+                    !state.isSubmitting,
+            ) {
+                if (state.isSubmitting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = LocalContentColor.current,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                }
+                Text(
+                    if (state.isSubmitting) {
+                        strings.rewardCodeSubmitting
+                    } else {
+                        strings.rewardCodeSubmit
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !state.isSubmitting,
+            ) {
+                Text(if (rewards != null) strings.close else strings.cancel)
+            }
+        },
+    )
 }
 
 @Composable

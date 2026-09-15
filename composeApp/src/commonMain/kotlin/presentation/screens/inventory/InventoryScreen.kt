@@ -53,9 +53,12 @@ import io.github.vrcmteam.vrcm.network.api.inventory.InventoryItemType
 import io.github.vrcmteam.vrcm.network.api.inventory.InventorySortOrder
 import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryItemData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeDialog
+import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeScreenModel
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import kotlinx.coroutines.flow.filter
@@ -78,12 +81,15 @@ object InventoryScreen : AppRoute {
 @Composable
 private fun InventoryScreenContent(
     model: InventoryScreenModel = koinViewModel(),
+    rewardCodeModel: RewardCodeScreenModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
     val filters by model.filters.collectAsState()
     val state by model.state.collectAsState()
     val creditsBalanceState by model.creditsBalanceState.collectAsState()
+    val rewardCodeState by rewardCodeModel.state.collectAsState()
     val content = state as? InventoryScreenState.Content
+    var showRewardCodeDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -99,6 +105,11 @@ private fun InventoryScreenContent(
                         state = creditsBalanceState,
                         onRetry = model::refreshCreditsBalance,
                     )
+                    ATooltipBox(tooltip = { Text(strings.rewardCodeEntry) }) {
+                        IconButton(onClick = { showRewardCodeDialog = true }) {
+                            Icon(AppIcons.Redeem, strings.rewardCodeEntry)
+                        }
+                    }
                     IconButton(
                         enabled = content != null &&
                             !content.isRefreshing &&
@@ -146,6 +157,17 @@ private fun InventoryScreenContent(
                 modifier = Modifier.weight(1f),
             )
         }
+    }
+    if (showRewardCodeDialog) {
+        RewardCodeDialog(
+            state = rewardCodeState,
+            onCodeChange = rewardCodeModel::updateCode,
+            onSubmit = rewardCodeModel::submit,
+            onDismiss = {
+                showRewardCodeDialog = false
+                rewardCodeModel.reset()
+            },
+        )
     }
 }
 
