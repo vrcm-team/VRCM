@@ -32,6 +32,46 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
     @Test
+    fun notificationPreferenceUpdatePublishesAndCachesTheAuthoritativeState() = runBlocking {
+        val account = AccountDto(REPRESENTATION_USER_ID, username = "notification-state")
+        SharedFlowCentre.emitAuthenticated(account)
+        val cache = BlockingGroupProfileCacheStore()
+        val fixture = createFixture(cache) { request ->
+            when (request.method) {
+                HttpMethod.Put -> respondJson(notificationMemberJson(enabled = true))
+                HttpMethod.Get -> respondJson(
+                    representationGroupJson(
+                        isRepresenting = false,
+                        isSubscribedToAnnouncements = true,
+                    )
+                )
+
+                else -> error("Unexpected request: ${request.method} ${request.url}")
+            }
+        }
+        try {
+            fixture.model.loadGroupData(representationProfile(isRepresenting = false))
+            cache.loadStarted.await()
+
+            fixture.model.updateNotificationPreference(
+                enabled = true,
+                failureMessage = "update failed",
+                sessionChangedMessage = "session changed",
+            )
+            cache.saveAttempted.await()
+            awaitUntil { !fixture.model.isNotificationPreferenceUpdating.value }
+
+            assertTrue(
+                fixture.model.groupProfileState.value!!.myMember!!.isSubscribedToAnnouncements
+            )
+            assertEquals(1, cache.saveCount)
+        } finally {
+            fixture.close()
+            SharedFlowCentre.emitLogout()
+        }
+    }
+
+    @Test
     fun cacheFailureDoesNotReverseAnAcceptedUpdate() = runBlocking {
         val account = AccountDto(REPRESENTATION_USER_ID, username = "cache-failure")
         SharedFlowCentre.emitAuthenticated(account)

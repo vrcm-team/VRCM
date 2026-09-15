@@ -98,6 +98,10 @@ class GroupProfileScreenModel(
     private val _isRepresentationUpdating = MutableStateFlow(false)
     val isRepresentationUpdating: StateFlow<Boolean> = _isRepresentationUpdating.asStateFlow()
 
+    private val _isNotificationPreferenceUpdating = MutableStateFlow(false)
+    val isNotificationPreferenceUpdating: StateFlow<Boolean> =
+        _isNotificationPreferenceUpdating.asStateFlow()
+
     private val initialLoadGate = GroupProfileInitialLoadGate()
     private val representationCoordinator = GroupRepresentationCoordinator(
         request = NetworkGroupRepresentationRequest(
@@ -105,8 +109,16 @@ class GroupProfileScreenModel(
             authService = authService,
         ),
     )
+    private val notificationPreferenceCoordinator = GroupNotificationPreferenceCoordinator(
+        request = NetworkGroupNotificationPreferenceRequest(
+            groupsApi = groupsApi,
+            authService = authService,
+        ),
+    )
     private var representationJob: Job? = null
     private var representationGeneration = 0L
+    private var notificationPreferenceJob: Job? = null
+    private var notificationPreferenceGeneration = 0L
     private var representationSessionUserId = SharedFlowCentre.currentSession.value?.token?.userId
 
     init {
@@ -115,6 +127,7 @@ class GroupProfileScreenModel(
                 val nextUserId = session?.token?.userId
                 if (representationSessionUserId != nextUserId) {
                     cancelRepresentationUpdate()
+                    cancelNotificationPreferenceUpdate()
                 }
                 representationSessionUserId = nextUserId
             }
@@ -126,6 +139,7 @@ class GroupProfileScreenModel(
         val currentGroupId = _groupProfileState.value?.groupId
         if (currentGroupId != null && currentGroupId != groupId) {
             cancelRepresentationUpdate()
+            cancelNotificationPreferenceUpdate()
         }
         if (groupId.isBlank()) {
             _groupProfileState.value = groupProfileVo
@@ -161,7 +175,14 @@ class GroupProfileScreenModel(
 
     private fun refreshGroupData(refreshProfile: Boolean) {
         val groupId = _groupProfileState.value?.groupId.orEmpty()
-        if (_isLoading.value || _isRepresentationUpdating.value || groupId.isBlank()) return
+        if (
+            _isLoading.value ||
+            _isRepresentationUpdating.value ||
+            _isNotificationPreferenceUpdating.value ||
+            groupId.isBlank()
+        ) {
+            return
+        }
 
         _members.value = emptyList()
         _owner.value = null
@@ -221,7 +242,13 @@ class GroupProfileScreenModel(
 
     fun joinGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
-        if (_isActionLoading.value || _isRepresentationUpdating.value) return
+        if (
+            _isActionLoading.value ||
+            _isRepresentationUpdating.value ||
+            _isNotificationPreferenceUpdating.value
+        ) {
+            return
+        }
         _isActionLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
@@ -237,7 +264,13 @@ class GroupProfileScreenModel(
 
     fun leaveGroup() {
         val groupId = _groupProfileState.value?.groupId ?: return
-        if (_isActionLoading.value || _isRepresentationUpdating.value) return
+        if (
+            _isActionLoading.value ||
+            _isRepresentationUpdating.value ||
+            _isNotificationPreferenceUpdating.value
+        ) {
+            return
+        }
         _isActionLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             authService.reTryAuthCatching {
@@ -261,6 +294,7 @@ class GroupProfileScreenModel(
         if (_isActionLoading.value ||
             _isLoading.value ||
             _isRepresentationUpdating.value ||
+            _isNotificationPreferenceUpdating.value ||
             !group.hasActiveMembership(sessionToken)
         ) {
             return
@@ -320,6 +354,77 @@ class GroupProfileScreenModel(
         job.start()
     }
 
+    fun updateNotificationPreference(
+        enabled: Boolean,
+        failureMessage: String,
+        sessionChangedMessage: String,
+    ) {
+        val group = _groupProfileState.value ?: return
+        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
+        if (
+            _isActionLoading.value ||
+            _isLoading.value ||
+            _isRepresentationUpdating.value ||
+            _isNotificationPreferenceUpdating.value ||
+            !group.hasActiveMembership(sessionToken)
+        ) {
+            return
+        }
+
+        val groupId = group.groupId
+        val generation = ++notificationPreferenceGeneration
+        _isNotificationPreferenceUpdating.value = true
+        val job = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            try {
+                when (
+                    val result = notificationPreferenceCoordinator.update(
+                        group = group,
+                        enabled = enabled,
+                        sessionToken = sessionToken,
+                    )
+                ) {
+                    is GroupNotificationPreferenceUpdateResult.Updated -> {
+                        if (acceptsNotificationPreferenceResult(groupId, generation, result.sessionToken)) {
+                            _groupProfileState.value = GroupProfileVo(result.group)
+                            saveNotificationPreferenceCache(
+                                groupId = groupId,
+                                generation = generation,
+                                sessionToken = result.sessionToken,
+                                group = result.group,
+                            )
+                        }
+                    }
+
+                    is GroupNotificationPreferenceUpdateResult.Failed -> {
+                        if (acceptsNotificationPreferenceResult(groupId, generation, result.sessionToken)) {
+                            logger.error("GroupNotifications: ${result.error.message.orEmpty()}")
+                            SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
+                        }
+                    }
+
+                    GroupNotificationPreferenceUpdateResult.SessionChanged -> {
+                        if (acceptsNotificationPreferenceRequest(groupId, generation, sessionToken.userId)) {
+                            SharedFlowCentre.toastText.emit(ToastText.Error(sessionChangedMessage))
+                        }
+                    }
+
+                    GroupNotificationPreferenceUpdateResult.InFlight,
+                    GroupNotificationPreferenceUpdateResult.NotAllowed,
+                    GroupNotificationPreferenceUpdateResult.Unchanged -> Unit
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } finally {
+                if (notificationPreferenceGeneration == generation) {
+                    _isNotificationPreferenceUpdating.value = false
+                    notificationPreferenceJob = null
+                }
+            }
+        }
+        notificationPreferenceJob = job
+        job.start()
+    }
+
     private fun acceptsRepresentationResult(
         groupId: String,
         generation: Long,
@@ -341,6 +446,29 @@ class GroupProfileScreenModel(
         representationJob?.cancel()
         representationJob = null
         _isRepresentationUpdating.value = false
+    }
+
+    private fun acceptsNotificationPreferenceResult(
+        groupId: String,
+        generation: Long,
+        sessionToken: AccountSessionToken,
+    ): Boolean = notificationPreferenceGeneration == generation &&
+        _groupProfileState.value?.groupId == groupId &&
+        SharedFlowCentre.isCurrentSession(sessionToken)
+
+    private fun acceptsNotificationPreferenceRequest(
+        groupId: String,
+        generation: Long,
+        userId: String,
+    ): Boolean = notificationPreferenceGeneration == generation &&
+        _groupProfileState.value?.groupId == groupId &&
+        SharedFlowCentre.currentSession.value?.token?.userId == userId
+
+    private fun cancelNotificationPreferenceUpdate() {
+        notificationPreferenceGeneration++
+        notificationPreferenceJob?.cancel()
+        notificationPreferenceJob = null
+        _isNotificationPreferenceUpdating.value = false
     }
 
     private suspend fun saveRepresentationCache(
@@ -367,6 +495,34 @@ class GroupProfileScreenModel(
                 throw cancellation
             } catch (deleteError: Throwable) {
                 logger.error("GroupRepresentationCacheDelete: ${deleteError.message.orEmpty()}")
+            }
+        }
+    }
+
+    private suspend fun saveNotificationPreferenceCache(
+        groupId: String,
+        generation: Long,
+        sessionToken: AccountSessionToken,
+        group: GroupData,
+    ) {
+        if (!acceptsNotificationPreferenceResult(groupId, generation, sessionToken)) return
+        try {
+            groupProfileCacheStore.save(
+                GroupProfileCache(
+                    group = group,
+                    cachedAtEpochMilliseconds = nowMilliseconds(),
+                )
+            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            logger.error("GroupNotificationsCache: ${error.message.orEmpty()}")
+            try {
+                groupProfileCacheStore.delete(groupId)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (deleteError: Throwable) {
+                logger.error("GroupNotificationsCacheDelete: ${deleteError.message.orEmpty()}")
             }
         }
     }

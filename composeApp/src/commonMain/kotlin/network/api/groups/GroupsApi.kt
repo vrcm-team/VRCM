@@ -9,6 +9,7 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupPostData
 import io.github.vrcmteam.vrcm.network.api.groups.data.JoinGroupRequest
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
+import io.github.vrcmteam.vrcm.network.api.groups.data.UpdateGroupMemberNotificationsRequest
 import io.github.vrcmteam.vrcm.network.api.groups.data.UpdateGroupRepresentationRequest
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.ktor.client.*
@@ -55,6 +56,16 @@ class GroupsApi(private val client: HttpClient) {
             contentType(ContentType.Application.Json)
             setBody(UpdateGroupRepresentationRequest(isRepresenting))
         }.checkSuccess { Unit }
+
+    suspend fun updateGroupNotifications(
+        groupId: String,
+        userId: String,
+        enabled: Boolean,
+    ): GroupMember =
+        client.put("$GROUPS_API_PREFIX/$groupId/members/$userId") {
+            contentType(ContentType.Application.Json)
+            setBody(UpdateGroupMemberNotificationsRequest(enabled))
+        }.checkSuccess()
 
     suspend fun getGroupMembers(
         groupId: String,

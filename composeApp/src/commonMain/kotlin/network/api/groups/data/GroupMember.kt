@@ -12,6 +12,7 @@ data class GroupMember(
     val groupId: String = "",
     val membershipStatus: String = "",
     val isRepresenting: Boolean = false,
+    val isSubscribedToAnnouncements: Boolean = false,
     val roleIds: List<String> = emptyList(),
     val joinedAt: String? = null,
     val user: GroupMemberLimitedUser? = null,

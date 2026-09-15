@@ -132,7 +132,10 @@ internal fun io.ktor.client.engine.mock.MockRequestHandleScope.respondJson(conte
         headers = headersOf(HttpHeaders.ContentType, "application/json"),
     )
 
-internal fun representationGroupJson(isRepresenting: Boolean) = """
+internal fun representationGroupJson(
+    isRepresenting: Boolean,
+    isSubscribedToAnnouncements: Boolean = false,
+) = """
     {
       "id":"$REPRESENTATION_GROUP_ID",
       "membershipStatus":"member",
@@ -141,7 +144,7 @@ internal fun representationGroupJson(isRepresenting: Boolean) = """
         "has2FA":true,
         "id":"gmem_1",
         "isRepresenting":$isRepresenting,
-        "isSubscribedToAnnouncements":false,
+        "isSubscribedToAnnouncements":$isSubscribedToAnnouncements,
         "joinedAt":"2026-01-01T00:00:00.000Z",
         "lastPostReadAt":null,
         "mRoleIds":[],

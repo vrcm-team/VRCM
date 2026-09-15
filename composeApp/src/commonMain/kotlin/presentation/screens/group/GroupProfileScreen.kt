@@ -143,6 +143,8 @@ class GroupProfileScreen(
         val isLoading by screenModel.isLoading.collectAsState()
         val isActionLoading by screenModel.isActionLoading.collectAsState()
         val isRepresentationUpdating by screenModel.isRepresentationUpdating.collectAsState()
+        val isNotificationPreferenceUpdating by
+            screenModel.isNotificationPreferenceUpdating.collectAsState()
         val currentSession by SharedFlowCentre.currentSession.collectAsState()
 
         LaunchedEffect(groupProfileVo.groupId) {
@@ -152,6 +154,8 @@ class GroupProfileScreen(
         val group = groupState ?: groupProfileVo
         val representationUpdateFailedMessage = strings.groupRepresentationUpdateFailed
         val representationSessionChangedMessage = strings.groupRepresentationSessionChanged
+        val notificationPreferenceUpdateFailedMessage = strings.groupNotificationsUpdateFailed
+        val notificationPreferenceSessionChangedMessage = strings.groupNotificationsSessionChanged
         val scrollState = rememberScrollState()
         var selectedTabIndex by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(0) }
 
@@ -194,7 +198,8 @@ class GroupProfileScreen(
                             isLoading = isLoading,
                             isActionLoading = isActionLoading,
                             isRepresentationUpdating = isRepresentationUpdating,
-                            representationAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
+                            isNotificationPreferenceUpdating = isNotificationPreferenceUpdating,
+                            groupSettingsAvailable = currentSession?.token?.let(group::hasActiveMembership) == true,
                             onJoin = { screenModel.joinGroup() },
                             onLeave = { screenModel.leaveGroup() },
                             onRepresentationChange = { isRepresenting ->
@@ -202,6 +207,13 @@ class GroupProfileScreen(
                                     isRepresenting = isRepresenting,
                                     failureMessage = representationUpdateFailedMessage,
                                     sessionChangedMessage = representationSessionChangedMessage,
+                                )
+                            },
+                            onNotificationPreferenceChange = { enabled ->
+                                screenModel.updateNotificationPreference(
+                                    enabled = enabled,
+                                    failureMessage = notificationPreferenceUpdateFailedMessage,
+                                    sessionChangedMessage = notificationPreferenceSessionChangedMessage,
                                 )
                             },
                         )
@@ -253,7 +265,9 @@ class GroupProfileScreen(
                                 colors = colors,
                             )
                             IconButton(
-                                enabled = !isLoading && !isRepresentationUpdating,
+                                enabled = !isLoading &&
+                                    !isRepresentationUpdating &&
+                                    !isNotificationPreferenceUpdating,
                                 colors = colors,
                                 onClick = screenModel::refreshGroupData,
                             ) {
@@ -336,10 +350,12 @@ private fun GroupHeaderInfo(
     isLoading: Boolean,
     isActionLoading: Boolean,
     isRepresentationUpdating: Boolean,
-    representationAvailable: Boolean,
+    isNotificationPreferenceUpdating: Boolean,
+    groupSettingsAvailable: Boolean,
     onJoin: () -> Unit,
     onLeave: () -> Unit,
     onRepresentationChange: (Boolean) -> Unit,
+    onNotificationPreferenceChange: (Boolean) -> Unit,
 ) {
     val membershipStatus = group.membershipStatus.lowercase()
     val joinState = group.joinState.lowercase()
@@ -387,7 +403,7 @@ private fun GroupHeaderInfo(
                 }
             }
         }
-        if (representationAvailable) {
+        if (groupSettingsAvailable) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -421,15 +437,61 @@ private fun GroupHeaderInfo(
                 }
                 Switch(
                     checked = group.myMember?.isRepresenting == true,
-                    enabled = !isLoading && !isActionLoading && !isRepresentationUpdating,
+                    enabled = !isLoading &&
+                        !isActionLoading &&
+                        !isRepresentationUpdating &&
+                        !isNotificationPreferenceUpdating,
                     onCheckedChange = onRepresentationChange,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = strings.groupNotifications,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = when {
+                            isNotificationPreferenceUpdating -> strings.groupNotificationsUpdating
+                            group.myMember?.isSubscribedToAnnouncements == true ->
+                                strings.groupNotificationsEnabled
+                            else -> strings.groupNotificationsDisabled
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isNotificationPreferenceUpdating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                Switch(
+                    checked = group.myMember?.isSubscribedToAnnouncements == true,
+                    enabled = !isLoading &&
+                        !isActionLoading &&
+                        !isRepresentationUpdating &&
+                        !isNotificationPreferenceUpdating,
+                    onCheckedChange = onNotificationPreferenceChange,
                 )
             }
         }
         LoadingButton(
             modifier = Modifier.fillMaxWidth(),
             text = actionLabel,
-            enabled = actionEnabled && !isRepresentationUpdating,
+            enabled = actionEnabled &&
+                !isRepresentationUpdating &&
+                !isNotificationPreferenceUpdating,
             isLoading = isActionLoading,
             onClick = { if (isMember) onLeave() else onJoin() }
         )
