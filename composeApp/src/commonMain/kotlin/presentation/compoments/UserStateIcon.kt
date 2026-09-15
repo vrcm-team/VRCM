@@ -146,7 +146,7 @@ fun UserIconsFlowRow(
     if (friends.isEmpty()) return
     FlowRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         friends.forEach { friendState ->
