@@ -46,9 +46,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubContent
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTopBarActions
-import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
-import io.github.vrcmteam.vrcm.presentation.screens.favorites.MyGroupsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.LogoutConfirmationDialog
@@ -63,6 +61,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterModel
 import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -627,8 +627,8 @@ private fun HomePersonalDrawer(
         },
         onFriendNetworkClick = { closeAndNavigate(FriendNetworkScreen) },
         onGalleryClick = { closeAndNavigate(GalleryScreen) },
-        onFavoritesClick = { closeAndNavigate(FavoritesScreen) },
-        onMyGroupsClick = { closeAndNavigate(MyGroupsScreen) },
+        onInviteMessagesClick = { closeAndNavigate(InviteMessageSlotsScreen) },
+        onPlayerManagementClick = { closeAndNavigate(PlayerModerationListScreen) },
         onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
         onInventoryClick = { closeAndNavigate(InventoryScreen) },
         onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },

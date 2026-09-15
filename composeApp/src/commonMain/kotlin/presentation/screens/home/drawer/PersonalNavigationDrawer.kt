@@ -54,8 +54,8 @@ fun PersonalNavigationDrawer(
     onStatusClick: () -> Unit,
     onFriendNetworkClick: () -> Unit,
     onGalleryClick: () -> Unit,
-    onFavoritesClick: () -> Unit,
-    onMyGroupsClick: () -> Unit,
+    onInviteMessagesClick: () -> Unit,
+    onPlayerManagementClick: () -> Unit,
     onRecentWorldsClick: () -> Unit,
     onInventoryClick: () -> Unit,
     onNameplateClick: () -> Unit,
@@ -102,8 +102,8 @@ fun PersonalNavigationDrawer(
                     )
                     DrawerItem(AppIcons.PersonSearch, strings.friendNetworkTitle, onFriendNetworkClick)
                     DrawerItem(AppIcons.Gallery, strings.galleryScreenTitle, onGalleryClick)
-                    DrawerItem(AppIcons.Favorite, strings.favoritesTitle, onFavoritesClick)
-                    DrawerItem(AppIcons.Groups, strings.myGroups, onMyGroupsClick)
+                    DrawerItem(AppIcons.Notifications, strings.inviteMessageSlotsTitle, onInviteMessagesClick)
+                    DrawerItem(AppIcons.Shield, strings.playerModerationTitle, onPlayerManagementClick)
                     DrawerItem(AppIcons.Explore, strings.recentWorldsTitle, onRecentWorldsClick)
                     DrawerItem(AppIcons.Inventory, strings.inventoryTitle, onInventoryClick)
                     DrawerItem(AppIcons.AccountCircle, strings.meetupCardTitle, onNameplateClick)
