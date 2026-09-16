@@ -26,7 +26,7 @@ VRCM is a cross-platform VRChat companion focused on social connection and conve
 > VRCM follows a different product direction from VRCX: VRCX puts greater emphasis on desktop logging and information management, while VRCM prioritizes mobile social connection, convenient interaction, and availability on the go.
 > Desktop builds will continue to receive basic support and essential maintenance, but deeper desktop development is not a near-term priority, nor is matching VRCX's desktop feature depth.
 
-[Download the latest release](https://github.com/vrcm-team/VRCM/releases/latest) · [What's new in 1.1.1](docs/releases/1.1.1.md)
+[Download the latest release](https://github.com/vrcm-team/VRCM/releases/latest) · [What's new in 1.1.3](docs/releases/1.1.3.md)
 
 </div>
 
