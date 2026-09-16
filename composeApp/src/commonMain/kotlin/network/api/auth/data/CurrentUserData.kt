@@ -16,13 +16,14 @@ data class CurrentUserData(
     val accountDeletionLog: List<AccountDeletionLog>?,
     val activeFriends: List<String>,
     val allowAvatarCopying: Boolean,
-    override val bio: String?,
-    override val bioLinks: List<String>,
+    override val bio: String? = null,
+    /** Optional on the auth response; profile links are not guaranteed by the public user schema. */
+    override val bioLinks: List<String> = emptyList(),
     val currentAvatar: String,
     val currentAvatarAssetUrl: String?,
-    override val currentAvatarImageUrl: String,
-    override val currentAvatarTags: List<String>,
-    override val currentAvatarThumbnailImageUrl: String,
+    override val currentAvatarImageUrl: String = "",
+    override val currentAvatarTags: List<String> = emptyList(),
+    override val currentAvatarThumbnailImageUrl: String? = null,
     @SerialName("date_joined")
     val dateJoined: String,
     override val developerType: String,
@@ -56,7 +57,11 @@ data class CurrentUserData(
     val pastDisplayNames: List<PastDisplayName>,
     val picoId: String,
     val presence: Presence,
-    override val profilePicOverride: String,
+    /** Optional on the auth response; [IUser.profileImageUrl] falls back to the current avatar. */
+    override val profilePicOverride: String = "",
+    /** Canonical profile icon returned by the post-PR user schema. */
+    @SerialName("iconUrl")
+    val profileIconUrl: String = "",
     val state: String,
     override val status: UserStatus,
     override val statusDescription: String,
@@ -70,7 +75,8 @@ data class CurrentUserData(
     val unsubscribe: Boolean,
     @SerialName("updated_at")
     val updatedAt: String,
-    override val userIcon: String,
+    /** Optional on the auth response; [IUser.iconUrl] falls back to the profile image. */
+    override val userIcon: String = "",
     val userLanguage: String?,
     val userLanguageCode: String?,
     val username: String,
@@ -79,6 +85,9 @@ data class CurrentUserData(
     val bannerType: String? = null,
     val bannerUrl: String? = null,
 ): IUser {
+    override val iconUrl: String
+        get() = profileIconUrl.ifBlank { userIcon.ifBlank { profileImageUrl } }
+
     override val location: String
         get() = presenceLocation(presence.world, presence.instance)
 }

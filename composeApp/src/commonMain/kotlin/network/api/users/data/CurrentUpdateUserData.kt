@@ -18,8 +18,8 @@ data class CurrentUpdateUserData(
     val accountDeletionDate: String?,
     val accountDeletionLog: List<AccountDeletionLog>?,
     val allowAvatarCopying: Boolean,
-    override val bio: String?,
-    override val bioLinks: List<String>,
+    override val bio: String? = null,
+    override val bioLinks: List<String> = emptyList(),
     val currentAvatar: String,
     val currentAvatarAssetUrl: String?,
     override val currentAvatarImageUrl: String,
@@ -55,7 +55,10 @@ data class CurrentUpdateUserData(
     val oculusId: String,
     val pastDisplayNames: List<PastDisplayName>,
     val picoId: String,
-    override val profilePicOverride: String,
+    /** Canonical profile icon returned by user update responses. */
+    @SerialName("iconUrl")
+    val profileIconUrl: String = "",
+    override val profilePicOverride: String = "",
     val state: String,
     override val status: UserStatus,
     override val statusDescription: String,
@@ -69,10 +72,13 @@ data class CurrentUpdateUserData(
     val unsubscribe: Boolean,
     @SerialName("updated_at")
     val updatedAt: String,
-    override val userIcon: String,
+    override val userIcon: String = "",
     val userLanguage: String?,
     val userLanguageCode: String?,
     val username: String,
     val viveId: String,
     override val pronouns: String?
-):IUser
+): IUser {
+    override val iconUrl: String
+        get() = profileIconUrl.ifBlank { userIcon.ifBlank { profileImageUrl } }
+}

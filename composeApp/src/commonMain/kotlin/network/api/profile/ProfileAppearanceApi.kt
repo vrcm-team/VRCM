@@ -17,6 +17,18 @@ class ProfileAppearanceApi(private val client: HttpClient) {
         }.checkSuccess()
     }
 
+    /**
+     * Loads the public profile fields that are no longer returned by `/users/{userId}`.
+     * `asSelf` is intentionally omitted: this call is also used for other users.
+     */
+    suspend fun getPublicProfile(userId: String): ProfileAppearanceData {
+        require(ID_PATTERN.matches(userId)) { "Invalid user ID" }
+
+        return client.get("profile/$userId") {
+            parameter("withGroupsAndWorlds", true)
+        }.checkSuccess()
+    }
+
     private companion object {
         val ID_PATTERN = Regex("[A-Za-z0-9_-]+")
     }

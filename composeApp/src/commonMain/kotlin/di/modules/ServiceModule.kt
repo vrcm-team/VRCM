@@ -13,6 +13,7 @@ import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRemoteDataSource
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCurrentUserSnapshotProvider
 import io.github.vrcmteam.vrcm.service.meetup.MeetupRemoteBytesLoader
+import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupCardAssetStore
 import io.github.vrcmteam.vrcm.storage.meetup.MeetupProfileSnapshot
 import kotlinx.coroutines.CoroutineScope

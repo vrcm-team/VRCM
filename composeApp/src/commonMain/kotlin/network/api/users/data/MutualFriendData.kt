@@ -18,6 +18,9 @@ data class MutualFriendData(
     override val currentAvatarThumbnailImageUrl: String? = null,
     override val currentAvatarTags: List<String> = emptyList(),
     val imageUrl: String = "",
+    /** Canonical profile icon returned by the mutual-friends endpoint. */
+    @SerialName("iconUrl")
+    val profileIconUrl: String = "",
     override val profilePicOverride: String = "",
     override val userIcon: String = "",
     override val isFriend: Boolean = true,
@@ -27,4 +30,9 @@ data class MutualFriendData(
     override val lastPlatform: String = "",
     override val developerType: String = "",
     override val pronouns: String? = null,
-) : IUser
+) : IUser {
+    override val iconUrl: String
+        get() = profileIconUrl.ifBlank {
+            userIcon.ifBlank { imageUrl.ifBlank { profileImageUrl } }
+        }
+}

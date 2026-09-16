@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "release_body": {
+      "type": "string"
+    },
+    "details_en": {
+      "type": "string"
+    },
+    "details_zh": {
+      "type": "string"
+    },
+    "details_ja": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "release_body",
+    "details_en",
+    "details_zh",
+    "details_ja"
+  ],
+  "additionalProperties": false
+}

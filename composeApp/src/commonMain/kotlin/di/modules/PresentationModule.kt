@@ -127,6 +127,7 @@ val presentationModule: Module = module {
             userProfileVO = parameters.get(),
             authService = get(),
             usersApi = get(),
+            profileAppearanceApi = get(),
             groupsApi = get(),
             friendService = get(),
             notificationApi = get(),

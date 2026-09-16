@@ -17,6 +17,7 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.resolveOriginalImageUrl
+import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
@@ -1323,6 +1324,33 @@ class FriendListPagerModel(
         _favoriteGroupClearState.value = FavoriteGroupClearState(
             group = target.key,
             itemCount = target.value.size,
+        )
+    }
+
+    private fun UserData.toFriendData(): FriendData {
+        return FriendData(
+            id = id,
+            displayName = displayName,
+            status = status,
+            lastLogin = lastLogin,
+            lastActivity = lastActivity,
+            lastPlatform = lastPlatform,
+            bio = bio,
+            bioLinks = bioLinks,
+            currentAvatarImageUrl = currentAvatarImageUrl,
+            currentAvatarThumbnailImageUrl = currentAvatarThumbnailImageUrl,
+            currentAvatarTags = currentAvatarTags,
+            developerType = developerType,
+            tags = tags,
+            isFriend = false,
+            profilePicOverride = profilePicOverride,
+            friendKey = "",
+            imageUrl = profileImageUrl,
+            profileIconUrl = profileIconUrl,
+            location = LocationType.Offline.value,
+            statusDescription = statusDescription,
+            userIcon = userIcon,
+            pronouns = pronouns,
         )
     }
 

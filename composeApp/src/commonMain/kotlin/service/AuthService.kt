@@ -10,6 +10,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.TWO_FACTOR_AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.network.api.auth.data.Presence
+import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
+import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.network.extensions.checkSuccess
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
@@ -67,6 +69,7 @@ class AuthService(
     private val accountDao: AccountDao,
     private val cookiesStorage: PersistentCookiesStorage,
     private val accountCacheManager: AccountCacheManager,
+    private val profileAppearanceApi: ProfileAppearanceApi? = null,
 ) : WebSocketSessionRecovery, AutoCloseable {
     private val serviceJob = Job()
     private val scope = CoroutineScope(serviceJob)
@@ -147,7 +150,7 @@ class AuthService(
         return homeWorldMutationGate.withLock {
             val cached = synchronized(currentUserLock) { currentUser }
             if (cached != null && !isRefresh) return@withLock cached
-            val refreshed = authApi.currentUser()
+            val refreshed = enrichCurrentUser(authApi.currentUser())
             synchronized(currentUserLock) {
                 publishCurrentUserLocked(
                     refreshed.copy(
@@ -163,7 +166,7 @@ class AuthService(
     ): CurrentUserData? = homeWorldMutationGate.withLock {
         if (!SharedFlowCentre.isCurrentSession(sessionToken)) return@withLock null
         val requestSocketRevision = synchronized(currentUserLock) { socketPresenceRevision }
-        val refreshed = authApi.currentUser()
+        val refreshed = enrichCurrentUser(authApi.currentUser())
         synchronized(currentUserLock) {
             if (!SharedFlowCentre.isCurrentSession(sessionToken) ||
                 refreshed.id != sessionToken.userId
@@ -318,11 +321,11 @@ class AuthService(
         }
     }
 
-    suspend fun applyOwnProfileRefresh(user: UserData) {
+    suspend fun applyOwnProfileRefresh(user: UserData): CurrentUserData? =
         homeWorldMutationGate.withLock {
             synchronized(currentUserLock) {
-                val existing = currentUser ?: return@synchronized
-                if (existing.id != user.id) return@synchronized
+                val existing = currentUser ?: return@synchronized null
+                if (existing.id != user.id) return@synchronized null
                 val (world, instance) = socketLocationToPresenceParts(user.location)
                 val (travelingToWorld, travelingToInstance) =
                     socketLocationToPresenceParts(user.travelingToLocation.orEmpty())
@@ -338,28 +341,34 @@ class AuthService(
                 publishCurrentUserLocked(
                     existing.copy(
                         allowAvatarCopying = user.allowAvatarCopying,
-                        currentAvatarImageUrl = user.currentAvatarImageUrl,
-                        currentAvatarTags = user.currentAvatarTags,
-                        currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
-                        displayName = user.displayName,
-                        lastActivity = user.lastActivity,
-                        lastLogin = user.lastLogin,
-                        lastPlatform = user.lastPlatform,
-                        profilePicOverride = user.profilePicOverride,
+                        bio = user.bio ?: existing.bio,
+                        bioLinks = user.bioLinks.ifEmpty { existing.bioLinks },
+                        currentAvatarImageUrl = user.currentAvatarImageUrl
+                            .ifBlank { existing.currentAvatarImageUrl },
+                        currentAvatarTags = user.currentAvatarTags.ifEmpty { existing.currentAvatarTags },
+                        currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl
+                            ?: existing.currentAvatarThumbnailImageUrl,
+                        displayName = user.displayName.ifBlank { existing.displayName },
+                        lastActivity = user.lastActivity.ifBlank { existing.lastActivity },
+                        lastLogin = user.lastLogin.ifBlank { existing.lastLogin },
+                        lastPlatform = user.lastPlatform.ifBlank { existing.lastPlatform },
+                        profilePicOverride = user.profilePicOverride
+                            .ifBlank { existing.profilePicOverride },
+                        profileIconUrl = user.profileIconUrl
+                            .ifBlank { existing.profileIconUrl },
                         state = user.state.value,
                         status = user.status,
                         statusDescription = user.statusDescription,
                         tags = user.tags,
-                        userIcon = user.userIcon,
-                        pronouns = user.pronouns,
-                        bannerType = user.bannerType,
-                        bannerUrl = user.bannerUrl,
+                        userIcon = user.userIcon.ifBlank { existing.userIcon },
+                        pronouns = user.pronouns ?: existing.pronouns,
+                        bannerType = user.bannerType ?: existing.bannerType,
+                        bannerUrl = user.bannerUrl ?: existing.bannerUrl,
                         presence = updatedPresence,
                     )
                 )
             }
         }
-    }
 
     fun applySocketUserUpdate(user: UserContent) {
         synchronized(currentUserLock) {
@@ -368,20 +377,27 @@ class AuthService(
             publishCurrentUserLocked(
                 existing.copy(
                     allowAvatarCopying = user.allowAvatarCopying,
-                    currentAvatarImageUrl = user.currentAvatarImageUrl,
-                    currentAvatarTags = user.currentAvatarTags,
-                    currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl,
-                    displayName = user.displayName,
-                    lastActivity = user.lastActivity,
-                    lastLogin = user.lastLogin,
-                    lastPlatform = user.lastPlatform,
-                    profilePicOverride = user.profilePicOverride,
+                    bio = user.bio ?: existing.bio,
+                    bioLinks = user.bioLinks.ifEmpty { existing.bioLinks },
+                    currentAvatarImageUrl = user.currentAvatarImageUrl
+                        .ifBlank { existing.currentAvatarImageUrl },
+                    currentAvatarTags = user.currentAvatarTags.ifEmpty { existing.currentAvatarTags },
+                    currentAvatarThumbnailImageUrl = user.currentAvatarThumbnailImageUrl
+                        ?: existing.currentAvatarThumbnailImageUrl,
+                    displayName = user.displayName.ifBlank { existing.displayName },
+                    lastActivity = user.lastActivity.ifBlank { existing.lastActivity },
+                    lastLogin = user.lastLogin.ifBlank { existing.lastLogin },
+                    lastPlatform = user.lastPlatform.ifBlank { existing.lastPlatform },
+                    profilePicOverride = user.profilePicOverride
+                        .ifBlank { existing.profilePicOverride },
+                    profileIconUrl = user.profileIconUrl
+                        .ifBlank { existing.profileIconUrl },
                     state = user.state,
                     status = user.status,
                     statusDescription = user.statusDescription,
                     tags = user.tags,
-                    userIcon = user.userIcon,
-                    pronouns = user.pronouns,
+                    userIcon = user.userIcon.ifBlank { existing.userIcon },
+                    pronouns = user.pronouns ?: existing.pronouns,
                 )
             )
         }
@@ -407,7 +423,7 @@ class AuthService(
         response: HttpResponse? = null,
     ): Result<Unit> = runCatching {
         (response ?: authApi.userRes()).let {
-            val userData = it.checkSuccess<CurrentUserData>()
+            val userData = enrichCurrentUser(it.checkSuccess<CurrentUserData>())
             val accountDto = AccountDto(
                 userId = userData.id,
                 username = userData.username,
@@ -682,7 +698,29 @@ class AuthService(
         _currentUserState.value = null
     }
 
+    private suspend fun enrichCurrentUser(user: CurrentUserData): CurrentUserData {
+        val profileApi = profileAppearanceApi ?: return user
+        val profile = try {
+            profileApi.getPublicProfile(user.id)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            return user
+        }
+        return user.mergePublicProfile(profile)
+    }
+
 }
+
+/** Merges fields moved from the user endpoint to the public profile endpoint. */
+internal fun CurrentUserData.mergePublicProfile(profile: ProfileAppearanceData): CurrentUserData = copy(
+    bio = profile.bio ?: bio,
+    bioLinks = profile.bioLinks ?: bioLinks,
+    displayName = profile.displayName?.takeIf(String::isNotBlank) ?: displayName,
+    profileIconUrl = profile.iconUrl?.takeIf(String::isNotBlank) ?: profileIconUrl,
+    userIcon = profile.iconUrl?.takeIf(String::isNotBlank) ?: userIcon,
+    pronouns = profile.pronouns ?: pronouns,
+)
 
 internal fun socketLocationToPresenceParts(location: String): Pair<String, String> =
     if (location.startsWith("wrld_") && location.contains(':')) {

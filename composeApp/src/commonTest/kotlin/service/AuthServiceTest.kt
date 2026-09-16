@@ -8,6 +8,8 @@ import io.github.vrcmteam.vrcm.network.api.attributes.AUTH_COOKIE
 import io.github.vrcmteam.vrcm.network.api.attributes.AuthState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
+import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
+import io.github.vrcmteam.vrcm.network.api.profile.data.ProfileAppearanceData
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.NetworkAvatarSelector
@@ -43,6 +45,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.koin.core.logger.EmptyLogger
 import org.koin.core.logger.Level
 import org.koin.core.logger.Logger
@@ -64,6 +68,48 @@ import kotlin.test.assertTrue
 class AuthServiceTest : MainDispatcherTest() {
     @AfterTest
     fun clearSession() = runTest { SharedFlowCentre.emitLogout() }
+
+    @Test
+    fun loginAcceptsAuthResponseWithoutOptionalProfileFields() = runTest {
+        val account = cachedAccount()
+        val response = Json.parseToJsonElement(currentUserJson(account)).jsonObject
+            .filterKeys { it !in setOf("bioLinks", "profilePicOverride", "userIcon") }
+            .let(::JsonObject)
+        val fixture = fixture { jsonResponse(Json.encodeToString(response)) }
+
+        assertIs<AuthState.Authed>(fixture.service.restoreAuth())
+        assertEquals(emptyList(), fixture.service.currentUserState.value?.bioLinks)
+        assertEquals("", fixture.service.currentUserState.value?.profilePicOverride)
+        assertEquals("", fixture.service.currentUserState.value?.userIcon)
+        fixture.client.close()
+    }
+
+    @Test
+    fun publicProfileRestoresFieldsMovedOutOfUserResponse() {
+        val account = cachedAccount()
+        val user = Json { ignoreUnknownKeys = true }
+            .decodeFromString<CurrentUserData>(currentUserJson(account))
+
+        val enriched = user.mergePublicProfile(
+            ProfileAppearanceData(
+                id = account.userId,
+                bio = "Public profile bio",
+                bioLinks = listOf("https://example.invalid"),
+                displayName = "Public display name",
+                iconUrl = "https://api.vrchat.cloud/file/file_profile/1/file",
+                pronouns = "they/them",
+            ),
+        )
+
+        assertEquals("Public profile bio", enriched.bio)
+        assertEquals(listOf("https://example.invalid"), enriched.bioLinks)
+        assertEquals("Public display name", enriched.displayName)
+        assertEquals(
+            "https://api.vrchat.cloud/file/file_profile/1/file",
+            enriched.userIcon,
+        )
+        assertEquals("they/them", enriched.pronouns)
+    }
 
     @Test
     fun cachedCookieRestoresWithOneRequest() = runTest {

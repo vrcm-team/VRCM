@@ -1,20 +1,20 @@
 package io.github.vrcmteam.vrcm.di.modules
 
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
+import kotlin.test.assertEquals
 
 class NetworkModuleTest {
     @Test
-    fun invalidNullDoesNotCoerceToDefaultValue() {
-        assertFailsWith<SerializationException> {
-            createNetworkJson().decodeFromString<StrictNetworkPayload>("""{"value":null}""")
-        }
+    fun invalidNullCoercesToDefaultValue() {
+        val payload = createNetworkJson()
+            .decodeFromString<LenientNetworkPayload>("""{"value":null}""")
+
+        assertEquals("fallback", payload.value)
     }
 }
 
 @Serializable
-private data class StrictNetworkPayload(
+private data class LenientNetworkPayload(
     val value: String = "fallback",
 )

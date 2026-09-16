@@ -520,7 +520,7 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
             status = friend.status.value,
             statusDescription = friend.statusDescription,
             bio = friend.bio.orEmpty(),
-            lastActivityAtMillis = friend.lastActivity.toEpochMillisOrNull()
+            lastActivityAtMillis = friend.lastActivity.orEmpty().toEpochMillisOrNull()
                 ?.takeIf { includeLastActivity }
                 ?.takeIf { friend.status == UserStatus.Offline },
             travelingToLocation = friend.travelingToLocation,

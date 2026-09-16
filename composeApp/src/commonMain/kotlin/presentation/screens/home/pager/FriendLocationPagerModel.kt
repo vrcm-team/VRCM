@@ -418,6 +418,7 @@ private fun io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData.toFrie
     friendKey = friendKey,
     id = id,
     imageUrl = profilePicOverride,
+    profileIconUrl = profileIconUrl,
     isFriend = false,
     lastLogin = lastLogin,
     lastActivity = lastActivity,

@@ -26,7 +26,7 @@ VRCM 是以社交性和便捷性为核心的跨平台 VRChat 伴侣应用。它�
 > VRCM 与 VRCX 的产品方向不同：VRCX 更重视桌面端的日志与信息管理，VRCM 则把移动社交、便捷互动和随时可用放在首位。
 > Desktop 版本仍会保持基础支持和必要维护，但近期不会作为重点深入开发，也不会追求与 VRCX 相同的桌面功能深度。
 
-[下载最新版本](https://github.com/vrcm-team/VRCM/releases/latest) · [查看 1.1.1 新功能详解](docs/releases/1.1.1_ZH.md)
+[下载最新版本](https://github.com/vrcm-team/VRCM/releases/latest) · [查看 1.1.3 新功能详解](docs/releases/1.1.3_ZH.md)
 
 </div>
 

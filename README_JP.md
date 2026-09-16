@@ -26,7 +26,7 @@ VRCM は、交流と使いやすさを中心に設計されたクロスプラッ
 > VRCM と VRCX は製品の方向性が異なります。VRCX がデスクトップでのログ閲覧や情報管理を重視する一方、VRCM はモバイルでの交流、手軽なインタラクション、外出先でもすぐに使えることを優先しています。
 > Desktop 版の基本サポートと必要な保守は継続しますが、当面は重点的な開発対象とせず、VRCX と同等のデスクトップ機能の深さを目指す予定もありません。
 
-[最新版をダウンロード](https://github.com/vrcm-team/VRCM/releases/latest) · [1.1.1 新機能の詳細](docs/releases/1.1.1_JP.md)
+[最新版をダウンロード](https://github.com/vrcm-team/VRCM/releases/latest) · [1.1.3 新機能の詳細](docs/releases/1.1.3_JP.md)
 
 </div>
 

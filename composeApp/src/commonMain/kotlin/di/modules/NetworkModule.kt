@@ -63,6 +63,7 @@ internal val networkModule = module(true) {
 
 internal fun createNetworkJson() = Json {
     ignoreUnknownKeys = true
+    coerceInputValues = true
     encodeDefaults = true
     explicitNulls = false
     prettyPrint = true
