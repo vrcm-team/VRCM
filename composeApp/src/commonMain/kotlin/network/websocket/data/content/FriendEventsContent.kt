@@ -46,6 +46,7 @@ internal fun UserContent.toFriendData(
     friendKey = friendKey,
     id = userId,
     imageUrl = profileImageUrl,
+    profileIconUrl = profileIconUrl,
     isFriend = isFriend,
     lastLogin = lastLogin,
     lastActivity = lastActivity,

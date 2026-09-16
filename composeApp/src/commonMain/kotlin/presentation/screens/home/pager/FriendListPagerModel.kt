@@ -371,6 +371,7 @@ class FriendListPagerModel(
             profilePicOverride = profilePicOverride,
             friendKey = "",
             imageUrl = profileImageUrl,
+            profileIconUrl = profileIconUrl,
             location = LocationType.Offline.value,
             statusDescription = statusDescription,
             userIcon = userIcon,

@@ -35,7 +35,8 @@ interface IUser {
         get() = tags.filter { it.startsWith("language_") }.map { it.removePrefix("language_") }
 
     val profileImageUrl:String
-        get() = profilePicOverride.ifBlank { currentAvatarImageUrl }.let { FileApi.convertFileUrl(it) }
+        get() = profilePicOverride.ifBlank { currentAvatarImageUrl.ifBlank { userIcon } }
+            .let { FileApi.convertFileUrl(it) }
 
     val iconUrl:String
         get() = userIcon.ifBlank { profileImageUrl }

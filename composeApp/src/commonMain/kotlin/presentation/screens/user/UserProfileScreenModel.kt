@@ -22,8 +22,11 @@ import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.instances.InstancesApi
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.network.api.notification.NotificationApi
+import io.github.vrcmteam.vrcm.network.api.profile.ProfileAppearanceApi
 import io.github.vrcmteam.vrcm.network.api.users.UsersApi
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
+import io.github.vrcmteam.vrcm.network.api.users.data.mergeCurrentUserProfile
+import io.github.vrcmteam.vrcm.network.api.users.data.mergePublicProfile
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.UpdateUserInfoData
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
@@ -319,6 +322,7 @@ class UserProfileScreenModel(
     userProfileVO: UserProfileVo,
     private val authService: AuthService,
     private val usersApi: UsersApi,
+    private val profileAppearanceApi: ProfileAppearanceApi,
     private val groupsApi: GroupsApi,
     private val friendService: FriendService,
     private val notificationApi: NotificationApi,
@@ -472,11 +476,20 @@ class UserProfileScreenModel(
 
     private fun restoreCachedProfile(cache: UserProfileCache) {
         cachedUserData = cache.user
-        val profile = mergeCachedProfile(
-            cachedUser = cache.user,
-            livePresence = _userState.value,
-            currentFriend = friendService.friendState.value[cache.user.id],
-        ).withSelfIdentity()
+        val currentUser = authService.currentUserState.value
+            ?.takeIf { it.id == cache.user.id && cache.user.id == cacheOwnerUserId }
+        val profile = if (currentUser != null) {
+            UserProfileVo(currentUser).copy(
+                friendRequestStatus = cache.user.friendRequestStatus,
+                note = cache.user.note,
+            ).withSelfIdentity()
+        } else {
+            mergeCachedProfile(
+                cachedUser = cache.user,
+                livePresence = _userState.value,
+                currentFriend = friendService.friendState.value[cache.user.id],
+            ).withSelfIdentity()
+        }
         _userState.value = profile
         computeFriendLocation(profile.location)
         _userGroups.value = visibleUserGroups(cache.groups, profile.isSelf)
@@ -554,16 +567,29 @@ class UserProfileScreenModel(
                     }.onSuccess { response ->
                         // 防止body序列化异常
                         runCatching { response.body<UserData>() }
-                            .onSuccess {
-                                if (it.id == cacheOwnerUserId) {
-                                    authService.applyOwnProfileRefresh(it)
+                            .onSuccess { userData ->
+                                val publicProfile = authService.reTryAuthCatching {
+                                    profileAppearanceApi.getPublicProfile(userData.id)
+                                }.getOrNull()
+                                val mergedUserData = userData.mergePublicProfile(publicProfile)
+                                val currentUser = if (mergedUserData.id == cacheOwnerUserId) {
+                                    authService.applyOwnProfileRefresh(mergedUserData)
+                                } else {
+                                    null
                                 }
-                                val profile = UserProfileVo(it).withSelfIdentity()
+                                val profile = if (currentUser != null) {
+                                    UserProfileVo(currentUser).copy(
+                                        friendRequestStatus = mergedUserData.friendRequestStatus,
+                                        note = mergedUserData.note,
+                                    ).withSelfIdentity()
+                                } else {
+                                    UserProfileVo(mergedUserData).withSelfIdentity()
+                                }
                                 if (_userState.value != profile) {
                                     _userState.value = profile
                                     computeFriendLocation(profile.location)
                                 }
-                                saveCache(it)
+                                saveCache(mergedUserData.mergeCurrentUserProfile(currentUser))
                                 userLoaded = true
                             }
                             .onFailure { handleError(it) }
@@ -1014,6 +1040,7 @@ private fun UserProfileVo.toFriendData() =
         friendKey = "",
         id = id,
         imageUrl = profileImageUrl,
+        profileIconUrl = iconUrl,
         isFriend = isFriend,
         lastLogin = lastLogin,
         lastPlatform = lastPlatform,
@@ -1040,7 +1067,7 @@ internal fun UserProfileVo.withCurrentFriendPresence(friend: FriendData): UserPr
     status = friend.status,
     statusDescription = friend.statusDescription,
     location = friend.location,
-    lastLogin = friend.lastLogin,
+    lastLogin = friend.lastLogin.orEmpty(),
     lastPlatform = friend.lastPlatform,
 )
 
