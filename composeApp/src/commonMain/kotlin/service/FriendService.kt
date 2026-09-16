@@ -282,6 +282,8 @@ class FriendService(
                         currentAvatarThumbnailImageUrl = content.user.currentAvatarThumbnailImageUrl,
                         displayName = content.user.displayName,
                         profilePicOverride = content.user.profilePicOverride,
+                        profileIconUrl = content.user.profileIconUrl
+                            .ifBlank { existing?.profileIconUrl.orEmpty() },
                         status = content.user.status,
                         statusDescription = content.user.statusDescription,
                         tags = content.user.tags,

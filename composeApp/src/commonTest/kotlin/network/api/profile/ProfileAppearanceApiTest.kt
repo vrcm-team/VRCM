@@ -46,11 +46,42 @@ class ProfileAppearanceApiTest {
     }
 
     @Test
+    fun getPublicProfileUsesGroupsAndWorldsWithoutAsSelf() = runBlocking {
+        var path: String? = null
+        var asSelf: String? = null
+        var withGroupsAndWorlds: String? = null
+        val client = testClient { request ->
+            path = request.url.encodedPath
+            asSelf = request.url.parameters["asSelf"]
+            withGroupsAndWorlds = request.url.parameters["withGroupsAndWorlds"]
+            """{"id":"usr_123","bio":"Bio","iconUrl":"https://example.invalid/icon.png"}"""
+        }
+
+        try {
+            val result = ProfileAppearanceApi(client).getPublicProfile("usr_123")
+
+            assertEquals("/api/1/profile/usr_123", path)
+            assertNull(asSelf)
+            assertEquals("true", withGroupsAndWorlds)
+            assertEquals("Bio", result.bio)
+            assertEquals("https://example.invalid/icon.png", result.iconUrl)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun getPreservesEmptyAppearanceValuesAndIgnoresUnknownFields() = runBlocking {
         val client = testClient {
             """{
                 "id":"usr_123",
                 "iconFrame":"",
+                "bio":"Profile bio",
+                "bioLinks":["https://example.invalid"],
+                "displayName":"Profile name",
+                "iconUrl":"https://api.vrchat.cloud/file/file_profile/1/file",
+                "pronouns":"they/them",
+                "bannerUrl":"https://api.vrchat.cloud/file/file_banner/1/file",
                 "unknownAppearanceField":{"nested":true}
             }"""
         }
@@ -60,6 +91,12 @@ class ProfileAppearanceApiTest {
 
             assertEquals("usr_123", result.id)
             assertEquals("", result.iconFrame)
+            assertEquals("Profile bio", result.bio)
+            assertEquals(listOf("https://example.invalid"), result.bioLinks)
+            assertEquals("Profile name", result.displayName)
+            assertEquals("https://api.vrchat.cloud/file/file_profile/1/file", result.iconUrl)
+            assertEquals("they/them", result.pronouns)
+            assertEquals("https://api.vrchat.cloud/file/file_banner/1/file", result.bannerUrl)
             assertNull(result.profileEffect)
             assertNull(result.nameplateEffect)
         } finally {
