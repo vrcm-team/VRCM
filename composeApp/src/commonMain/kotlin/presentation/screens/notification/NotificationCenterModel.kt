@@ -184,7 +184,7 @@ class NotificationCenterModel(
                 val user = usersById[notification.senderUserId]
                 NotificationItemData(
                     n = notification,
-                    imageUrl = user?.profileImageUrl.orEmpty(),
+                    imageUrl = user?.iconUrl.orEmpty(),
                     title = user?.displayName ?: notification.senderUserId,
                     actions = listOf(
                         NotificationItemData.ActionData(data = "", type = "Accept"),
@@ -199,7 +199,7 @@ class NotificationCenterModel(
             .mapCatching { data ->
                 val friendPresentations = friendService.friendMap.mapValues { (_, friend) ->
                     NotificationUserPresentation(
-                        imageUrl = friend.profileImageUrl,
+                        imageUrl = friend.iconUrl,
                         displayName = friend.displayName,
                     )
                 }
@@ -209,7 +209,7 @@ class NotificationCenterModel(
                 ) { userId ->
                     usersApi.fetchUser(userId).let { user ->
                         NotificationUserPresentation(
-                            imageUrl = user.profileImageUrl,
+                            imageUrl = user.iconUrl,
                             displayName = user.displayName,
                         )
                     }
