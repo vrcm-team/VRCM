@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -29,6 +27,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
@@ -50,7 +50,7 @@ class SharedTransitionScreenAdaptiveTest {
         var sharedTransitionScope: SharedTransitionScope? = null
 
         setContent {
-            MaterialTheme {
+            AppTheme {
                 CompositionLocalProvider(
                     LocalBackNavigationPolicy provides BackNavigationPolicy(),
                 ) {
@@ -120,7 +120,7 @@ class SharedTransitionScreenAdaptiveTest {
         var contentSize by mutableStateOf(DpSize(1_200.dp, 800.dp))
 
         setContent {
-            MaterialTheme {
+            AppTheme {
                 CompositionLocalProvider(
                     LocalBackNavigationPolicy provides BackNavigationPolicy(),
                     LocalAppContentSize provides contentSize,
@@ -129,7 +129,7 @@ class SharedTransitionScreenAdaptiveTest {
                         SharedTransitionScreen(
                             navigator = navigator,
                             content = { route ->
-                                Text(
+                                AppText(
                                     text = "${route.key}:" +
                                         (LocalSharedTransitionScreenScope.current != null),
                                 )
@@ -164,14 +164,14 @@ class SharedTransitionScreenAdaptiveTest {
         )
 
         setContent {
-            MaterialTheme {
+            AppTheme {
                 CompositionLocalProvider(
                     LocalBackNavigationPolicy provides BackNavigationPolicy(),
                 ) {
                     SharedTransitionScreen(
                         navigator = navigator,
                         content = { route ->
-                            Text(
+                            AppText(
                                 text = "${route.key}:" +
                                     (LocalSharedTransitionScreenScope.current != null),
                             )

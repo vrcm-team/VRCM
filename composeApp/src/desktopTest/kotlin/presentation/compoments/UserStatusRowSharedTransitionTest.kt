@@ -6,7 +6,6 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.LayoutInfo
@@ -19,6 +18,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import coil3.ImageLoader
 import coil3.PlatformContext
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
@@ -62,7 +62,7 @@ class UserStatusRowSharedTransitionTest {
         )
 
         setContent {
-            MaterialTheme {
+            AppTheme {
                 SharedTransitionLayout {
                     AnimatedContent(targetState = Unit) {
                         CompositionLocalProvider(
@@ -132,7 +132,7 @@ class UserStatusRowSharedTransitionTest {
                     )
                 },
             ) {
-                MaterialTheme {
+                AppTheme {
                     SharedTransitionLayout {
                         AnimatedContent(targetState = Unit) {
                             CompositionLocalProvider(
@@ -179,7 +179,7 @@ class UserStatusRowSharedTransitionTest {
         )
 
         setContent {
-            MaterialTheme {
+            AppTheme {
                 SharedTransitionLayout {
                     AnimatedContent(targetState = Unit) {
                         CompositionLocalProvider(

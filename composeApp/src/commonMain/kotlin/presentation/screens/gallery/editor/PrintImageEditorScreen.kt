@@ -19,28 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.RotateLeft
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +45,22 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHost
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHostState
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconToggleButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSlider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppVerticalDivider
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
@@ -95,8 +89,7 @@ import kotlin.math.roundToInt
 class PrintImageEditorScreen(
     private val sessionId: String,
 ) : AppRoute {
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val calculator: CropTransformCalculator = koinInject()
@@ -122,7 +115,7 @@ class PrintImageEditorScreen(
             onDispose(screenModel::releasePreviewDisplayLease)
         }
         val state by screenModel.state.collectAsState()
-        val snackbarHostState = remember { SnackbarHostState() }
+        val bannerHostState = remember { AppBannerHostState() }
         val title = when (session.target) {
             ImageEditorTarget.Print -> locale.printEditorTitle
             is ImageEditorTarget.AvatarCover -> locale.avatarEditCover
@@ -171,38 +164,38 @@ class PrintImageEditorScreen(
 
         LaunchedEffect(state.error) {
             val error = state.error ?: return@LaunchedEffect
-            snackbarHostState.showSnackbar(error.localizedMessage(locale, session.target))
+            bannerHostState.show(error.localizedMessage(locale, session.target))
             screenModel.clearError()
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text(title) },
+                AppNavBar(
+                    title = { AppText(title) },
                     navigationIcon = {
-                        IconButton(
+                        AppIconButton(
                             onClick = navigator::pop,
                             enabled = !state.isBusy,
                         ) {
-                            Icon(
+                            AppIcon(
                                 imageVector = AppIcons.ArrowBackIosNew,
                                 contentDescription = locale.printEditorBack,
                             )
                         }
                     },
                     actions = {
-                        ATooltipBox(tooltip = { Text(submitLabel) }) {
-                            FilledTonalIconButton(
+                        ATooltipBox(tooltip = { AppText(submitLabel) }) {
+                            AppIconButton(
                                 onClick = screenModel::upload,
                                 enabled = !state.isBusy,
+                                style = AppButtonStyle.Tinted,
                             ) {
                                 if (state.isBusy) {
-                                    CircularProgressIndicator(
+                                    AppActivityIndicator(
                                         modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
                                     )
                                 } else {
-                                    Icon(
+                                    AppIcon(
                                         imageVector = AppIcons.Publish,
                                         contentDescription = submitLabel,
                                     )
@@ -212,7 +205,7 @@ class PrintImageEditorScreen(
                     },
                 )
             },
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            bannerHost = { AppBannerHost(bannerHostState) },
         ) { paddingValues ->
             PrintEditorContent(
                 state = state,
@@ -303,7 +296,7 @@ private fun PrintEditorContent(
     if (expanded) {
         Row(modifier = modifier) {
             preview(Modifier.weight(1f).fillMaxHeight())
-            VerticalDivider(Modifier.fillMaxHeight())
+            AppVerticalDivider(Modifier.fillMaxHeight())
             controls(Modifier.width(360.dp).fillMaxHeight(), true)
         }
     } else {
@@ -343,7 +336,7 @@ private fun PrintEditorPreview(
             modifier = Modifier
                 .width(cropWidth)
                 .aspectRatio(aspectRatio)
-                .clip(RoundedCornerShape(4.dp)),
+                .clip(AppShapes.xs),
         ) {
             EditorCanvasBackground(
                 background = canvasBackground,
@@ -366,9 +359,9 @@ private fun PrintEditorPreview(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(color = Color.White)
+                    AppActivityIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text(
+                    AppText(
                         text = if (state.phase == EditorPhase.Processing) {
                             locale.printEditorProcessing
                         } else if (state.phase == EditorPhase.Refreshing) {
@@ -383,7 +376,7 @@ private fun PrintEditorPreview(
                             }
                         },
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.type.subheadline,
                     )
                 }
             }
@@ -396,8 +389,8 @@ private fun EditorCanvasBackground(
     background: CanvasBackground,
     modifier: Modifier = Modifier,
 ) {
-    val lightTile = MaterialTheme.colorScheme.surface
-    val darkTile = MaterialTheme.colorScheme.surfaceVariant
+    val lightTile = AppTheme.colors.secondaryGroupedBackground
+    val darkTile = AppTheme.colors.fill
     Canvas(modifier = modifier) {
         if (background == CanvasBackground.White) {
             drawRect(Color.White)
@@ -444,7 +437,7 @@ private fun PrintEditorControls(
     sidePanel: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier = modifier, tonalElevation = 2.dp) {
+    AppSurface(modifier = modifier) {
         Column(
             modifier = (if (sidePanel) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -476,11 +469,11 @@ private fun PrintEditorControls(
                 } else {
                     1f..3f
                 }
-                Text(
+                AppText(
                     text = locale.printEditorZoom,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.type.subheadlineEmphasized,
                 )
-                Slider(
+                AppSlider(
                     value = state.transform.zoom,
                     onValueChange = {
                         if (viewport.isValid()) onSetZoom(viewport, it)
@@ -498,12 +491,12 @@ private fun PrintEditorControls(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
+                AppText(
                     text = fitModeLabel,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.type.subheadlineEmphasized,
                     modifier = Modifier.weight(1f),
                 )
-                Switch(
+                AppToggle(
                     checked = state.fillWhiteBorder,
                     onCheckedChange = { onFillWhiteBorderChange(it, viewport) },
                     enabled = !state.isBusy && viewport.isValid(),
@@ -518,12 +511,12 @@ private fun PrintEditorControls(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
+                    AppText(
                         text = locale.galleryTabCropPrintBorder,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.type.subheadlineEmphasized,
                         modifier = Modifier.weight(1f),
                     )
-                    Switch(
+                    AppToggle(
                         checked = state.cropDownloadedPrintBorder,
                         onCheckedChange = {
                             onCropDownloadedPrintBorderChange(it, viewport)
@@ -545,14 +538,14 @@ private fun PrintEditorControls(
                     enabled = !state.isBusy && viewport.isValid(),
                     onClick = { onRotateLeft(viewport) },
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.RotateLeft, contentDescription = locale.printEditorRotateLeft)
+                    AppIcon(AppIcons.RotateLeft, contentDescription = locale.printEditorRotateLeft)
                 }
                 EditorToolButton(
                     label = locale.printEditorRotateRight,
                     enabled = !state.isBusy && viewport.isValid(),
                     onClick = { onRotateRight(viewport) },
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.RotateRight, contentDescription = locale.printEditorRotateRight)
+                    AppIcon(AppIcons.RotateRight, contentDescription = locale.printEditorRotateRight)
                 }
                 EditorToggleButton(
                     label = locale.printEditorFlipHorizontal,
@@ -560,7 +553,7 @@ private fun PrintEditorControls(
                     enabled = !state.isBusy,
                     onClick = onFlipHorizontal,
                 ) {
-                    Icon(Icons.Default.Flip, contentDescription = locale.printEditorFlipHorizontal)
+                    AppIcon(AppIcons.FlipHorizontal, contentDescription = locale.printEditorFlipHorizontal)
                 }
                 EditorToggleButton(
                     label = locale.printEditorFlipVertical,
@@ -568,8 +561,8 @@ private fun PrintEditorControls(
                     enabled = !state.isBusy,
                     onClick = onFlipVertical,
                 ) {
-                    Icon(
-                        Icons.Default.Flip,
+                    AppIcon(
+                        AppIcons.FlipHorizontal,
                         contentDescription = locale.printEditorFlipVertical,
                         modifier = Modifier.rotate(90f),
                     )
@@ -579,7 +572,7 @@ private fun PrintEditorControls(
                     enabled = !state.isBusy && viewport.isValid(),
                     onClick = { if (viewport.isValid()) onReset(viewport) },
                 ) {
-                    Icon(Icons.Default.RestartAlt, contentDescription = locale.printEditorReset)
+                    AppIcon(AppIcons.Reset, contentDescription = locale.printEditorReset)
                 }
             }
         }
@@ -675,7 +668,6 @@ private fun PrintCropPreview(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorToolButton(
     label: String,
@@ -683,12 +675,11 @@ private fun EditorToolButton(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    ATooltipBox(tooltip = { Text(label) }) {
-        FilledTonalIconButton(onClick = onClick, enabled = enabled, content = content)
+    ATooltipBox(tooltip = { AppText(label) }) {
+        AppIconButton(onClick = onClick, enabled = enabled, content = content, style = AppButtonStyle.Tinted)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorToggleButton(
     label: String,
@@ -697,8 +688,8 @@ private fun EditorToggleButton(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    ATooltipBox(tooltip = { Text(label) }) {
-        FilledIconToggleButton(
+    ATooltipBox(tooltip = { AppText(label) }) {
+        AppIconToggleButton(
             checked = checked,
             onCheckedChange = { onClick() },
             enabled = enabled,

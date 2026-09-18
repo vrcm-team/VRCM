@@ -13,23 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,6 +26,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.inventory.data.RewardRedemption
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -63,7 +62,6 @@ object RewardCodeScreen : AppDetailRoute {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RewardCodeContent(
     state: RewardCodeUiState,
@@ -79,13 +77,13 @@ private fun RewardCodeContent(
     }
     val rewards = state.rewards
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(strings.rewardCodeTitle) },
+            AppNavBar(
+                title = { AppText(strings.rewardCodeTitle) },
                 navigationIcon = {
-                    IconButton(onClick = navigator::pop) {
-                        Icon(
+                    AppIconButton(onClick = navigator::pop) {
+                        AppIcon(
                             imageVector = AppIcons.ArrowBackIosNew,
                             contentDescription = strings.back,
                         )
@@ -110,36 +108,36 @@ private fun RewardCodeContent(
                     modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(
+                    AppTextField(
                         value = state.code,
                         onValueChange = onCodeChange,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = state.sessionToken != null && !state.isSubmitting,
-                        label = { Text(strings.rewardCodeInputLabel) },
+                        label = { AppText(strings.rewardCodeInputLabel) },
                         singleLine = true,
                         isError = failureText != null,
                         supportingText = failureText?.let { message ->
-                            { Text(message) }
+                            { AppText(message) }
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { onSubmit() }),
                     )
-                    Button(
+                    AppButton(
                         onClick = onSubmit,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = state.sessionToken != null &&
                             state.code.isNotBlank() &&
                             !state.isSubmitting,
+                        style = AppButtonStyle.Prominent,
                     ) {
                         if (state.isSubmitting) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.size(18.dp),
                                 color = LocalContentColor.current,
-                                strokeWidth = 2.dp,
                             )
                             Spacer(Modifier.size(8.dp))
                         }
-                        Text(
+                        AppText(
                             if (state.isSubmitting) {
                                 strings.rewardCodeSubmitting
                             } else {
@@ -157,15 +155,15 @@ private fun RewardCodeContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
+                        AppIcon(
                             imageVector = AppIcons.CheckCircle,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AppTheme.colors.tint,
                         )
-                        Text(
+                        AppText(
                             text = strings.rewardCodeSuccess,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = AppTheme.type.subheadlineEmphasized,
+                            color = AppTheme.colors.tint,
                         )
                     }
                 }
@@ -201,31 +199,31 @@ internal fun RewardCodeDialog(
     }
     val rewards = state.rewards
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!state.isSubmitting) onDismiss() },
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Redeem,
                 contentDescription = null,
             )
         },
-        title = { Text(strings.rewardCodeTitle) },
+        title = { AppText(strings.rewardCodeTitle) },
         text = {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item(key = "reward-code-dialog-input") {
-                    OutlinedTextField(
+                    AppTextField(
                         value = state.code,
                         onValueChange = onCodeChange,
                         modifier = Modifier.fillMaxWidth(),
                         enabled = state.sessionToken != null && !state.isSubmitting,
-                        label = { Text(strings.rewardCodeInputLabel) },
+                        label = { AppText(strings.rewardCodeInputLabel) },
                         singleLine = true,
                         isError = failureText != null,
                         supportingText = failureText?.let { message ->
-                            { Text(message) }
+                            { AppText(message) }
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { onSubmit() }),
@@ -238,15 +236,15 @@ internal fun RewardCodeDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
+                            AppIcon(
                                 imageVector = AppIcons.CheckCircle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = AppTheme.colors.tint,
                             )
-                            Text(
+                            AppText(
                                 text = strings.rewardCodeSuccess,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = AppTheme.type.subheadlineEmphasized,
+                                color = AppTheme.colors.tint,
                             )
                         }
                     }
@@ -263,21 +261,21 @@ internal fun RewardCodeDialog(
             }
         },
         confirmButton = {
-            Button(
+            AppButton(
                 onClick = onSubmit,
                 enabled = state.sessionToken != null &&
                     state.code.isNotBlank() &&
                     !state.isSubmitting,
+                style = AppButtonStyle.Prominent,
             ) {
                 if (state.isSubmitting) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(
+                AppText(
                     if (state.isSubmitting) {
                         strings.rewardCodeSubmitting
                     } else {
@@ -287,11 +285,12 @@ internal fun RewardCodeDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
                 enabled = !state.isSubmitting,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(if (rewards != null) strings.close else strings.cancel)
+                AppText(if (rewards != null) strings.close else strings.cancel)
             }
         },
     )
@@ -308,9 +307,9 @@ private fun RewardResultCard(
         "item" -> strings.rewardCodeItem
         else -> reward.type.ifBlank { strings.rewardCodeReward }
     }
-    Card(
+    AppCard(
         modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
+        shape = AppShapes.m,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -321,29 +320,29 @@ private fun RewardResultCard(
                 AImage(
                     imageData = presentation.imageUrl,
                     contentDescription = presentation.name,
-                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(6.dp)),
+                    modifier = Modifier.size(52.dp).clip(AppShapes.s),
                 )
             }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
+                AppText(
                     text = typeLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.caption1Emphasized,
+                    color = AppTheme.colors.tint,
                 )
-                Text(
+                AppText(
                     text = presentation.name.ifBlank { typeLabel },
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppTheme.type.subheadlineEmphasized,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (presentation.description.isNotBlank()) {
-                    Text(
+                    AppText(
                         text = presentation.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.caption1,
+                        color = AppTheme.colors.secondaryLabel,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )

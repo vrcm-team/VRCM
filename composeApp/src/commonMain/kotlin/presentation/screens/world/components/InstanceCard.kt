@@ -2,27 +2,21 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.components
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -32,6 +26,7 @@ import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.compoments.IconLabelRow
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.screens.group.GroupProfileScreen
@@ -48,6 +43,9 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 
+/** 面板里的房间卡片与空状态卡片共用的圆角。 */
+private val InstanceCardShape = AppShapes.l
+
 @Composable
 fun EmptyInstanceCard(
     onCreateInstance: () -> Unit,
@@ -55,27 +53,12 @@ fun EmptyInstanceCard(
     modifier: Modifier = Modifier,
 ) {
     val localeStrings = strings
-    val shape = MaterialTheme.shapes.medium
-    val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(120.dp)
-            .drawWithContent {
-                drawContent()
-                drawOutline(
-                    outline = shape.createOutline(size, layoutDirection, this),
-                    color = outlineColor,
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(
-                            floatArrayOf(10.dp.toPx(), 6.dp.toPx())
-                        ),
-                    ),
-                )
-            }
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .clip(InstanceCardShape)
+            .background(AppTheme.colors.tertiaryGroupedBackground)
             .clickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -88,30 +71,30 @@ fun EmptyInstanceCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Surface(
+            AppSurface(
                 modifier = Modifier.size(40.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = AppTheme.colors.tintSoft,
             ) {
-                Icon(
+                AppIcon(
                     imageVector = AppIcons.Add,
                     contentDescription = null,
                     modifier = Modifier.padding(9.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colors.tint,
                 )
             }
-            Text(
+            AppText(
                 text = localeStrings.worldProfileCreateFirstInstance,
-                style = MaterialTheme.typography.titleSmall,
+                style = AppTheme.type.subheadlineEmphasized,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            AppText(
                 text = localeStrings.worldProfileCreateFirstInstanceHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -130,7 +113,7 @@ fun InstanceCard(
     verticalOffset: Dp = ((size - index) * 8).dp, // 新增参数，控制垂直偏移
     scaleEffect: Float = 1f - ((size - index) * 0.05f), // 新增参数，控制缩放
     alphaEffect: Float = 1f - ((size - index) * 0.6f), // 新增参数，控制透明度
-    shape: Shape = RoundedCornerShape(32.dp),
+    shape: Shape = InstanceCardShape,
     expandProgress: Float = 1f,
     onClick: (() -> Unit)? = null,
 ) {
@@ -153,16 +136,17 @@ fun InstanceCard(
                     scaleX = animatedScale,
                 )
         }
-        .clip(MaterialTheme.shapes.medium)
-        .background(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium)
+        .clip(InstanceCardShape)
         .enableIf(onClick != null) {
             clickable { onClick?.invoke() }
         }
 
-    Surface(
+    AppSurface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        tonalElevation = 10.dp
+        shape = InstanceCardShape,
+        color = AppTheme.colors.tertiaryGroupedBackground,
+        // 堆叠时前后卡片同色，靠发丝线分出层次
+        border = BorderStroke(0.5.dp, AppTheme.colors.separator),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -220,9 +204,9 @@ private fun RowScope.InstanceInfoSection(
         verticalArrangement = Arrangement.spacedBy(elementSpacing)
     ) {
         // 实例名称（带溢出处理）
-        Text(
+        AppText(
             text = "#${instance.instanceName}",
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.type.headline,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -258,7 +242,7 @@ private fun UserStatsSection(
             text = "${instance.currentUsers ?: 0}",
             iconSize = iconSize,
             spacing = elementSpacing,
-            textStyle = MaterialTheme.typography.titleSmall
+            textStyle = AppTheme.type.subheadlineEmphasized
         )
 
         // 设备统计（复用组件）
@@ -348,13 +332,13 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val owner = instance.owner.collectAsState().value ?: return@Row
-            Icon(
+            AppIcon(
                 modifier = Modifier.size(16.dp),
                 imageVector = owner.iconVector,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = AppTheme.colors.tint,
                 contentDescription = "OwnerIcon"
             )
-            Text(
+            AppText(
                 modifier = Modifier.enableIf(isExtended) {
                     clickable {
                         if (owner.type == BlueprintType.User) {
@@ -366,24 +350,27 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
                         }
                     }
                 },
-                textDecoration = if (owner.type == BlueprintType.User || owner.type == BlueprintType.Group) TextDecoration.Underline else null,
                 text = owner.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
+                style = AppTheme.type.subheadline,
+                color = if (isExtended && (owner.type == BlueprintType.User || owner.type == BlueprintType.Group)) {
+                    AppTheme.colors.tint
+                } else {
+                    AppTheme.colors.secondaryLabel
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         val enabled = !isInvited && isExtended && instance.isActive != false && instance.hasCapacity != false
         if (expandProgress == 0f) return@Box
-        Button(
+        AppButton(
             modifier = Modifier.align(Alignment.CenterEnd).alpha(expandProgress),
             enabled = enabled,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.tertiary
-            ),
-            onClick = { onClickInvite() }
+            onClick = { onClickInvite() },
+            style = AppButtonStyle.Tinted,
+            size = AppButtonSize.Small,
         ) {
-            Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+            AppText(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
         }
     }
 
@@ -405,7 +392,7 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
 //        if(instance.queueEnabled == true && instance.queueSize != null && instance.queueSize > 0){
 //            IconTextChip(
 //                text = "队列: ${instance.queueSize}",
-//                icon = AppIcons.Queue,
+//                icon = AppIcons.Duplicate,
 //            )
 //        }
 //
@@ -419,7 +406,7 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
 //        if (instance.hasCapacity == true){
 //            IconTextChip(
 //                text = "可加入",
-//                icon = AppIcons.Login,
+//                icon = AppIcons.Logout,
 //            )
 //        }
 //
@@ -432,7 +419,7 @@ private fun BottomActionSection(instance: InstanceVo, expandProgress: Float = 1f
 //                text = owner.displayName,
 //                iconSize = 14.dp,
 //                spacing = 4.dp,
-//                textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+//                textColor = AppTheme.colors.label.copy(alpha = 0.7f),
 //                iconAlpha = 0.7f
 //            )
 //        }

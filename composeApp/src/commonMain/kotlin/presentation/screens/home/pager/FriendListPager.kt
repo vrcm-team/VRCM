@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -135,7 +135,7 @@ fun FriendsDirectoryContent(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
+                            AppText(
                                 text = if (removalState.isSubmitting) {
                                     localeStrings.friendDirectoryRemovingProgress
                                         .replaceFirst("%d", removalState.completedCount.toString())
@@ -147,15 +147,16 @@ fun FriendsDirectoryContent(
                                     )
                                 },
                                 modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.labelLarge,
+                                style = AppTheme.type.subheadlineEmphasized,
                             )
-                            TextButton(
+                            AppButton(
                                 enabled = !removalState.isSubmitting && visibleUserIds.isNotEmpty(),
                                 onClick = {
                                     model.toggleVisibleFriendSelection(visibleUserIds)
                                 },
+                                style = AppButtonStyle.Plain,
                             ) {
-                                Text(
+                                AppText(
                                     if (allVisibleSelected) {
                                         localeStrings.friendDirectoryClearSelection
                                     } else {
@@ -228,11 +229,11 @@ fun FriendsDirectoryContent(
     }
 
     if (removalState.confirmationVisible) {
-        AlertDialog(
+        AppAlert(
             onDismissRequest = model::dismissFriendRemovalConfirmation,
-            title = { Text(localeStrings.friendDirectoryRemoveConfirmTitle) },
+            title = { AppText(localeStrings.friendDirectoryRemoveConfirmTitle) },
             text = {
-                Text(
+                AppText(
                     localeStrings.friendDirectoryRemoveConfirmMessage.replaceFirst(
                         "%d",
                         removalState.selectedUserIds.size.toString(),
@@ -240,16 +241,17 @@ fun FriendsDirectoryContent(
                 )
             },
             confirmButton = {
-                TextButton(
+                AppButton(
                     enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
                     onClick = model::confirmFriendRemoval,
+                    style = AppButtonStyle.Plain,
                 ) {
-                    Text(localeStrings.friendDirectoryRemoveSelected)
+                    AppText(localeStrings.friendDirectoryRemoveSelected)
                 }
             },
             dismissButton = {
-                TextButton(onClick = model::dismissFriendRemovalConfirmation) {
-                    Text(localeStrings.cancel)
+                AppButton(onClick = model::dismissFriendRemovalConfirmation, style = AppButtonStyle.Plain) {
+                    AppText(localeStrings.cancel)
                 }
             },
         )
@@ -262,28 +264,28 @@ private fun BoxScope.DirectoryMessage(message: String, retry: Boolean, onRetry: 
         modifier = Modifier.align(Alignment.Center).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (retry) TextButton(onClick = onRetry) { Text(strings.retry) }
+        AppText(message, color = AppTheme.colors.secondaryLabel)
+        if (retry) AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
     }
 }
 
 @Composable
 private fun BoxScope.DirectoryErrorBanner(bottomPadding: Dp, onRetry: () -> Unit) {
-    Surface(
+    AppSurface(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = bottomPadding),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.medium,
+        color = AppTheme.colors.destructiveSoft,
+        contentColor = AppTheme.colors.onDestructiveSoft,
+        shape = AppShapes.m,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(strings.friendDirectoryLoadFailed, Modifier.weight(1f))
-            TextButton(onClick = onRetry) { Text(strings.retry) }
+            AppText(strings.friendDirectoryLoadFailed, Modifier.weight(1f))
+            AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
         }
     }
 }

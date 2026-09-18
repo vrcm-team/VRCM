@@ -8,17 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +16,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppPopUpButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppRadioButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSlider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.WorldSearchOptions
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 
@@ -35,7 +31,6 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
  * 
  * 用于显示和编辑世界搜索的高级选项
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorldSearchOptionsUI(
     options: WorldSearchOptions,
@@ -54,11 +49,11 @@ fun WorldSearchOptionsUI(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
+            AppText(
                 text = strings.worldSearchFeaturedOnly,
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.type.subheadline
             )
-            Switch(
+            AppToggle(
                 checked = options.featured ?: false,
                 onCheckedChange = { 
                     onOptionsChanged(options.copy(featured = if (it) true else null))
@@ -72,46 +67,28 @@ fun WorldSearchOptionsUI(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
         ) {
-            Text(
+            AppText(
                 text = strings.worldSearchSortBy,
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.type.subheadline
             )
             Spacer(modifier = Modifier.height(4.dp))
 
             // 排序下拉菜单
             var expandSortMenu by remember { mutableStateOf(false) }
-            ExposedDropdownMenuBox(
+            AppPopUpButton(
+                value = options.sortOption.displayName,
                 expanded = expandSortMenu,
-                onExpandedChange = { expandSortMenu = it }
+                onExpandedChange = { expandSortMenu = it },
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                OutlinedTextField(
-                    value = options.sortOption.displayName,
-                    onValueChange = {},
-                    shape = MaterialTheme.shapes.medium,
-                    readOnly = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandSortMenu)
-                    },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                )
-                
-                ExposedDropdownMenu(
-                    shape = MaterialTheme.shapes.medium,
-                    expanded = expandSortMenu,
-                    onDismissRequest = { expandSortMenu = false }
-                ) {
-                    SortOption.entries.forEach { sortOption ->
-                        DropdownMenuItem(
-                            text = { Text(sortOption.displayName) },
-                            onClick = {
-                                onOptionsChanged(options.copy(sortOption = sortOption))
-                                expandSortMenu = false
-                            }
-                        )
-                    }
+                SortOption.entries.forEach { sortOption ->
+                    AppMenuItem(
+                        text = { AppText(sortOption.displayName) },
+                        onClick = {
+                            onOptionsChanged(options.copy(sortOption = sortOption))
+                            expandSortMenu = false
+                        }
+                    )
                 }
             }
         }
@@ -123,9 +100,9 @@ fun WorldSearchOptionsUI(
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            AppText(
                 text = strings.worldSearchOrder,
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.type.subheadline
             )
             Spacer(modifier = Modifier.weight(1f))
             
@@ -136,25 +113,25 @@ fun WorldSearchOptionsUI(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
+                    AppRadioButton(
                         selected = options.order == "descending",
                         onClick = {
                             onOptionsChanged(options.copy(order = "descending"))
                         }
                     )
-                    Text(strings.worldSearchDescending)
+                    AppText(strings.worldSearchDescending)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
+                    AppRadioButton(
                         selected = options.order == "ascending",
                         onClick = {
                             onOptionsChanged(options.copy(order = "ascending"))
                         }
                     )
-                    Text(strings.worldSearchAscending)
+                    AppText(strings.worldSearchAscending)
                 }
             }
         }
@@ -165,12 +142,12 @@ fun WorldSearchOptionsUI(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
         ) {
-            Text(
+            AppText(
                 text = strings.worldSearchResultCount,
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.type.subheadline
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Slider(
+            AppSlider(
                 value = options.resultsCount.toFloat(),
                 onValueChange = { 
                     val newValue = it.toInt()
@@ -182,9 +159,9 @@ fun WorldSearchOptionsUI(
                 steps = 9,
                 modifier = Modifier.fillMaxWidth()
             )
-            Text(
+            AppText(
                 text = strings.worldSearchResultsFormat.replaceFirst("%d", options.resultsCount.toString()),
-                style = MaterialTheme.typography.bodySmall
+                style = AppTheme.type.caption1
             )
         }
     }

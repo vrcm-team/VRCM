@@ -11,13 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -28,6 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppRadioButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.service.InviteMessageAction
 
@@ -48,30 +48,31 @@ internal fun InviteMessageSelectorDialog(
         InviteMessageAction.RequestInvite -> strings.inviteMessageSelectorRequestTitle
     }.replace("%name%", state.targetDisplayName)
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!sending) onDismiss() },
-        title = { Text(title) },
+        title = { AppText(title) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when {
-                    state.isLoading -> CircularProgressIndicator(
+                    state.isLoading -> AppActivityIndicator(
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
 
                     state.loadFailed -> {
-                        Text(strings.inviteMessageSelectorLoadFailed)
-                        TextButton(
+                        AppText(strings.inviteMessageSelectorLoadFailed)
+                        AppButton(
                             modifier = Modifier.align(Alignment.End),
                             onClick = onRetry,
+                            style = AppButtonStyle.Plain,
                         ) {
-                            Text(strings.retry)
+                            AppText(strings.retry)
                         }
                     }
 
-                    state.messages.isEmpty() -> Text(strings.inviteMessageSelectorEmpty)
+                    state.messages.isEmpty() -> AppText(strings.inviteMessageSelectorEmpty)
 
                     else -> LazyColumn(
                         modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
@@ -90,23 +91,23 @@ internal fun InviteMessageSelectorDialog(
             }
         },
         confirmButton = {
-            Button(
+            AppButton(
                 enabled = !state.isLoading && !state.loadFailed && selectedSlot >= 0 && !sending,
                 onClick = { onSend(selectedSlot) },
+                style = AppButtonStyle.Prominent,
             ) {
                 if (sending) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(strings.inviteMessageSelectorSend)
+                AppText(strings.inviteMessageSelectorSend)
             }
         },
         dismissButton = {
-            TextButton(enabled = !sending, onClick = onDismiss) {
-                Text(strings.cancel)
+            AppButton(enabled = !sending, onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )
@@ -126,14 +127,14 @@ private fun InviteMessageSlotRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, enabled = enabled, onClick = onSelect)
+        AppRadioButton(selected = selected, enabled = enabled, onClick = onSelect)
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            AppText(
                 text = strings.inviteMessageSelectorSlot.replace("%slot%", (message.slot + 1).toString()),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1Emphasized,
+                color = AppTheme.colors.secondaryLabel,
             )
-            Text(
+            AppText(
                 text = message.message,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,

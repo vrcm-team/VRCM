@@ -5,18 +5,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonRole
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
@@ -32,58 +33,57 @@ internal fun UserReportDialog(
 
     val localeStrings = strings
     val isSubmitting = state == UserReportState.Submitting
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Shield,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colors.destructive,
             )
         },
-        title = { Text(localeStrings.profileReportTitle) },
+        title = { AppText(localeStrings.profileReportTitle) },
         text = {
             Column {
-                Text(localeStrings.profileReportMessage.replace("%name%", targetName))
+                AppText(localeStrings.profileReportMessage.replace("%name%", targetName))
                 if (state == UserReportState.Failed) {
                     Spacer(Modifier.height(12.dp))
-                    Text(
+                    AppText(
                         text = localeStrings.profileReportFailed,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colors.destructive,
+                        style = AppTheme.type.caption1,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 enabled = !isSubmitting,
                 onClick = onSubmit,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+                style = AppButtonStyle.Plain,
+                role = AppButtonRole.Destructive,
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(
+                    AppText(
                         text = localeStrings.profileReportSubmit,
                         modifier = Modifier.alpha(if (isSubmitting) 0f else 1f),
                     )
                     if (isSubmitting) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.error,
-                            strokeWidth = 2.dp,
+                            color = AppTheme.colors.destructive,
                         )
                     }
                 }
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 enabled = !isSubmitting,
                 onClick = onDismiss,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(localeStrings.cancel)
+                AppText(localeStrings.cancel)
             }
         },
     )

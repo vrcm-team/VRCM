@@ -17,22 +17,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.PersonRemove
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -61,6 +45,20 @@ import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableAvatarIte
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
@@ -87,8 +85,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
 object FavoritesScreen : AppRoute {
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = currentNavigator
         val favoritesModel: FriendListPagerModel = koinViewModel()
@@ -96,13 +93,13 @@ object FavoritesScreen : AppRoute {
         var selectedTabIndex by rememberSaveable { mutableIntStateOf(FavoritesTab.Player.ordinal) }
         val selectedTab = FavoritesTab.entries[selectedTabIndex]
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text(strings.favoritesTitle) },
+                AppNavBar(
+                    title = { AppText(strings.favoritesTitle) },
                     navigationIcon = {
-                        IconButton(onClick = navigator::pop) {
-                            Icon(AppIcons.ArrowBackIosNew, strings.back)
+                        AppIconButton(onClick = navigator::pop) {
+                            AppIcon(AppIcons.ArrowBackIosNew, strings.back)
                         }
                     },
                     actions = {
@@ -189,13 +186,13 @@ internal fun FavoritesHubContent(
     }
 
     Column(modifier.fillMaxSize()) {
-        PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+        AppTabRow(selectedTabIndex = pagerState.currentPage) {
             FavoritesTab.entries.forEachIndexed { index, tab ->
-                Tab(
+                AppTab(
                     selected = index == pagerState.currentPage,
                     onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
                     text = {
-                        Text(
+                        AppText(
                             text = tab.title(),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -339,7 +336,7 @@ private fun FavoriteWorldsContent(
             )
         }
         Box(Modifier.fillMaxWidth().height(4.dp)) {
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (loading) AppProgressBar(Modifier.fillMaxWidth())
         }
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -402,7 +399,7 @@ private fun FavoriteWorldsContent(
                 }
             }
             when {
-                loading && empty -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                loading && empty -> AppActivityIndicator(Modifier.align(Alignment.Center))
                 error != null && empty -> StateMessage(strings.favoritesLoadFailed, strings.retry) {
                     model.refreshCurrentTabCacheData(tabIndex = tabIndex)
                 }
@@ -510,7 +507,7 @@ private fun FavoriteAvatarsContent(
             )
         }
         Box(Modifier.fillMaxWidth().height(4.dp)) {
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (loading) AppProgressBar(Modifier.fillMaxWidth())
         }
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -559,7 +556,7 @@ private fun FavoriteAvatarsContent(
                 }
             }
             when {
-                loading && empty -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                loading && empty -> AppActivityIndicator(Modifier.align(Alignment.Center))
                 error != null && empty -> StateMessage(strings.favoritesLoadFailed, strings.retry) {
                     model.refreshCurrentTabCacheData(tabIndex = tabIndex)
                 }
@@ -586,16 +583,15 @@ private fun FavoriteAvatarsContent(
 
 @Composable
 private fun LibrarySectionHeader(title: String) {
-    Text(
+    AppText(
         text = title,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
+        style = AppTheme.type.subheadlineEmphasized,
+        color = AppTheme.colors.tint,
     )
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun RowScope.FavoritesHubTopBarActions(
     selectedTab: FavoritesTab,
     favoritesModel: FriendListPagerModel,
@@ -632,64 +628,63 @@ internal fun RowScope.FavoritesHubTopBarActions(
                 },
             )
             if (!removalState.selectionMode) {
-                IconButton(
+                AppIconButton(
                     enabled = tabIndex !in refreshingTabs,
                     onClick = { favoritesModel.refreshCurrentTabCacheData(tabIndex = tabIndex) },
                 ) {
                     if (tabIndex in refreshingTabs) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        AppActivityIndicator(Modifier.size(20.dp))
                     } else {
-                        Icon(AppIcons.Update, strings.refresh)
+                        AppIcon(AppIcons.Refresh, strings.refresh)
                     }
                 }
             }
         }
         FavoritesTab.Group -> MyGroupsActions(groupsModel)
     }
-    ATooltipBox(tooltip = { Text(strings.fiendListPagerSearch) }) {
-        IconButton(onClick = onSearch) {
-            Icon(AppIcons.Search, strings.fiendListPagerSearch)
+    ATooltipBox(tooltip = { AppText(strings.fiendListPagerSearch) }) {
+        AppIconButton(onClick = onSearch) {
+            AppIcon(AppIcons.Search, strings.fiendListPagerSearch)
         }
     }
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun FriendDirectoryActions(model: FriendListPagerModel) {
     val isRefreshing by model.directoryRefreshing.collectAsState()
     val total by model.friendTotal.collectAsState()
     val removalState by model.friendRemovalState.collectAsState()
 
     if (removalState.selectionMode) {
-        ATooltipBox(tooltip = { Text(strings.cancel) }) {
-            IconButton(enabled = !removalState.isSubmitting, onClick = model::exitFriendSelectionMode) {
-                Icon(AppIcons.Close, strings.cancel)
+        ATooltipBox(tooltip = { AppText(strings.cancel) }) {
+            AppIconButton(enabled = !removalState.isSubmitting, onClick = model::exitFriendSelectionMode) {
+                AppIcon(AppIcons.Close, strings.cancel)
             }
         }
-        ATooltipBox(tooltip = { Text(strings.friendDirectoryRemoveSelected) }) {
-            IconButton(
+        ATooltipBox(tooltip = { AppText(strings.friendDirectoryRemoveSelected) }) {
+            AppIconButton(
                 enabled = removalState.selectedUserIds.isNotEmpty() && !removalState.isSubmitting,
                 onClick = model::requestFriendRemovalConfirmation,
             ) {
                 if (removalState.isSubmitting) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(Modifier.size(20.dp))
                 } else {
-                    Icon(Icons.Outlined.DeleteOutline, strings.friendDirectoryRemoveSelected)
+                    AppIcon(AppIcons.Delete, strings.friendDirectoryRemoveSelected)
                 }
             }
         }
     } else {
-        ATooltipBox(tooltip = { Text(strings.friendDirectorySelect) }) {
-            IconButton(enabled = total > 0 && !isRefreshing, onClick = model::enterFriendSelectionMode) {
-                Icon(Icons.Outlined.PersonRemove, strings.friendDirectorySelect)
+        ATooltipBox(tooltip = { AppText(strings.friendDirectorySelect) }) {
+            AppIconButton(enabled = total > 0 && !isRefreshing, onClick = model::enterFriendSelectionMode) {
+                AppIcon(AppIcons.PersonRemove, strings.friendDirectorySelect)
             }
         }
-        ATooltipBox(tooltip = { Text(strings.refresh) }) {
-            IconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
+        ATooltipBox(tooltip = { AppText(strings.refresh) }) {
+            AppIconButton(enabled = !isRefreshing, onClick = model::refreshFriendDirectory) {
                 if (isRefreshing) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(Modifier.size(20.dp))
                 } else {
-                    Icon(AppIcons.Update, strings.refresh)
+                    AppIcon(AppIcons.Refresh, strings.refresh)
                 }
             }
         }
@@ -702,21 +697,21 @@ internal fun BoxScope.ErrorBanner(
     bottomPadding: Dp = 12.dp,
     onRetry: () -> Unit,
 ) {
-    Surface(
+    AppSurface(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = bottomPadding),
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.medium,
+        color = AppTheme.colors.destructiveSoft,
+        contentColor = AppTheme.colors.onDestructiveSoft,
+        shape = AppShapes.m,
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(message, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = onRetry) { Text(strings.retry) }
+            AppText(message, Modifier.weight(1f), style = AppTheme.type.subheadline)
+            AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
         }
     }
 }
@@ -727,7 +722,7 @@ internal fun BoxScope.StateMessage(message: String, action: String?, onAction: (
         Modifier.align(Alignment.Center).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        if (action != null && onAction != null) TextButton(onClick = onAction) { Text(action) }
+        AppText(message, color = AppTheme.colors.secondaryLabel, textAlign = TextAlign.Center)
+        if (action != null && onAction != null) AppButton(onClick = onAction, style = AppButtonStyle.Plain) { AppText(action) }
     }
 }

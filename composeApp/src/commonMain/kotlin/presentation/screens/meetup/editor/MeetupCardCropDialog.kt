@@ -13,15 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,6 +32,15 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegment
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegmentedRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransform
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageSize
@@ -86,36 +86,32 @@ fun MeetupCardCropDialog(
         onDismissRequest = { if (!savingPhoto) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(
+        AppSurface(
             // 宽屏上限制对话框尺寸，避免铺满整个桌面窗口。
             modifier = Modifier
                 .sizeIn(maxWidth = 720.dp, maxHeight = 960.dp)
                 .fillMaxSize(0.96f),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = AppShapes.l,
+            color = AppTheme.colors.secondaryGroupedBackground,
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
+                AppText(
                     text = locale.meetupCardCropTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.headline,
+                    color = AppTheme.colors.label,
                 )
                 if (orientations.size > 1) {
-                    SingleChoiceSegmentedButtonRow {
+                    AppSegmentedRow {
                         orientations.forEachIndexed { index, entry ->
-                            SegmentedButton(
+                            AppSegment(
                                 selected = orientation == entry,
                                 onClick = { orientation = entry },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = orientations.size,
-                                ),
                             ) {
-                                Text(
+                                AppText(
                                     text = when (entry) {
                                         MeetupOrientation.Portrait -> locale.meetupCardPortrait
                                         MeetupOrientation.Landscape -> locale.meetupCardLandscape
@@ -142,21 +138,21 @@ fun MeetupCardCropDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss, enabled = !savingPhoto) {
-                        Text(strings.cancel)
+                    AppButton(onClick = onDismiss, enabled = !savingPhoto, style = AppButtonStyle.Plain) {
+                        AppText(strings.cancel)
                     }
-                    Button(
+                    AppButton(
                         onClick = onConfirm,
                         enabled = !savingPhoto,
                         modifier = Modifier.padding(start = 8.dp),
+                        style = AppButtonStyle.Prominent,
                     ) {
                         if (savingPhoto) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.padding(end = 8.dp).aspectRatio(1f),
-                                strokeWidth = 2.dp,
                             )
                         }
-                        Text(strings.confirm)
+                        AppText(strings.confirm)
                     }
                 }
             }

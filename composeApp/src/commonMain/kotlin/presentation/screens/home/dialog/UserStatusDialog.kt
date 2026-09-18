@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.HomeScreenModel
 import org.koin.compose.viewmodel.koinViewModel
@@ -76,14 +76,15 @@ class UserStatusDialog(
                 }
 
                 // 更新状态按钮
-                Button(
+                AppButton(
                     onClick = {
                         homeScreenModel.updateUserStatus(currentStatus, statusDescriptionText)
                         close()
                     },
                     modifier = Modifier.padding(8.dp),
+                    style = AppButtonStyle.Prominent,
                 ) {
-                    Text(strings.homeUpdateStatus)
+                    AppText(strings.homeUpdateStatus)
                 }
             }
         }
@@ -107,32 +108,31 @@ class UserStatusDialog(
                     animatedVisibilityScope = animatedVisibilityScope
                 ),
             leadingIcon = {
-                Icon(
+                AppIcon(
                     imageVector = if (historyExpanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
                     contentDescription = "history status",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colors.tint,
                     modifier = Modifier
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(AppShapes.m)
                         .clickable { historyExpanded = true }
                 )
                 // 历史状态描述下拉菜单
-                DropdownMenu(
-                    shape = MaterialTheme.shapes.medium,
+                AppMenu(
                     expanded = historyExpanded,
                     onDismissRequest = { historyExpanded = false }
                 ) {
                     // 显示历史状态描述
                     currentUser.statusHistory.take(10).forEach { historyStatus ->
-                        DropdownMenuItem(
-                            modifier = Modifier.clip(MaterialTheme.shapes.medium),
-                            text = { Text(historyStatus) },
+                        AppMenuItem(
+                            modifier = Modifier.clip(AppShapes.m),
+                            text = { AppText(historyStatus) },
                             onClick = {
                                 setStatusDescriptionText(historyStatus)
                                 historyExpanded = false
                             },
                             trailingIcon = {
                                 if (historyStatus == statusDescriptionText) {
-                                    Icon(
+                                    AppIcon(
                                         imageVector = AppIcons.Check,
                                         contentDescription = "checked",
                                         modifier = Modifier.size(16.dp)
@@ -154,13 +154,13 @@ class UserStatusDialog(
                 }
             },
             supportingText = {
-                Text(
+                AppText(
                     text = "${statusDescriptionText.length}/32",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = AppTheme.type.caption2Emphasized,
                     color = if (statusDescriptionText.length >= 32)
-                        MaterialTheme.colorScheme.error
+                        AppTheme.colors.destructive
                     else
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        AppTheme.colors.secondaryLabel
                 )
             }
         )
@@ -183,9 +183,9 @@ fun StatusDropdownMenu(
     Box(
         modifier = modifier
     ) {
-        OutlinedCard(
+        AppCard(
             modifier = Modifier
-                .clip(MaterialTheme.shapes.medium)
+                .clip(AppShapes.m)
                 .clickable { expanded = true }
                 .sharedBoundsBy(
                     key = "${id}UserStatusIcon",
@@ -210,23 +210,22 @@ fun StatusDropdownMenu(
                         style = Fill
                     )
                 }
-                Icon(
+                AppIcon(
                     imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
                     contentDescription = "select status"
                 )
             }
         }
 
-        DropdownMenu(
-            shape = MaterialTheme.shapes.medium,
+        AppMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
             val userStatuses =
                 remember { UserStatus.entries.filter { it != UserStatus.Offline && it != currentStatus } }
             userStatuses.forEach { status ->
-                DropdownMenuItem(
-                    modifier = Modifier.clip(MaterialTheme.shapes.medium),
+                AppMenuItem(
+                    modifier = Modifier.clip(AppShapes.m),
                     text = {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -240,7 +239,7 @@ fun StatusDropdownMenu(
                                 )
                             }
                             // 状态文本
-                            Text(text = status.value)
+                            AppText(text = status.value)
                         }
                     },
                     onClick = {
@@ -253,21 +252,14 @@ fun StatusDropdownMenu(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StateItem(
     userStatus: UserStatus,
     isSelected: Boolean = false,
     onClick: (UserStatus) -> Unit = {},
 ) {
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = {
-            PlainTooltip {
-                Text(text = userStatus.value)
-            }
-        },
-        state = rememberTooltipState()
+    AppTooltipBox(
+        tooltip = { AppText(text = userStatus.value) },
     ) {
         Canvas(
             modifier = Modifier

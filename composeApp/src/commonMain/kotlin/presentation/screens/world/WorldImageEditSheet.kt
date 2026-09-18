@@ -11,19 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +28,17 @@ import coil3.compose.AsyncImage
 import coil3.ImageLoader
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheet
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetValue
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.galleryImagePickerType
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PreparedImage
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PrintImageFailure
@@ -54,7 +53,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorldImageEditSheet(
     world: WorldProfileVo,
@@ -67,10 +65,10 @@ internal fun WorldImageEditSheet(
     val scope = rememberCoroutineScope()
     val locale = strings
     val latestIsPreparing = rememberUpdatedState(isPreparing)
-    val sheetState = rememberModalBottomSheetState(
+    val sheetState = rememberAppSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { targetValue ->
-            targetValue != SheetValue.Hidden || !latestIsPreparing.value
+            targetValue != AppSheetValue.Hidden || !latestIsPreparing.value
         },
     )
     val picker = rememberFilePickerLauncher(
@@ -117,7 +115,7 @@ internal fun WorldImageEditSheet(
         }
     }
 
-    ModalBottomSheet(
+    AppSheet(
         onDismissRequest = { if (!isPreparing) onDismiss() },
         sheetState = sheetState,
         sheetGesturesEnabled = !isPreparing,
@@ -130,10 +128,10 @@ internal fun WorldImageEditSheet(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            AppText(
                 text = locale.worldImageEditTitle,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.type.title2,
+                color = AppTheme.colors.tint,
             )
             WorldImagePreview(
                 label = locale.worldImageEditPreview,
@@ -143,45 +141,46 @@ internal fun WorldImageEditSheet(
                 label = locale.worldImageEditThumbnail,
                 imageUrl = world.thumbnailImageUrl ?: world.worldImageUrl,
             )
-            Text(
+            AppText(
                 text = locale.worldImageEditHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
-            OutlinedButton(
+            AppButton(
                 onClick = picker::launch,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isPreparing,
+                style = AppButtonStyle.Gray,
             ) {
                 if (isPreparing) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(Modifier.size(8.dp))
-                Text(locale.worldImageEditChoose)
+                AppText(locale.worldImageEditChoose)
             }
             errorText?.let { error ->
-                Text(
+                AppText(
                     text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.destructive,
                 )
             }
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
                 enabled = !isPreparing,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(locale.cancel)
+                AppText(locale.cancel)
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -195,12 +194,12 @@ private fun WorldImagePreview(
 ) {
     val imageLoader: ImageLoader = koinInject()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = label, style = MaterialTheme.typography.titleSmall)
+        AppText(text = label, style = AppTheme.type.subheadlineEmphasized)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(8.dp)),
+                .clip(AppShapes.s),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(

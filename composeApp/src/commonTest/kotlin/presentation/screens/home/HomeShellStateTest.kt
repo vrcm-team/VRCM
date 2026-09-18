@@ -1,6 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.home
 
-import androidx.compose.material3.DrawerValue
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDrawerValue
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,10 +12,10 @@ class HomeShellStateTest {
     fun initialClosedDrawerStateDoesNotCancelOpeningIntent() {
         val coordinator = HomeDrawerStateCoordinator()
 
-        assertFalse(coordinator.shouldHide(DrawerValue.Closed))
-        assertFalse(coordinator.shouldHide(DrawerValue.Open))
-        assertTrue(coordinator.shouldHide(DrawerValue.Closed))
-        assertFalse(coordinator.shouldHide(DrawerValue.Closed))
+        assertFalse(coordinator.shouldHide(AppDrawerValue.Closed))
+        assertFalse(coordinator.shouldHide(AppDrawerValue.Open))
+        assertTrue(coordinator.shouldHide(AppDrawerValue.Closed))
+        assertFalse(coordinator.shouldHide(AppDrawerValue.Closed))
     }
 
     @Test
@@ -37,12 +37,7 @@ class HomeShellStateTest {
         state.showDrawer()
         assertTrue(state.drawerVisible)
 
-        state.showSettings()
-        assertFalse(state.drawerVisible)
-        assertTrue(state.settingsVisible)
-
         state.clearOverlays()
         assertFalse(state.drawerVisible)
-        assertFalse(state.settingsVisible)
     }
 }

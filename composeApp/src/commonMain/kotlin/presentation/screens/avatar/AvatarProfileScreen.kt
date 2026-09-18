@@ -4,9 +4,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -156,7 +155,7 @@ class AvatarProfileScreen(
     private val sharedImageCacheKey: String? = null,
 ) : AppDetailRoute {
 
-    @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content() {
         val navigator = currentNavigator
@@ -180,7 +179,7 @@ class AvatarProfileScreen(
         var showEditSheet by remember { mutableStateOf(false) }
         var showFavoriteSheet by remember { mutableStateOf(false) }
         var actionSheetIsVisible by remember { mutableStateOf(false) }
-        val actionSheetState = rememberModalBottomSheetState()
+        val actionSheetState = rememberAppSheetState()
         var pendingModerationChange by remember { mutableStateOf<Boolean?>(null) }
         var showImpostorDeletionConfirmation by remember { mutableStateOf(false) }
 
@@ -262,10 +261,10 @@ class AvatarProfileScreen(
         }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
-            Surface(
+            AppSurface(
                 modifier = Modifier.fillMaxSize(),
                 color = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                contentColor = AppTheme.colors.label,
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     ProfileScaffold(
@@ -279,10 +278,9 @@ class AvatarProfileScreen(
                         onReturn = { navigator.pop() },
                         onMenu = { actionSheetIsVisible = true },
                         menuContentDescription = strings.avatarProfileMoreActions,
-                        topBarActions = { colors ->
+                        topBarActions = {
                             OfficialUrlShareButton(
                                 url = "https://vrchat.com/home/avatar/${displayedAvatar.avatarId}",
-                                colors = colors,
                             )
                         },
                     ) { _, _ ->
@@ -427,10 +425,10 @@ private fun AvatarProfileContent(
 
     // 名称
     SelectionContainer {
-        Text(
+        AppText(
             text = avatarProfileVo.avatarName,
-            color = MaterialTheme.colorScheme.secondary,
-            style = MaterialTheme.typography.titleLarge,
+            color = AppTheme.colors.label,
+            style = AppTheme.type.title2,
             fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -439,10 +437,10 @@ private fun AvatarProfileContent(
 
     // 作者
     if (avatarProfileVo.authorName.isNotBlank()) {
-        Text(
+        AppText(
             text = avatarProfileVo.authorName,
-            color = MaterialTheme.colorScheme.secondary,
-            style = MaterialTheme.typography.labelMedium,
+            color = AppTheme.colors.secondaryLabel,
+            style = AppTheme.type.caption1Emphasized,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.simpleClickable {
@@ -460,16 +458,16 @@ private fun AvatarProfileContent(
 
     // 描述
     if (avatarProfileVo.avatarDescription.isNotBlank()) {
-        Surface(
+        AppSurface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            shape = MaterialTheme.shapes.extraLarge
+            color = AppTheme.colors.secondaryGroupedBackground,
+            shape = AppShapes.xl
         ) {
             SelectionContainer {
-                Text(
+                AppText(
                     modifier = Modifier.padding(12.dp),
                     text = avatarProfileVo.avatarDescription,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.type.subheadline,
                 )
             }
         }
@@ -546,19 +544,20 @@ private fun AvatarProfilePrimaryActions(
             modifier = Modifier.weight(1f),
         )
 
-        OutlinedButton(
+        AppButton(
             onClick = onFavoriteAvatar,
             enabled = favoriteEntryState != FavoriteEntryState.Loading &&
                 favoriteEntryState != FavoriteEntryState.Unavailable,
             modifier = Modifier.weight(1f),
+            style = AppButtonStyle.Gray,
         ) {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Favorite,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(8.dp))
-            Text(
+            AppText(
                 text = when (favoriteEntryState) {
                     FavoriteEntryState.Loading -> strings.loading
                     FavoriteEntryState.Favorited -> strings.editFavorite
@@ -711,32 +710,19 @@ private fun ColumnScope.AvatarProfileSheetButton(
     isDestructive: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val colors = if (isDestructive) {
-        ButtonDefaults.textButtonColors(
-            contentColor = MaterialTheme.colorScheme.error,
-            disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
-        )
-    } else {
-        ButtonDefaults.textButtonColors()
-    }
-    TextButton(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .fillMaxWidth()
-            .padding(vertical = 2.dp, horizontal = 24.dp),
+    AppSheetAction(
         enabled = enabled,
-        colors = colors,
         onClick = onClick,
+        role = if (isDestructive) AppButtonRole.Destructive else AppButtonRole.Default,
     ) {
         if (loading) {
-            CircularProgressIndicator(
+            AppActivityIndicator(
                 modifier = Modifier.size(20.dp),
                 color = LocalContentColor.current,
-                strokeWidth = 2.dp,
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
-        Text(
+        AppText(
             text = text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -757,17 +743,17 @@ private fun AvatarGallerySection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
+        AppText(
             text = strings.avatarGalleryTitle,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.type.headline,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = AppTheme.colors.label,
         )
         when {
             state.isLoading -> Box(
                 modifier = Modifier.fillMaxWidth().height(96.dp),
                 contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator(modifier = Modifier.size(28.dp)) }
+            ) { AppActivityIndicator(modifier = Modifier.size(28.dp)) }
 
             state.initialLoadFailed -> AvatarGalleryMessage(
                 message = strings.avatarGalleryLoadFailed,
@@ -797,7 +783,7 @@ private fun AvatarGallerySection(
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center,
-                    ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                    ) { AppActivityIndicator(modifier = Modifier.size(24.dp)) }
                 } else if (state.loadMoreFailed) {
                     AvatarGalleryMessage(
                         message = strings.avatarGalleryLoadMoreFailed,
@@ -805,10 +791,11 @@ private fun AvatarGallerySection(
                         onAction = onRetry,
                     )
                 } else if (state.hasMore) {
-                    OutlinedButton(
+                    AppButton(
                         onClick = onLoadMore,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
-                    ) { Text(strings.avatarGalleryLoadMore) }
+                        style = AppButtonStyle.Gray,
+                    ) { AppText(strings.avatarGalleryLoadMore) }
                 }
             }
         }
@@ -826,14 +813,14 @@ private fun AvatarGalleryMessage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
+        AppText(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.subheadline,
+            color = AppTheme.colors.secondaryLabel,
             textAlign = TextAlign.Center,
         )
         if (actionText != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionText) }
+            AppButton(onClick = onAction, style = AppButtonStyle.Plain) { AppText(actionText) }
         }
     }
 }
@@ -867,21 +854,21 @@ private fun AvatarGalleryGrid(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(MaterialTheme.shapes.medium)
+                                    .clip(AppShapes.m)
                                     .clickable(enabled = version != null) {
                                         version?.let { selectedVersion -> onOpen(file, selectedVersion) }
                                     },
                                 loading = {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                                        AppActivityIndicator(modifier = Modifier.size(22.dp))
                                     }
                                 },
                                 error = {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text(
+                                        AppText(
                                             text = strings.galleryTabLoadFailed,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.error,
+                                            style = AppTheme.type.caption2Emphasized,
+                                            color = AppTheme.colors.destructive,
                                         )
                                     }
                                 },
@@ -903,42 +890,39 @@ private fun AvatarImpostorDeletionConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!isDeleting) onDismiss() },
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Delete,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colors.destructive,
             )
         },
-        title = { Text(strings.avatarImpostorDeleteConfirmationTitle) },
+        title = { AppText(strings.avatarImpostorDeleteConfirmationTitle) },
         text = {
-            Text(strings.avatarImpostorDeleteConfirmationMessage.replace("%name%", avatarName))
+            AppText(strings.avatarImpostorDeleteConfirmationMessage.replace("%name%", avatarName))
         },
         confirmButton = {
-            Button(
+            AppButton(
                 enabled = enabled,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
                 onClick = onConfirm,
+                style = AppButtonStyle.Prominent,
+                role = AppButtonRole.Destructive,
             ) {
                 if (isDeleting) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(strings.avatarImpostorDeleteAction)
+                AppText(strings.avatarImpostorDeleteAction)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isDeleting) {
-                Text(strings.cancel)
+            AppButton(onClick = onDismiss, enabled = !isDeleting, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )
@@ -951,56 +935,55 @@ private fun AvatarDeletionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!state.isDeleting) onDismiss() },
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Delete,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colors.destructive,
             )
         },
-        title = { Text(strings.avatarDeleteTitle) },
+        title = { AppText(strings.avatarDeleteTitle) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(strings.avatarDeleteMessage.replace("%s", avatarName))
+                AppText(strings.avatarDeleteMessage.replace("%s", avatarName))
                 state.failure?.let { failure ->
-                    Text(
+                    AppText(
                         text = failure.localizedMessage(strings),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppTheme.colors.destructive,
+                        style = AppTheme.type.subheadline,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 onClick = onConfirm,
                 enabled = !state.isDeleting,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
+                style = AppButtonStyle.Plain,
+                role = AppButtonRole.Destructive,
             ) {
                 if (state.isDeleting) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(
+                AppText(
                     if (state.isDeleting) strings.avatarDeleteDeleting
                     else strings.avatarDeleteConfirm
                 )
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
                 enabled = !state.isDeleting,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(strings.cancel)
+                AppText(strings.cancel)
             }
         },
     )
@@ -1012,11 +995,11 @@ private fun AvatarModerationConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        icon = { Icon(AppIcons.Block, contentDescription = null) },
+        icon = { AppIcon(AppIcons.Block, contentDescription = null) },
         title = {
-            Text(
+            AppText(
                 if (blocked) {
                     strings.avatarModerationBlockConfirmTitle
                 } else {
@@ -1025,7 +1008,7 @@ private fun AvatarModerationConfirmationDialog(
             )
         },
         text = {
-            Text(
+            AppText(
                 if (blocked) {
                     strings.avatarModerationBlockConfirmMessage
                 } else {
@@ -1034,17 +1017,16 @@ private fun AvatarModerationConfirmationDialog(
             )
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (blocked) {
-                        MaterialTheme.colorScheme.error
+                contentColor = if (blocked) {
+                        AppTheme.colors.destructive
                     } else {
-                        MaterialTheme.colorScheme.primary
-                    }
-                ),
+                        AppTheme.colors.tint
+                    },
+                style = AppButtonStyle.Plain,
             ) {
-                Text(
+                AppText(
                     if (blocked) {
                         strings.avatarModerationBlock
                     } else {
@@ -1054,7 +1036,7 @@ private fun AvatarModerationConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(strings.cancel) }
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) { AppText(strings.cancel) }
         },
     )
 }
@@ -1073,34 +1055,34 @@ private fun AvatarActionButton(
     val showProgress = state.isSelecting || availability == AvatarActionAvailability.Checking
     val icon = when (availability) {
         AvatarActionAvailability.Current -> AppIcons.CheckCircle
-        AvatarActionAvailability.Own -> AppIcons.Update
-        AvatarActionAvailability.Copyable -> AppIcons.Queue
+        AvatarActionAvailability.Own -> AppIcons.Refresh
+        AvatarActionAvailability.Copyable -> AppIcons.Duplicate
         AvatarActionAvailability.Banned,
         AvatarActionAvailability.NotCopyable -> AppIcons.Block
         AvatarActionAvailability.Checking,
         AvatarActionAvailability.CheckFailed -> AppIcons.QuestionMark
     }
 
-    Button(
+    AppButton(
         modifier = modifier,
         enabled = enabled,
         onClick = onClick,
+        style = AppButtonStyle.Prominent,
     ) {
         if (showProgress) {
-            CircularProgressIndicator(
+            AppActivityIndicator(
                 modifier = Modifier.size(20.dp),
                 color = LocalContentColor.current,
-                strokeWidth = 2.dp,
             )
         } else {
-            Icon(
+            AppIcon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
+        AppText(
             text = availability.localizedButtonText(strings),
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -1115,7 +1097,7 @@ private fun AvatarInfoCards(avatarProfileVo: AvatarProfileVo) {
 
     // 版本
     avatarProfileVo.version?.let {
-        infoCards.add(Triple(AppIcons.Update, "v$it", strings.avatarProfileVersion))
+        infoCards.add(Triple(AppIcons.Refresh, "v$it", strings.avatarProfileVersion))
     }
 
     // 发布状态
@@ -1169,7 +1151,6 @@ private fun AvatarInfoCards(avatarProfileVo: AvatarProfileVo) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AvatarInfoItemBlock(
     modifier: Modifier = Modifier,
@@ -1179,28 +1160,28 @@ private fun AvatarInfoItemBlock(
 ) {
     ATooltipBox(
         tooltip = {
-            Text(text = description, style = MaterialTheme.typography.labelSmall)
+            AppText(text = description, style = AppTheme.type.caption2Emphasized)
         }
     ) {
-        val bgColor = MaterialTheme.colorScheme.tertiary
+        val bgColor = AppTheme.colors.secondaryTint
         Column(
             modifier = modifier
-                .clip(RoundedCornerShape(12.dp))
+                .clip(AppShapes.m)
                 .background(bgColor),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
+            AppIcon(
                 imageVector = icon,
-                tint = MaterialTheme.colorScheme.onPrimary,
+                tint = AppTheme.colors.onSecondaryTint,
                 contentDescription = description,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
+            AppText(
                 text = label,
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.labelSmall,
+                color = AppTheme.colors.onSecondaryTint,
+                style = AppTheme.type.caption2Emphasized,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
@@ -1215,16 +1196,16 @@ private fun AvatarPlatformSection(platformInfos: List<AvatarPlatformInfo>) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
+        AppText(
             text = strings.avatarProfilePlatforms,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.type.headline,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = AppTheme.colors.label
         )
-        Surface(
+        AppSurface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-            shape = MaterialTheme.shapes.extraLarge
+            color = AppTheme.colors.secondaryGroupedBackground,
+            shape = AppShapes.xl
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
@@ -1236,21 +1217,21 @@ private fun AvatarPlatformSection(platformInfos: List<AvatarPlatformInfo>) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
+                        AppText(
                             text = info.displayName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = AppTheme.type.subheadline,
+                            color = AppTheme.colors.label
                         )
-                        Text(
+                        AppText(
                             text = info.ratingDisplay,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = AppTheme.type.caption1Emphasized,
                             color = ratingColor(info.performanceRating)
                         )
                     }
                     if (info != platformInfos.last()) {
-                        HorizontalDivider(
+                        AppDivider(
                             thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            color = AppTheme.colors.separator.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -1268,8 +1249,8 @@ private fun ratingColor(rating: String?): androidx.compose.ui.graphics.Color {
         "excellent" -> androidx.compose.ui.graphics.Color(0xFF51E57E)
         "good" -> androidx.compose.ui.graphics.Color(0xFF51E57E)
         "medium" -> androidx.compose.ui.graphics.Color(0xFFFFD24C)
-        "poor" -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
-        "verypoor" -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outline
+        "poor" -> AppTheme.colors.destructive.copy(alpha = 0.8f)
+        "verypoor" -> AppTheme.colors.destructive
+        else -> AppTheme.colors.tertiaryLabel
     }
 }

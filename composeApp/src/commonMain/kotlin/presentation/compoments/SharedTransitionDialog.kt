@@ -8,13 +8,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalAppColors
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -69,7 +71,7 @@ fun SharedTransitionDialog(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .simpleClickable(onClick = closeDialog)
-                                .background(Color.Black.copy(alpha = 0.6f))
+                                .background(AppTheme.colors.scrim)
                         )
                         targetDialogContent.Content(
                             animatedVisibilityScope = this@AnimatedContent
@@ -152,32 +154,39 @@ interface SharedDialog {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-inline fun SharedDialogContainer(
+fun SharedDialogContainer(
     key: String = "",
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    background: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    background: Color = AppTheme.colors.elevated().groupedBackground,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .padding(
-                start = 16.dp,
-                end = 16.dp,
-                top = getInsetPadding(16, WindowInsets::getTop) + 16.dp,
-                bottom = getInsetPadding(16, WindowInsets::getBottom) + 16.dp,
-            )
-            .enableIf(animatedVisibilityScope != null) {
-                sharedBoundsBy(
-                    key = key + "Container",
-                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                    animatedVisibilityScope = animatedVisibilityScope!!,
-                    clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
-                        OverlayClip(DialogShapeForSharedElement)
-                    }
+    // 弹层内部是"抬升"层级：深色下面板上的卡片才不会和面板糊成一片
+    val colors = AppTheme.colors.elevated()
+    CompositionLocalProvider(
+        LocalAppColors provides colors,
+        LocalContentColor provides colors.label,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = getInsetPadding(16, WindowInsets::getTop) + 16.dp,
+                    bottom = getInsetPadding(16, WindowInsets::getBottom) + 16.dp,
                 )
-            }
-            .background(background, DialogShapeForSharedElement)
-            .clip(DialogShapeForSharedElement),
-        content = content
-    )
+                .enableIf(animatedVisibilityScope != null) {
+                    sharedBoundsBy(
+                        key = key + "Container",
+                        sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                        animatedVisibilityScope = animatedVisibilityScope!!,
+                        clipInOverlayDuringTransition = with(LocalSharedTransitionDialogScope.current) {
+                            OverlayClip(DialogShapeForSharedElement)
+                        }
+                    )
+                }
+                .background(background, DialogShapeForSharedElement)
+                .clip(DialogShapeForSharedElement),
+            content = content
+        )
+    }
 }

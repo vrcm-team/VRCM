@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -28,6 +24,11 @@ import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCheckbox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -95,7 +96,7 @@ fun LazyItemScope.renderUserItem(
         headlineContent = {
             UserInfoRow(
                 iconSize = 16.dp,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 user = user,
                 sharedSuffixKey = sharedSuffixKey,
                 pronouns = user.pronouns,
@@ -104,14 +105,14 @@ fun LazyItemScope.renderUserItem(
         supportingContent = {
             UserStatusRow(
                 iconSize = 8.dp,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 user = user,
                 sharedSuffixKey = sharedSuffixKey,
             )
         },
         trailingContent = {
             if (selected != null) {
-                Checkbox(
+                AppCheckbox(
                     checked = selected,
                     onCheckedChange = null,
                     enabled = enabled,
@@ -121,9 +122,9 @@ fun LazyItemScope.renderUserItem(
             // 离线用户显示最后活动时间
             val lastSeenAt = user.lastSeenAt()
             if (user.status != UserStatus.Offline || lastSeenAt == null) return@SearchResultItem
-            Text(
+            AppText(
                 text = lastSeenAt.toLocalDateTime()?.ignoredFormat.orEmpty(),
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
                 maxLines = 1
             )
         }
@@ -207,14 +208,14 @@ fun LazyItemScope.renderWorldItem(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
                     ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .clip(AppShapes.m)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -224,29 +225,29 @@ fun LazyItemScope.renderWorldItem(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
                     ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                        .clip(AppShapes.m),
                     imageData = world.safeImageUrl(),
                 )
             }
         },
         headlineContent = {
-            Text(
+            AppText(
                 text = if (world.isHiddenWorld()) world.hiddenWorldDisplayName() else world.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = if (world.isHiddenWorld()) strings.hiddenWorld else world.authorName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 maxLines = 1
             )
         },
         trailingContent = {
             if (selected != null) {
-                Checkbox(
+                AppCheckbox(
                     checked = selected,
                     onCheckedChange = null,
                     enabled = enabled,
@@ -264,7 +265,7 @@ fun LazyItemScope.renderWorldItem(
                         Ios -> AppIcons.Apple
                         Windows -> AppIcons.Windows
                     }
-                    Icon(
+                    AppIcon(
                         imageVector = icon,
                         contentDescription = "PlatformIcon",
                         modifier = Modifier.size(16.dp)
@@ -337,14 +338,14 @@ fun LazyItemScope.renderAvatarItem(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
                     ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .clip(AppShapes.m)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -354,29 +355,29 @@ fun LazyItemScope.renderAvatarItem(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
                     ).size(48.dp)
-                        .clip(MaterialTheme.shapes.medium),
+                        .clip(AppShapes.m),
                     imageData = avatar.thumbnailImageUrl,
                 )
             }
         },
         headlineContent = {
-            Text(
+            AppText(
                 text = if (avatar.releaseStatus == "hidden") avatar.id else avatar.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = if (avatar.releaseStatus == "hidden") strings.hiddenModel else avatar.authorName,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 maxLines = 1
             )
         },
         trailingContent = {
             if (selected != null) {
-                Checkbox(
+                AppCheckbox(
                     checked = selected,
                     onCheckedChange = null,
                     enabled = enabled,
@@ -403,7 +404,7 @@ fun LazyItemScope.renderAvatarItem(
                         Ios -> AppIcons.Apple
                         Windows -> AppIcons.Windows
                     }
-                    Icon(
+                    AppIcon(
                         imageVector = icon,
                         contentDescription = "PlatformIcon",
                         modifier = Modifier.size(16.dp)
@@ -478,29 +479,29 @@ fun LazyItemScope.renderGroupItem(
             )
         },
         headlineContent = {
-            Text(
+            AppText(
                 modifier = Modifier.sharedBoundsBy(
                     key = groupNameSharedKey(group.id),
                     suffixKey = sharedSuffixKey,
                     resizeMode = SharedTextBoundsResizeMode,
                 ),
                 text = group.name,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         supportingContent = {
-            Text(
+            AppText(
                 text = group.description,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1
             )
         },
         trailingContent = {
             if (selected != null) {
-                Checkbox(
+                AppCheckbox(
                     checked = selected,
                     onCheckedChange = null,
                     enabled = enabled,
@@ -508,9 +509,9 @@ fun LazyItemScope.renderGroupItem(
                 return@SearchResultItem
             }
             // 显示成员数量
-            Text(
+            AppText(
                 text = "${group.memberCount}",
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
                 maxLines = 1
             )
         }

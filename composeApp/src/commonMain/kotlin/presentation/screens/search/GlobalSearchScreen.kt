@@ -2,15 +2,14 @@ package io.github.vrcmteam.vrcm.presentation.screens.search
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.PublicSearchContent
@@ -20,17 +19,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 object GlobalSearchScreen : AppRoute {
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = currentNavigator
-        Scaffold(
+        AppScaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text(strings.fiendListPagerSearch) },
+                AppNavBar(
+                    title = { AppText(strings.fiendListPagerSearch) },
                     navigationIcon = {
-                        IconButton(onClick = navigator::pop) {
-                            Icon(AppIcons.ArrowBackIosNew, strings.back)
+                        AppIconButton(onClick = navigator::pop) {
+                            AppIcon(AppIcons.ArrowBackIosNew, strings.back)
                         }
                     },
                 )

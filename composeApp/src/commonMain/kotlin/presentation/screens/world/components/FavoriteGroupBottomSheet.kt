@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +17,7 @@ import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -41,7 +41,6 @@ import org.koin.compose.koinInject
  * @param onDismiss 关闭回调
  * @param onConfirm 确认选择回调，参数为所选收藏组name的Result
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoriteGroupBottomSheet(
     isVisible: Boolean,
@@ -58,10 +57,10 @@ fun FavoriteGroupBottomSheet(
     val strings = strings
     var isChanging by remember(favoriteId, favoriteType, favoriteRecordId) { mutableStateOf(false) }
     val latestIsChanging = rememberUpdatedState(isChanging)
-    val sheetState = rememberModalBottomSheetState(
+    val sheetState = rememberAppSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { targetValue ->
-            targetValue != SheetValue.Hidden || !latestIsChanging.value
+            targetValue != AppSheetValue.Hidden || !latestIsChanging.value
         },
     )
 
@@ -133,20 +132,20 @@ fun FavoriteGroupBottomSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 标题
-            Text(
+            AppText(
                 text = when {
                     !allowGroupChange -> strings.remove
                     currentGroupName != null -> strings.favoriteMoveToAnotherGroup
                     else -> strings.selectFavoriteGroup
                 },
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppTheme.colors.label,
                 textAlign = TextAlign.Center
             )
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                shape = MaterialTheme.shapes.large,
+            AppSurface(
+                color = AppTheme.colors.secondaryGroupedBackground,
+                shape = AppShapes.l,
             ) {
                 Column(
                     modifier = Modifier
@@ -162,7 +161,7 @@ fun FavoriteGroupBottomSheet(
                                 .height(200.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator()
+                            AppActivityIndicator()
                         }
                     } else {
                         val maxFavoritesPerGroup = remember { favoriteService.getMaxFavoritesPerGroup(favoriteType) }
@@ -170,9 +169,9 @@ fun FavoriteGroupBottomSheet(
                         entries.forEachIndexed { index, (group, favorites) ->
                             val isCurrentGroup = group.name == currentGroupName
                             val backgroundColor = if (isCurrentGroup)
-                                MaterialTheme.colorScheme.primaryContainer
+                                AppTheme.colors.tintSoft
                             else
-                                MaterialTheme.colorScheme.surfaceContainerLowest
+                                AppTheme.colors.secondaryGroupedBackground
 
                             Box(
                                 modifier = Modifier
@@ -190,29 +189,29 @@ fun FavoriteGroupBottomSheet(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
+                                    AppIcon(
                                         imageVector = AppIcons.Check,
                                         contentDescription = "已收藏",
-                                        tint = if (isCurrentGroup) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        tint = if (isCurrentGroup) AppTheme.colors.tint else Color.Transparent,
                                     )
-                                    Text(
+                                    AppText(
                                         modifier = Modifier.weight(1f),
                                         text = group.displayName,
-                                        style = MaterialTheme.typography.titleMedium.copy(
+                                        style = AppTheme.type.headline.copy(
                                             fontWeight = if (isCurrentGroup) FontWeight.Bold else FontWeight.Normal
                                         ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Text(
+                                    AppText(
                                         text = "${favorites.size}/${maxFavoritesPerGroup}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = AppTheme.type.caption1,
+                                        color = AppTheme.colors.secondaryLabel
                                     )
                                 }
                             }
                             if (entries.size - 1 <= index) return@forEachIndexed
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
+                            AppDivider(modifier = Modifier.padding(horizontal = 12.dp), thickness = 0.5.dp)
                         }
                     }
 
@@ -221,16 +220,14 @@ fun FavoriteGroupBottomSheet(
             }
             // 底部按钮
             if (currentGroupName != null) {
-                TextButton(
+                AppButton(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isChanging,
                     onClick = { onClickGroupItem(currentGroupName) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+                    style = AppButtonStyle.Tinted,
+                    role = AppButtonRole.Destructive,
                 ) {
-                    Text(strings.remove)
+                    AppText(strings.remove)
                 }
             }
         }

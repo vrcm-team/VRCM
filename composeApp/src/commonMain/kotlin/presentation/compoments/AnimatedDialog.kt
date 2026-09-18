@@ -3,16 +3,17 @@ package io.github.vrcmteam.vrcm.presentation.compoments
 import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import kotlin.math.roundToInt
 
 @Composable
@@ -50,25 +51,25 @@ fun AnimatedDialogExample() {
             visible = isVisible,
             onDismissRequest = { isVisible = false }
         ) {
-            Surface(
+            AppSurface(
                 modifier = Modifier.height(250.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.l,
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Hello World")
-                    Button(onClick = { isVisible = false }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Click Me")
+                    AppText("Hello World")
+                    AppButton(onClick = { isVisible = false }, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) {
+                        AppText("Click Me")
                     }
                 }
 
             }
         }
-        Button(modifier = Modifier.align(Alignment.Center), onClick = { isVisible = true }) {
-            Text("Click Me")
+        AppButton(modifier = Modifier.align(Alignment.Center), onClick = { isVisible = true }, style = AppButtonStyle.Prominent) {
+            AppText("Click Me")
         }
     }
 }

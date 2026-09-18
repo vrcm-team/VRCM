@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import io.github.vrcmteam.vrcm.AndroidAppPlatform
 import io.github.vrcmteam.vrcm.AppPlatform
 
@@ -32,9 +31,6 @@ actual fun AppPlatform.shareUrl(url: String): Boolean = runCatching {
         )
     }
 }.isSuccess
-
-actual val AppPlatform.isSupportBlur: Boolean
-    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
 tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

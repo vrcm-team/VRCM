@@ -5,7 +5,6 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +16,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -100,10 +100,9 @@ class InstancesDialog(
                         .padding(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Surface(
+                    AppSurface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium,
-                        contentColor = MaterialTheme.colorScheme.primary
+                        shape = AppShapes.m,
                     ) {
 
                         Column(
@@ -115,18 +114,18 @@ class InstancesDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 val owner = instance.owner.collectAsState().value ?: return@Row
-                                Text(
+                                AppText(
                                     text = "${localeStrings.locationDialogOwner}:",
                                     fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = AppTheme.type.subheadlineEmphasized,
                                 )
-                                Icon(
+                                AppIcon(
                                     modifier = Modifier.size(16.dp),
                                     imageVector = owner.iconVector,
                                     contentDescription = "OwnerIcon"
                                 )
                                 // TODO: Group详情页跳转
-                                Text(
+                                AppText(
                                     modifier = if (owner.type == BlueprintType.User)
                                         Modifier.clickable {
                                             onClickUserIcon(
@@ -136,8 +135,8 @@ class InstancesDialog(
                                     else Modifier,
                                     textDecoration = if (owner.type == BlueprintType.User) TextDecoration.Underline else null,
                                     text = owner.displayName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.outline,
+                                    style = AppTheme.type.subheadline,
+                                    color = AppTheme.colors.tertiaryLabel,
                                 )
                             }
 
@@ -154,10 +153,10 @@ class InstancesDialog(
                                 RegionIcon(
                                     region = instance.regionType
                                 )
-                                Text(
+                                AppText(
                                     text = "${instance.accessType}(${instance.instanceName})",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    style = AppTheme.type.subheadlineEmphasized,
+                                    color = AppTheme.colors.tertiaryLabel
                                 )
                                 TextLabel(
                                     text = "${instance.currentUsers ?: "0"}",
@@ -170,30 +169,28 @@ class InstancesDialog(
                                 itemVerticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (canOfferClose) {
-                                    OutlinedButton(
+                                    AppButton(
                                         enabled = instanceCloseState is InstanceCloseState.Idle,
                                         onClick = {
                                             screenModel.requestInstanceClose(instance, localeStrings)
                                         },
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.error,
-                                        ),
+                                        style = AppButtonStyle.Gray,
+                                        role = AppButtonRole.Destructive,
                                     ) {
                                         if (isAuthorizingClose) {
-                                            CircularProgressIndicator(
+                                            AppActivityIndicator(
                                                 modifier = Modifier.size(18.dp),
                                                 color = LocalContentColor.current,
-                                                strokeWidth = 2.dp,
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                         } else {
-                                            Icon(
+                                            AppIcon(
                                                 imageVector = AppIcons.Close,
                                                 contentDescription = null,
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                         }
-                                        Text(
+                                        AppText(
                                             if (isAuthorizingClose) {
                                                 localeStrings.instanceCloseCheckingPermission
                                             } else {
@@ -202,12 +199,13 @@ class InstancesDialog(
                                         )
                                     }
                                 }
-                                Button(
+                                AppButton(
                                     modifier = Modifier.animateContentSize(),
                                     enabled = !isInvited,
-                                    onClick = { onClickInvite() }
+                                    onClick = { onClickInvite() },
+                                    style = AppButtonStyle.Prominent,
                                 ) {
-                                    Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+                                    AppText(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
                                 }
                             }
                         }
@@ -217,31 +215,29 @@ class InstancesDialog(
         }
 
         if (isAwaitingCloseConfirmation || isSubmittingClose) {
-            AlertDialog(
+            AppAlert(
                 onDismissRequest = {
                     if (!isSubmittingClose) {
                         closeLocation?.let(screenModel::abandonInstanceClose)
                     }
                 },
-                title = { Text(localeStrings.instanceCloseConfirmTitle) },
-                text = { Text(localeStrings.instanceCloseConfirmMessage) },
+                title = { AppText(localeStrings.instanceCloseConfirmTitle) },
+                text = { AppText(localeStrings.instanceCloseConfirmMessage) },
                 confirmButton = {
-                    TextButton(
+                    AppButton(
                         enabled = !isSubmittingClose,
                         onClick = { screenModel.confirmInstanceClose(localeStrings) },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
+                        style = AppButtonStyle.Plain,
+                        role = AppButtonRole.Destructive,
                     ) {
                         if (isSubmittingClose) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.size(18.dp),
                                 color = LocalContentColor.current,
-                                strokeWidth = 2.dp,
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(
+                        AppText(
                             if (isSubmittingClose) {
                                 localeStrings.instanceCloseInProgress
                             } else {
@@ -251,13 +247,14 @@ class InstancesDialog(
                     }
                 },
                 dismissButton = {
-                    TextButton(
+                    AppButton(
                         enabled = !isSubmittingClose,
                         onClick = {
                             closeLocation?.let(screenModel::abandonInstanceClose)
                         },
+                        style = AppButtonStyle.Plain,
                     ) {
-                        Text(localeStrings.cancel)
+                        AppText(localeStrings.cancel)
                     }
                 },
             )

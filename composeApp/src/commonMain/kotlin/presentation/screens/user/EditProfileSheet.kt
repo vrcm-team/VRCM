@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,6 +13,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -52,7 +52,6 @@ private fun UserStatus.toLocalizedString(): String = when (this) {
     else -> value
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileSheet(
     isVisible: Boolean,
@@ -91,10 +90,10 @@ fun EditProfileSheet(
         mutableLongStateOf(bioLinksUpdateState.completedRequestId)
     }
     val latestBioLinksSaving = rememberUpdatedState(bioLinksUpdateState.isSaving)
-    val profileSheetState = rememberModalBottomSheetState(
+    val profileSheetState = rememberAppSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { targetValue ->
-            targetValue != SheetValue.Hidden || !latestBioLinksSaving.value
+            targetValue != AppSheetValue.Hidden || !latestBioLinksSaving.value
         },
     )
 
@@ -109,7 +108,7 @@ fun EditProfileSheet(
         }
     }
 
-    ModalBottomSheet(
+    AppSheet(
         onDismissRequest = { if (!bioLinksUpdateState.isSaving) onDismiss() },
         sheetState = profileSheetState,
         sheetGesturesEnabled = !bioLinksUpdateState.isSaving,
@@ -127,10 +126,10 @@ fun EditProfileSheet(
                 ),
         ) {
             if (editingField == null) {
-                Text(
+                AppText(
                     text = strings.editProfileTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.title2,
+                    color = AppTheme.colors.tint,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 ProfileFieldRow(strings.editProfileStatus, "${status.toLocalizedString()} $statusDescription".trim()) {
@@ -207,10 +206,10 @@ private fun BoopPrivacyRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        AppText(
             text = strings.editProfileBoopPrivacy,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = AppTheme.type.body,
+            color = AppTheme.colors.label,
             modifier = Modifier.weight(1f),
         )
         Box(
@@ -220,19 +219,18 @@ private fun BoopPrivacyRow(
             contentAlignment = Alignment.Center,
         ) {
             if (state.isLoading || state.isUpdating) {
-                CircularProgressIndicator(
+                AppActivityIndicator(
                     modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
                 )
             } else {
-                Switch(
+                AppToggle(
                     checked = state.isEnabled,
                     onCheckedChange = null,
                 )
             }
         }
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+    AppDivider(color = AppTheme.colors.fill)
 }
 
 @Composable
@@ -252,25 +250,25 @@ private fun AvatarCopyingPrivacyRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
+            AppText(
                 text = strings.editProfileAvatarCopying,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = AppTheme.type.body,
+                color = AppTheme.colors.label,
             )
-            Text(
+            AppText(
                 text = strings.editProfileAvatarCopyingDescription,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
             if (state.loadFailed || state.updateFailed) {
-                Text(
+                AppText(
                     text = if (state.loadFailed) {
                         strings.editProfileAvatarCopyingLoadFailed
                     } else {
                         strings.editProfileAvatarCopyingUpdateFailed
                     },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.destructive,
                 )
             }
         }
@@ -287,29 +285,27 @@ private fun AvatarCopyingPrivacyRow(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (state.isSaving) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
                             )
                         }
-                        Switch(
+                        AppToggle(
                             checked = state.isAllowed,
                             onCheckedChange = onCheckedChange,
                             enabled = !state.isSaving,
                         )
                     }
                 }
-                state.loadFailed -> TextButton(onClick = onRetry) {
-                    Text(strings.retry)
+                state.loadFailed -> AppButton(onClick = onRetry, style = AppButtonStyle.Plain) {
+                    AppText(strings.retry)
                 }
-                else -> CircularProgressIndicator(
+                else -> AppActivityIndicator(
                     modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
                 )
             }
         }
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+    AppDivider(color = AppTheme.colors.fill)
 }
 
 @Composable
@@ -322,23 +318,23 @@ private fun EditSocialLinksField(
 ) {
     EditHeader(strings.editProfileSocialLinks, onBack, enabled = !isSaving)
     bioLinks.forEachIndexed { index, link ->
-        OutlinedTextField(
+        AppTextField(
             value = link,
             onValueChange = { value ->
                 onBioLinksChange(bioLinks.toMutableList().also { it[index] = value })
             },
             label = {
-                Text(strings.editProfileSocialLink.replace("%s", (index + 1).toString()))
+                AppText(strings.editProfileSocialLink.replace("%s", (index + 1).toString()))
             },
-            leadingIcon = { Icon(AppIcons.Link, contentDescription = null) },
+            leadingIcon = { AppIcon(AppIcons.Link, contentDescription = null) },
             trailingIcon = {
-                IconButton(
+                AppIconButton(
                     onClick = {
                         onBioLinksChange(bioLinks.filterIndexed { itemIndex, _ -> itemIndex != index })
                     },
                     enabled = !isSaving,
                 ) {
-                    Icon(AppIcons.Close, contentDescription = strings.editProfileRemoveSocialLink)
+                    AppIcon(AppIcons.Close, contentDescription = strings.editProfileRemoveSocialLink)
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -347,36 +343,37 @@ private fun EditSocialLinksField(
         )
         Spacer(Modifier.height(8.dp))
     }
-    OutlinedButton(
+    AppButton(
         onClick = { onBioLinksChange(bioLinks + "") },
         modifier = Modifier.fillMaxWidth(),
         enabled = !isSaving && bioLinks.size < MAX_PROFILE_BIO_LINKS,
+        style = AppButtonStyle.Gray,
     ) {
-        Icon(AppIcons.Add, contentDescription = null)
+        AppIcon(AppIcons.Add, contentDescription = null)
         Spacer(Modifier.width(8.dp))
-        Text(strings.editProfileAddSocialLink)
+        AppText(strings.editProfileAddSocialLink)
     }
     Spacer(Modifier.height(8.dp))
-    Text(
+    AppText(
         strings.editProfileSocialLinksHint,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AppTheme.type.caption1,
+        color = AppTheme.colors.secondaryLabel,
     )
     Spacer(Modifier.height(16.dp))
-    Button(
+    AppButton(
         onClick = onSave,
         modifier = Modifier.fillMaxWidth(),
         enabled = !isSaving,
+        style = AppButtonStyle.Prominent,
     ) {
         if (isSaving) {
-            CircularProgressIndicator(
+            AppActivityIndicator(
                 modifier = Modifier.size(18.dp),
                 color = LocalContentColor.current,
-                strokeWidth = 2.dp,
             )
             Spacer(Modifier.width(8.dp))
         }
-        Text(strings.editProfileSave)
+        AppText(strings.editProfileSave)
     }
 }
 
@@ -388,21 +385,21 @@ private fun ProfileFieldRow(label: String, value: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            AppText(label, style = AppTheme.type.body, color = AppTheme.colors.label)
+            AppText(value, style = AppTheme.type.subheadline, color = AppTheme.colors.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(AppIcons.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(-90f))
+        AppIcon(AppIcons.ExpandMore, null, tint = AppTheme.colors.secondaryLabel, modifier = Modifier.rotate(-90f))
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+    AppDivider(color = AppTheme.colors.fill)
 }
 
 @Composable
 internal fun EditHeader(title: String, onBack: () -> Unit, enabled: Boolean = true) {
     Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
-        IconButton(onClick = onBack, enabled = enabled) {
-            Icon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f))
+        AppIconButton(onClick = onBack, enabled = enabled) {
+            AppIcon(AppIcons.ExpandMore, "back", modifier = Modifier.rotate(90f))
         }
-        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        AppText(title, style = AppTheme.type.headline, color = AppTheme.colors.label)
     }
     Spacer(Modifier.height(12.dp))
 }
@@ -414,21 +411,21 @@ private fun EditStatusField(
     onSave: () -> Unit, onBack: () -> Unit,
 ) {
     EditHeader(strings.editProfileStatus, onBack)
-    OutlinedTextField(
+    AppTextField(
         value = statusDescription, onValueChange = { if (it.length <= 32) onStatusDescChange(it) },
-        label = { Text(strings.editProfileStatusDescription) },
+        label = { AppText(strings.editProfileStatusDescription) },
         modifier = Modifier.fillMaxWidth(), singleLine = true,
-        supportingText = { Text("${statusDescription.length}/32") },
+        supportingText = { AppText("${statusDescription.length}/32") },
     )
     Spacer(Modifier.height(10.dp))
     STATUS_OPTIONS.forEach { option ->
         Row(Modifier.fillMaxWidth().clickable { onStatusChange(option) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            RadioButton(selected = status == option, onClick = { onStatusChange(option) })
-            Text(option.toLocalizedString(), style = MaterialTheme.typography.bodyMedium)
+            AppRadioButton(selected = status == option, onClick = { onStatusChange(option) })
+            AppText(option.toLocalizedString(), style = AppTheme.type.subheadline)
         }
     }
     Spacer(Modifier.height(16.dp))
-    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text(strings.editProfileSave) }
+    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
 }
 
 @Composable
@@ -442,26 +439,26 @@ private fun EditLanguageField(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             languages.forEach { code ->
                 val name = LANGUAGE_OPTIONS.find { it.first == code }?.second ?: code
-                InputChip(selected = false, onClick = { onLanguagesChange(languages - code) }, label = { Text(name) },
-                    trailingIcon = { Icon(AppIcons.Close, "remove", modifier = Modifier.size(16.dp)) })
+                AppFilterChip(selected = false, onClick = { onLanguagesChange(languages - code) }, label = { AppText(name) },
+                    trailingIcon = { AppIcon(AppIcons.Close, "remove", modifier = Modifier.size(16.dp)) })
             }
         }
         Spacer(Modifier.height(8.dp))
     }
     if (languages.size < 3) {
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) { Text(strings.editProfileAddLanguage) }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AppButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Gray) { AppText(strings.editProfileAddLanguage) }
+            AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 LANGUAGE_OPTIONS.filter { it.first !in languages }.forEach { (code, name) ->
-                    DropdownMenuItem(text = { Text("$name (${code.uppercase()})") }, onClick = { onLanguagesChange(languages + code); expanded = false })
+                    AppMenuItem(text = { AppText("$name (${code.uppercase()})") }, onClick = { onLanguagesChange(languages + code); expanded = false })
                 }
             }
         }
     }
     Spacer(Modifier.height(8.dp))
-    Text(strings.editProfileLanguageHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    AppText(strings.editProfileLanguageHint, style = AppTheme.type.caption1, color = AppTheme.colors.secondaryLabel)
     Spacer(Modifier.height(16.dp))
-    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text(strings.editProfileSave) }
+    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
 }
 
 @Composable
@@ -470,11 +467,11 @@ private fun EditContentField(
     maxLength: Int, maxLines: Int, onSave: () -> Unit, onBack: () -> Unit,
 ) {
     EditHeader(title, onBack)
-    OutlinedTextField(
+    AppTextField(
         value = value, onValueChange = { if (it.length <= maxLength) onValueChange(it) },
         modifier = Modifier.fillMaxWidth(), maxLines = maxLines,
-        supportingText = { Text("${value.length}/$maxLength") },
+        supportingText = { AppText("${value.length}/$maxLength") },
     )
     Spacer(Modifier.height(16.dp))
-    Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text(strings.editProfileSave) }
+    AppButton(onClick = onSave, modifier = Modifier.fillMaxWidth(), style = AppButtonStyle.Prominent) { AppText(strings.editProfileSave) }
 }

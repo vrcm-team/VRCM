@@ -60,8 +60,8 @@ VRCM 是使用 Kotlin Multiplatform 与 Compose Multiplatform 开发的 VRChat �
 
 ## Compose 与资源
 
-- 使用 `MaterialTheme` 和现有主题定义，禁止无理由硬编码颜色、字体或形状。
-- 图标优先使用 `AppIcons`，不要创建重复图标实现。
+- 界面走 `presentation/designsystem` 的 Apple HIG 风格设计系统：颜色、字体、形状取 `AppTheme` / `AppShapes` 令牌，控件用 `App*` 组件；不要重新引入 `compose.material3` 组件，禁止无理由硬编码颜色、字体或形状。
+- 图标统一用 `AppIcons`（SF Symbols 风格的自绘符号，项目不再依赖 Material 图标库）；缺的符号按同一画法补进 `AppIcons`，不要创建重复图标实现。
 - 同级组件间距由共同父容器管理，子组件只负责自身内边距，避免同方向重复 padding。
 - 文本与页面内容应适配系统字体和窗口宽度，不要用固定高度掩盖溢出。
 - 稳定工具栏按钮、图片比例等控件可以有明确尺寸，但必须承担清晰布局契约且不造成遮挡。

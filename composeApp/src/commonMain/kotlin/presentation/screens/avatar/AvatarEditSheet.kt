@@ -12,29 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +26,24 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppPopUpButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegment
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegmentedRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheet
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetValue
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.galleryImagePickerType
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PreparedImage
@@ -68,7 +63,6 @@ import kotlinx.coroutines.launch
 private const val AvatarNameMaxLength = 64
 private const val AvatarDescriptionMaxLength = 256
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AvatarEditSheet(
     avatar: AvatarProfileVo,
@@ -105,9 +99,9 @@ internal fun AvatarEditSheet(
     val isBusy = isRemoteUpdateBusy || isPreparingCover || isPreparingGallery ||
         impostorState.isSubmitting || impostorState.isLoadingQueueEstimate
     val latestIsBusy = rememberUpdatedState(isBusy)
-    val sheetState = rememberModalBottomSheetState(
+    val sheetState = rememberAppSheetState(
         confirmValueChange = { targetValue ->
-            targetValue != SheetValue.Hidden || !latestIsBusy.value
+            targetValue != AppSheetValue.Hidden || !latestIsBusy.value
         },
     )
     val formNestedScrollConnection = rememberConsumeRemainingUpwardScrollConnection()
@@ -198,7 +192,7 @@ internal fun AvatarEditSheet(
         }
     }
 
-    ModalBottomSheet(
+    AppSheet(
         onDismissRequest = { if (!isBusy) onDismiss() },
         sheetState = sheetState,
         sheetGesturesEnabled = !isBusy,
@@ -212,48 +206,48 @@ internal fun AvatarEditSheet(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            AppText(
                 text = locale.avatarEditTitle,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.type.title2,
+                color = AppTheme.colors.tint,
             )
 
-            OutlinedTextField(
+            AppTextField(
                 value = name,
                 onValueChange = { if (it.length <= AvatarNameMaxLength) name = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(locale.avatarEditName) },
-                supportingText = { Text("${name.length}/$AvatarNameMaxLength") },
+                label = { AppText(locale.avatarEditName) },
+                supportingText = { AppText("${name.length}/$AvatarNameMaxLength") },
                 singleLine = true,
                 enabled = !isBusy,
             )
-            OutlinedTextField(
+            AppTextField(
                 value = description,
                 onValueChange = {
                     if (it.length <= AvatarDescriptionMaxLength) description = it
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(locale.avatarEditDescription) },
+                label = { AppText(locale.avatarEditDescription) },
                 supportingText = {
-                    Text("${description.length}/$AvatarDescriptionMaxLength")
+                    AppText("${description.length}/$AvatarDescriptionMaxLength")
                 },
                 minLines = 3,
                 maxLines = 6,
                 enabled = !isBusy,
             )
 
-            HorizontalDivider()
+            AppDivider()
 
-            Text(
+            AppText(
                 text = locale.avatarEditContentTags,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
             )
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 AvatarContentTag.entries.forEach { tag ->
-                    FilterChip(
+                    AppFilterChip(
                         selected = tag.apiValue in contentTags,
                         onClick = {
                             contentTags = if (tag.apiValue in contentTags) {
@@ -263,14 +257,14 @@ internal fun AvatarEditSheet(
                             }
                         },
                         enabled = !state.isSavingMetadata,
-                        label = { Text(tag.localizedLabel(locale)) },
+                        label = { AppText(tag.localizedLabel(locale)) },
                     )
                 }
             }
 
-            Text(
+            AppText(
                 text = locale.avatarEditStyles,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
             )
             when (val styles = state.styles) {
                 AvatarStylesLoadState.NotLoaded,
@@ -278,8 +272,8 @@ internal fun AvatarEditSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(locale.avatarEditStylesLoading)
+                    AppActivityIndicator(modifier = Modifier.size(18.dp))
+                    AppText(locale.avatarEditStylesLoading)
                 }
                 AvatarStylesLoadState.Empty -> StyleLoadMessage(
                     message = locale.avatarEditStylesEmpty,
@@ -315,18 +309,18 @@ internal fun AvatarEditSheet(
                 }
             }
 
-            OutlinedTextField(
+            AppTextField(
                 value = authorTags,
                 onValueChange = { authorTags = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(locale.avatarEditAuthorTags) },
-                supportingText = { Text(locale.avatarEditAuthorTagsHint) },
+                label = { AppText(locale.avatarEditAuthorTags) },
+                supportingText = { AppText(locale.avatarEditAuthorTagsHint) },
                 minLines = 2,
                 maxLines = 5,
                 enabled = !state.isSavingMetadata,
             )
 
-            Button(
+            AppButton(
                 onClick = {
                     onSaveMetadata(
                         AvatarMetadataDraft(
@@ -341,16 +335,16 @@ internal fun AvatarEditSheet(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = name.isNotBlank() && !isBusy,
+                style = AppButtonStyle.Prominent,
             ) {
                 if (state.isSavingMetadata) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(
+                AppText(
                     if (state.isSavingMetadata) {
                         locale.avatarEditSavingMetadata
                     } else {
@@ -359,19 +353,19 @@ internal fun AvatarEditSheet(
                 )
             }
 
-            HorizontalDivider()
+            AppDivider()
 
             state.publication?.let { currentPublication ->
-                Text(
+                AppText(
                     text = locale.avatarEditPublication,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.type.headline,
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                AppSegmentedRow(modifier = Modifier.fillMaxWidth()) {
                     AvatarPublicationStatus.entries.forEachIndexed { index, publication ->
-                        SegmentedButton(
+                        AppSegment(
                             selected = publication == currentPublication,
                             onClick = {
-                                if (publication == currentPublication) return@SegmentedButton
+                                if (publication == currentPublication) return@AppSegment
                                 if (publication == AvatarPublicationStatus.Public) {
                                     showPublicConfirmation = true
                                 } else {
@@ -379,12 +373,8 @@ internal fun AvatarEditSheet(
                                 }
                             },
                             enabled = !isBusy,
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index,
-                                AvatarPublicationStatus.entries.size,
-                            ),
                             label = {
-                                Text(
+                                AppText(
                                     when (publication) {
                                         AvatarPublicationStatus.Private ->
                                             locale.avatarEditPublicationPrivate
@@ -401,89 +391,88 @@ internal fun AvatarEditSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
                         )
-                        Text(
+                        AppText(
                             text = locale.avatarEditUpdatingPublication,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.type.caption1,
+                            color = AppTheme.colors.secondaryLabel,
                         )
                     }
                 }
 
-                HorizontalDivider()
+                AppDivider()
             }
 
-            Text(
+            AppText(
                 text = locale.avatarEditCover,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
             )
-            Text(
+            AppText(
                 text = locale.avatarEditCoverHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
 
-            OutlinedButton(
+            AppButton(
                 onClick = coverPicker::launch,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isBusy,
+                style = AppButtonStyle.Gray,
             ) {
                 if (isPreparingCover) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(AppIcons.Publish, contentDescription = null, Modifier.size(18.dp))
+                    AppIcon(AppIcons.Publish, contentDescription = null, Modifier.size(18.dp))
                 }
                 Spacer(Modifier.size(8.dp))
-                Text(locale.avatarEditChooseCover)
+                AppText(locale.avatarEditChooseCover)
             }
 
             coverError?.let { error ->
-                Text(
+                AppText(
                     text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.destructive,
                 )
             }
 
-            HorizontalDivider()
-            Text(
+            AppDivider()
+            AppText(
                 text = locale.avatarGalleryTitle,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
             )
-            Text(
+            AppText(
                 text = locale.avatarGalleryHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
-            OutlinedButton(
+            AppButton(
                 onClick = galleryPicker::launch,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isBusy,
+                style = AppButtonStyle.Gray,
             ) {
                 if (isPreparingGallery) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Icon(AppIcons.Publish, contentDescription = null, Modifier.size(18.dp))
+                    AppIcon(AppIcons.Publish, contentDescription = null, Modifier.size(18.dp))
                 }
                 Spacer(Modifier.size(8.dp))
-                Text(locale.avatarGalleryChooseImage)
+                AppText(locale.avatarGalleryChooseImage)
             }
             galleryError?.let { error ->
-                Text(
+                AppText(
                     text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.destructive,
                 )
             }
 
@@ -493,37 +482,39 @@ internal fun AvatarEditSheet(
                 onEnqueue = onEnqueueImpostor,
             )
 
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End),
                 enabled = !isBusy,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(locale.cancel)
+                AppText(locale.cancel)
             }
             Spacer(Modifier.height(12.dp))
         }
     }
 
     if (showPublicConfirmation) {
-        AlertDialog(
+        AppAlert(
             onDismissRequest = { showPublicConfirmation = false },
-            title = { Text(locale.avatarEditPublishConfirmTitle) },
-            text = { Text(locale.avatarEditPublishConfirmMessage) },
+            title = { AppText(locale.avatarEditPublishConfirmTitle) },
+            text = { AppText(locale.avatarEditPublishConfirmMessage) },
             confirmButton = {
-                TextButton(
+                AppButton(
                     onClick = {
                         showPublicConfirmation = false
                         onUpdatePublication(AvatarPublicationStatus.Public)
                     },
                     enabled = !isBusy &&
                         state.publication == AvatarPublicationStatus.Private,
+                    style = AppButtonStyle.Plain,
                 ) {
-                    Text(locale.avatarEditPublishConfirmAction)
+                    AppText(locale.avatarEditPublishConfirmAction)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPublicConfirmation = false }) {
-                    Text(locale.cancel)
+                AppButton(onClick = { showPublicConfirmation = false }, style = AppButtonStyle.Plain) {
+                    AppText(locale.cancel)
                 }
             },
         )
@@ -541,75 +532,75 @@ private fun AvatarImpostorSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
+        AppText(
             text = locale.avatarImpostorTitle,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.type.headline,
         )
-        Text(
+        AppText(
             text = if (state.hasImpostor) {
                 locale.avatarImpostorAvailable
             } else {
                 locale.avatarImpostorUnavailable
             },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.subheadline,
+            color = AppTheme.colors.secondaryLabel,
         )
-        Text(
+        AppText(
             text = locale.avatarImpostorTaskStatus,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.type.subheadlineEmphasized,
         )
-        Text(
+        AppText(
             text = state.taskState?.localizedImpostorState(locale)
                 ?: locale.avatarImpostorTaskEmpty,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.subheadline,
+            color = AppTheme.colors.secondaryLabel,
         )
 
         when {
-            state.isLoadingQueueEstimate -> Text(
+            state.isLoadingQueueEstimate -> AppText(
                 text = locale.avatarImpostorQueueEstimateLoading,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
-            state.estimatedQueueSeconds != null -> Text(
+            state.estimatedQueueSeconds != null -> AppText(
                 text = locale.avatarImpostorQueueEstimateMinutes.replace(
                     "%minutes%",
                     ((state.estimatedQueueSeconds + 59) / 60).coerceAtLeast(1).toString(),
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
-            state.queueEstimateFailed -> Text(
+            state.queueEstimateFailed -> AppText(
                 text = locale.avatarImpostorQueueEstimateUnavailable,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.secondaryLabel,
             )
         }
 
         state.failure?.let { failure ->
-            Text(
+            AppText(
                 text = failure.localizedMessage(locale),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.destructive,
             )
         }
 
-        OutlinedButton(
+        AppButton(
             onClick = onEnqueue,
             modifier = Modifier.fillMaxWidth(),
             enabled = state.canBuild && !localPreparationInProgress,
+            style = AppButtonStyle.Gray,
         ) {
             if (state.isSubmitting) {
-                CircularProgressIndicator(
+                AppActivityIndicator(
                     modifier = Modifier.size(18.dp),
                     color = LocalContentColor.current,
-                    strokeWidth = 2.dp,
                 )
             } else {
-                Icon(AppIcons.Update, contentDescription = null, Modifier.size(18.dp))
+                AppIcon(AppIcons.Refresh, contentDescription = null, Modifier.size(18.dp))
             }
             Spacer(Modifier.size(8.dp))
-            Text(
+            AppText(
                 when {
                     state.isSubmitting -> locale.avatarImpostorSubmitting
                     state.hasImpostor -> locale.avatarImpostorRebuild
@@ -654,18 +645,17 @@ private fun StyleLoadMessage(
     onRetry: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
+        AppText(
             text = message,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.secondaryLabel,
         )
-        TextButton(onClick = onRetry, enabled = enabled) {
-            Text(retryLabel)
+        AppButton(onClick = onRetry, enabled = enabled, style = AppButtonStyle.Plain) {
+            AppText(retryLabel)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AvatarStyleDropdown(
     label: String,
@@ -687,41 +677,29 @@ private fun AvatarStyleDropdown(
             .orEmpty()
     }
 
-    ExposedDropdownMenuBox(
+    AppPopUpButton(
+        value = selectedText,
         expanded = expanded,
         onExpandedChange = { if (enabled) expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+        label = label,
+        enabled = enabled,
     ) {
-        OutlinedTextField(
-            value = selectedText,
-            onValueChange = {},
-            modifier = Modifier.fillMaxWidth().menuAnchor(
-                ExposedDropdownMenuAnchorType.PrimaryNotEditable
-            ),
-            label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            readOnly = true,
-            enabled = enabled,
+        AppMenuItem(
+            text = { AppText(noneLabel) },
+            onClick = {
+                onChoice(AvatarStyleChoice.Clear)
+                expanded = false
+            },
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            DropdownMenuItem(
-                text = { Text(noneLabel) },
+        options.forEach { style ->
+            AppMenuItem(
+                text = { AppText(style.styleName) },
                 onClick = {
-                    onChoice(AvatarStyleChoice.Clear)
+                    onChoice(AvatarStyleChoice.Selected(style.id))
                     expanded = false
                 },
             )
-            options.forEach { style ->
-                DropdownMenuItem(
-                    text = { Text(style.styleName) },
-                    onClick = {
-                        onChoice(AvatarStyleChoice.Selected(style.id))
-                        expanded = false
-                    },
-                )
-            }
         }
     }
 }

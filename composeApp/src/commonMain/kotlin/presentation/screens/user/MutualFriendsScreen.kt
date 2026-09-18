@@ -6,15 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -26,6 +17,15 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -43,8 +43,7 @@ data class MutualFriendsScreen(
     private val userName: String,
 ) : AppDetailRoute {
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: MutualFriendsScreenModel = koinViewModel()
@@ -81,31 +80,26 @@ data class MutualFriendsScreen(
             model.load(userId)
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
                     title = {
-                        Text(
+                        AppText(
                             text = titleText,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                tint = MaterialTheme.colorScheme.primary,
                                 contentDescription = "back"
                             )
                         }
                     }
                 )
             },
-            contentColor = MaterialTheme.colorScheme.primary
         ) { paddingValues ->
             Box(
                 modifier = Modifier
@@ -114,31 +108,32 @@ data class MutualFriendsScreen(
             ) {
                 when (contentState) {
                     MutualFriendsContentState.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        AppActivityIndicator(modifier = Modifier.align(Alignment.Center))
                     }
 
                     MutualFriendsContentState.Error -> {
                         Column(modifier = Modifier.align(Alignment.Center)) {
-                            Text(
+                            AppText(
                                 text = strings.mutualFriendsLoadFailed,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
+                                style = AppTheme.type.subheadline,
+                                color = AppTheme.colors.destructive
                             )
-                            TextButton(
+                            AppButton(
                                 modifier = Modifier.align(Alignment.CenterHorizontally),
-                                onClick = { model.load(userId) }
+                                onClick = { model.load(userId) },
+                                style = AppButtonStyle.Plain,
                             ) {
-                                Text(strings.retry)
+                                AppText(strings.retry)
                             }
                         }
                     }
 
                     MutualFriendsContentState.Empty -> {
-                        Text(
+                        AppText(
                             modifier = Modifier.align(Alignment.Center),
                             text = strings.mutualFriendsEmpty.replace("%s", displayName),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline
+                            style = AppTheme.type.subheadline,
+                            color = AppTheme.colors.tertiaryLabel
                         )
                     }
 

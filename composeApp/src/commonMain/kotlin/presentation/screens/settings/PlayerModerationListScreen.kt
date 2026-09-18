@@ -18,24 +18,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,6 +36,25 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationData
 import io.github.vrcmteam.vrcm.network.api.playermoderation.data.PlayerModerationType
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppListItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenu
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppRadioButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.BlockBackNavigation
@@ -75,7 +76,6 @@ object PlayerModerationListScreen : AppDetailRoute {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlayerModerationScreenContent(
     model: PlayerModerationListScreenModel = koinViewModel(),
@@ -148,41 +148,41 @@ internal fun PlayerModerationScreenContent(
         )
     }
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(strings.playerModerationTitle) },
+            AppNavBar(
+                title = { AppText(strings.playerModerationTitle) },
                 navigationIcon = {
-                    IconButton(
+                    AppIconButton(
                         enabled = !state.isClearing,
                         onClick = { navigator.pop() },
                     ) {
-                        Icon(
+                        AppIcon(
                             imageVector = AppIcons.ArrowBackIosNew,
                             contentDescription = strings.notificationBack,
                         )
                     }
                 },
                 actions = {
-                    IconButton(
+                    AppIconButton(
                         onClick = { showCleanupDialog = true },
                         enabled = state.availableTypes.isNotEmpty() &&
                             !state.isLoading &&
                             !state.isClearing,
                     ) {
-                        Icon(
-                            imageVector = AppIcons.Clear,
+                        AppIcon(
+                            imageVector = AppIcons.Delete,
                             contentDescription = strings.playerModerationCleanupTitle,
                         )
                     }
-                    IconButton(
+                    AppIconButton(
                         onClick = model::refresh,
                         enabled = state.isSessionAvailable &&
                             !state.isLoading &&
                             !state.isClearing,
                     ) {
-                        Icon(
-                            imageVector = AppIcons.Update,
+                        AppIcon(
+                            imageVector = AppIcons.Refresh,
                             contentDescription = strings.playerModerationRefresh,
                         )
                     }
@@ -231,14 +231,14 @@ private fun PlayerModerationContent(
             modifier = Modifier.fillMaxSize().padding(contentPadding),
             contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp))
+            AppActivityIndicator(modifier = Modifier.size(32.dp))
         }
 
         state.loadFailed && state.records.isEmpty() -> MessageState(
             message = strings.playerModerationLoadFailed,
             contentPadding = contentPadding,
             action = {
-                TextButton(onClick = onRetry) { Text(strings.retry) }
+                AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
             },
         )
 
@@ -274,17 +274,17 @@ private fun PlayerModerationLoadedContent(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
+                        AppText(
                             text = strings.playerModerationLoadFailed,
                             modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                            style = AppTheme.type.caption1,
+                            color = AppTheme.colors.destructive,
                         )
-                        TextButton(onClick = onRetry) { Text(strings.retry) }
+                        AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
                     }
                 }
                 if (state.isLoading && state.hasLoaded) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    AppProgressBar(modifier = Modifier.fillMaxWidth())
                 }
                 if (state.isClearing) {
                     PlayerModerationCleanupProgress(state)
@@ -297,10 +297,10 @@ private fun PlayerModerationLoadedContent(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
+                AppText(
                     text = strings.playerModerationEmpty,
                     modifier = Modifier.padding(24.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppTheme.colors.secondaryLabel,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -311,23 +311,23 @@ private fun PlayerModerationLoadedContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
-                    FilterChip(
+                    AppFilterChip(
                         selected = state.selectedFilter == null,
                         onClick = { onSelectFilter(null) },
                         enabled = !state.isClearing,
-                        label = { Text(strings.playerModerationFilterAll) },
+                        label = { AppText(strings.playerModerationFilterAll) },
                     )
                 }
                 items(state.availableFilterTypes) { type ->
-                    FilterChip(
+                    AppFilterChip(
                         selected = state.selectedFilter == type,
                         onClick = { onSelectFilter(type) },
                         enabled = !state.isClearing,
-                        label = { Text(strings.playerModerationTypeLabel(type)) },
+                        label = { AppText(strings.playerModerationTypeLabel(type)) },
                     )
                 }
             }
-            HorizontalDivider()
+            AppDivider()
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentPadding = PaddingValues(vertical = 4.dp),
@@ -337,7 +337,7 @@ private fun PlayerModerationLoadedContent(
                     key = { _, item -> item.key },
                 ) { index, item ->
                     if (index > 0) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        AppDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     }
                     PlayerModerationRecordItem(
                         record = item.record,
@@ -361,22 +361,22 @@ private fun PlayerModerationCleanupDialog(
     val selectedOption = state.availableTypes.firstOrNull {
         it.type == state.selectedCleanupType
     }
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        title = { Text(strings.playerModerationCleanupConfirmTitle) },
+        title = { AppText(strings.playerModerationCleanupConfirmTitle) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
+                AppText(
                     text = strings.playerModerationCleanupDescription,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.subheadline,
+                    color = AppTheme.colors.secondaryLabel,
                 )
-                Text(
+                AppText(
                     text = strings.playerModerationCleanupSelectType,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppTheme.type.subheadlineEmphasized,
                 )
                 state.availableTypes.forEach { option ->
                     val selected = option.type == state.selectedCleanupType
@@ -390,50 +390,51 @@ private fun PlayerModerationCleanupDialog(
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(
+                        AppRadioButton(
                             selected = selected,
                             onClick = null,
                         )
                         Spacer(Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
+                            AppText(
                                 text = option.type.localizedName(strings),
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = AppTheme.type.body,
                             )
-                            Text(
+                            AppText(
                                 text = strings.playerModerationCleanupTargetCount
                                     .replace("%count%", option.targetCount.toString()),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = AppTheme.type.caption1,
+                                color = AppTheme.colors.secondaryLabel,
                             )
                         }
                     }
                 }
                 selectedOption?.let { option ->
-                    Text(
+                    AppText(
                         text = strings.playerModerationCleanupConfirmMessage
                             .replace("%type%", option.type.localizedName(strings))
                             .replace("%count%", option.targetCount.toString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
+                        style = AppTheme.type.subheadline,
+                        color = AppTheme.colors.destructive,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 enabled = selectedOption != null,
                 onClick = onConfirm,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(
+                AppText(
                     text = strings.playerModerationCleanupAction,
-                    color = MaterialTheme.colorScheme.error,
+                    color = AppTheme.colors.destructive,
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(strings.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )
@@ -442,14 +443,14 @@ private fun PlayerModerationCleanupDialog(
 @Composable
 private fun PlayerModerationCleanupProgress(state: PlayerModerationState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        LinearProgressIndicator(
+        AppProgressBar(
             progress = {
                 if (state.totalCount == 0) 0f
                 else state.processedCount.toFloat() / state.totalCount
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(
+        AppText(
             text = if (state.totalCount == 0) {
                 strings.playerModerationCleanupPreparing
             } else {
@@ -457,8 +458,8 @@ private fun PlayerModerationCleanupProgress(state: PlayerModerationState) {
                     .replace("%processed%", state.processedCount.toString())
                     .replace("%total%", state.totalCount.toString())
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.secondaryLabel,
         )
     }
 }
@@ -469,40 +470,40 @@ private fun CleanupResultMessage(result: PlayerModerationCleanupResult) {
         PlayerModerationCleanupResultKind.Success -> Triple(
             strings.playerModerationCleanupSuccess
                 .replace("%removed%", result.removedCount.toString()),
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
+            AppTheme.colors.tintSoft,
+            AppTheme.colors.onTintSoft,
         )
 
         PlayerModerationCleanupResultKind.NoRecords -> Triple(
             strings.playerModerationCleanupNoRecords,
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant,
+            AppTheme.colors.fill,
+            AppTheme.colors.secondaryLabel,
         )
 
         PlayerModerationCleanupResultKind.PartialFailure -> Triple(
             strings.playerModerationCleanupPartialFailure
                 .replace("%removed%", result.removedCount.toString())
                 .replace("%failed%", result.failedCount.toString()),
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
+            AppTheme.colors.destructiveSoft,
+            AppTheme.colors.onDestructiveSoft,
         )
 
         PlayerModerationCleanupResultKind.Failure -> Triple(
             strings.playerModerationCleanupFailure,
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
+            AppTheme.colors.destructiveSoft,
+            AppTheme.colors.onDestructiveSoft,
         )
     }
-    Surface(
+    AppSurface(
         modifier = Modifier.fillMaxWidth(),
         color = containerColor,
         contentColor = contentColor,
-        shape = MaterialTheme.shapes.small,
+        shape = AppShapes.s,
     ) {
-        Text(
+        AppText(
             text = message,
             modifier = Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.type.subheadline,
         )
     }
 }
@@ -513,34 +514,34 @@ private fun PlayerModerationRecordCleanupDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = AppIcons.Delete,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colors.destructive,
             )
         },
-        title = { Text(strings.playerModerationRemoveConfirmTitle) },
+        title = { AppText(strings.playerModerationRemoveConfirmTitle) },
         text = {
-            Text(
+            AppText(
                 strings.playerModerationRemoveConfirmMessage
                     .replace("%player%", record.targetLabel(strings))
                     .replace("%type%", strings.playerModerationTypeLabel(record.type)),
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
+            AppButton(onClick = onConfirm, style = AppButtonStyle.Plain) {
+                AppText(
                     text = strings.playerModerationRemoveSetting,
-                    color = MaterialTheme.colorScheme.error,
+                    color = AppTheme.colors.destructive,
                 )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(strings.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )
@@ -565,9 +566,9 @@ private fun PlayerModerationRecordItem(
         if (!enabled) menuExpanded = false
     }
 
-    ListItem(
+    AppListItem(
         headlineContent = {
-            Text(
+            AppText(
                 text = target,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -575,37 +576,37 @@ private fun PlayerModerationRecordItem(
         },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
+                AppText(
                     text = strings.playerModerationTypeLabel(record.type),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppTheme.colors.secondaryLabel,
                 )
-                Text(
+                AppText(
                     text = created,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall,
+                    color = AppTheme.colors.secondaryLabel,
+                    style = AppTheme.type.caption2Emphasized,
                 )
             }
         },
         trailingContent = if (canManage) {
             {
                 Box {
-                    IconButton(
+                    AppIconButton(
                         enabled = enabled,
                         onClick = { menuExpanded = true },
                     ) {
-                        Icon(
-                            imageVector = AppIcons.MoreVert,
+                        AppIcon(
+                            imageVector = AppIcons.More,
                             contentDescription = strings.playerModerationPlayerActions,
                         )
                     }
-                    DropdownMenu(
+                    AppMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false },
                     ) {
-                        DropdownMenuItem(
-                            text = { Text(strings.playerModerationManagePlayer) },
+                        AppMenuItem(
+                            text = { AppText(strings.playerModerationManagePlayer) },
                             leadingIcon = {
-                                Icon(
+                                AppIcon(
                                     imageVector = AppIcons.Person,
                                     contentDescription = null,
                                 )
@@ -616,18 +617,18 @@ private fun PlayerModerationRecordItem(
                             },
                         )
                         if (canClear) {
-                            DropdownMenuItem(
+                            AppMenuItem(
                                 text = {
-                                    Text(
+                                    AppText(
                                         text = strings.playerModerationRemoveSetting,
-                                        color = MaterialTheme.colorScheme.error,
+                                        color = AppTheme.colors.destructive,
                                     )
                                 },
                                 leadingIcon = {
-                                    Icon(
+                                    AppIcon(
                                         imageVector = AppIcons.Delete,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
+                                        tint = AppTheme.colors.destructive,
                                     )
                                 },
                                 onClick = {
@@ -656,9 +657,9 @@ private fun MessageState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        Text(
+        AppText(
             text = message,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AppTheme.colors.secondaryLabel,
             textAlign = TextAlign.Center,
         )
         action?.invoke()

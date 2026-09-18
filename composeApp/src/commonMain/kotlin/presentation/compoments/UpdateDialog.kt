@@ -4,13 +4,13 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.AppPlatformType
 import io.github.vrcmteam.vrcm.getAppPlatform
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -40,14 +40,14 @@ fun UpdateDialog(
                 -> null
             } ?: version.htmlUrl
         }
-        AlertDialog(
+        AppAlert(
             icon = {
-                Icon(AppIcons.Update, contentDescription = "AlertDialogIcon")
+                AppIcon(AppIcons.Refresh, contentDescription = "AlertDialogIcon")
             },
             title = {
-                Text(
+                AppText(
                     text = strings.startupDialogTitle,
-                    style = MaterialTheme.typography.titleLarge
+                    style = AppTheme.type.title2
                 )
             },
             text = {
@@ -57,28 +57,44 @@ fun UpdateDialog(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
+                    AppText(
                         text = "Ver.${version.tagName}",
-                        style = MaterialTheme.typography.labelMedium
+                        style = AppTheme.type.caption1Emphasized
                     )
                     Box(
                         modifier = Modifier
+                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
                             .horizontalScroll(rememberScrollState())
                     ) {
-                        Text(
+                        AppText(
                             text = version.body
                         )
+                    }
+                    if (onRememberVersion != null) {
+                        // 版本更新提示单选框
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            AppCheckbox(
+                                checked = rememberVersionChecked,
+                                enabled = !isUpdating,
+                                onCheckedChange = {
+                                    rememberVersionChecked = it
+                                    // 记住或清除此版本更新提示
+                                    val versionTagName = if (rememberVersionChecked) version.tagName else null
+                                    onRememberVersion(versionTagName)
+                                }
+                            )
+                            AppText(text = strings.startupDialogRememberVersion)
+                        }
                     }
                 }
             },
             onDismissRequest = { if (!isUpdating) onDismissRequest() },
             confirmButton = {
-                FilledTonalButton(
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
+                AppButton(
                     enabled = !isUpdating,
                     onClick = {
                         val hasApk = version.downloadUrl.any { it.endsWith(".apk", ignoreCase = true) }
@@ -101,53 +117,34 @@ fun UpdateDialog(
                                 updateProgress = null
                             }
                         }
-                    }
+                    },
+                    style = AppButtonStyle.Tinted,
                 ) {
                     if (isUpdating) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
                         )
                         updateProgress?.let { progress ->
                             Spacer(Modifier.width(8.dp))
-                            Text("${(progress * 100).toInt()}%")
+                            AppText("${(progress * 100).toInt()}%")
                         }
                     } else {
-                        Text(strings.startupDialogUpdate)
+                        AppText(strings.startupDialogUpdate)
                     }
                 }
-                FilledTonalButton(
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    ),
+            },
+            dismissButton = {
+                AppButton(
                     enabled = !isUpdating,
                     onClick = {
                         // 关闭弹窗
                         onDismissRequest()
-                    }
+                    },
+                    style = AppButtonStyle.Plain,
                 ) {
-                    Text(strings.startupDialogIgnore)
+                    AppText(strings.startupDialogIgnore)
                 }
-                if (onRememberVersion == null) return@AlertDialog
-                // 版本更新提示单选框
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Checkbox(
-                        checked = rememberVersionChecked,
-                        enabled = !isUpdating,
-                        onCheckedChange = {
-                            rememberVersionChecked = it
-                            // 记住或清除此版本更新提示
-                            val versionTagName = if (rememberVersionChecked) version.tagName else null
-                            onRememberVersion(versionTagName)
-                        }
-                    )
-                    Text(text = strings.startupDialogRememberVersion)
-                }
-            }
+            },
         )
     }
 }

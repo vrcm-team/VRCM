@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.runtime.Composable
@@ -43,6 +39,10 @@ import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDe
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultScreenTransition
 import io.github.vrcmteam.vrcm.presentation.animations.ParentClip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppVerticalDivider
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
@@ -104,9 +104,9 @@ fun SharedTransitionScreen(
                     ),
                 contentAlignment = Center,
             ) {
-                VerticalDivider(
+                AppVerticalDivider(
                     modifier = Modifier.fillMaxHeight(),
-                    color = MaterialTheme.colorScheme.outlineVariant,
+                    color = AppTheme.colors.separator,
                 )
             }
         },
@@ -160,24 +160,24 @@ private fun EmptyDetailPane() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        Icon(
+        AppIcon(
             imageVector = AppIcons.Mirror,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.32f),
+            tint = AppTheme.colors.secondaryLabel.copy(alpha = 0.32f),
         )
-        Text(
+        AppText(
             text = locale.widePaneEmptyTitle,
             modifier = Modifier.widthIn(max = 360.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleMedium,
+            color = AppTheme.colors.secondaryLabel,
+            style = AppTheme.type.headline,
             textAlign = TextAlign.Center,
         )
-        Text(
+        AppText(
             text = locale.widePaneEmptyHint,
             modifier = Modifier.widthIn(max = 360.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            style = MaterialTheme.typography.bodyMedium,
+            color = AppTheme.colors.secondaryLabel.copy(alpha = 0.72f),
+            style = AppTheme.type.subheadline,
             textAlign = TextAlign.Center,
         )
     }

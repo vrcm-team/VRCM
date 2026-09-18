@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.core.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +23,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Precision
 import coil3.size.Size
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import org.koin.compose.koinInject
 
 internal fun createAImageRequest(
@@ -51,8 +51,8 @@ internal fun createAImageRequest(
 @Composable
 fun Modifier.shimmerEffect(
     isLoading: Boolean = true,
-    shimmerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-    backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+    shimmerColor: Color = AppTheme.colors.fill,
+    backgroundColor: Color = AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.3f),
     shape: Shape = RectangleShape
 ): Modifier = composed {
     if (isLoading) {
@@ -95,7 +95,7 @@ fun Modifier.shimmerEffect(
 fun AImage(
     modifier: Modifier = Modifier,
     imageData: Any?,
-    color: Color = MaterialTheme.colorScheme.outlineVariant,
+    color: Color = AppTheme.colors.separator,
     contentDescription: String? = null,
     error: Painter? = remember(color) { ColorPainter(color) },
     placeholder: Painter? = remember(color) { ColorPainter(color) },
@@ -121,8 +121,8 @@ fun AImage(
         }
 
     // 选择合适的闪烁动画颜色
-    val background = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-    val shimmer =  MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    val background = AppTheme.colors.fill
+    val shimmer =  AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.5f)
     
     AsyncImage(
         modifier = modifier.shimmerEffect(

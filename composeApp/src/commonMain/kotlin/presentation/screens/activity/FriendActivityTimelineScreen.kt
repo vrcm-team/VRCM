@@ -18,17 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,6 +31,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -67,21 +68,20 @@ import kotlin.time.Instant
 
 @Serializable
 object FriendActivityTimelineScreen : AppDetailRoute {
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: FriendActivityTimelineModel = koinViewModel()
         val state by model.state.collectAsState()
         val filter by model.filter.collectAsState()
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text(strings.friendActivityTimelineTitle) },
+                AppNavBar(
+                    title = { AppText(strings.friendActivityTimelineTitle) },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(
                                 imageVector = AppIcons.ArrowBackIosNew,
                                 contentDescription = strings.friendActivityBack,
                             )
@@ -241,7 +241,7 @@ private fun ActivityTimelineList(
                     if (includeControls) Modifier.padding(vertical = 48.dp)
                     else Modifier.fillParentMaxHeight(),
                 ) {
-                    CircularProgressIndicator()
+                    AppActivityIndicator()
                 }
             }
             FriendActivityTimelineState.Error -> item(key = "activity-error") {
@@ -250,8 +250,8 @@ private fun ActivityTimelineList(
                     else Modifier.fillParentMaxHeight(),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(strings.friendActivityTimelineError)
-                        TextButton(onClick = onRetry) { Text(strings.retry) }
+                        AppText(strings.friendActivityTimelineError)
+                        AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
                     }
                 }
             }
@@ -261,13 +261,13 @@ private fun ActivityTimelineList(
                         if (includeControls) Modifier.padding(vertical = 48.dp)
                         else Modifier.fillParentMaxHeight(),
                     ) {
-                        Text(strings.friendActivityTimelineEmpty)
+                        AppText(strings.friendActivityTimelineEmpty)
                     }
                 }
             } else {
                 state.events.groupBy(FriendActivityEvent::activityDate).forEach { (date, dateEvents) ->
                     item(key = "date:$date") {
-                        Text(
+                        AppText(
                             text = date,
                             modifier = Modifier.padding(
                                 start = 16.dp,
@@ -275,8 +275,8 @@ private fun ActivityTimelineList(
                                 end = 16.dp,
                                 bottom = 2.dp,
                             ),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = AppTheme.type.subheadlineEmphasized,
+                            color = AppTheme.colors.tint,
                         )
                     }
                     itemsIndexed(dateEvents, key = { _, event -> event.id }) { _, event ->
@@ -298,7 +298,7 @@ private fun ActivityTimelineList(
                             Modifier.fillMaxWidth().padding(16.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                            AppActivityIndicator(Modifier.size(24.dp))
                         }
                     }
                 } else if (state.loadMoreError) {
@@ -308,13 +308,13 @@ private fun ActivityTimelineList(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(
+                            AppText(
                                 strings.friendActivityLoadMoreError,
                                 Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
+                                color = AppTheme.colors.destructive,
+                                style = AppTheme.type.caption1,
                             )
-                            TextButton(onClick = onRetryLoadMore) { Text(strings.retry) }
+                            AppButton(onClick = onRetryLoadMore, style = AppButtonStyle.Plain) { AppText(strings.retry) }
                         }
                     }
                 }
@@ -334,10 +334,10 @@ private fun ActivityTimelineFilters(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(FriendActivityTimelineFilter.entries, key = { it.name }) { option ->
-            FilterChip(
+            AppFilterChip(
                 selected = option == filter,
                 onClick = { onFilterSelected(option) },
-                label = { Text(option.label()) },
+                label = { AppText(option.label()) },
             )
         }
     }
@@ -345,11 +345,11 @@ private fun ActivityTimelineFilters(
 
 @Composable
 private fun ActivityTimelineObservedHint() {
-    Text(
+    AppText(
         text = strings.friendActivityObservedHint,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AppTheme.type.caption1,
+        color = AppTheme.colors.secondaryLabel,
     )
 }
 
@@ -375,10 +375,10 @@ private fun FriendTimelineEvent(
     onWorldClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    AppSurface(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = AppShapes.m,
+        color = AppTheme.colors.secondaryGroupedBackground,
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -394,10 +394,10 @@ private fun FriendTimelineEvent(
                     .clickable(onClick = onUserClick),
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                AppText(
                     text = event.displayName.ifBlank { event.friendUserId },
                     modifier = Modifier.clickable(onClick = onUserClick),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.type.body,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

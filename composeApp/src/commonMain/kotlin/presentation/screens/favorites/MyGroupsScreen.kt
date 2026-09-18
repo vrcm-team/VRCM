@@ -13,14 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -36,6 +28,13 @@ import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableGroupItems
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
@@ -54,20 +53,19 @@ object MyGroupsScreen : AppRoute {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MyGroupsScreenContent(
     model: FavoritesGroupsModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(strings.myGroups) },
+            AppNavBar(
+                title = { AppText(strings.myGroups) },
                 navigationIcon = {
-                    IconButton(onClick = { navigator.pop() }) {
-                        Icon(AppIcons.ArrowBackIosNew, strings.back)
+                    AppIconButton(onClick = { navigator.pop() }) {
+                        AppIcon(AppIcons.ArrowBackIosNew, strings.back)
                     }
                 },
                 actions = {
@@ -126,7 +124,7 @@ internal fun MyGroupsContent(
             )
         }
         Box(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 16.dp)) {
-            if (state.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (state.isLoading) AppProgressBar(Modifier.fillMaxWidth())
         }
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -154,7 +152,7 @@ internal fun MyGroupsContent(
 
             val empty = state.visibleGroups.isEmpty()
             if (state.isLoading && empty) {
-                CircularProgressIndicator(Modifier.align(Alignment.Center))
+                AppActivityIndicator(Modifier.align(Alignment.Center))
             } else if (state.error != null && empty) {
                 StateMessage(strings.myGroupsLoadFailed, strings.retry, model::refresh)
             } else if (empty) {
@@ -195,11 +193,11 @@ internal fun RowScope.MyGroupsActions(model: FavoritesGroupsModel) {
         onRequestRemoval = model::requestGroupLeaveConfirmation,
     )
     if (!removalState.selectionMode) {
-        IconButton(enabled = !state.isLoading, onClick = model::refresh) {
+        AppIconButton(enabled = !state.isLoading, onClick = model::refresh) {
             if (state.isLoading) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                AppActivityIndicator(Modifier.size(20.dp))
             } else {
-                Icon(AppIcons.Update, strings.refresh)
+                AppIcon(AppIcons.Refresh, strings.refresh)
             }
         }
     }

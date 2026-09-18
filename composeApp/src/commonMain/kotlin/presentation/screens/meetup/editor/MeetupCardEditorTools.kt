@@ -17,22 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +31,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegment
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegmentedRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSlider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardUiState
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupEditorError
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.meetupCardLinkLabel
@@ -116,24 +114,22 @@ internal fun MeetupEditorTools(
     var selectedTab by remember { mutableStateOf(MeetupEditorTab.Photo) }
     val locale = strings
     Column(modifier = modifier) {
-        PrimaryTabRow(
+        AppTabRow(
             selectedTabIndex = selectedTab.ordinal,
-            containerColor = Color.Transparent,
-            divider = {},
         ) {
             MeetupEditorTab.entries.forEach { tab ->
-                Tab(
+                AppTab(
                     selected = selectedTab == tab,
                     onClick = { selectedTab = tab },
                     text = {
-                        Text(
+                        AppText(
                             text = when (tab) {
                                 MeetupEditorTab.Photo -> locale.meetupCardPhoto
                                 MeetupEditorTab.Layout -> locale.meetupCardLayout
                                 MeetupEditorTab.Content -> locale.meetupCardContent
                                 MeetupEditorTab.Style -> locale.meetupCardStyle
                             },
-                            style = MaterialTheme.typography.labelLarge,
+                            style = AppTheme.type.subheadlineEmphasized,
                             maxLines = 1,
                         )
                     },
@@ -164,15 +160,15 @@ private fun ToolSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
+        AppText(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            style = AppTheme.type.subheadlineEmphasized,
+            color = AppTheme.colors.tint,
             modifier = Modifier.padding(start = 4.dp),
         )
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = MaterialTheme.shapes.large,
+        AppSurface(
+            color = AppTheme.colors.tertiaryGroupedBackground,
+            shape = AppShapes.l,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -196,12 +192,12 @@ private fun PhotoTools(
     ToolSection(strings.meetupCardPhotoTarget) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MeetupPhotoTarget.entries.forEach { target ->
-                FilterChip(
+                AppFilterChip(
                     selected = photoTarget == target,
                     onClick = { onPhotoTarget(target) },
                     enabled = enabled,
                     label = {
-                        Text(
+                        AppText(
                             text = when (target) {
                                 MeetupPhotoTarget.Both -> strings.meetupCardPhotoTargetBoth
                                 MeetupPhotoTarget.Portrait -> strings.meetupCardPortrait
@@ -220,14 +216,14 @@ private fun PhotoTools(
             enabled = enabled,
             onClick = actions.onPickProfileBackground,
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        AppDivider(color = AppTheme.colors.separator.copy(alpha = 0.4f))
         PhotoSourceRow(
             label = strings.meetupCardAlbum,
             icon = AppIcons.Publish,
             enabled = enabled,
             onClick = actions.onPickLocalAlbum,
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        AppDivider(color = AppTheme.colors.separator.copy(alpha = 0.4f))
         PhotoSourceRow(
             label = strings.meetupCardGallery,
             icon = AppIcons.Mirror,
@@ -248,25 +244,25 @@ private fun PhotoSourceRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(AppShapes.m)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
+        AppIcon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = AppTheme.colors.tint,
             modifier = Modifier.size(20.dp),
         )
-        Text(
+        AppText(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = AppTheme.type.body,
             color = if (enabled) {
-                MaterialTheme.colorScheme.onSurface
+                AppTheme.colors.label
             } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                AppTheme.colors.label.copy(alpha = 0.38f)
             },
         )
     }
@@ -281,18 +277,18 @@ private fun LayoutTools(state: MeetupCardUiState, actions: MeetupEditorActions) 
         MeetupOrientation.Landscape -> strings.meetupCardLandscape
     }
     ToolSection("${strings.meetupCardLayout} · $orientationLabel") {
-        Text(
+        AppText(
             text = strings.meetupCardLayoutPerOrientation,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.secondaryLabel,
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MeetupCardTemplate.entries.forEach { template ->
-                FilterChip(
+                AppFilterChip(
                     selected = state.config.templateFor(state.orientation) == template,
                     onClick = { actions.onTemplate(template) },
                     label = {
-                        Text(
+                        AppText(
                             text = when (template) {
                                 MeetupCardTemplate.InfoBar -> strings.meetupCardInfoBar
                                 MeetupCardTemplate.Spotlight -> strings.meetupCardSpotlight
@@ -329,10 +325,10 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 actions.onShowRepresentedGroup,
             )
             if (config.showRepresentedGroup) {
-                Text(
+                AppText(
                     text = strings.meetupCardGroupDisplayStyle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.subheadline,
+                    color = AppTheme.colors.secondaryLabel,
                 )
                 val selectedStyle = config.resolvedGroupDisplayStyle(
                     config.templateFor(state.orientation),
@@ -341,14 +337,13 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                     MeetupGroupDisplayStyle.Banner,
                     MeetupGroupDisplayStyle.IconName,
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                AppSegmentedRow(modifier = Modifier.fillMaxWidth()) {
                     displayStyles.forEachIndexed { index, style ->
-                        SegmentedButton(
+                        AppSegment(
                             selected = selectedStyle == style,
                             onClick = { actions.onGroupDisplayStyle(style) },
-                            shape = SegmentedButtonDefaults.itemShape(index, displayStyles.size),
                             label = {
-                                Text(
+                                AppText(
                                     when (style) {
                                         MeetupGroupDisplayStyle.Banner -> strings.meetupCardGroupBanner
                                         MeetupGroupDisplayStyle.IconName -> strings.meetupCardGroupIconName
@@ -366,7 +361,7 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
         ToggleRow(strings.meetupCardShortText, config.showShortText, actions.onShowShortText)
         if (config.showShortText) {
             var text by remember(state.ownerUserId) { mutableStateOf(config.shortText) }
-            OutlinedTextField(
+            AppTextField(
                 value = text,
                 onValueChange = { value ->
                     text = value
@@ -375,13 +370,13 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 isError = state.editorError is MeetupEditorError.ShortTextTooLong,
                 supportingText = {
                     if (state.editorError is MeetupEditorError.ShortTextTooLong) {
-                        Text(
+                        AppText(
                             text = strings.meetupCardShortTextTooLong,
-                            color = MaterialTheme.colorScheme.error,
+                            color = AppTheme.colors.destructive,
                         )
                     }
                 },
-                shape = MaterialTheme.shapes.medium,
+                shape = AppShapes.m,
                 minLines = 2,
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth(),
@@ -391,10 +386,10 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
     ToolSection(strings.meetupCardShowQrCode) {
         ToggleRow(strings.meetupCardShowQrCode, config.showQrCode, actions.onShowQrCode)
         if (config.showQrCode) {
-            Text(
+            AppText(
                 text = strings.meetupCardQrLinkType,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.type.subheadline,
+                color = AppTheme.colors.secondaryLabel,
             )
             val selectedTypes = config.resolvedQrLinkTypes()
             val selectedLinks = config.resolvedQrProfileLinks()
@@ -403,12 +398,12 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 editableMeetupQrLinkTypes.forEach { linkType ->
                     val selected = linkType in selectedTypes
-                    FilterChip(
+                    AppFilterChip(
                         selected = selected,
                         enabled = selected || !atLimit,
                         onClick = { actions.onQrLinkTypeToggle(linkType) },
                         label = {
-                            Text(
+                            AppText(
                                 text = when (linkType) {
                                     MeetupQrLinkType.VrchatWeb -> strings.meetupCardQrLinkVrchat
                                     MeetupQrLinkType.VrcmDeepLink -> strings.meetupCardQrLinkVrchat
@@ -420,27 +415,27 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
             }
             val profileLinks = config.profile.links
             if (profileLinks.isNotEmpty()) {
-                Text(
+                AppText(
                     text = strings.meetupCardQrProfileLinks,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.subheadline,
+                    color = AppTheme.colors.secondaryLabel,
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     profileLinks.forEach { link ->
                         val selected = link in selectedLinks
-                        FilterChip(
+                        AppFilterChip(
                             selected = selected,
                             enabled = selected || !atLimit,
                             onClick = { actions.onQrProfileLinkToggle(link) },
                             leadingIcon = {
-                                Icon(
+                                AppIcon(
                                     imageVector = WebIcons.selectIcon(link) ?: AppIcons.Link,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
                             },
                             label = {
-                                Text(
+                                AppText(
                                     text = meetupCardLinkLabel(link),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -451,11 +446,11 @@ private fun ContentTools(state: MeetupCardUiState, actions: MeetupEditorActions)
                 }
             }
             if (atLimit) {
-                Text(
+                AppText(
                     text = strings.meetupCardQrLimit
                         .replaceFirst("%d", MEETUP_QR_MAX_CODES.toString()),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.secondaryLabel,
                 )
             }
         }
@@ -483,9 +478,9 @@ private fun StyleTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
                         .border(
                             width = if (selected) 3.dp else 1.dp,
                             color = if (selected) {
-                                MaterialTheme.colorScheme.onSurface
+                                AppTheme.colors.label
                             } else {
-                                MaterialTheme.colorScheme.outlineVariant
+                                AppTheme.colors.separator
                             },
                             shape = CircleShape,
                         )
@@ -497,7 +492,7 @@ private fun StyleTools(state: MeetupCardUiState, actions: MeetupEditorActions) {
     ToolSection(strings.meetupCardScrim) {
         // 拖动期间只更新本地值，手势结束才提交持久化。
         var scrimDraft by remember(config.scrimAlpha) { mutableFloatStateOf(config.scrimAlpha) }
-        Slider(
+        AppSlider(
             value = scrimDraft,
             onValueChange = { scrimDraft = it },
             onValueChangeFinished = { actions.onScrim(scrimDraft) },
@@ -524,16 +519,16 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(AppShapes.m)
             .clickable { onChange(!checked) }
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        AppText(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = AppTheme.type.body,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = checked, onCheckedChange = onChange)
+        AppToggle(checked = checked, onCheckedChange = onChange)
     }
 }

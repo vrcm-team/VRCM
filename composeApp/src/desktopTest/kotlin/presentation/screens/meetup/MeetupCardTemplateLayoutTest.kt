@@ -3,7 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.meetup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -22,6 +21,7 @@ import coil3.PlatformContext
 import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.service.meetup.DecorationSlot
 import io.github.vrcmteam.vrcm.service.meetup.ResolvedDecoration
 import io.github.vrcmteam.vrcm.storage.meetup.MEETUP_QR_MAX_CODES
@@ -417,7 +417,7 @@ class MeetupCardTemplateLayoutTest {
                 LocalAppContentSize provides DpSize(cardWidth, cardHeight),
                 LocalDensity provides Density(base.density, fontScale),
             ) {
-                MaterialTheme { content() }
+                AppTheme { content() }
             }
         }
     }

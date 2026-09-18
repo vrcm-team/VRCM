@@ -24,16 +24,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -70,6 +60,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -93,8 +92,7 @@ import kotlin.time.ExperimentalTime
 @Serializable
 object FriendNetworkScreen : AppRoute {
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: FriendNetworkScreenModel = koinViewModel()
@@ -104,7 +102,7 @@ object FriendNetworkScreen : AppRoute {
         // 图例选中的社区，与个人长按高亮互斥
         val selectedCommunityState = remember { mutableStateOf<Int?>(null) }
         var showSheet by remember { mutableStateOf(false) }
-        val sheetState = rememberModalBottomSheetState()
+        val sheetState = rememberAppSheetState()
 
         val density = LocalDensity.current
         // 最大头像尺寸（基础 40dp + 度数加成 44dp），布局间距按此计算
@@ -130,43 +128,37 @@ object FriendNetworkScreen : AppRoute {
             }
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
                     title = {
-                        Text(
+                        AppText(
                             text = strings.friendNetworkTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                tint = MaterialTheme.colorScheme.primary,
                                 contentDescription = "back"
                             )
                         }
                     },
                     actions = {
-                        IconButton(
+                        AppIconButton(
                             enabled = !state.isLoading,
                             onClick = { model.refresh(nodeSizePx) }
                         ) {
-                            Icon(
-                                painter = rememberVectorPainter(AppIcons.Update),
-                                tint = MaterialTheme.colorScheme.primary,
+                            AppIcon(
+                                painter = rememberVectorPainter(AppIcons.Refresh),
                                 contentDescription = "refresh"
                             )
                         }
                     }
                 )
             },
-            contentColor = MaterialTheme.colorScheme.primary
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -223,11 +215,11 @@ object FriendNetworkScreen : AppRoute {
                     val isEgoView = state.viewMode == FriendNetworkViewMode.Ego
                     val layout = if (isEgoView) state.egoLayout else state.layout
                     if (state.nodes.isEmpty() && !state.isLoading && !state.isPreparing) {
-                        Text(
+                        AppText(
                             modifier = Modifier.align(Alignment.Center),
                             text = strings.friendNetworkEmpty,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline
+                            style = AppTheme.type.subheadline,
+                            color = AppTheme.colors.tertiaryLabel
                         )
                     } else if (layout != null && state.nodes.isNotEmpty()) {
                         FriendNetworkGraph(
@@ -265,7 +257,7 @@ object FriendNetworkScreen : AppRoute {
                         )
                     }
                     if ((state.isLoading || state.isPreparing) && state.nodes.isEmpty()) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        AppActivityIndicator(modifier = Modifier.align(Alignment.Center))
                     }
                 }
             }
@@ -313,25 +305,25 @@ private fun FriendNetworkHeader(
             if (isFromCache) add(strings.friendNetworkCacheHint)
         }.joinToString(" · ")
         if (infoLine.isNotEmpty()) {
-            Text(
+            AppText(
                 text = infoLine,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.tertiaryLabel,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
         if (isLoading) {
             val progressText = progress?.let { "${it.current}/${it.total}" }.orEmpty()
-            Text(
+            AppText(
                 text = strings.friendNetworkBuilding.replace("%s", progressText),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.tint,
                 maxLines = 1
             )
         }
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+    AppDivider(color = AppTheme.colors.fill)
 }
 
 @Composable
@@ -355,7 +347,7 @@ private fun FriendNetworkControlRow(
         Row(
             modifier = Modifier
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .background(AppTheme.colors.fill)
                 .padding(2.dp)
         ) {
             ViewModeChip(
@@ -384,7 +376,7 @@ private fun FriendNetworkControlRow(
                             .clip(CircleShape)
                             .background(
                                 if (isSelected) community.color.copy(alpha = 0.16f)
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                else AppTheme.colors.fill
                             )
                             .border(
                                 width = 1.dp,
@@ -401,11 +393,11 @@ private fun FriendNetworkControlRow(
                                 .background(community.color, CircleShape)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
+                        AppText(
                             text = "${community.name} · ${community.count}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.type.caption1Emphasized,
+                            color = if (isSelected) AppTheme.colors.label
+                            else AppTheme.colors.secondaryLabel,
                             maxLines = 1
                         )
                     }
@@ -413,13 +405,13 @@ private fun FriendNetworkControlRow(
                 // 共同好友数 Top10：点击进入该好友的高亮状态
                 egoTopFriends.forEachIndexed { index, (friend, count) ->
                     val isSelected = highlightedId == friend.id
-                    val primary = MaterialTheme.colorScheme.primary
+                    val primary = AppTheme.colors.tint
                     Row(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(
                                 if (isSelected) primary.copy(alpha = 0.14f)
-                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                else AppTheme.colors.fill
                             )
                             .border(
                                 width = 1.dp,
@@ -430,18 +422,18 @@ private fun FriendNetworkControlRow(
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
+                        AppText(
                             text = "${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = AppTheme.type.caption1Emphasized,
                             fontWeight = FontWeight.Bold,
-                            color = if (isSelected) primary else MaterialTheme.colorScheme.outline
+                            color = if (isSelected) primary else AppTheme.colors.tertiaryLabel
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
+                        AppText(
                             text = "${friend.displayName} · $count",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.type.caption1Emphasized,
+                            color = if (isSelected) AppTheme.colors.label
+                            else AppTheme.colors.secondaryLabel,
                             maxLines = 1
                         )
                     }
@@ -457,16 +449,16 @@ private fun ViewModeChip(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    Text(
+    AppText(
         text = text,
         modifier = Modifier
             .clip(CircleShape)
-            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .background(if (isSelected) AppTheme.colors.tint else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 3.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-        else MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AppTheme.type.caption1Emphasized,
+        color = if (isSelected) AppTheme.colors.onTint
+        else AppTheme.colors.secondaryLabel,
         maxLines = 1
     )
 }
@@ -642,12 +634,12 @@ private fun FriendNetworkGraph(
         val viewCenter = Offset(viewWidthPx / 2f, viewHeightPx / 2f)
         val layoutCenter = Offset(layoutWidthPx / 2f, layoutHeightPx / 2f)
         val centeredOffset = viewCenter - (layoutCenter * initialScale)
-        val defaultColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-        val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-        val crossEdgeColor = MaterialTheme.colorScheme.outline
+        val defaultColor = AppTheme.colors.tertiaryLabel.copy(alpha = 0.35f)
+        val highlightColor = AppTheme.colors.tint.copy(alpha = 0.8f)
+        val crossEdgeColor = AppTheme.colors.tertiaryLabel
         val textMeasurer = rememberTextMeasurer()
-        val ringLabelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.outline)
-        val primaryColor = MaterialTheme.colorScheme.primary
+        val ringLabelStyle = AppTheme.type.caption2Emphasized.copy(color = AppTheme.colors.tertiaryLabel)
+        val primaryColor = AppTheme.colors.tint
 
         // 自我视图 Top10 辐射线数据：(好友 ID, 共同好友数比例)
         val egoTopSpokes = remember(nodes, edges, isEgoView) {
@@ -950,7 +942,7 @@ private fun FriendNetworkGraph(
                                 node = selfNode,
                                 size = with(density) { selfSizePx.toDp() },
                                 selectedIdState = selectedIdState,
-                                communityColor = MaterialTheme.colorScheme.primary,
+                                communityColor = AppTheme.colors.tint,
                             )
                         }
                     }
@@ -969,7 +961,7 @@ private fun FriendNetworkNode(
 ) {
     val isSelected = selectedIdState.value == node.id
     val borderColor = when {
-        isSelected -> MaterialTheme.colorScheme.primary
+        isSelected -> AppTheme.colors.tint
         communityColor != null -> communityColor
         else -> Color.Transparent
     }
@@ -982,7 +974,7 @@ private fun FriendNetworkNode(
                     color = borderColor,
                     shape = CircleShape
                 )
-                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                .background(AppTheme.colors.secondaryGroupedBackground, CircleShape)
         ) {
             UserStateIcon(
                 modifier = Modifier.fillMaxSize(),
@@ -991,13 +983,13 @@ private fun FriendNetworkNode(
         }
         Spacer(modifier = Modifier.height(4.dp))
         if (node.displayName.isNotBlank()) {
-            Text(
+            AppText(
                 text = node.displayName,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface
+                color = AppTheme.colors.label
             )
         }
     }
@@ -1023,14 +1015,14 @@ private fun FriendNetworkSheet(
             )
             Spacer(modifier = Modifier.width(12.dp))
             val displayName = node.displayName.ifBlank { strings.users }
-            Text(
+            AppText(
                 text = displayName,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        HorizontalDivider()
+        AppDivider()
         Spacer(modifier = Modifier.height(8.dp))
         val visibleMutualUsers = mutualUsers.filter { it.id != HIDDEN_MUTUAL_USER_ID }
         val hiddenCount = mutualUsers.size - visibleMutualUsers.size
@@ -1041,17 +1033,17 @@ private fun FriendNetworkSheet(
         } else {
             strings.mutualFriendsCount.replace("%total%", mutualUsers.size.toString())
         }
-        Text(
+        AppText(
             text = titleText,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary
+            style = AppTheme.type.subheadlineEmphasized,
+            color = AppTheme.colors.tint
         )
         Spacer(modifier = Modifier.height(8.dp))
         if (mutualUsers.isEmpty()) {
-            Text(
+            AppText(
                 text = strings.mutualFriendsEmpty.replace("%s", node.displayName),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
+                style = AppTheme.type.caption1,
+                color = AppTheme.colors.tertiaryLabel
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth().height(280.dp)) {
@@ -1071,9 +1063,9 @@ private fun FriendNetworkSheet(
                             iconUrl = user.iconUrl,
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(
+                        AppText(
                             text = user.displayName,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = AppTheme.type.subheadline,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

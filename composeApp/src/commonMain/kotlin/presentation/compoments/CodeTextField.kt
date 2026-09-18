@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +29,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.vrcmteam.vrcm.core.extensions.isDigitsOnly
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 
 /**
  * 验证码输入框
@@ -51,12 +50,12 @@ fun CodeTextField(
     boxShape: Shape = RectangleShape,
     boxBackgroundColor: Color = Color.Unspecified,
     boxBorderStroke: BorderStroke = BorderStroke(
-        width = TextFieldDefaults.UnfocusedIndicatorThickness,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+        width = 1.dp,
+        color = AppTheme.colors.separator
     ),
     boxFocusedBorderStroke: BorderStroke = BorderStroke(
-        width =  TextFieldDefaults.FocusedIndicatorThickness,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        width = 2.dp,
+        color = AppTheme.colors.tint
     ),
     enabled: Boolean = true,
     textStyle: TextStyle = TextStyle(fontSize = 20.sp),
@@ -165,7 +164,7 @@ private fun CodeText(
                     mutableStateOf(Rect(0f, 0f, 0f, 0f))
                 }
                 // 框的文本内容
-                Text(
+                AppText(
                     text = if (cipherMask.isNotEmpty() && text.isNotEmpty()) cipherMask else text,
                     modifier = Modifier.cursor(
                         cursorBrush = cursorBrush,

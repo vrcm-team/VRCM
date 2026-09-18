@@ -20,14 +20,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,6 +47,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
 import io.github.vrcmteam.vrcm.presentation.compoments.shouldLoadNextPage
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -283,13 +284,13 @@ private fun PublicSearchTabRow(
     tabs: List<String>,
 ) {
     val scope = rememberCoroutineScope()
-    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+    AppTabRow(selectedTabIndex = pagerState.currentPage) {
         tabs.forEachIndexed { index, title ->
-            Tab(
+            AppTab(
                 selected = index == pagerState.currentPage,
                 onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
                 text = {
-                    Text(
+                    AppText(
                         text = title,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -360,7 +361,7 @@ private fun LazyListScope.renderPublicSearchStatus(
         query.isBlank() -> searchMessageItem(promptText, retryText = retryText)
         loadState.phase == SearchLoadPhase.Loading && resultCount == 0 -> item("search-loading") {
             Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                AppActivityIndicator()
             }
         }
         loadState.phase == SearchLoadPhase.Error && resultCount == 0 -> searchMessageItem(
@@ -371,7 +372,7 @@ private fun LazyListScope.renderPublicSearchStatus(
         loadState.phase == SearchLoadPhase.Success && resultCount == 0 ->
             searchMessageItem(noResultsText, retryText = retryText)
         loadState.phase == SearchLoadPhase.Loading -> item("search-refreshing") {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+            AppProgressBar(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         }
         loadState.phase == SearchLoadPhase.Error -> item("search-refresh-failed") {
             Row(
@@ -379,12 +380,12 @@ private fun LazyListScope.renderPublicSearchStatus(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
+                AppText(
                     text = refreshFailedText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    style = AppTheme.type.subheadline,
+                    color = AppTheme.colors.destructive,
                 )
-                TextButton(onClick = retry) { Text(retryText) }
+                AppButton(onClick = retry, style = AppButtonStyle.Plain) { AppText(retryText) }
             }
         }
     }
@@ -401,15 +402,15 @@ private fun LazyListScope.searchMessageItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(48.dp))
+            AppIcon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(48.dp))
             Spacer(Modifier.height(16.dp))
-            Text(message, style = MaterialTheme.typography.bodyLarge)
+            AppText(message, style = AppTheme.type.body)
             if (retry != null) {
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = retry) {
-                    Icon(AppIcons.Update, contentDescription = null)
+                AppButton(onClick = retry, style = AppButtonStyle.Plain) {
+                    AppIcon(AppIcons.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(retryText)
+                    AppText(retryText)
                 }
             }
         }
@@ -429,12 +430,12 @@ private fun LazyListScope.renderGroupPagingStatus(
             contentAlignment = Alignment.Center,
         ) {
             if (isLoading) {
-                CircularProgressIndicator(Modifier.size(24.dp))
+                AppActivityIndicator(Modifier.size(24.dp))
             } else {
-                TextButton(onClick = retry) {
-                    Icon(AppIcons.Update, contentDescription = null)
+                AppButton(onClick = retry, style = AppButtonStyle.Plain) {
+                    AppIcon(AppIcons.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(retryText)
+                    AppText(retryText)
                 }
             }
         }

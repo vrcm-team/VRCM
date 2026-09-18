@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +18,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -161,8 +160,7 @@ internal fun <T> RecentWorldPagingState<T>.canAutoLoadNextPage(): Boolean =
 @Serializable
 object RecentWorldsScreen : AppDetailRoute {
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val model: RecentWorldsScreenModel = koinViewModel()
@@ -173,18 +171,17 @@ object RecentWorldsScreen : AppDetailRoute {
             model.loadRecentWorlds()
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
                     title = {
-                        Text(
+                        AppText(
                             text = strings.recentWorldsTitle,
-                            style = MaterialTheme.typography.titleMedium,
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(AppIcons.ArrowBackIosNew, contentDescription = "Back")
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(AppIcons.ArrowBackIosNew, contentDescription = "Back")
                         }
                     }
                 )
@@ -195,17 +192,17 @@ object RecentWorldsScreen : AppDetailRoute {
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    AppActivityIndicator()
                 }
             } else if (model.worlds.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    AppText(
                         text = strings.recentWorldsEmpty,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.body,
+                        color = AppTheme.colors.secondaryLabel,
                     )
                 }
             } else {
@@ -251,10 +248,10 @@ object RecentWorldsScreen : AppDetailRoute {
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (model.isLoadingMore) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    AppActivityIndicator(modifier = Modifier.size(24.dp))
                                 } else {
-                                    TextButton(onClick = model::retryLoadMoreRecentWorlds) {
-                                        Text(strings.retry)
+                                    AppButton(onClick = model::retryLoadMoreRecentWorlds, style = AppButtonStyle.Plain) {
+                                        AppText(strings.retry)
                                     }
                                 }
                             }
@@ -272,15 +269,12 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
     val sharedImageCacheKey = (world.thumbnailImageUrl ?: world.imageUrl)
         .orEmpty()
         .ifBlank { null }
-    Card(
+    AppCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick(sharedImageCacheKey) },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
-        )
-    ) {
+        shape = AppShapes.l,
+        color = AppTheme.colors.secondaryGroupedBackground) {
         Row(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -290,14 +284,14 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                 Box(
                     modifier = Modifier
                         .size(80.dp, 45.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .clip(AppShapes.s)
+                        .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
+                    AppIcon(
                         imageVector = AppIcons.VisibilityOff,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colors.secondaryLabel,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -310,20 +304,20 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                     modifier = Modifier
                         .sharedBoundsBy("${world.id}WorldImage")
                         .size(80.dp, 45.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(AppShapes.s),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                AppText(
                     text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.type.subheadline,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
+                AppText(
                     text = if (world.id == "???") strings.hiddenWorld else world.authorName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.secondaryLabel,
                     maxLines = 1,
                 )
             }

@@ -18,11 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -52,6 +47,11 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardCanvas
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
@@ -188,19 +188,19 @@ fun MeetupCardDisplayContent(
                             }
                         },
                     ) {
-                        Icon(
+                        AppIcon(
                             painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
                             tint = Color.White,
                             contentDescription = "back",
                         )
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    Text(
+                    AppText(
                         text = when (orientation) {
                             MeetupOrientation.Portrait -> strings.meetupCardPortrait
                             MeetupOrientation.Landscape -> strings.meetupCardLandscape
                         },
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.type.subheadlineEmphasized,
                         color = Color.White,
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -212,7 +212,7 @@ fun MeetupCardDisplayContent(
                             }
                         },
                     ) {
-                        Icon(
+                        AppIcon(
                             painter = rememberVectorPainter(AppIcons.Edit),
                             tint = Color.White,
                             contentDescription = strings.meetupCardEdit,
@@ -248,10 +248,10 @@ fun MeetupCardDisplayContent(
                                 forcedLandscape = !forcedLandscape
                             },
                         ) {
-                            Icon(
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ScreenRotation),
                                 tint = if (forcedLandscape) {
-                                    MaterialTheme.colorScheme.primary
+                                    AppTheme.colors.tint
                                 } else {
                                     Color.White
                                 },
@@ -294,13 +294,12 @@ fun MeetupCardDisplayContent(
                         },
                     ) {
                         if (saving) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
                                 color = Color.White,
                             )
                         } else {
-                            Icon(
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.SaveAlt),
                                 tint = Color.White,
                                 contentDescription = strings.meetupCardSaveImage,
@@ -364,6 +363,6 @@ private fun ControlIconButton(
     Box(
         modifier = Modifier.background(Color.Black.copy(alpha = 0.35f), CircleShape),
     ) {
-        IconButton(onClick = onClick, content = content)
+        AppIconButton(onClick = onClick, content = content)
     }
 }

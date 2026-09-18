@@ -76,9 +76,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.NetworkWorldImageEdito
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldImageEditor
 import io.github.vrcmteam.vrcm.presentation.settings.SettingsModel
 import io.github.vrcmteam.vrcm.presentation.settings.theme.ThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.blue.BlueThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.green.GreenThemeColor
-import io.github.vrcmteam.vrcm.presentation.theme.pink.PinkThemeColor
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryApi
 import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.PrintUploadService
@@ -280,8 +277,7 @@ private val imageLoaderDefinition: Definition<ImageLoader> = {
 }
 
 private fun Module.configThemeColor() {
-    single(named(ThemeColor.Default.name)){ ThemeColor.Default }
-    single(named(BlueThemeColor.name)){ BlueThemeColor }
-    single(named(PinkThemeColor.name)){ PinkThemeColor }
-    single (named(GreenThemeColor.name)){ GreenThemeColor}
+    ThemeColor.all.forEach { themeColor ->
+        single(named(themeColor.name)) { themeColor }
+    }
 }

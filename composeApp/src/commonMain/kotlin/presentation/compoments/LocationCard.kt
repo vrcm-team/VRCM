@@ -7,10 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -21,12 +17,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.HomeInstanceVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -46,11 +47,10 @@ fun LocationCard(
     val sharedSuffixKey = rememberContainerTransformToken(
         "location:${location.location}:${instants.worldId}",
     ) ?: LocalSharedSuffixKey.current
-    Surface(
+    AppSurface(
         modifier = modifier
             .fillMaxWidth(),
-        tonalElevation = (-2).dp,
-        shape = MaterialTheme.shapes.large
+        shape = AppShapes.l
     ) {
         Box {
             Column(
@@ -61,7 +61,7 @@ fun LocationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp)
-                    .clip(MaterialTheme.shapes.medium),
+                    .clip(AppShapes.m),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AImage(
@@ -98,11 +98,11 @@ fun LocationCard(
                         )
                         .clickable(onClick = onClickLocationCard),
                 ) {
-                    Text(
+                    AppText(
                         text = instants.worldName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.type.headline,
                         maxLines = 1,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppTheme.colors.tint,
                     )
                     Row(
                         modifier = Modifier
@@ -114,27 +114,27 @@ fun LocationCard(
                             modifier = Modifier.align(Alignment.CenterVertically),
                             region = instants.region
                         )
-                        Text(
+                        AppText(
                             text = instants.accessType.displayName,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = AppTheme.type.caption1Emphasized,
                             maxLines = 1,
-                            color = MaterialTheme.colorScheme.outline
+                            color = AppTheme.colors.tertiaryLabel
                         )
-                        Text(
+                        AppText(
                             text = "#${instants.name}",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = AppTheme.type.caption1Emphasized,
                             maxLines = 1,
-                            color = MaterialTheme.colorScheme.outline
+                            color = AppTheme.colors.tertiaryLabel
                         )
                     }
-                    Text(
+                    AppText(
                         modifier = Modifier
                             .fillMaxWidth(),
                         text = instants.worldDescription,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppTheme.type.caption1,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colors.secondaryLabel
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
@@ -152,18 +152,18 @@ fun LocationCard(
             }
             }
             if (isCurrentUserLocation) {
-                Surface(
+                AppSurface(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(4.dp),
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                    shape = AppShapes.s,
+                    color = AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.8f),
                 ) {
-                    Text(
+                    AppText(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         text = strings.currentUserLocation,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.label,
                         maxLines = 1,
                     )
                 }
@@ -206,7 +206,7 @@ private inline fun MemberInfoRow(
                             Box(contentAlignment = Alignment.Center) {
                                 UserStateIcon(
                                     modifier = Modifier
-                                        .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                                        .border(1.dp, AppTheme.colors.secondaryGroupedBackground, CircleShape),
                                     iconUrl = friendState.value.iconUrl,
                                 )
                                 if (friendState.value.id in travelingIds) {
@@ -217,9 +217,8 @@ private inline fun MemberInfoRow(
                                             .background(Color.Black.copy(alpha = 0.55f)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        CircularProgressIndicator(
+                                        AppActivityIndicator(
                                             modifier = Modifier.size(12.dp),
-                                            strokeWidth = 2.dp,
                                             color = Color.White,
                                         )
                                     }
@@ -227,12 +226,12 @@ private inline fun MemberInfoRow(
                             }
                         }
                         friendList.singleOrNull()?.let { friendState ->
-                            Text(
+                            AppText(
                                 text = friendState.value.displayName,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface
+                                style = AppTheme.type.caption2Emphasized,
+                                color = AppTheme.colors.label
                             )
                         }
                     }
@@ -240,26 +239,26 @@ private inline fun MemberInfoRow(
                     val owner = instants.owner ?: return@AnimatedContent
                     Row(
                         modifier = Modifier.fillMaxHeight().background(
-                            MaterialTheme.colorScheme.inverseOnSurface,
-                            MaterialTheme.shapes.medium
+                            AppTheme.colors.fill,
+                            AppShapes.m
                         )
-                            .clip(MaterialTheme.shapes.medium)
+                            .clip(AppShapes.m)
                             .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
+                        AppIcon(
                             modifier = Modifier.size(16.dp),
                             imageVector = owner.iconVector,
                             contentDescription = "OwnerIcon",
-                            tint = MaterialTheme.colorScheme.outline
+                            tint = AppTheme.colors.tertiaryLabel
                         )
                         Spacer(modifier = Modifier.width(2.dp))
-                        Text(
+                        AppText(
                             text = owner.displayName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                            style = AppTheme.type.caption2Emphasized,
+                            color = AppTheme.colors.tertiaryLabel
                         )
                     }
                 }

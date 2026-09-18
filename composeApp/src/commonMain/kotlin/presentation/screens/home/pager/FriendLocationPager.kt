@@ -3,9 +3,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.home.pager
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -22,6 +19,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsFlowRow
 import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -94,7 +93,6 @@ object FriendLocationPager : Pager {
 
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Pager.FriendLocationPager(
     friendLocationMap: Map<LocationType, MutableList<FriendLocation>>,
@@ -246,10 +244,10 @@ private fun LazyListScope.SimpleCLocationCard(
 private fun LocationTitle(
     text: String,
 ) {
-    Text(
+    AppText(
         modifier = Modifier.padding(horizontal = 16.dp),
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AppTheme.type.subheadlineEmphasized,
+        color = AppTheme.colors.secondaryLabel,
     )
 }

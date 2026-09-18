@@ -11,15 +11,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +27,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppFloatingActionButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vinceglb.filekit.name
@@ -70,8 +67,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         @Composable
         get() = tagType.toString().replaceFirstChar { it.uppercase() }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     fun Content(galleryScreenModel: GalleryScreenModel) {
         val navigator = LocalNavigator.currentOrThrow
         val printImageProcessor: PrintImageProcessor = koinInject()
@@ -208,7 +204,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FloatingActionButton(
+                AppFloatingActionButton(
                     onClick = {
                         if (hasSelection) {
                             // 删除选中项
@@ -231,28 +227,27 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         }
                     },
                     containerColor = when {
-                        hasSelection -> MaterialTheme.colorScheme.error
-                        isVrcPlus -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
+                        hasSelection -> AppTheme.colors.destructive
+                        isVrcPlus -> AppTheme.colors.tintSoft
+                        else -> AppTheme.colors.fill
                     },
                     contentColor = when {
-                        hasSelection -> MaterialTheme.colorScheme.onError
-                        isVrcPlus -> MaterialTheme.colorScheme.onPrimaryContainer
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        hasSelection -> AppTheme.colors.onDestructive
+                        isVrcPlus -> AppTheme.colors.onTintSoft
+                        else -> AppTheme.colors.secondaryLabel.copy(alpha = 0.38f)
                     },
                 ) {
                     if (isPreparing) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
                         )
                     } else if (hasSelection) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
+                        AppIcon(
+                            imageVector = AppIcons.Delete,
                             contentDescription = locale.galleryTabDelete,
                         )
                     } else {
-                        Icon(
+                        AppIcon(
                             imageVector = AppIcons.Publish,
                             contentDescription = if (isVrcPlus) {
                                 locale.galleryTabUploadImage
@@ -365,14 +360,14 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.3f))
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(AppShapes.m)
                         .clickable {
                             galleryScreenModel.toggleSelection(FileTagType.Print, print.id)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                    AppIcon(
+                        imageVector = AppIcons.CheckCircle,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(36.dp),
@@ -404,7 +399,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         // 根据文件类型设置不同的形状
         val shape = when (tagType) {
             FileTagType.Icon -> CircleShape  // 圆形展示
-            else -> MaterialTheme.shapes.medium  // 其他类型使用默认的medium形状
+            else -> AppShapes.m  // 其他类型使用默认的medium形状
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = minimumCellSize),
@@ -429,7 +424,7 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         tagType: FileTagType,
         galleryScreenModel: GalleryScreenModel,
         aspectRatio: Float = 1f,
-        shape: Shape = MaterialTheme.shapes.medium
+        shape: Shape = AppShapes.m
     ) {
         val (dialogContent, setDialogContent) = LocationDialogContent.current
         val selected = galleryScreenModel.isSelected(tagType, file.id)
@@ -474,9 +469,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         ),
                     loading = {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
+                            AppActivityIndicator(
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     },
@@ -486,10 +480,10 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text(
+                            AppText(
                                 text = strings.galleryTabLoadFailed,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
+                                style = AppTheme.type.caption1,
+                                color = AppTheme.colors.destructive
                             )
                         }
                     }
@@ -505,8 +499,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                         .clickable { galleryScreenModel.toggleSelection(tagType, file.id) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                    AppIcon(
+                        imageVector = AppIcons.CheckCircle,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(36.dp),

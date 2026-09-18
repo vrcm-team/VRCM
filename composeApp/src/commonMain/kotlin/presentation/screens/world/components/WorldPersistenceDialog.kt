@@ -3,23 +3,21 @@ package io.github.vrcmteam.vrcm.presentation.screens.world.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonRole
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldPersistenceStatus
 import io.github.vrcmteam.vrcm.presentation.screens.world.WorldPersistenceUiState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 @Composable
 internal fun WorldPersistenceDialog(
@@ -32,44 +30,43 @@ internal fun WorldPersistenceDialog(
     onConfirmDeletion: () -> Unit,
 ) {
     if (state.confirmingDeletion) {
-        AlertDialog(
+        AppAlert(
             onDismissRequest = onDismissDeletion,
             icon = {
-                Icon(
-                    imageVector = Icons.Default.DeleteForever,
+                AppIcon(
+                    imageVector = AppIcons.DeleteForever,
                     contentDescription = null,
                 )
             },
-            title = { Text(localeStrings.worldPersistenceDeleteConfirmTitle) },
-            text = { Text(localeStrings.worldPersistenceDeleteConfirmMessage) },
+            title = { AppText(localeStrings.worldPersistenceDeleteConfirmTitle) },
+            text = { AppText(localeStrings.worldPersistenceDeleteConfirmMessage) },
             confirmButton = {
-                TextButton(
+                AppButton(
                     onClick = onConfirmDeletion,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
+                    style = AppButtonStyle.Plain,
+                    role = AppButtonRole.Destructive,
                 ) {
-                    Text(localeStrings.worldPersistenceDelete)
+                    AppText(localeStrings.worldPersistenceDelete)
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissDeletion) {
-                    Text(localeStrings.cancel)
+                AppButton(onClick = onDismissDeletion, style = AppButtonStyle.Plain) {
+                    AppText(localeStrings.cancel)
                 }
             },
         )
         return
     }
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(
-                imageVector = Icons.Default.Storage,
+            AppIcon(
+                imageVector = AppIcons.Storage,
                 contentDescription = null,
             )
         },
-        title = { Text(localeStrings.worldPersistenceTitle) },
+        title = { AppText(localeStrings.worldPersistenceTitle) },
         text = {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -78,50 +75,48 @@ internal fun WorldPersistenceDialog(
                 if (state.status == WorldPersistenceStatus.Checking ||
                     state.status == WorldPersistenceStatus.Deleting
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(modifier = Modifier.size(20.dp))
                 }
-                Text(state.status.message(localeStrings))
+                AppText(state.status.message(localeStrings))
             }
         },
         confirmButton = {
             when (state.status) {
                 WorldPersistenceStatus.Initial -> {
-                    TextButton(onClick = onCheck) {
-                        Text(localeStrings.worldPersistenceCheck)
+                    AppButton(onClick = onCheck, style = AppButtonStyle.Plain) {
+                        AppText(localeStrings.worldPersistenceCheck)
                     }
                 }
 
                 WorldPersistenceStatus.Exists -> {
-                    TextButton(
+                    AppButton(
                         onClick = onRequestDeletion,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
+                        style = AppButtonStyle.Plain,
+                        role = AppButtonRole.Destructive,
                     ) {
-                        Text(localeStrings.worldPersistenceDelete)
+                        AppText(localeStrings.worldPersistenceDelete)
                     }
                 }
 
                 is WorldPersistenceStatus.Missing -> {
-                    TextButton(onClick = onCheck) {
-                        Text(localeStrings.worldPersistenceCheckAgain)
+                    AppButton(onClick = onCheck, style = AppButtonStyle.Plain) {
+                        AppText(localeStrings.worldPersistenceCheckAgain)
                     }
                 }
 
                 WorldPersistenceStatus.CheckFailed -> {
-                    TextButton(onClick = onCheck) {
-                        Text(localeStrings.retry)
+                    AppButton(onClick = onCheck, style = AppButtonStyle.Plain) {
+                        AppText(localeStrings.retry)
                     }
                 }
 
                 WorldPersistenceStatus.DeleteFailed -> {
-                    TextButton(
+                    AppButton(
                         onClick = onRequestDeletion,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error,
-                        ),
+                        style = AppButtonStyle.Plain,
+                        role = AppButtonRole.Destructive,
                     ) {
-                        Text(localeStrings.retry)
+                        AppText(localeStrings.retry)
                     }
                 }
 
@@ -130,8 +125,8 @@ internal fun WorldPersistenceDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(localeStrings.close)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(localeStrings.close)
             }
         },
     )

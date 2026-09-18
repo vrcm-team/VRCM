@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +15,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteData
 import io.github.vrcmteam.vrcm.network.api.favorite.data.FavoriteGroupData
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.service.FavoriteService
 import org.koin.compose.koinInject
@@ -31,7 +31,6 @@ import org.koin.compose.koinInject
  * @param getSelectedGroup 从选项中获取当前选择的分组
  * @param updateOptions 更新选项的函数
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> GroupOptionsUI(
     currentOptions: T,
@@ -63,54 +62,30 @@ fun <T> GroupOptionsUI(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ExposedDropdownMenuBox(
+            AppPopUpButton(
+                value = selectedGroup?.displayName ?: defaultText,
                 expanded = expandGroupMenu,
                 onExpandedChange = { expandGroupMenu = it },
                 modifier = Modifier.weight(1f),
             ) {
-                OutlinedTextField(
-                    value = selectedGroup?.displayName ?: defaultText,
-                    onValueChange = {},
-                    shape = MaterialTheme.shapes.medium,
-                    readOnly = true,
-                    singleLine = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandGroupMenu)
+                AppMenuItem(
+                    text = { AppText(defaultText) },
+                    trailingIcon = { AppText("$total") },
+                    onClick = {
+                        onOptionsChanged(updateOptions(currentOptions, null))
+                        expandGroupMenu = false
                     },
-                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                    ),
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp)
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                 )
 
-                ExposedDropdownMenu(
-                    shape = MaterialTheme.shapes.medium,
-                    expanded = expandGroupMenu,
-                    onDismissRequest = { expandGroupMenu = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(defaultText) },
-                        trailingIcon = { Text("$total") },
+                favoriteGroups.forEach { (group, data) ->
+                    AppMenuItem(
+                        text = { AppText(group.displayName) },
+                        trailingIcon = { AppText("${data.size}/${maxFavoritesPerGroup}") },
                         onClick = {
-                            onOptionsChanged(updateOptions(currentOptions, null))
+                            onOptionsChanged(updateOptions(currentOptions, group))
                             expandGroupMenu = false
                         },
                     )
-
-                    favoriteGroups.forEach { (group, data) ->
-                        DropdownMenuItem(
-                            text = { Text(group.displayName) },
-                            trailingIcon = { Text("${data.size}/${maxFavoritesPerGroup}") },
-                            onClick = {
-                                onOptionsChanged(updateOptions(currentOptions, group))
-                                expandGroupMenu = false
-                            },
-                        )
-                    }
                 }
             }
 
@@ -118,29 +93,28 @@ fun <T> GroupOptionsUI(
                 val canEdit = selectedGroup != null &&
                     selectedGroup.ownerId != "local" &&
                     selectedGroup.type == favoriteType.value
-                ATooltipBox(tooltip = { Text(editGroupContentDescription) }) {
-                    IconButton(
+                ATooltipBox(tooltip = { AppText(editGroupContentDescription) }) {
+                    AppIconButton(
                         enabled = canEdit,
                         onClick = { selectedGroup?.let(onEditGroup) },
                     ) {
-                        Icon(AppIcons.Edit, contentDescription = editGroupContentDescription)
+                        AppIcon(AppIcons.Edit, contentDescription = editGroupContentDescription)
                     }
                 }
             }
 
             if (onClearGroup != null) {
-                ATooltipBox(tooltip = { Text(clearGroupContentDescription) }) {
-                    IconButton(
+                ATooltipBox(tooltip = { AppText(clearGroupContentDescription) }) {
+                    AppIconButton(
                         enabled = clearGroupEnabled && !clearGroupInProgress,
                         onClick = { selectedGroup?.let(onClearGroup) },
                     ) {
                         if (clearGroupInProgress) {
-                            CircularProgressIndicator(
+                            AppActivityIndicator(
                                 modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
                             )
                         } else {
-                            Icon(
+                            AppIcon(
                                 imageVector = AppIcons.Delete,
                                 contentDescription = clearGroupContentDescription,
                             )

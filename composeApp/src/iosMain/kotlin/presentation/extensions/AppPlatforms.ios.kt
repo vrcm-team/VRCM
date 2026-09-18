@@ -37,6 +37,3 @@ actual fun AppPlatform.shareUrl(url: String): Boolean {
 
 private tailrec fun UIViewController.topPresentedViewController(): UIViewController =
     presentedViewController?.topPresentedViewController() ?: this
-
-actual val AppPlatform.isSupportBlur: Boolean
-    get() = true

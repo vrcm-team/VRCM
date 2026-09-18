@@ -5,13 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +23,13 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
@@ -199,12 +199,12 @@ private fun ClipboardConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
-            Text(
+            AppText(
                 locale.officialLinkPromptMessage.replace(
                     "%s",
                     targetType.localizedName(locale),
@@ -212,16 +212,17 @@ private fun ClipboardConfirmationDialog(
             )
         },
         confirmButton = {
-            Button(
+            AppButton(
                 modifier = Modifier.widthIn(min = 96.dp),
                 onClick = onConfirm,
+                style = AppButtonStyle.Prominent,
             ) {
-                Text(locale.officialLinkOpen)
+                AppText(locale.officialLinkOpen)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(locale.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(locale.cancel)
             }
         },
     )
@@ -229,17 +230,17 @@ private fun ClipboardConfirmationDialog(
 
 @Composable
 private fun ResolvingOfficialLinkDialog(locale: LocaleStrings) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = {},
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                Text(locale.loading)
+                AppActivityIndicator(modifier = Modifier.size(24.dp))
+                AppText(locale.loading)
             }
         },
         confirmButton = {},
@@ -253,26 +254,26 @@ private fun OfficialLinkFailureDialog(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        icon = { Icon(AppIcons.Link, contentDescription = null) },
-        title = { Text(locale.officialLinkPromptTitle) },
+        icon = { AppIcon(AppIcons.Link, contentDescription = null) },
+        title = { AppText(locale.officialLinkPromptTitle) },
         text = {
-            Text(
+            AppText(
                 text = locale.officialLinkOpenFailed,
-                color = MaterialTheme.colorScheme.error,
+                color = AppTheme.colors.destructive,
             )
         },
         confirmButton = {
             if (retryAvailable) {
-                Button(onClick = onRetry) {
-                    Text(locale.retry)
+                AppButton(onClick = onRetry, style = AppButtonStyle.Prominent) {
+                    AppText(locale.retry)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(locale.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(locale.cancel)
             }
         },
     )

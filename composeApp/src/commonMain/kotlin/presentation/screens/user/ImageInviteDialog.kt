@@ -11,12 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +18,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GallerySelection
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.service.ImageInviteNotInInstanceException
@@ -56,10 +57,10 @@ internal fun ImageInviteDialog(
         else -> ""
     }
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!busy) onDismiss() },
         title = {
-            Text(strings.imageInviteTitle.replace("%name%", targetName))
+            AppText(strings.imageInviteTitle.replace("%name%", targetName))
         },
         text = {
             Column(
@@ -74,23 +75,22 @@ internal fun ImageInviteDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
-                            .clip(MaterialTheme.shapes.small),
+                            .clip(AppShapes.s),
                     )
                 }
                 Row(modifier = Modifier.fillMaxWidth()) {
                     if (busy) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
                         )
                         Spacer(Modifier.size(8.dp))
                     }
-                    Text(
+                    AppText(
                         text = statusText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.type.subheadline,
                         color = if (state is ImageInviteUiState.Failed ||
                             state is ImageInviteUiState.SessionChanged
-                        ) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        ) AppTheme.colors.destructive else AppTheme.colors.label,
                     )
                 }
                 if (state is ImageInviteUiState.Failed &&
@@ -104,10 +104,10 @@ internal fun ImageInviteDialog(
                     }
                     if (!reason.isNullOrBlank()) {
                         SelectionContainer {
-                            Text(
+                            AppText(
                                 text = reason,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                                style = AppTheme.type.caption1,
+                                color = AppTheme.colors.destructive,
                             )
                         }
                     }
@@ -116,17 +116,18 @@ internal fun ImageInviteDialog(
         },
         confirmButton = {
             when (state) {
-                is ImageInviteUiState.Ready -> Button(onClick = onSend) {
-                    Text(strings.imageInviteSend)
+                is ImageInviteUiState.Ready -> AppButton(onClick = onSend, style = AppButtonStyle.Prominent) {
+                    AppText(strings.imageInviteSend)
                 }
-                is ImageInviteUiState.Failed -> Button(
+                is ImageInviteUiState.Failed -> AppButton(
                     onClick = if (state.stage == ImageInviteFailureStage.Preparation) {
                         onRetryPreparation
                     } else {
                         onSend
                     },
+                    style = AppButtonStyle.Prominent,
                 ) {
-                    Text(strings.retry)
+                    AppText(strings.retry)
                 }
                 else -> Unit
             }
@@ -135,12 +136,12 @@ internal fun ImageInviteDialog(
             if (!busy) {
                 Row(modifier = Modifier.padding(end = 4.dp)) {
                     if (selection != null) {
-                        TextButton(onClick = onChooseAnother) {
-                            Text(strings.imageInviteChooseAnother)
+                        AppButton(onClick = onChooseAnother, style = AppButtonStyle.Plain) {
+                            AppText(strings.imageInviteChooseAnother)
                         }
                     }
-                    TextButton(onClick = onDismiss) {
-                        Text(strings.cancel)
+                    AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                        AppText(strings.cancel)
                     }
                 }
             }

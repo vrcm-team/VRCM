@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -26,6 +25,7 @@ import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
 import io.github.vrcmteam.vrcm.presentation.compoments.DesktopWindowTitleBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import org.jetbrains.compose.resources.painterResource
 import org.koin.core.context.startKoin
 import vrcm.composeapp.generated.resources.Res
@@ -113,7 +113,7 @@ fun ScaleOnScrollList() {
                     .background(Color.LightGray)
                     .padding(8.dp)
             ) {
-                Text("Item $index", fontSize = 18.sp)
+                AppText("Item $index", fontSize = 18.sp)
             }
         }
     }

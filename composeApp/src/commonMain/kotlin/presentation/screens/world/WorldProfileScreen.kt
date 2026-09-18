@@ -1,32 +1,53 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material3.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.times
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
+import io.github.vrcmteam.vrcm.presentation.screens.world.data.SheetState
+import kotlin.math.abs
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.compose.koinInject
 import kotlinx.serialization.Serializable
@@ -248,40 +269,42 @@ class WorldProfileScreen(
                 HomeWorldActionAvailability.Unavailable &&
                 (action != HomeWorldAction.Reset ||
                     homeWorldActionState.availability == HomeWorldActionAvailability.Current)
-            AlertDialog(
+            AppAlert(
                 onDismissRequest = {
                     if (!homeWorldActionState.isUpdating) pendingHomeWorldAction = null
                 },
                 title = {
-                    Text(
+                    AppText(
                         if (resetHomeWorld) strings.worldProfileResetHomeWorld
                         else strings.worldProfileSetHomeWorld
                     )
                 },
                 text = {
-                    Text(
+                    AppText(
                         if (resetHomeWorld) strings.worldProfileResetHomeWorldConfirmation
                         else strings.worldProfileSetHomeWorldConfirmation
                     )
                 },
                 confirmButton = {
-                    TextButton(
+                    AppButton(
                         enabled = !homeWorldActionState.isUpdating &&
                             actionStillAllowed,
                         onClick = {
                             pendingHomeWorldAction = null
                             screenModel.updateHomeWorld(action)
                         },
+                        style = AppButtonStyle.Plain,
                     ) {
-                        Text(strings.confirm)
+                        AppText(strings.confirm)
                     }
                 },
                 dismissButton = {
-                    TextButton(
+                    AppButton(
                         enabled = !homeWorldActionState.isUpdating,
                         onClick = { pendingHomeWorldAction = null },
+                        style = AppButtonStyle.Plain,
                     ) {
-                        Text(strings.cancel)
+                        AppText(strings.cancel)
                     }
                 },
             )
@@ -482,32 +505,130 @@ class WorldProfileScreen(
             }
         }
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                val sysTopPadding = getInsetPadding(WindowInsets::getTop)
-                val sysBottomPadding = getInsetPadding(WindowInsets::getBottom)
+        // 模糊效果状态
+        val hazeState = remember { HazeState() }
 
-                WorldProfileCompactLayout(
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // 屏幕宽度减去左右中间边距
+
+            // 每行四个信息块：两侧页面边距 + 三个 8 dp 间隔
+            val itemSize = DpSize(width = (maxWidth - AppSpacing.page * 2 - 8.dp * 3) / 4, height = 68.dp)
+            // ========== 尺寸计算 ==========
+            val sysTopPadding = getInsetPadding(WindowInsets::getTop)
+            val imageHigh = maxHeight / 5 // 图片高度为屏幕高度的1/5
+            val contentPadding = 8.dp // 内容区域内边距
+
+            val sizes = remember(maxHeight, maxWidth, sysTopPadding) {
+                WorldDetailSizesState(
+                    maxHeight = maxHeight,
+                    imageHigh = imageHigh,
+                    // 折叠高度：留出图片高度+顶部信息+两行信息块的空间
+                    collapsedHeight = (maxHeight * 2 / 3) - contentPadding - (itemSize.height * 2 + contentPadding * 2),
+                    // 半展开高度：屏幕高度的2/3
+                    halfExpandedHeight = (maxHeight * 2 / 3) - contentPadding,
+                    // 完全展开高度：完整屏幕高度减去状态栏
+                    expandedHeight = maxHeight - sysTopPadding,
+                    topBarHeight = 64.dp,
+                    sysTopPadding = sysTopPadding,
+                    itemSize = itemSize
+                )
+            }
+            // ========== BottomSheet状态管理 ==========
+            var sheetState by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(SheetState.HALF_EXPANDED) }
+            var dragOffset by remember { mutableStateOf(0f) }
+            val collapseExpandedInstances = {
+                sheetState = SheetState.HALF_EXPANDED
+                dragOffset = 0f
+            }
+            val handleReturn = {
+                if (sheetState == SheetState.EXPANDED) {
+                    collapseExpandedInstances()
+                } else {
+                    onReturn()
+                }
+            }
+
+            HandleBackNavigation(
+                enabled = sheetState == SheetState.EXPANDED,
+                onBack = collapseExpandedInstances,
+            )
+
+            // 计算目标高度和当前高度
+            val bottomSheetState = calculateBottomSheetState(
+                sheetState = sheetState,
+                dragOffset = dragOffset,
+                sizes = sizes
+            )
+
+            // 背景图、信息区和底部面板是内容层：顶栏的玻璃按钮取样它做模糊
+            val glassBackdrop = rememberGlassBackdrop()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .glassBackdropSource(glassBackdrop)
+                    .background(AppTheme.colors.groupedBackground)
+            ) {
+                // ========== 渲染背景图像 ==========
+                RenderBackgroundImage(
+                    worldId = location ?: worldProfileVo.worldId,
+                    imageUrl = worldProfileVo.worldImageUrl ?: "",
+                    hazeState = hazeState,
+                    imageHeight = sizes.imageHigh * 2,
+                    sharedKeyPrefix = sharedKeyPrefix,
+                    sharedImageCacheKey = sharedImageCacheKey,
+                )
+
+                // ========== 应用模糊效果 ==========
+                ApplyBlurEffect(
+                    hazeState = hazeState,
+                    blurRadius = bottomSheetState.blurRadius.dp,
+                    overlayAlpha = bottomSheetState.overlayAlpha
+                )
+
+                // ========== 主内容区域 ==========
+                RenderMainContent(
+                    worldProfileVo = worldProfileVo,
+                    sizes = sizes,
+                    collapsedAlphaVariant = 1 - bottomSheetState.collapsedAlpha,
+                )
+
+                // ========== BottomSheet ==========
+                RenderBottomSheet(
                     worldProfileVo = worldProfileVo,
                     activeInstances = activeInstances,
                     favoriteEntryState = favoriteEntryState,
-                    sysBottomPadding = sysBottomPadding,
-                    worldIdForSharedElement = location ?: worldProfileVo.worldId,
-                    sharedKeyPrefix = sharedKeyPrefix,
-                    sharedImageCacheKey = sharedImageCacheKey,
+                    bottomSheetState = bottomSheetState,
+                    sizes = sizes,
+                    onExpanded = { sheetState = SheetState.EXPANDED },
+                    onDragDelta = { delta -> dragOffset += -delta },
+                    onDragStopped = { velocity ->
+                        // 决定最终状态并重置拖动偏移
+                        sheetState = determineSheetState(
+                            currentHeightValue = bottomSheetState.targetHeight.value + dragOffset,
+                            velocity = velocity,
+                            currentState = sheetState,
+                            sizes = sizes
+                        )
+                        dragOffset = 0f
+                    },
                     onCreateRoom = createRoom,
                     onFavoriteWorld = favoriteWorld,
                     onOpenRoom = openRoom,
                 )
+            }
 
+            // ========== 顶部菜单栏 ==========
+            CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
                 WorldProfileTopBar(
                     worldId = worldProfileVo.worldId,
-                    sysTopPadding = sysTopPadding,
-                    onReturn = onReturn,
+                    worldName = worldProfileVo.worldName,
+                    blurProgress = bottomSheetState.blurProgress,
+                    topBarHeight = sizes.topBarHeight,
+                    sysTopPadding = sizes.sysTopPadding,
+                    onReturn = handleReturn,
+                    onCollapse = { sheetState = SheetState.COLLAPSED },
                     onManagePersistence = { showWorldPersistenceDialog = true },
                     isRefreshing = isRefreshing,
                     onRefresh = onRefresh,
@@ -532,386 +653,867 @@ class WorldProfileScreen(
 
 }
 
-private val WorldProfileCompactContentMaxWidth = 720.dp
+// ======================================
+// 状态计算函数
+// ======================================
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * 计算BottomSheet状态
+ */
 @Composable
-private fun WorldProfileCompactLayout(
-    worldProfileVo: WorldProfileVo,
-    activeInstances: List<InstanceVo>,
-    favoriteEntryState: FavoriteEntryState,
-    sysBottomPadding: Dp,
-    worldIdForSharedElement: String,
-    sharedKeyPrefix: String,
-    sharedImageCacheKey: String?,
-    onCreateRoom: () -> Unit,
-    onFavoriteWorld: () -> Unit,
-    onOpenRoom: (InstanceVo) -> Unit,
+private fun calculateBottomSheetState(
+    sheetState: SheetState,
+    dragOffset: Float,
+    sizes: WorldDetailSizesState,
+): BottomSheetUIState {
+    // 计算目标高度
+    val targetHeight = when (sheetState) {
+        SheetState.COLLAPSED -> sizes.collapsedHeight
+        SheetState.HALF_EXPANDED -> sizes.halfExpandedHeight
+        SheetState.EXPANDED -> sizes.expandedHeight
+    }
+
+    // 计算当前显示高度（原目标高度 + 拖动偏移）
+    val currentHeight = (targetHeight.value + dragOffset / 2).coerceIn(
+        sizes.collapsedHeight.value,
+        sizes.expandedHeight.value
+    ).dp
+
+    // 使用动画平滑过渡
+    val animatedHeight by animateDpAsState(
+        targetValue = currentHeight,
+        label = "BottomSheet Height Animation"
+    )
+
+    // 计算模糊相关状态
+    val blurProgress = if (currentHeight.value > sizes.halfExpandedHeight.value) {
+        (currentHeight.value - sizes.halfExpandedHeight.value) /
+                (sizes.expandedHeight.value - sizes.halfExpandedHeight.value)
+    } else {
+        0f
+    }.coerceIn(0f, 1f)
+
+    val blurRadius by animateFloatAsState(
+        targetValue = (blurProgress * 25f).coerceIn(0f, 25f),
+        animationSpec = tween(100),
+        label = "Blur Animation"
+    )
+
+    val blurAlpha by animateFloatAsState(
+        targetValue = blurProgress,
+        label = "Blur Animation"
+    )
+
+    val overlayAlpha by animateFloatAsState(
+        targetValue = (blurProgress * 0.6f).coerceIn(0f, 0.6f),
+        label = "Overlay Animation"
+    )
+
+    // 计算折叠状态进度
+    val collapsedProgress = (currentHeight.value - sizes.collapsedHeight.value) /
+            (sizes.halfExpandedHeight.value - sizes.collapsedHeight.value)
+    val collapsedAlpha by animateFloatAsState(
+        targetValue = collapsedProgress.coerceIn(0f, 1f),
+    )
+
+    return BottomSheetUIState(
+        targetHeight = targetHeight,
+        currentHeight = currentHeight,
+        animatedHeight = animatedHeight,
+        blurProgress = blurProgress,
+        blurRadius = blurRadius,
+        blurAlpha = blurAlpha,
+        overlayAlpha = overlayAlpha,
+        collapsedProgress = collapsedProgress,
+        collapsedAlpha = collapsedAlpha
+    )
+}
+
+/**
+ * 根据拖动结束时的状态确定最终Sheet状态
+ */
+private fun determineSheetState(
+    currentHeightValue: Float,
+    velocity: Float,
+    currentState: SheetState,
+    sizes: WorldDetailSizesState,
+): SheetState {
+    // 计算各状态高度
+    val collapsedHeight = sizes.collapsedHeight.value
+    val halfExpandedHeight = sizes.halfExpandedHeight.value
+    val expandedHeight = sizes.expandedHeight.value
+
+    // 计算当前高度距离各状态的距离
+    val distToCollapsed = abs(currentHeightValue - collapsedHeight)
+    val distToHalfExpanded = abs(currentHeightValue - halfExpandedHeight)
+    val distToExpanded = abs(currentHeightValue - expandedHeight)
+
+    // 计算相对位置 - 当前高度在整个范围内的位置比例(0~1)
+    val positionRatio = (currentHeightValue - collapsedHeight) / (expandedHeight - collapsedHeight)
+
+    // 速度处理 - 正规化速度值 (正值表示向下拖动/收起，负值表示向上拖动/展开)
+    val normalizedVelocity = (velocity / 800f).coerceIn(-3f, 3f)
+
+    // 防止状态跳跃：根据当前状态和速度限制可达状态
+    val allowedStates = when (currentState) {
+        SheetState.COLLAPSED -> {
+            // 从折叠状态只能到达半展开
+            if (normalizedVelocity < -1.5f) listOf(SheetState.HALF_EXPANDED)
+            else listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED)
+        }
+
+        SheetState.HALF_EXPANDED -> {
+            // 从半展开可到达任何状态，但需要根据位置和速度判断
+            listOf(SheetState.COLLAPSED, SheetState.HALF_EXPANDED, SheetState.EXPANDED)
+        }
+
+        SheetState.EXPANDED -> {
+            // 从展开状态只能到达半展开
+            if (normalizedVelocity > 1.5f) listOf(SheetState.HALF_EXPANDED)
+            else listOf(SheetState.HALF_EXPANDED, SheetState.EXPANDED)
+        }
+    }
+
+    // 强磁吸效果：如果非常接近某个状态且没有明显反向速度，直接返回该状态
+    when {
+        // 非常接近折叠状态 (距离小于总范围的10%)
+        distToCollapsed < (expandedHeight - collapsedHeight) * 0.1f &&
+                normalizedVelocity > -1f &&
+                SheetState.COLLAPSED in allowedStates ->
+            return SheetState.COLLAPSED
+
+        // 非常接近半展开状态 (距离小于总范围的10%)
+        distToHalfExpanded < (expandedHeight - collapsedHeight) * 0.1f &&
+                abs(normalizedVelocity) < 1f &&
+                SheetState.HALF_EXPANDED in allowedStates ->
+            return SheetState.HALF_EXPANDED
+
+        // 非常接近展开状态 (距离小于总范围的10%)
+        distToExpanded < (expandedHeight - collapsedHeight) * 0.1f &&
+                normalizedVelocity < 1f &&
+                SheetState.EXPANDED in allowedStates ->
+            return SheetState.EXPANDED
+    }
+
+    // 处理中等速度滑动 - 主要根据方向和位置决定
+    if (abs(normalizedVelocity) > 1f) {
+        return when {
+            normalizedVelocity < 0 -> { // 向上滑动
+                // 在底部区域向上滑，到达半展开
+                if (positionRatio < 0.4f && SheetState.HALF_EXPANDED in allowedStates)
+                    SheetState.HALF_EXPANDED
+                // 在上部区域向上滑，且允许展开，则展开
+                else if (positionRatio > 0.6f && SheetState.EXPANDED in allowedStates)
+                    SheetState.EXPANDED
+                // 默认保持在半展开
+                else SheetState.HALF_EXPANDED
+            }
+
+            else -> { // 向下滑动
+                // 在上部区域向下滑，到达半展开
+                if (positionRatio > 0.6f && SheetState.HALF_EXPANDED in allowedStates)
+                    SheetState.HALF_EXPANDED
+                // 在底部区域向下滑，且允许折叠，则折叠
+                else if (positionRatio < 0.4f && SheetState.COLLAPSED in allowedStates)
+                    SheetState.COLLAPSED
+                // 默认保持在半展开
+                else SheetState.HALF_EXPANDED
+            }
+        }
+    }
+
+    // 对于低速或停止的情况，纯粹根据位置决定
+    return when {
+        // 位于下1/3区域，倾向于折叠
+        positionRatio < 0.33f && SheetState.COLLAPSED in allowedStates ->
+            SheetState.COLLAPSED
+        // 位于上1/3区域，倾向于展开
+        positionRatio > 0.67f && SheetState.EXPANDED in allowedStates ->
+            SheetState.EXPANDED
+        // 中间区域或其他情况，倾向于半展开
+        else -> SheetState.HALF_EXPANDED
+    }
+}
+
+// ======================================
+// UI 渲染组件
+// ======================================
+
+/**
+ * 渲染背景图像
+ */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun RenderBackgroundImage(
+    worldId: String,
+    imageUrl: String,
+    hazeState: HazeState,
+    imageHeight: Dp,
+    sharedKeyPrefix: String = "",
+    sharedImageCacheKey: String? = null,
 ) {
-    var roomsExpanded by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(false) }
+    AImage(
+        modifier = Modifier
+            .height(imageHeight)
+            .hazeSource(hazeState)
+            .sharedBoundsBy(
+                key = sharedKeyPrefix + worldId + "WorldImage",
+                renderInOverlayDuringTransition = false
+        ),
+        imageData = imageUrl,
+        loadOriginalSize = true,
+        cachedPlaceholderKey = sharedImageCacheKey,
+    )
+}
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Hero 使用完整页面宽度；正文和房间仍保持适合阅读的最大宽度。
-        LazyColumn(
+/**
+ * 应用模糊效果
+ */
+@Composable
+private fun ApplyBlurEffect(
+    hazeState: HazeState,
+    blurRadius: Dp,
+    overlayAlpha: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .hazeEffect(
+                hazeState,
+                style = HazeStyle(
+                    blurRadius = blurRadius,
+                    tint = null,
+                    backgroundColor = AppTheme.colors.label.copy(alpha = overlayAlpha)
+                )
+            )
+    )
+}
+
+/**
+ * 渲染主内容区域
+ */
+@Composable
+private fun RenderMainContent(
+    worldProfileVo: WorldProfileVo,
+    sizes: WorldDetailSizesState,
+    collapsedAlphaVariant: Float,
+) {
+
+    // 渐变和卡片样式
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color.Transparent, // 起始颜色（完全透明）
+            AppTheme.colors.groupedBackground// 结束
+        ),
+        endY = with(LocalDensity.current){ 100.dp.toPx() },
+    )
+
+
+    val itemSize = sizes.itemSize
+    val navigator = LocalNavigator.currentOrThrow
+
+    // 主内容区域
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = sizes.maxHeight - sizes.halfExpandedHeight - sizes.imageHigh * 0.75f)
+            .background(gradientBrush)
+            .padding(horizontal = AppSpacing.page),
+    ) {
+        Spacer(modifier = Modifier.height(sizes.imageHigh * 0.25f))
+        // 顶部信息区
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            item(key = "hero") {
-                WorldProfileHero(
-                    worldProfileVo = worldProfileVo,
-                    worldIdForSharedElement = worldIdForSharedElement,
-                    sharedKeyPrefix = sharedKeyPrefix,
-                    sharedImageCacheKey = sharedImageCacheKey,
-                )
-            }
-
-            item(key = "details") {
-                WorldDetails(
-                    worldProfileVo = worldProfileVo,
-                    modifier = Modifier
-                        .widthIn(max = WorldProfileCompactContentMaxWidth)
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                )
-            }
-
-            if (activeInstances.isEmpty()) {
-                item(key = "rooms-empty") {
-                    EmptyInstanceCard(
-                        onCreateInstance = onCreateRoom,
-                        enabled = true,
-                        modifier = Modifier
-                            .widthIn(max = WorldProfileCompactContentMaxWidth)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+            ATooltipBox(
+                tooltip = {
+                    AppText(text = worldProfileVo.worldName)
+                },
+            ) {
+                SelectionContainer {
+                    AppText(
+                        text = worldProfileVo.worldName,
+                        color = AppTheme.colors.label,
+                        style = AppTheme.type.title1,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            } else if (activeInstances.size > 1 && !roomsExpanded) {
-                item(key = "rooms-stack") {
-                    WorldRoomStack(
-                        instances = activeInstances,
-                        onExpand = { roomsExpanded = true },
-                        modifier = Modifier
-                            .widthIn(max = WorldProfileCompactContentMaxWidth)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                    )
-                }
-            } else {
-                itemsIndexed(
-                    items = activeInstances,
-                    key = { _, instance -> instance.id },
-                ) { index, instance ->
-                    Box(
-                        modifier = Modifier
-                            .widthIn(max = WorldProfileCompactContentMaxWidth)
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        InstanceCard(
-                            instance = instance,
-                            size = activeInstances.size,
-                            index = index,
-                            unfold = true,
-                            expandProgress = 1f,
-                            onClick = { onOpenRoom(instance) },
-                        )
+            }
+            Box(
+                modifier = Modifier.enableIf(worldProfileVo.authorName != null){
+                    simpleClickable {
+                        worldProfileVo.authorID?.let {
+                            val userProfileScreen = UserProfileScreen(
+                                userProfileVO = UserProfileVo(
+                                    id = it,
+                                    displayName = worldProfileVo.authorName.orEmpty(),
+                                )
+                            )
+                            navigator.push(userProfileScreen)
+                        }
                     }
                 }
+            ) {
+                // 可点的作者名按链接处理：tint 色、不加下划线
+                AppText(
+                    text = worldProfileVo.authorName ?: strings.unknown,
+                    color = if (worldProfileVo.authorName != null) AppTheme.colors.tint else AppTheme.colors.secondaryLabel,
+                    style = AppTheme.type.subheadlineEmphasized,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
 
-        WorldProfileBottomActions(
-            favoriteEntryState = favoriteEntryState,
-            sysBottomPadding = sysBottomPadding,
-            onCreateRoom = onCreateRoom,
-            onFavoriteWorld = onFavoriteWorld,
-        )
+        InfoArea(worldProfileVo, collapsedAlphaVariant, itemSize)
+
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun WorldProfileBottomActions(
+private fun ColumnScope.InfoArea(
+    worldProfileVo: WorldProfileVo,
+    collapsedAlphaVariant: Float,
+    itemSize: DpSize,
+) {
+    // 基本信息卡片（日期类只在有值时显示，不放"未知"占位）
+    val basicInfoCards = buildList {
+        // 世界容量
+        add(Triple(AppIcons.Person, "${worldProfileVo.capacity}", strings.worldProfileCapacity))
+        // 在线人数
+        add(
+            Triple(
+                AppIcons.Group,
+                "${worldProfileVo.publicOccupants + worldProfileVo.privateOccupants}",
+                strings.worldProfileOnlineUsers
+            )
+        )
+        // 访问次数
+        add(Triple(AppIcons.Visibility, "${worldProfileVo.visits}", strings.worldProfileVisits))
+        // 收藏数
+        add(Triple(AppIcons.Favorite, "${worldProfileVo.favorites}", strings.worldProfileFavorites))
+        // 热度
+        add(Triple(AppIcons.Hot, "${worldProfileVo.heat}", strings.worldProfileHeat))
+        // 热门程度
+        add(Triple(AppIcons.Trending, "${worldProfileVo.popularity}", strings.worldProfilePopularity))
+        // 版本
+        add(Triple(AppIcons.Refresh, "v${worldProfileVo.version ?: 1}", strings.worldProfileVersion))
+        // 发布时间
+        worldProfileVo.publicationDate.toWorldDisplayDate()?.let { add(Triple(AppIcons.Publish, it, strings.worldProfilePublishDate)) }
+        // 更新时间
+        worldProfileVo.updatedAt.toWorldDisplayDate()?.let { add(Triple(AppIcons.DateRange, it, strings.worldProfileUpdateDate)) }
+        // 创建时间
+        worldProfileVo.createdAt.toWorldDisplayDate()?.let { add(Triple(AppIcons.DateRange, it, strings.worldProfileCreatedDate)) }
+        // 实验室发布日期
+        worldProfileVo.labsPublicationDate.toWorldDisplayDate()?.let { add(Triple(AppIcons.FlaskConical, it, strings.worldProfileLabReleaseDate)) }
+    }
+
+    // 平台文件大小卡片
+    val platformSizeCards = worldProfileVo.platformFileSizes.map { platformSize ->
+        val icon = when (platformSize.platform) {
+            Windows -> AppIcons.Computer
+            Ios -> AppIcons.Apple
+            Android -> AppIcons.Android
+        }
+        Triple(icon, platformSize.formattedSize, platformSize.displayName)
+    }
+
+    // 合并所有卡片
+    val infoCards = basicInfoCards + platformSizeCards
+
+    // 计算每页显示的卡片数量
+    val cardsPerRow = 4 // 每行显示4个卡片
+    val rowsPerPage = 2 // 每页显示2行
+    val cardsPerPage = cardsPerRow * rowsPerPage // 每页8个卡片
+    val pageCount = (infoCards.size + cardsPerPage - 1) / cardsPerPage
+    // 使用HorizontalPager实现水平滑动
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    // 信息卡片区域
+    AnimatedVisibility(
+        visible = collapsedAlphaVariant > 0,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(collapsedAlphaVariant),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                pageSpacing = 8.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemSize.height * 2 + 8.dp), // 增加高度限制以适应更大的卡片
+            ) { page ->
+                // 计算当前页应显示的卡片
+                val startIndex = page * cardsPerPage
+                val endIndex = minOf(startIndex + cardsPerPage, infoCards.size)
+                val pageCards = infoCards.subList(startIndex, endIndex)
+
+                // 添加页面过渡动画
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 第一行卡片
+                    val firstRowEnd = minOf(startIndex + cardsPerRow, endIndex)
+                    if (startIndex < firstRowEnd) {
+                        val firstRowCards = pageCards.subList(0, firstRowEnd - startIndex)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for ((icon, label, description) in firstRowCards) {
+                                InfoItemBlock(
+                                    size = itemSize,
+                                    icon = icon,
+                                    label = label,
+                                    description = description
+                                )
+                            }
+                        }
+                    }
+
+                    // 第二行卡片
+                    val secondRowStart = firstRowEnd
+                    val secondRowEnd = minOf(secondRowStart + cardsPerRow, endIndex)
+                    if (secondRowStart < secondRowEnd) {
+                        val secondRowCards = pageCards.subList(firstRowEnd - startIndex, secondRowEnd - startIndex)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for ((icon, label, description) in secondRowCards) {
+                                InfoItemBlock(
+                                    size = itemSize,
+                                    icon = icon,
+                                    label = label,
+                                    description = description
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+
+    }
+}
+
+private fun String?.toWorldDisplayDate(): String? = this
+    ?.takeIf { it.isNotEmpty() }
+    ?.toLocalDate()
+    ?.simpleFormat
+
+/**
+ * 渲染BottomSheet
+ */
+@Composable
+private fun RenderBottomSheet(
+    worldProfileVo: WorldProfileVo,
+    activeInstances: List<InstanceVo>,
     favoriteEntryState: FavoriteEntryState,
-    sysBottomPadding: Dp,
+    bottomSheetState: BottomSheetUIState,
+    sizes: WorldDetailSizesState,
+    onExpanded: () -> Unit,
+    onDragDelta: (Float) -> Unit,
+    onDragStopped: (Float) -> Unit,
     onCreateRoom: () -> Unit,
     onFavoriteWorld: () -> Unit,
+    onOpenRoom: (InstanceVo) -> Unit,
 ) {
+    // BottomSheet容器
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = sysBottomPadding),
-        contentAlignment = Alignment.Center,
+            .fillMaxSize()
     ) {
+        AppSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(bottomSheetState.animatedHeight)
+                .align(Alignment.BottomCenter),
+            shape = RoundedCornerShape(topStart = AppRadius.xl, topEnd = AppRadius.xl),
+            shadowElevation = 16.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .draggable(
+                        state = rememberDraggableState(onDelta = onDragDelta),
+                        orientation = Orientation.Vertical,
+                        onDragStopped = { velocity -> onDragStopped(velocity) }
+                    )
+            ) {
+                // 拖动指示条
+                DragBar(dragOffset = bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value)
+
+                // 全屏时添加额外空间
+                Spacer(modifier = Modifier.height(bottomSheetState.blurProgress * (sizes.topBarHeight - 24.dp)))
+
+                // 主要信息内容
+                RenderBottomSheetContent(
+                    worldProfileVo = worldProfileVo,
+                    activeInstances = activeInstances,
+                    favoriteEntryState = favoriteEntryState,
+                    bottomSheetState = bottomSheetState,
+                    onExpanded = onExpanded,
+                    onCreateRoom = onCreateRoom,
+                    onFavoriteWorld = onFavoriteWorld,
+                    onOpenRoom = onOpenRoom,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 渲染BottomSheet内容
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RenderBottomSheetContent(
+    worldProfileVo: WorldProfileVo,
+    activeInstances: List<InstanceVo>,
+    favoriteEntryState: FavoriteEntryState,
+    bottomSheetState: BottomSheetUIState,
+    onExpanded: () -> Unit,
+    onCreateRoom: () -> Unit,
+    onFavoriteWorld: () -> Unit,
+    onOpenRoom: (InstanceVo) -> Unit,
+) {
+    // 上滑渐变小
+    val fl = 1 - bottomSheetState.blurProgress
+    val hasNoInstances = activeInstances.isEmpty()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = getInsetPadding(WindowInsets::getBottom))
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 标签区域
+
+            if (fl > 0f) {
+                Column(
+                    modifier = Modifier.alpha(fl),
+                    verticalArrangement = Arrangement.spacedBy(4.dp * fl)
+                ) {
+                    // 描述标题
+                    AppText(
+                        text = strings.worldProfileDescription,
+                        style = AppTheme.type.headline,
+                        fontWeight = FontWeight.Bold,
+                        color = AppTheme.colors.label.copy(
+                            alpha = 1f - (0.3f * abs(
+                                (bottomSheetState.currentHeight.value - bottomSheetState.targetHeight.value).coerceIn(
+                                    -30f,
+                                    30f
+                                )
+                            ) / 30f)
+                        )
+                    )
+
+                    // 描述内容
+                    AppText(
+                        modifier = Modifier.heightIn(max = (bottomSheetState.animatedHeight / 3.5f * fl))
+                            .verticalScroll(rememberScrollState()),
+                        text = worldProfileVo.worldDescription,
+                        style = AppTheme.type.subheadline,
+                        color = AppTheme.colors.secondaryLabel,
+                    )
+                    if (worldProfileVo.tags?.isNotEmpty() == true) {
+                        AppText(
+                            text = strings.worldProfileAuthorTags,
+                            fontWeight = FontWeight.Bold,
+                            style = AppTheme.type.headline,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            worldProfileVo.tags.forEach { tag ->
+                                TextChip(text = tag)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 堆叠卡片 - 改为随着滑动过程展开
+
+            if (hasNoInstances && bottomSheetState.blurProgress > 0f) {
+                EmptyInstanceCard(
+                    onCreateInstance = onCreateRoom,
+                    enabled = bottomSheetState.blurProgress >= 1f,
+                    modifier = Modifier.alpha(bottomSheetState.blurProgress),
+                )
+            }
+
+            if (!hasNoInstances && bottomSheetState.collapsedAlpha > 0f) {
+                Box(modifier = Modifier.alpha(bottomSheetState.collapsedAlpha)) {
+                    StackedCards(
+                        instances = activeInstances,
+                        maxVisibleCards = 3,
+                        // 传递展开程度，用于调整卡片样式
+                        expandProgress = bottomSheetState.blurProgress,
+                        onOpenRoom = onOpenRoom,
+                        onExpandCardClick = { onExpanded() },
+                    )
+                }
+            }
+        }
+
+        val buttonAlpha = (1 - bottomSheetState.blurProgress * 2).coerceIn(0f, 1f)
+        // 操作按钮 - 始终显示在底部
+        if (buttonAlpha <= 0f) return@Box
         WorldProfilePrimaryActions(
             favoriteEntryState = favoriteEntryState,
             onCreateRoom = onCreateRoom,
             onFavoriteWorld = onFavoriteWorld,
             modifier = Modifier
-                .widthIn(max = WorldProfileCompactContentMaxWidth)
                 .fillMaxWidth()
                 .height(80.dp)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .offset(y = 80.dp * bottomSheetState.blurProgress)
+                .alpha(buttonAlpha)
+                .align(Alignment.BottomCenter)
+                .padding(vertical = 16.dp),
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+/**
+ * 拖动指示条
+ */
 @Composable
-private fun WorldProfileHero(
-    worldProfileVo: WorldProfileVo,
-    worldIdForSharedElement: String,
-    sharedKeyPrefix: String,
-    sharedImageCacheKey: String?,
+private fun DragBar(dragOffset: Float = 100f) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(5.dp)
+                .clip(AppShapes.capsule)
+                .background(
+                    AppTheme.colors.tertiaryLabel.copy(
+                        alpha = 0.5f + (0.5f * abs(dragOffset.coerceIn(-100f, 100f)) / 100f)
+                    )
+                )
+        )
+    }
+}
+
+/**
+ * 信息块
+ */
+@Composable
+private fun InfoItemBlock(
+    color: Color = AppTheme.colors.secondaryGroupedBackground,
+    size: DpSize,
+    icon: ImageVector,
+    label: String,
+    description: String,
 ) {
-    val navigator = LocalNavigator.currentOrThrow
-    val contentCornerRadius = 24.dp
-    val bottomScrim = Brush.verticalGradient(
-        colors = listOf(
-            Color.Transparent,
-            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.9f),
-        ),
-        endY = with(LocalDensity.current) { 100.dp.toPx() },
-    )
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val heroHeight = maxWidth * 3f / 4f
+    ATooltipBox(
+        tooltip = {
+            AppText(
+                text = description,
+                style = AppTheme.type.caption2Emphasized
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .size(size)
+                .clip(AppShapes.m)
+                .background(color),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            AppIcon(
+                imageVector = icon,
+                tint = AppTheme.colors.tint,
+                contentDescription = description,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            AppText(
+                text = label,
+                color = AppTheme.colors.label,
+                style = AppTheme.type.footnoteEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+
+@Composable
+fun StackedCards(
+    instances: List<InstanceVo>,
+    maxVisibleCards: Int = 3,
+    expandProgress: Float = 0f,  // 默认值为0，表示未展开
+    onOpenRoom: (InstanceVo) -> Unit = {},
+    onExpandCardClick: () -> Unit,
+) {
+
+    val size = instances.size
+    // 空状态由调用方优先渲染，保留防御性返回。
+    if (size == 0) return
+    val isFullyExpanded = expandProgress >= 1f
+
+    val doExpandCardClick = if (expandProgress == 0f) onExpandCardClick else null
+    if (isFullyExpanded) {
+        // 在完全展开状态下使用Column布局垂直排列所有卡片
+        val lazyListState = rememberLazyListState()
+        val layoutInfo by remember { derivedStateOf { lazyListState.layoutInfo } }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth(),
+            state = lazyListState,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            itemsIndexed(instances, key = { _, instance -> instance.id }) { index, instance ->
+                val visibleItemInfo by remember {
+                    derivedStateOf {
+                        layoutInfo.visibleItemsInfo.find { it.index == index }
+                    }
+                }
+                // 计算缩放比例
+                val scale by animateFloatAsState(
+                    targetValue = visibleItemInfo?.let {
+                        val itemBottom = it.offset + it.size
+                        val viewportBottom = layoutInfo.viewportEndOffset
+                        val distanceFromBottom = viewportBottom - itemBottom
+
+                        when {
+                            // 元素完全在视口下方
+                            distanceFromBottom < -it.size -> 0.7f
+                            // 元素开始进入视口
+                            distanceFromBottom < 0 -> 0.7f + 0.3f * (1 - distanceFromBottom / -it.size.toFloat())
+                            // 元素完全可见
+                            else -> 1f
+                        }
+                    } ?: 0.7f,  // 不可见元素保持最小缩放
+                    animationSpec = tween(300)
+                )
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                ) {
+                    InstanceCard(
+                        instance = instance,
+                        size = instances.size - index,
+                        index = index,
+                        verticalOffset = 0.dp, // 在Column中不需要手动设置偏移
+                        scaleEffect = 1f,
+                        alphaEffect = 1f,
+                        // 展开后点卡片打开房间详情（管理 / 关闭房间在这里）
+                        onClick = { onOpenRoom(instance) },
+                    )
+                }
+            }
+        }
+    } else {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(heroHeight),
+                .enableIf(expandProgress >= 1f) {
+                    fillMaxHeight()
+                }
         ) {
-            AImage(
-                modifier = Modifier
-                    .matchParentSize()
-                    .sharedBoundsBy(
-                        key = sharedKeyPrefix + worldIdForSharedElement + "WorldImage",
-                        renderInOverlayDuringTransition = false,
-                    ),
-                imageData = worldProfileVo.worldImageUrl.orEmpty(),
-                contentScale = ContentScale.Fit,
-                loadOriginalSize = true,
-                cachedPlaceholderKey = sharedImageCacheKey,
-            )
+            // 计算需要显示的卡片数量
+            val visibleCardsCount = minOf(maxVisibleCards, size)
 
-            WorldPlatformBadges(
-                worldProfileVo = worldProfileVo,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = getInsetPadding(WindowInsets::getTop) + 72.dp, end = 12.dp),
-            )
+            // 只显示前visibleCardsCount张卡片，并且倒序渲染（最后一张卡片最先渲染，在最底层）
+            // 获取要显示的卡片子列表
+            val visibleCards = instances.take(visibleCardsCount)
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .background(bottomScrim)
-                    .padding(
-                        start = 8.dp,
-                        top = 48.dp,
-                        end = 8.dp,
-                        bottom = contentCornerRadius + 8.dp,
-                    ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.Start,
-            ) {
-                ATooltipBox(tooltip = { Text(worldProfileVo.worldName) }) {
-                    SelectionContainer {
-                        Text(
-                            text = worldProfileVo.worldName,
-                            color = MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                HorizontalDivider(
-                    thickness = 2.dp,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-                Box(
-                    modifier = Modifier.enableIf(worldProfileVo.authorName != null) {
-                        simpleClickable {
-                            worldProfileVo.authorID?.let { authorId ->
-                                navigator.push(
-                                    UserProfileScreen(
-                                        userProfileVO = UserProfileVo(
-                                            id = authorId,
-                                            displayName = worldProfileVo.authorName.orEmpty(),
-                                        )
-                                    )
-                                )
-                            }
-                        }
-                    }
-                ) {
-                    Text(
-                        text = worldProfileVo.authorName ?: strings.unknown,
-                        color = MaterialTheme.colorScheme.secondary,
-                        style = MaterialTheme.typography.labelMedium,
-                        textDecoration = TextDecoration.Underline,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                WorldProfileSummary(
-                    worldProfileVo = worldProfileVo,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+            // 从下往上渲染卡片（索引从visibleCards.size-1到0）
+            for (i in visibleCards.size - 1 downTo 1) {
+                val instance = visibleCards[i]
+
+
+                // 基础偏移和视觉效果
+                val baseOffset = 10.dp * i
+                val baseScale = 1f - (0.1f * i)
+                val baseAlpha = 1f - (0.25f * i)
+
+                // 随展开程度调整的偏移量（展开时增加间距）
+                val expandedOffset = i * 130f
+                val currentOffset = baseOffset + (expandedOffset.dp - baseOffset) * expandProgress
+
+                // 随展开程度调整的透明度和缩放（展开时减少透明度和缩放效果）
+                val currentScale = baseScale + ((1f - baseScale) * expandProgress)
+                val currentAlpha = baseAlpha + ((1f - baseAlpha) * expandProgress)
+
+                InstanceCard(
+                    instance = instance,
+                    size = size,
+                    index = i,
+                    verticalOffset = currentOffset,
+                    scaleEffect = currentScale,
+                    alphaEffect = currentAlpha,
+                    expandProgress = expandProgress
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(contentCornerRadius)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(
-                            topStart = contentCornerRadius,
-                            topEnd = contentCornerRadius,
-                        ),
-                    ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorldPlatformBadges(
-    worldProfileVo: WorldProfileVo,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (worldProfileVo.isInCommunityLabs()) {
-            WorldPlatformBadge(
-                icon = AppIcons.FlaskConical,
-                description = strings.worldProfileCommunityLabs,
-            )
-        }
-        listOf(
-            Triple(Windows, AppIcons.Computer, "PC"),
-            Triple(Android, AppIcons.Android, "Android"),
-            Triple(Ios, AppIcons.Apple, "iOS"),
-        ).forEach { (platform, icon, description) ->
-            if (platform !in worldProfileVo.supportedPlatforms) return@forEach
-            WorldPlatformBadge(
-                icon = icon,
-                description = description,
-            )
-        }
-    }
-}
-
-private fun WorldProfileVo.isInCommunityLabs(): Boolean =
-    releaseStatus.equals("public", ignoreCase = true) &&
-        labsPublicationDate.isPublicationDate() &&
-        !publicationDate.isPublicationDate()
-
-private fun String?.isPublicationDate(): Boolean =
-    !isNullOrBlank() && !equals("none", ignoreCase = true)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WorldPlatformBadge(
-    icon: ImageVector,
-    description: String,
-) {
-    ATooltipBox(tooltip = { Text(description) }) {
-        Surface(
-            modifier = Modifier.size(34.dp),
-            shape = RoundedCornerShape(7.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
-            shadowElevation = 2.dp,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = description,
-                modifier = Modifier.padding(7.dp),
-                tint = MaterialTheme.colorScheme.secondary,
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorldProfileSummary(
-    worldProfileVo: WorldProfileVo,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        WorldSummaryItem(
-            icon = AppIcons.Person,
-            value = strings.worldProfileCapacityValue.replace(
-                "%count%",
-                worldProfileVo.capacity.toString(),
-            ),
-            description = strings.worldProfileCapacity,
-            modifier = Modifier.weight(1f),
-        )
-        WorldSummaryItem(
-            icon = AppIcons.Groups,
-            value = strings.worldProfileCapacityValue.replace(
-                "%count%",
-                (worldProfileVo.publicOccupants + worldProfileVo.privateOccupants).toString(),
-            ),
-            description = strings.worldProfileOnlineUsers,
-            modifier = Modifier.weight(1f),
-        )
-        WorldSummaryItem(
-            icon = AppIcons.Visibility,
-            value = formatCompactCount(worldProfileVo.visits),
-            description = strings.worldProfileVisits,
-            modifier = Modifier.weight(1f),
-        )
-        WorldSummaryItem(
-            icon = AppIcons.Favorite,
-            value = formatCompactCount(worldProfileVo.favorites),
-            description = strings.worldProfileFavorites,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WorldSummaryItem(
-    icon: ImageVector,
-    value: String,
-    description: String,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier.heightIn(min = 32.dp)) {
-        ATooltipBox(tooltip = { Text(description) }) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = description,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            // 显示顶部卡片（始终在最上方且完全不透明不缩小）
+            if (visibleCards.isNotEmpty()) {
+                InstanceCard(
+                    instance = visibleCards.first(),
+                    size = size,
+                    index = 0,
+                    verticalOffset = 0.dp,
+                    scaleEffect = 1f,
+                    alphaEffect = 1f,
+                    expandProgress = expandProgress,
+                    onClick = doExpandCardClick
                 )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            }
+
+            // 显示剩余卡片数量的指示器
+            if (instances.size > 1) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 12.dp, end = 16.dp)
+                        .alpha((1f - expandProgress * 3f).coerceIn(0f, 1f)) // 随着展开进度增加而变透明
+                        .background(
+                            color = AppTheme.colors.tint,
+                            shape = AppShapes.capsule
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    AppText(
+                        text = "+${instances.size - 1}",
+                        color = AppTheme.colors.onTint,
+                        style = AppTheme.type.caption1Emphasized
+                    )
+                }
             }
         }
     }
@@ -928,24 +1530,26 @@ private fun WorldProfilePrimaryActions(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Button(
+        AppButton(
             onClick = onCreateRoom,
             modifier = Modifier.weight(1f),
+            style = AppButtonStyle.Prominent,
         ) {
-            Text(
+            AppText(
                 text = strings.createInstance,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
-        OutlinedButton(
+        AppButton(
             onClick = onFavoriteWorld,
             enabled = favoriteEntryState != FavoriteEntryState.Loading &&
                 favoriteEntryState != FavoriteEntryState.Unavailable,
             modifier = Modifier.weight(1f),
+            style = AppButtonStyle.Gray,
         ) {
-            Text(
+            AppText(
                 text = when (favoriteEntryState) {
                     FavoriteEntryState.Loading -> strings.loading
                     FavoriteEntryState.Favorited -> strings.editFavorite
@@ -961,243 +1565,14 @@ private fun WorldProfilePrimaryActions(
 }
 
 @Composable
-private fun WorldRoomStack(
-    instances: List<InstanceVo>,
-    onExpand: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val visibleInstances = instances.take(3)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(140.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
-        ) {
-            for (index in visibleInstances.lastIndex downTo 1) {
-                InstanceCard(
-                    instance = visibleInstances[index],
-                    size = instances.size,
-                    index = index,
-                    verticalOffset = 10.dp * index,
-                    scaleEffect = 1f - 0.1f * index,
-                    alphaEffect = 1f - 0.25f * index,
-                    expandProgress = 0f,
-                )
-            }
-
-            InstanceCard(
-                instance = visibleInstances.first(),
-                size = instances.size,
-                index = 0,
-                verticalOffset = 0.dp,
-                scaleEffect = 1f,
-                alphaEffect = 1f,
-                expandProgress = 0f,
-                onClick = onExpand,
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 12.dp, end = 16.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.tertiary,
-                        shape = CircleShape,
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                Text(
-                    text = "+${instances.size - 1}",
-                    color = MaterialTheme.colorScheme.onTertiary,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun WorldDetails(
-    worldProfileVo: WorldProfileVo,
-    modifier: Modifier = Modifier,
-) {
-    val information = buildList {
-        worldProfileVo.publicationDate.toWorldDisplayDate()?.let { date ->
-            add(WorldInformationItem(AppIcons.Publish, strings.worldProfilePublishDate, date))
-        }
-        worldProfileVo.labsPublicationDate.toWorldDisplayDate()?.let { date ->
-            add(WorldInformationItem(AppIcons.FlaskConical, strings.worldProfileLabReleaseDate, date))
-        }
-        worldProfileVo.updatedAt.toWorldDisplayDate()?.let { date ->
-            add(WorldInformationItem(AppIcons.DateRange, strings.worldProfileUpdateDate, date))
-        }
-        worldProfileVo.createdAt.toWorldDisplayDate()?.let { date ->
-            add(WorldInformationItem(AppIcons.DateRange, strings.worldProfileCreatedDate, date))
-        }
-        worldProfileVo.version?.let { version ->
-            add(WorldInformationItem(AppIcons.Update, strings.worldProfileVersion, "v$version"))
-        }
-        add(WorldInformationItem(AppIcons.Hot, strings.worldProfileHeat, worldProfileVo.heat.toString()))
-        add(
-            WorldInformationItem(
-                AppIcons.Trending,
-                strings.worldProfilePopularity,
-                worldProfileVo.popularity.toString(),
-            )
-        )
-        worldProfileVo.platformFileSizes
-            .sortedBy { platformFile ->
-                when (platformFile.platform) {
-                    Windows -> 0
-                    Android -> 1
-                    Ios -> 2
-                }
-            }
-            .forEach { platformFile ->
-                val icon = when (platformFile.platform) {
-                    Windows -> AppIcons.Computer
-                    Android -> AppIcons.Android
-                    Ios -> AppIcons.Apple
-                }
-                add(WorldInformationItem(icon, platformFile.displayName, platformFile.formattedSize))
-            }
-    }
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = strings.worldProfileDescription,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = worldProfileVo.worldDescription.ifBlank { strings.unknown },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = strings.worldProfileInformation,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            information.chunked(2).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    rowItems.forEach { item ->
-                        WorldInformationTile(
-                            item = item,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-        }
-
-        if (!worldProfileVo.tags.isNullOrEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = strings.worldProfileAuthorTags,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    worldProfileVo.tags.forEach { tag ->
-                        TextChip(text = tag)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private data class WorldInformationItem(
-    val icon: ImageVector,
-    val label: String,
-    val value: String,
-)
-
-private fun String?.toWorldDisplayDate(): String? = this
-    ?.takeIf { it.isNotBlank() && !it.equals("none", ignoreCase = true) }
-    ?.toLocalDate()
-    ?.simpleFormat
-
-@Composable
-private fun WorldInformationTile(
-    item: WorldInformationItem,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.heightIn(min = 64.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(32.dp),
-                shape = RoundedCornerShape(7.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = item.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun WorldProfileTopBar(
     worldId: String,
+    worldName: String,
+    blurProgress: Float,
+    topBarHeight: Dp,
     sysTopPadding: Dp,
     onReturn: () -> Unit,
+    onCollapse: () -> Unit,
     onManagePersistence: () -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
@@ -1216,25 +1591,55 @@ private fun WorldProfileTopBar(
     onEditMetadata: () -> Unit,
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberAppSheetState()
 
-    TopMenuBar(
-        topBarHeight = 64.dp,
-        sysTopPadding = sysTopPadding,
-        offsetDp = 0.dp,
-        ratio = 1f,
-        color = MaterialTheme.colorScheme.surface,
-        onReturn = onReturn,
-        onMenu = { bottomSheetIsVisible = true },
-        menuContentDescription = strings.worldProfileMoreActions,
-        actions = { colors ->
-            OfficialUrlShareButton(
-                url = "https://vrchat.com/home/world/$worldId",
-                colors = colors,
-                forceSharePresentation = true,
-            )
-        },
-    )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val topBarRatio = (1 - blurProgress).coerceIn(0f, 1f)
+        val titleMaxWidth = (maxWidth - 208.dp).coerceIn(40.dp, 200.dp)
+
+        TopMenuBar(
+            topBarHeight = topBarHeight,
+            sysTopPadding = sysTopPadding,
+            offsetDp = 0.dp,
+            ratio = topBarRatio,
+            color = AppTheme.colors.secondaryGroupedBackground,
+            onReturn = onReturn,
+            onMenu = { bottomSheetIsVisible = true },
+            menuContentDescription = strings.worldProfileMoreActions,
+            actions = {
+                OfficialUrlShareButton(
+                    url = "https://vrchat.com/home/world/$worldId",
+                    forceSharePresentation = true,
+                )
+            },
+        )
+        // 标题显示：面板全展开时淡入，点一下收起面板
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(topBarHeight + sysTopPadding)
+                .alpha(blurProgress)
+                .padding(top = sysTopPadding)
+        ) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .simpleClickable(onClick = onCollapse),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AppText(
+                    modifier = Modifier.widthIn(max = titleMaxWidth),
+                    text = worldName,
+                    textAlign = TextAlign.Center,
+                    style = AppTheme.type.headline,
+                    color = AppTheme.colors.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
 
     ABottomSheet(
         isVisible = bottomSheetIsVisible,
@@ -1375,48 +1780,21 @@ private fun ColumnScope.WorldProfileSheetButton(
     isDestructive: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val colors = if (isDestructive) {
-        ButtonDefaults.textButtonColors(
-            contentColor = MaterialTheme.colorScheme.error,
-            disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.38f),
-        )
-    } else {
-        ButtonDefaults.textButtonColors()
-    }
-    TextButton(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .fillMaxWidth()
-            .padding(vertical = 2.dp, horizontal = 24.dp),
+    AppSheetAction(
         enabled = enabled,
-        colors = colors,
         onClick = onClick,
+        role = if (isDestructive) AppButtonRole.Destructive else AppButtonRole.Default,
     ) {
         if (loading) {
-            CircularProgressIndicator(
+            AppActivityIndicator(
                 modifier = Modifier.size(20.dp),
                 color = LocalContentColor.current,
-                strokeWidth = 2.dp,
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
-        Text(text = text)
+        AppText(text = text)
     }
 }
-
-private fun formatCompactCount(value: Int): String = when {
-    value >= 1_000_000 -> formatCompactDecimal(value, 1_000_000, "M")
-    value >= 1_000 -> formatCompactDecimal(value, 1_000, "K")
-    else -> value.toString()
-}
-
-private fun formatCompactDecimal(value: Int, unit: Int, suffix: String): String {
-    val tenths = value / (unit / 10)
-    val whole = tenths / 10
-    val fraction = tenths % 10
-    return if (fraction == 0) "$whole$suffix" else "$whole.$fraction$suffix"
-}
-
 
 @Composable
 private fun WorldPublicationConfirmationDialog(
@@ -1435,10 +1813,10 @@ private fun WorldPublicationConfirmationDialog(
         WorldPublicationAction.Unpublish -> strings.worldUnpublishConfirmationMessage
     }.replace("%s", worldName)
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
         icon = {
-            Icon(
+            AppIcon(
                 imageVector = when (action) {
                     WorldPublicationAction.Publish -> AppIcons.Publish
                     WorldPublicationAction.Unpublish -> AppIcons.VisibilityOff
@@ -1446,16 +1824,16 @@ private fun WorldPublicationConfirmationDialog(
                 contentDescription = null,
             )
         },
-        title = { Text(title) },
-        text = { Text(message) },
+        title = { AppText(title) },
+        text = { AppText(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = enabled) {
-                Text(strings.confirm)
+            AppButton(onClick = onConfirm, enabled = enabled, style = AppButtonStyle.Plain) {
+                AppText(strings.confirm)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(strings.cancel)
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )
@@ -1469,56 +1847,54 @@ private fun WorldDeletionConfirmationDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!isDeleting) onDismiss() },
         icon = {
-            Icon(
-                imageVector = Icons.Default.DeleteOutline,
+            AppIcon(
+                imageVector = AppIcons.Delete,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colors.destructive,
             )
         },
-        title = { Text(strings.worldDeleteConfirmationTitle) },
+        title = { AppText(strings.worldDeleteConfirmationTitle) },
         text = {
-            Text(strings.worldDeleteConfirmationMessage.replace("%name%", worldName))
+            AppText(strings.worldDeleteConfirmationMessage.replace("%name%", worldName))
         },
         confirmButton = {
-            Button(
+            AppButton(
                 enabled = enabled,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
                 onClick = onConfirm,
+                style = AppButtonStyle.Prominent,
+                role = AppButtonRole.Destructive,
             ) {
                 Box(
                     modifier = Modifier.size(18.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isDeleting) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.fillMaxSize(),
                             color = LocalContentColor.current,
-                            strokeWidth = 2.dp,
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
+                        AppIcon(
+                            imageVector = AppIcons.Delete,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(strings.worldDeleteAction)
+                AppText(strings.worldDeleteAction)
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 enabled = !isDeleting,
                 onClick = onDismiss,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(strings.cancel)
+                AppText(strings.cancel)
             }
         },
     )

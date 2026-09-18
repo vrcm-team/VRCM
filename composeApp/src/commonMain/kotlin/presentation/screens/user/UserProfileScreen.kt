@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -24,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -105,8 +105,7 @@ data class UserProfileScreen(
     // Keep dialog/shared-element state distinct for profiles with different IDs.
     override val key = "UserProfileScreen:${userProfileVO.id}"
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @ExperimentalSharedTransitionApi
+        @ExperimentalSharedTransitionApi
     @Composable
     override fun Content() {
         val currentNavigator = currentNavigator
@@ -146,7 +145,7 @@ data class UserProfileScreen(
         var bottomSheetIsVisible by remember {
             mutableStateOf(openActionMenuOnEntry && actionMenuEntranceGate.consume())
         }
-        val sheetState = rememberModalBottomSheetState()
+        val sheetState = rememberAppSheetState()
         val actionMenuNestedScrollConnection =
             rememberConsumeRemainingUpwardScrollConnection()
         var openAlertDialog by remember { mutableStateOf(false) }
@@ -227,10 +226,9 @@ data class UserProfileScreen(
                 onMenu = { bottomSheetIsVisible = true },
                 outerScrollState = outerScrollState,
                 innerScrollState = innerScrollState,
-                topBarActions = { colors ->
+                topBarActions = {
                     OfficialUrlShareButton(
                         url = "https://vrchat.com/home/user/${currentUser.id}",
-                        colors = colors,
                     )
                 },
             ) { _, contentMinHeight ->
@@ -317,7 +315,7 @@ data class UserProfileScreen(
             openAlertDialog = openAlertDialog,
             onDismissRequest = { openAlertDialog = false }
         ) {
-            Text(text = userProfileScreenModel.userJson)
+            AppText(text = userProfileScreenModel.userJson)
         }
         // 编辑资料底部弹窗
         val editSuccessMsg = strings.editProfileUpdateSuccess
@@ -690,7 +688,7 @@ private fun ColumnScope.SheetItems(
                 }
             },
             content = { label ->
-                Text(label, color = MaterialTheme.colorScheme.error)
+                AppText(label, color = AppTheme.colors.destructive)
             },
         )
     }
@@ -789,27 +787,28 @@ private fun PlayerInteractionOverrideDialog(
     val requested = requestedOverride ?: return
     val localeStrings = strings
     val closing = requested == PlayerInteractionOverride.InteractOff
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
         title = {
-            Text(
+            AppText(
                 if (closing) localeStrings.profileInteractionCloseConfirmTitle
                 else localeStrings.profileInteractionRestoreConfirmTitle,
             )
         },
         text = {
-            Text(
+            AppText(
                 (if (closing) localeStrings.profileInteractionCloseConfirmMessage
                 else localeStrings.profileInteractionRestoreConfirmMessage)
                     .replace("%s", targetName),
             )
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 enabled = !submitting,
                 onClick = { onConfirm(requested) },
+                style = AppButtonStyle.Plain,
             ) {
-                Text(
+                AppText(
                     when {
                         submitting && closing -> localeStrings.profileInteractionClosing
                         submitting -> localeStrings.profileInteractionRestoring
@@ -819,8 +818,8 @@ private fun PlayerInteractionOverrideDialog(
             }
         },
         dismissButton = {
-            TextButton(enabled = !submitting, onClick = onDismiss) {
-                Text(localeStrings.cancel)
+            AppButton(enabled = !submitting, onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(localeStrings.cancel)
             }
         },
     )
@@ -921,10 +920,10 @@ private fun PlayerBlockConfirmationDialog(
     val blocked = desiredBlockedState ?: return
     val localeStrings = strings
     val canSubmit = !currentState.isUpdating && currentState.isBlocked == !blocked
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!currentState.isUpdating) onDismiss() },
         title = {
-            Text(
+            AppText(
                 if (blocked) {
                     localeStrings.profileBlockConfirmTitle
                 } else {
@@ -933,7 +932,7 @@ private fun PlayerBlockConfirmationDialog(
             )
         },
         text = {
-            Text(
+            AppText(
                 (if (blocked) {
                     localeStrings.profileBlockConfirmMessage
                 } else {
@@ -942,26 +941,27 @@ private fun PlayerBlockConfirmationDialog(
             )
         },
         confirmButton = {
-            Button(
+            AppButton(
                 enabled = canSubmit,
                 onClick = { onConfirm(blocked) },
+                style = AppButtonStyle.Prominent,
             ) {
                 if (currentState.isUpdating) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Text(if (blocked) localeStrings.profileBlock else localeStrings.profileUnblock)
+                    AppText(if (blocked) localeStrings.profileBlock else localeStrings.profileUnblock)
                 }
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 enabled = !currentState.isUpdating,
                 onClick = onDismiss,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(localeStrings.cancel)
+                AppText(localeStrings.cancel)
             }
         },
     )
@@ -1036,15 +1036,11 @@ private fun ColumnScope.SheetButtonItem(
     text: String? = null,
     enabled: Boolean = true,
     onClick: () -> Unit,
-    content: @Composable RowScope.(String) -> Unit = { Text(text = it) },
+    content: @Composable RowScope.(String) -> Unit = { AppText(text = it) },
 ) {
-    TextButton(
-        modifier = Modifier
-            .align(Alignment.CenterHorizontally)
-            .fillMaxWidth()
-            .padding(vertical = 2.dp, horizontal = 24.dp),
+    AppSheetAction(
         enabled = enabled,
-        onClick = onClick
+        onClick = onClick,
     ) {
         content(text.orEmpty())
     }
@@ -1057,9 +1053,9 @@ private fun JsonAlertDialog(
     content: @Composable BoxScope.() -> Unit,
 ) {
     if (openAlertDialog) {
-        AlertDialog(
+        AppAlert(
             icon = {
-                Icon(AppIcons.Person, contentDescription = "AlertDialogIcon")
+                AppIcon(AppIcons.Person, contentDescription = "AlertDialogIcon")
             },
             text = {
                 Box(
@@ -1074,10 +1070,11 @@ private fun JsonAlertDialog(
             },
             onDismissRequest = onDismissRequest,
             confirmButton = {
-                TextButton(
-                    onClick = onDismissRequest
+                AppButton(
+                    onClick = onDismissRequest,
+                    style = AppButtonStyle.Plain,
                 ) {
-                    Text("Back")
+                    AppText("Back")
                 }
             }
         )
@@ -1290,7 +1287,7 @@ private fun ColumnScope.ProfileContent(
     )
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun UserGroupsSection(
     groups: List<LimitedUserGroup>,
@@ -1312,15 +1309,15 @@ private fun UserGroupsSection(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             itemsIndexed(shownGroups, key = { _, group -> group.groupId }) { index, group ->
-                Surface(
+                AppSurface(
                     modifier = Modifier
                         .animateItem(fadeInSpec = entranceFadeSpec(index))
                         .width(180.dp)
                         .height(88.dp)
-                        .clip(MaterialTheme.shapes.large)
+                        .clip(AppShapes.l)
                         .clickable { onGroupClick(group) },
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    color = AppTheme.colors.secondaryGroupedBackground,
+                    contentColor = AppTheme.colors.tint
                 ) {
                     Column(
                         modifier = Modifier.padding(10.dp),
@@ -1342,7 +1339,7 @@ private fun UserGroupsSection(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    Text(
+                                    AppText(
                                         modifier = Modifier
                                             .weight(1f)
                                             .sharedBoundsBy(
@@ -1350,37 +1347,37 @@ private fun UserGroupsSection(
                                                 resizeMode = SharedTextBoundsResizeMode,
                                             ),
                                         text = group.name,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = AppTheme.type.subheadline,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     if (group.isRepresenting) {
                                         ATooltipBox(
-                                            tooltip = { Text(strings.groupRepresentationEnabled) },
+                                            tooltip = { AppText(strings.groupRepresentationEnabled) },
                                         ) {
-                                            Icon(
+                                            AppIcon(
                                                 imageVector = AppIcons.CheckCircle,
                                                 contentDescription = strings.groupRepresentationEnabled,
                                                 modifier = Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.tertiary,
+                                                tint = AppTheme.colors.secondaryTint,
                                             )
                                         }
                                     }
                                 }
                                 if (group.shortCode.isNotBlank()) {
-                                    Text(
+                                    AppText(
                                         text = "#${group.shortCode}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = AppTheme.type.caption2Emphasized,
+                                        color = AppTheme.colors.secondaryLabel,
                                         maxLines = 1
                                     )
                                 }
                             }
                         }
-                        Text(
+                        AppText(
                             text = "${group.memberCount} ${strings.groupMembers}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.type.caption2Emphasized,
+                            color = AppTheme.colors.secondaryLabel,
                             maxLines = 1
                         )
                     }
@@ -1402,16 +1399,16 @@ private fun SectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
+        AppText(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
+            style = AppTheme.type.headline,
+            color = AppTheme.colors.label
         )
         if (countText != null) {
-            Text(
+            AppText(
                 text = countText,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.secondaryLabel
             )
         }
     }
@@ -1448,7 +1445,7 @@ private fun <T> StackedLocationCardList(
         modifier = Modifier
             .fillMaxWidth()
             .height(128.dp)
-            .clip(MaterialTheme.shapes.large)
+            .clip(AppShapes.l)
             .graphicsLayer { alpha = entranceAlpha.value }
             .clickable {
                 if (items.size == 1) {
@@ -1464,7 +1461,7 @@ private fun <T> StackedLocationCardList(
             val baseOffset = 10.dp * i
             val baseScale = 1f - (0.1f * i)
             val baseAlpha = 1f - (0.25f * i)
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(112.dp)
@@ -1475,19 +1472,18 @@ private fun <T> StackedLocationCardList(
                         scaleY = baseScale
                         alpha = baseAlpha
                     },
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceVariant
+                shape = AppShapes.l,
+                color = AppTheme.colors.fill
             ) {}
         }
 
         // 前方主卡片
-        Surface(
+        AppSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(112.dp)
                 .align(Alignment.BottomCenter),
-            tonalElevation = (-2).dp,
-            shape = MaterialTheme.shapes.large
+            shape = AppShapes.l
         ) {
             Row(
                 modifier = Modifier.padding(8.dp),
@@ -1519,19 +1515,19 @@ private fun <T> StackedLocationCardList(
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
+                    AppText(
                         text = title(firstItem),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.type.headline,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AppTheme.colors.tint
                     )
-                    Text(
+                    AppText(
                         text = subtitle(firstItem),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppTheme.type.caption1,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colors.secondaryLabel
                     )
                 }
             }
@@ -1539,18 +1535,18 @@ private fun <T> StackedLocationCardList(
 
         // 标签气泡（左上角）
         if (label != null) {
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(4.dp),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.secondaryContainer
+                shape = AppShapes.s,
+                color = AppTheme.colors.fill
             ) {
-                Text(
+                AppText(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = AppTheme.type.caption2Emphasized,
+                    color = AppTheme.colors.label,
                     maxLines = 1
                 )
             }
@@ -1563,15 +1559,15 @@ private fun <T> StackedLocationCardList(
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 12.dp, end = 16.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f),
+                        color = AppTheme.colors.secondaryTint.copy(alpha = 0.8f),
                         shape = CircleShape
                     )
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text(
+                AppText(
                     text = "+${items.size - 1}",
-                    color = MaterialTheme.colorScheme.onTertiary,
-                    style = MaterialTheme.typography.labelMedium
+                    color = AppTheme.colors.onSecondaryTint,
+                    style = AppTheme.type.caption1Emphasized
                 )
             }
         }
@@ -1587,8 +1583,8 @@ private fun DetailTopBar(
     sysTopPadding: Dp,
     onReturn: () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    AppSurface(
+        color = AppTheme.colors.secondaryGroupedBackground,
     ) {
         Row(
             modifier = Modifier
@@ -1598,19 +1594,19 @@ private fun DetailTopBar(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onReturn) {
-                Icon(
+            AppIconButton(onClick = onReturn) {
+                AppIcon(
                     imageVector = AppIcons.ArrowBackIosNew,
                     contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = AppTheme.colors.tint
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            Text(
+            AppText(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = AppTheme.colors.tint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -1682,9 +1678,9 @@ class CardListDetailScreen(
         val hiddenWorldCannotViewText = strings.hiddenWorldCannotView
         val sysTopPadding = getInsetPadding(WindowInsets::getTop)
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
-            Surface(
+            AppSurface(
                 modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
+                color = AppTheme.colors.secondaryGroupedBackground
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     DetailTopBar(
@@ -1775,15 +1771,14 @@ private fun <T> CardListContent(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         itemsIndexed(shownItems, key = { _, item -> key(item) }) { index, item ->
-            Surface(
+            AppSurface(
                 modifier = Modifier
                     .animateItem(fadeInSpec = entranceFadeSpec(index))
                     .fillMaxWidth()
                     .height(108.dp)
-                    .clip(MaterialTheme.shapes.large)
+                    .clip(AppShapes.l)
                     .then(if (onClickItem != null) Modifier.clickable { onClickItem(item) } else Modifier),
-                tonalElevation = (-2).dp,
-                shape = MaterialTheme.shapes.large
+                shape = AppShapes.l
             ) {
                 Row(
                     modifier = Modifier.padding(8.dp),
@@ -1811,19 +1806,19 @@ private fun <T> CardListContent(
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
+                        AppText(
                             text = itemTitle(item),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.type.headline,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colors.tint
                         )
-                        Text(
+                        AppText(
                             text = itemSubtitle(item),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = AppTheme.type.caption1,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = AppTheme.colors.secondaryLabel
                         )
                     }
                 }
@@ -2065,7 +2060,6 @@ private fun UserProfileIdentity(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun BottomCardTab(
     bioMinHeight: Dp = 0.dp,
     userProfileVO: UserProfileVo,
@@ -2080,22 +2074,22 @@ private fun BottomCardTab(
         AnimatedContent(targetState = state) {
             when (it) {
                 0 -> {
-                    Surface(
+                    AppSurface(
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = bioMinHeight),
-                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        shape = MaterialTheme.shapes.extraLarge
+                        color = AppTheme.colors.secondaryGroupedBackground,
+                        shape = AppShapes.xl
                     ) {
                         Column {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 // TODO: UI 需要重写后恢复“查看最近更改”入口，相关逻辑暂时保留。
                                 /*
                                 if (latestBioChange != null) {
-                                    TextButton(
+                                    AppButton(
                                         modifier = Modifier.align(Alignment.End),
                                         onClick = { showBioChange = !showBioChange },
+                                        style = AppButtonStyle.Plain,
                                     ) {
-                                        Text(
+                                        AppText(
                                             if (showBioChange) strings.friendActivityBioDiffHide
                                             else strings.friendActivityBioDiffShow,
                                         )
@@ -2113,22 +2107,22 @@ private fun BottomCardTab(
                                         }
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             lines.forEach { line ->
-                                                Text(
+                                                AppText(
                                                     text = when {
                                                         line.unchanged -> "  ${line.text}"
                                                         line.added -> "+ ${line.text}"
                                                         else -> "- ${line.text}"
                                                     },
                                                     color = when {
-                                                        line.unchanged -> MaterialTheme.colorScheme.primary
-                                                        line.added -> MaterialTheme.colorScheme.tertiary
-                                                        else -> MaterialTheme.colorScheme.error
+                                                        line.unchanged -> AppTheme.colors.label
+                                                        line.added -> AppTheme.colors.success
+                                                        else -> AppTheme.colors.destructive
                                                     },
                                                 )
                                             }
                                         }
                                     } else {
-                                        Text(text = userProfileVO.bio)
+                                        AppText(text = userProfileVO.bio)
                                     }
                                 }
                             }
@@ -2164,9 +2158,9 @@ private fun LangAndLinkRow(userProfileVO: UserProfileVo) {
             LanguagesRow(speakLanguages, width)
         }
         if (speakLanguages.isNotEmpty() && bioLinks.isNotEmpty()) {
-            VerticalDivider(
+            AppVerticalDivider(
                 modifier = Modifier.height(width).padding(vertical = 6.dp),
-                color = MaterialTheme.colorScheme.outlineVariant,
+                color = AppTheme.colors.separator,
                 thickness = 1.dp,
             )
         }
@@ -2177,7 +2171,6 @@ private fun LangAndLinkRow(userProfileVO: UserProfileVo) {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LanguagesRow(
     speakLanguages: List<String>,
@@ -2194,7 +2187,7 @@ internal fun LanguagesRow(
         speakLanguages.forEach { language ->
             val imageVector = LanguageIcons.getFlag(language)
             ATooltipBox(
-                tooltip = { Text(text = language) }
+                tooltip = { AppText(text = language) }
             ) {
                 if (imageVector == null) {
                     Box(
@@ -2202,12 +2195,12 @@ internal fun LanguagesRow(
                             .fillMaxHeight()
                             .width(width)
                             .padding(vertical = 3.dp)
-                            .background(MaterialTheme.colorScheme.inversePrimary, MaterialTheme.shapes.extraSmall)
+                            .background(AppTheme.colors.tintSoft, AppShapes.xs)
                     ) {
-                        Icon(
+                        AppIcon(
                             modifier = Modifier.align(Alignment.Center),
                             imageVector = AppIcons.QuestionMark,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = AppTheme.colors.onTintSoft,
                             contentDescription = "NotKnownLanguageIcon",
                         )
                     }
@@ -2218,7 +2211,7 @@ internal fun LanguagesRow(
                         modifier = Modifier
                             .fillMaxHeight()
                             .align(Alignment.CenterVertically)
-                            .clip(MaterialTheme.shapes.extraSmall)
+                            .clip(AppShapes.xs)
                             .width(width),
                         contentScale = ContentScale.FillWidth
                     )
@@ -2228,7 +2221,6 @@ internal fun LanguagesRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LinksRow(
     bioLinks: List<String>,
@@ -2245,20 +2237,15 @@ fun LinksRow(
         val appPlatform = getAppPlatform()
         bioLinks.forEach { link ->
             val webIconVector = WebIcons.selectIcon(link)
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = {
-                    PlainTooltip {
-                        Text(text = link)
-                    }
-                },
-                state = rememberTooltipState()
+            AppTooltipBox(
+                tooltip = { AppText(text = link) },
             ) {
-                FilledIconButton(
+                AppIconButton(
                     modifier = Modifier.size(width),
                     onClick = { appPlatform.openUrl(link) },
+                    style = AppButtonStyle.Prominent,
                 ) {
-                    Icon(
+                    AppIcon(
                         modifier = Modifier
                             .padding(6.dp)
                             .enableIf(webIconVector == null) { rotate(-45F) },
@@ -2271,7 +2258,6 @@ fun LinksRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditNoteDialog(
     isVisible: Boolean,
@@ -2284,9 +2270,9 @@ private fun EditNoteDialog(
     var noteText by remember { mutableStateOf(initialNote) }
     val maxLen = 256
 
-    ModalBottomSheet(
+    AppSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberAppSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
             modifier = Modifier
@@ -2294,25 +2280,26 @@ private fun EditNoteDialog(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             EditHeader(localeStrings.userNoteEditTitle, onDismiss)
-            OutlinedTextField(
+            AppTextField(
                 value = noteText,
                 onValueChange = { if (it.length <= maxLen) noteText = it },
                 modifier = Modifier.fillMaxWidth(),
                 maxLines = 8,
                 placeholder = {
-                    Text(
+                    AppText(
                         localeStrings.userNoteEditTitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        color = AppTheme.colors.secondaryLabel.copy(alpha = 0.5f)
                     )
                 },
-                supportingText = { Text("${noteText.length}/$maxLen") },
+                supportingText = { AppText("${noteText.length}/$maxLen") },
             )
             Spacer(Modifier.height(16.dp))
-            Button(
+            AppButton(
                 onClick = { onSave(noteText) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                style = AppButtonStyle.Prominent,
             ) {
-                Text(localeStrings.editProfileSave)
+                AppText(localeStrings.editProfileSave)
             }
         }
     }

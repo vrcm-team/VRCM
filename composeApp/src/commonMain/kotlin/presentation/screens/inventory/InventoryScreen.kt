@@ -16,21 +16,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,6 +37,21 @@ import io.github.vrcmteam.vrcm.network.api.inventory.InventorySortOrder
 import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryItemData
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenu
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
@@ -75,7 +75,6 @@ object InventoryScreen : AppRoute {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InventoryScreenContent(
     model: InventoryScreenModel = koinViewModel(),
@@ -89,13 +88,13 @@ private fun InventoryScreenContent(
     val content = state as? InventoryScreenState.Content
     var showRewardCodeDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(strings.inventoryTitle) },
+            AppNavBar(
+                title = { AppText(strings.inventoryTitle) },
                 navigationIcon = {
-                    IconButton(onClick = { navigator.pop() }) {
-                        Icon(AppIcons.ArrowBackIosNew, strings.back)
+                    AppIconButton(onClick = { navigator.pop() }) {
+                        AppIcon(AppIcons.ArrowBackIosNew, strings.back)
                     }
                 },
                 actions = {
@@ -103,18 +102,18 @@ private fun InventoryScreenContent(
                         state = creditsBalanceState,
                         onRetry = model::refreshCreditsBalance,
                     )
-                    ATooltipBox(tooltip = { Text(strings.rewardCodeEntry) }) {
-                        IconButton(onClick = { showRewardCodeDialog = true }) {
-                            Icon(AppIcons.Redeem, strings.rewardCodeEntry)
+                    ATooltipBox(tooltip = { AppText(strings.rewardCodeEntry) }) {
+                        AppIconButton(onClick = { showRewardCodeDialog = true }) {
+                            AppIcon(AppIcons.Redeem, strings.rewardCodeEntry)
                         }
                     }
-                    IconButton(
+                    AppIconButton(
                         enabled = content != null &&
                             !content.isRefreshing &&
                             !content.isLoadingMore,
                         onClick = model::refresh,
                     ) {
-                        Icon(AppIcons.Update, strings.refresh)
+                        AppIcon(AppIcons.Refresh, strings.refresh)
                     }
                 },
             )
@@ -128,17 +127,17 @@ private fun InventoryScreenContent(
                 onOrderSelected = model::selectOrder,
             )
             if (content?.isRefreshing == true) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
+                AppProgressBar(Modifier.fillMaxWidth())
             }
             if (content != null) {
-                Text(
+                AppText(
                     text = strings.inventoryCount.replace(
                         "%d",
                         (content.totalCount ?: content.items.size).toString(),
                     ),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.caption1Emphasized,
+                    color = AppTheme.colors.secondaryLabel,
                 )
             }
             if (content?.refreshError == true) {
@@ -186,15 +185,14 @@ private fun CreditsBalanceAction(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
+                AppIcon(
                     painter = icon,
                     contentDescription = strings.inventoryCreditsTitle,
                     modifier = iconModifier,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colors.tint,
                 )
-                CircularProgressIndicator(
+                AppActivityIndicator(
                     modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
                 )
             }
 
@@ -203,35 +201,35 @@ private fun CreditsBalanceAction(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
+                AppIcon(
                     painter = icon,
                     contentDescription = strings.inventoryCreditsTitle,
                     modifier = iconModifier,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colors.tint,
                 )
-                Text(
+                AppText(
                     text = state.balance.toString(),
                     modifier = Modifier.widthIn(max = 72.dp),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.type.subheadlineEmphasized,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            CreditsBalanceState.Unavailable -> Icon(
+            CreditsBalanceState.Unavailable -> AppIcon(
                 painter = icon,
                 contentDescription = strings.inventoryCreditsUnavailable,
                 modifier = Modifier.padding(end = 8.dp).size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                tint = AppTheme.colors.secondaryLabel.copy(alpha = 0.38f),
             )
 
-            CreditsBalanceState.Error -> IconButton(onClick = onRetry) {
-                Icon(
+            CreditsBalanceState.Error -> AppIconButton(onClick = onRetry) {
+                AppIcon(
                     painter = icon,
                     contentDescription = strings.inventoryCreditsLoadFailed,
                     modifier = iconModifier,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = AppTheme.colors.destructive,
                 )
             }
         }
@@ -288,33 +286,35 @@ private fun <T> InventoryDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
-        TextButton(
+        AppButton(
             onClick = { expanded = !expanded },
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
+            // 筛选项是灰底小胶囊的弹出按钮；三个并排，字号用小一档才放得下"标签: 值"
+            style = AppButtonStyle.Gray,
+            size = AppButtonSize.Small,
         ) {
-            Text(
+            AppText(
                 text = "$label: ${optionLabel(selected)}",
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(
+            AppIcon(
                 imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(14.dp),
             )
         }
-        DropdownMenu(
+        AppMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.widthIn(min = 200.dp),
-            shape = MaterialTheme.shapes.medium,
         ) {
             options.forEach { option ->
                 val isSelected = option == selected
-                DropdownMenuItem(
-                    text = { Text(optionLabel(option)) },
+                AppMenuItem(
+                    text = { AppText(optionLabel(option)) },
                     onClick = {
                         expanded = false
                         onSelected(option)
@@ -325,7 +325,7 @@ private fun <T> InventoryDropdown(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (isSelected) {
-                                Icon(
+                                AppIcon(
                                     imageVector = AppIcons.Check,
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
@@ -349,19 +349,19 @@ private fun InventoryBody(
 ) {
     when (state) {
         InventoryScreenState.Loading -> InventoryMessage(modifier) {
-            CircularProgressIndicator()
+            AppActivityIndicator()
         }
         InventoryScreenState.SessionMissing -> InventoryMessage(modifier) {
-            Text(strings.inventorySessionMissing)
+            AppText(strings.inventorySessionMissing)
         }
         InventoryScreenState.Error -> InventoryMessage(modifier) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(strings.inventoryLoadFailed)
-                TextButton(onClick = onRetry) { Text(strings.retry) }
+                AppText(strings.inventoryLoadFailed)
+                AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
             }
         }
         is InventoryScreenState.Content -> if (state.items.isEmpty()) {
-            InventoryMessage(modifier) { Text(strings.inventoryEmpty) }
+            InventoryMessage(modifier) { AppText(strings.inventoryEmpty) }
         } else {
             InventoryList(
                 state = state,
@@ -416,7 +416,7 @@ private fun InventoryList(
                     Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(Modifier.size(24.dp))
                 }
             }
         } else if (state.loadMoreError) {
@@ -432,12 +432,10 @@ private fun InventoryList(
 
 @Composable
 private fun InventoryItemCard(item: InventoryItemData) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        shape = AppShapes.m,
+        color = AppTheme.colors.secondaryGroupedBackground,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -449,55 +447,55 @@ private fun InventoryItemCard(item: InventoryItemData) {
                 contentDescription = item.name?.takeIf(String::isNotBlank)
                     ?: strings.inventoryUnknownName,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(6.dp)),
+                modifier = Modifier.size(72.dp).clip(AppShapes.s),
             )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Text(
+                AppText(
                     text = item.name?.takeIf(String::isNotBlank) ?: strings.inventoryUnknownName,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = AppTheme.type.subheadlineEmphasized,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
+                AppText(
                     text = item.localizedTypeLabel(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.caption1Emphasized,
+                    color = AppTheme.colors.tint,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 item.description?.takeIf(String::isNotBlank)?.let { description ->
-                    Text(
+                    AppText(
                         text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.caption1,
+                        color = AppTheme.colors.secondaryLabel,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 item.expiryDate?.takeIf(String::isNotBlank)?.let { expiry ->
                     val displayExpiry = expiry.toLocalDateTime()?.ignoredFormat ?: expiry
-                    Text(
+                    AppText(
                         text = strings.inventoryExpires.replace("%s", displayExpiry),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.secondaryLabel,
                     )
                 }
                 if (item.quantifiable == true) {
-                    Text(
+                    AppText(
                         text = strings.inventoryQuantifiable,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.secondaryLabel,
                     )
                 }
                 if (item.isArchived == true) {
-                    Text(
+                    AppText(
                         text = strings.inventoryArchivedBadge,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.secondaryTint,
                     )
                 }
             }
@@ -512,13 +510,13 @@ private fun InventoryErrorBanner(message: String, onRetry: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        AppText(
             text = message,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
+            style = AppTheme.type.caption1,
+            color = AppTheme.colors.destructive,
         )
-        TextButton(onClick = onRetry) { Text(strings.retry) }
+        AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
     }
 }
 

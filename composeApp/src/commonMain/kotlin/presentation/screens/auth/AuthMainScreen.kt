@@ -5,13 +5,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.animations.fadeSlideHorizontally
@@ -58,12 +58,11 @@ object AuthScreen : AppRoute {
                     when (state) {
                         AuthCardPage.Loading -> {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                CircularProgressIndicator(
+                                AppActivityIndicator(
                                     modifier = Modifier
                                         .size(60.dp)
                                         .align(Alignment.Center),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 5.dp
+                                    color = AppTheme.colors.tint
                                 )
                             }
                         }
@@ -116,7 +115,6 @@ object AuthScreen : AppRoute {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun AccountBottomSheet(
     showAccountMenu: Boolean,
     onDismissRequest: () -> Unit,
@@ -126,27 +124,27 @@ private fun AccountBottomSheet(
     authUIState: AuthUIState,
 ) {
     val scope = rememberCoroutineScope()
-    val sheetState: SheetState = rememberModalBottomSheetState()
+    val sheetState: AppSheetState = rememberAppSheetState()
     val accountList = remember { mutableStateListOf<AccountDto>().apply { addAll(findAccountList()) } }
     ABottomSheet(
         isVisible = showAccountMenu,
         sheetState = sheetState,
         onDismissRequest = onDismissRequest,
     ) {
-        Surface(
+        AppSurface(
             modifier = Modifier.fillMaxWidth()
                 .align(Alignment.CenterHorizontally)
                 .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-            shape = MaterialTheme.shapes.large,
+            shape = AppShapes.l,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 accountList.forEach { accountDto ->
-                    ListItem(
+                    AppListItem(
                         modifier = Modifier
-                            .clip(MaterialTheme.shapes.large)
+                            .clip(AppShapes.l)
                             .clickable(enabled = authUIState.userId != accountDto.userId) {
                                 onAccountChange(accountDto)
                                 scope.launch { sheetState.hide() }
@@ -159,10 +157,10 @@ private fun AccountBottomSheet(
                             )
                         },
                         headlineContent = {
-                            Text(
+                            AppText(
                                 text = accountDto.username,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = AppTheme.type.headline,
+                                color = AppTheme.colors.tint,
                                 textAlign = TextAlign.Center,
                             )
                         },
@@ -170,10 +168,10 @@ private fun AccountBottomSheet(
                             if (authUIState.userId == accountDto.userId){
                                 TextLabel(
                                     text = strings.authCurrent,
-                                    backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    backgroundColor = AppTheme.colors.fill,
                                 )
                             } else {
-                                Icon(
+                                AppIcon(
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .clickable {
@@ -184,7 +182,7 @@ private fun AccountBottomSheet(
                                         },
                                     imageVector = AppIcons.Clear,
                                     contentDescription = "ClearIcon",
-                                    tint = MaterialTheme.colorScheme.outlineVariant
+                                    tint = AppTheme.colors.separator
                                 )
                             }
                         }
@@ -237,15 +235,15 @@ private fun AuthCard(
 
 @Composable
 private fun ReturnIcon(onClick: () -> Unit) {
-    IconButton(
+    AppIconButton(
         modifier = Modifier
             .padding(start = 6.dp, top = 6.dp),
         onClick = onClick
     ) {
-        Icon(
+        AppIcon(
             imageVector =AppIcons.KeyboardArrowLeft,
             contentDescription = "ReturnIcon",
-            tint = MaterialTheme.colorScheme.primary
+            tint = AppTheme.colors.tint
         )
     }
 }
@@ -265,11 +263,11 @@ private fun NavCard(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Text(
+            AppText(
                 modifier = Modifier.fillMaxWidth(),
                 text = tileText,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.type.title2,
+                color = AppTheme.colors.tint,
                 textAlign = TextAlign.Center
             )
             content()

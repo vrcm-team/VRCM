@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,6 +12,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.CropTransformCalculator
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.ImageSize
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.animation.DecorationVisualImage
@@ -98,7 +98,7 @@ fun MeetupCardCanvas(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(AppTheme.colors.secondaryGroupedBackground)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(accent.copy(alpha = 0.55f), accent.copy(alpha = 0.1f)),

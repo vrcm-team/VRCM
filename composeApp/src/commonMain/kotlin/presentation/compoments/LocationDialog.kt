@@ -7,10 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.BlueprintType
 import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.glideBack
 import io.github.vrcmteam.vrcm.presentation.screens.home.data.FriendLocation
@@ -37,7 +36,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-val DialogShapeForSharedElement = RoundedCornerShape(16.dp)
+val DialogShapeForSharedElement = AppShapes.l
 
 class LocationDialog(
     private val friendLocation: FriendLocation,
@@ -101,7 +100,7 @@ class LocationDialog(
                                 sharedTransitionScope = LocalSharedTransitionDialogScope.current,
                                 animatedVisibilityScope = animatedVisibilityScope,
                             )
-                            .clip(MaterialTheme.shapes.medium)
+                            .clip(AppShapes.m)
                     ) {
                         // 添加世界详情页跳转功能
                         AImage(
@@ -110,7 +109,7 @@ class LocationDialog(
                                 .height(200.dp)
                                 .clickable { onClickWorldImage() }
                                 .sharedBoundsBy( currentInstants.worldId + "WorldImage")
-                                .clip(MaterialTheme.shapes.medium),
+                                .clip(AppShapes.m),
                             imageData = friendLocation.instants.value.worldImageUrl,
                             contentDescription = "WorldImage"
                         )
@@ -119,24 +118,23 @@ class LocationDialog(
                                 .fillMaxWidth()
                                 .align(Alignment.BottomCenter)
                                 .background(
-                                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                    AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.8f),
                                 )
                                 .padding(3.dp)
                         ) {
-                            Text(
+                            AppText(
                                 modifier = Modifier.align(Alignment.Center),
                                 text = currentInstants.worldName,
                                 fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = AppTheme.type.subheadlineEmphasized,
+                                color = AppTheme.colors.tint,
                                 maxLines = 1
                             )
                         }
                     }
-                    Surface(
+                    AppSurface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium,
-                        contentColor = MaterialTheme.colorScheme.primary
+                        shape = AppShapes.m,
                     ) {
 
                         Column(
@@ -148,13 +146,13 @@ class LocationDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (owner == null) return@Row
-                                Text(
+                                AppText(
                                     text = "${localeStrings.locationDialogOwner}:",
                                     fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = AppTheme.type.subheadlineEmphasized,
                                 )
-                                Icon(modifier = Modifier.size(16.dp), imageVector = owner.iconVector, contentDescription = "OwnerIcon")
-                                Text(
+                                AppIcon(modifier = Modifier.size(16.dp), imageVector = owner.iconVector, contentDescription = "OwnerIcon")
+                                AppText(
                                     modifier = if (owner.type == BlueprintType.User || owner.type == BlueprintType.Group)
                                         Modifier.clickable {
                                             if (owner.type == BlueprintType.User) {
@@ -171,44 +169,44 @@ class LocationDialog(
                                     else Modifier,
                                     textDecoration = if (owner.type == BlueprintType.User || owner.type == BlueprintType.Group) TextDecoration.Underline else null,
                                     text = owner.displayName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.outline,
+                                    style = AppTheme.type.subheadline,
+                                    color = AppTheme.colors.tertiaryLabel,
                                 )
                             }
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
+                                AppText(
                                     text = "${localeStrings.locationDialogAuthor}:",
                                     fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = AppTheme.type.subheadlineEmphasized,
                                 )
-                                Text(
+                                AppText(
                                     modifier = Modifier.clickable { onClickUserIcon(UserProfileVo(currentInstants.worldAuthorId)) },
                                     textDecoration = TextDecoration.Underline,
                                     text = currentInstants.worldAuthorName,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppTheme.colors.tertiaryLabel,
+                                    style = AppTheme.type.subheadline,
                                 )
                             }
-                            Text(
+                            AppText(
                                 text = "${localeStrings.locationDialogDescription}:",
                                 fontWeight = FontWeight.Medium,
-                                style = MaterialTheme.typography.titleSmall,
+                                style = AppTheme.type.subheadlineEmphasized,
                             )
                             SelectionContainer {
-                                Text(
+                                AppText(
                                     modifier = Modifier.heightIn(max = 80.dp).verticalScroll(rememberScrollState()),
                                     text = currentInstants.worldDescription,
-                                    color = MaterialTheme.colorScheme.outline,
-                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppTheme.colors.tertiaryLabel,
+                                    style = AppTheme.type.caption1,
                                 )
                             }
                             if (currentInstants.worldAuthorTag.isNotEmpty()) {
-                                Text(
+                                AppText(
                                     text = "${localeStrings.locationDialogTags}:",
                                     fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = AppTheme.type.subheadlineEmphasized,
                                 )
                                 FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -217,7 +215,7 @@ class LocationDialog(
                                     currentInstants.worldAuthorTag.forEach { tag ->
                                         TextLabel(
                                             text = tag,
-                                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            backgroundColor = AppTheme.colors.fill,
                                         )
                                     }
                                 }
@@ -237,20 +235,21 @@ class LocationDialog(
                                 RegionIcon(
                                     region = currentInstants.region
                                 )
-                                Text(
+                                AppText(
                                     text = "${currentInstants.accessType}(${currentInstants.name})",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    style = AppTheme.type.subheadlineEmphasized,
+                                    color = AppTheme.colors.tertiaryLabel
                                 )
                                 TextLabel(
                                     text = currentInstants.userCount,
                                 )
-                                Button(
+                                AppButton(
                                     modifier = Modifier.animateContentSize(),
                                     enabled = !isInvited,
-                                    onClick = { onClickInvite() }
+                                    onClick = { onClickInvite() },
+                                    style = AppButtonStyle.Prominent,
                                 ) {
-                                    Text(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
+                                    AppText(text = if (isInvited) localeStrings.locationInvited else localeStrings.locationInviteMe)
                                 }
                             }
                         }

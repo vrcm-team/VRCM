@@ -8,12 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.automirrored.outlined.Reply
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -35,6 +29,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.extensions.openUrl
@@ -74,7 +69,6 @@ data class NotificationScreen(val targetNotificationId: String? = null) : AppDet
 }
 
 /** Notification center UI shared by a root navigation destination and the detail route. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationCenterContent(
     modifier: Modifier = Modifier,
@@ -163,32 +157,32 @@ fun NotificationCenterContent(
         }
     }
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier,
-        containerColor = if (showTopBar) MaterialTheme.colorScheme.background else Color.Transparent,
-        contentColor = MaterialTheme.colorScheme.onBackground,
+        containerColor = if (showTopBar) AppTheme.colors.groupedBackground else Color.Transparent,
+        contentColor = AppTheme.colors.label,
         contentWindowInsets = if (showTopBar) {
-            ScaffoldDefaults.contentWindowInsets
+            WindowInsets.systemBars
         } else {
             WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
         },
         topBar = {
             if (showTopBar) {
-                TopAppBar(
-                    title = { Text(strings.notificationSectionInbox) },
+                AppNavBar(
+                    title = { AppText(strings.notificationSectionInbox) },
                     navigationIcon = {
                         if (showBackButton) {
-                            IconButton(onClick = { navigator.pop() }) {
-                                Icon(AppIcons.ArrowBackIosNew, strings.notificationBack)
+                            AppIconButton(onClick = { navigator.pop() }) {
+                                AppIcon(AppIcons.ArrowBackIosNew, strings.notificationBack)
                             }
                         }
                     },
                     actions = {
-                        IconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
+                        AppIconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
                             if (model.isRefreshing) {
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                AppActivityIndicator(Modifier.size(20.dp))
                             } else {
-                                Icon(AppIcons.Update, strings.notificationRefresh)
+                                AppIcon(AppIcons.Refresh, strings.notificationRefresh)
                             }
                         }
                     },
@@ -203,15 +197,15 @@ fun NotificationCenterContent(
         when {
             model.isRefreshing && notifications.isEmpty() -> CenterState(
                 centerStateModifier,
-            ) { CircularProgressIndicator() }
+            ) { AppActivityIndicator() }
             model.hasRefreshError && notifications.isEmpty() -> CenterState(
                 centerStateModifier,
             ) {
-                Text(strings.notificationRefreshFailed, textAlign = TextAlign.Center)
-                TextButton(onClick = model::refreshAllNotification) { Text(strings.retry) }
+                AppText(strings.notificationRefreshFailed, textAlign = TextAlign.Center)
+                AppButton(onClick = model::refreshAllNotification, style = AppButtonStyle.Plain) { AppText(strings.retry) }
             }
             notifications.isEmpty() -> CenterState(centerStateModifier) {
-                Text(strings.homeNotificationEmpty, textAlign = TextAlign.Center)
+                AppText(strings.homeNotificationEmpty, textAlign = TextAlign.Center)
             }
             else -> LazyColumn(
                 state = listState,
@@ -226,13 +220,13 @@ fun NotificationCenterContent(
             ) {
                 if (model.hasRefreshError) item(key = "refresh-error") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
+                        AppText(
                             strings.notificationRefreshFailed,
                             Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.destructive,
+                            style = AppTheme.type.caption1,
                         )
-                        TextButton(onClick = model::refreshAllNotification) { Text(strings.retry) }
+                        AppButton(onClick = model::refreshAllNotification, style = AppButtonStyle.Plain) { AppText(strings.retry) }
                     }
                 }
                 items(notifications, key = { it.identity.stableKey }) { item ->
@@ -281,15 +275,15 @@ fun NotificationCenterContent(
         },
     )
     externalLink?.let { target ->
-        AlertDialog(
+        AppAlert(
             onDismissRequest = { externalLink = null },
-            icon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
-            title = { Text(strings.notificationExternalLinkTitle) },
+            icon = { AppIcon(AppIcons.OpenInNew, contentDescription = null) },
+            title = { AppText(strings.notificationExternalLinkTitle) },
             text = {
-                Text(strings.notificationExternalLinkMessage.replace("%s", target.host))
+                AppText(strings.notificationExternalLinkMessage.replace("%s", target.host))
             },
             confirmButton = {
-                Button(
+                AppButton(
                     onClick = {
                         externalLink = null
                         runCatching { platform.openUrl(target.url) }
@@ -301,13 +295,14 @@ fun NotificationCenterContent(
                                 }
                             }
                     },
+                    style = AppButtonStyle.Prominent,
                 ) {
-                    Text(strings.officialLinkOpen)
+                    AppText(strings.officialLinkOpen)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { externalLink = null }) {
-                    Text(strings.cancel)
+                AppButton(onClick = { externalLink = null }, style = AppButtonStyle.Plain) {
+                    AppText(strings.cancel)
                 }
             },
         )
@@ -335,7 +330,6 @@ private data class BoopReply(
 @OptIn(
     ExperimentalSharedTransitionApi::class,
     ExperimentalLayoutApi::class,
-    ExperimentalMaterial3Api::class,
 )
 @Composable
 private fun LazyItemScope.NotificationItem(
@@ -409,11 +403,9 @@ private fun LazyItemScope.NotificationItem(
         ?: senderId.takeIf(String::isNotEmpty)?.let { NotificationActionTarget.User(it) }
     val profileUserId = (profileTarget as? NotificationActionTarget.User)?.id
     Box(
-        Modifier.fillMaxWidth().animateItem().clip(MaterialTheme.shapes.large)
-            .background(
-                if (item.seen) MaterialTheme.colorScheme.surface
-                else MaterialTheme.colorScheme.secondaryContainer,
-            )
+        Modifier.fillMaxWidth().animateItem().clip(AppShapes.l)
+            // 未读靠标题前的强调色圆点区分（Apple 列表的做法），卡片底色保持一致
+            .background(AppTheme.colors.secondaryGroupedBackground)
             .clickable(enabled = !pending) {
                 expanded = !expanded
                 if (!item.seen) onRead()
@@ -436,44 +428,44 @@ private fun LazyItemScope.NotificationItem(
                             )
                         }
                         .size(120.dp, 80.dp)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, MaterialTheme.shapes.medium)
-                        .clip(MaterialTheme.shapes.medium),
+                        .background(AppTheme.colors.tertiaryGroupedBackground, AppShapes.m)
+                        .clip(AppShapes.m),
                     imageData = item.imageUrl,
                 )
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (!item.seen) Box(
-                            Modifier.padding(end = 6.dp).size(8.dp).clip(MaterialTheme.shapes.extraLarge)
-                                .background(MaterialTheme.colorScheme.primary),
+                            Modifier.padding(end = 6.dp).size(8.dp).clip(AppShapes.xl)
+                                .background(AppTheme.colors.tint),
                         )
-                        Text(
+                        AppText(
                             headline,
                             Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = AppTheme.type.subheadlineEmphasized,
+                            color = AppTheme.colors.tint,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    if (groupName.isNotEmpty() && !isGroupInvite) Text(
+                    if (groupName.isNotEmpty() && !isGroupInvite) AppText(
                         groupName,
                         Modifier.enableIf(groupId.isNotEmpty()) { clickable(onClick = openGroup) },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = AppTheme.type.caption1Emphasized,
+                        color = AppTheme.colors.secondaryTint,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.weight(1f))
                     NotificationTypeLabel(item)
-                    Text(
+                    AppText(
                         remember(item.createdAt) {
                             @OptIn(ExperimentalTime::class)
                             runCatching {
                                 Instant.parse(item.createdAt).toLocalDateTime(TimeZone.currentSystemDefault()).ignoredFormat
                             }.getOrDefault(item.createdAt)
                         },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.tertiaryLabel,
                     )
                 }
             }
@@ -490,7 +482,7 @@ private fun LazyItemScope.NotificationItem(
                     if (isBoop && item.showStandaloneReadAction) {
                         NotificationCommandButton(
                             label = strings.notificationAccept,
-                            icon = Icons.Outlined.Check,
+                            icon = AppIcons.Check,
                             loading = false,
                             enabled = !pending,
                             onClick = onRead,
@@ -534,19 +526,19 @@ private fun LazyItemScope.NotificationItem(
                             canRetryPhotoResponse -> strings.notificationRetryPhotoResponse
                             else -> strings.notificationReplyWithPhoto
                         }
-                        ATooltipBox(tooltip = { Text(photoLabel) }) {
-                            IconButton(
+                        ATooltipBox(tooltip = { AppText(photoLabel) }) {
+                            AppIconButton(
                                 enabled = !pending,
                                 onClick = if (canRetryPhotoResponse) onPhotoRetry else onPhotoReply,
                             ) {
                                 if (photoResponsePhase != null) {
-                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    AppActivityIndicator(Modifier.size(20.dp))
                                 } else {
-                                    Icon(
+                                    AppIcon(
                                         imageVector = if (canRetryPhotoResponse) {
-                                            Icons.Outlined.Refresh
+                                            AppIcons.Refresh
                                         } else {
-                                            Icons.Outlined.AddPhotoAlternate
+                                            AppIcons.AddPhoto
                                         },
                                         contentDescription = photoLabel,
                                     )
@@ -554,29 +546,28 @@ private fun LazyItemScope.NotificationItem(
                             }
                         }
                     }
-                    if (item.showStandaloneReadAction && !isBoop) IconButton(enabled = !pending, onClick = onRead) {
-                        Icon(Icons.Outlined.MarkEmailRead, strings.notificationMarkRead)
+                    if (item.showStandaloneReadAction && !isBoop) AppIconButton(enabled = !pending, onClick = onRead) {
+                        AppIcon(AppIcons.MarkRead, strings.notificationMarkRead)
                     }
-                    if (item.canDelete) IconButton(enabled = !pending, onClick = onDelete) {
-                        Icon(Icons.Default.DeleteOutline, strings.notificationDelete)
+                    if (item.canDelete) AppIconButton(enabled = !pending, onClick = onDelete) {
+                        AppIcon(AppIcons.Delete, strings.notificationDelete)
                     }
                 }
             }
             AnimatedVisibility(expanded) {
-                Text(
+                AppText(
                     if (isFriendRequest) "${item.message} ${strings.notificationFriendRequest}" else item.message,
                     Modifier.fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.small)
+                        .background(AppTheme.colors.tertiaryGroupedBackground, AppShapes.s)
                         .padding(8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.secondaryLabel,
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotificationResponseButton(
     item: NotificationItemData,
@@ -597,7 +588,7 @@ private fun NotificationResponseButton(
         )
     }
     if (unavailableLink) {
-        ATooltipBox(tooltip = { Text(strings.notificationUnsupportedLink) }, content = button)
+        ATooltipBox(tooltip = { AppText(strings.notificationUnsupportedLink) }, content = button)
     } else {
         button()
     }
@@ -611,10 +602,11 @@ private fun NotificationCommandButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    FilledTonalButton(
+    AppButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.padding(start = 6.dp),
+        style = AppButtonStyle.Tinted,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Row(
@@ -622,10 +614,10 @@ private fun NotificationCommandButton(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                AppIcon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                AppText(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            if (loading) AppActivityIndicator(Modifier.size(18.dp))
         }
     }
 }
@@ -659,18 +651,18 @@ private fun notificationActionLabel(
 }
 
 private fun notificationActionIcon(action: NotificationItemData.ActionData): ImageVector = when {
-    action.type.equals("link", true) -> Icons.AutoMirrored.Outlined.OpenInNew
-    action.type.equals("accept", true) || action.icon.equals("check", true) -> Icons.Outlined.Check
-    action.type.equals("delete", true) -> Icons.Default.DeleteOutline
+    action.type.equals("link", true) -> AppIcons.OpenInNew
+    action.type.equals("accept", true) || action.icon.equals("check", true) -> AppIcons.Check
+    action.type.equals("delete", true) -> AppIcons.Delete
     action.type.equals("decline", true) || action.type.equals("hide", true) ||
-        action.icon.equals("cancel", true) -> Icons.Outlined.Close
+        action.icon.equals("cancel", true) -> AppIcons.Close
     action.type.equals("unsubscribe", true) || action.icon.equals("bell-slash", true) ->
-        Icons.Outlined.NotificationsOff
-    action.icon.equals("bell", true) -> Icons.Outlined.Notifications
+        AppIcons.NotificationsOff
+    action.icon.equals("bell", true) -> AppIcons.Notifications
     action.type.equals("block", true) || action.type.equals("ban", true) ||
-        action.icon.equals("ban", true) -> Icons.Outlined.Block
-    action.type.equals("boop", true) || action.icon.equals("reply", true) -> Icons.AutoMirrored.Outlined.Reply
-    else -> Icons.Outlined.Tag
+        action.icon.equals("ban", true) -> AppIcons.Block
+    action.type.equals("boop", true) || action.icon.equals("reply", true) -> AppIcons.Reply
+    else -> AppIcons.Tag
 }
 
 @Composable
@@ -679,26 +671,26 @@ private fun NotificationTypeLabel(item: NotificationItemData) {
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(boopIcon(item.boopEmojiId), strings.profileBoop, Modifier.size(16.dp))
-        Text(strings.profileBoop, style = MaterialTheme.typography.labelSmall)
-    } else Text(
+        AppIcon(boopIcon(item.boopEmojiId), strings.profileBoop, Modifier.size(16.dp))
+        AppText(strings.profileBoop, style = AppTheme.type.caption2Emphasized)
+    } else AppText(
         when {
             item.type == NotificationType.FriendRequest.value -> strings.notificationFriendRequestAlert
             item.isGroupInvite -> strings.notificationGroupInvite
             isGroupNotificationType(item.type) -> strings.notificationGroupAnnouncement
             else -> item.type
         },
-        style = MaterialTheme.typography.labelSmall,
+        style = AppTheme.type.caption2Emphasized,
     )
 }
 
 private fun boopIcon(emojiId: String?) = when (emojiId?.lowercase()) {
-    "default_heart" -> Icons.Outlined.FavoriteBorder
-    "default_hand_wave" -> Icons.Outlined.WavingHand
-    "default_laugh" -> Icons.Outlined.SentimentVerySatisfied
-    "default_thumbs_up" -> Icons.Outlined.ThumbUpOffAlt
-    "default_thinking" -> Icons.Outlined.PsychologyAlt
-    "default_wow" -> Icons.Outlined.EmojiEmotions
-    "default_angry" -> Icons.Outlined.SentimentDissatisfied
-    else -> Icons.Outlined.TouchApp
+    "default_heart" -> AppIcons.FavoriteBorder
+    "default_hand_wave" -> AppIcons.Wave
+    "default_laugh" -> AppIcons.FaceLaugh
+    "default_thumbs_up" -> AppIcons.ThumbUp
+    "default_thinking" -> AppIcons.FaceThinking
+    "default_wow" -> AppIcons.FaceSurprised
+    "default_angry" -> AppIcons.FaceAngry
+    else -> AppIcons.Tap
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.plus
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import kotlin.math.roundToInt
 
 
@@ -57,7 +57,7 @@ fun Modifier.drawSateCircle(
     alignment: Alignment = Alignment.BottomEnd,
     enable: Boolean = true,
     hollow: Boolean = false,
-    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    backgroundColor: Color = AppTheme.colors.secondaryGroupedBackground,
     onDraw: ContentDrawScope.(Float, Offset) -> Unit = { borderRadius: Float, borderOffset: Offset ->
         val radius = (size.maxDimension - borderWidth.toPx()) * percentage
         this.drawContent()

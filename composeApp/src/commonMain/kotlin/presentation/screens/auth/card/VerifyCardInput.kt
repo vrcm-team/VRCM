@@ -3,13 +3,14 @@ package io.github.vrcmteam.vrcm.presentation.screens.auth.card
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.CodeTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 
@@ -35,9 +36,9 @@ fun VerifyCardInput(
         boxWidth = 48.dp,
         boxHeight = 48.dp,
         boxMargin = 12.dp,
-        boxShape = MaterialTheme.shapes.small,
-        boxBackgroundColor = MaterialTheme.colorScheme.surface,
-        textColor = MaterialTheme.colorScheme.onSurface
+        boxShape = AppShapes.s,
+        boxBackgroundColor = AppTheme.colors.secondaryGroupedBackground,
+        textColor = AppTheme.colors.label
     )
     LoadingButton(
         modifier = Modifier

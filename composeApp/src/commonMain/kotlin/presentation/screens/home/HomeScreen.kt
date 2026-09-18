@@ -8,36 +8,27 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeDefaults.style
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
-import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
-import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
-import io.github.vrcmteam.vrcm.presentation.extensions.isSupportBlur
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleCombinedClickable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
 import io.github.vrcmteam.vrcm.presentation.navigation.*
@@ -55,7 +46,6 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigati
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusSharedUserId
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
-import io.github.vrcmteam.vrcm.presentation.screens.home.sheet.SettingsBottomSheet
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
@@ -63,6 +53,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCen
 import io.github.vrcmteam.vrcm.presentation.screens.search.GlobalSearchScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.InviteMessageSlotsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.settings.PlayerModerationListScreen
+import io.github.vrcmteam.vrcm.presentation.screens.settings.SettingsScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.user.data.UserProfileVo
@@ -87,12 +78,10 @@ object HomeScreen : AppListRoute {
         val notificationModel = koinInject<NotificationCenterModel>()
         val stateHolder = rememberSaveableStateHolder()
         val scope = rememberCoroutineScope()
-        val drawerState = rememberDrawerState(DrawerValue.Closed)
+        val drawerState = rememberAppDrawerState(AppDrawerValue.Closed)
         val drawerCoordinator = remember { HomeDrawerStateCoordinator() }
         val windowWidthClass = LocalAppWindowWidthClass.current
         val useRail = windowWidthClass != AppWindowWidthClass.Compact
-        val supportBlur = getAppPlatform().isSupportBlur
-        val hazeState = if (supportBlur) remember { HazeState() } else null
         val selectedDestination = HomeDestination.entries[model.selectedDestinationIndex]
         val selectedFavoritesTab = FavoritesTab.entries[model.selectedFavoritesTabIndex]
         val friendListModel = if (selectedDestination == HomeDestination.Favorites) {
@@ -153,14 +142,10 @@ object HomeScreen : AppListRoute {
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
         ) {
-            Scaffold(
-                contentColor = MaterialTheme.colorScheme.primary,
+            AppScaffold(
                 topBar = {
                     if (showMainNavigation) {
-                        HomeIdentityTopBar(
-                            model = model,
-                            hazeState = hazeState,
-                        ) {
+                        HomeIdentityTopBar(model = model) {
                             when (selectedDestination) {
                                 HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
                                 HomeDestination.Favorites -> FavoritesHubTopBarActions(
@@ -179,17 +164,14 @@ object HomeScreen : AppListRoute {
                         MainNavigationBar(
                             selected = selectedDestination,
                             hasUnread = notificationModel.hasUnread,
-                            hazeState = hazeState,
                             onSelect = onDestinationSelected,
                         )
                     }
                 },
             ) { contentPadding ->
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .enableIf(supportBlur) { hazeSource(hazeState!!) },
-                    tonalElevation = 2.dp,
+                AppSurface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = AppTheme.colors.groupedBackground,
                 ) {
                     Row {
                         if (useRail && showMainNavigation) {
@@ -230,8 +212,6 @@ object HomeScreen : AppListRoute {
                 }
             }
         }
-
-        SettingsBottomSheet(model.settingsVisible, model::hideSettings)
     }
 }
 
@@ -308,9 +288,9 @@ private fun HomeTabRow(
 ) {
     val scope = rememberCoroutineScope()
     var activityFilterMenuExpanded by remember { mutableStateOf(false) }
-    PrimaryTabRow(selectedTabIndex = pagerState.currentPage) {
+    AppTabRow(selectedTabIndex = pagerState.currentPage) {
         HomeTab.entries.forEachIndexed { index, tab ->
-            Tab(
+            AppTab(
                 selected = index == pagerState.currentPage,
                 onClick = {
                     if (tab == HomeTab.Activity) {
@@ -327,7 +307,7 @@ private fun HomeTabRow(
                 },
                 text = {
                     if (tab == HomeTab.Location) {
-                        Text(
+                        AppText(
                             strings.homeTabLocation,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -338,12 +318,12 @@ private fun HomeTabRow(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
-                                Text(
+                                AppText(
                                     strings.homeTabActivity,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Icon(
+                                AppIcon(
                                     imageVector = if (activityFilterMenuExpanded) {
                                         AppIcons.ExpandLess
                                     } else {
@@ -353,16 +333,15 @@ private fun HomeTabRow(
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
-                            DropdownMenu(
+                            AppMenu(
                                 expanded = activityFilterMenuExpanded,
                                 onDismissRequest = { activityFilterMenuExpanded = false },
                                 modifier = Modifier.widthIn(min = 200.dp),
-                                shape = MaterialTheme.shapes.medium,
                             ) {
                                 FriendActivityTimelineFilter.entries.forEach { option ->
                                     val isSelected = option == activityFilter
-                                    DropdownMenuItem(
-                                        text = { Text(option.label()) },
+                                    AppMenuItem(
+                                        text = { AppText(option.label()) },
                                         onClick = {
                                             activityFilterMenuExpanded = false
                                             onActivityFilterSelected(option)
@@ -373,7 +352,7 @@ private fun HomeTabRow(
                                                 contentAlignment = Alignment.Center,
                                             ) {
                                                 if (isSelected) {
-                                                    Icon(
+                                                    AppIcon(
                                                         imageVector = AppIcons.Check,
                                                         contentDescription = null,
                                                         modifier = Modifier.size(20.dp),
@@ -454,35 +433,28 @@ private fun ActivityTimelinePreview() {
 @Composable
 private fun HomeIdentityTopBar(
     model: HomeScreenModel,
-    hazeState: HazeState?,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    val modifier = if (hazeState != null) {
-        Modifier.hazeEffect(
-            state = hazeState,
-            style = style(backgroundColor = backgroundColor),
-        )
-    } else {
-        Modifier.shadow(2.dp)
-    }
-    Surface(
-        modifier = modifier,
-        color = if (hazeState != null) Color.Transparent else backgroundColor,
+    Row(
+        Modifier.fillMaxWidth()
+            .scrollEdgeEffect()
+            .padding(top = getInsetPadding(WindowInsets::getTop))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            Modifier.fillMaxWidth()
-                .padding(top = getInsetPadding(WindowInsets::getTop))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.weight(1f)) {
-                HomeIdentity(
-                    model = model,
-                    modifier = Modifier.widthIn(max = 286.dp),
-                )
-            }
-            actions()
+        Box(Modifier.weight(1f)) {
+            HomeIdentity(
+                model = model,
+                modifier = Modifier.widthIn(max = 286.dp),
+            )
+        }
+        // 顶栏动作与其他页面的导航栏一致：玻璃圆钮
+        CompositionLocalProvider(LocalAppControlContext provides AppControlContext.NavBar) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions,
+            )
         }
     }
 }
@@ -508,7 +480,7 @@ private fun HomeIdentity(
     Row(
         modifier
             .sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
-            .clip(MaterialTheme.shapes.medium),
+            .clip(AppShapes.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -549,7 +521,7 @@ private fun HomeIdentity(
         ) {
             UserInfoRow(
                 iconSize = 16.dp,
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.type.headline,
                 user = currentUser,
                 sharedUserId = userId,
                 sharedSuffixKey = suffix,
@@ -558,7 +530,7 @@ private fun HomeIdentity(
             AnimatedVisibility(statusVisible) {
                 UserStatusRow(
                     iconSize = 8.dp,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = AppTheme.type.caption1Emphasized,
                     user = currentUser,
                     animatedVisibilityScope = this,
                     sharedUserId = userId,
@@ -571,11 +543,11 @@ private fun HomeIdentity(
 
 @Composable
 private fun NotificationRefreshAction(model: NotificationCenterModel) {
-    IconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
+    AppIconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
         if (model.isRefreshing) {
-            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            AppActivityIndicator(Modifier.size(20.dp))
         } else {
-            Icon(AppIcons.Update, strings.notificationRefresh)
+            AppIcon(AppIcons.Refresh, strings.notificationRefresh)
         }
     }
 }
@@ -583,7 +555,7 @@ private fun NotificationRefreshAction(model: NotificationCenterModel) {
 @Composable
 private fun HomePersonalDrawer(
     model: HomeScreenModel,
-    drawerState: DrawerState,
+    drawerState: AppDrawerState,
     gesturesEnabled: Boolean,
     content: @Composable () -> Unit,
 ) {
@@ -632,13 +604,7 @@ private fun HomePersonalDrawer(
         onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
         onInventoryClick = { closeAndNavigate(InventoryScreen) },
         onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
-        onSettingsClick = {
-            scope.launch {
-                drawerState.close()
-                model.hideDrawer()
-                model.showSettings()
-            }
-        },
+        onSettingsClick = { closeAndNavigate(SettingsScreen) },
         onLogoutClick = { showLogoutConfirmation = true },
         content = content,
     )
@@ -675,70 +641,37 @@ private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
 private fun MainNavigationBar(
     selected: HomeDestination,
     hasUnread: Boolean,
-    hazeState: HazeState?,
     onSelect: (HomeDestination) -> Unit,
 ) {
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
-    val backgroundColor = MaterialTheme.colorScheme.surfaceContainerLowest
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            modifier = Modifier
-                .height(64.dp)
-                .run {
-                    if (hazeState != null) {
-                        clip(CircleShape).hazeEffect(
-                            state = hazeState,
-                            style = style(backgroundColor = backgroundColor),
-                        )
-                    } else {
-                        shadow(elevation = 2.dp, shape = CircleShape)
-                    }
-                },
-            color = if (hazeState != null) Color.Transparent else backgroundColor,
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+        AppTabBar(
+            itemCount = HomeDestination.entries.size,
+            selectedIndex = selected.ordinal,
+            onSelect = { onSelect(HomeDestination.entries[it]) },
+            itemWidth = 78.dp,
+        ) { index, isSelected ->
+            val destination = HomeDestination.entries[index]
+            val presentation = destination.presentation()
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
-                HomeDestination.entries.forEach { destination ->
-                    val presentation = destination.presentation()
-                    MainNavigationItem(
-                        presentation = presentation,
-                        selected = selected == destination,
-                        unread = destination == HomeDestination.Notifications && hasUnread,
-                        onClick = { onSelect(destination) },
-                    )
-                }
+                MainDestinationIcon(
+                    presentation = presentation,
+                    selected = isSelected,
+                    unread = destination == HomeDestination.Notifications && hasUnread,
+                    modifier = Modifier.size(24.dp),
+                    tint = LocalContentColor.current,
+                )
+                AppText(presentation.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-    }
-}
-
-@Composable
-private fun MainNavigationItem(
-    presentation: MainDestinationPresentation,
-    selected: Boolean,
-    unread: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.simpleClickable(onClick),
-    ) {
-        MainDestinationIcon(
-            presentation = presentation,
-            unread = unread,
-            modifier = Modifier.size(40.dp),
-            tint = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
     }
 }
 
@@ -748,18 +681,24 @@ private fun MainNavigationRail(
     hasUnread: Boolean,
     onSelect: (HomeDestination) -> Unit,
 ) {
-    NavigationRail(
+    AppNavigationRail(
         Modifier.fillMaxHeight(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        containerColor = AppTheme.colors.secondaryGroupedBackground,
     ) {
         Spacer(Modifier.weight(1f))
         HomeDestination.entries.forEach { destination ->
             val presentation = destination.presentation()
-            NavigationRailItem(
+            AppNavigationRailItem(
                 selected = selected == destination,
                 onClick = { onSelect(destination) },
-                icon = { MainDestinationIcon(presentation, destination == HomeDestination.Notifications && hasUnread) },
-                label = { Text(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                icon = {
+                    MainDestinationIcon(
+                        presentation = presentation,
+                        selected = selected == destination,
+                        unread = destination == HomeDestination.Notifications && hasUnread,
+                    )
+                },
+                label = { AppText(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             )
         }
         Spacer(Modifier.weight(1f))
@@ -767,9 +706,10 @@ private fun MainNavigationRail(
 }
 
 @Composable
-private fun MainDestinationIcon(presentation: MainDestinationPresentation, unread: Boolean) {
+private fun MainDestinationIcon(presentation: MainDestinationPresentation, selected: Boolean, unread: Boolean) {
     MainDestinationIcon(
         presentation = presentation,
+        selected = selected,
         unread = unread,
         modifier = Modifier.size(24.dp),
         tint = LocalContentColor.current,
@@ -779,22 +719,24 @@ private fun MainDestinationIcon(presentation: MainDestinationPresentation, unrea
 @Composable
 private fun MainDestinationIcon(
     presentation: MainDestinationPresentation,
+    selected: Boolean,
     unread: Boolean,
     modifier: Modifier,
     tint: Color,
 ) {
-    BadgedBox(
+    AppBadgedBox(
         badge = {
             if (unread) {
-                val badgeColor = MaterialTheme.colorScheme.tertiary
+                val badgeColor = AppTheme.colors.secondaryTint
                 Canvas(Modifier.offset(4.dp, (-4).dp).size(8.dp)) {
                     drawCircle(color = badgeColor, radius = 4.dp.toPx())
                 }
             }
         },
     ) {
-        Icon(
-            imageVector = presentation.icon,
+        AppIcon(
+            // 选中是实心符号、未选中是描边：状态不只靠颜色传达
+            imageVector = if (selected) presentation.selectedIcon else presentation.icon,
             contentDescription = presentation.label,
             modifier = modifier,
             tint = tint,
@@ -802,17 +744,17 @@ private fun MainDestinationIcon(
     }
 }
 
-private data class MainDestinationPresentation(val label: String, val icon: ImageVector)
+private data class MainDestinationPresentation(val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
 
 internal class HomeDrawerStateCoordinator {
     private var hasSettledOpen = false
 
-    fun shouldHide(value: DrawerValue): Boolean = when (value) {
-        DrawerValue.Open -> {
+    fun shouldHide(value: AppDrawerValue): Boolean = when (value) {
+        AppDrawerValue.Open -> {
             hasSettledOpen = true
             false
         }
-        DrawerValue.Closed -> {
+        AppDrawerValue.Closed -> {
             val shouldHide = hasSettledOpen
             hasSettledOpen = false
             shouldHide
@@ -822,7 +764,11 @@ internal class HomeDrawerStateCoordinator {
 
 @Composable
 private fun HomeDestination.presentation(): MainDestinationPresentation = when (this) {
-    HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Explore)
-    HomeDestination.Favorites -> MainDestinationPresentation(strings.favoritesTitle, AppIcons.Favorite)
-    HomeDestination.Notifications -> MainDestinationPresentation(strings.mainNavigationNotifications, AppIcons.Notifications)
+    HomeDestination.Home -> MainDestinationPresentation(strings.mainNavigationHome, AppIcons.Home, AppIcons.HomeFill)
+    HomeDestination.Favorites -> MainDestinationPresentation(strings.favoritesTitle, AppIcons.FavoriteBorder, AppIcons.Favorite)
+    HomeDestination.Notifications -> MainDestinationPresentation(
+        strings.mainNavigationNotifications,
+        AppIcons.Notifications,
+        AppIcons.NotificationsFill,
+    )
 }

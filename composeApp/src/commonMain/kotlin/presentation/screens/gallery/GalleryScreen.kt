@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
 import org.koin.compose.viewmodel.koinViewModel
@@ -46,8 +45,7 @@ object GalleryScreen : AppRoute {
         GalleryTabPager.Companion.Sticker,
     )
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     override fun Content() {
         val galleryScreenModel: GalleryScreenModel = koinViewModel()
         val pagerState = rememberPagerState { tabPagers.size }
@@ -63,32 +61,27 @@ object GalleryScreen : AppRoute {
             editorSessionStore.galleryUploadCompletions.collect(galleryScreenModel::refreshFiles)
         }
 
-        Scaffold(
+        AppScaffold(
             topBar = {
-                CenterAlignedTopAppBar(
+                AppNavBar(
                     title = {
-                        Text(
+                        AppText(
                             text = strings.galleryScreenTitle,
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(
+                        AppIconButton(onClick = { navigator.pop() }) {
+                            AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                                tint = MaterialTheme.colorScheme.primary,
                                 contentDescription = "back"
                             )
                         }
                     },
                 )
             },
-            contentColor = MaterialTheme.colorScheme.primary
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -96,27 +89,11 @@ object GalleryScreen : AppRoute {
                     .padding(paddingValues)
             ) {
                 // 标签页
-                ScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    edgePadding = 16.dp,
-                    divider = {
-                        HorizontalDivider(
-                            thickness = 0.5.dp,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    },
-                    indicator = {
-                        TabRowDefaults.PrimaryIndicator(
-                            modifier = Modifier
-                                .tabIndicatorOffset(it[pagerState.currentPage]),
-                            width = 32.dp,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                    }
+                AppScrollableTabRow(
+                    edgePadding = 16.dp
                 ) {
                     tabPagers.forEachIndexed { index, pager ->
-                        Tab(
+                        AppTab(
                             selected = pagerState.currentPage == index,
                             onClick = {
                                 coroutineScope.launch {
@@ -128,17 +105,17 @@ object GalleryScreen : AppRoute {
                                 val count = galleryScreenModel.getFileCount(tagType)
                                 val maxCount = galleryScreenModel.getMaxCount(tagType)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
+                                    AppText(
                                         text = pager.title,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
+                                    AppText(
                                         text = "$count/$maxCount",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = AppTheme.type.caption2Emphasized,
                                         fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        color = AppTheme.colors.label.copy(alpha = 0.6f),
                                         maxLines = 1
                                     )
                                 }

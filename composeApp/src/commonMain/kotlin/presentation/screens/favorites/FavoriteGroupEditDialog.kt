@@ -6,17 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,11 +16,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteGroupVisibility
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegment
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegmentedRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FavoriteGroupEditFailure
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FavoriteGroupEditState
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FavoriteGroupEditDialog(
     state: FavoriteGroupEditState,
@@ -50,21 +48,21 @@ internal fun FavoriteGroupEditDialog(
     val invalidName = normalizedDisplayName.isEmpty()
     val hasChanges = normalizedDisplayName != group.displayName || visibility.value != group.visibility
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!state.isSaving) onDismiss() },
-        title = { Text(strings.favoriteGroupEditTitle) },
+        title = { AppText(strings.favoriteGroupEditTitle) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                AppTextField(
                     value = displayName,
                     onValueChange = {
                         displayName = it
                         onClearFailure()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.favoriteGroupEditName) },
+                    label = { AppText(strings.favoriteGroupEditName) },
                     supportingText = if (invalidName) {
-                        { Text(strings.favoriteGroupEditNameRequired) }
+                        { AppText(strings.favoriteGroupEditNameRequired) }
                     } else {
                         null
                     },
@@ -73,26 +71,21 @@ internal fun FavoriteGroupEditDialog(
                     enabled = !state.isSaving,
                 )
 
-                Text(
+                AppText(
                     text = strings.favoriteGroupEditVisibility,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.type.subheadlineEmphasized,
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                AppSegmentedRow(Modifier.fillMaxWidth()) {
                     FavoriteGroupVisibility.entries.forEachIndexed { index, option ->
-                        SegmentedButton(
+                        AppSegment(
                             selected = visibility == option,
                             onClick = {
                                 visibility = option
                                 onClearFailure()
                             },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = FavoriteGroupVisibility.entries.size,
-                            ),
                             enabled = !state.isSaving,
-                            icon = {},
                             label = {
-                                Text(
+                                AppText(
                                     text = when (option) {
                                         FavoriteGroupVisibility.Private -> strings.favoriteGroupVisibilityPrivate
                                         FavoriteGroupVisibility.Friends -> strings.favoriteGroupVisibilityFriends
@@ -107,32 +100,32 @@ internal fun FavoriteGroupEditDialog(
                 }
 
                 if (state.failure == FavoriteGroupEditFailure.SaveFailed) {
-                    Text(
+                    AppText(
                         text = strings.favoriteGroupEditFailed,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        style = AppTheme.type.caption1,
+                        color = AppTheme.colors.destructive,
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 onClick = { onSave(normalizedDisplayName, visibility) },
                 enabled = hasChanges && !invalidName && !state.isSaving,
+                style = AppButtonStyle.Plain,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
                     if (state.isSaving) {
-                        CircularProgressIndicator(
+                        AppActivityIndicator(
                             modifier = Modifier.size(18.dp),
                             color = LocalContentColor.current,
-                            strokeWidth = 2.dp,
                         )
                         Spacer(Modifier.size(8.dp))
                     }
-                    Text(
+                    AppText(
                         if (state.isSaving) {
                             strings.favoriteGroupEditSaving
                         } else {
@@ -143,11 +136,12 @@ internal fun FavoriteGroupEditDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            AppButton(
                 onClick = onDismiss,
                 enabled = !state.isSaving,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(strings.cancel)
+                AppText(strings.cancel)
             }
         },
     )

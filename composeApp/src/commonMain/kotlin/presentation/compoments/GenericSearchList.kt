@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * 通用搜索列表组件
  * 提供搜索框、选项卡和可切换的内容
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenericSearchList(
     key: String,
@@ -103,39 +102,21 @@ fun GenericSearchList(
                     headerContent()
 
                     // 标签栏
-                    PrimaryTabRow(
+                    AppTabRow(
                         selectedTabIndex = selectedTabIndex,
                         modifier = Modifier
                             .fillMaxWidth(),
-                        divider = {
-                            HorizontalDivider(
-                                thickness = 0.5.dp,
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        },
-                        indicator = {
-                            TabRowDefaults.PrimaryIndicator(
-                                modifier = Modifier
-                                    .tabIndicatorOffset(selectedTabIndex),
-                                width = 32.dp,
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                        },
                     ) {
                         tabs.forEachIndexed { index, title ->
-                            Tab(
+                            AppTab(
                                 selected = index == selectedTabIndex,
                                 onClick = { onTabSelected(index) },
-                                interactionSource = null,
-                                selectedContentColor = MaterialTheme.colorScheme.primary,
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 text = {
-                                    Text(
+                                    AppText(
                                         text = title,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                        style = AppTheme.type.subheadline.copy(
                                             fontWeight = if (index == selectedTabIndex) FontWeight.Bold
                                                         else FontWeight.Normal
                                         )
@@ -172,7 +153,7 @@ fun GenericSearchList(
 /**
  * 用于显示搜索结果列表项的组件
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> SearchResultItem(
     item: T,
@@ -194,12 +175,12 @@ fun <T> SearchResultItem(
             onLongClick = { onLongClick(item) },
         )
     }
-    ListItem(
+    AppListItem(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
             .padding(horizontal = 6.dp)
-            .clip(MaterialTheme.shapes.large)
+            .clip(AppShapes.l)
             .then(interactionModifier),
         leadingContent = leadingContent,
         headlineContent = headlineContent,
@@ -234,16 +215,16 @@ fun AdvancedOptionsPanel(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
+                AppIcon(
                     imageVector = AppIcons.Settings,
                     contentDescription = title
                 )
-                Text(
+                AppText(
                     text = title,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = AppTheme.type.subheadline
                 )
             }
-            Icon(
+            AppIcon(
                 imageVector = if (expanded) AppIcons.ExpandLess else AppIcons.ExpandMore,
                 contentDescription = if (expanded) {
                     strings.notificationCollapse

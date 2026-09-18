@@ -11,10 +11,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +34,11 @@ import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.invite.InviteApi
 import io.github.vrcmteam.vrcm.presentation.animations.NoClip
 import io.github.vrcmteam.vrcm.presentation.animations.TextBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.drawSateCircle
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
@@ -85,7 +86,7 @@ internal fun UserStatusIndicator(
     modifier: Modifier = Modifier,
     userStatus: UserStatus?,
     location: String?,
-    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    backgroundColor: Color = AppTheme.colors.secondaryGroupedBackground,
 ) {
     val isHollow = isHollowUserStatus(userStatus, location)
     Canvas(modifier = modifier) {
@@ -195,7 +196,7 @@ fun LazyItemScope.InviteSelf(
     }
     Column(
         modifier = Modifier.width(60.dp)
-            .clip(MaterialTheme.shapes.small)
+            .clip(AppShapes.s)
             .clickable(enabled = !isInvited){ onClickInvite() }
             .animateItem(),
         verticalArrangement = Arrangement.Center
@@ -205,22 +206,22 @@ fun LazyItemScope.InviteSelf(
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondary)
+                .background(AppTheme.colors.tintSoft)
         ) {
-            Icon(
+            AppIcon(
                 imageVector = if (isInvited) AppIcons.Check else AppIcons.Add,
                 modifier = Modifier.padding(4.dp).fillMaxSize(),
                 contentDescription = "InviteSelfIcon",
-                tint = MaterialTheme.colorScheme.onSecondary,
+                tint = AppTheme.colors.onTintSoft,
             )
         }
-        Text(
+        AppText(
             modifier = Modifier.fillMaxWidth(),
             text = strings.locationInviteMe,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
+            style = AppTheme.type.caption2Emphasized,
+            color = AppTheme.colors.tertiaryLabel
         )
     }
 }
@@ -264,7 +265,7 @@ private fun LocationFriendContent(
         ?: LocalSharedSuffixKey.current
     Column(
         modifier = Modifier.width(FriendIconItemWidth)
-            .clip(MaterialTheme.shapes.small)
+            .clip(AppShapes.s)
             .clickable { onClickUserIcon(sharedSuffixKey) }
             .then(modifier),
         verticalArrangement = Arrangement.Center
@@ -288,15 +289,14 @@ private fun LocationFriendContent(
                         .background(Color.Black.copy(alpha = 0.55f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
                         color = Color.White,
                     )
                 }
             }
         }
-        Text(
+        AppText(
             modifier = Modifier.sharedBoundsBy(
                 key = "${id}UserName",
                 suffixKey = sharedSuffixKey,
@@ -307,8 +307,8 @@ private fun LocationFriendContent(
             text = name,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline
+            style = AppTheme.type.caption2Emphasized,
+            color = AppTheme.colors.tertiaryLabel
         )
     }
 }
@@ -320,14 +320,14 @@ fun UserInfoRow(
     canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 24.dp,
-    style: TextStyle = MaterialTheme.typography.headlineSmall,
+    style: TextStyle = AppTheme.type.title2,
     user: IUser?,
     sharedUserId: String? = user?.id,
     sharedSuffixKey: String? = null,
     pronouns: String? = null,
 ) {
     val userNameText = @Composable {
-        Text(
+        AppText(
             modifier = Modifier.sharedBoundsBy(
                 key = "${sharedUserId}UserName",
                 suffixKey = sharedSuffixKey,
@@ -339,7 +339,7 @@ fun UserInfoRow(
             style = style,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.primary,
+            color = AppTheme.colors.tint,
         )
     }
 
@@ -348,7 +348,7 @@ fun UserInfoRow(
     Layout(
         modifier = modifier.offset(x = (-4).dp),
         content = {
-            Icon(
+            AppIcon(
                 modifier = Modifier
                     .size(iconSize),
                 imageVector = AppIcons.Shield,
@@ -363,10 +363,10 @@ fun UserInfoRow(
                 userNameText()
             }
             if (hasPronouns) {
-                Text(
+                AppText(
                     text = pronouns.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    style = AppTheme.type.caption1,
+                    color = AppTheme.colors.secondaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -465,14 +465,14 @@ fun UserStatusRow(
     canCopy: Boolean = false,
     spacedBy: Dp = 6.dp,
     iconSize: Dp = 12.dp,
-    style: TextStyle = MaterialTheme.typography.labelLarge,
+    style: TextStyle = AppTheme.type.subheadlineEmphasized,
     user: IUser?,
     animatedVisibilityScope: AnimatedVisibilityScope? =  null,
     sharedUserId: String? = user?.id,
     sharedSuffixKey: String? = null,
 ) {
     val statusText = @Composable {
-        Text(
+        AppText(
             modifier = Modifier
                 .sharedBoundsBy(
                     key = "${sharedUserId}UserStatusRow",
@@ -490,7 +490,7 @@ fun UserStatusRow(
                 },
             text = user?.statusDescription?.ifBlank { user.status.value }.orEmpty(),
             style = style,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AppTheme.colors.secondaryLabel,
             overflow = TextOverflow.Ellipsis,
             maxLines = 1
         )

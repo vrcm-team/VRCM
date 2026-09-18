@@ -4,9 +4,9 @@ import android.app.Application
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.LocalResourceReader
 import org.jetbrains.compose.resources.ResourceReader
@@ -30,8 +30,8 @@ class CreditsIconResourceTest {
 
         controller.get().setContent {
             CompositionLocalProvider(LocalResourceReader provides AndroidVectorResourceReader) {
-                MaterialTheme {
-                    Icon(
+                AppTheme {
+                    AppIcon(
                         painter = painterResource(Res.drawable.vrchat_credits),
                         contentDescription = null,
                     )

@@ -12,19 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +36,19 @@ import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegment
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSegmentedRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppVerticalDivider
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryPickerScreen
@@ -74,7 +74,6 @@ import org.koin.compose.koinInject
  * 身份卡编辑页：实时预览 + 四个工具页；无保存按钮，离散操作立即提交，
  * 页面返回前刷新一次草稿。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeetupCardEditorContent(
     model: MeetupCardScreenModel,
@@ -218,41 +217,38 @@ fun MeetupCardEditorContent(
         )
     }
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            CenterAlignedTopAppBar(
+            AppNavBar(
                 title = {
-                    Text(
+                    AppText(
                         text = locale.meetupCardTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
                     )
                 },
                 navigationIcon = {
-                    IconButton(
+                    AppIconButton(
                         onClick = {
                             model.flushDrafts()
                             onBack()
                         },
                     ) {
-                        Icon(
+                        AppIcon(
                             painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                            tint = MaterialTheme.colorScheme.primary,
                             contentDescription = "back",
                         )
                     }
                 },
                 actions = {
                     // 编辑页此前没有通往展示页的出口，首次配置完只能退回首页再长按。
-                    TextButton(
+                    AppButton(
                         onClick = {
                             model.finishSetup()
                             onDone()
                         },
                         enabled = !state.savingPhoto,
+                        style = AppButtonStyle.Plain,
                     ) {
-                        Text(locale.meetupCardDone)
+                        AppText(locale.meetupCardDone)
                     }
                 },
             )
@@ -265,9 +261,9 @@ fun MeetupCardEditorContent(
             val toolsWidth = if (maxWidth >= 1080.dp) 420.dp else 380.dp
             val preview: @Composable (Modifier) -> Unit = { previewModifier ->
                 // 预览衬在低一层的表面上，与右侧/下方的设置区形成层次。
-                Surface(
+                AppSurface(
                     modifier = previewModifier,
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    color = AppTheme.colors.secondaryGroupedBackground,
                 ) {
                     EditorPreview(
                         state = state,
@@ -277,9 +273,9 @@ fun MeetupCardEditorContent(
                 }
             }
             val tools: @Composable (Modifier) -> Unit = { toolsModifier ->
-                Surface(
+                AppSurface(
                     modifier = toolsModifier,
-                    color = MaterialTheme.colorScheme.surface,
+                    color = AppTheme.colors.secondaryGroupedBackground,
                 ) {
                     MeetupEditorTools(
                         state = state,
@@ -299,7 +295,7 @@ fun MeetupCardEditorContent(
                 // 宽屏：预览占据剩余空间，工具固定宽度靠右成检查器面板。
                 Row(modifier = Modifier.fillMaxSize()) {
                     preview(Modifier.weight(1f).fillMaxHeight())
-                    VerticalDivider(thickness = 0.5.dp)
+                    AppVerticalDivider(thickness = 0.5.dp)
                     tools(Modifier.width(toolsWidth).fillMaxHeight())
                 }
             }
@@ -332,17 +328,13 @@ private fun EditorPreview(
         modifier = modifier.padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SingleChoiceSegmentedButtonRow {
+        AppSegmentedRow {
             MeetupOrientation.entries.forEachIndexed { index, entry ->
-                SegmentedButton(
+                AppSegment(
                     selected = state.orientation == entry,
                     onClick = { onOrientation(entry) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = MeetupOrientation.entries.size,
-                    ),
                 ) {
-                    Text(
+                    AppText(
                         text = when (entry) {
                             MeetupOrientation.Portrait -> strings.meetupCardPortrait
                             MeetupOrientation.Landscape -> strings.meetupCardLandscape
@@ -374,7 +366,7 @@ private fun EditorPreview(
                             useSuffixKey = false,
                             resizeMode = MeetupCardResizeMode,
                         )
-                        .clip(MaterialTheme.shapes.medium),
+                        .clip(AppShapes.m),
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(

@@ -6,13 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -63,12 +63,11 @@ data class AuthAnimeScreen(
                 shapeDp = shapeDp,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier
                             .size(60.dp)
                             .align(Alignment.Center),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 5.dp
+                        color = AppTheme.colors.tint
                     )
                 }
             }

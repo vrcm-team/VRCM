@@ -1,8 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -10,15 +8,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 
 @Composable
 fun IChip(
-    color: Color = MaterialTheme.colorScheme.tertiary,
+    color: Color = AppTheme.colors.secondaryTint,
     content: @Composable () -> Unit
 ) {
-    Surface(
+    AppSurface(
         color = color.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(12.dp)
+        shape = AppShapes.m
     ) {
         CompositionLocalProvider(LocalContentColor provides color){
             Box(
@@ -34,21 +33,21 @@ fun IChip(
 inline fun IconTextChip(
     text: String,
     icon: ImageVector,
-    color: Color = MaterialTheme.colorScheme.tertiary,
+    color: Color = AppTheme.colors.secondaryTint,
 ) {
     IChip(color = color){
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
+            AppIcon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(12.dp)
             )
-            Text(
+            AppText(
                 text = text,
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.type.caption2Emphasized,
             )
         }
     }
@@ -57,12 +56,12 @@ inline fun IconTextChip(
 @Composable
 fun TextChip(
     text: String,
-    color: Color = MaterialTheme.colorScheme.tertiary,
+    color: Color = AppTheme.colors.secondaryTint,
 ) {
     IChip(color = color){
-        Text(
+        AppText(
             text = text,
-            style = MaterialTheme.typography.labelSmall,
+            style = AppTheme.type.caption2Emphasized,
         )
     }
 }

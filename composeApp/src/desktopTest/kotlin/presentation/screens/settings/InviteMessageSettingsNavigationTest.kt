@@ -1,8 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.settings
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateListOf
@@ -18,6 +15,10 @@ import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageType
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppContentSize
 import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppListRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
@@ -47,7 +48,7 @@ class InviteMessageSettingsNavigationTest {
                     )
                 },
             ) {
-                MaterialTheme {
+                AppTheme {
                     CompositionLocalProvider(
                         LocalNavigator provides navigator,
                         LocalBackNavigationPolicy provides BackNavigationPolicy(),
@@ -55,10 +56,11 @@ class InviteMessageSettingsNavigationTest {
                     ) {
                         SharedTransitionScreen(navigator = navigator) { route ->
                             when (route) {
-                                SettingsRoute -> TextButton(
+                                SettingsRoute -> AppButton(
                                     onClick = { navigator.push(InviteMessageSlotsScreen) },
+                                    style = AppButtonStyle.Plain,
                                 ) {
-                                    Text("Invite entry")
+                                    AppText("Invite entry")
                                 }
 
                                 else -> route.Content()

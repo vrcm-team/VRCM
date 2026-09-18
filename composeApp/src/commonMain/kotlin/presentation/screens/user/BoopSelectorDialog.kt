@@ -13,24 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.PsychologyAlt
-import androidx.compose.material.icons.outlined.SentimentDissatisfied
-import androidx.compose.material.icons.outlined.SentimentVerySatisfied
-import androidx.compose.material.icons.outlined.ThumbUpOffAlt
-import androidx.compose.material.icons.outlined.TouchApp
-import androidx.compose.material.icons.outlined.WavingHand
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +24,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 private data class BoopOption(
     val emojiId: String?,
@@ -61,18 +53,18 @@ internal fun BoopSelectorDialog(
     if (!visible) return
     var selectedEmojiId by remember { mutableStateOf<String?>(null) }
     val options = listOf(
-        BoopOption(null, strings.boopEmojiDefault, Icons.Outlined.TouchApp),
-        BoopOption("default_heart", strings.boopEmojiHeart, Icons.Outlined.FavoriteBorder),
-        BoopOption("default_hand_wave", strings.boopEmojiWave, Icons.Outlined.WavingHand),
-        BoopOption("default_laugh", strings.boopEmojiLaugh, Icons.Outlined.SentimentVerySatisfied),
-        BoopOption("default_thumbs_up", strings.boopEmojiLike, Icons.Outlined.ThumbUpOffAlt),
-        BoopOption("default_thinking", strings.boopEmojiThink, Icons.Outlined.PsychologyAlt),
-        BoopOption("default_wow", strings.boopEmojiSurprise, Icons.Outlined.EmojiEmotions),
-        BoopOption("default_angry", strings.boopEmojiAngry, Icons.Outlined.SentimentDissatisfied),
+        BoopOption(null, strings.boopEmojiDefault, AppIcons.Tap),
+        BoopOption("default_heart", strings.boopEmojiHeart, AppIcons.FavoriteBorder),
+        BoopOption("default_hand_wave", strings.boopEmojiWave, AppIcons.Wave),
+        BoopOption("default_laugh", strings.boopEmojiLaugh, AppIcons.FaceLaugh),
+        BoopOption("default_thumbs_up", strings.boopEmojiLike, AppIcons.ThumbUp),
+        BoopOption("default_thinking", strings.boopEmojiThink, AppIcons.FaceThinking),
+        BoopOption("default_wow", strings.boopEmojiSurprise, AppIcons.FaceSurprised),
+        BoopOption("default_angry", strings.boopEmojiAngry, AppIcons.FaceAngry),
     )
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!sending) onDismiss() },
-        title = { Text(strings.boopSelectorTitle.replace("%name%", targetName)) },
+        title = { AppText(strings.boopSelectorTitle.replace("%name%", targetName)) },
         text = {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
@@ -82,19 +74,19 @@ internal fun BoopSelectorDialog(
             ) {
                 items(options, key = { it.emojiId ?: "default" }) { option ->
                     val selected = selectedEmojiId == option.emojiId
-                    Surface(
+                    AppSurface(
                         modifier = Modifier
                             .aspectRatio(1f)
                             .clickable(enabled = !sending) { selectedEmojiId = option.emojiId },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = AppShapes.m,
                         color = if (selected) {
-                            MaterialTheme.colorScheme.secondaryContainer
+                            AppTheme.colors.fill
                         } else {
-                            MaterialTheme.colorScheme.surfaceContainer
+                            AppTheme.colors.tertiaryGroupedBackground
                         },
                         border = BorderStroke(
                             width = 1.dp,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            color = if (selected) AppTheme.colors.tint else AppTheme.colors.separator,
                         ),
                     ) {
                         Column(
@@ -102,10 +94,10 @@ internal fun BoopSelectorDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {
-                            Icon(option.icon, contentDescription = null)
-                            Text(
+                            AppIcon(option.icon, contentDescription = null)
+                            AppText(
                                 text = option.label,
-                                style = MaterialTheme.typography.labelSmall,
+                                style = AppTheme.type.caption2Emphasized,
                                 textAlign = TextAlign.Center,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
@@ -116,20 +108,19 @@ internal fun BoopSelectorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = !sending, onClick = { onSend(selectedEmojiId) }) {
+            AppButton(enabled = !sending, onClick = { onSend(selectedEmojiId) }, style = AppButtonStyle.Prominent) {
                 if (sending) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.size(8.dp))
                 }
-                Text(strings.boopSend)
+                AppText(strings.boopSend)
             }
         },
         dismissButton = {
-            TextButton(enabled = !sending, onClick = onDismiss) {
-                Text(strings.cancel)
+            AppButton(enabled = !sending, onClick = onDismiss, style = AppButtonStyle.Plain) {
+                AppText(strings.cancel)
             }
         },
     )

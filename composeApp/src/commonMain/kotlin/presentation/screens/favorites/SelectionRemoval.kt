@@ -5,21 +5,19 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 internal data class SelectionRemovalResult(
@@ -57,7 +55,7 @@ internal fun SelectionRemovalStatusRow(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        AppText(
             text = if (state.isSubmitting) {
                 progressText
                     .replaceFirst("%d", state.completedCount.toString())
@@ -66,19 +64,19 @@ internal fun SelectionRemovalStatusRow(
                 selectedCountText.replaceFirst("%d", state.selectedIds.size.toString())
             },
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.type.subheadlineEmphasized,
         )
-        TextButton(
+        AppButton(
             enabled = !state.isSubmitting && visibleIds.isNotEmpty(),
             onClick = { onToggleVisibleSelection(visibleIds) },
+            style = AppButtonStyle.Plain,
         ) {
-            Text(if (allVisibleSelected) clearSelectionText else selectAllText)
+            AppText(if (allVisibleSelected) clearSelectionText else selectAllText)
         }
     }
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun RowScope.SelectionRemovalActions(
     state: SelectionRemovalState,
     canEnterSelection: Boolean,
@@ -90,27 +88,27 @@ internal fun RowScope.SelectionRemovalActions(
     onRequestRemoval: () -> Unit,
 ) {
     if (state.selectionMode) {
-        ATooltipBox(tooltip = { Text(cancelDescription) }) {
-            IconButton(enabled = !state.isSubmitting, onClick = onExitSelection) {
-                Icon(AppIcons.Close, cancelDescription)
+        ATooltipBox(tooltip = { AppText(cancelDescription) }) {
+            AppIconButton(enabled = !state.isSubmitting, onClick = onExitSelection) {
+                AppIcon(AppIcons.Close, cancelDescription)
             }
         }
-        ATooltipBox(tooltip = { Text(removeSelectedDescription) }) {
-            IconButton(
+        ATooltipBox(tooltip = { AppText(removeSelectedDescription) }) {
+            AppIconButton(
                 enabled = state.selectedIds.isNotEmpty() && !state.isSubmitting,
                 onClick = onRequestRemoval,
             ) {
                 if (state.isSubmitting) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(Modifier.size(20.dp))
                 } else {
-                    Icon(Icons.Outlined.DeleteOutline, removeSelectedDescription)
+                    AppIcon(AppIcons.Delete, removeSelectedDescription)
                 }
             }
         }
     } else {
-        ATooltipBox(tooltip = { Text(enterSelectionDescription) }) {
-            IconButton(enabled = canEnterSelection, onClick = onEnterSelection) {
-                Icon(Icons.Outlined.DeleteOutline, enterSelectionDescription)
+        ATooltipBox(tooltip = { AppText(enterSelectionDescription) }) {
+            AppIconButton(enabled = canEnterSelection, onClick = onEnterSelection) {
+                AppIcon(AppIcons.Delete, enterSelectionDescription)
             }
         }
     }
@@ -127,22 +125,23 @@ internal fun SelectionRemovalConfirmationDialog(
     onDismiss: () -> Unit,
 ) {
     if (!state.confirmationVisible) return
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = { AppText(title) },
         text = {
-            Text(message.replaceFirst("%d", state.selectedIds.size.toString()))
+            AppText(message.replaceFirst("%d", state.selectedIds.size.toString()))
         },
         confirmButton = {
-            TextButton(
+            AppButton(
                 enabled = state.selectedIds.isNotEmpty() && !state.isSubmitting,
                 onClick = onConfirm,
+                style = AppButtonStyle.Plain,
             ) {
-                Text(confirmLabel)
+                AppText(confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(cancelLabel) }
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) { AppText(cancelLabel) }
         },
     )
 }

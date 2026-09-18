@@ -11,28 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +28,24 @@ import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageData
 import io.github.vrcmteam.vrcm.network.api.invite.data.InviteMessageType
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHost
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHostState
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppScrollableTabRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -69,7 +65,6 @@ object InviteMessageSlotsScreen : AppDetailRoute {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InviteMessageSlotsContent(
     state: InviteMessageSlotsUiState,
@@ -77,7 +72,7 @@ private fun InviteMessageSlotsContent(
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = strings
-    val snackbarHostState = remember { SnackbarHostState() }
+    val bannerHostState = remember { AppBannerHostState() }
     var editingTarget by remember { mutableStateOf<InviteMessageDialogTarget?>(null) }
     var resettingTarget by remember { mutableStateOf<InviteMessageDialogTarget?>(null) }
 
@@ -88,22 +83,21 @@ private fun InviteMessageSlotsContent(
     LaunchedEffect(state.feedback?.id) {
         val feedback = state.feedback ?: return@LaunchedEffect
         if (feedback.kind == InviteMessageFeedbackKind.Updated) editingTarget = null
-        snackbarHostState.showSnackbar(feedback.kind.localizedMessage(locale))
+        bannerHostState.show(feedback.kind.localizedMessage(locale))
         model.clearFeedback(feedback.id)
     }
 
-    Scaffold(
+    AppScaffold(
         topBar = {
-            CenterAlignedTopAppBar(
+            AppNavBar(
                 title = {
-                    Text(
+                    AppText(
                         text = locale.inviteMessageSlotsTitle,
-                        style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navigator.pop() }) {
-                        Icon(
+                    AppIconButton(onClick = { navigator.pop() }) {
+                        AppIcon(
                             imageVector = AppIcons.ArrowBackIosNew,
                             contentDescription = locale.back,
                         )
@@ -111,7 +105,7 @@ private fun InviteMessageSlotsContent(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bannerHost = { AppBannerHost(bannerHostState) },
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -119,17 +113,15 @@ private fun InviteMessageSlotsContent(
                 .padding(paddingValues),
         ) {
             val messageTypes = InviteMessageType.entries
-            ScrollableTabRow(
-                selectedTabIndex = messageTypes.indexOf(state.selectedType),
+            AppScrollableTabRow(
                 edgePadding = 8.dp,
-                divider = { HorizontalDivider() },
             ) {
                 messageTypes.forEach { messageType ->
-                    Tab(
+                    AppTab(
                         selected = state.selectedType == messageType,
                         onClick = { model.selectType(messageType) },
                         text = {
-                            Text(
+                            AppText(
                                 text = messageType.localizedName(locale),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -145,14 +137,14 @@ private fun InviteMessageSlotsContent(
                         message = locale.inviteMessageSessionUnavailable,
                     )
 
-                    state.isLoading -> CircularProgressIndicator(
+                    state.isLoading -> AppActivityIndicator(
                         modifier = Modifier.align(Alignment.Center),
                     )
 
                     state.loadFailed -> EmptyContent(
                         message = locale.inviteMessageLoadFailed,
                         actionContent = {
-                            Button(onClick = model::retry) { Text(locale.retry) }
+                            AppButton(onClick = model::retry, style = AppButtonStyle.Prominent) { AppText(locale.retry) }
                         },
                     )
 
@@ -239,7 +231,6 @@ private data class InviteMessageDialogTarget(
     val slot: Int,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InviteMessageSlotCard(
     message: InviteMessageData,
@@ -253,9 +244,9 @@ private fun InviteMessageSlotCard(
         pendingMutation.messageType == message.messageType
     val actionsEnabled = !isLocked && pendingMutation == null
 
-    ElevatedCard(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = AppShapes.m,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
@@ -265,39 +256,39 @@ private fun InviteMessageSlotCard(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
+                AppText(
                     text = locale.inviteMessageSlotLabel.replace("%d", message.slot.toString()),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.type.subheadlineEmphasized,
+                    color = AppTheme.colors.tint,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
+                AppText(
                     text = message.message,
                     modifier = Modifier.weight(1f).padding(start = 12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = AppTheme.type.subheadline,
+                    color = AppTheme.colors.label,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 when {
-                    message.remainingCooldownMinutes > 0 -> Text(
+                    message.remainingCooldownMinutes > 0 -> AppText(
                         text = locale.inviteMessageCooldownRemaining.replace(
                             "%d",
                             message.remainingCooldownMinutes.toString(),
                         ),
                         modifier = Modifier.padding(start = 8.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.secondaryTint,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
 
-                    !message.canBeUpdated -> Text(
+                    !message.canBeUpdated -> AppText(
                         text = locale.inviteMessageUnavailable,
                         modifier = Modifier.padding(start = 8.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        style = AppTheme.type.caption2Emphasized,
+                        color = AppTheme.colors.secondaryTint,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -305,22 +296,22 @@ private fun InviteMessageSlotCard(
             }
             if (isPending) {
                 Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    AppActivityIndicator(modifier = Modifier.size(20.dp))
                 }
             } else {
-                ATooltipBox(tooltip = { Text(locale.inviteMessageEdit) }) {
-                    IconButton(onClick = onEdit, enabled = actionsEnabled) {
-                        Icon(
+                ATooltipBox(tooltip = { AppText(locale.inviteMessageEdit) }) {
+                    AppIconButton(onClick = onEdit, enabled = actionsEnabled) {
+                        AppIcon(
                             imageVector = AppIcons.Edit,
                             contentDescription = locale.inviteMessageEdit,
                         )
                     }
                 }
             }
-            ATooltipBox(tooltip = { Text(locale.inviteMessageReset) }) {
-                IconButton(onClick = onReset, enabled = actionsEnabled) {
-                    Icon(
-                        imageVector = Icons.Default.RestartAlt,
+            ATooltipBox(tooltip = { AppText(locale.inviteMessageReset) }) {
+                AppIconButton(onClick = onReset, enabled = actionsEnabled) {
+                    AppIcon(
+                        imageVector = AppIcons.Reset,
                         contentDescription = locale.inviteMessageReset,
                     )
                 }
@@ -342,23 +333,23 @@ private fun InviteMessageEditDialog(
     val isError = validation == InviteMessageEditValidation.Blank ||
         validation == InviteMessageEditValidation.TooLong
 
-    AlertDialog(
+    AppAlert(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = {
-            Text(locale.inviteMessageEditTitle.replace("%d", message.slot.toString()))
+            AppText(locale.inviteMessageEditTitle.replace("%d", message.slot.toString()))
         },
         text = {
-            OutlinedTextField(
+            AppTextField(
                 value = value,
                 onValueChange = { value = it },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSaving,
                 isError = isError,
-                label = { Text(locale.inviteMessageFieldLabel) },
+                label = { AppText(locale.inviteMessageFieldLabel) },
                 minLines = 2,
                 maxLines = 3,
                 supportingText = {
-                    Text(
+                    AppText(
                         when (validation) {
                             InviteMessageEditValidation.Blank -> locale.inviteMessageRequired
                             InviteMessageEditValidation.TooLong -> locale.inviteMessageTooLong
@@ -372,23 +363,23 @@ private fun InviteMessageEditDialog(
             )
         },
         confirmButton = {
-            Button(
+            AppButton(
                 onClick = { onSave(value) },
                 enabled = validation == InviteMessageEditValidation.Valid && !isSaving,
+                style = AppButtonStyle.Prominent,
             ) {
                 if (isSaving) {
-                    CircularProgressIndicator(
+                    AppActivityIndicator(
                         modifier = Modifier.size(18.dp),
                         color = LocalContentColor.current,
-                        strokeWidth = 2.dp,
                     )
                 } else {
-                    Text(locale.editProfileSave)
+                    AppText(locale.editProfileSave)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isSaving) { Text(locale.cancel) }
+            AppButton(onClick = onDismiss, enabled = !isSaving, style = AppButtonStyle.Plain) { AppText(locale.cancel) }
         },
     )
 }
@@ -400,17 +391,17 @@ private fun InviteMessageResetDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
+    AppAlert(
         onDismissRequest = onDismiss,
-        title = { Text(locale.inviteMessageResetTitle) },
+        title = { AppText(locale.inviteMessageResetTitle) },
         text = {
-            Text(locale.inviteMessageResetMessage.replace("%d", slot.toString()))
+            AppText(locale.inviteMessageResetMessage.replace("%d", slot.toString()))
         },
         confirmButton = {
-            Button(onClick = onConfirm) { Text(locale.inviteMessageResetConfirm) }
+            AppButton(onClick = onConfirm, style = AppButtonStyle.Prominent) { AppText(locale.inviteMessageResetConfirm) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(locale.cancel) }
+            AppButton(onClick = onDismiss, style = AppButtonStyle.Plain) { AppText(locale.cancel) }
         },
     )
 }

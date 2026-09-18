@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +29,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserStateIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.UserStatusIndicator
 import io.github.vrcmteam.vrcm.presentation.compoments.VrcPlusIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
@@ -49,7 +49,7 @@ data class PersonalDrawerUser(
 /** Personal navigation drawer shell. Services and navigation remain owned by its caller. */
 @Composable
 fun PersonalNavigationDrawer(
-    drawerState: DrawerState,
+    drawerState: AppDrawerState,
     gesturesEnabled: Boolean,
     user: PersonalDrawerUser?,
     profileSharedSuffixKey: String,
@@ -68,13 +68,11 @@ fun PersonalNavigationDrawer(
     content: @Composable () -> Unit,
 ) {
     val drawerDescription = strings.personalDrawerTitle
-    ModalNavigationDrawer(
+    AppModalDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
-        scrimColor = DrawerDefaults.scrimColor,
         drawerContent = {
-            ModalDrawerSheet(
-                drawerState = drawerState,
+            AppDrawerSheet(
                 modifier = Modifier
                     .fillMaxWidth(.82f)
                     .widthIn(max = 360.dp)
@@ -99,7 +97,7 @@ fun PersonalNavigationDrawer(
                             onStatusClick = onStatusClick,
                         )
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    AppDivider(Modifier.padding(vertical = 8.dp))
                     DrawerItem(
                         AppIcons.Person,
                         strings.drawerMyProfile,
@@ -115,8 +113,8 @@ fun PersonalNavigationDrawer(
                     DrawerItem(AppIcons.AccountCircle, strings.meetupCardTitle, onNameplateClick)
                     DrawerItem(AppIcons.Settings, strings.drawerSettings, onSettingsClick)
                     Spacer(Modifier.height(20.dp))
-                    HorizontalDivider()
-                    DrawerItem(AppIcons.Login, strings.stettingLogout, onLogoutClick, error = true)
+                    AppDivider()
+                    DrawerItem(AppIcons.Logout, strings.stettingLogout, onLogoutClick, error = true)
                 }
             }
         },
@@ -143,7 +141,7 @@ private fun PersonalHeaderBackground(
         Box(
             Modifier
                 .matchParentSize()
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f)),
+                .background(AppTheme.colors.secondarySystemBackground.copy(alpha = .78f)),
         )
         content()
     }
@@ -185,7 +183,7 @@ private fun PersonalHeader(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(
+                    AppText(
                         text = user?.displayName ?: strings.loading,
                         modifier = Modifier
                             .weight(1f, fill = false)
@@ -198,7 +196,7 @@ private fun PersonalHeader(
                                     clipInOverlayDuringTransition = NoClip,
                                 )
                             },
-                        style = MaterialTheme.typography.titleLarge,
+                        style = AppTheme.type.title2,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -208,10 +206,10 @@ private fun PersonalHeader(
                     }
                 }
                 user?.pronouns?.takeIf { it.isNotBlank() }?.let { pronouns ->
-                    Text(
+                    AppText(
                         pronouns,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.type.subheadline,
+                        color = AppTheme.colors.secondaryLabel,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -225,7 +223,7 @@ private fun PersonalHeader(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(AppShapes.m)
                     .clickable(enabled = loaded, onClick = onStatusClick)
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -243,9 +241,9 @@ private fun PersonalHeader(
                         },
                     userStatus = user?.status,
                     location = user?.location,
-                    backgroundColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    backgroundColor = AppTheme.colors.secondarySystemBackground,
                 )
-                Text(
+                AppText(
                     text = user?.statusDescription.orEmpty().ifBlank {
                         user?.status?.localizedLabel() ?: strings.loading
                     },
@@ -267,7 +265,7 @@ private fun PersonalHeader(
                             )
                         }
                         .weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.type.subheadline,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -284,7 +282,7 @@ private fun DrawerItem(
     error: Boolean = false,
     enabled: Boolean = true,
 ) {
-    val baseColor = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val baseColor = if (error) AppTheme.colors.destructive else AppTheme.colors.label
     val color = baseColor.copy(alpha = if (enabled) 1f else .38f)
     Row(
         Modifier
@@ -294,12 +292,12 @@ private fun DrawerItem(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
-        Text(
+        AppIcon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+        AppText(
             text,
             modifier = Modifier.weight(1f),
             color = color,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.type.body,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

@@ -6,9 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +15,8 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.screens.auth.data.AuthUIState
@@ -45,20 +44,16 @@ fun AuthFold(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = MaterialTheme.colorScheme.primaryContainer)
+            .background(color = AppTheme.colors.tintSoft)
     ) {
-        Card(
+        AppCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset(y = cardYOffset)
                 .alpha(cardAlpha)
                 .height(cardHeightDp + bottomPadding)
                 .align(Alignment.BottomCenter),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.onPrimary,
-                contentColor = MaterialTheme.colorScheme.primary
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            color = AppTheme.colors.secondaryGroupedBackground,
             shape = RoundedCornerShape(topStart = shapeDp, topEnd = shapeDp),
         ) {
             Box(
@@ -88,7 +83,7 @@ fun AuthFold(
                     )
                 }
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.background)
+                .background(AppTheme.colors.groupedBackground)
                 .enableIf(clickIcon != null && authUIState.iconUrl != null) {
                     clickable(onClick = clickIcon!!)
                 },

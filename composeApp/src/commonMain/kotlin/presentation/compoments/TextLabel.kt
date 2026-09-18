@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,28 +12,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 
 @Composable
 fun TextLabel(
     modifier: Modifier = Modifier,
     text: String,
-    color: Color = MaterialTheme.colorScheme.outline,
-    backgroundColor: Color = MaterialTheme.colorScheme.inverseOnSurface
+    color: Color = AppTheme.colors.tertiaryLabel,
+    backgroundColor: Color = AppTheme.colors.fill
 ) {
     Box(
         modifier = modifier
             .background(
                 backgroundColor,
-                MaterialTheme.shapes.medium
+                AppShapes.m
             )
-            .clip(MaterialTheme.shapes.medium)
+            .clip(AppShapes.m)
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         BasicText(
             text = text,
-            style = MaterialTheme.typography.labelSmall.merge(color = color),
-            autoSize = TextAutoSize.StepBased(8.sp,MaterialTheme.typography.labelSmall.fontSize),
+            style = AppTheme.type.caption2Emphasized.merge(color = color),
+            autoSize = TextAutoSize.StepBased(8.sp,AppTheme.type.caption2Emphasized.fontSize),
             maxLines = 1
         )
     }

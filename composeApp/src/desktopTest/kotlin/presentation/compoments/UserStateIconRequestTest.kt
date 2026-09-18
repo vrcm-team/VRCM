@@ -1,7 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
@@ -12,6 +11,7 @@ import coil3.intercept.Interceptor
 import coil3.memory.MemoryCache
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 import java.util.concurrent.CopyOnWriteArrayList
@@ -50,7 +50,7 @@ class UserStateIconRequestTest {
                     )
                 },
             ) {
-                MaterialTheme {
+                AppTheme {
                     UserStateIcon(
                         modifier = Modifier.size(54.dp),
                         iconUrl = TargetAvatarUrl,

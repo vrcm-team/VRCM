@@ -15,23 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,10 +29,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import io.github.vrcmteam.vrcm.network.api.attributes.AccessType
 import io.github.vrcmteam.vrcm.network.api.attributes.RegionType
 import io.github.vrcmteam.vrcm.network.api.instances.data.MinimumAvatarPerformance
 import io.github.vrcmteam.vrcm.presentation.compoments.RegionIcon
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppCheckbox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDialogSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppPopUpButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.GROUP_ACCESS_TYPES
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.GroupInstancePermission
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationDraft
@@ -67,8 +64,7 @@ internal class CreateInstanceDialog(
     private val onRetryGroups: () -> Unit,
     private val onConfirm: (InstanceCreationDraft) -> Unit,
 ) {
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     fun Content() {
         var selectedAccessType by remember { mutableStateOf(AccessType.FriendPlus) }
         var selectedRegion by remember { mutableStateOf(RegionType.Us) }
@@ -127,18 +123,17 @@ internal class CreateInstanceDialog(
         )
         val validationError = draft.validationError(groups)
 
-        BasicAlertDialog(
-            onDismissRequest = { if (!isSubmitting) onDismiss() },
-            modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 560.dp).heightIn(max = 720.dp),
-        ) {
-            Surface(shape = RoundedCornerShape(8.dp)) {
+        Dialog(onDismissRequest = { if (!isSubmitting) onDismiss() }) {
+            AppDialogSurface(
+                modifier = Modifier.fillMaxWidth(0.92f).widthIn(max = 560.dp).heightIn(max = 720.dp),
+            ) {
                 Column(
                     modifier = Modifier.padding(16.dp).fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
+                    AppText(
                         text = strings.createInstance,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = AppTheme.type.title2,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                     )
@@ -208,28 +203,28 @@ internal class CreateInstanceDialog(
                             }
                         }
 
-                        OutlinedTextField(
+                        AppTextField(
                             value = displayName,
                             onValueChange = { displayName = it },
-                            label = { Text(strings.createInstanceDisplayName) },
-                            supportingText = { Text(strings.createInstanceOptional) },
+                            label = { AppText(strings.createInstanceDisplayName) },
+                            supportingText = { AppText(strings.createInstanceOptional) },
                             enabled = !isSubmitting,
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
 
                         validationError?.let {
-                            Text(
+                            AppText(
                                 text = it.localizedMessage(strings),
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
+                                color = AppTheme.colors.destructive,
+                                style = AppTheme.type.caption1,
                             )
                         }
                         if (submissionState == InstanceCreationSubmissionState.Failed) {
-                            Text(
+                            AppText(
                                 text = strings.instanceCreateFailed,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
+                                color = AppTheme.colors.destructive,
+                                style = AppTheme.type.caption1,
                             )
                         }
                     }
@@ -239,27 +234,28 @@ internal class CreateInstanceDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(
+                        AppButton(
                             onClick = onDismiss,
                             enabled = !isSubmitting,
                             modifier = Modifier.weight(1f),
+                            style = AppButtonStyle.Gray,
                         ) {
-                            Text(strings.cancel)
+                            AppText(strings.cancel)
                         }
-                        Button(
+                        AppButton(
                             onClick = { onConfirm(draft) },
                             enabled = validationError == null && !isSubmitting,
                             modifier = Modifier.weight(1f),
+                            style = AppButtonStyle.Prominent,
                         ) {
                             if (isSubmitting) {
-                                CircularProgressIndicator(
+                                AppActivityIndicator(
                                     modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
                                 )
                                 Spacer(Modifier.size(8.dp))
-                                Text(strings.createInstanceSubmitting)
+                                AppText(strings.createInstanceSubmitting)
                             } else {
-                                Text(strings.confirm)
+                                AppText(strings.confirm)
                             }
                         }
                     }
@@ -268,8 +264,7 @@ internal class CreateInstanceDialog(
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     private fun GroupFields(
         groupsState: InstanceCreationGroupsState,
         selectedGroup: InstanceCreationGroup?,
@@ -293,21 +288,21 @@ internal class CreateInstanceDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(strings.createInstanceGroupsLoading)
+                AppActivityIndicator(Modifier.size(20.dp))
+                AppText(strings.createInstanceGroupsLoading)
             }
 
             InstanceCreationGroupsState.Failed -> Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(strings.createInstanceGroupsFailed, modifier = Modifier.weight(1f))
-                OutlinedButton(onClick = onRetryGroups) { Text(strings.retry) }
+                AppText(strings.createInstanceGroupsFailed, modifier = Modifier.weight(1f))
+                AppButton(onClick = onRetryGroups, style = AppButtonStyle.Gray) { AppText(strings.retry) }
             }
 
             is InstanceCreationGroupsState.Ready -> {
                 if (groupsState.groups.isEmpty()) {
-                    Text(strings.createInstanceNoEligibleGroups)
+                    AppText(strings.createInstanceNoEligibleGroups)
                 } else {
                     GroupDropdown(
                         groups = groupsState.groups,
@@ -336,12 +331,12 @@ internal class CreateInstanceDialog(
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Checkbox(
+                    AppCheckbox(
                         checked = role.id in roleIds,
                         onCheckedChange = null,
                         enabled = enabled,
                     )
-                    Text(role.name)
+                    AppText(role.name)
                 }
             }
         }
@@ -369,8 +364,7 @@ internal class CreateInstanceDialog(
         )
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     private fun GroupDropdown(
         groups: List<InstanceCreationGroup>,
         selectedGroupId: String,
@@ -378,63 +372,50 @@ internal class CreateInstanceDialog(
         onGroupSelected: (String) -> Unit,
     ) {
         var expanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = {
-            if (enabled) expanded = it
-        }) {
-            OutlinedTextField(
-                value = groups.firstOrNull { it.id == selectedGroupId }?.name.orEmpty(),
-                onValueChange = {},
-                readOnly = true,
-                enabled = enabled,
-                label = { Text(strings.createInstanceGroup) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                groups.forEach { group ->
-                    DropdownMenuItem(
-                        text = { Text(group.name) },
-                        onClick = {
-                            onGroupSelected(group.id)
-                            expanded = false
-                        },
-                    )
-                }
+        AppPopUpButton(
+            value = groups.firstOrNull { it.id == selectedGroupId }?.name.orEmpty(),
+            expanded = expanded,
+            onExpandedChange = { if (enabled) expanded = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = strings.createInstanceGroup,
+            enabled = enabled,
+        ) {
+            groups.forEach { group ->
+                AppMenuItem(
+                    text = { AppText(group.name) },
+                    onClick = {
+                        onGroupSelected(group.id)
+                        expanded = false
+                    },
+                )
             }
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
+        @Composable
     private fun PerformanceDropdown(
         selected: MinimumAvatarPerformance?,
         enabled: Boolean,
         onSelected: (MinimumAvatarPerformance?) -> Unit,
     ) {
         var expanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = {
-            if (enabled) expanded = it
-        }) {
-            OutlinedTextField(
-                value = selected.localizedName(strings),
-                onValueChange = {},
-                readOnly = true,
-                enabled = enabled,
-                label = { Text(strings.createInstanceMinimumPerformance) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                (listOf<MinimumAvatarPerformance?>(null) + MinimumAvatarPerformance.entries).forEach {
-                    performance ->
-                    DropdownMenuItem(
-                        text = { Text(performance.localizedName(strings)) },
-                        onClick = {
-                            onSelected(performance)
-                            expanded = false
-                        },
-                    )
-                }
+        AppPopUpButton(
+            value = selected.localizedName(strings),
+            expanded = expanded,
+            onExpandedChange = { if (enabled) expanded = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = strings.createInstanceMinimumPerformance,
+            enabled = enabled,
+        ) {
+            (listOf<MinimumAvatarPerformance?>(null) + MinimumAvatarPerformance.entries).forEach {
+                performance ->
+                AppMenuItem(
+                    text = { AppText(performance.localizedName(strings)) },
+                    onClick = {
+                        onSelected(performance)
+                        expanded = false
+                    },
+                )
             }
         }
     }
@@ -451,21 +432,21 @@ internal class CreateInstanceDialog(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            AppText(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+            AppToggle(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         }
     }
 
     @Composable
     private fun SectionLabel(text: String) {
-        Text(
+        AppText(
             text = text,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
+            style = AppTheme.type.subheadlineEmphasized,
+            color = AppTheme.colors.tint,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -478,27 +459,27 @@ internal class CreateInstanceDialog(
         onClick: () -> Unit,
     ) {
         val backgroundColor = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer
+            AppTheme.colors.tintSoft
         } else {
-            MaterialTheme.colorScheme.surface
+            AppTheme.colors.secondaryGroupedBackground
         }
         val textColor = if (isSelected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            AppTheme.colors.onTintSoft
         } else {
-            MaterialTheme.colorScheme.onSurface
+            AppTheme.colors.label
         }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(AppShapes.s)
                 .background(backgroundColor)
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            AppText(
                 text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.type.subheadline,
                 color = textColor.copy(alpha = if (enabled) 1f else 0.38f),
             )
         }
@@ -515,24 +496,24 @@ internal class CreateInstanceDialog(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .padding(4.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(AppShapes.s)
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) AppTheme.colors.tint else Color.Transparent,
+                    shape = AppShapes.m,
                 )
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(8.dp),
         ) {
             RegionIcon(region = region, modifier = Modifier.size(36.dp))
             Spacer(Modifier.height(4.dp))
-            Text(
+            AppText(
                 text = region.name,
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTheme.type.caption1Emphasized,
                 color = if (isSelected) {
-                    MaterialTheme.colorScheme.primary
+                    AppTheme.colors.tint
                 } else {
-                    MaterialTheme.colorScheme.onSurface
+                    AppTheme.colors.label
                 },
             )
         }

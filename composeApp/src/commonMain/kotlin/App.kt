@@ -33,12 +33,15 @@ import io.github.vrcmteam.vrcm.presentation.compoments.SharedTransitionScreen
 import io.github.vrcmteam.vrcm.presentation.compoments.SnackBarToastBox
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialLinkPrompt
 import io.github.vrcmteam.vrcm.presentation.compoments.NotificationLaunchHandler
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppOverlayHost
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalAppOverlayBackHandler
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioning
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningFromTo
 import io.github.vrcmteam.vrcm.presentation.extensions.isTransitioningOn
 import io.github.vrcmteam.vrcm.presentation.navigation.BackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.navigation.AppNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
+import io.github.vrcmteam.vrcm.presentation.navigation.HandleBackNavigation
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalBackNavigationPolicy
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberAppNavigator
@@ -129,16 +132,21 @@ fun App(
                                 .systemBarsPadding()
                                 .padding(vertical = 76.dp, horizontal = 12.dp)
                         ) {
-                            VersionDialog()
-                            OfficialLinkPrompt(navigator, activeOfficialLinkInbox) {
-                                NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
-                                SharedTransitionScreen(
-                                    navigator = navigator,
-                                    transitionSpec = { selectTransition(isPop = false) },
-                                    popTransitionSpec = { selectTransition(isPop = true) },
-                                ) { screen ->
-                                    SharedTransitionDialog(key = screen.key) {
-                                        screen.Content()
+                            // sheet 等整屏模态叠在页面之上、toast 之下；返回键先交给最上面的覆盖层
+                            CompositionLocalProvider(LocalAppOverlayBackHandler provides OverlayBackHandler) {
+                                AppOverlayHost {
+                                    VersionDialog()
+                                    OfficialLinkPrompt(navigator, activeOfficialLinkInbox) {
+                                        NotificationLaunchHandler(navigator, activeNotificationLaunchInbox)
+                                        SharedTransitionScreen(
+                                            navigator = navigator,
+                                            transitionSpec = { selectTransition(isPop = false) },
+                                            popTransitionSpec = { selectTransition(isPop = true) },
+                                        ) { screen ->
+                                            SharedTransitionDialog(key = screen.key) {
+                                                screen.Content()
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -148,6 +156,10 @@ fun App(
             }
         }
     }
+}
+
+private val OverlayBackHandler: @Composable (Boolean, () -> Unit) -> Unit = { enabled, onBack ->
+    HandleBackNavigation(enabled, onBack)
 }
 
 fun AnimatedContentTransitionScope<Scene<AppRoute>>.selectTransition(isPop: Boolean): ContentTransform =

@@ -46,9 +46,6 @@ class HomeScreenModel(
     val drawerVisible: Boolean
         get() = shellState.drawerVisible
 
-    val settingsVisible: Boolean
-        get() = shellState.settingsVisible
-
     /** 长按头像的入口分流：已有配置直接展示，首次使用进入编辑器。 */
     fun meetupCardStartRoute(): AppRoute = if (meetupCardRepository.isConfigured(userId)) {
         MeetupCardDisplayRoute(userId)
@@ -84,14 +81,6 @@ class HomeScreenModel(
 
     fun hideDrawer() {
         shellState.hideDrawer()
-    }
-
-    fun showSettings() {
-        shellState.showSettings()
-    }
-
-    fun hideSettings() {
-        shellState.hideSettings()
     }
 
     fun clearOverlays() {
@@ -172,9 +161,6 @@ internal class HomeShellState {
     var drawerVisible by mutableStateOf(false)
         private set
 
-    var settingsVisible by mutableStateOf(false)
-        private set
-
     fun selectDestination(destination: HomeDestination): Boolean {
         val reselected = selectedDestinationIndex == destination.ordinal
         selectedDestinationIndex = destination.ordinal
@@ -190,7 +176,6 @@ internal class HomeShellState {
     }
 
     fun showDrawer() {
-        settingsVisible = false
         drawerVisible = true
     }
 
@@ -198,17 +183,7 @@ internal class HomeShellState {
         drawerVisible = false
     }
 
-    fun showSettings() {
-        drawerVisible = false
-        settingsVisible = true
-    }
-
-    fun hideSettings() {
-        settingsVisible = false
-    }
-
     fun clearOverlays() {
         drawerVisible = false
-        settingsVisible = false
     }
 }
