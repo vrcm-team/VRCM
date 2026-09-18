@@ -222,7 +222,7 @@ generate_notes() {
   NOTES_PATH="$RELEASE_DIR/VRCM-v$VERSION-release-notes.md"
   if [[ -n "$NOTES_FILE" ]]; then
     [[ -f "$NOTES_FILE" ]] || fail "文案文件不存在：$NOTES_FILE"
-    if [[ "$NOTES_FILE" != "$NOTES_PATH" ]]; then
+    if ! [[ "$NOTES_FILE" -ef "$NOTES_PATH" ]]; then
       cp -f "$NOTES_FILE" "$NOTES_PATH"
     fi
     return 0
