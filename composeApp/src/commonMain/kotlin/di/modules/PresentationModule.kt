@@ -64,6 +64,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSel
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.editor.MeetupPhotoSessionStore
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPagerModel
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.GroupInstancePagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.SearchListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.FriendNetworkScreenModel
 import io.github.vrcmteam.vrcm.presentation.screens.user.MutualFriendsScreenModel
@@ -215,6 +216,7 @@ val presentationModule: Module = module {
         )
     }
     singleOf (::FriendLocationPagerModel)
+    viewModelOf(::GroupInstancePagerModel)
     viewModelOf(::FriendListPagerModel)
     viewModelOf(::FavoritesGroupsModel)
     viewModelOf(::SearchListPagerModel)

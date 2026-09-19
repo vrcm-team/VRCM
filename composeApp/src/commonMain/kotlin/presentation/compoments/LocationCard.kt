@@ -37,7 +37,8 @@ fun LocationCard(
     location: FriendLocation,
     isSelected: Boolean,
     onClickWorldImage: (String) -> Unit,
-    onClickLocationCard: () -> Unit,
+    /** 参数是这张卡的共享元素后缀，点卡片直接跳世界时要带上它才能接上转场。 */
+    onClickLocationCard: (String) -> Unit,
     travelingIds: Set<String> = emptySet(),
     isCurrentUserLocation: Boolean = false,
     content: @Composable (List<State<FriendData>>) -> Unit,
@@ -96,7 +97,7 @@ fun LocationCard(
                                 bottomEnd = 16.dp
                             )
                         )
-                        .clickable(onClick = onClickLocationCard),
+                        .clickable { onClickLocationCard(sharedSuffixKey) },
                 ) {
                     AppText(
                         text = instants.worldName,
@@ -138,7 +139,8 @@ fun LocationCard(
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     // 房间好友头像/房间持有者与房间人数比
-                    MemberInfoRow(isSelected, friendList, instants, travelingIds)
+                    // 没有好友在场（群组房间）时直接显示房主，不然这行是空的
+                    MemberInfoRow(isSelected || friendList.isEmpty(), friendList, instants, travelingIds)
                 }
             }
             AnimatedVisibility(isSelected) {

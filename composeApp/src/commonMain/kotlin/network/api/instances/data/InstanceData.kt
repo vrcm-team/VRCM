@@ -9,9 +9,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class InstanceData(
-    val active: Boolean,
-    val canRequestInvite: Boolean,
-    val capacity: Int,
+    // 协议里这几个字段是可选的（hidden 只有 Friends+ 房间才带、ownerId 只有群组/个人房间才带），
+    // 给默认值，少一个键不要把整份实例列表变成解析失败
+    val active: Boolean = true,
+    val canRequestInvite: Boolean = true,
+    val capacity: Int = 0,
     val clientNumber: String,
     val closedAt: String? = null,
     val displayName: String? = null,
@@ -19,14 +21,14 @@ data class InstanceData(
     val gameServerVersion: Int? = null,
     val hardClose: Boolean? = null,
     val hasCapacityForYou: Boolean? = null,
-    val hidden: String?,
+    val hidden: String? = null,
     val id: String,
     override val instanceId: String,
     val location: String,
     @SerialName("n_users")
     val nUsers: Int,
     val name: String,
-    val ownerId: String?,
+    val ownerId: String? = null,
     val permanent: Boolean,
     val photonRegion: String,
     val platforms: Platforms,

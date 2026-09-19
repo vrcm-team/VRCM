@@ -111,4 +111,9 @@ class GroupsApi(private val client: HttpClient) {
         client.get("$USERS_API_PREFIX/$userId/instances/groups/$groupId")
             .checkSuccess()
 
+    /** 自己加入的所有群组当前开着的房间，只有本人能查。 */
+    suspend fun getUserGroupInstances(userId: String): GroupInstancesResponse =
+        client.get("$USERS_API_PREFIX/$userId/instances/groups")
+            .checkSuccess()
+
 }
