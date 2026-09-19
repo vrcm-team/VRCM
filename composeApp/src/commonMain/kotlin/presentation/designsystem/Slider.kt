@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -61,7 +60,7 @@ fun AppSlider(
         modifier
             .fillMaxWidth()
             .height(44.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .semantics {
                 if (!enabled) disabled()
                 progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange, steps)

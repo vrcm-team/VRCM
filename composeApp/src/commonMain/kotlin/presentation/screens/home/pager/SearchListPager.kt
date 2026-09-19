@@ -402,9 +402,15 @@ private fun LazyListScope.searchMessageItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            AppIcon(AppIcons.Search, contentDescription = null, modifier = Modifier.size(48.dp))
+            // 空状态是提示而不是内容：符号与文字都退到次级色
+            AppIcon(
+                AppIcons.Search,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = AppTheme.colors.tertiaryLabel,
+            )
             Spacer(Modifier.height(16.dp))
-            AppText(message, style = AppTheme.type.body)
+            AppText(message, style = AppTheme.type.body, color = AppTheme.colors.secondaryLabel)
             if (retry != null) {
                 Spacer(Modifier.height(8.dp))
                 AppButton(onClick = retry, style = AppButtonStyle.Plain) {

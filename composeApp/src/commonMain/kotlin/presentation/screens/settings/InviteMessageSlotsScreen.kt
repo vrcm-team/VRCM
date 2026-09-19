@@ -5,16 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,13 +35,15 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHost
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppBannerHostState
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroup
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScrollableTabRow
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
@@ -154,36 +157,40 @@ private fun InviteMessageSlotsContent(
 
                     else -> LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(horizontal = AppSpacing.page, vertical = 8.dp),
                     ) {
-                        items(
-                            items = state.messages,
-                            key = { message -> message.slot },
-                        ) { message ->
-                            InviteMessageSlotCard(
-                                message = message,
-                                pendingMutation = state.pendingMutation,
-                                locale = locale,
-                                onEdit = {
-                                    state.session?.let { session ->
-                                        editingTarget = InviteMessageDialogTarget(
-                                            session = session,
-                                            messageType = state.selectedType,
-                                            slot = message.slot,
+                        // 槽位数量固定且很少：整组放进一张分组卡片，行间用发丝线
+                        item {
+                            AppGroup {
+                                state.messages.forEachIndexed { index, message ->
+                                    key(message.slot) {
+                                        if (index > 0) AppDivider(Modifier.padding(start = AppSpacing.row))
+                                        InviteMessageSlotRow(
+                                            message = message,
+                                            pendingMutation = state.pendingMutation,
+                                            locale = locale,
+                                            onEdit = {
+                                                state.session?.let { session ->
+                                                    editingTarget = InviteMessageDialogTarget(
+                                                        session = session,
+                                                        messageType = state.selectedType,
+                                                        slot = message.slot,
+                                                    )
+                                                }
+                                            },
+                                            onReset = {
+                                                state.session?.let { session ->
+                                                    resettingTarget = InviteMessageDialogTarget(
+                                                        session = session,
+                                                        messageType = state.selectedType,
+                                                        slot = message.slot,
+                                                    )
+                                                }
+                                            },
                                         )
                                     }
-                                },
-                                onReset = {
-                                    state.session?.let { session ->
-                                        resettingTarget = InviteMessageDialogTarget(
-                                            session = session,
-                                            messageType = state.selectedType,
-                                            slot = message.slot,
-                                        )
-                                    }
-                                },
-                            )
+                                }
+                            }
                         }
                     }
                 }
@@ -231,8 +238,9 @@ private data class InviteMessageDialogTarget(
     val slot: Int,
 )
 
+/** 一个槽位：上面一行小字是槽位号与状态，下面是消息正文；尾部是编辑 / 重置。 */
 @Composable
-private fun InviteMessageSlotCard(
+private fun InviteMessageSlotRow(
     message: InviteMessageData,
     pendingMutation: PendingInviteMessageMutation?,
     locale: LocaleStrings,
@@ -243,78 +251,76 @@ private fun InviteMessageSlotCard(
     val isPending = pendingMutation?.slot == message.slot &&
         pendingMutation.messageType == message.messageType
     val actionsEnabled = !isLocked && pendingMutation == null
+    val lockedText = when {
+        message.remainingCooldownMinutes > 0 -> locale.inviteMessageCooldownRemaining.replace(
+            "%d",
+            message.remainingCooldownMinutes.toString(),
+        )
+        !message.canBeUpdated -> locale.inviteMessageUnavailable
+        else -> null
+    }
 
-    AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = AppShapes.m,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppSize.rowMinHeight)
+            .padding(start = AppSpacing.row, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(
-                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppText(
                     text = locale.inviteMessageSlotLabel.replace("%d", message.slot.toString()),
-                    style = AppTheme.type.subheadlineEmphasized,
-                    color = AppTheme.colors.tint,
+                    style = AppTheme.type.footnote,
+                    color = AppTheme.colors.secondaryLabel,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
-                AppText(
-                    text = message.message,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
-                    style = AppTheme.type.subheadline,
-                    color = AppTheme.colors.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                when {
-                    message.remainingCooldownMinutes > 0 -> AppText(
-                        text = locale.inviteMessageCooldownRemaining.replace(
-                            "%d",
-                            message.remainingCooldownMinutes.toString(),
-                        ),
-                        modifier = Modifier.padding(start = 8.dp),
-                        style = AppTheme.type.caption2Emphasized,
-                        color = AppTheme.colors.secondaryTint,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-
-                    !message.canBeUpdated -> AppText(
-                        text = locale.inviteMessageUnavailable,
-                        modifier = Modifier.padding(start = 8.dp),
-                        style = AppTheme.type.caption2Emphasized,
-                        color = AppTheme.colors.secondaryTint,
+                if (lockedText != null) {
+                    AppText(
+                        text = lockedText,
+                        style = AppTheme.type.footnote,
+                        color = AppTheme.colors.onWarningSoft,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            if (isPending) {
-                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    AppActivityIndicator(modifier = Modifier.size(20.dp))
-                }
-            } else {
-                ATooltipBox(tooltip = { AppText(locale.inviteMessageEdit) }) {
-                    AppIconButton(onClick = onEdit, enabled = actionsEnabled) {
-                        AppIcon(
-                            imageVector = AppIcons.Edit,
-                            contentDescription = locale.inviteMessageEdit,
-                        )
-                    }
-                }
+            AppText(
+                text = message.message,
+                style = AppTheme.type.body,
+                color = AppTheme.colors.label,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (isPending) {
+            Box(modifier = Modifier.size(AppSize.iconButton), contentAlignment = Alignment.Center) {
+                AppActivityIndicator(modifier = Modifier.size(20.dp))
             }
-            ATooltipBox(tooltip = { AppText(locale.inviteMessageReset) }) {
-                AppIconButton(onClick = onReset, enabled = actionsEnabled) {
+        } else {
+            ATooltipBox(tooltip = { AppText(locale.inviteMessageEdit) }) {
+                AppIconButton(onClick = onEdit, enabled = actionsEnabled, contentColor = AppTheme.colors.tint) {
                     AppIcon(
-                        imageVector = AppIcons.Reset,
-                        contentDescription = locale.inviteMessageReset,
+                        imageVector = AppIcons.Edit,
+                        contentDescription = locale.inviteMessageEdit,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
+            }
+        }
+        ATooltipBox(tooltip = { AppText(locale.inviteMessageReset) }) {
+            AppIconButton(onClick = onReset, enabled = actionsEnabled, contentColor = AppTheme.colors.tint) {
+                AppIcon(
+                    imageVector = AppIcons.Reset,
+                    contentDescription = locale.inviteMessageReset,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }

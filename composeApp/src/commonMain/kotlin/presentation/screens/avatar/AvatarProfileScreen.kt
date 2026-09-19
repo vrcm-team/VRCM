@@ -307,26 +307,28 @@ class AvatarProfileScreen(
             sheetState = actionSheetState,
             onDismissRequest = { actionSheetIsVisible = false },
         ) {
-            AvatarProfileActionSheet(
-                hideSheet = { actionSheetState.hide() },
-                onHideCompletion = {
-                    if (!actionSheetState.isVisible) actionSheetIsVisible = false
-                },
-                fallbackActionState = fallbackActionState,
-                onSelectFallbackAvatar = screenModel::selectFallbackAvatar,
-                moderationState = moderationState,
-                onRetryModeration = screenModel::retryAvatarModerationLoad,
-                onModerationChangeRequested = { blocked ->
-                    pendingModerationChange = blocked
-                },
-                canEdit = editState.canEdit,
-                onEdit = editAvatar,
-                deletionState = deletionState,
-                onDelete = screenModel::requestAvatarDeletion,
-                impostorDeletionState = impostorDeletionState,
-                onDeleteImpostor = { showImpostorDeletionConfirmation = true },
-                onRetryImpostorVerification = screenModel::retryImpostorVerification,
-            )
+            AppSheetActionGroup {
+                AvatarProfileActionSheet(
+                    hideSheet = { actionSheetState.hide() },
+                    onHideCompletion = {
+                        if (!actionSheetState.isVisible) actionSheetIsVisible = false
+                    },
+                    fallbackActionState = fallbackActionState,
+                    onSelectFallbackAvatar = screenModel::selectFallbackAvatar,
+                    moderationState = moderationState,
+                    onRetryModeration = screenModel::retryAvatarModerationLoad,
+                    onModerationChangeRequested = { blocked ->
+                        pendingModerationChange = blocked
+                    },
+                    canEdit = editState.canEdit,
+                    onEdit = editAvatar,
+                    deletionState = deletionState,
+                    onDelete = screenModel::requestAvatarDeletion,
+                    impostorDeletionState = impostorDeletionState,
+                    onDeleteImpostor = { showImpostorDeletionConfirmation = true },
+                    onRetryImpostorVerification = screenModel::retryImpostorVerification,
+                )
+            }
         }
         FavoriteGroupBottomSheet(
             isVisible = showFavoriteSheet,
@@ -520,7 +522,6 @@ private fun AvatarProfileBottomActions(
             modifier = Modifier
                 .widthIn(max = AvatarProfileContentMaxWidth)
                 .fillMaxWidth()
-                .height(80.dp)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         )
     }
@@ -534,21 +535,22 @@ private fun AvatarProfilePrimaryActions(
     onFavoriteAvatar: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 左边按钮的状态文案是整句，可能折成两行：两个按钮跟着最高的那个等高
     Row(
-        modifier = modifier,
+        modifier = modifier.height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AvatarActionButton(
             state = actionState,
             onClick = onSelectAvatar,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
 
         AppButton(
             onClick = onFavoriteAvatar,
             enabled = favoriteEntryState != FavoriteEntryState.Loading &&
                 favoriteEntryState != FavoriteEntryState.Unavailable,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             style = AppButtonStyle.Gray,
         ) {
             AppIcon(
@@ -556,7 +558,6 @@ private fun AvatarProfilePrimaryActions(
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(Modifier.width(8.dp))
             AppText(
                 text = when (favoriteEntryState) {
                     FavoriteEntryState.Loading -> strings.loading
@@ -1068,6 +1069,7 @@ private fun AvatarActionButton(
         enabled = enabled,
         onClick = onClick,
         style = AppButtonStyle.Prominent,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
     ) {
         if (showProgress) {
             AppActivityIndicator(
@@ -1081,11 +1083,11 @@ private fun AvatarActionButton(
                 modifier = Modifier.size(20.dp),
             )
         }
-        Spacer(modifier = Modifier.width(8.dp))
         AppText(
             text = availability.localizedButtonText(strings),
+            modifier = Modifier.weight(1f, fill = false),
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -1163,25 +1165,25 @@ private fun AvatarInfoItemBlock(
             AppText(text = description, style = AppTheme.type.caption2Emphasized)
         }
     ) {
-        val bgColor = AppTheme.colors.secondaryTint
+        // 与世界详情页的信息块同一套样式：白色磁贴、强调色符号、正文色数值
         Column(
             modifier = modifier
                 .clip(AppShapes.m)
-                .background(bgColor),
+                .background(AppTheme.colors.secondaryGroupedBackground),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             AppIcon(
                 imageVector = icon,
-                tint = AppTheme.colors.onSecondaryTint,
+                tint = AppTheme.colors.tint,
                 contentDescription = description,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             AppText(
                 text = label,
-                color = AppTheme.colors.onSecondaryTint,
-                style = AppTheme.type.caption2Emphasized,
+                color = AppTheme.colors.label,
+                style = AppTheme.type.footnoteEmphasized,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center

@@ -527,12 +527,12 @@ private fun LazyItemScope.NotificationItem(
                             else -> strings.notificationReplyWithPhoto
                         }
                         ATooltipBox(tooltip = { AppText(photoLabel) }) {
-                            AppIconButton(
+                            NotificationIconAction(
                                 enabled = !pending,
                                 onClick = if (canRetryPhotoResponse) onPhotoRetry else onPhotoReply,
                             ) {
                                 if (photoResponsePhase != null) {
-                                    AppActivityIndicator(Modifier.size(20.dp))
+                                    AppActivityIndicator(Modifier.size(18.dp))
                                 } else {
                                     AppIcon(
                                         imageVector = if (canRetryPhotoResponse) {
@@ -541,16 +541,21 @@ private fun LazyItemScope.NotificationItem(
                                             AppIcons.AddPhoto
                                         },
                                         contentDescription = photoLabel,
+                                        modifier = Modifier.size(18.dp),
                                     )
                                 }
                             }
                         }
                     }
-                    if (item.showStandaloneReadAction && !isBoop) AppIconButton(enabled = !pending, onClick = onRead) {
-                        AppIcon(AppIcons.MarkRead, strings.notificationMarkRead)
+                    if (item.showStandaloneReadAction && !isBoop) NotificationIconAction(enabled = !pending, onClick = onRead) {
+                        AppIcon(AppIcons.MarkRead, strings.notificationMarkRead, modifier = Modifier.size(18.dp))
                     }
-                    if (item.canDelete) AppIconButton(enabled = !pending, onClick = onDelete) {
-                        AppIcon(AppIcons.Delete, strings.notificationDelete)
+                    if (item.canDelete) NotificationIconAction(
+                        enabled = !pending,
+                        onClick = onDelete,
+                        role = AppButtonRole.Destructive,
+                    ) {
+                        AppIcon(AppIcons.Delete, strings.notificationDelete, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -592,6 +597,25 @@ private fun NotificationResponseButton(
     } else {
         button()
     }
+}
+
+/** 卡片动作行里的次要动作：灰底小圆钮，和旁边的胶囊按钮同高度、同一套语汇。 */
+@Composable
+private fun NotificationIconAction(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    role: AppButtonRole = AppButtonRole.Default,
+    content: @Composable () -> Unit,
+) {
+    AppIconButton(
+        onClick = onClick,
+        modifier = Modifier.padding(start = 6.dp),
+        enabled = enabled,
+        style = AppButtonStyle.Gray,
+        role = role,
+        size = AppButtonSize.Regular.minHeight,
+        content = content,
+    )
 }
 
 @Composable

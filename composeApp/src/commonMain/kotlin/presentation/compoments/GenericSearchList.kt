@@ -175,13 +175,15 @@ fun <T> SearchResultItem(
             onLongClick = { onLongClick(item) },
         )
     }
+    // 列表页是分组底色：每一项是一张白色卡片行，左右与页面边距对齐
     AppListItem(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
-            .padding(horizontal = 6.dp)
+            .padding(horizontal = AppSpacing.page)
             .clip(AppShapes.l)
             .then(interactionModifier),
+        containerColor = AppTheme.colors.secondaryGroupedBackground,
         leadingContent = leadingContent,
         headlineContent = headlineContent,
         supportingContent = supportingContent ?: {},

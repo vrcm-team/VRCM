@@ -9,11 +9,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +49,12 @@ data class PersonalDrawerUser(
     val location: String,
 )
 
+/** 资料卡片顶部横幅的高度；头像压在它的下沿上。 */
+private val ProfileBannerHeight = 80.dp
+private val ProfileAvatarSize = 64.dp
+/** 头像外圈的卡片色描边：把头像从横幅上"切"出来。 */
+private val ProfileAvatarRing = 3.dp
+
 /** Personal navigation drawer shell. Services and navigation remain owned by its caller. */
 @Composable
 fun PersonalNavigationDrawer(
@@ -72,23 +81,27 @@ fun PersonalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
         drawerContent = {
-            AppDrawerSheet(
-                modifier = Modifier
-                    .fillMaxWidth(.82f)
-                    .widthIn(max = 360.dp)
-                    .semantics { contentDescription = drawerDescription },
-                windowInsets = WindowInsets.safeDrawing.only(
-                    WindowInsetsSides.Vertical + WindowInsetsSides.Start,
-                ),
-            ) {
-                Column(
+            // 抽屉是盖在页面上的一层：深色下用抬升令牌，分组卡片才和抽屉底色分得开。
+            val colors = AppTheme.colors.elevated()
+            CompositionLocalProvider(LocalAppColors provides colors) {
+                AppDrawerSheet(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 12.dp),
+                        .fillMaxWidth(.82f)
+                        .widthIn(max = 360.dp)
+                        .semantics { contentDescription = drawerDescription },
+                    containerColor = colors.groupedBackground,
+                    windowInsets = WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Vertical + WindowInsetsSides.Start,
+                    ),
                 ) {
-                    PersonalHeaderBackground(user?.customBannerUrl) {
-                        PersonalHeader(
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = AppSpacing.page, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        ProfileCard(
                             user = user,
                             sharedSuffixKey = profileSharedSuffixKey,
                             sharedElementsEnabled = gesturesEnabled,
@@ -96,25 +109,33 @@ fun PersonalNavigationDrawer(
                             onProfileClick = onProfileClick,
                             onStatusClick = onStatusClick,
                         )
+                        // 社交
+                        AppGroup {
+                            DrawerRow(AppIcons.Person, AppRowIconColor.Blue, strings.drawerMyProfile, onProfileClick, enabled = user != null)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.PersonSearch, AppRowIconColor.Indigo, strings.friendNetworkTitle, onFriendNetworkClick)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.Envelope, AppRowIconColor.Green, strings.inviteMessageSlotsTitle, onInviteMessagesClick)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.Shield, AppRowIconColor.Red, strings.playerModerationTitle, onPlayerManagementClick)
+                        }
+                        // 内容
+                        AppGroup {
+                            DrawerRow(AppIcons.Gallery, AppRowIconColor.Orange, strings.galleryScreenTitle, onGalleryClick)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.Explore, AppRowIconColor.Teal, strings.recentWorldsTitle, onRecentWorldsClick)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.Inventory, AppRowIconColor.Purple, strings.inventoryTitle, onInventoryClick)
+                            DrawerRowDivider()
+                            DrawerRow(AppIcons.AccountCircle, AppRowIconColor.Pink, strings.meetupCardTitle, onNameplateClick)
+                        }
+                        AppGroup {
+                            DrawerRow(AppIcons.Settings, AppRowIconColor.Gray, strings.drawerSettings, onSettingsClick)
+                        }
+                        AppGroup {
+                            LogoutRow(onLogoutClick)
+                        }
                     }
-                    AppDivider(Modifier.padding(vertical = 8.dp))
-                    DrawerItem(
-                        AppIcons.Person,
-                        strings.drawerMyProfile,
-                        onProfileClick,
-                        enabled = user != null,
-                    )
-                    DrawerItem(AppIcons.PersonSearch, strings.friendNetworkTitle, onFriendNetworkClick)
-                    DrawerItem(AppIcons.Gallery, strings.galleryScreenTitle, onGalleryClick)
-                    DrawerItem(AppIcons.Notifications, strings.inviteMessageSlotsTitle, onInviteMessagesClick)
-                    DrawerItem(AppIcons.Shield, strings.playerModerationTitle, onPlayerManagementClick)
-                    DrawerItem(AppIcons.Explore, strings.recentWorldsTitle, onRecentWorldsClick)
-                    DrawerItem(AppIcons.Inventory, strings.inventoryTitle, onInventoryClick)
-                    DrawerItem(AppIcons.AccountCircle, strings.meetupCardTitle, onNameplateClick)
-                    DrawerItem(AppIcons.Settings, strings.drawerSettings, onSettingsClick)
-                    Spacer(Modifier.height(20.dp))
-                    AppDivider()
-                    DrawerItem(AppIcons.Logout, strings.stettingLogout, onLogoutClick, error = true)
                 }
             }
         },
@@ -122,34 +143,13 @@ fun PersonalNavigationDrawer(
     )
 }
 
-@Composable
-private fun PersonalHeaderBackground(
-    customBannerUrl: String?,
-    content: @Composable () -> Unit,
-) {
-    if (customBannerUrl == null) {
-        content()
-        return
-    }
-    Box(Modifier.fillMaxWidth()) {
-        AImage(
-            modifier = Modifier.matchParentSize(),
-            imageData = customBannerUrl,
-            contentDescription = null,
-            contentScale = ContentScale.FillWidth,
-        )
-        Box(
-            Modifier
-                .matchParentSize()
-                .background(AppTheme.colors.secondarySystemBackground.copy(alpha = .78f)),
-        )
-        content()
-    }
-}
-
+/**
+ * 资料卡片：横幅 + 压在横幅下沿的头像 + 名字，整块点进个人资料；下面一行是当前状态，点开状态编辑。
+ * 没有自定义横幅时用主题的浅强调色垫一条，卡片结构保持一致。
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun PersonalHeader(
+private fun ProfileCard(
     user: PersonalDrawerUser?,
     sharedSuffixKey: String,
     sharedElementsEnabled: Boolean,
@@ -159,28 +159,56 @@ private fun PersonalHeader(
 ) {
     val loaded = user != null
     val userId = user?.id
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    val cardColor = AppTheme.colors.secondaryGroupedBackground
+    AppGroup(background = cardColor) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = loaded, onClick = onProfileClick),
         ) {
-            UserStateIcon(
-                modifier = Modifier
-                    .enableIf(loaded && sharedElementsEnabled) {
-                        sharedBoundsBy(
-                            key = "${userId}UserIcon",
-                            suffixKey = sharedSuffixKey,
+            Box(Modifier.fillMaxWidth()) {
+                val bannerModifier = Modifier.fillMaxWidth().height(ProfileBannerHeight)
+                val bannerUrl = user?.customBannerUrl
+                if (bannerUrl != null) {
+                    AImage(
+                        modifier = bannerModifier,
+                        imageData = bannerUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Box(bannerModifier.background(AppTheme.colors.tintSoft))
+                }
+                Box(
+                    Modifier
+                        .padding(
+                            start = AppSpacing.row - ProfileAvatarRing,
+                            top = ProfileBannerHeight - ProfileAvatarSize / 2 - ProfileAvatarRing,
                         )
-                    }
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .clickable(enabled = loaded, onClick = onProfileClick),
-                iconUrl = user?.avatarUrl,
-            )
-            Column(Modifier.weight(1f).clickable(enabled = loaded, onClick = onProfileClick)) {
+                        .background(cardColor, CircleShape)
+                        .padding(ProfileAvatarRing),
+                ) {
+                    UserStateIcon(
+                        modifier = Modifier
+                            .enableIf(loaded && sharedElementsEnabled) {
+                                sharedBoundsBy(
+                                    key = "${userId}UserIcon",
+                                    suffixKey = sharedSuffixKey,
+                                )
+                            }
+                            .size(ProfileAvatarSize),
+                        iconUrl = user?.avatarUrl,
+                    )
+                }
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppSpacing.row)
+                    .padding(top = 6.dp, bottom = 12.dp),
+            ) {
                 Row(
-                    verticalAlignment = Alignment.Top,
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     AppText(
@@ -196,7 +224,7 @@ private fun PersonalHeader(
                                     clipInOverlayDuringTransition = NoClip,
                                 )
                             },
-                        style = AppTheme.type.title2,
+                        style = AppTheme.type.title3,
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -216,90 +244,110 @@ private fun PersonalHeader(
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
         AnimatedVisibility(visible = statusVisible) {
             val visibilityScope = this
             val dialogSharedUserId = userId?.let(::drawerStatusSharedUserId).orEmpty()
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(AppShapes.m)
-                    .clickable(enabled = loaded, onClick = onStatusClick)
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                UserStatusIndicator(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .enableIf(loaded && sharedElementsEnabled) {
-                            sharedBoundsBy(
-                                key = "${dialogSharedUserId}UserStatusIcon",
-                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                                animatedVisibilityScope = visibilityScope,
-                            )
+            Column {
+                AppDivider(Modifier.padding(start = AppSpacing.row))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = loaded, onClick = onStatusClick)
+                        .defaultMinSize(minHeight = AppSize.rowMinHeight)
+                        .padding(horizontal = AppSpacing.row, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    UserStatusIndicator(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .enableIf(loaded && sharedElementsEnabled) {
+                                sharedBoundsBy(
+                                    key = "${dialogSharedUserId}UserStatusIcon",
+                                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                    animatedVisibilityScope = visibilityScope,
+                                )
+                            },
+                        userStatus = user?.status,
+                        location = user?.location,
+                        backgroundColor = cardColor,
+                    )
+                    AppText(
+                        text = user?.statusDescription.orEmpty().ifBlank {
+                            user?.status?.localizedLabel() ?: strings.loading
                         },
-                    userStatus = user?.status,
-                    location = user?.location,
-                    backgroundColor = AppTheme.colors.secondarySystemBackground,
-                )
-                AppText(
-                    text = user?.statusDescription.orEmpty().ifBlank {
-                        user?.status?.localizedLabel() ?: strings.loading
-                    },
-                    modifier = Modifier
-                        .enableIf(loaded && sharedElementsEnabled) {
-                            sharedBoundsBy(
-                                key = "${userId}UserStatusRow",
-                                suffixKey = sharedSuffixKey,
-                                resizeMode = SharedTextBoundsResizeMode,
-                                boundsTransform = TextBoundsTransform,
-                                clipInOverlayDuringTransition = NoClip,
-                            )
-                        }
-                        .enableIf(loaded && sharedElementsEnabled) {
-                            sharedBoundsBy(
-                                key = "${dialogSharedUserId}UserStatusText",
-                                sharedTransitionScope = LocalSharedTransitionDialogScope.current,
-                                animatedVisibilityScope = visibilityScope,
-                            )
-                        }
-                        .weight(1f),
-                    style = AppTheme.type.subheadline,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                        modifier = Modifier
+                            .enableIf(loaded && sharedElementsEnabled) {
+                                sharedBoundsBy(
+                                    key = "${userId}UserStatusRow",
+                                    suffixKey = sharedSuffixKey,
+                                    resizeMode = SharedTextBoundsResizeMode,
+                                    boundsTransform = TextBoundsTransform,
+                                    clipInOverlayDuringTransition = NoClip,
+                                )
+                            }
+                            .enableIf(loaded && sharedElementsEnabled) {
+                                sharedBoundsBy(
+                                    key = "${dialogSharedUserId}UserStatusText",
+                                    sharedTransitionScope = LocalSharedTransitionDialogScope.current,
+                                    animatedVisibilityScope = visibilityScope,
+                                )
+                            }
+                            .weight(1f),
+                        style = AppTheme.type.subheadline,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    AppIcon(
+                        AppChevronRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = AppTheme.colors.tertiaryLabel,
+                    )
+                }
             }
         }
     }
 }
 
+/** 抽屉里的导航行：彩色图标方块 + 标题 + chevron。 */
 @Composable
-private fun DrawerItem(
+private fun DrawerRow(
     icon: ImageVector,
+    iconColor: Color,
     text: String,
     onClick: () -> Unit,
-    error: Boolean = false,
     enabled: Boolean = true,
 ) {
-    val baseColor = if (error) AppTheme.colors.destructive else AppTheme.colors.label
-    val color = baseColor.copy(alpha = if (enabled) 1f else .38f)
-    Row(
-        Modifier
+    AppRow(
+        title = text,
+        leading = { AppRowIcon(icon, iconColor, Modifier.alpha(if (enabled) 1f else .38f)) },
+        chevron = true,
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun DrawerRowDivider() {
+    AppDivider(Modifier.padding(start = AppRowIconDividerInset))
+}
+
+/** 破坏性操作独占一组、红字居中（与设置页的退出登录一致）。 */
+@Composable
+private fun LogoutRow(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+            .clickable(role = Role.Button, onClick = onClick)
+            .defaultMinSize(minHeight = AppSize.rowMinHeight)
+            .padding(horizontal = AppSpacing.row, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        AppIcon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
         AppText(
-            text,
-            modifier = Modifier.weight(1f),
-            color = color,
+            text = strings.stettingLogout,
             style = AppTheme.type.body,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            color = AppTheme.colors.destructive,
         )
     }
 }

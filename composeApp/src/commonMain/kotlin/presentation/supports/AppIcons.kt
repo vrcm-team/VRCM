@@ -284,6 +284,16 @@ object AppIcons {
     /** heart */
     val FavoriteBorder: ImageVector by lazy { symbol("heart") { stroke { heart(inset = 0.7f) } } }
 
+    /** envelope：邀请消息。 */
+    val Envelope: ImageVector by lazy {
+        symbol("envelope") {
+            stroke {
+                roundRect(3f, 5.5f, 18f, 13f, 2.5f)
+                polyline(3.9f, 7.7f, 12f, 13.3f, 20.1f, 7.7f)
+            }
+        }
+    }
+
     /** bell：通知。 */
     val Notifications: ImageVector by lazy { symbol("bell") { bell() } }
 

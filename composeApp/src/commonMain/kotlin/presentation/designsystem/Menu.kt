@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.TransformOrigin
@@ -125,7 +124,7 @@ fun AppMenuItem(
         modifier
             .fillMaxWidth()
             .clickable(interactionSource = null, indication = LocalIndication.current, enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minHeight = 44.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -134,7 +133,10 @@ fun AppMenuItem(
         ProvideContentColor(foreground, AppTheme.type.body) {
             if (leadingIcon != null) Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { leadingIcon() }
             Box(Modifier.weight(1f)) { text() }
-            if (trailingIcon != null) Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { trailingIcon() }
+            // 尾随位多半是图标，也可能是计数这类短文字：至少占一个图标位，内容更宽时跟着撑开而不是被裁掉
+            if (trailingIcon != null) {
+                Box(Modifier.defaultMinSize(minWidth = 22.dp, minHeight = 22.dp), contentAlignment = Alignment.Center) { trailingIcon() }
+            }
         }
     }
 }
@@ -165,7 +167,7 @@ fun AppPopUpButton(
                     .clip(AppShapes.s)
                     .background(c.secondaryFill)
                     .clickable(interactionSource = null, indication = LocalIndication.current, enabled = enabled) { onExpandedChange(!expanded) }
-                    .alpha(if (enabled) 1f else 0.4f)
+                    .enabledAlpha(enabled)
                     .defaultMinSize(minHeight = 44.dp)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -182,7 +184,7 @@ fun AppPopUpButton(
 private val MenuShadowInset = 12.dp
 
 /**
- * 贴着锚点下沿、起始边对齐；右侧放不下改为末端对齐，下方放不下翻到上方；最后夹在窗口边距内。
+ * 贴着锚点下沿、起始边对齐；右侧放不下时，宽锚点改为末端对齐、窄锚点就近挪回窗口内；下方放不下翻到上方；最后夹在窗口边距内。
  * 弹层四周有 [inset] 的投影留白，定位按可见面板算，再把留白扣回去。
  */
 private class MenuPositionProvider(
@@ -212,8 +214,13 @@ private class MenuPositionProvider(
             anchorBounds.left + offset.x
         }
         val fitsStart = startAligned >= windowMargin && startAligned + width <= windowSize.width - windowMargin
-        val x = (if (fitsStart) startAligned else endAligned)
-            .coerceIn(windowMargin, (windowSize.width - width - windowMargin).coerceAtLeast(windowMargin))
+        val x = when {
+            fitsStart -> startAligned
+            // 锚点比菜单宽（整行的弹出按钮）：改贴锚点的末端边
+            anchorBounds.width >= width -> endAligned
+            // 锚点比菜单窄（一个文字标签、一个图标）：只挪到放得下为止，菜单才留在锚点正下方而不是被甩到另一侧
+            else -> startAligned
+        }.coerceIn(windowMargin, (windowSize.width - width - windowMargin).coerceAtLeast(windowMargin))
 
         val below = anchorBounds.bottom + offset.y
         val above = anchorBounds.top - offset.y - height

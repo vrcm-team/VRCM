@@ -259,7 +259,8 @@ fun LazyItemScope.renderWorldItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ){
-               remember { world.unityPackages.platformPackages.keys.sortedBy { it.name } } .forEach {
+               // 缓存里的世界可能还没有包信息，刷新后同一个列表项要跟着更新
+               remember(world.unityPackages) { world.unityPackages.platformPackages.keys.sortedBy { it.name } }.forEach {
                     val icon = when(it){
                         Android -> AppIcons.Android
                         Ios -> AppIcons.Apple

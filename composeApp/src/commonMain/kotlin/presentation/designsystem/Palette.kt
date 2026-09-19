@@ -52,6 +52,17 @@ object Palette {
     const val DarkGlassStroke: Long = 0x14FFFFFF
     const val DarkGlassHighlight: Long = 0x38FFFFFF
 
+    // ---- 列表行图标色块（iOS 系统色；深浅模式同一组，对齐系统设置）----
+    const val RowIconBlue: Long = 0xFF3478F6
+    const val RowIconIndigo: Long = 0xFF5856D6
+    const val RowIconPurple: Long = 0xFFAF52DE
+    const val RowIconPink: Long = 0xFFFF2D55
+    const val RowIconRed: Long = 0xFFFF3B30
+    const val RowIconOrange: Long = 0xFFFF9500
+    const val RowIconGreen: Long = 0xFF2E9E4F
+    const val RowIconTeal: Long = 0xFF30B0C7
+    const val RowIconGray: Long = 0xFF8E8E93
+
     /** WCAG 相对亮度（sRGB）。 */
     fun relativeLuminance(argb: Long): Double {
         fun ch(v: Long): Double {

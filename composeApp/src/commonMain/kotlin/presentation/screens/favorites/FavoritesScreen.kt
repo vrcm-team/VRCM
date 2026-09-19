@@ -587,7 +587,7 @@ private fun LibrarySectionHeader(title: String) {
         text = title,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         style = AppTheme.type.subheadlineEmphasized,
-        color = AppTheme.colors.tint,
+        color = AppTheme.colors.secondaryLabel,
     )
 }
 

@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -57,7 +56,7 @@ fun AppToggle(
     Box(
         modifier
             .then(toggle)
-            .alpha(if (enabled) 1f else 0.4f),
+            .enabledAlpha(enabled),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
@@ -111,7 +110,7 @@ fun AppCheckbox(
         modifier
             .then(toggle)
             .padding(9.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .size(22.dp)
             .clip(CircleShape)
             .background(fill)
@@ -154,7 +153,7 @@ fun AppRadioButton(
         modifier
             .then(select)
             .padding(9.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .size(22.dp)
             .clip(CircleShape)
             .background(fill)

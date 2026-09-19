@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
@@ -58,10 +59,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonRole
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppCard
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroup
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSize
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
@@ -179,7 +186,7 @@ class GroupProfileScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(AppTheme.colors.secondaryGroupedBackground)
+                        .background(AppTheme.colors.groupedBackground)
                 ) {
                     // 页面内容是顶栏玻璃按钮的取样源
                     val glassBackdrop = rememberGlassBackdrop()
@@ -318,7 +325,7 @@ private fun GroupBanner(
                         Brush.verticalGradient(
                             listOf(
                                 AppTheme.colors.fill,
-                                AppTheme.colors.secondaryGroupedBackground
+                                AppTheme.colors.groupedBackground
                             )
                         )
                     )
@@ -329,7 +336,7 @@ private fun GroupBanner(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, AppTheme.colors.secondaryGroupedBackground.copy(alpha = 0.9f))
+                        listOf(Color.Transparent, AppTheme.colors.groupedBackground.copy(alpha = 0.9f))
                     )
                 )
         )
@@ -396,82 +403,35 @@ private fun GroupHeaderInfo(
             }
         }
         if (groupSettingsAvailable) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    AppText(
-                        text = strings.groupRepresentation,
-                        style = AppTheme.type.subheadlineEmphasized,
-                    )
-                    AppText(
-                        text = when {
-                            isRepresentationUpdating -> strings.groupRepresentationUpdating
-                            group.myMember?.isRepresenting == true -> strings.groupRepresentationEnabled
-                            else -> strings.groupRepresentationDisabled
-                        },
-                        style = AppTheme.type.caption1,
-                        color = AppTheme.colors.secondaryLabel,
-                    )
-                }
-                Box(
-                    modifier = Modifier.size(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isRepresentationUpdating) {
-                        AppActivityIndicator(
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-                AppToggle(
+            val settingsEnabled = !isLoading &&
+                !isActionLoading &&
+                !isRepresentationUpdating &&
+                !isNotificationPreferenceUpdating
+            AppGroup {
+                GroupSettingRow(
+                    title = strings.groupRepresentation,
+                    description = when {
+                        isRepresentationUpdating -> strings.groupRepresentationUpdating
+                        group.myMember?.isRepresenting == true -> strings.groupRepresentationEnabled
+                        else -> strings.groupRepresentationDisabled
+                    },
                     checked = group.myMember?.isRepresenting == true,
-                    enabled = !isLoading &&
-                        !isActionLoading &&
-                        !isRepresentationUpdating &&
-                        !isNotificationPreferenceUpdating,
+                    updating = isRepresentationUpdating,
+                    enabled = settingsEnabled,
                     onCheckedChange = onRepresentationChange,
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    AppText(
-                        text = strings.groupNotifications,
-                        style = AppTheme.type.subheadlineEmphasized,
-                    )
-                    AppText(
-                        text = when {
-                            isNotificationPreferenceUpdating -> strings.groupNotificationsUpdating
-                            group.myMember?.isSubscribedToAnnouncements == true ->
-                                strings.groupNotificationsEnabled
-                            else -> strings.groupNotificationsDisabled
-                        },
-                        style = AppTheme.type.caption1,
-                        color = AppTheme.colors.secondaryLabel,
-                    )
-                }
-                Box(
-                    modifier = Modifier.size(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isNotificationPreferenceUpdating) {
-                        AppActivityIndicator(
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-                AppToggle(
+                AppDivider(Modifier.padding(start = AppSpacing.row))
+                GroupSettingRow(
+                    title = strings.groupNotifications,
+                    description = when {
+                        isNotificationPreferenceUpdating -> strings.groupNotificationsUpdating
+                        group.myMember?.isSubscribedToAnnouncements == true ->
+                            strings.groupNotificationsEnabled
+                        else -> strings.groupNotificationsDisabled
+                    },
                     checked = group.myMember?.isSubscribedToAnnouncements == true,
-                    enabled = !isLoading &&
-                        !isActionLoading &&
-                        !isRepresentationUpdating &&
-                        !isNotificationPreferenceUpdating,
+                    updating = isNotificationPreferenceUpdating,
+                    enabled = settingsEnabled,
                     onCheckedChange = onNotificationPreferenceChange,
                 )
             }
@@ -483,7 +443,47 @@ private fun GroupHeaderInfo(
                 !isRepresentationUpdating &&
                 !isNotificationPreferenceUpdating,
             isLoading = isActionLoading,
+            // 退出是破坏性操作：灰底红字，不和"加入"一样用最醒目的主色
+            style = if (isMember) AppButtonStyle.Gray else AppButtonStyle.Prominent,
+            role = if (isMember) AppButtonRole.Destructive else AppButtonRole.Default,
             onClick = { if (isMember) onLeave() else onJoin() }
+        )
+    }
+}
+
+/** 群组设置的一行：标题 + 当前状态说明，尾部是开关；提交中在开关前转圈。 */
+@Composable
+private fun GroupSettingRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    updating: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = AppSize.rowMinHeight)
+            .padding(horizontal = AppSpacing.row, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            AppText(text = title, style = AppTheme.type.body)
+            AppText(
+                text = description,
+                style = AppTheme.type.footnote,
+                color = AppTheme.colors.secondaryLabel,
+            )
+        }
+        if (updating) {
+            AppActivityIndicator(modifier = Modifier.size(18.dp))
+        }
+        AppToggle(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
         )
     }
 }
@@ -1150,8 +1150,8 @@ private fun SectionCard(
         ) {
             AppText(
                 text = title,
-                style = AppTheme.type.subheadlineEmphasized,
-                color = AppTheme.colors.tint
+                style = AppTheme.type.headline,
+                color = AppTheme.colors.label
             )
             content()
         }

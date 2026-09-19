@@ -48,9 +48,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -314,9 +314,35 @@ fun AppSheet(
     }
 }
 
+/** [AppSheetAction] 是否处在 [AppSheetActionGroup] 里：在组里就不再各自带圆角与外边距。 */
+private val LocalSheetActionGrouped = staticCompositionLocalOf { false }
+
 /**
- * Sheet 里的一行动作（HIG Action sheets）：整行可点的圆角行，强调色文字居中；破坏性动作红字。
- * 一组动作就是上下排开的若干行，取消靠下滑 / 点背景，不另设取消按钮。
+ * Sheet 里的一组动作（HIG Action sheets）：若干 [AppSheetAction] 合成一张圆角卡片，行与行之间是发丝线。
+ * 分隔线就是卡片底色从行间缝隙里露出来，所以按条件增减动作行时不用自己管分隔线。
+ */
+@Composable
+fun AppSheetActionGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    CompositionLocalProvider(LocalSheetActionGrouped provides true) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppSpacing.page)
+                .clip(AppShapes.m)
+                .background(AppTheme.colors.separator),
+            verticalArrangement = Arrangement.spacedBy(0.5.dp),
+            content = content,
+        )
+    }
+}
+
+/**
+ * Sheet 里的一行动作（HIG Action sheets）：整行可点，强调色文字居中；破坏性动作红字。
+ * 放进 [AppSheetActionGroup] 时并入同一张卡片；单独使用时自己是一张圆角卡片。
+ * 取消靠下滑 / 点背景，不另设取消按钮。
  */
 @Composable
 fun AppSheetAction(
@@ -327,14 +353,20 @@ fun AppSheetAction(
     content: @Composable RowScope.() -> Unit,
 ) {
     val c = AppTheme.colors
-    Row(
-        modifier = modifier
+    val container = if (LocalSheetActionGrouped.current) {
+        Modifier.fillMaxWidth()
+    } else {
+        Modifier
             .fillMaxWidth()
             .padding(horizontal = AppSpacing.page, vertical = 2.dp)
             .clip(AppShapes.m)
+    }
+    Row(
+        modifier = modifier
+            .then(container)
             .background(c.secondaryGroupedBackground)
             .clickable(interactionSource = null, indication = LocalIndication.current, enabled = enabled, role = Role.Button, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minHeight = 46.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),

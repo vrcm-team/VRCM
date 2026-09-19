@@ -70,7 +70,7 @@ fun <T> GroupOptionsUI(
             ) {
                 AppMenuItem(
                     text = { AppText(defaultText) },
-                    trailingIcon = { AppText("$total") },
+                    trailingIcon = { AppText("$total", color = AppTheme.colors.secondaryLabel) },
                     onClick = {
                         onOptionsChanged(updateOptions(currentOptions, null))
                         expandGroupMenu = false
@@ -80,7 +80,7 @@ fun <T> GroupOptionsUI(
                 favoriteGroups.forEach { (group, data) ->
                     AppMenuItem(
                         text = { AppText(group.displayName) },
-                        trailingIcon = { AppText("${data.size}/${maxFavoritesPerGroup}") },
+                        trailingIcon = { AppText("${data.size}/${maxFavoritesPerGroup}", color = AppTheme.colors.secondaryLabel) },
                         onClick = {
                             onOptionsChanged(updateOptions(currentOptions, group))
                             expandGroupMenu = false

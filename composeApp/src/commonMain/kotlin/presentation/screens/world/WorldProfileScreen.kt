@@ -1646,28 +1646,30 @@ private fun WorldProfileTopBar(
         sheetState = sheetState,
         onDismissRequest = { bottomSheetIsVisible = false },
     ) {
-        WorldProfileActionSheet(
-            hideSheet = { sheetState.hide() },
-            onHideCompletion = {
-                if (!sheetState.isVisible) bottomSheetIsVisible = false
-            },
-            onManagePersistence = onManagePersistence,
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
-            publicationState = publicationState,
-            onPublicationAction = onPublicationAction,
-            showDelete = showDelete,
-            deleteEnabled = deleteEnabled,
-            isDeleting = isDeleting,
-            isDeleted = isDeleted,
-            onDelete = onDelete,
-            homeWorldActionState = homeWorldActionState,
-            onHomeWorldClick = onHomeWorldClick,
-            canEditImage = canEditImage,
-            onEditImage = onEditImage,
-            canEditMetadata = canEditMetadata,
-            onEditMetadata = onEditMetadata,
-        )
+        AppSheetActionGroup {
+            WorldProfileActionSheet(
+                hideSheet = { sheetState.hide() },
+                onHideCompletion = {
+                    if (!sheetState.isVisible) bottomSheetIsVisible = false
+                },
+                onManagePersistence = onManagePersistence,
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                publicationState = publicationState,
+                onPublicationAction = onPublicationAction,
+                showDelete = showDelete,
+                deleteEnabled = deleteEnabled,
+                isDeleting = isDeleting,
+                isDeleted = isDeleted,
+                onDelete = onDelete,
+                homeWorldActionState = homeWorldActionState,
+                onHomeWorldClick = onHomeWorldClick,
+                canEditImage = canEditImage,
+                onEditImage = onEditImage,
+                canEditMetadata = canEditMetadata,
+                onEditMetadata = onEditMetadata,
+            )
+        }
     }
 }
 

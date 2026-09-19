@@ -16,7 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -79,7 +78,7 @@ fun AppFilterChip(
                 role = Role.Checkbox,
                 onClick = onClick,
             )
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minHeight = 32.dp)
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

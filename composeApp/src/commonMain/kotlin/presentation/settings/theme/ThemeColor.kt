@@ -4,21 +4,6 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AccentSpec
 import io.github.vrcmteam.vrcm.presentation.designsystem.Accents
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppColors
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /**
  * 设置里可选的主题色。[name] 是持久化在设置里的标识，[accent] 是它在设计系统里对应的强调色；
  * 背景、文字等其余语义色不随主题色变化。

@@ -1,10 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.screens.world.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,9 +39,15 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppCheckbox
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppDialogSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroup
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppMenuItem
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppPopUpButton
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppRow
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSectionHeader
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTextField
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
@@ -56,6 +62,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.data.InstanceCreationV
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.validationError
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
+import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 
 internal class CreateInstanceDialog(
     private val groupsState: InstanceCreationGroupsState,
@@ -145,25 +152,20 @@ internal class CreateInstanceDialog(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        SectionLabel(strings.createInstanceStandardAccessType)
-                        STANDARD_ACCESS_TYPES.forEach { accessType ->
-                            AccessTypeItem(
-                                label = accessType.localizedName(strings),
-                                isSelected = accessType == selectedAccessType,
-                                enabled = !isSubmitting,
-                                onClick = { selectedAccessType = accessType },
-                            )
-                        }
-
-                        SectionLabel(strings.createInstanceGroupAccessType)
-                        GROUP_ACCESS_TYPES.forEach { accessType ->
-                            AccessTypeItem(
-                                label = accessType.localizedName(strings),
-                                isSelected = accessType == selectedAccessType,
-                                enabled = groups.isNotEmpty() && !isSubmitting,
-                                onClick = { selectedAccessType = accessType },
-                            )
-                        }
+                        AccessTypeGroup(
+                            title = strings.createInstanceStandardAccessType,
+                            accessTypes = STANDARD_ACCESS_TYPES,
+                            selected = selectedAccessType,
+                            enabled = !isSubmitting,
+                            onSelect = { selectedAccessType = it },
+                        )
+                        AccessTypeGroup(
+                            title = strings.createInstanceGroupAccessType,
+                            accessTypes = GROUP_ACCESS_TYPES,
+                            selected = selectedAccessType,
+                            enabled = groups.isNotEmpty() && !isSubmitting,
+                            onSelect = { selectedAccessType = it },
+                        )
 
                         if (isGroupType) {
                             GroupFields(
@@ -443,45 +445,41 @@ internal class CreateInstanceDialog(
 
     @Composable
     private fun SectionLabel(text: String) {
-        AppText(
-            text = text,
-            style = AppTheme.type.subheadlineEmphasized,
-            color = AppTheme.colors.tint,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        AppSectionHeader(text, modifier = Modifier.fillMaxWidth())
     }
 
+    /** 访问类型是多选一：一张分组卡片，选中的那行尾部打勾。 */
     @Composable
-    private fun AccessTypeItem(
-        label: String,
-        isSelected: Boolean,
+    private fun AccessTypeGroup(
+        title: String,
+        accessTypes: List<AccessType>,
+        selected: AccessType,
         enabled: Boolean,
-        onClick: () -> Unit,
+        onSelect: (AccessType) -> Unit,
     ) {
-        val backgroundColor = if (isSelected) {
-            AppTheme.colors.tintSoft
-        } else {
-            AppTheme.colors.secondaryGroupedBackground
-        }
-        val textColor = if (isSelected) {
-            AppTheme.colors.onTintSoft
-        } else {
-            AppTheme.colors.label
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(AppShapes.s)
-                .background(backgroundColor)
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppText(
-                text = label,
-                style = AppTheme.type.subheadline,
-                color = textColor.copy(alpha = if (enabled) 1f else 0.38f),
-            )
+        Column {
+            SectionLabel(title)
+            AppGroup {
+                accessTypes.forEachIndexed { index, accessType ->
+                    if (index > 0) AppDivider(Modifier.padding(start = AppSpacing.row))
+                    AppRow(
+                        title = accessType.localizedName(strings),
+                        modifier = Modifier.semantics { this.selected = accessType == selected },
+                        enabled = enabled,
+                        onClick = { onSelect(accessType) },
+                        trailing = {
+                            if (accessType == selected) {
+                                AppIcon(
+                                    imageVector = AppIcons.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = AppTheme.colors.tint,
+                                )
+                            }
+                        },
+                    )
+                }
+            }
         }
     }
 

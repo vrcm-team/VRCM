@@ -40,8 +40,8 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppAlert
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroupedItem
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppListItem
@@ -52,6 +52,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppRadioButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
@@ -327,24 +328,22 @@ private fun PlayerModerationLoadedContent(
                     )
                 }
             }
-            AppDivider()
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = AppSpacing.page, vertical = 4.dp),
             ) {
                 itemsIndexed(
                     items = state.visibleRecords,
                     key = { _, item -> item.key },
                 ) { index, item ->
-                    if (index > 0) {
-                        AppDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    AppGroupedItem(index = index, count = state.visibleRecords.size) {
+                        PlayerModerationRecordItem(
+                            record = item.record,
+                            enabled = !state.isLoading && !state.isClearing,
+                            onManage = { onManagePlayer(item.record) },
+                            onClear = { onClearRecord(item.record) },
+                        )
                     }
-                    PlayerModerationRecordItem(
-                        record = item.record,
-                        enabled = !state.isLoading && !state.isClearing,
-                        onManage = { onManagePlayer(item.record) },
-                        onClear = { onClearRecord(item.record) },
-                    )
                 }
             }
         }

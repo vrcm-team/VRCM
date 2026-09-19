@@ -262,46 +262,48 @@ data class UserProfileScreen(
                     .nestedScroll(actionMenuNestedScrollConnection)
                     .verticalScroll(rememberScrollState()),
             ) {
-                SheetItems(
-                    currentUser = currentUser,
-                    userProfileScreenModel = userProfileScreenModel,
-                    hideSheet = { sheetState.hide() },
-                    onHideCompletion = {
-                        if (!sheetState.isVisible) bottomSheetIsVisible = false
-                    },
-                    openAlertDialog = { openAlertDialog = true },
-                    openEditProfileDialog = { openEditProfileDialog = true },
-                    onManageFriendFavorite = { showFriendFavoriteSheet = true },
-                    openEditNoteDialog = { openEditNoteDialog = true },
-                    boopEnabled = userProfileScreenModel.isBoopAllowed,
-                    openBoopDialog = { openBoopDialog = true },
-                    playerChatboxModerationState = playerChatboxModerationState,
-                    playerVoiceModerationState = playerVoiceModerationState,
-                    playerInteractionState = playerInteractionState,
-                    requestPlayerInteractionOverride = { pendingInteractionOverride = it },
-                    retryPlayerInteractionLoad = {
-                        userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
-                    },
-                    playerBlockState = playerBlockState,
-                    retryPlayerBlockStatus = {
-                        userProfileScreenModel.refreshPlayerBlockStatus(
-                            localeStrings.profileBlockStatusLoadFailed
-                        )
-                    },
-                    confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
-                    openReportDialog = {
-                        userProfileScreenModel.resetUserReportState()
-                        openReportDialog = true
-                    },
-                    openImageInvitePicker = openImageInvitePicker,
-                    openInviteMessageSelection = { action ->
-                        userProfileScreenModel.openInviteMessageSelection(
-                            action = action,
-                            targetUserId = currentUser.id,
-                            targetDisplayName = currentUser.displayName,
-                        )
-                    },
-                )
+                AppSheetActionGroup {
+                    SheetItems(
+                        currentUser = currentUser,
+                        userProfileScreenModel = userProfileScreenModel,
+                        hideSheet = { sheetState.hide() },
+                        onHideCompletion = {
+                            if (!sheetState.isVisible) bottomSheetIsVisible = false
+                        },
+                        openAlertDialog = { openAlertDialog = true },
+                        openEditProfileDialog = { openEditProfileDialog = true },
+                        onManageFriendFavorite = { showFriendFavoriteSheet = true },
+                        openEditNoteDialog = { openEditNoteDialog = true },
+                        boopEnabled = userProfileScreenModel.isBoopAllowed,
+                        openBoopDialog = { openBoopDialog = true },
+                        playerChatboxModerationState = playerChatboxModerationState,
+                        playerVoiceModerationState = playerVoiceModerationState,
+                        playerInteractionState = playerInteractionState,
+                        requestPlayerInteractionOverride = { pendingInteractionOverride = it },
+                        retryPlayerInteractionLoad = {
+                            userProfileScreenModel.refreshPlayerInteractionStatus(interactionLoadFailedMessage)
+                        },
+                        playerBlockState = playerBlockState,
+                        retryPlayerBlockStatus = {
+                            userProfileScreenModel.refreshPlayerBlockStatus(
+                                localeStrings.profileBlockStatusLoadFailed
+                            )
+                        },
+                        confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
+                        openReportDialog = {
+                            userProfileScreenModel.resetUserReportState()
+                            openReportDialog = true
+                        },
+                        openImageInvitePicker = openImageInvitePicker,
+                        openInviteMessageSelection = { action ->
+                            userProfileScreenModel.openInviteMessageSelection(
+                                action = action,
+                                targetUserId = currentUser.id,
+                                targetDisplayName = currentUser.displayName,
+                            )
+                        },
+                    )
+                }
             }
         }
         // Friend FavoriteType group management bottom sheet
@@ -1525,7 +1527,8 @@ private fun <T> StackedLocationCardList(
                     AppText(
                         text = subtitle(firstItem),
                         style = AppTheme.type.caption1,
-                        maxLines = 3,
+                        // 堆叠时右下角有"+N"角标，少排一行给它让位
+                        maxLines = if (items.size > 1) 2 else 3,
                         overflow = TextOverflow.Ellipsis,
                         color = AppTheme.colors.secondaryLabel
                     )
@@ -1559,14 +1562,14 @@ private fun <T> StackedLocationCardList(
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 12.dp, end = 16.dp)
                     .background(
-                        color = AppTheme.colors.secondaryTint.copy(alpha = 0.8f),
-                        shape = CircleShape
+                        color = AppTheme.colors.tint,
+                        shape = AppShapes.capsule
                     )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 AppText(
                     text = "+${items.size - 1}",
-                    color = AppTheme.colors.onSecondaryTint,
+                    color = AppTheme.colors.onTint,
                     style = AppTheme.type.caption1Emphasized
                 )
             }

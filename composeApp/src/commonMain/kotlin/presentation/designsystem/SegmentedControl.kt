@@ -30,7 +30,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -89,7 +88,7 @@ fun AppSegmentedControl(
                     .clip(CircleShape)
                     .semantics { this.selected = selected }
                     .clickable(interactionSource = null, indication = null, enabled = segmentIsEnabled, role = Role.Tab) { onSelect(index) }
-                    .alpha(if (segmentIsEnabled) 1f else 0.4f)
+                    .enabledAlpha(segmentIsEnabled)
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -144,7 +143,7 @@ fun RowScope.AppSegment(
             .background(container)
             .semantics { this.selected = selected }
             .clickable(interactionSource = null, indication = null, enabled = enabled, role = Role.Tab, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -212,7 +211,7 @@ fun AppTab(
             .then(if (scrollable) Modifier.background(if (selected) c.tint else c.fill) else Modifier)
             .semantics { this.selected = selected }
             .clickable(interactionSource = null, indication = null, enabled = enabled, role = Role.Tab, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minWidth = 44.dp)
             .padding(horizontal = if (scrollable) 14.dp else 8.dp),
         contentAlignment = Alignment.Center,

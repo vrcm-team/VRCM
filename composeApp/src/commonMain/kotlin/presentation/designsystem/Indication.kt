@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.invalidateDraw
@@ -62,3 +63,12 @@ private class PressHighlightNode(
         }
     }
 }
+
+/** 禁用态控件的整体透明度。 */
+private const val DisabledAlpha = 0.4f
+
+/**
+ * 禁用态压暗。始终挂一个图层、只改它的 alpha，而不是用 `Modifier.alpha(…)`：alpha 为 1 时后者会整个省掉，
+ * 启用 / 禁用一切换修饰符链的结构就变了，链上的 haze 玻璃节点会被重建、且等不到下一次位置回调，玻璃面就不画了。
+ */
+fun Modifier.enabledAlpha(enabled: Boolean): Modifier = graphicsLayer { alpha = if (enabled) 1f else DisabledAlpha }

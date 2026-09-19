@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -130,7 +129,7 @@ fun AppButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minWidth = size.minHeight, minHeight = if (inNavBar) AppSize.glassButton else size.minHeight)
             .padding(contentPadding),
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
@@ -186,7 +185,7 @@ private fun AlertActionButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .alpha(if (enabled) 1f else 0.4f)
+            .enabledAlpha(enabled)
             .defaultMinSize(minHeight = 44.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
@@ -239,7 +238,7 @@ fun AppIconButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .alpha(if (enabled) 1f else 0.4f),
+            .enabledAlpha(enabled),
         contentAlignment = Alignment.Center,
     ) {
         if (glass) {
@@ -278,7 +277,7 @@ fun AppIconToggleButton(
                 role = Role.Checkbox,
                 onValueChange = onCheckedChange,
             )
-            .alpha(if (enabled) 1f else 0.4f),
+            .enabledAlpha(enabled),
         contentAlignment = Alignment.Center,
     ) {
         ProvideContentColor(if (checked) c.onTint else c.label, content = content)
@@ -311,7 +310,7 @@ fun AppFloatingActionButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .alpha(if (enabled) 1f else 0.4f),
+            .enabledAlpha(enabled),
         contentAlignment = Alignment.Center,
     ) {
         ProvideContentColor(contentColor, content = content)

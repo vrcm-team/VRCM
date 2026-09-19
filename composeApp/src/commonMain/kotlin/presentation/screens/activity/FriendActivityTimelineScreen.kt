@@ -276,7 +276,7 @@ private fun ActivityTimelineList(
                                 bottom = 2.dp,
                             ),
                             style = AppTheme.type.subheadlineEmphasized,
-                            color = AppTheme.colors.tint,
+                            color = AppTheme.colors.secondaryLabel,
                         )
                     }
                     itemsIndexed(dateEvents, key = { _, event -> event.id }) { _, event ->
