@@ -52,7 +52,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -87,8 +86,6 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupPost
 import io.github.vrcmteam.vrcm.network.api.groups.data.Role
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
-import io.github.vrcmteam.vrcm.network.api.attributes.IUser
-import io.github.vrcmteam.vrcm.network.api.attributes.UserStatus
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
@@ -917,10 +914,11 @@ private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = fals
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = 4000.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = AppSpacing.page),
     ) {
         renderUserItems(
             users = users,
+            grouped = true,
             onUserClick = { user, sharedSuffixKey ->
                 currentNavigator push UserProfileScreen(
                     userProfileVO = UserProfileVo(user),

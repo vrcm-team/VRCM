@@ -324,7 +324,6 @@ private fun PublicSearchPage(
             top = 8.dp,
             bottom = bottomContentPadding,
         ),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (advancedOptionsContent != null) {
             item(key = "public-search-advanced-options") {

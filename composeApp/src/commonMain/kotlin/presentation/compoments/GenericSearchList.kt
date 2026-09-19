@@ -9,12 +9,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -150,8 +148,12 @@ fun GenericSearchList(
     }
 }
 
+/** 列表行前导内容（头像 / 缩略图 / 图标）的边长；分隔线按它内缩，所以各处的前导内容都用这个尺寸。 */
+val SearchResultLeadingSize = 48.dp
+
 /**
- * 用于显示搜索结果列表项的组件
+ * 列表里的一行，照 iOS「信息」的列表：通栏、没有卡片底，按压时整行压暗；
+ * 行与行之间是一条从标题起、一直到屏幕边的发丝线。放进分组卡片等自带分隔线的容器时关掉 [showDivider]。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -161,6 +163,7 @@ fun <T> SearchResultItem(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     onLongClick: ((T) -> Unit)? = null,
+    showDivider: Boolean = true,
     leadingContent: @Composable () -> Unit,
     headlineContent: @Composable () -> Unit,
     supportingContent: @Composable (() -> Unit)? = null,
@@ -175,20 +178,21 @@ fun <T> SearchResultItem(
             onLongClick = { onLongClick(item) },
         )
     }
-    // 列表页是分组底色：每一项是一张白色卡片行，左右与页面边距对齐
-    AppListItem(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 68.dp)
-            .padding(horizontal = AppSpacing.page)
-            .clip(AppShapes.l)
-            .then(interactionModifier),
-        containerColor = AppTheme.colors.secondaryGroupedBackground,
-        leadingContent = leadingContent,
-        headlineContent = headlineContent,
-        supportingContent = supportingContent ?: {},
-        trailingContent = trailingContent ?: {}
-    )
+    Column(modifier.fillMaxWidth()) {
+        AppListItem(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 68.dp)
+                .then(interactionModifier),
+            leadingContent = leadingContent,
+            headlineContent = headlineContent,
+            supportingContent = supportingContent ?: {},
+            trailingContent = trailingContent ?: {}
+        )
+        if (showDivider) {
+            AppDivider(Modifier.padding(start = appRowDividerInset(SearchResultLeadingSize)))
+        }
+    }
 }
 
 /**

@@ -103,10 +103,12 @@ fun FriendsDirectoryContent(
             modifier = Modifier.fillMaxSize(),
             state = listState,
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             item(key = "friend-directory-controls") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     SearchTextField(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         value = searchText,

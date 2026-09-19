@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.favorites
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
+import io.github.vrcmteam.vrcm.presentation.compoments.contentTopInsetPadding
 import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableGroupItems
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
@@ -106,7 +106,7 @@ internal fun MyGroupsContent(
         onBack = model::exitGroupSelectionMode,
     )
 
-    Column(modifier) {
+    Column(modifier.contentTopInsetPadding()) {
         SearchTextField(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             value = state.searchText,
@@ -131,7 +131,6 @@ internal fun MyGroupsContent(
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (removalState.selectionMode) {
                     renderSelectableGroupItems(

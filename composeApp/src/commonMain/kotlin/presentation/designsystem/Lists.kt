@@ -192,8 +192,14 @@ fun AppListItem(
 private val RowContentGap = 12.dp
 private val RowIconSize = 29.dp
 
-/** 带 [AppRowIcon] 的行之间的分隔线起点：行内边距 + 图标方块 + 图标与标题的间隔（分隔线从标题起）。 */
-val AppRowIconDividerInset: Dp = AppSpacing.row + RowIconSize + RowContentGap
+/**
+ * 带前导内容（头像、缩略图、图标）的行，分隔线从标题起而不是从行首起：
+ * 行内边距 + 前导内容的宽度 + 前导与标题的间隔。
+ */
+fun appRowDividerInset(leadingSize: Dp): Dp = AppSpacing.row + leadingSize + RowContentGap
+
+/** 带 [AppRowIcon] 的行之间的分隔线起点。 */
+val AppRowIconDividerInset: Dp = appRowDividerInset(RowIconSize)
 
 /** [AppRowIcon] 的底色：按功能类别挑一个，同一组里尽量不重复。 */
 object AppRowIconColor {

@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -172,8 +173,10 @@ object RecentWorldsScreen : AppDetailRoute {
         }
 
         AppScaffold(
+            containerColor = AppTheme.colors.systemBackground,
             topBar = {
                 AppNavBar(
+                    edgeColor = AppTheme.colors.systemBackground,
                     title = {
                         AppText(
                             text = strings.recentWorldsTitle,
@@ -222,8 +225,7 @@ object RecentWorldsScreen : AppDetailRoute {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(paddingValues),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     items(model.worlds, key = { it.id }) { world ->
                         RecentWorldItem(world) { sharedImageCacheKey ->
@@ -269,21 +271,21 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
     val sharedImageCacheKey = (world.thumbnailImageUrl ?: world.imageUrl)
         .orEmpty()
         .ifBlank { null }
-    AppCard(
+    // iOS「信息」那种列表行：通栏、没有卡片底，行间是一条从文字起的发丝线
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick(sharedImageCacheKey) },
-        shape = AppShapes.l,
-        color = AppTheme.colors.secondaryGroupedBackground) {
+    ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = AppSpacing.row, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(RecentWorldThumbnailGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (world.id == "???") {
                 Box(
                     modifier = Modifier
-                        .size(80.dp, 45.dp)
+                        .size(RecentWorldThumbnailSize)
                         .clip(AppShapes.s)
                         .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
@@ -303,24 +305,28 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .sharedBoundsBy("${world.id}WorldImage")
-                        .size(80.dp, 45.dp)
+                        .size(RecentWorldThumbnailSize)
                         .clip(AppShapes.s),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 AppText(
                     text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
-                    style = AppTheme.type.subheadline,
+                    style = AppTheme.type.body,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 AppText(
                     text = if (world.id == "???") strings.hiddenWorld else world.authorName,
-                    style = AppTheme.type.caption2Emphasized,
+                    style = AppTheme.type.footnote,
                     color = AppTheme.colors.secondaryLabel,
                     maxLines = 1,
                 )
             }
         }
+        AppDivider(Modifier.padding(start = AppSpacing.row + RecentWorldThumbnailSize.width + RecentWorldThumbnailGap))
     }
 }
+
+private val RecentWorldThumbnailSize = DpSize(80.dp, 45.dp)
+private val RecentWorldThumbnailGap = 12.dp

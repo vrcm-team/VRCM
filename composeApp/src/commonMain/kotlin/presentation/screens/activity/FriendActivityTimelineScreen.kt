@@ -31,16 +31,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
@@ -76,8 +77,10 @@ object FriendActivityTimelineScreen : AppDetailRoute {
         val filter by model.filter.collectAsState()
 
         AppScaffold(
+            containerColor = AppTheme.colors.systemBackground,
             topBar = {
                 AppNavBar(
+                    edgeColor = AppTheme.colors.systemBackground,
                     title = { AppText(strings.friendActivityTimelineTitle) },
                     navigationIcon = {
                         AppIconButton(onClick = { navigator.pop() }) {
@@ -216,8 +219,7 @@ private fun ActivityTimelineList(
         contentPadding = PaddingValues(
             top = if (includeControls) 0.dp else 16.dp,
             bottom = 16.dp + bottomNavigationPadding,
-        ),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        ).withContentTopInset(),
     ) {
         if (headerContent != null) {
             item(key = "activity-header") {
@@ -271,9 +273,9 @@ private fun ActivityTimelineList(
                             text = date,
                             modifier = Modifier.padding(
                                 start = 16.dp,
-                                top = 8.dp,
+                                top = 16.dp,
                                 end = 16.dp,
-                                bottom = 2.dp,
+                                bottom = 6.dp,
                             ),
                             style = AppTheme.type.subheadlineEmphasized,
                             color = AppTheme.colors.secondaryLabel,
@@ -288,7 +290,6 @@ private fun ActivityTimelineList(
                             } else {
                                 null
                             },
-                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
                 }
@@ -375,21 +376,18 @@ private fun FriendTimelineEvent(
     onWorldClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    AppSurface(
-        modifier = modifier.fillMaxWidth(),
-        shape = AppShapes.m,
-        color = AppTheme.colors.secondaryGroupedBackground,
-    ) {
+    // iOS「信息」那种列表行：通栏、没有卡片底，行间是一条从文字起的发丝线
+    Column(modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = AppSpacing.row, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(TimelineAvatarGap),
             verticalAlignment = Alignment.Top,
         ) {
             AImage(
                 imageData = event.profileImageUrl,
                 contentDescription = event.displayName,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(TimelineAvatarSize)
                     .clip(CircleShape)
                     .clickable(onClick = onUserClick),
             )
@@ -408,8 +406,12 @@ private fun FriendTimelineEvent(
                 )
             }
         }
+        AppDivider(Modifier.padding(start = AppSpacing.row + TimelineAvatarSize + TimelineAvatarGap))
     }
 }
+
+private val TimelineAvatarSize = 44.dp
+private val TimelineAvatarGap = 12.dp
 
 @Composable
 internal fun FriendActivityTimelineFilter.label(): String = when (this) {

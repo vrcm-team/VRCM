@@ -10,6 +10,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.PublicSearchContent
@@ -23,8 +24,10 @@ object GlobalSearchScreen : AppRoute {
     override fun Content() {
         val navigator = currentNavigator
         AppScaffold(
+            containerColor = AppTheme.colors.systemBackground,
             topBar = {
                 AppNavBar(
+                    edgeColor = AppTheme.colors.systemBackground,
                     title = { AppText(strings.fiendListPagerSearch) },
                     navigationIcon = {
                         AppIconButton(onClick = navigator::pop) {

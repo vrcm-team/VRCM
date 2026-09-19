@@ -19,6 +19,8 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsFlowRow
 import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
+import io.github.vrcmteam.vrcm.presentation.compoments.expandedContentTopInset
+import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.animateScrollToFirst
@@ -136,7 +138,8 @@ fun Pager.FriendLocationPager(
         )
     }
     RefreshBox(
-        refreshContainerOffsetY = topPadding,
+        // 下拉刷新时顶栏一定是露着的：指示器让到它下面
+        refreshContainerOffsetY = topPadding + expandedContentTopInset(),
         isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
@@ -158,7 +161,7 @@ fun Pager.FriendLocationPager(
             contentPadding = PaddingValues(
                 top = topPadding,
                 bottom = bottomPadding
-            )
+            ).withContentTopInset()
         ) {
 
             if (headerContent != null) {

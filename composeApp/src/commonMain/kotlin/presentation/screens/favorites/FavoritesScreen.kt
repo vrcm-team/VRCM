@@ -1,6 +1,5 @@
 package io.github.vrcmteam.vrcm.presentation.screens.favorites
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,12 +39,14 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
 import io.github.vrcmteam.vrcm.presentation.compoments.animateScrollToTab
+import io.github.vrcmteam.vrcm.presentation.compoments.contentTopInsetPadding
 import io.github.vrcmteam.vrcm.presentation.compoments.isHiddenWorld
 import io.github.vrcmteam.vrcm.presentation.compoments.renderAvatarItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableAvatarItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderWorldItems
 import io.github.vrcmteam.vrcm.presentation.compoments.safeImageUrl
+import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
@@ -133,13 +135,14 @@ internal fun FavoritesHubContent(
     groupsModel: FavoritesGroupsModel,
     contentBottomPadding: Dp,
     modifier: Modifier = Modifier,
-) {
-    val favoriteLocale = strings
-    val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(
+    pagerState: PagerState = rememberPagerState(
         initialPage = selectedTab.ordinal,
         pageCount = { FavoritesTab.entries.size },
-    )
+    ),
+    // 主页把标签条放进自己的顶部容器里（见 [FavoritesHubTabRow]），这里就不再画
+    showTabRow: Boolean = true,
+) {
+    val favoriteLocale = strings
     val worldListState = rememberLazyListState()
     val avatarListState = rememberLazyListState()
     val groupListState = rememberLazyListState()
@@ -186,22 +189,7 @@ internal fun FavoritesHubContent(
     }
 
     Column(modifier.fillMaxSize()) {
-        AppTabRow(selectedTabIndex = pagerState.currentPage) {
-            FavoritesTab.entries.forEachIndexed { index, tab ->
-                AppTab(
-                    selected = index == pagerState.currentPage,
-                    onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
-                    text = {
-                        AppText(
-                            text = tab.title(),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
-                    },
-                )
-            }
-        }
+        if (showTabRow) FavoritesHubTabRow(pagerState)
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -209,7 +197,7 @@ internal fun FavoritesHubContent(
         ) { page ->
             when (FavoritesTab.entries[page]) {
                 FavoritesTab.Player -> FriendsDirectoryContent(
-                    contentPadding = PaddingValues(top = 12.dp, bottom = contentBottomPadding),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = contentBottomPadding).withContentTopInset(),
                     showFavoriteGroupDialogs = false,
                     model = favoritesModel,
                 )
@@ -248,6 +236,28 @@ internal fun FavoritesHubContent(
         onClearFailure = favoritesModel::clearFavoriteGroupEditFailure,
         onSave = favoritesModel::saveFavoriteGroup,
     )
+}
+
+/** 收藏页的标签条：玩家 / 世界 / 模型 / 群组。 */
+@Composable
+internal fun FavoritesHubTabRow(pagerState: PagerState, modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    AppTabRow(selectedTabIndex = pagerState.currentPage, modifier = modifier) {
+        FavoritesTab.entries.forEachIndexed { index, tab ->
+            AppTab(
+                selected = index == pagerState.currentPage,
+                onClick = { scope.launch { pagerState.animateScrollToTab(index) } },
+                text = {
+                    AppText(
+                        text = tab.title(),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                },
+            )
+        }
+    }
 }
 
 @Composable
@@ -300,7 +310,7 @@ private fun FavoriteWorldsContent(
         onBack = { model.exitFavoriteSelectionMode(FavoriteType.World) },
     )
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().contentTopInsetPadding()) {
         SearchTextField(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             value = searchText,
@@ -343,7 +353,6 @@ private fun FavoriteWorldsContent(
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (displayedFavoriteWorlds.isNotEmpty()) {
                     item(key = "favorite-worlds-heading") { LibrarySectionHeader(strings.userFavoritedWorlds) }
@@ -471,7 +480,7 @@ private fun FavoriteAvatarsContent(
         onBack = { model.exitFavoriteSelectionMode(FavoriteType.Avatar) },
     )
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().contentTopInsetPadding()) {
         SearchTextField(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             value = searchText,
@@ -514,7 +523,6 @@ private fun FavoriteAvatarsContent(
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
                 contentPadding = PaddingValues(bottom = contentBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (displayedFavoriteAvatars.isNotEmpty()) {
                     item(key = "favorite-avatars-heading") { LibrarySectionHeader(strings.userFavoritedAvatars) }

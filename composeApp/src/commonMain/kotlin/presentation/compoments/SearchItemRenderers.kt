@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -25,10 +26,12 @@ import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppCheckbox
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppGroupedItem
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.appRowDividerInset
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.rememberContainerTransformToken
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
@@ -41,10 +44,31 @@ import io.github.vrcmteam.vrcm.service.platformPackages
 fun LazyListScope.renderUserItems(
     users: List<IUser>,
     onUserLongClick: ((IUser) -> Unit)? = null,
+    grouped: Boolean = false,
     onUserClick: (IUser, String) -> Unit
 ) {
-    items(users, key = { it.id }) { user ->
-        renderUserItem(user, onUserLongClick, onUserClick)
+    if (!grouped) {
+        items(users, key = { it.id }) { user ->
+            renderUserItem(user, onUserLongClick, onUserClick)
+        }
+        return
+    }
+    // 放在分组灰底的页面里（群组成员）：整个列表拼成一张白色分组卡片，分隔线由卡片画
+    itemsIndexed(users, key = { _, user -> user.id }) { index, user ->
+        AppGroupedItem(
+            index = index,
+            count = users.size,
+            modifier = Modifier.animateItem(),
+            dividerInset = appRowDividerInset(SearchResultLeadingSize),
+        ) {
+            renderUserItem(
+                user = user,
+                onUserLongClick = onUserLongClick,
+                onUserClick = onUserClick,
+                modifier = Modifier,
+                showDivider = false,
+            )
+        }
     }
 }
 
@@ -75,6 +99,8 @@ fun LazyItemScope.renderUserItem(
     onUserClick: (IUser, String) -> Unit,
     selected: Boolean? = null,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier.animateItem(),
+    showDivider: Boolean = true,
 ) {
     val sharedSuffixKey = rememberContainerTransformToken("user:${user.id}")
         ?: LocalSharedSuffixKey.current
@@ -82,14 +108,15 @@ fun LazyItemScope.renderUserItem(
         item = user,
         onClick = { onUserClick(it, sharedSuffixKey) },
         onLongClick = onUserLongClick,
-        modifier = Modifier.animateItem(),
+        modifier = modifier,
         enabled = enabled,
+        showDivider = showDivider,
         leadingContent = {
             UserStateIcon(
                 modifier = Modifier.sharedBoundsBy(
                     key = "${user.id}UserIcon",
                     suffixKey = sharedSuffixKey,
-                ).size(48.dp),
+                ).size(SearchResultLeadingSize),
                 iconUrl = user.iconUrl,
             )
         },
@@ -207,7 +234,7 @@ fun LazyItemScope.renderWorldItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
+                    ).size(SearchResultLeadingSize)
                         .clip(AppShapes.m)
                         .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
@@ -224,7 +251,7 @@ fun LazyItemScope.renderWorldItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${world.id}WorldImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
+                    ).size(SearchResultLeadingSize)
                         .clip(AppShapes.m),
                     imageData = world.safeImageUrl(),
                 )
@@ -338,7 +365,7 @@ fun LazyItemScope.renderAvatarItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
+                    ).size(SearchResultLeadingSize)
                         .clip(AppShapes.m)
                         .background(AppTheme.colors.fill),
                     contentAlignment = Alignment.Center
@@ -355,7 +382,7 @@ fun LazyItemScope.renderAvatarItem(
                     modifier = Modifier.sharedBoundsBy(
                         key = "${avatar.id}AvatarImage",
                         suffixKey = sharedSuffixKey,
-                    ).size(48.dp)
+                    ).size(SearchResultLeadingSize)
                         .clip(AppShapes.m),
                     imageData = avatar.thumbnailImageUrl,
                 )
@@ -476,7 +503,7 @@ fun LazyItemScope.renderGroupItem(
                     key = "${group.id}GroupIcon",
                     suffixKey = sharedSuffixKey,
                 ),
-                size = 48.dp
+                size = SearchResultLeadingSize
             )
         },
         headlineContent = {

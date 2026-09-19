@@ -2,6 +2,8 @@ package io.github.vrcmteam.vrcm.presentation.screens.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -16,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -26,6 +30,8 @@ import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.animations.DefaultBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.animations.IconBoundsTransform
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.presentation.compoments.ContentTopInset
+import io.github.vrcmteam.vrcm.presentation.compoments.LocalContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
@@ -36,6 +42,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubContent
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTabRow
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTopBarActions
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
@@ -62,6 +69,7 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -137,24 +145,83 @@ object HomeScreen : AppListRoute {
         }
         HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
 
+        // 顶栏 / 底栏随列表滚动收起；换页面、换标签或点标签回到顶部时放出来，否则没有栏可点
+        val barsState = remember { HomeBarsScrollState() }
+        val barsConnection = rememberHomeBarsNestedScrollConnection(barsState)
+        LaunchedEffect(
+            barsConnection,
+            selectedDestination,
+            model.selectedHomeTabIndex,
+            model.selectedFavoritesTabIndex,
+        ) {
+            barsConnection.show()
+        }
+        LaunchedEffect(barsConnection) {
+            SharedFlowCentre.toPagerTop.collect { barsConnection.show() }
+        }
+
+        // 标签条在顶部容器里、页面在内容区里，两边共用的分页状态提到它们之上
+        val homePagerState = rememberPagerState(
+            initialPage = model.selectedHomeTabIndex,
+            pageCount = { HomeTab.entries.size },
+        )
+        var activityFilterIndex by rememberSaveable {
+            mutableIntStateOf(FriendActivityTimelineFilter.All.ordinal)
+        }
+        val activityFilter = FriendActivityTimelineFilter.entries.getOrElse(activityFilterIndex) {
+            FriendActivityTimelineFilter.All
+        }
+        val favoritesPagerState = rememberPagerState(
+            initialPage = model.selectedFavoritesTabIndex,
+            pageCount = { FavoritesTab.entries.size },
+        )
+
+        // 收藏、动态是通栏列表（iOS 信息那种），用系统背景色；位置、通知是卡片，用分组灰底
+        val showsPlainList = selectedDestination == HomeDestination.Favorites ||
+            (selectedDestination == HomeDestination.Home && model.selectedHomeTabIndex == HomeTab.Activity.ordinal)
+        val pageColor by animateColorAsState(
+            targetValue = if (showsPlainList) AppTheme.colors.systemBackground else AppTheme.colors.groupedBackground,
+            animationSpec = tween(AppTheme.motion.normalMs),
+        )
         HomePersonalDrawer(
             model = model,
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
         ) {
             AppScaffold(
+                containerColor = pageColor,
                 topBar = {
                     if (showMainNavigation) {
-                        HomeIdentityTopBar(model = model) {
-                            when (selectedDestination) {
-                                HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
-                                HomeDestination.Favorites -> FavoritesHubTopBarActions(
-                                    selectedTab = selectedFavoritesTab,
-                                    favoritesModel = requireNotNull(friendListModel),
-                                    groupsModel = requireNotNull(groupsModel),
-                                    onSearch = { navigator push GlobalSearchScreen },
-                                )
-                                else -> Unit
+                        // 顶部容器 = 身份栏 + 当前页面的标签条：一整块模糊玻璃，内容从它下面滚过；随滚动整体收起
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .collapseUpwardWith(barsState)
+                                .glassBar(pageColor),
+                        ) {
+                            Column(Modifier.fadeOutWith(barsState)) {
+                                HomeIdentityTopBar(model = model) {
+                                    when (selectedDestination) {
+                                        HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
+                                        HomeDestination.Favorites -> FavoritesHubTopBarActions(
+                                            selectedTab = selectedFavoritesTab,
+                                            favoritesModel = requireNotNull(friendListModel),
+                                            groupsModel = requireNotNull(groupsModel),
+                                            onSearch = { navigator push GlobalSearchScreen },
+                                        )
+                                        else -> Unit
+                                    }
+                                }
+                                when (selectedDestination) {
+                                    HomeDestination.Home -> HomeTabRow(
+                                        pagerState = homePagerState,
+                                        activityFilter = activityFilter,
+                                        onActivityFilterSelected = { activityFilterIndex = it.ordinal },
+                                        onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
+                                    )
+                                    HomeDestination.Favorites -> FavoritesHubTabRow(favoritesPagerState)
+                                    HomeDestination.Notifications -> Unit
+                                }
                             }
                         }
                     }
@@ -165,13 +232,28 @@ object HomeScreen : AppListRoute {
                             selected = selectedDestination,
                             hasUnread = notificationModel.hasUnread,
                             onSelect = onDestinationSelected,
+                            modifier = Modifier.slideOutDownwardWith(barsState),
                         )
                     }
                 },
             ) { contentPadding ->
+                // 顶部容器能收起的只有状态栏以下的那一段；内容铺在它下面，列表自己把它盖住的高度让出来
+                val expandedTop = contentPadding.calculateTopPadding()
+                val statusBarTop = getInsetPadding(WindowInsets::getTop)
+                val (expandedTopPx, collapseRangePx) = with(LocalDensity.current) {
+                    expandedTop.roundToPx() to (expandedTop - statusBarTop).toPx()
+                }
+                SideEffect { barsState.updateCollapseRange(collapseRangePx) }
+                val currentExpandedTopPx by rememberUpdatedState(expandedTopPx)
+                val contentTopInset = remember(barsState) {
+                    ContentTopInset(
+                        current = { currentExpandedTopPx - barsState.collapsed.roundToInt() },
+                        expanded = { currentExpandedTopPx },
+                    )
+                }
                 AppSurface(
                     modifier = Modifier.fillMaxSize(),
-                    color = AppTheme.colors.groupedBackground,
+                    color = pageColor,
                 ) {
                     Row {
                         if (useRail && showMainNavigation) {
@@ -185,26 +267,32 @@ object HomeScreen : AppListRoute {
                             Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .padding(top = contentPadding.calculateTopPadding()),
+                                .nestedScroll(barsConnection),
                         ) {
-                            stateHolder.SaveableStateProvider(selectedDestination.name) {
-                                when (selectedDestination) {
-                                    HomeDestination.Home -> HomeDestinationContent(
-                                        model,
-                                        hasBottomNavigation = !useRail && showMainNavigation,
-                                    )
-                                    HomeDestination.Favorites -> FavoritesHubContent(
-                                        selectedTab = selectedFavoritesTab,
-                                        onSelectedTab = model::selectFavoritesTab,
-                                        favoritesModel = requireNotNull(friendListModel),
-                                        groupsModel = requireNotNull(groupsModel),
-                                        contentBottomPadding = getInsetPadding(12, WindowInsets::getBottom) +
-                                            if (!useRail && showMainNavigation) 80.dp else 0.dp,
-                                    )
-                                    HomeDestination.Notifications -> NotificationCenterContent(
-                                        bottomNavigationPadding = if (!useRail && showMainNavigation) 80.dp else 0.dp,
-                                        showTopBar = false,
-                                    )
+                            CompositionLocalProvider(LocalContentTopInset provides contentTopInset) {
+                                stateHolder.SaveableStateProvider(selectedDestination.name) {
+                                    when (selectedDestination) {
+                                        HomeDestination.Home -> HomeDestinationContent(
+                                            model = model,
+                                            pagerState = homePagerState,
+                                            activityFilter = activityFilter,
+                                            hasBottomNavigation = !useRail && showMainNavigation,
+                                        )
+                                        HomeDestination.Favorites -> FavoritesHubContent(
+                                            selectedTab = selectedFavoritesTab,
+                                            onSelectedTab = model::selectFavoritesTab,
+                                            favoritesModel = requireNotNull(friendListModel),
+                                            groupsModel = requireNotNull(groupsModel),
+                                            contentBottomPadding = getInsetPadding(12, WindowInsets::getBottom) +
+                                                if (!useRail && showMainNavigation) 80.dp else 0.dp,
+                                            pagerState = favoritesPagerState,
+                                            showTabRow = false,
+                                        )
+                                        HomeDestination.Notifications -> NotificationCenterContent(
+                                            bottomNavigationPadding = if (!useRail && showMainNavigation) 80.dp else 0.dp,
+                                            showTopBar = false,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -219,21 +307,12 @@ object HomeScreen : AppListRoute {
 @Composable
 private fun HomeDestinationContent(
     model: HomeScreenModel,
+    pagerState: PagerState,
+    activityFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
     val stateHolder = rememberSaveableStateHolder()
-    val scope = rememberCoroutineScope()
     var activityActivated by rememberSaveable { mutableStateOf(false) }
-    var activityFilterIndex by rememberSaveable {
-        mutableIntStateOf(FriendActivityTimelineFilter.All.ordinal)
-    }
-    val activityFilter = FriendActivityTimelineFilter.entries.getOrElse(activityFilterIndex) {
-        FriendActivityTimelineFilter.All
-    }
-    val pagerState = rememberPagerState(
-        initialPage = model.selectedHomeTabIndex,
-        pageCount = { HomeTab.entries.size },
-    )
 
     LaunchedEffect(pagerState, model) {
         snapshotFlow { pagerState.settledPage }
@@ -243,13 +322,8 @@ private fun HomeDestinationContent(
                 if (page == HomeTab.Activity.ordinal) activityActivated = true
             }
     }
+    // 标签条在骨架的顶部容器里；这里只有页面
     Column(Modifier.fillMaxSize()) {
-        HomeTabRow(
-            pagerState = pagerState,
-            activityFilter = activityFilter,
-            onActivityFilterSelected = { activityFilterIndex = it.ordinal },
-            onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
-        )
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -433,11 +507,11 @@ private fun ActivityTimelinePreview() {
 @Composable
 private fun HomeIdentityTopBar(
     model: HomeScreenModel,
+    modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(
-        Modifier.fillMaxWidth()
-            .scrollEdgeEffect()
+        modifier.fillMaxWidth()
             .padding(top = getInsetPadding(WindowInsets::getTop))
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -642,10 +716,11 @@ private fun MainNavigationBar(
     selected: HomeDestination,
     hasUnread: Boolean,
     onSelect: (HomeDestination) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
         contentAlignment = Alignment.Center,

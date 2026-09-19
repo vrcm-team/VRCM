@@ -184,6 +184,32 @@ fun Modifier.glassFlat(
 }
 
 /**
+ * 通栏容器（悬浮在内容之上的顶栏）的材质：整块均匀的高斯模糊，叠一层半透明的页面底色；
+ * 内容从下面滚过时透出模糊的影子，停在顶上时看起来就是页面底色。
+ * 拿不到内容层、平台不能模糊或开了「降低透明度」时退化为不透明的页面底色。
+ */
+@Composable
+fun Modifier.glassBar(
+    color: Color = AppTheme.colors.groupedBackground,
+    backdrop: GlassBackdrop? = LocalGlassBackdrop.current,
+): Modifier {
+    val spec = rememberGlassSpec(backdropAvailable = backdrop != null)
+    if (!spec.blurEnabled || backdrop == null) return this.drawBehind { drawRect(color) }
+    val hazeStyle = remember(color, spec.blurRadius) {
+        HazeStyle(
+            backgroundColor = color,
+            tints = listOf(HazeTint(color.copy(alpha = GlassBarTintAlpha))),
+            blurRadius = spec.blurRadius,
+            noiseFactor = 0f,
+        )
+    }
+    return this.hazeEffect(backdrop.hazeState, style = hazeStyle)
+}
+
+/** 通栏玻璃上页面底色的浓度：要压得住下面滚过的图片，栏上的文字才读得清，又得留出能看出模糊的透明度。 */
+private const val GlassBarTintAlpha = 0.72f
+
+/**
  * 滚动边缘效果（iOS 26 的 scroll edge effect）：透明的顶栏背后，内容从下面滚过时自上而下渐进模糊并淡入页面底色，
  * 既不挡内容也保证栏上的标题 / 按钮可读。拿不到内容层或不能模糊时退化为页面底色到透明的渐变。
  */

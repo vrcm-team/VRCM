@@ -29,6 +29,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
+import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
@@ -215,7 +216,7 @@ fun NotificationCenterContent(
                     top = padding.calculateTopPadding() + 12.dp,
                     end = 12.dp,
                     bottom = padding.calculateBottomPadding() + bottomNavigationPadding + 12.dp,
-                ),
+                ).withContentTopInset(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (model.hasRefreshError) item(key = "refresh-error") {
