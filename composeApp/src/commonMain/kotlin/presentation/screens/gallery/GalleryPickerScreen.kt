@@ -118,8 +118,9 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                 )
             },
         ) { paddingValues ->
+            // 顶部留白做外边距；底部安全区交给网格的 contentPadding，图片能滚到系统导航条下面
             RefreshBox(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding()),
                 isRefreshing = galleryScreenModel.isRefreshingByTag(FileTagType.Gallery),
                 doRefresh = { galleryScreenModel.refreshFiles(FileTagType.Gallery) },
             ) {
@@ -131,7 +132,12 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
-                        contentPadding = PaddingValues(8.dp),
+                        contentPadding = PaddingValues(
+                            start = 8.dp,
+                            top = 8.dp,
+                            end = 8.dp,
+                            bottom = 8.dp + paddingValues.calculateBottomPadding(),
+                        ),
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         items(items = files, key = FileData::id) { file ->

@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
@@ -110,6 +111,8 @@ internal fun MeetupEditorTools(
     photoTarget: MeetupPhotoTarget,
     onPhotoTarget: (MeetupPhotoTarget) -> Unit,
     modifier: Modifier = Modifier,
+    /** 面板铺到屏幕底时，滚动内容末尾要让开的系统导航条高度。 */
+    bottomContentPadding: Dp = 0.dp,
 ) {
     var selectedTab by remember { mutableStateOf(MeetupEditorTab.Photo) }
     val locale = strings
@@ -140,7 +143,8 @@ internal fun MeetupEditorTools(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(bottom = bottomContentPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             when (selectedTab) {

@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -44,6 +44,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
@@ -115,7 +116,8 @@ object FriendActivityTimelineScreen : AppDetailRoute {
                         WorldProfileVo(worldId = worldId, worldName = event.worldName.orEmpty())
                     )
                 },
-                modifier = Modifier.padding(padding),
+                // 顶部留白做外边距；底部安全区由列表的 contentPadding 承担，列表铺到屏幕底
+                modifier = Modifier.padding(top = padding.calculateTopPadding()),
             )
         }
     }
@@ -213,12 +215,13 @@ private fun ActivityTimelineList(
     showFilterControls: Boolean,
     bottomNavigationPadding: Dp,
 ) {
+    // 列表铺到屏幕底（Edge-to-Edge）：系统导航条的高度加进 contentPadding，最后一项仍能滚到它上方
     LazyColumn(
-        modifier = modifier.fillMaxSize().navigationBarsPadding(),
+        modifier = modifier.fillMaxSize(),
         state = listState,
         contentPadding = PaddingValues(
             top = if (includeControls) 0.dp else 16.dp,
-            bottom = 16.dp + bottomNavigationPadding,
+            bottom = getInsetPadding(WindowInsets::getBottom) + 16.dp + bottomNavigationPadding,
         ).withContentTopInset(),
     ) {
         if (headerContent != null) {

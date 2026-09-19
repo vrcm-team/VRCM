@@ -74,8 +74,10 @@ private fun MyGroupsScreenContent(
             )
         },
     ) { padding ->
+        // 顶部留白做外边距；底部安全区并入列表内边距，列表能滚到系统导航条下面
         MyGroupsContent(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+            contentBottomPadding = padding.calculateBottomPadding() + 24.dp,
             model = model,
         )
     }

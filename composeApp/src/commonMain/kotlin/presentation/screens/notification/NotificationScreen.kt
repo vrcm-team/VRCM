@@ -210,7 +210,8 @@ fun NotificationCenterContent(
             }
             else -> LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                // 列表铺到屏幕底（Edge-to-Edge）：系统导航条的留白在 contentPadding 里，不能再用外边距把列表截短
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = 12.dp,
                     top = padding.calculateTopPadding() + 12.dp,

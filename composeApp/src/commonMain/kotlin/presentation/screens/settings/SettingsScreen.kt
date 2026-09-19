@@ -151,8 +151,9 @@ object SettingsScreen : AppDetailRoute {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .verticalScroll(rememberScrollState())
+                    // 骨架的留白放在滚动区里面：内容从导航栏和系统导航条下面滚过去（Edge-to-Edge）
+                    .padding(padding)
                     .padding(horizontal = AppSpacing.page, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {

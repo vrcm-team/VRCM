@@ -83,10 +83,11 @@ object GalleryScreen : AppRoute {
                 )
             },
         ) { paddingValues ->
+            // 顶部留白做外边距（标签条固定在导航栏下方）；底部安全区由各标签页的网格承担，图片能滚到系统导航条下面
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(top = paddingValues.calculateTopPadding())
             ) {
                 // 标签页
                 AppScrollableTabRow(

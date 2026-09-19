@@ -33,6 +33,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vinceglb.filekit.name
@@ -200,7 +201,8 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+                    // 网格铺到屏幕底，悬浮按钮自己让开系统导航条
+                    .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + getInsetPadding(WindowInsets::getBottom)),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -291,7 +293,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
     ) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 160.dp),
-            contentPadding = PaddingValues(8.dp),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                top = 8.dp,
+                end = 8.dp,
+                bottom = 8.dp + getInsetPadding(WindowInsets::getBottom),
+            ),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()
@@ -403,7 +410,12 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = minimumCellSize),
-            contentPadding = PaddingValues(8.dp),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                top = 8.dp,
+                end = 8.dp,
+                bottom = 8.dp + getInsetPadding(WindowInsets::getBottom),
+            ),
             verticalArrangement = Arrangement.spacedBy(3.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxSize()

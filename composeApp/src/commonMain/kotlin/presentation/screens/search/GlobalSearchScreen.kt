@@ -37,9 +37,10 @@ object GlobalSearchScreen : AppRoute {
                 )
             },
         ) { padding ->
+            // 顶部留白做外边距（标签条与搜索框固定在导航栏下方）；底部留白交给列表，结果能滚到系统导航条下面
             PublicSearchContent(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                bottomContentPadding = 24.dp,
+                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+                bottomContentPadding = padding.calculateBottomPadding() + 24.dp,
             )
         }
     }

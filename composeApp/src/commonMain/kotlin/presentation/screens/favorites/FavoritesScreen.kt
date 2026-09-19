@@ -120,8 +120,9 @@ object FavoritesScreen : AppRoute {
                 onSelectedTab = { selectedTabIndex = it.ordinal },
                 favoritesModel = favoritesModel,
                 groupsModel = groupsModel,
-                contentBottomPadding = 24.dp,
-                modifier = Modifier.fillMaxSize().padding(padding),
+                // 顶部留白做外边距（分段控件固定在导航栏下方）；底部安全区并入列表内边距，列表能滚到系统导航条下面
+                contentBottomPadding = padding.calculateBottomPadding() + 24.dp,
+                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
             )
         }
     }

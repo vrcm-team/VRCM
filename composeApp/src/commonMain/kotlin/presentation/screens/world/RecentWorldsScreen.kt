@@ -222,10 +222,14 @@ object RecentWorldsScreen : AppDetailRoute {
                     }
                 }
 
+                // 骨架的留白交给 contentPadding：列表从导航栏和系统导航条下面滚过去（Edge-to-Edge）
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(paddingValues),
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = paddingValues.calculateTopPadding() + 8.dp,
+                        bottom = paddingValues.calculateBottomPadding() + 8.dp,
+                    ),
                 ) {
                     items(model.worlds, key = { it.id }) { world ->
                         RecentWorldItem(world) { sharedImageCacheKey ->

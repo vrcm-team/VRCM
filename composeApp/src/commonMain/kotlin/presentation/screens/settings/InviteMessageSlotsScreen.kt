@@ -110,10 +110,11 @@ private fun InviteMessageSlotsContent(
         },
         bannerHost = { AppBannerHost(bannerHostState) },
     ) { paddingValues ->
+        // 顶部留白做外边距（类型标签固定在导航栏下方）；底部安全区交给槽位列表，能滚到系统导航条下面
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(top = paddingValues.calculateTopPadding()),
         ) {
             val messageTypes = InviteMessageType.entries
             AppScrollableTabRow(
@@ -157,7 +158,12 @@ private fun InviteMessageSlotsContent(
 
                     else -> LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = AppSpacing.page, vertical = 8.dp),
+                        contentPadding = PaddingValues(
+                            start = AppSpacing.page,
+                            top = 8.dp,
+                            end = AppSpacing.page,
+                            bottom = paddingValues.calculateBottomPadding() + 8.dp,
+                        ),
                     ) {
                         // 槽位数量固定且很少：整组放进一张分组卡片，行间用发丝线
                         item {

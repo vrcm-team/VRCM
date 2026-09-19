@@ -254,7 +254,8 @@ fun MeetupCardEditorContent(
             )
         },
     ) { paddingValues ->
-        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        // 顶部留白做外边距；预览与工具面板铺到屏幕底，系统导航条的高度交给工具面板的滚动内容
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding())) {
             // 与项目其他编辑页一致：Expanded 宽度类才并列预览与设置栏。
             val expanded = LocalAppWindowWidthClass.current == AppWindowWidthClass.Expanded &&
                 maxWidth >= 840.dp
@@ -268,7 +269,10 @@ fun MeetupCardEditorContent(
                     EditorPreview(
                         state = state,
                         onOrientation = model::setOrientation,
-                        modifier = Modifier.fillMaxSize(),
+                        // 并列布局下预览也到屏幕底：卡片在系统导航条以上的区域里居中
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = if (expanded) paddingValues.calculateBottomPadding() else 0.dp),
                     )
                 }
             }
@@ -283,6 +287,7 @@ fun MeetupCardEditorContent(
                         photoTarget = photoTarget,
                         onPhotoTarget = { photoTarget = it },
                         modifier = Modifier.fillMaxSize(),
+                        bottomContentPadding = paddingValues.calculateBottomPadding(),
                     )
                 }
             }

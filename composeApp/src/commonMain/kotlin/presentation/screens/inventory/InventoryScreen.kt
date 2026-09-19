@@ -5,10 +5,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +53,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppShapes
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.ignoredFormat
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import io.github.vrcmteam.vrcm.presentation.screens.settings.RewardCodeDialog
@@ -119,7 +120,8 @@ private fun InventoryScreenContent(
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        // 顶部留白做外边距（筛选条固定在导航栏下方）；底部安全区交给列表，物品能滚到系统导航条下面
+        Column(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
             InventoryFilterBar(
                 filters = filters,
                 onTypeSelected = model::selectType,
@@ -399,9 +401,14 @@ private fun InventoryList(
     }
 
     LazyColumn(
-        modifier = modifier.fillMaxSize().navigationBarsPadding(),
+        modifier = modifier.fillMaxSize(),
         state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 8.dp,
+            end = 16.dp,
+            bottom = getInsetPadding(WindowInsets::getBottom) + 8.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         itemsIndexed(

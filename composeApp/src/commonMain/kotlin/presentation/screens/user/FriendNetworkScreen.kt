@@ -160,10 +160,11 @@ object FriendNetworkScreen : AppRoute {
                 )
             },
         ) { paddingValues ->
+            // 顶部留白做外边距（状态与图例固定在导航栏下方）；关系图是可平移的画布，直接铺到屏幕底
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(top = paddingValues.calculateTopPadding())
             ) {
                 FriendNetworkHeader(
                     updatedAt = state.updatedAt,

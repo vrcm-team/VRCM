@@ -247,7 +247,8 @@ class GroupProfileScreen(
                             2 -> MembersContent(members = members, isLoading = membersLoading)
                             else -> GalleriesContent(group = group, galleryImages = galleryImages)
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        // 页面铺到屏幕底：末尾留出系统导航条的高度，最后一张卡片才不会被它压住
+                        Spacer(modifier = Modifier.height(24.dp + getInsetPadding(WindowInsets::getBottom)))
                     }
                     CompositionLocalProvider(LocalGlassBackdrop provides glassBackdrop) {
                         TopMenuBar(

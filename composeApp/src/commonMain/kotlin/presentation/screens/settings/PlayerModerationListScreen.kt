@@ -263,7 +263,8 @@ private fun PlayerModerationLoadedContent(
     onClearRecord: (PlayerModerationData) -> Unit,
     onRetry: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+    // 顶部留白做外边距（筛选条固定在导航栏下方）；底部安全区交给记录列表，能滚到系统导航条下面
+    Column(modifier = Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         if (state.result != null || state.loadFailed || state.isLoading || state.isClearing) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -330,7 +331,12 @@ private fun PlayerModerationLoadedContent(
             }
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(horizontal = AppSpacing.page, vertical = 4.dp),
+                contentPadding = PaddingValues(
+                    start = AppSpacing.page,
+                    top = 4.dp,
+                    end = AppSpacing.page,
+                    bottom = contentPadding.calculateBottomPadding() + 4.dp,
+                ),
             ) {
                 itemsIndexed(
                     items = state.visibleRecords,

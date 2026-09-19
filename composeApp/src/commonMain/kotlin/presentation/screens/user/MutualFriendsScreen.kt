@@ -2,6 +2,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.user
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -100,10 +101,11 @@ data class MutualFriendsScreen(
                 )
             },
         ) { paddingValues ->
+            // 顶部留白做外边距；底部安全区交给列表的 contentPadding，列表能滚到系统导航条下面
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(top = paddingValues.calculateTopPadding())
             ) {
                 when (contentState) {
                     MutualFriendsContentState.Loading -> {
@@ -137,7 +139,12 @@ data class MutualFriendsScreen(
                     }
 
                     MutualFriendsContentState.Content -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                bottom = paddingValues.calculateBottomPadding() + 8.dp,
+                            ),
+                        ) {
                             renderUserItems(visibleMutualFriends) { user, sharedSuffixKey ->
                                 navigator push UserProfileScreen(
                                     userProfileVO = UserProfileVo(user),
