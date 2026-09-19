@@ -8,11 +8,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeDefaults
@@ -25,7 +29,7 @@ import dev.chrisbanes.haze.hazeSource
 
 // ---------- Liquid Glass：玻璃只出现在功能层（导航栏按钮 / 标签栏 / 弹层），内容层绝不用 ----------
 // 实现：内容层用 haze 标记为取样源（hazeSource），每个玻璃件用 hazeEffect 取样并模糊 + 叠半透明填充 + 2% 噪点，
-// 上面再画 0.5 dp 描边与顶部高光线。平台差异：iOS / 桌面走 Skia RenderEffect，Android 12+ 走 RenderNode + RenderEffect；
+// 上面再画 0.5 dp 描边与沿轮廓淡出的顶部边缘高光。平台差异：iOS / 桌面走 Skia RenderEffect，Android 12+ 走 RenderNode + RenderEffect；
 // Android < 12 没有 RenderEffect（HazeDefaults.blurEnabled() = false），不挂 haze，直接画高填充。
 // Reduce Transparency → 不走 haze，不透明回退；Increase Contrast → 加强描边与填充。
 
@@ -137,9 +141,30 @@ fun Modifier.glass(
         base.drawBehind { drawRect(fill) }
     }
     return material
-        // 顶部 0.5 dp 高光线：模拟玻璃边缘折射
-        .drawBehind { drawLine(spec.highlight, Offset(0f, 0.5f), Offset(size.width, 0.5f), strokeWidth = 1f) }
+        .rimHighlight(shape, spec.highlight)
         .border(0.5.dp, spec.stroke, shape)
+}
+
+/** 边缘高光的描边粗细。 */
+private val RimHighlightWidth = 1.dp
+
+/** 高光从顶边往下淡出的距离：大约绕过一个标准圆角；比半个控件还高时只取到半高。 */
+private val RimHighlightFade = 20.dp
+
+/**
+ * 顶部的边缘高光（模拟玻璃边缘的折射）：沿 [shape] 的轮廓描边，亮度自上而下淡出——平直的顶边最亮，顺着顶部两个圆角绕下去后消失。
+ * 不能画成一条横贯整宽的直线：直线只落在平直的那一段上，到圆角处被形状裁掉，两头就像被截断，深色模式下尤其显眼。
+ */
+private fun Modifier.rimHighlight(shape: Shape, color: Color): Modifier = drawWithCache {
+    val stroke = RimHighlightWidth.toPx()
+    if (size.minDimension <= stroke) return@drawWithCache onDrawBehind {}
+    val fade = minOf(RimHighlightFade.toPx(), size.height / 2f)
+    val brush = Brush.verticalGradient(0f to color, 1f to Color.Transparent, startY = 0f, endY = fade)
+    // 轮廓按描边宽度内缩后再画，整条描边都落在形状以内，不会被外层的 clip 削掉一半
+    val outline = shape.createOutline(Size(size.width - stroke, size.height - stroke), layoutDirection, this)
+    onDrawBehind {
+        translate(stroke / 2f, stroke / 2f) { drawOutline(outline, brush = brush, style = Stroke(stroke)) }
+    }
 }
 
 /**
