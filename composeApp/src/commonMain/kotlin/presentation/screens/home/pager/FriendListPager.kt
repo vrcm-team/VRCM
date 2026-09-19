@@ -8,7 +8,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
@@ -98,7 +97,14 @@ fun FriendsDirectoryContent(
         onBack = model::exitFriendSelectionMode,
     )
 
-    Box(modifier.fillMaxSize()) {
+    RefreshBox(
+        modifier = modifier.fillMaxSize(),
+        refreshContainerOffsetY = 12.dp,
+        isRefreshing = refreshing,
+        // 批量选择期间列表不能在手底下变
+        enabled = !removalState.selectionMode,
+        doRefresh = { model.refreshFriendDirectory() },
+    ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -186,28 +192,18 @@ fun FriendsDirectoryContent(
             }
         }
 
-        if (friends.isEmpty() && refreshFailed && !refreshing) {
-            DirectoryMessage(
-                message = strings.friendDirectoryLoadFailed,
-                retry = true,
-                onRetry = model::refreshFriendDirectory,
-            )
-        } else if (friends.isEmpty() && !refreshing) {
-            DirectoryMessage(
-                message = if (searchText.isBlank() && options.selectedGroup == null) {
-                    strings.friendDirectoryEmpty
-                } else {
-                    strings.friendDirectoryNoMatches
-                },
-                retry = false,
-                onRetry = model::refreshFriendDirectory,
-            )
-        } else if (friends.isNotEmpty() && refreshFailed) {
-            DirectoryErrorBanner(
-                bottomPadding = contentPadding.calculateBottomPadding(),
-                onRetry = model::refreshFriendDirectory,
-            )
-        }
+        ListStateOverlay(
+            isEmpty = friends.isEmpty(),
+            isLoading = refreshing,
+            emptyMessage = if (searchText.isBlank() && options.selectedGroup == null) {
+                strings.friendDirectoryEmpty
+            } else {
+                strings.friendDirectoryNoMatches
+            },
+            errorMessage = strings.friendDirectoryLoadFailed.takeIf { refreshFailed },
+            onRetry = model::refreshFriendDirectory,
+            bottomPadding = contentPadding.calculateBottomPadding(),
+        )
     }
 
     if (showFavoriteGroupDialogs) {
@@ -257,37 +253,5 @@ fun FriendsDirectoryContent(
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun BoxScope.DirectoryMessage(message: String, retry: Boolean, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        AppText(message, color = AppTheme.colors.secondaryLabel)
-        if (retry) AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
-    }
-}
-
-@Composable
-private fun BoxScope.DirectoryErrorBanner(bottomPadding: Dp, onRetry: () -> Unit) {
-    AppSurface(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = bottomPadding),
-        color = AppTheme.colors.destructiveSoft,
-        contentColor = AppTheme.colors.onDestructiveSoft,
-        shape = AppShapes.m,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppText(strings.friendDirectoryLoadFailed, Modifier.weight(1f))
-            AppButton(onClick = onRetry, style = AppButtonStyle.Plain) { AppText(strings.retry) }
-        }
     }
 }

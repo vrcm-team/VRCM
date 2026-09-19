@@ -21,9 +21,15 @@ import androidx.compose.ui.unit.offset
  *
  * 主页的顶栏会随滚动收起，[current] 是个随时在变的量：只在测量 / 布局阶段读它，变化时只重新测量、不重组。
  * [expanded] 是顶栏完全显示时的高度，给下拉刷新指示器这类"栏一定是露着的"场合用。
+ * [onContentPulledChange]：栏下面的内容被下拉刷新拉了下来 / 回到了原位（见 [RefreshBox]）。
+ * 拉着的时候往回推是在把内容推回去，会收起的顶栏这时不能跟着收。
  */
 @Stable
-class ContentTopInset(val current: () -> Int, val expanded: () -> Int) {
+class ContentTopInset(
+    val current: () -> Int,
+    val expanded: () -> Int,
+    val onContentPulledChange: (pulled: Boolean) -> Unit = {},
+) {
     companion object {
         val None = ContentTopInset(current = { 0 }, expanded = { 0 })
     }

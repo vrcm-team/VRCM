@@ -47,6 +47,14 @@ internal class HomeBarsScrollState {
     val hiddenFraction: Float
         get() = if (collapseRange > 0f) collapsed / collapseRange else 0f
 
+    /** 栏下面正被下拉刷新拉着（或停在刷新指示器下面）的列表数。 */
+    private var pulledContents = 0
+
+    /** 栏下面的某个列表被下拉刷新拉了下来 / 回到了原位。 */
+    fun contentPulledChanged(pulled: Boolean) {
+        pulledContents = (pulledContents + if (pulled) 1 else -1).coerceAtLeast(0)
+    }
+
     /** 顶部容器高度变了（字号、窗口变化、换到没有标签的页面）：保持收起进度不变。 */
     fun updateCollapseRange(range: Float) {
         val fraction = hiddenFraction
@@ -59,6 +67,8 @@ internal class HomeBarsScrollState {
      * 返回栏消耗掉的那部分，余下的才归列表。
      */
     fun consumeScroll(delta: Float): Float {
+        // 内容被下拉刷新拉着时往回推，是在把内容推回原位（反悔这次刷新）：这段距离归下拉，栏不跟着收
+        if (delta < 0f && pulledContents > 0) return 0f
         val target = (collapsed - delta).coerceIn(0f, collapseRange)
         val consumed = collapsed - target
         collapsed = target

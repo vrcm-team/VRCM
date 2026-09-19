@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -138,7 +139,7 @@ fun AppTabBar(
     val c = AppTheme.colors
     val motion = AppTheme.motion
     val density = LocalDensity.current
-    val gap = 2.dp
+    val gap = TabBarItemGap
     // 选中底的位置：以标签序号为单位做弹簧插值，画在所有标签后面。记住起点，路上按进度让胶囊先胀大再缩回。
     val indicator = remember { Animatable(selectedIndex.toFloat()) }
     var from by remember { mutableFloatStateOf(selectedIndex.toFloat()) }
@@ -155,7 +156,7 @@ fun AppTabBar(
         modifier
             .glass(CircleShape)
             .height(AppSize.tabBar)
-            .padding(6.dp)
+            .padding(TabBarPadding)
             .drawBehind {
                 if (itemCount <= 0) return@drawBehind
                 val slot = with(density) { itemWidth.toPx() }
@@ -203,6 +204,42 @@ fun AppTabBar(
                 ProvideContentColor(foreground, AppTheme.type.caption2Emphasized) { item(index, selected) }
             }
         }
+    }
+}
+
+private val TabBarPadding = 6.dp
+private val TabBarItemGap = 2.dp
+
+/** [AppTabBar] 要在 [availableWidth] 里放下 [itemCount] 项时，每项最多能有多宽（不超过 [preferred]）。 */
+fun appTabBarItemWidth(availableWidth: Dp, itemCount: Int, preferred: Dp = 72.dp): Dp {
+    if (itemCount <= 0) return preferred
+    val chrome = TabBarPadding * 2 + TabBarItemGap * (itemCount - 1)
+    return ((availableWidth - chrome) / itemCount).coerceIn(0.dp, preferred)
+}
+
+/**
+ * 标签栏旁边的独立圆钮（iOS 26 标签栏右侧的搜索钮）：和标签栏同高、同一种玻璃，前景色同未选中的标签。
+ * 标签栏只导航；全局都用得上的那一个动作放在这里，而不是挤进标签里。图标必须给 contentDescription。
+ */
+@Composable
+fun AppTabBarAccessoryButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .size(AppSize.tabBar)
+            .glass(CircleShape)
+            .clickable(
+                interactionSource = null,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        ProvideContentColor(AppTheme.colors.secondaryLabel, content = content)
     }
 }
 

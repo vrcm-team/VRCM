@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.LocationType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
+import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.LocationCard
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
@@ -19,7 +20,6 @@ import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsFlowRow
 import io.github.vrcmteam.vrcm.presentation.compoments.UserIconsRow
 import io.github.vrcmteam.vrcm.presentation.adaptive.AppWindowWidthClass
 import io.github.vrcmteam.vrcm.presentation.adaptive.LocalAppWindowWidthClass
-import io.github.vrcmteam.vrcm.presentation.compoments.expandedContentTopInset
 import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
@@ -138,8 +138,7 @@ fun Pager.FriendLocationPager(
         )
     }
     RefreshBox(
-        // 下拉刷新时顶栏一定是露着的：指示器让到它下面
-        refreshContainerOffsetY = topPadding + expandedContentTopInset(),
+        refreshContainerOffsetY = topPadding,
         isRefreshing = isRefreshing,
         doRefresh = doRefresh
     ) {
@@ -154,6 +153,9 @@ fun Pager.FriendLocationPager(
             LocalAppWindowWidthClass.current == AppWindowWidthClass.Compact
         ) 80.dp else 0.dp
         val bottomPadding = getInsetPadding(12, WindowInsets::getBottom) + bottomNavigationPadding
+        val isEmpty = instanceFriendLocations.isNullOrEmpty() &&
+            privateFriendLocation?.friendList.isNullOrEmpty() &&
+            webFriendLocation?.friendList.isNullOrEmpty()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState,
@@ -213,6 +215,7 @@ fun Pager.FriendLocationPager(
             ) { "${strings.fiendLocationPagerWebsite}${webFriendLocation?.let { "(${it.friends.size})" }}" }
 
         }
+        ListStateOverlay(isEmpty = isEmpty, isLoading = isRefreshing)
     }
 
 
@@ -244,7 +247,7 @@ private fun LazyListScope.SimpleCLocationCard(
 }
 
 @Composable
-private fun LocationTitle(
+internal fun LocationTitle(
     text: String,
 ) {
     AppText(

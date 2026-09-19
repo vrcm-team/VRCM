@@ -76,39 +76,31 @@ internal fun SelectionRemovalStatusRow(
     }
 }
 
+/** 批量选择期间的顶栏动作：「取消」和「移除所选」。进入选择靠长按条目，平时这里什么都不画。 */
 @Composable
 internal fun RowScope.SelectionRemovalActions(
     state: SelectionRemovalState,
-    canEnterSelection: Boolean,
-    enterSelectionDescription: String,
     removeSelectedDescription: String,
     cancelDescription: String,
-    onEnterSelection: () -> Unit,
     onExitSelection: () -> Unit,
     onRequestRemoval: () -> Unit,
 ) {
-    if (state.selectionMode) {
-        ATooltipBox(tooltip = { AppText(cancelDescription) }) {
-            AppIconButton(enabled = !state.isSubmitting, onClick = onExitSelection) {
-                AppIcon(AppIcons.Close, cancelDescription)
-            }
+    if (!state.selectionMode) return
+
+    ATooltipBox(tooltip = { AppText(cancelDescription) }) {
+        AppIconButton(enabled = !state.isSubmitting, onClick = onExitSelection) {
+            AppIcon(AppIcons.Close, cancelDescription)
         }
-        ATooltipBox(tooltip = { AppText(removeSelectedDescription) }) {
-            AppIconButton(
-                enabled = state.selectedIds.isNotEmpty() && !state.isSubmitting,
-                onClick = onRequestRemoval,
-            ) {
-                if (state.isSubmitting) {
-                    AppActivityIndicator(Modifier.size(20.dp))
-                } else {
-                    AppIcon(AppIcons.Delete, removeSelectedDescription)
-                }
-            }
-        }
-    } else {
-        ATooltipBox(tooltip = { AppText(enterSelectionDescription) }) {
-            AppIconButton(enabled = canEnterSelection, onClick = onEnterSelection) {
-                AppIcon(AppIcons.Delete, enterSelectionDescription)
+    }
+    ATooltipBox(tooltip = { AppText(removeSelectedDescription) }) {
+        AppIconButton(
+            enabled = state.selectedIds.isNotEmpty() && !state.isSubmitting,
+            onClick = onRequestRemoval,
+        ) {
+            if (state.isSubmitting) {
+                AppActivityIndicator(Modifier.size(20.dp))
+            } else {
+                AppIcon(AppIcons.Delete, removeSelectedDescription)
             }
         }
     }

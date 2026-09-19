@@ -1,14 +1,12 @@
 package io.github.vrcmteam.vrcm.presentation.screens.favorites
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -18,21 +16,20 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.network.api.groups.data.LimitedGroup
 import io.github.vrcmteam.vrcm.network.api.users.data.LimitedUserGroup
+import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
+import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.SearchTextField
-import io.github.vrcmteam.vrcm.presentation.compoments.contentTopInsetPadding
 import io.github.vrcmteam.vrcm.presentation.compoments.renderGroupItems
 import io.github.vrcmteam.vrcm.presentation.compoments.renderSelectableGroupItems
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppProgressBar
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
@@ -69,7 +66,7 @@ private fun MyGroupsScreenContent(
                     }
                 },
                 actions = {
-                    MyGroupsActions(model)
+                    MyGroupsSelectionActions(model)
                 },
             )
         },
@@ -108,64 +105,66 @@ internal fun MyGroupsContent(
         onBack = model::exitGroupSelectionMode,
     )
 
-    Column(modifier.contentTopInsetPadding()) {
-        SearchTextField(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            value = state.searchText,
-            onValueChange = model::setSearchText,
-        )
-        if (removalState.selectionMode) {
-            SelectionRemovalStatusRow(
-                state = removalState,
-                visibleIds = visibleGroupIds,
-                selectedCountText = locale.favoriteSelectionSelectedCount,
-                progressText = locale.groupSelectionLeavingProgress,
-                selectAllText = locale.favoriteSelectionSelectAll,
-                clearSelectionText = locale.favoriteSelectionClearSelection,
-                onToggleVisibleSelection = model::toggleVisibleGroupSelection,
-            )
-        }
-        Box(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 16.dp)) {
-            if (state.isLoading) AppProgressBar(Modifier.fillMaxWidth())
-        }
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(bottom = contentBottomPadding),
-            ) {
-                if (removalState.selectionMode) {
-                    renderSelectableGroupItems(
-                        groups = visibleGroups,
-                        selectedGroupIds = removalState.selectedIds,
-                        enabled = !removalState.isSubmitting,
-                        onSelectionToggle = model::toggleGroupSelection,
+    RefreshBox(
+        modifier = modifier.fillMaxSize(),
+        refreshContainerOffsetY = 12.dp,
+        isRefreshing = state.isLoading,
+        // 批量选择期间列表不能在手底下变
+        enabled = !removalState.selectionMode,
+        doRefresh = { model.refresh() },
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(top = 12.dp, bottom = contentBottomPadding).withContentTopInset(),
+        ) {
+            item(key = "my-groups-controls") {
+                Column(
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SearchTextField(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        value = state.searchText,
+                        onValueChange = model::setSearchText,
                     )
-                } else {
-                    renderGroupItems(
-                        groups = visibleGroups,
-                        onGroupLongClick = { model.beginGroupSelection(it.id) },
-                    ) { group, suffix ->
-                        navigator push GroupProfileScreen(GroupProfileVo(group), suffix)
+                    if (removalState.selectionMode) {
+                        SelectionRemovalStatusRow(
+                            state = removalState,
+                            visibleIds = visibleGroupIds,
+                            selectedCountText = locale.favoriteSelectionSelectedCount,
+                            progressText = locale.groupSelectionLeavingProgress,
+                            selectAllText = locale.favoriteSelectionSelectAll,
+                            clearSelectionText = locale.favoriteSelectionClearSelection,
+                            onToggleVisibleSelection = model::toggleVisibleGroupSelection,
+                        )
                     }
                 }
             }
-
-            val empty = state.visibleGroups.isEmpty()
-            if (state.isLoading && empty) {
-                AppActivityIndicator(Modifier.align(Alignment.Center))
-            } else if (state.error != null && empty) {
-                StateMessage(strings.myGroupsLoadFailed, strings.retry, model::refresh)
-            } else if (empty) {
-                StateMessage(strings.myGroupsEmpty, null, null)
-            } else if (state.error != null) {
-                ErrorBanner(
-                    message = strings.myGroupsLoadFailed,
-                    bottomPadding = contentBottomPadding,
-                    onRetry = model::refresh,
+            if (removalState.selectionMode) {
+                renderSelectableGroupItems(
+                    groups = visibleGroups,
+                    selectedGroupIds = removalState.selectedIds,
+                    enabled = !removalState.isSubmitting,
+                    onSelectionToggle = model::toggleGroupSelection,
                 )
+            } else {
+                renderGroupItems(
+                    groups = visibleGroups,
+                    onGroupLongClick = { model.beginGroupSelection(it.id) },
+                ) { group, suffix ->
+                    navigator push GroupProfileScreen(GroupProfileVo(group), suffix)
+                }
             }
         }
+        ListStateOverlay(
+            isEmpty = state.visibleGroups.isEmpty(),
+            isLoading = state.isLoading,
+            emptyMessage = strings.myGroupsEmpty,
+            errorMessage = strings.myGroupsLoadFailed.takeIf { state.error != null },
+            onRetry = model::refresh,
+            bottomPadding = contentBottomPadding,
+        )
     }
 
     SelectionRemovalConfirmationDialog(
@@ -179,29 +178,17 @@ internal fun MyGroupsContent(
     )
 }
 
+/** 批量退出群组期间的顶栏动作；平时没有按钮（刷新靠下拉、选择靠长按）。 */
 @Composable
-internal fun RowScope.MyGroupsActions(model: FavoritesGroupsModel) {
-    val state by model.state.collectAsState()
+internal fun RowScope.MyGroupsSelectionActions(model: FavoritesGroupsModel) {
     val removalState by model.removalState.collectAsState()
     SelectionRemovalActions(
         state = removalState,
-        canEnterSelection = state.groups.isNotEmpty() && !state.isLoading,
-        enterSelectionDescription = strings.groupSelectionAction,
         removeSelectedDescription = strings.groupSelectionLeaveSelected,
         cancelDescription = strings.cancel,
-        onEnterSelection = model::enterGroupSelectionMode,
         onExitSelection = model::exitGroupSelectionMode,
         onRequestRemoval = model::requestGroupLeaveConfirmation,
     )
-    if (!removalState.selectionMode) {
-        AppIconButton(enabled = !state.isLoading, onClick = model::refresh) {
-            if (state.isLoading) {
-                AppActivityIndicator(Modifier.size(20.dp))
-            } else {
-                AppIcon(AppIcons.Refresh, strings.refresh)
-            }
-        }
-    }
 }
 
 private fun LimitedUserGroup.toLimitedGroup() = LimitedGroup(

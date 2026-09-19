@@ -185,8 +185,9 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
+            val isRefreshing = if (isPrint) galleryScreenModel.isRefreshingPrints else galleryScreenModel.isRefreshingByTag(tagType)
             RefreshBox(
-                isRefreshing = if (isPrint) galleryScreenModel.isRefreshingPrints else galleryScreenModel.isRefreshingByTag(tagType),
+                isRefreshing = isRefreshing,
                 doRefresh = { if (isPrint) galleryScreenModel.refreshPrints() else galleryScreenModel.refreshFiles(tagType) }
             ) {
                 if (isPrint) {
@@ -194,6 +195,11 @@ sealed class GalleryTabPager(private val tagType: FileTagType) {
                 } else {
                     FileContent(galleryScreenModel)
                 }
+                // 自动加载不再把内容顶下来露出指示器：还没有内容时在中间放一个
+                ListStateOverlay(
+                    isEmpty = if (isPrint) galleryScreenModel.prints.isEmpty() else galleryScreenModel.getFilesByTag(tagType).isEmpty(),
+                    isLoading = isRefreshing,
+                )
             }
 
             // 选中时为红色删除按钮，否则为上传按钮

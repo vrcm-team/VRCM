@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
@@ -45,25 +46,49 @@ fun AppActivityIndicator(
         label = "activityIndicatorRotation",
     )
     Canvas(modifier.progressSemantics().size(28.dp)) {
-        val strokeWidth = size.minDimension * 0.11f
-        val inset = strokeWidth / 2f
-        val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-        val radius = arcSize.minDimension / 2f
-        rotate(rotation) {
-            // 拖尾：从透明扫到实色，留一小段缺口让头尾不相接
-            drawArc(
-                brush = Brush.sweepGradient(0f to color.copy(alpha = 0f), 0.82f to color, 1f to color, center = center),
-                startAngle = 0f,
-                sweepAngle = 300f,
-                useCenter = false,
-                topLeft = Offset(inset, inset),
-                size = arcSize,
-                style = Stroke(strokeWidth),
-            )
-            // 头部补一个圆头（渐变弧的端点用圆头会把透明的那端也画出来）
-            val headAngle = 300f * (PI.toFloat() / 180f)
-            drawCircle(color, radius = strokeWidth / 2f, center = Offset(center.x + radius * cos(headAngle), center.y + radius * sin(headAngle)))
-        }
+        drawActivityRing(color, rotation)
+    }
+}
+
+/**
+ * 活动指示器的静止形态：环随 [progress]（0..1）从头部往回一点点绕出来，到 1 时正好是旋转形态起步的样子。
+ * 给下拉刷新的拉动过程用——拉满一圈就是"松手即刷新"。
+ */
+@Composable
+fun AppActivityIndicator(
+    progress: () -> Float,
+    modifier: Modifier = Modifier,
+    color: Color = AppTheme.colors.secondaryLabel,
+) {
+    Canvas(modifier.size(28.dp)) {
+        val fraction = progress().coerceIn(0f, 1f)
+        if (fraction > 0f) drawActivityRing(color, rotation = 360f * fraction, sweep = ActivityRingSweep * fraction)
+    }
+}
+
+/** 整环的角度：留一小段缺口让头尾不相接。 */
+private const val ActivityRingSweep = 300f
+
+/** 活动指示器的环：转到 [rotation]，从头部（实色圆头）往回画出 [sweep] 这么长的渐隐拖尾。 */
+private fun DrawScope.drawActivityRing(color: Color, rotation: Float, sweep: Float = ActivityRingSweep) {
+    val strokeWidth = size.minDimension * 0.11f
+    val inset = strokeWidth / 2f
+    val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
+    val radius = arcSize.minDimension / 2f
+    rotate(rotation) {
+        // 拖尾：从透明扫到实色
+        drawArc(
+            brush = Brush.sweepGradient(0f to color.copy(alpha = 0f), 0.82f to color, 1f to color, center = center),
+            startAngle = ActivityRingSweep - sweep,
+            sweepAngle = sweep,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(strokeWidth),
+        )
+        // 头部补一个圆头（渐变弧的端点用圆头会把透明的那端也画出来）
+        val headAngle = ActivityRingSweep * (PI.toFloat() / 180f)
+        drawCircle(color, radius = strokeWidth / 2f, center = Offset(center.x + radius * cos(headAngle), center.y + radius * sin(headAngle)))
     }
 }
 

@@ -16,7 +16,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,7 +25,9 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.NotificationType
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
+import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
@@ -88,13 +89,12 @@ fun NotificationCenterContent(
         }
     }
     val listState = rememberLazyListState()
-    var lastTargetListIndex by remember(targetNotificationId) { mutableIntStateOf(-1) }
-    LaunchedEffect(targetNotificationId, notifications, model.hasRefreshError) {
+    var lastTargetIndex by remember(targetNotificationId) { mutableIntStateOf(-1) }
+    LaunchedEffect(targetNotificationId, notifications) {
         val targetIndex = notifications.indexOfNotificationTarget(targetNotificationId)
-        val targetListIndex = notificationListIndex(targetIndex, model.hasRefreshError)
-        if (targetIndex < 0 || targetListIndex == lastTargetListIndex) return@LaunchedEffect
-        listState.animateScrollToItem(targetListIndex)
-        lastTargetListIndex = targetListIndex
+        if (targetIndex < 0 || targetIndex == lastTargetIndex) return@LaunchedEffect
+        listState.animateScrollToItem(targetIndex)
+        lastTargetIndex = targetIndex
         notifications.getOrNull(targetIndex)?.let(model::markNotificationAsRead)
     }
 
@@ -178,37 +178,17 @@ fun NotificationCenterContent(
                             }
                         }
                     },
-                    actions = {
-                        AppIconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
-                            if (model.isRefreshing) {
-                                AppActivityIndicator(Modifier.size(20.dp))
-                            } else {
-                                AppIcon(AppIcons.Refresh, strings.notificationRefresh)
-                            }
-                        }
-                    },
                 )
             }
         },
     ) { padding ->
-        val centerStateModifier = Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .padding(bottom = bottomNavigationPadding)
-        when {
-            model.isRefreshing && notifications.isEmpty() -> CenterState(
-                centerStateModifier,
-            ) { AppActivityIndicator() }
-            model.hasRefreshError && notifications.isEmpty() -> CenterState(
-                centerStateModifier,
-            ) {
-                AppText(strings.notificationRefreshFailed, textAlign = TextAlign.Center)
-                AppButton(onClick = model::refreshAllNotification, style = AppButtonStyle.Plain) { AppText(strings.retry) }
-            }
-            notifications.isEmpty() -> CenterState(centerStateModifier) {
-                AppText(strings.homeNotificationEmpty, textAlign = TextAlign.Center)
-            }
-            else -> LazyColumn(
+        RefreshBox(
+            modifier = Modifier.fillMaxSize(),
+            refreshContainerOffsetY = padding.calculateTopPadding() + 12.dp,
+            isRefreshing = model.isRefreshing,
+            doRefresh = { model.refreshAllNotification() },
+        ) {
+            LazyColumn(
                 state = listState,
                 // 列表铺到屏幕底（Edge-to-Edge）：系统导航条的留白在 contentPadding 里，不能再用外边距把列表截短
                 modifier = Modifier.fillMaxSize(),
@@ -220,17 +200,6 @@ fun NotificationCenterContent(
                 ).withContentTopInset(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (model.hasRefreshError) item(key = "refresh-error") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppText(
-                            strings.notificationRefreshFailed,
-                            Modifier.weight(1f),
-                            color = AppTheme.colors.destructive,
-                            style = AppTheme.type.caption1,
-                        )
-                        AppButton(onClick = model::refreshAllNotification, style = AppButtonStyle.Plain) { AppText(strings.retry) }
-                    }
-                }
                 items(notifications, key = { it.identity.stableKey }) { item ->
                     NotificationItem(
                         item = item,
@@ -261,6 +230,14 @@ fun NotificationCenterContent(
                     )
                 }
             }
+            ListStateOverlay(
+                isEmpty = notifications.isEmpty(),
+                isLoading = model.isRefreshing,
+                emptyMessage = strings.homeNotificationEmpty,
+                errorMessage = strings.notificationRefreshFailed.takeIf { model.hasRefreshError },
+                onRetry = model::refreshAllNotification,
+                bottomPadding = padding.calculateBottomPadding() + bottomNavigationPadding + 12.dp,
+            )
         }
     }
     BoopSelectorDialog(
@@ -309,19 +286,6 @@ fun NotificationCenterContent(
             },
         )
     }
-}
-
-internal fun notificationListIndex(notificationIndex: Int, hasRefreshError: Boolean): Int =
-    notificationIndex + if (hasRefreshError) 1 else 0
-
-@Composable
-private fun CenterState(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier.padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        content = content,
-    )
 }
 
 private data class BoopReply(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.compoments.ContentTopInset
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalContentTopInset
+import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import kotlin.math.roundToInt
@@ -75,7 +77,37 @@ class HomeBarsScrollBehaviorTest {
         assertEquals(1f, state.hiddenFraction)
     }
 
-    private fun runBarsTest(block: ComposeUiTest.(HomeBarsScrollState, LazyListState) -> Unit) =
+    @Test
+    fun pushingAPulledListBackUpCancelsThePullInsteadOfCollapsingTheBars() {
+        var refreshCount = 0
+        runBarsTest(onRefresh = { refreshCount++ }) { state, _ ->
+            // 拉过了刷新阈值，没松手又推回去大半：这是在反悔，推回去的距离该先还给下拉
+            onNodeWithTag(ListTag).performTouchInput {
+                down(center)
+                repeat(20) {
+                    advanceEventTime(50)
+                    moveBy(Offset(0f, 20f))
+                }
+                repeat(20) {
+                    advanceEventTime(50)
+                    moveBy(Offset(0f, -5f))
+                }
+                advanceEventTime(300)
+                up()
+            }
+            waitForIdle()
+
+            assertEquals(0, refreshCount)
+            assertEquals(0f, state.hiddenFraction)
+            assertEquals(TopBarHeight, onNodeWithTag(FirstItemTag).getBoundsInRoot().top)
+        }
+    }
+
+    /** [onRefresh] 非空时列表外面包一层下拉刷新，和主页的各个列表一样。 */
+    private fun runBarsTest(
+        onRefresh: (() -> Unit)? = null,
+        block: ComposeUiTest.(HomeBarsScrollState, LazyListState) -> Unit,
+    ) =
         runDesktopComposeUiTest(width = 400, height = WindowHeight) {
             val state = HomeBarsScrollState()
             val listState = LazyListState()
@@ -90,23 +122,33 @@ class HomeBarsScrollBehaviorTest {
                         ContentTopInset(
                             current = { expandedTopPx - state.collapsed.roundToInt() },
                             expanded = { expandedTopPx },
+                            onContentPulledChange = state::contentPulledChanged,
                         )
                     }
                     Box(Modifier.fillMaxSize()) {
                         // 和主页一样：内容铺满，列表自己把顶部容器盖住的高度让出来
                         CompositionLocalProvider(LocalContentTopInset provides topInset) {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize().nestedScroll(connection).testTag(ListTag),
-                                state = listState,
-                                contentPadding = PaddingValues().withContentTopInset(),
-                            ) {
-                                items(100) { index ->
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .height(60.dp)
-                                            .then(if (index == 0) Modifier.testTag(FirstItemTag) else Modifier),
-                                    )
+                            Box(Modifier.fillMaxSize().nestedScroll(connection)) {
+                                val list = @Composable {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize().testTag(ListTag),
+                                        state = listState,
+                                        contentPadding = PaddingValues().withContentTopInset(),
+                                    ) {
+                                        items(100) { index ->
+                                            Box(
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .height(60.dp)
+                                                    .then(if (index == 0) Modifier.testTag(FirstItemTag) else Modifier),
+                                            )
+                                        }
+                                    }
+                                }
+                                if (onRefresh == null) {
+                                    list()
+                                } else {
+                                    RefreshBox(isRefreshing = false, doRefresh = { onRefresh() }) { list() }
                                 }
                             }
                         }

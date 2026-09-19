@@ -42,8 +42,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.activity.*
 import io.github.vrcmteam.vrcm.presentation.screens.auth.AuthAnimeScreen
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesGroupsModel
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubContent
+import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubSelectionActions
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTabRow
-import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesHubTopBarActions
 import io.github.vrcmteam.vrcm.presentation.screens.favorites.FavoritesTab
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.GalleryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.home.dialog.UserStatusDialog
@@ -53,6 +53,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.PersonalNavigati
 import io.github.vrcmteam.vrcm.presentation.screens.home.drawer.drawerStatusSharedUserId
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendListPagerModel
 import io.github.vrcmteam.vrcm.presentation.screens.home.pager.FriendLocationPager
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.GroupInstancePager
+import io.github.vrcmteam.vrcm.presentation.screens.home.pager.HomeLocationSource
 import io.github.vrcmteam.vrcm.presentation.screens.inventory.InventoryScreen
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.*
 import io.github.vrcmteam.vrcm.presentation.screens.notification.NotificationCenterContent
@@ -145,6 +147,12 @@ object HomeScreen : AppListRoute {
         }
         HandleBackNavigation(model.drawerVisible || drawerState.isOpen, closeDrawer)
 
+        var locationSourceIndex by rememberSaveable {
+            mutableIntStateOf(HomeLocationSource.Friends.ordinal)
+        }
+        val locationSource = HomeLocationSource.entries.getOrElse(locationSourceIndex) {
+            HomeLocationSource.Friends
+        }
         // 顶栏 / 底栏随列表滚动收起；换页面、换标签或点标签回到顶部时放出来，否则没有栏可点
         val barsState = remember { HomeBarsScrollState() }
         val barsConnection = rememberHomeBarsNestedScrollConnection(barsState)
@@ -153,6 +161,7 @@ object HomeScreen : AppListRoute {
             selectedDestination,
             model.selectedHomeTabIndex,
             model.selectedFavoritesTabIndex,
+            locationSourceIndex,
         ) {
             barsConnection.show()
         }
@@ -200,24 +209,23 @@ object HomeScreen : AppListRoute {
                                 .glassBar(pageColor),
                         ) {
                             Column(Modifier.fadeOutWith(barsState)) {
+                                // 平时身份栏右侧没有按钮：刷新靠下拉，搜索在底栏；只有收藏页批量选择期间才出现动作
                                 HomeIdentityTopBar(model = model) {
-                                    when (selectedDestination) {
-                                        HomeDestination.Notifications -> NotificationRefreshAction(notificationModel)
-                                        HomeDestination.Favorites -> FavoritesHubTopBarActions(
+                                    if (selectedDestination == HomeDestination.Favorites) {
+                                        FavoritesHubSelectionActions(
                                             selectedTab = selectedFavoritesTab,
                                             favoritesModel = requireNotNull(friendListModel),
                                             groupsModel = requireNotNull(groupsModel),
-                                            onSearch = { navigator push GlobalSearchScreen },
                                         )
-                                        else -> Unit
                                     }
                                 }
                                 when (selectedDestination) {
                                     HomeDestination.Home -> HomeTabRow(
                                         pagerState = homePagerState,
+                                        locationSource = locationSource,
+                                        onLocationSourceSelected = { locationSourceIndex = it.ordinal },
                                         activityFilter = activityFilter,
                                         onActivityFilterSelected = { activityFilterIndex = it.ordinal },
-                                        onReselect = { scope.launch { SharedFlowCentre.toPagerTop.emit(Unit) } },
                                     )
                                     HomeDestination.Favorites -> FavoritesHubTabRow(favoritesPagerState)
                                     HomeDestination.Notifications -> Unit
@@ -232,6 +240,7 @@ object HomeScreen : AppListRoute {
                             selected = selectedDestination,
                             hasUnread = notificationModel.hasUnread,
                             onSelect = onDestinationSelected,
+                            onSearch = { navigator push GlobalSearchScreen },
                             modifier = Modifier.slideOutDownwardWith(barsState),
                         )
                     }
@@ -249,6 +258,7 @@ object HomeScreen : AppListRoute {
                     ContentTopInset(
                         current = { currentExpandedTopPx - barsState.collapsed.roundToInt() },
                         expanded = { currentExpandedTopPx },
+                        onContentPulledChange = barsState::contentPulledChanged,
                     )
                 }
                 AppSurface(
@@ -258,9 +268,10 @@ object HomeScreen : AppListRoute {
                     Row {
                         if (useRail && showMainNavigation) {
                             MainNavigationRail(
-                                selectedDestination,
-                                notificationModel.hasUnread,
-                                onDestinationSelected,
+                                selected = selectedDestination,
+                                hasUnread = notificationModel.hasUnread,
+                                onSelect = onDestinationSelected,
+                                onSearch = { navigator push GlobalSearchScreen },
                             )
                         }
                         Box(
@@ -275,6 +286,7 @@ object HomeScreen : AppListRoute {
                                         HomeDestination.Home -> HomeDestinationContent(
                                             model = model,
                                             pagerState = homePagerState,
+                                            locationSource = locationSource,
                                             activityFilter = activityFilter,
                                             hasBottomNavigation = !useRail && showMainNavigation,
                                         )
@@ -308,6 +320,7 @@ object HomeScreen : AppListRoute {
 private fun HomeDestinationContent(
     model: HomeScreenModel,
     pagerState: PagerState,
+    locationSource: HomeLocationSource,
     activityFilter: FriendActivityTimelineFilter,
     hasBottomNavigation: Boolean,
 ) {
@@ -329,13 +342,21 @@ private fun HomeDestinationContent(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             key = { HomeTab.entries[it].name },
         ) { page ->
-            stateHolder.SaveableStateProvider(HomeTab.entries[page].name) {
-                when (HomeTab.entries[page]) {
+            val tab = HomeTab.entries[page]
+            // 位置页两种来源各存各的列表状态，换回来时还在原来的位置
+            val pageKey = when (tab) {
+                HomeTab.Location -> "${'$'}{tab.name}:${'$'}{locationSource.name}"
+                HomeTab.Activity -> tab.name
+            }
+            stateHolder.SaveableStateProvider(pageKey) {
+                when (tab) {
                     HomeTab.Location -> Box(Modifier.fillMaxSize()) {
                         CompositionLocalProvider(LocalSharedSuffixKey provides FriendLocationPager.title) {
-                            FriendLocationPager.Content(
-                                isActive = { pagerState.settledPage == HomeTab.Location.ordinal },
-                            )
+                            val isActive = { pagerState.settledPage == HomeTab.Location.ordinal }
+                            when (locationSource) {
+                                HomeLocationSource.Friends -> FriendLocationPager.Content(isActive = isActive)
+                                HomeLocationSource.Groups -> GroupInstancePager(isActive = isActive)
+                            }
                         }
                     }
                     HomeTab.Activity -> if (activityActivated) {
@@ -356,93 +377,120 @@ private fun HomeDestinationContent(
 @Composable
 private fun HomeTabRow(
     pagerState: PagerState,
+    locationSource: HomeLocationSource,
+    onLocationSourceSelected: (HomeLocationSource) -> Unit,
     activityFilter: FriendActivityTimelineFilter,
     onActivityFilterSelected: (FriendActivityTimelineFilter) -> Unit,
-    onReselect: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var activityFilterMenuExpanded by remember { mutableStateOf(false) }
+    var menuTab by remember { mutableStateOf<HomeTab?>(null) }
     AppTabRow(selectedTabIndex = pagerState.currentPage) {
         HomeTab.entries.forEachIndexed { index, tab ->
             AppTab(
                 selected = index == pagerState.currentPage,
                 onClick = {
-                    if (tab == HomeTab.Activity) {
-                        if (index == pagerState.settledPage && !pagerState.isScrollInProgress) {
-                            activityFilterMenuExpanded = true
-                        } else {
-                            scope.launch { pagerState.animateScrollToTab(index) }
-                        }
-                    } else if (index == pagerState.currentPage && !pagerState.isScrollInProgress) {
-                        onReselect()
+                    // 已经选中的标签再点一次，拉出下拉框换这一页显示的内容
+                    if (index == pagerState.settledPage && !pagerState.isScrollInProgress) {
+                        menuTab = tab
                     } else {
                         scope.launch { pagerState.animateScrollToTab(index) }
                     }
                 },
                 text = {
-                    if (tab == HomeTab.Location) {
-                        AppText(
-                            strings.homeTabLocation,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    } else {
-                        Box {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                AppText(
-                                    strings.homeTabActivity,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                AppIcon(
-                                    imageVector = if (activityFilterMenuExpanded) {
-                                        AppIcons.ExpandLess
-                                    } else {
-                                        AppIcons.ExpandMore
-                                    },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                            AppMenu(
-                                expanded = activityFilterMenuExpanded,
-                                onDismissRequest = { activityFilterMenuExpanded = false },
-                                modifier = Modifier.widthIn(min = 200.dp),
-                            ) {
-                                FriendActivityTimelineFilter.entries.forEach { option ->
-                                    val isSelected = option == activityFilter
-                                    AppMenuItem(
-                                        text = { AppText(option.label()) },
-                                        onClick = {
-                                            activityFilterMenuExpanded = false
-                                            onActivityFilterSelected(option)
-                                        },
-                                        leadingIcon = {
-                                            Box(
-                                                modifier = Modifier.size(20.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                if (isSelected) {
-                                                    AppIcon(
-                                                        imageVector = AppIcons.Check,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(20.dp),
-                                                    )
-                                                }
-                                            }
-                                        },
-                                    )
-                                }
-                            }
+                    Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            AppText(
+                                text = when (tab) {
+                                    HomeTab.Location -> strings.homeTabLocation
+                                    HomeTab.Activity -> strings.homeTabActivity
+                                },
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            AppIcon(
+                                imageVector = if (menuTab == tab) {
+                                    AppIcons.ExpandLess
+                                } else {
+                                    AppIcons.ExpandMore
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        val dismiss = { menuTab = null }
+                        when (tab) {
+                            HomeTab.Location -> HomeTabOptionsMenu(
+                                expanded = menuTab == tab,
+                                onDismissRequest = dismiss,
+                                options = HomeLocationSource.entries,
+                                selected = locationSource,
+                                label = { it.label() },
+                                onSelected = onLocationSourceSelected,
+                            )
+                            HomeTab.Activity -> HomeTabOptionsMenu(
+                                expanded = menuTab == tab,
+                                onDismissRequest = dismiss,
+                                options = FriendActivityTimelineFilter.entries,
+                                selected = activityFilter,
+                                label = { it.label() },
+                                onSelected = onActivityFilterSelected,
+                            )
                         }
                     }
                 },
             )
         }
     }
+}
+
+/** 标签上的下拉框：这一页显示哪一种内容，选中项打对勾。 */
+@Composable
+private fun <T> HomeTabOptionsMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> String,
+    onSelected: (T) -> Unit,
+) {
+    AppMenu(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        modifier = Modifier.widthIn(min = 200.dp),
+    ) {
+        options.forEach { option ->
+            AppMenuItem(
+                text = { AppText(label(option)) },
+                onClick = {
+                    onDismissRequest()
+                    onSelected(option)
+                },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier.size(20.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (option == selected) {
+                            AppIcon(
+                                imageVector = AppIcons.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeLocationSource.label(): String = when (this) {
+    HomeLocationSource.Friends -> strings.homeLocationSourceFriends
+    HomeLocationSource.Groups -> strings.groupInstances
 }
 
 @Composable
@@ -616,17 +664,6 @@ private fun HomeIdentity(
 }
 
 @Composable
-private fun NotificationRefreshAction(model: NotificationCenterModel) {
-    AppIconButton(enabled = !model.isRefreshing, onClick = model::refreshAllNotification) {
-        if (model.isRefreshing) {
-            AppActivityIndicator(Modifier.size(20.dp))
-        } else {
-            AppIcon(AppIcons.Refresh, strings.notificationRefresh)
-        }
-    }
-}
-
-@Composable
 private fun HomePersonalDrawer(
     model: HomeScreenModel,
     drawerState: AppDrawerState,
@@ -711,40 +748,57 @@ private fun CurrentUserData.toPersonalDrawerUser() = PersonalDrawerUser(
     location = location,
 )
 
+/** 底栏：标签栏 + 右侧独立的搜索圆钮（全局搜索三个页面都用得上），两块玻璃一起居中。 */
 @Composable
 private fun MainNavigationBar(
     selected: HomeDestination,
     hasUnread: Boolean,
     onSelect: (HomeDestination) -> Unit,
+    onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val bottomPadding = getInsetPadding(12, WindowInsets::getBottom)
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, end = 28.dp, bottom = bottomPadding),
+            .padding(start = 16.dp, end = 16.dp, bottom = bottomPadding),
         contentAlignment = Alignment.Center,
     ) {
-        AppTabBar(
+        val spacing = 10.dp
+        // 窄屏放不下时压缩标签，搜索钮保持圆形
+        val itemWidth = appTabBarItemWidth(
+            availableWidth = maxWidth - AppSize.tabBar - spacing,
             itemCount = HomeDestination.entries.size,
-            selectedIndex = selected.ordinal,
-            onSelect = { onSelect(HomeDestination.entries[it]) },
-            itemWidth = 78.dp,
-        ) { index, isSelected ->
-            val destination = HomeDestination.entries[index]
-            val presentation = destination.presentation()
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                MainDestinationIcon(
-                    presentation = presentation,
-                    selected = isSelected,
-                    unread = destination == HomeDestination.Notifications && hasUnread,
-                    modifier = Modifier.size(24.dp),
-                    tint = LocalContentColor.current,
-                )
-                AppText(presentation.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            preferred = 78.dp,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppTabBar(
+                itemCount = HomeDestination.entries.size,
+                selectedIndex = selected.ordinal,
+                onSelect = { onSelect(HomeDestination.entries[it]) },
+                itemWidth = itemWidth,
+            ) { index, isSelected ->
+                val destination = HomeDestination.entries[index]
+                val presentation = destination.presentation()
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    MainDestinationIcon(
+                        presentation = presentation,
+                        selected = isSelected,
+                        unread = destination == HomeDestination.Notifications && hasUnread,
+                        modifier = Modifier.size(24.dp),
+                        tint = LocalContentColor.current,
+                    )
+                    AppText(presentation.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            AppTabBarAccessoryButton(onClick = onSearch) {
+                AppIcon(AppIcons.Search, strings.fiendListPagerSearch, Modifier.size(24.dp))
             }
         }
     }
@@ -755,6 +809,7 @@ private fun MainNavigationRail(
     selected: HomeDestination,
     hasUnread: Boolean,
     onSelect: (HomeDestination) -> Unit,
+    onSearch: () -> Unit,
 ) {
     AppNavigationRail(
         Modifier.fillMaxHeight(),
@@ -776,6 +831,13 @@ private fun MainNavigationRail(
                 label = { AppText(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
             )
         }
+        // 搜索排在页面之后（iOS 26 的搜索标签）：点了进搜索页，不改变选中的页面
+        AppNavigationRailItem(
+            selected = false,
+            onClick = onSearch,
+            icon = { AppIcon(AppIcons.Search, strings.fiendListPagerSearch, Modifier.size(24.dp)) },
+            label = { AppText(strings.fiendListPagerSearch, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        )
         Spacer(Modifier.weight(1f))
     }
 }

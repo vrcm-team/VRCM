@@ -15,6 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
@@ -22,6 +29,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.vrcmteam.vrcm.core.shared.AppConst.APP_NAME
+import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.di.commonModules
 import io.github.vrcmteam.vrcm.di.modules.platformModule
 import io.github.vrcmteam.vrcm.presentation.compoments.DesktopWindowTitleBar
@@ -49,6 +57,10 @@ fun main() = run {
             title = APP_NAME,
             icon = painterResource(Res.drawable.logo),
             undecorated = true,
+            onKeyEvent = { event ->
+                // 鼠标没法下拉刷新：刷新快捷键交给当前显示着的列表
+                event.isRefreshShortcut() && SharedFlowCentre.refreshRequest.tryEmit(Unit)
+            },
         ) {
             LaunchedEffect(window) {
                 window.minimumSize = Dimension(760, 560)
@@ -63,6 +75,10 @@ fun main() = run {
         }
     }
 }
+
+/** F5，或 Ctrl+R（Windows / Linux）、⌘R（macOS）。 */
+private fun KeyEvent.isRefreshShortcut(): Boolean =
+    type == KeyEventType.KeyDown && (key == Key.F5 || (key == Key.R && (isCtrlPressed || isMetaPressed)))
 
 @Composable
 fun AppDesktopPreview() {

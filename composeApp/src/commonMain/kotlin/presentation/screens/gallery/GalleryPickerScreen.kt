@@ -33,6 +33,7 @@ import io.github.vrcmteam.vrcm.network.api.files.data.FileData
 import io.github.vrcmteam.vrcm.network.api.files.data.FileStatus
 import io.github.vrcmteam.vrcm.network.api.files.data.FileTagType
 import io.github.vrcmteam.vrcm.presentation.compoments.EmptyContent
+import io.github.vrcmteam.vrcm.presentation.compoments.ListStateOverlay
 import io.github.vrcmteam.vrcm.presentation.compoments.RefreshBox
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
@@ -145,6 +146,11 @@ data class GalleryPickerScreen(val sessionId: String) : AppRoute {
                         }
                     }
                 }
+                // 自动加载不再把内容顶下来露出指示器：还没有内容时在中间放一个
+                ListStateOverlay(
+                    isEmpty = files.isEmpty(),
+                    isLoading = galleryScreenModel.isRefreshingByTag(FileTagType.Gallery),
+                )
             }
         }
     }

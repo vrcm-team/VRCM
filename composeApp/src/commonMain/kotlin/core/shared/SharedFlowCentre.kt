@@ -5,6 +5,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.service.data.AccountDto
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -73,6 +74,12 @@ object SharedFlowCentre {
     val toastText = MutableSharedFlow<ToastText>()
 
     val toPagerTop = MutableSharedFlow<Unit>()
+
+    /**
+     * 刷新快捷键（桌面端的 F5 / Ctrl+R / ⌘R）：当前显示着的可刷新列表收到后刷新自己。
+     * 从按键回调里用 tryEmit 发，所以留一格缓冲；连按只保留最后一次。
+     */
+    val refreshRequest = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     suspend fun emitAuthenticated(account: AccountDto) {
         _authed.emit(sessionRegistry.authenticate(account))
