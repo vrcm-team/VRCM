@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
@@ -171,7 +172,7 @@ internal class FriendActivityTrackingState(
 
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalTime::class)
 class FriendActivityService internal constructor(
-    friendService: FriendService,
+    private val friendService: FriendService,
     private val store: RoomFriendActivityStore,
     private val worldsApi: WorldsApi,
     private val logger: Logger,
@@ -287,7 +288,7 @@ class FriendActivityService internal constructor(
                         .distinct()
                         .forEach { worldId -> resolveWorldName(session.account.userId, worldId) }
                 }
-                .map { events -> events.mapNotNull(FriendActivityEventEntity::toEventOrNull) }
+                .mapToEventsWithCurrentFriendIcons()
         }
     }
 
@@ -306,9 +307,8 @@ class FriendActivityService internal constructor(
                         .distinct()
                         .forEach { worldId -> resolveWorldName(token.userId, worldId) }
                 }
-            }.mapNotNull { events ->
+            }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
                 events.takeIf { SharedFlowCentre.isCurrentSession(token) }
-                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
             }
 
     fun observeAllEventsBefore(
@@ -332,9 +332,8 @@ class FriendActivityService internal constructor(
                         .distinct()
                         .forEach { worldId -> resolveWorldName(token.userId, worldId) }
                 }
-            }.mapNotNull { events ->
+            }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
                 events.takeIf { SharedFlowCentre.isCurrentSession(token) }
-                    ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
             }
 
     fun observeAllEventsThrough(
@@ -358,9 +357,18 @@ class FriendActivityService internal constructor(
                     .distinct()
                     .forEach { worldId -> resolveWorldName(token.userId, worldId) }
             }
-        }.mapNotNull { events ->
+        }.mapToEventsWithCurrentFriendIcons().mapNotNull { events ->
             events.takeIf { SharedFlowCentre.isCurrentSession(token) }
-                ?.mapNotNull(FriendActivityEventEntity::toEventOrNull)
+        }
+
+    private fun Flow<List<FriendActivityEventEntity>>.mapToEventsWithCurrentFriendIcons(): Flow<List<FriendActivityEvent>> =
+        combine(friendService.friendState) { entities, friends ->
+            entities.mapNotNull { entity ->
+                entity.toEventOrNull()?.let { event ->
+                    val iconUrl = friends[event.friendUserId]?.iconUrl
+                    if (iconUrl.isNullOrBlank()) event else event.copy(profileImageUrl = iconUrl)
+                }
+            }
         }
 
     fun observeRecentTogether(
@@ -515,7 +523,8 @@ private fun FriendActivitySourceSnapshot.toInputSnapshot(
         FriendActivityObservation(
             userId = friend.id,
             displayName = friend.displayName,
-            profileImageUrl = friend.profileImageUrl,
+            // Keep activity avatars aligned with the friend location cards, which use iconUrl.
+            profileImageUrl = friend.iconUrl,
             location = friend.location,
             status = friend.status.value,
             statusDescription = friend.statusDescription,
