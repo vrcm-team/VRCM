@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.presentation.screens.auth
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -12,6 +13,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
 import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.presentation.compoments.AuthFold
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.service.VersionService
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -53,12 +55,19 @@ object StartupAnimeScreen : AppRoute {
                 label = "AuthSurfaceAlpha",
                 finishedListener = {  current replace AuthScreen }
             )
+            // 开屏是纯色底（与 iOS 启动屏 LaunchBackground 一致），随 logo 上移过渡到登录页的强调色浅底
+            val backgroundColor by animateColorAsState(
+                if (isStartUp) AppTheme.colors.tintSoft else AppTheme.colors.secondaryGroupedBackground,
+                tween(durationMillis),
+                label = "StartupBackground"
+            )
             AuthFold(
                 authUIState = authScreenModel.uiState,
                 iconYOffset = iconYOffset,
                 cardYOffset = authSurfaceOffset,
                 cardAlpha = authSurfaceAlpha,
                 cardHeightDp = maxHeight.times(0.42f),
+                backgroundColor = backgroundColor,
             )
         }
 

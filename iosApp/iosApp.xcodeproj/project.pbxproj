@@ -14,6 +14,7 @@
 		1FC04F412C9567B400F4E074 /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 1FC04F402C9567B400F4E074 /* Launch Screen.storyboard */; };
 		69F0D94E2886B7FCC481AFEE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B47CEEA79F9515185D9ADF9F /* PrivacyInfo.xcprivacy */; };
 		A6C367C9C107A9414C151CDB /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = CB6149C3392D3EA914A7809B /* InfoPlist.strings */; };
+		A73F6EBE86244AB8853327A9 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A6A61AC44958F03786C7D047 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +32,7 @@
 		9D99D79B8533533BE05B2E7E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		B5BB81D285317E0F567B1830 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		B5C5308BACE188E0271FEACD /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		A6A61AC44958F03786C7D047 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				1FAB711B2D3FA1D80069EA4E /* iosApp.entitlements */,
+				A6A61AC44958F03786C7D047 /* AppIcon.icon */,
 				058557BA273AAA24004C7B11 /* Assets.xcassets */,
 				7555FF82242A565900829871 /* ContentView.swift */,
 				7555FF8C242A565B00829871 /* Info.plist */,
@@ -170,6 +173,7 @@
 			files = (
 				058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */,
 				058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */,
+				A73F6EBE86244AB8853327A9 /* AppIcon.icon in Resources */,
 				1FC04F412C9567B400F4E074 /* Launch Screen.storyboard in Resources */,
 				69F0D94E2886B7FCC481AFEE /* PrivacyInfo.xcprivacy in Resources */,
 				A6C367C9C107A9414C151CDB /* InfoPlist.strings in Resources */,
