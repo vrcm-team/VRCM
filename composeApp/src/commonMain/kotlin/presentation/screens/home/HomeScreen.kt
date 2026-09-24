@@ -5,6 +5,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -22,6 +23,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.auth.data.CurrentUserData
@@ -81,6 +83,9 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Serializable
 object HomeScreen : AppListRoute {
+    // 分栏时列表栏里还常驻着竖排标签栏：在它之外再给列表内容留一部 iPhone 的宽度
+    override val minListPaneWidth: Dp get() = MainNavigationRailWidth + ListPaneContentMinWidth
+
     @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
     override fun Content() {
@@ -195,87 +200,92 @@ object HomeScreen : AppListRoute {
             drawerState = drawerState,
             gesturesEnabled = model.drawerVisible || drawerState.isOpen,
         ) {
-            AppScaffold(
-                containerColor = pageColor,
-                topBar = {
-                    if (showMainNavigation) {
-                        // 顶部容器 = 身份栏 + 当前页面的标签条：一整块模糊玻璃，内容从它下面滚过；随滚动整体收起
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .collapseUpwardWith(barsState)
-                                .glassBar(pageColor),
-                        ) {
-                            Column(Modifier.fadeOutWith(barsState)) {
-                                // 平时身份栏右侧没有按钮：刷新靠下拉，搜索在底栏；只有收藏页批量选择期间才出现动作
-                                HomeIdentityTopBar(model = model) {
-                                    if (selectedDestination == HomeDestination.Favorites) {
-                                        FavoritesHubSelectionActions(
-                                            selectedTab = selectedFavoritesTab,
-                                            favoritesModel = requireNotNull(friendListModel),
-                                            groupsModel = requireNotNull(groupsModel),
-                                        )
+            // 宽屏：标签栏竖在最左侧，独占一整列；顶部容器和内容只占右边这一栏
+            Row(Modifier.fillMaxSize().background(pageColor)) {
+                if (useRail && showMainNavigation) {
+                    MainNavigationRail(
+                        selected = selectedDestination,
+                        hasUnread = notificationModel.hasUnread,
+                        onSelect = onDestinationSelected,
+                        onSearch = { navigator push GlobalSearchScreen },
+                    )
+                }
+                AppScaffold(
+                    modifier = Modifier.weight(1f),
+                    containerColor = pageColor,
+                    topBar = {
+                        if (showMainNavigation) {
+                            // 顶部容器 = 身份栏 + 当前页面的标签条：一整块模糊玻璃，内容从它下面滚过；随滚动整体收起
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .collapseUpwardWith(barsState)
+                                    .glassBar(pageColor),
+                            ) {
+                                Column(Modifier.fadeOutWith(barsState)) {
+                                    // 平时身份栏右侧没有按钮：刷新靠下拉，搜索在标签栏旁的圆钮；只有收藏页批量选择期间才出现动作
+                                    HomeIdentityTopBar(model = model) {
+                                        if (selectedDestination == HomeDestination.Favorites) {
+                                            FavoritesHubSelectionActions(
+                                                selectedTab = selectedFavoritesTab,
+                                                favoritesModel = requireNotNull(friendListModel),
+                                                groupsModel = requireNotNull(groupsModel),
+                                            )
+                                        }
                                     }
-                                }
-                                when (selectedDestination) {
-                                    HomeDestination.Home -> HomeTabRow(
-                                        pagerState = homePagerState,
-                                        locationSource = locationSource,
-                                        onLocationSourceSelected = { locationSourceIndex = it.ordinal },
-                                        activityFilter = activityFilter,
-                                        onActivityFilterSelected = { activityFilterIndex = it.ordinal },
-                                    )
-                                    HomeDestination.Favorites -> FavoritesHubTabRow(favoritesPagerState)
-                                    HomeDestination.Notifications -> Unit
+                                    when (selectedDestination) {
+                                        HomeDestination.Home -> HomeTabRow(
+                                            pagerState = homePagerState,
+                                            locationSource = locationSource,
+                                            onLocationSourceSelected = { locationSourceIndex = it.ordinal },
+                                            activityFilter = activityFilter,
+                                            onActivityFilterSelected = { activityFilterIndex = it.ordinal },
+                                            modifier = Modifier.widthIn(max = HomeTabRowMaxWidth),
+                                        )
+                                        HomeDestination.Favorites -> FavoritesHubTabRow(
+                                            pagerState = favoritesPagerState,
+                                            modifier = Modifier.widthIn(max = HomeTabRowMaxWidth),
+                                        )
+                                        HomeDestination.Notifications -> Unit
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-                bottomBar = {
-                    if (!useRail && showMainNavigation) {
-                        MainNavigationBar(
-                            selected = selectedDestination,
-                            hasUnread = notificationModel.hasUnread,
-                            onSelect = onDestinationSelected,
-                            onSearch = { navigator push GlobalSearchScreen },
-                            modifier = Modifier.slideOutDownwardWith(barsState),
-                        )
-                    }
-                },
-            ) { contentPadding ->
-                // 顶部容器能收起的只有状态栏以下的那一段；内容铺在它下面，列表自己把它盖住的高度让出来
-                val expandedTop = contentPadding.calculateTopPadding()
-                val statusBarTop = getInsetPadding(WindowInsets::getTop)
-                val (expandedTopPx, collapseRangePx) = with(LocalDensity.current) {
-                    expandedTop.roundToPx() to (expandedTop - statusBarTop).toPx()
-                }
-                SideEffect { barsState.updateCollapseRange(collapseRangePx) }
-                val currentExpandedTopPx by rememberUpdatedState(expandedTopPx)
-                val contentTopInset = remember(barsState) {
-                    ContentTopInset(
-                        current = { currentExpandedTopPx - barsState.collapsed.roundToInt() },
-                        expanded = { currentExpandedTopPx },
-                        onContentPulledChange = barsState::contentPulledChanged,
-                    )
-                }
-                AppSurface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = pageColor,
-                ) {
-                    Row {
-                        if (useRail && showMainNavigation) {
-                            MainNavigationRail(
+                    },
+                    bottomBar = {
+                        if (!useRail && showMainNavigation) {
+                            MainNavigationBar(
                                 selected = selectedDestination,
                                 hasUnread = notificationModel.hasUnread,
                                 onSelect = onDestinationSelected,
                                 onSearch = { navigator push GlobalSearchScreen },
+                                modifier = Modifier.slideOutDownwardWith(barsState),
                             )
                         }
+                    },
+                ) { contentPadding ->
+                    // 顶部容器能收起的只有状态栏以下的那一段；内容铺在它下面，列表自己把它盖住的高度让出来
+                    val expandedTop = contentPadding.calculateTopPadding()
+                    val statusBarTop = getInsetPadding(WindowInsets::getTop)
+                    val (expandedTopPx, collapseRangePx) = with(LocalDensity.current) {
+                        expandedTop.roundToPx() to (expandedTop - statusBarTop).toPx()
+                    }
+                    SideEffect { barsState.updateCollapseRange(collapseRangePx) }
+                    val currentExpandedTopPx by rememberUpdatedState(expandedTopPx)
+                    val contentTopInset = remember(barsState) {
+                        ContentTopInset(
+                            current = { currentExpandedTopPx - barsState.collapsed.roundToInt() },
+                            expanded = { currentExpandedTopPx },
+                            onContentPulledChange = barsState::contentPulledChanged,
+                        )
+                    }
+                    AppSurface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = pageColor,
+                    ) {
                         Box(
                             Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
+                                .fillMaxSize()
                                 .nestedScroll(barsConnection),
                         ) {
                             CompositionLocalProvider(LocalContentTopInset provides contentTopInset) {
@@ -379,10 +389,11 @@ private fun HomeTabRow(
     onLocationSourceSelected: (HomeLocationSource) -> Unit,
     activityFilter: FriendActivityTimelineFilter,
     onActivityFilterSelected: (FriendActivityTimelineFilter) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     var menuTab by remember { mutableStateOf<HomeTab?>(null) }
-    AppTabRow(selectedTabIndex = pagerState.currentPage) {
+    AppTabRow(selectedTabIndex = pagerState.currentPage, modifier = modifier) {
         HomeTab.entries.forEachIndexed { index, tab ->
             AppTab(
                 selected = index == pagerState.currentPage,
@@ -761,21 +772,7 @@ private fun MainNavigationBar(
                 onSelect = { onSelect(HomeDestination.entries[it]) },
                 itemWidth = itemWidth,
             ) { index, isSelected ->
-                val destination = HomeDestination.entries[index]
-                val presentation = destination.presentation()
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
-                ) {
-                    MainDestinationIcon(
-                        presentation = presentation,
-                        selected = isSelected,
-                        unread = destination == HomeDestination.Notifications && hasUnread,
-                        modifier = Modifier.size(24.dp),
-                        tint = LocalContentColor.current,
-                    )
-                    AppText(presentation.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                MainDestinationTab(HomeDestination.entries[index], isSelected, hasUnread)
             }
             AppTabBarAccessoryButton(onClick = onSearch) {
                 AppIcon(AppIcons.Search, strings.fiendListPagerSearch, Modifier.size(24.dp))
@@ -784,6 +781,7 @@ private fun MainNavigationBar(
     }
 }
 
+/** 宽屏：同一套玻璃标签栏竖在页面前缘，搜索圆钮在它下面，整组在这一列里竖直居中。 */
 @Composable
 private fun MainNavigationRail(
     selected: HomeDestination,
@@ -791,46 +789,56 @@ private fun MainNavigationRail(
     onSelect: (HomeDestination) -> Unit,
     onSearch: () -> Unit,
 ) {
-    AppNavigationRail(
-        Modifier.fillMaxHeight(),
-        containerColor = AppTheme.colors.secondaryGroupedBackground,
+    Column(
+        Modifier
+            .fillMaxHeight()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start))
+            .padding(horizontal = MainNavigationRailMargin, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.weight(1f))
-        HomeDestination.entries.forEach { destination ->
-            val presentation = destination.presentation()
-            AppNavigationRailItem(
-                selected = selected == destination,
-                onClick = { onSelect(destination) },
-                icon = {
-                    MainDestinationIcon(
-                        presentation = presentation,
-                        selected = selected == destination,
-                        unread = destination == HomeDestination.Notifications && hasUnread,
-                    )
-                },
-                label = { AppText(presentation.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            )
+        AppSideTabBar(
+            itemCount = HomeDestination.entries.size,
+            selectedIndex = selected.ordinal,
+            onSelect = { onSelect(HomeDestination.entries[it]) },
+        ) { index, isSelected ->
+            MainDestinationTab(HomeDestination.entries[index], isSelected, hasUnread)
         }
-        // 搜索排在页面之后（iOS 26 的搜索标签）：点了进搜索页，不改变选中的页面
-        AppNavigationRailItem(
-            selected = false,
-            onClick = onSearch,
-            icon = { AppIcon(AppIcons.Search, strings.fiendListPagerSearch, Modifier.size(24.dp)) },
-            label = { AppText(strings.fiendListPagerSearch, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-        )
-        Spacer(Modifier.weight(1f))
+        AppTabBarAccessoryButton(onClick = onSearch) {
+            AppIcon(AppIcons.Search, strings.fiendListPagerSearch, Modifier.size(24.dp))
+        }
     }
 }
 
+/** 竖排标签栏两侧的留白。 */
+private val MainNavigationRailMargin = 12.dp
+
+/** 宽屏最左侧那一列：竖排标签栏加两侧留白。 */
+private val MainNavigationRailWidth = appSideTabBarWidth() + MainNavigationRailMargin * 2
+
+/** 分栏时列表内容至少留一部 iPhone 的宽度：四段的收藏标签在这个宽度下才放得下完整文字。 */
+private val ListPaneContentMinWidth = 390.dp
+
+/** 宽屏上页面标签条（分段控件）的最大宽度：再宽只会把每一段拉得很长。 */
+private val HomeTabRowMaxWidth = 480.dp
+
+/** 标签栏里的一项：图标 + 单词标签，底栏和侧栏共用。 */
 @Composable
-private fun MainDestinationIcon(presentation: MainDestinationPresentation, selected: Boolean, unread: Boolean) {
-    MainDestinationIcon(
-        presentation = presentation,
-        selected = selected,
-        unread = unread,
-        modifier = Modifier.size(24.dp),
-        tint = LocalContentColor.current,
-    )
+private fun MainDestinationTab(destination: HomeDestination, selected: Boolean, hasUnread: Boolean) {
+    val presentation = destination.presentation()
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        MainDestinationIcon(
+            presentation = presentation,
+            selected = selected,
+            unread = destination == HomeDestination.Notifications && hasUnread,
+            modifier = Modifier.size(24.dp),
+            tint = LocalContentColor.current,
+        )
+        AppText(presentation.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 @Composable

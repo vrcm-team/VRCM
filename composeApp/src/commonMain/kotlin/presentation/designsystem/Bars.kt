@@ -7,12 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -136,10 +135,41 @@ fun AppTabBar(
     itemWidth: Dp = 72.dp,
     item: @Composable (index: Int, selected: Boolean) -> Unit,
 ) {
+    GlassTabBar(vertical = false, itemCount, selectedIndex, onSelect, modifier, itemWidth, item)
+}
+
+/**
+ * 宽屏的侧边标签栏：把 [AppTabBar] 竖过来贴在页面前缘（visionOS 标签栏的放法），同一种玻璃胶囊、选中胶囊和动效。
+ * 每项与横排标签同高、宽 [itemWidth]；全局动作（搜索）照样用 [AppTabBarAccessoryButton] 单独放在旁边。
+ */
+@Composable
+fun AppSideTabBar(
+    itemCount: Int,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    itemWidth: Dp = 72.dp,
+    item: @Composable (index: Int, selected: Boolean) -> Unit,
+) {
+    GlassTabBar(vertical = true, itemCount, selectedIndex, onSelect, modifier, itemWidth, item)
+}
+
+@Composable
+private fun GlassTabBar(
+    vertical: Boolean,
+    itemCount: Int,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier,
+    itemWidth: Dp,
+    item: @Composable (index: Int, selected: Boolean) -> Unit,
+) {
     val c = AppTheme.colors
     val motion = AppTheme.motion
     val density = LocalDensity.current
     val gap = TabBarItemGap
+    // 竖排时每项与横排标签同高：两种栏里的标签内容是同一个尺寸
+    val itemHeight = AppSize.tabBar - TabBarPadding * 2
     // 选中底的位置：以标签序号为单位做弹簧插值，画在所有标签后面。记住起点，路上按进度让胶囊先胀大再缩回。
     val indicator = remember { Animatable(selectedIndex.toFloat()) }
     var from by remember { mutableFloatStateOf(selectedIndex.toFloat()) }
@@ -151,64 +181,106 @@ fun AppTabBar(
             indicator.animateTo(selectedIndex.toFloat(), spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow))
         }
     }
-    val pill = if (c.isDark) c.label.copy(alpha = 0.14f) else c.systemBackground.copy(alpha = 0.8f)
-    Row(
-        modifier
-            .glass(CircleShape)
-            .height(AppSize.tabBar)
-            .padding(TabBarPadding)
-            .drawBehind {
-                if (itemCount <= 0) return@drawBehind
-                val slot = with(density) { itemWidth.toPx() }
-                val gapPx = with(density) { gap.toPx() }
-                val pos = indicator.value
-                val total = selectedIndex - from
-                val progress = if (abs(total) < 0.001f || motion.reduced) 1f else ((pos - from) / total).coerceIn(0f, 1f)
-                // sin(π) 在浮点里略小于 0，负数开分数次方是 NaN → 先夹到 0
-                val grow = sin(PI.toFloat() * progress).coerceIn(0f, 1f).pow(0.5f)
-                val w = slot * (1f + 0.30f * grow)
-                val h = size.height * (1f + 0.16f * grow)
-                val cx = pos * (slot + gapPx) + slot / 2f
-                drawRoundRect(pill, topLeft = Offset(cx - w / 2f, (size.height - h) / 2f), size = Size(w, h), cornerRadius = CornerRadius(h / 2f))
-            },
-        horizontalArrangement = Arrangement.spacedBy(gap),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(itemCount) { index ->
-            val selected = index == selectedIndex
-            val foreground by animateColorAsState(
-                if (selected) c.tint else c.secondaryLabel,
-                if (motion.reduced) snap() else tween(motion.normalMs),
-                label = "tabColor",
-            )
-            // 新选中时内容轻弹一下（1 → 1.12 → 1）
-            val bounce = remember { Animatable(1f) }
-            LaunchedEffect(selected) {
-                if (selected && !motion.reduced) {
-                    bounce.animateTo(1.12f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
-                    bounce.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
-                } else {
-                    bounce.snapTo(1f)
-                }
+    // 选中胶囊要和玻璃拉开对比：浅色玻璃透出下面的模糊内容时，胶囊是更亮的一块；
+    // 没有可模糊的背景（侧边栏）、降低透明度或平台不支持模糊时，玻璃退成近乎不透明的白，亮胶囊会看不见，改用灰色填充
+    val glassBlurs = rememberGlassSpec(backdropAvailable = LocalGlassBackdrop.current != null).blurEnabled
+    val pill = when {
+        c.isDark -> c.label.copy(alpha = 0.14f)
+        glassBlurs -> c.systemBackground.copy(alpha = 0.8f)
+        else -> c.fill
+    }
+    val barModifier = modifier
+        .glass(TabBarShape)
+        .then(if (vertical) Modifier.width(itemWidth + TabBarPadding * 2) else Modifier.height(AppSize.tabBar))
+        .padding(TabBarPadding)
+        .drawBehind {
+            if (itemCount <= 0) return@drawBehind
+            // 沿排列方向的一格：横排是标签宽，竖排是标签高
+            val slot = with(density) { (if (vertical) itemHeight else itemWidth).toPx() }
+            val gapPx = with(density) { gap.toPx() }
+            val pos = indicator.value
+            val total = selectedIndex - from
+            val progress = if (abs(total) < 0.001f || motion.reduced) 1f else ((pos - from) / total).coerceIn(0f, 1f)
+            // sin(π) 在浮点里略小于 0，负数开分数次方是 NaN → 先夹到 0
+            val grow = sin(PI.toFloat() * progress).coerceIn(0f, 1f).pow(0.5f)
+            // 沿排列方向胀 30%，另一个方向胀 16%
+            val along = slot * (1f + 0.30f * grow)
+            val across = (if (vertical) size.width else size.height) * (1f + 0.16f * grow)
+            val center = pos * (slot + gapPx) + slot / 2f
+            val pillSize = if (vertical) Size(across, along) else Size(along, across)
+            val topLeft = if (vertical) {
+                Offset((size.width - across) / 2f, center - along / 2f)
+            } else {
+                Offset(center - along / 2f, (size.height - across) / 2f)
             }
-            Box(
-                Modifier
-                    .width(itemWidth)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .semantics { this.selected = selected }
-                    .clickable(interactionSource = null, indication = null, role = Role.Tab) { onSelect(index) }
-                    .scale(bounce.value),
-                contentAlignment = Alignment.Center,
-            ) {
-                ProvideContentColor(foreground, AppTheme.type.caption2Emphasized) { item(index, selected) }
+            drawRoundRect(pill, topLeft, pillSize, CornerRadius(minOf(pillSize.width, pillSize.height) / 2f))
+        }
+    val itemModifier = if (vertical) Modifier.height(itemHeight).fillMaxWidth() else Modifier.width(itemWidth).fillMaxHeight()
+    val items: @Composable () -> Unit = {
+        repeat(itemCount) { index ->
+            TabBarItem(selected = index == selectedIndex, onClick = { onSelect(index) }, modifier = itemModifier) { selected ->
+                item(index, selected)
             }
         }
+    }
+    if (vertical) {
+        Column(barModifier, verticalArrangement = Arrangement.spacedBy(gap), horizontalAlignment = Alignment.CenterHorizontally) {
+            items()
+        }
+    } else {
+        Row(barModifier, horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
+            items()
+        }
+    }
+}
+
+/** 标签栏里的一项：前景色随选中渐变，新选中时内容轻弹一下（1 → 1.12 → 1）。 */
+@Composable
+private fun TabBarItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    content: @Composable (selected: Boolean) -> Unit,
+) {
+    val c = AppTheme.colors
+    val motion = AppTheme.motion
+    val foreground by animateColorAsState(
+        if (selected) c.tint else c.secondaryLabel,
+        if (motion.reduced) snap() else tween(motion.normalMs),
+        label = "tabColor",
+    )
+    val bounce = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected && !motion.reduced) {
+            bounce.animateTo(1.12f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+            bounce.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+        } else {
+            bounce.snapTo(1f)
+        }
+    }
+    Box(
+        modifier
+            .clip(CircleShape)
+            .semantics { this.selected = selected }
+            .clickable(interactionSource = null, indication = null, role = Role.Tab, onClick = onClick)
+            .scale(bounce.value),
+        contentAlignment = Alignment.Center,
+    ) {
+        ProvideContentColor(foreground, AppTheme.type.caption2Emphasized) { content(selected) }
     }
 }
 
 private val TabBarPadding = 6.dp
 private val TabBarItemGap = 2.dp
+
+/**
+ * 栏的圆角 = 选中胶囊的半径 + 内边距：选中胶囊走到两端时与栏的圆角同心。
+ * 横排时正好是整条胶囊；竖排时栏比选中胶囊宽，不能用胶囊形，否则两端的弧度对不上。
+ */
+private val TabBarShape = RoundedCornerShape(AppSize.tabBar / 2)
+
+/** 每项宽 [itemWidth] 的 [AppSideTabBar] 整条有多宽。 */
+fun appSideTabBarWidth(itemWidth: Dp = 72.dp): Dp = itemWidth + TabBarPadding * 2
 
 /** [AppTabBar] 要在 [availableWidth] 里放下 [itemCount] 项时，每项最多能有多宽（不超过 [preferred]）。 */
 fun appTabBarItemWidth(availableWidth: Dp, itemCount: Int, preferred: Dp = 72.dp): Dp {
@@ -240,60 +312,5 @@ fun AppTabBarAccessoryButton(
         contentAlignment = Alignment.Center,
     ) {
         ProvideContentColor(AppTheme.colors.secondaryLabel, content = content)
-    }
-}
-
-/**
- * 宽屏的侧边导航：竖排的图标 + 单词标签，选中项是淡色底胶囊。只导航、不执行动作（HIG Tab bars / Sidebars）。
- */
-@Composable
-fun AppNavigationRail(
-    modifier: Modifier = Modifier,
-    containerColor: Color = AppTheme.colors.secondaryGroupedBackground,
-    windowInsets: WindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(containerColor)
-            .windowInsetsPadding(windowInsets)
-            .width(80.dp)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        content = content,
-    )
-}
-
-@Composable
-fun AppNavigationRailItem(
-    selected: Boolean,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    label: (@Composable () -> Unit)? = null,
-) {
-    val c = AppTheme.colors
-    val motion = AppTheme.motion
-    val animation = if (motion.reduced) snap<Color>() else tween(motion.normalMs)
-    val foreground by animateColorAsState(if (selected) c.tint else c.secondaryLabel, animation, label = "railItemColor")
-    val container by animateColorAsState(if (selected) c.tintSoft else Color.Transparent, animation, label = "railItemContainer")
-    Column(
-        modifier = modifier
-            .width(68.dp)
-            .clip(AppShapes.m)
-            .background(container)
-            .semantics { this.selected = selected }
-            .clickable(interactionSource = null, indication = LocalIndication.current, enabled = enabled, role = Role.Tab, onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        ProvideContentColor(foreground, AppTheme.type.caption2Emphasized) {
-            icon()
-            label?.invoke()
-        }
     }
 }
