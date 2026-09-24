@@ -46,13 +46,13 @@ import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
 import io.github.vrcmteam.vrcm.presentation.theme.GameColor
 import io.github.vrcmteam.vrcm.service.AuthService
+import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 private val FriendIconItemWidth = 60.dp
-private val FriendIconVerticalSpacing = 16.dp
 
 @Composable
 fun UserStateIcon(
@@ -141,39 +141,45 @@ fun UserIconsRow(
     }
 }
 
+/** 好友头像网格在 [width] 宽度里能排的列数。 */
+fun userIconsGridColumns(width: Dp): Int = (width / FriendIconItemWidth).toInt().coerceAtLeast(1)
+
+/**
+ * 头像网格至少要几行才能铺满 [height]：每行按最矮算（只算正方形头像、不算名字）再加 [rowSpacing]，
+ * 估出来的行数只多不少。
+ */
+fun userIconsGridRowsToFill(height: Dp, rowSpacing: Dp): Int =
+    ceil(height / (FriendIconItemWidth + rowSpacing)).toInt().coerceAtLeast(1)
+
+/**
+ * 好友头像网格的一行。人多的名单在懒加载列表里按行拆成 item（列数用 [userIconsGridColumns] 算），
+ * 只组合看得见的行；每行都排满 [columns] 个列位，不足的补空位，各行的列位对齐。
+ */
 @Composable
-fun UserIconsFlowRow(
+fun UserIconsGridRow(
     modifier: Modifier = Modifier,
     friends: List<State<FriendData>>,
+    columns: Int,
     onClickUserIcon: (FriendData, String) -> Unit,
 ) {
-    if (friends.isEmpty()) return
-    BoxWithConstraints(modifier = modifier) {
-        // 按头像宽度确定最大列数，再补齐末行，让每一行复用同一组列位。
-        val maxItemsInEachRow = (maxWidth / FriendIconItemWidth).toInt().coerceAtLeast(1)
-        val trailingSlotCount =
-            (maxItemsInEachRow - friends.size % maxItemsInEachRow) % maxItemsInEachRow
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(FriendIconVerticalSpacing),
-            maxItemsInEachRow = maxItemsInEachRow,
-        ) {
-            friends.forEach { friendState ->
-                val friend = friendState.value
-                key(friend.id) {
-                    LocationFriendContent(
-                        id = friend.id,
-                        iconUrl = friend.iconUrl,
-                        name = friend.displayName,
-                        userStatus = friend.status,
-                        location = friend.location,
-                    ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
-                }
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        friends.forEach { friendState ->
+            val friend = friendState.value
+            key(friend.id) {
+                LocationFriendContent(
+                    id = friend.id,
+                    iconUrl = friend.iconUrl,
+                    name = friend.displayName,
+                    userStatus = friend.status,
+                    location = friend.location,
+                ) { sharedSuffixKey -> onClickUserIcon(friend, sharedSuffixKey) }
             }
-            repeat(trailingSlotCount) {
-                Spacer(modifier = Modifier.width(FriendIconItemWidth))
-            }
+        }
+        repeat(columns - friends.size) {
+            Spacer(modifier = Modifier.width(FriendIconItemWidth))
         }
     }
 }

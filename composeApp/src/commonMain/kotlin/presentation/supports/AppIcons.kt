@@ -571,6 +571,22 @@ object AppIcons {
         symbol("desktopcomputer") { stroke { roundRect(3f, 4f, 18f, 12f, 2.2f); line(12f, 16f, 12f, 19.8f); line(8f, 20f, 16f, 20f) } }
     }
 
+    /** globe：在网页上在线（不在游戏里）。 */
+    val Globe: ImageVector by lazy {
+        symbol("globe") {
+            stroke {
+                circle(12f, 12f, 9.2f)
+                moveTo(12f, 2.8f)
+                arcTo(4.2f, 9.2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 12f, 21.2f)
+                arcTo(4.2f, 9.2f, 0f, isMoreThanHalf = false, isPositiveArc = true, 12f, 2.8f)
+                close()
+                line(2.8f, 12f, 21.2f, 12f)
+                line(4.2f, 7.2f, 19.8f, 7.2f)
+                line(4.2f, 16.8f, 19.8f, 16.8f)
+            }
+        }
+    }
+
     // ---------- 图片编辑 / 铭牌 ----------
 
     /** rotate.left：逆时针转 90°。 */

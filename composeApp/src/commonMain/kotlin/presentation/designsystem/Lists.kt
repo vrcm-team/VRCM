@@ -93,6 +93,7 @@ fun AppGroup(
  * 懒加载列表里的分组行容器：按所在位置取圆角（首行圆上角、末行圆下角、中间直角），
  * 相邻的行拼起来就是一张 inset grouped 卡片；除首行外，顶部画一条从 [dividerInset] 起的发丝线。
  * 行数不定或很多、不能整组放进一个 [AppGroup] 时用它。
+ * 同一块内容被拆成多个 item 时（比如按行懒加载的头像网格），中间几行用 [showDivider] 关掉分隔线。
  */
 @Composable
 fun AppGroupedItem(
@@ -100,6 +101,7 @@ fun AppGroupedItem(
     count: Int,
     modifier: Modifier = Modifier,
     dividerInset: Dp = AppSpacing.row,
+    showDivider: Boolean = index > 0,
     background: Color = AppTheme.colors.secondaryGroupedBackground,
     content: @Composable () -> Unit,
 ) {
@@ -111,7 +113,7 @@ fun AppGroupedItem(
             .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
             .background(background),
     ) {
-        if (index > 0) AppDivider(Modifier.padding(start = dividerInset))
+        if (showDivider) AppDivider(Modifier.padding(start = dividerInset))
         content()
     }
 }
