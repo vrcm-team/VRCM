@@ -34,6 +34,7 @@ import io.github.vrcmteam.vrcm.presentation.compoments.ContentTopInset
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.*
 import io.github.vrcmteam.vrcm.presentation.extensions.currentNavigator
+import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleCombinedClickable
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -123,9 +124,6 @@ object HomeScreen : AppListRoute {
                 model.currentUser = null
                 navigator replaceAll AuthAnimeScreen(false)
             }
-        }
-        LaunchedEffect(Unit) {
-            SharedFlowCentre.currentSession.collect { model.clearOverlays() }
         }
         LaunchedEffect(model.drawerVisible) {
             if (model.drawerVisible) drawerState.open() else drawerState.close()
@@ -601,7 +599,10 @@ private fun HomeIdentity(
     }
     Row(
         modifier
-            .sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
+            // 抽屉展开时身份区被它盖着，不参与铭牌的共享过渡：否则铭牌会越过抽屉飞回这里
+            .enableIf(!model.drawerVisible) {
+                sharedBoundsBy(meetupCardSharedKey(userId), useSuffixKey = false, resizeMode = MeetupCardResizeMode)
+            }
             .clip(AppShapes.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -677,13 +678,8 @@ private fun HomePersonalDrawer(
     var showLogoutConfirmation by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val suffix = rememberContainerTransformToken("home-user:${model.userId}") ?: LocalSharedSuffixKey.current
-    fun closeAndNavigate(route: AppRoute) {
-        scope.launch {
-            drawerState.close()
-            model.hideDrawer()
-            navigator push route
-        }
-    }
+    // 从抽屉跳转时不收起抽屉：返回首页时它还展开在原处；
+    // 进出个人资料时，头像、名字、状态也就能在抽屉和详情页之间来回共享过渡
     PersonalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
@@ -691,10 +687,7 @@ private fun HomePersonalDrawer(
         profileSharedSuffixKey = suffix,
         statusVisible = statusVisible,
         onProfileClick = {
-            currentUser?.let {
-                navigator push UserProfileScreen(UserProfileVo(it), suffix)
-                model.hideDrawer()
-            }
+            currentUser?.let { navigator push UserProfileScreen(UserProfileVo(it), suffix) }
         },
         onStatusClick = {
             currentUser?.let { user ->
@@ -708,14 +701,14 @@ private fun HomePersonalDrawer(
                 }
             }
         },
-        onFriendNetworkClick = { closeAndNavigate(FriendNetworkScreen) },
-        onGalleryClick = { closeAndNavigate(GalleryScreen) },
-        onInviteMessagesClick = { closeAndNavigate(InviteMessageSlotsScreen) },
-        onPlayerManagementClick = { closeAndNavigate(PlayerModerationListScreen) },
-        onRecentWorldsClick = { closeAndNavigate(RecentWorldsScreen) },
-        onInventoryClick = { closeAndNavigate(InventoryScreen) },
-        onNameplateClick = { closeAndNavigate(model.meetupCardStartRoute()) },
-        onSettingsClick = { closeAndNavigate(SettingsScreen) },
+        onFriendNetworkClick = { navigator push FriendNetworkScreen },
+        onGalleryClick = { navigator push GalleryScreen },
+        onInviteMessagesClick = { navigator push InviteMessageSlotsScreen },
+        onPlayerManagementClick = { navigator push PlayerModerationListScreen },
+        onRecentWorldsClick = { navigator push RecentWorldsScreen },
+        onInventoryClick = { navigator push InventoryScreen },
+        onNameplateClick = { navigator push model.meetupCardStartRoute() },
+        onSettingsClick = { navigator push SettingsScreen },
         onLogoutClick = { showLogoutConfirmation = true },
         content = content,
     )

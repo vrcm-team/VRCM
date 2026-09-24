@@ -22,6 +22,9 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.meetup.MeetupCardRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 
@@ -96,6 +99,15 @@ class HomeScreenModel(
         refreshCurrentUser()
         viewModelScope.launch {
             authService.currentUserState.collect { _currentUser.value = it }
+        }
+        viewModelScope.launch {
+            // 换了账号（含登出）才收起个人抽屉等覆盖层，同账号重新认证不算。
+            // 在 ViewModel 里只订阅一次：页面每次重新进入组合都重新订阅的话，回放的当前会话会误把抽屉关掉
+            SharedFlowCentre.currentSession
+                .map { it?.account?.userId }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { clearOverlays() }
         }
     }
 
