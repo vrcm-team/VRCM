@@ -82,6 +82,7 @@ import io.github.vrcmteam.vrcm.service.AuthService
 import io.github.vrcmteam.vrcm.service.PrintUploadService
 import io.github.vrcmteam.vrcm.service.PrintUploader
 import io.github.vrcmteam.vrcm.service.FriendActivityService
+import io.github.vrcmteam.vrcm.service.FriendService
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.ktor.client.*
 import kotlinx.coroutines.Dispatchers
@@ -220,7 +221,16 @@ val presentationModule: Module = module {
     viewModelOf(::FavoritesGroupsModel)
     viewModelOf(::SearchListPagerModel)
     viewModelOf(::WorldProfileScreenModel)
-    viewModelOf(::GroupProfileScreenModel)
+    viewModel {
+        GroupProfileScreenModel(
+            groupsApi = get(),
+            usersApi = get(),
+            authService = get(),
+            logger = get(),
+            groupProfileCacheStore = get(),
+            friends = get<FriendService>().friendState,
+        )
+    }
     singleOf(::AuthenticatedFavoriteEntrySource) bind FavoriteEntrySource::class
     singleOf(::NetworkAvatarProfileLoader) bind AvatarProfileLoader::class
     singleOf(::NetworkAvatarGalleryLoader) bind AvatarGalleryLoader::class

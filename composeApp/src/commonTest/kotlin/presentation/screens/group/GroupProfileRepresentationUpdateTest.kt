@@ -19,6 +19,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
@@ -216,6 +217,7 @@ class GroupProfileRepresentationUpdateTest : MainDispatcherTest() {
                 authService = authService,
                 logger = EmptyLogger(),
                 groupProfileCacheStore = cache,
+                friends = MutableStateFlow(emptyMap()),
             ),
             client = client,
         )

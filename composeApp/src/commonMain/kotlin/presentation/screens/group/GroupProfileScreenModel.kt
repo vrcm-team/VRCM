@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.vrcmteam.vrcm.core.shared.AccountSessionToken
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
+import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupData
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
@@ -26,9 +28,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.koin.core.logger.Logger
 import kotlin.time.Clock
@@ -45,6 +50,10 @@ internal class GroupProfileInitialLoadGate {
     }
 }
 
+/** 好友成员用好友数据（带信用等级与在线状态），其余用成员接口里的用户。 */
+private fun groupMemberUsers(members: List<GroupMember>, friends: Map<String, FriendData>): List<IUser> =
+    members.mapNotNull { member -> friends[member.userId] ?: member.user }
+
 @OptIn(ExperimentalTime::class)
 class GroupProfileScreenModel(
     private val groupsApi: GroupsApi,
@@ -52,13 +61,21 @@ class GroupProfileScreenModel(
     private val authService: AuthService,
     private val logger: Logger,
     private val groupProfileCacheStore: GroupProfileCacheStore,
+    /** 当前账号的好友（按用户 ID），用来补全成员列表里接口不给的信息。 */
+    friends: StateFlow<Map<String, FriendData>>,
 ) : ViewModel() {
 
     private val _groupProfileState = MutableStateFlow<GroupProfileVo?>(null)
     val groupProfileState: StateFlow<GroupProfileVo?> = _groupProfileState.asStateFlow()
 
     private val _members = MutableStateFlow<List<GroupMember>>(emptyList())
-    val members: StateFlow<List<GroupMember>> = _members.asStateFlow()
+
+    /**
+     * 成员列表里显示的用户。群组成员接口不返回信用等级（tags）和在线状态，
+     * 是好友的成员换成本地好友数据（随好友实时事件更新），其余成员沿用接口数据，缺的字段取默认值。
+     */
+    val memberUsers: StateFlow<List<IUser>> = combine(_members, friends, ::groupMemberUsers)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, groupMemberUsers(_members.value, friends.value))
 
     private val _owner = MutableStateFlow<UserData?>(null)
     val owner: StateFlow<UserData?> = _owner.asStateFlow()

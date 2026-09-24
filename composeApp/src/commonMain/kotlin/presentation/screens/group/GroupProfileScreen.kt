@@ -84,6 +84,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
+import io.github.vrcmteam.vrcm.network.api.attributes.IUser
 import io.github.vrcmteam.vrcm.network.api.groups.data.Gallery
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupGalleryImage
 import io.github.vrcmteam.vrcm.network.api.groups.data.GroupMember
@@ -140,7 +141,7 @@ class GroupProfileScreen(
         val currentNavigator = currentNavigator
         val screenModel: GroupProfileScreenModel = koinViewModel()
         val groupState by screenModel.groupProfileState.collectAsState()
-        val members by screenModel.members.collectAsState()
+        val memberUsers by screenModel.memberUsers.collectAsState()
         val owner by screenModel.owner.collectAsState()
         val galleryImages by screenModel.galleryImages.collectAsState()
         val posts by screenModel.posts.collectAsState()
@@ -290,7 +291,7 @@ class GroupProfileScreen(
                                 isLoadingMore = postsLoadingMore,
                                 endReached = postsEndReached,
                             )
-                            2 -> MembersContent(members = members, isLoading = membersLoading)
+                            2 -> MembersContent(users = memberUsers, isLoading = membersLoading)
                             else -> GalleriesContent(group = group, galleryImages = galleryImages)
                         }
                         // 页面铺到屏幕底：末尾留出系统导航条的高度，最后一张卡片才不会被它压住
@@ -938,9 +939,8 @@ private fun PostCard(post: GroupPost, roles: List<Role>, authorName: String? = n
 }
 
 @Composable
-private fun MembersContent(members: List<GroupMember>, isLoading: Boolean = false) {
+private fun MembersContent(users: List<IUser>, isLoading: Boolean = false) {
     val currentNavigator = currentNavigator
-    val users = remember(members) { members.mapNotNull { it.user } }
 
     if (isLoading) {
         Box(
