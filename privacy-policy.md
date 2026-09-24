@@ -4,7 +4,9 @@
 
 ## 1. Overview
 
-VRCM is an open-source, third-party companion application for VRChat. VRCM's developers do not operate an analytics, advertising, telemetry, or user-data collection backend for the app.
+VRCM is an open-source, third-party companion application for VRChat. VRCM is an unofficial app: it is not affiliated with, endorsed by, or sponsored by VRChat Inc. VRChat is a trademark of VRChat Inc.
+
+VRCM's developers do not operate an analytics, advertising, telemetry, or user-data collection backend for the app.
 
 VRCM must communicate with third-party services to provide its features. This policy explains what remains on your device and what is sent to those services.
 
