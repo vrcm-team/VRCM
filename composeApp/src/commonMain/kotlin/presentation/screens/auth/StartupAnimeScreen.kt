@@ -78,13 +78,12 @@ object StartupAnimeScreen : AppRoute {
 
 @Composable
 fun VersionDialog() {
-    // 应用商店分发的安装包由商店负责更新，不查询 GitHub Release
-    if (!getAppPlatform().supportsGitHubUpdateCheck) return
+    val updateSource = getAppPlatform().updateSource ?: return
     val versionService: VersionService = koinInject()
     val logger: Logger = koinInject()
     var version by remember { mutableStateOf(VersionVo()) }
     LaunchedEffect(versionService) {
-        versionService.checkVersion(checkRemember = true)
+        versionService.checkVersion(updateSource, checkRemember = true)
             .onFailure { logger.error("Failed to check version: ${it.message.orEmpty()}") }
             .onSuccess {
                 if (it.hasNewVersion) {

@@ -29,7 +29,8 @@ VRCM does not upload locally generated friend-activity statistics or friend-netw
 VRCM sends requests directly to services needed for the action you request:
 
 - **VRChat services:** authentication, profiles, friends, presence, worlds, instances, groups, notifications, avatars, inventory, and gallery operations, plus any report you choose to submit (the reported content, the category and reason you pick, and optional details) for review by VRChat's moderation team. Requests identify the app by its name, version, and project page, as VRChat requires. Information sent to VRChat is handled under VRChat's own privacy policy and terms.
-- **GitHub:** builds distributed through GitHub Releases check the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information. Builds installed from the App Store do not contact GitHub; the App Store delivers their updates.
+- **GitHub:** builds distributed through GitHub Releases check the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information.
+- **Apple App Store:** builds installed from the App Store look up VRCM's current App Store version, sending the app's bundle identifier and your device's region, so VRCM can tell you when an update is available. Apple may receive standard network information such as your IP address and user-agent information. These builds do not contact GitHub; updates are installed through the App Store.
 - **Media hosts referenced by VRChat:** downloading profile images, world images, avatar images, and profile decorations for display or local caching.
 
 When you explicitly upload a gallery image or avatar cover, the selected image is processed on your device and then sent to VRChat. VRCM does not proxy these requests through a VRCM-operated server.

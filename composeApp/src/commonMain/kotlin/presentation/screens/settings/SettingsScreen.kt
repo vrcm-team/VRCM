@@ -51,6 +51,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.ImageLoader
 import io.github.vrcmteam.vrcm.AppPlatform
+import io.github.vrcmteam.vrcm.AppUpdateSource
 import io.github.vrcmteam.vrcm.BackgroundFriendMonitoringResult
 import io.github.vrcmteam.vrcm.core.extensions.bytesToMb
 import io.github.vrcmteam.vrcm.core.shared.AppConst
@@ -421,11 +422,11 @@ private fun AboutSection(platform: AppPlatform) {
     // 不能直接version.not()因为默认为false会导致一点开就显示
     var isLatestVersion by remember { mutableStateOf(false) }
     var isLoadingVersion by remember { mutableStateOf(false) }
-    val checkVersion: () -> Unit = {
+    val checkVersion: (AppUpdateSource) -> Unit = { updateSource ->
         scope.launch {
             if (isLoadingVersion) return@launch
             isLoadingVersion = true
-            versionService.checkVersion(false).onSuccess {
+            versionService.checkVersion(updateSource, checkRemember = false).onSuccess {
                 isLatestVersion = it.hasNewVersion.not()
                 version = VersionVo(
                     it.tagName,
@@ -475,8 +476,8 @@ private fun AboutSection(platform: AppPlatform) {
                     AppActivityIndicator(modifier = Modifier.size(20.dp))
                 }
             },
-            // 应用商店分发的安装包由商店负责更新：版本行只展示版本号，不查询 GitHub
-            onClick = checkVersion.takeIf { platform.supportsGitHubUpdateCheck },
+            // 不在应用内检查更新的安装包：版本行只展示版本号
+            onClick = platform.updateSource?.let { updateSource -> { checkVersion(updateSource) } },
         )
         SettingsRowDivider()
         AppRow(

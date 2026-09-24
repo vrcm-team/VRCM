@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.di.modules
 
+import io.github.vrcmteam.vrcm.network.api.appstore.AppStoreApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarModerationApi
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.auth.AuthApi
@@ -50,6 +51,7 @@ internal val networkModule = module(true) {
     singleOf(::FeedbackApi)
     singleOf(::WebSocketApi)
     singleOf(::GitHubApi)
+    singleOf(::AppStoreApi)
     singleOf(::GroupsApi)
     singleOf(::PrintsApi)
     singleOf(::ProfileAppearanceApi)
