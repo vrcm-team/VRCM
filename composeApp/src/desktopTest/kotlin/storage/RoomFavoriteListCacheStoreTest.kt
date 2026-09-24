@@ -3,7 +3,9 @@ package io.github.vrcmteam.vrcm.storage
 import androidx.room.Room
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
+import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType
 import io.github.vrcmteam.vrcm.network.api.worlds.data.FavoritedWorld
+import io.github.vrcmteam.vrcm.network.api.worlds.data.UnityPackage
 import io.github.vrcmteam.vrcm.storage.data.FavoritedWorldGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
@@ -11,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RoomFavoriteListCacheStoreTest {
     @Test
@@ -62,6 +65,36 @@ class RoomFavoriteListCacheStoreTest {
         val bothTypes = assertNotNull(store.load("usr_owner"))
         assertEquals(true, bothTypes.worldsLoaded)
         assertEquals(true, bothTypes.avatarsLoaded)
+    }
+
+    @Test
+    fun cachedFavoriteWorldsKeepPlatformsForTheListIconsButDropCdnLinks() = withStore { store ->
+        fun pkg(platform: PlatformType, version: String) = UnityPackage(
+            assetUrl = "https://api.vrchat.cloud/api/1/file/file_$version/1/file",
+            createdAt = "2026-01-0${version.last()}T00:00:00Z",
+            platform = platform,
+            pluginUrl = "https://api.vrchat.cloud/api/1/file/file_plugin_$version/1/file",
+            unityVersion = "2022.3.22f1",
+        )
+        val world = FavoritedWorld(
+            id = "wrld_cached",
+            name = "Cached world",
+            favoriteId = "fvrt_cached",
+            favoriteGroup = "worlds1",
+            unityPackages = listOf(
+                pkg(PlatformType.Windows, "w1"),
+                pkg(PlatformType.Windows, "w2"),
+                pkg(PlatformType.Android, "a1"),
+            ),
+        )
+
+        store.saveWorlds("usr_owner", listOf(FavoritedWorldGroup(name = "Worlds", groupKey = "worlds1", worlds = listOf(world))))
+
+        // 收藏列表从缓存恢复时就要画出"支持平台"图标，不能等网络刷新
+        val cachedPackages = assertNotNull(store.load("usr_owner")).favoritedWorlds.single().worlds.single().unityPackages
+        assertEquals(setOf(PlatformType.Windows, PlatformType.Android), cachedPackages.map { it.platform }.toSet())
+        assertEquals(2, cachedPackages.size)
+        assertTrue(cachedPackages.all { it.assetUrl == null && it.pluginUrl == null })
     }
 
     @Test
