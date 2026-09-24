@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -152,13 +154,64 @@ fun AppRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) leading()
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            AppText(title, style = AppTheme.type.body, color = if (enabled) titleColor else c.tertiaryLabel)
-            if (subtitle != null) AppText(subtitle, style = AppTheme.type.footnote, color = c.secondaryLabel)
+        val titleBlock: @Composable (Modifier) -> Unit = { titleModifier ->
+            Column(titleModifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                AppText(title, style = AppTheme.type.body, color = if (enabled) titleColor else c.tertiaryLabel)
+                if (subtitle != null) AppText(subtitle, style = AppTheme.type.footnote, color = c.secondaryLabel)
+            }
         }
-        if (value != null) AppText(value, style = AppTheme.type.body, color = c.secondaryLabel, maxLines = 1)
+        if (value == null) {
+            titleBlock(Modifier.weight(1f))
+        } else {
+            RowTitleAndValue(
+                modifier = Modifier.weight(1f),
+                title = { titleBlock(Modifier) },
+                value = {
+                    AppText(value, style = AppTheme.type.body, color = c.secondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
+            )
+        }
         if (trailing != null) trailing()
         if (chevron) AppIcon(AppChevronRight, contentDescription = null, modifier = Modifier.size(14.dp), tint = c.tertiaryLabel)
+    }
+}
+
+/**
+ * 行标题与右侧的值：并排放得下就并排（值靠右）；放不下就把值换到标题下面，而不是把标题挤到折行
+ * （iOS 列表单元格 prefersSideBySideTextAndSecondaryText 的做法，长文案和大字号下都成立）。
+ */
+@Composable
+private fun RowTitleAndValue(
+    title: @Composable () -> Unit,
+    value: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Layout(contents = listOf(title, value), modifier = modifier) { (titleMeasurables, valueMeasurables), constraints ->
+        val titleMeasurable = titleMeasurables.single()
+        val valueMeasurable = valueMeasurables.single()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val width = constraints.maxWidth
+        val gap = AppRowContentGap.roundToPx()
+        val titleWidth = titleMeasurable.maxIntrinsicWidth(loose.maxHeight)
+        val valueWidth = valueMeasurable.maxIntrinsicWidth(loose.maxHeight)
+        if (titleWidth + gap + valueWidth <= width) {
+            val titlePlaceable = titleMeasurable.measure(loose.copy(maxWidth = width - gap - valueWidth))
+            val valuePlaceable = valueMeasurable.measure(loose.copy(maxWidth = valueWidth))
+            val height = maxOf(titlePlaceable.height, valuePlaceable.height, constraints.minHeight)
+            layout(width, height) {
+                titlePlaceable.placeRelative(0, (height - titlePlaceable.height) / 2)
+                valuePlaceable.placeRelative(width - valuePlaceable.width, (height - valuePlaceable.height) / 2)
+            }
+        } else {
+            val titlePlaceable = titleMeasurable.measure(loose)
+            val valuePlaceable = valueMeasurable.measure(loose)
+            val spacing = 2.dp.roundToPx()
+            val height = maxOf(titlePlaceable.height + spacing + valuePlaceable.height, constraints.minHeight)
+            layout(width, height) {
+                titlePlaceable.placeRelative(0, 0)
+                valuePlaceable.placeRelative(0, titlePlaceable.height + spacing)
+            }
+        }
     }
 }
 
