@@ -2,7 +2,6 @@ package io.github.vrcmteam.vrcm.presentation.screens.world
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -27,6 +26,7 @@ import io.github.vrcmteam.vrcm.presentation.navigation.currentOrThrow
 import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.worlds.WorldsApi
 import io.github.vrcmteam.vrcm.network.api.worlds.data.WorldData
+import io.github.vrcmteam.vrcm.presentation.compoments.SearchResultItem
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.compoments.shouldLoadNextPage
@@ -275,17 +275,11 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
     val sharedImageCacheKey = (world.thumbnailImageUrl ?: world.imageUrl)
         .orEmpty()
         .ifBlank { null }
-    // iOS「信息」那种列表行：通栏、没有卡片底，行间是一条从文字起的发丝线
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick(sharedImageCacheKey) },
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = AppSpacing.row, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(RecentWorldThumbnailGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    SearchResultItem(
+        item = world,
+        onClick = { onClick(sharedImageCacheKey) },
+        leadingWidth = RecentWorldThumbnailSize.width,
+        leadingContent = {
             if (world.id == "???") {
                 Box(
                     modifier = Modifier
@@ -313,24 +307,24 @@ private fun RecentWorldItem(world: WorldData, onClick: (String?) -> Unit) {
                         .clip(AppShapes.s),
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                AppText(
-                    text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
-                    style = AppTheme.type.body,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                AppText(
-                    text = if (world.id == "???") strings.hiddenWorld else world.authorName,
-                    style = AppTheme.type.footnote,
-                    color = AppTheme.colors.secondaryLabel,
-                    maxLines = 1,
-                )
-            }
-        }
-        AppDivider(Modifier.padding(start = AppSpacing.row + RecentWorldThumbnailSize.width + RecentWorldThumbnailGap))
-    }
+        },
+        headlineContent = {
+            AppText(
+                text = if (world.id == "???") world.favoriteId ?: world.name else world.name,
+                style = AppTheme.type.body,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent = {
+            AppText(
+                text = if (world.id == "???") strings.hiddenWorld else world.authorName,
+                style = AppTheme.type.footnote,
+                color = AppTheme.colors.secondaryLabel,
+                maxLines = 1,
+            )
+        },
+    )
 }
 
 private val RecentWorldThumbnailSize = DpSize(80.dp, 45.dp)
-private val RecentWorldThumbnailGap = 12.dp

@@ -148,12 +148,13 @@ fun GenericSearchList(
     }
 }
 
-/** 列表行前导内容（头像 / 缩略图 / 图标）的边长；分隔线按它内缩，所以各处的前导内容都用这个尺寸。 */
+/** 列表行前导内容（头像 / 缩略图 / 图标）的默认边长；分隔线默认按它内缩，所以前导内容尽量都用这个尺寸。 */
 val SearchResultLeadingSize = 48.dp
 
 /**
- * 列表里的一行，照 iOS「信息」的列表：通栏、没有卡片底，按压时整行压暗；
- * 行与行之间是一条从标题起、一直到屏幕边的发丝线。放进分组卡片等自带分隔线的容器时关掉 [showDivider]。
+ * 列表里的一行，照 iOS「信息」的列表：通栏、没有卡片底，按压时整行压暗；行与行之间是 [AppPlainListDivider]。
+ * 前导内容不是 [SearchResultLeadingSize] 宽时（如 16:9 缩略图）传 [leadingWidth]，分隔线才对得齐标题。
+ * 放进分组卡片等自带分隔线的容器时关掉 [showDivider]。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -164,6 +165,7 @@ fun <T> SearchResultItem(
     enabled: Boolean = true,
     onLongClick: ((T) -> Unit)? = null,
     showDivider: Boolean = true,
+    leadingWidth: Dp = SearchResultLeadingSize,
     leadingContent: @Composable () -> Unit,
     headlineContent: @Composable () -> Unit,
     supportingContent: @Composable (() -> Unit)? = null,
@@ -190,7 +192,7 @@ fun <T> SearchResultItem(
             trailingContent = trailingContent ?: {}
         )
         if (showDivider) {
-            AppDivider(Modifier.padding(start = appRowDividerInset(SearchResultLeadingSize)))
+            AppPlainListDivider(leadingWidth)
         }
     }
 }

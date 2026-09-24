@@ -146,7 +146,7 @@ fun AppRow(
             )
             .defaultMinSize(minHeight = AppSize.rowMinHeight)
             .padding(horizontal = AppSpacing.row, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(RowContentGap),
+        horizontalArrangement = Arrangement.spacedBy(AppRowContentGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) leading()
@@ -177,7 +177,7 @@ fun AppListItem(
             .background(containerColor)
             .defaultMinSize(minHeight = AppSize.rowMinHeight)
             .padding(horizontal = AppSpacing.row, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(RowContentGap),
+        horizontalArrangement = Arrangement.spacedBy(AppRowContentGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingContent != null) ProvideContentColor(c.secondaryLabel, content = leadingContent)
@@ -189,17 +189,28 @@ fun AppListItem(
     }
 }
 
-private val RowContentGap = 12.dp
+/** 列表行里前导内容（图标、头像、缩略图）与标题之间的间隔。 */
+val AppRowContentGap: Dp = 12.dp
 private val RowIconSize = 29.dp
 
 /**
  * 带前导内容（头像、缩略图、图标）的行，分隔线从标题起而不是从行首起：
  * 行内边距 + 前导内容的宽度 + 前导与标题的间隔。
  */
-fun appRowDividerInset(leadingSize: Dp): Dp = AppSpacing.row + leadingSize + RowContentGap
+fun appRowDividerInset(leadingSize: Dp): Dp = AppSpacing.row + leadingSize + AppRowContentGap
 
 /** 带 [AppRowIcon] 的行之间的分隔线起点。 */
 val AppRowIconDividerInset: Dp = appRowDividerInset(RowIconSize)
+
+/**
+ * 通栏列表（照 iOS「信息」：铺满页面、没有卡片底）行与行之间的发丝线：
+ * 从标题起（[appRowDividerInset]）、到行尾内边距止，和尾随内容右对齐，不贴屏幕边。
+ * 分组卡片里的行不用它，那里的分隔线照 iOS 画到卡片边（见 [AppGroupedItem]）。
+ */
+@Composable
+fun AppPlainListDivider(leadingSize: Dp, modifier: Modifier = Modifier) {
+    AppDivider(modifier.padding(start = appRowDividerInset(leadingSize), end = AppSpacing.row))
+}
 
 /** [AppRowIcon] 的底色：按功能类别挑一个，同一组里尽量不重复。 */
 object AppRowIconColor {

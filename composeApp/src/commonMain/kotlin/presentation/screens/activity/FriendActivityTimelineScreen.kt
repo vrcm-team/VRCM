@@ -35,11 +35,12 @@ import io.github.vrcmteam.vrcm.presentation.compoments.withContentTopInset
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppButtonStyle
-import io.github.vrcmteam.vrcm.presentation.designsystem.AppDivider
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppFilterChip
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppNavBar
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppPlainListDivider
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppRowContentGap
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppScaffold
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
@@ -379,11 +380,12 @@ private fun FriendTimelineEvent(
     onWorldClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    // iOS「信息」那种列表行：通栏、没有卡片底，行间是一条从文字起的发丝线
+    // iOS「信息」那种列表行：通栏、没有卡片底，行间是一条从文字起的发丝线。
+    // 头像、名字、世界各自可点，内容顶部对齐，所以不套整行可点的 SearchResultItem，只和它共用分隔线与间距令牌。
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(horizontal = AppSpacing.row, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(TimelineAvatarGap),
+            horizontalArrangement = Arrangement.spacedBy(AppRowContentGap),
             verticalAlignment = Alignment.Top,
         ) {
             AImage(
@@ -409,12 +411,11 @@ private fun FriendTimelineEvent(
                 )
             }
         }
-        AppDivider(Modifier.padding(start = AppSpacing.row + TimelineAvatarSize + TimelineAvatarGap))
+        AppPlainListDivider(TimelineAvatarSize)
     }
 }
 
 private val TimelineAvatarSize = 44.dp
-private val TimelineAvatarGap = 12.dp
 
 @Composable
 internal fun FriendActivityTimelineFilter.label(): String = when (this) {
