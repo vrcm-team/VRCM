@@ -119,7 +119,7 @@ class WorldPlatformFileSizesTest : MainDispatcherTest() {
             listOf(PlatformType.Windows, PlatformType.Android, PlatformType.Ios),
             firstSizes.map { it.platform },
         )
-        assertEquals(listOf("PC", "Android", "iOS"), firstSizes.map { it.displayName })
+        assertEquals(listOf("Desktop", "Android", "iOS"), firstSizes.map { it.displayName })
         assertEquals(listOf(64L, 48L, 40L), firstSizes.map { it.sizeInBytes / MEBIBYTE })
         assertEquals(1, worldRequests.value)
 

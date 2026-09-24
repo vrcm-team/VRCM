@@ -1038,7 +1038,7 @@ private fun ColumnScope.InfoArea(
     val platformSizeCards = worldProfileVo.platformFileSizes.map { platformSize ->
         val icon = when (platformSize.platform) {
             Windows -> AppIcons.Computer
-            Ios -> AppIcons.Apple
+            Ios -> AppIcons.Phone
             Android -> AppIcons.VrHeadset
         }
         Triple(icon, platformSize.formattedSize, platformSize.displayName)

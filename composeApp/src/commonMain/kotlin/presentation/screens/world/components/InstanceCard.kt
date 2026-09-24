@@ -270,7 +270,7 @@ private fun DeviceStatsRow(
     ) {
         if (pcUsers != null && pcUsers > 0) {
             IconLabelRow(
-                icon = AppIcons.Windows,
+                icon = AppIcons.Computer,
                 text = "$pcUsers",
                 iconSize = iconSize,
                 spacing = spacing
@@ -286,7 +286,7 @@ private fun DeviceStatsRow(
         }
         if (iosUsers != null && iosUsers > 0) {
             IconLabelRow(
-                icon = AppIcons.Apple,
+                icon = AppIcons.Phone,
                 text = "$iosUsers",
                 iconSize = iconSize,
                 spacing = spacing

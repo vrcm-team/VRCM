@@ -107,7 +107,7 @@ class WorldPlatformService(
         private const val FILE_REFERENCE_SEGMENT_COUNT = 3
         private val fileIdRegex = Regex("file_[\\w-]+")
         private val supportedPlatforms = listOf(
-            PlatformType.Windows to "PC",
+            PlatformType.Windows to "Desktop",
             PlatformType.Android to "Android",
             PlatformType.Ios to "iOS",
         )

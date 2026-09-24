@@ -290,8 +290,8 @@ fun LazyItemScope.renderWorldItem(
                remember(world.unityPackages) { world.unityPackages.platformPackages.keys.sortedBy { it.name } }.forEach {
                     val icon = when(it){
                         Android -> AppIcons.VrHeadset
-                        Ios -> AppIcons.Apple
-                        Windows -> AppIcons.Windows
+                        Ios -> AppIcons.Phone
+                        Windows -> AppIcons.Computer
                     }
                     AppIcon(
                         imageVector = icon,
@@ -429,8 +429,8 @@ fun LazyItemScope.renderAvatarItem(
                 }.forEach {
                     val icon = when (it) {
                         Android -> AppIcons.VrHeadset
-                        Ios -> AppIcons.Apple
-                        Windows -> AppIcons.Windows
+                        Ios -> AppIcons.Phone
+                        Windows -> AppIcons.Computer
                     }
                     AppIcon(
                         imageVector = icon,
