@@ -10,13 +10,14 @@ class IosAppPlatform: AppPlatform {
     override val version: String = UIDevice.currentDevice.systemVersion
     override val type: AppPlatformType = AppPlatformType.Ios
 
-    // 分发渠道由构建设置 VRCM_DISTRIBUTION_CHANNEL 写入 Info.plist：GitHub Release 的 IPA 查询 GitHub 新版本；
-    // App Store / TestFlight 版查询商店上架版本，更新只能跳转 App Store，不能引导用户去商店外安装。
-    private val distributionChannel =
-        NSBundle.mainBundle.objectForInfoDictionaryKey("VRCMDistributionChannel") as? String
+    // 分发渠道由构建设置 VRCM_DISTRIBUTION_CHANNEL 写入 Info.plist：只有 GitHub Release 的 IPA 是 "GitHub"，
+    // App Store / TestFlight 版按商店规则来。
+    private val isGitHubRelease =
+        NSBundle.mainBundle.objectForInfoDictionaryKey("VRCMDistributionChannel") as? String == "GitHub"
 
+    // GitHub 版查询 GitHub 新版本；商店版查询商店上架版本，更新只能跳转 App Store，不能引导用户去商店外安装。
     override val updateSource: AppUpdateSource?
-        get() = if (distributionChannel == "GitHub") {
+        get() = if (isGitHubRelease) {
             AppUpdateSource.GitHub
         } else {
             NSBundle.mainBundle.bundleIdentifier?.let { bundleId ->
@@ -26,4 +27,7 @@ class IosAppPlatform: AppPlatform {
                 )
             }
         }
+
+    // 审核准则 3.1.1 不允许在应用里用兑换码解锁内容：商店版不提供 VRChat 奖励兑换，GitHub 版保留
+    override val supportsRewardCodeRedemption: Boolean get() = isGitHubRelease
 }

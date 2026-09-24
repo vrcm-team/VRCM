@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.network.api.inventory.InventoryItemType
 import io.github.vrcmteam.vrcm.network.api.inventory.InventorySortOrder
 import io.github.vrcmteam.vrcm.network.api.inventory.data.InventoryItemData
@@ -82,6 +83,7 @@ private fun InventoryScreenContent(
     rewardCodeModel: RewardCodeScreenModel = koinViewModel(),
 ) {
     val navigator = currentNavigator
+    val platform = getAppPlatform()
     val filters by model.filters.collectAsState()
     val state by model.state.collectAsState()
     val creditsBalanceState by model.creditsBalanceState.collectAsState()
@@ -103,9 +105,11 @@ private fun InventoryScreenContent(
                         state = creditsBalanceState,
                         onRetry = model::refreshCreditsBalance,
                     )
-                    ATooltipBox(tooltip = { AppText(strings.rewardCodeEntry) }) {
-                        AppIconButton(onClick = { showRewardCodeDialog = true }) {
-                            AppIcon(AppIcons.Redeem, strings.rewardCodeEntry)
+                    if (platform.supportsRewardCodeRedemption) {
+                        ATooltipBox(tooltip = { AppText(strings.rewardCodeEntry) }) {
+                            AppIconButton(onClick = { showRewardCodeDialog = true }) {
+                                AppIcon(AppIcons.Redeem, strings.rewardCodeEntry)
+                            }
                         }
                     }
                     AppIconButton(

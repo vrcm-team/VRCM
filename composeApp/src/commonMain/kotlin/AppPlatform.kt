@@ -12,6 +12,9 @@ interface AppPlatform : KoinComponent {
     /** 应用内检查新版本的来源，由安装包的分发渠道决定；null 表示不在应用内检查。 */
     val updateSource: AppUpdateSource? get() = AppUpdateSource.GitHub
 
+    /** 是否提供 VRChat 奖励兑换码入口；App Store 版按审核准则 3.1.1 不提供应用内兑换码。 */
+    val supportsRewardCodeRedemption: Boolean get() = true
+
     val supportsFriendActivityNotifications: Boolean get() = false
     val supportsBackgroundFriendMonitoring: Boolean get() = false
     fun hasBackgroundFriendMonitoringPermission(): Boolean = true
