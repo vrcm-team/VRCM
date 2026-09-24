@@ -1,6 +1,8 @@
 package io.github.vrcmteam.vrcm.presentation.compoments
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -103,6 +105,22 @@ fun AImage(
     loadOriginalSize: Boolean = false,
     cachedPlaceholderKey: String? = null,
 ) {
+    // VRChat 用空串表示"没有图片"：交给 Coil 只会找不到能加载空地址的 fetcher 而报错，直接画兜底图。
+    // 调用方自己构造的 ImageRequest 也一样（例如资料页顶栏用头像缩略图地址建的请求）
+    val requestedUrl = when (imageData) {
+        is String -> imageData
+        is ImageRequest -> imageData.data as? String
+        else -> null
+    }
+    if (requestedUrl != null && requestedUrl.isBlank()) {
+        val fallback = error ?: placeholder
+        if (fallback != null) {
+            Image(painter = fallback, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+        } else {
+            Box(modifier)
+        }
+        return
+    }
     val imageLoader: ImageLoader = koinInject()
     val platformContext = koinInject<PlatformContext>()
     val isLoading = remember(imageData) { mutableStateOf(true) }
