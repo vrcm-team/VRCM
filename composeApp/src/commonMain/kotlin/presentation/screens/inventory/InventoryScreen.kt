@@ -262,7 +262,9 @@ private fun InventoryFilterBar(
             label = strings.inventoryFilterArchived,
             selected = filters.archived,
             options = InventoryArchivedFilter.entries,
-            optionLabel = InventoryArchivedFilter::localizedLabel,
+            // 不要写成 InventoryArchivedFilter::localizedLabel：@Composable 函数引用在 iOS（Kotlin/Native）
+            // 上链接出错，打开页面就抛 IrLinkageError 闪退
+            optionLabel = { it.localizedLabel() },
             onSelected = onArchivedSelected,
             modifier = Modifier.weight(1f),
         )
@@ -270,7 +272,7 @@ private fun InventoryFilterBar(
             label = strings.inventorySortLabel,
             selected = filters.order,
             options = InventorySortOrder.entries,
-            optionLabel = InventorySortOrder::localizedLabel,
+            optionLabel = { it.localizedLabel() },
             onSelected = onOrderSelected,
             modifier = Modifier.weight(1f),
         )
