@@ -35,6 +35,7 @@ import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.FileApi
 import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.ATooltipBox
+import io.github.vrcmteam.vrcm.presentation.compoments.ContentReportSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedSuffixKey
 import io.github.vrcmteam.vrcm.presentation.compoments.OfficialUrlShareButton
 import io.github.vrcmteam.vrcm.presentation.compoments.ProfileScaffold
@@ -62,6 +63,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.components.FavoriteGro
 import io.github.vrcmteam.vrcm.presentation.settings.locale.LocaleStrings
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -182,6 +185,7 @@ class AvatarProfileScreen(
         val actionSheetState = rememberAppSheetState()
         var pendingModerationChange by remember { mutableStateOf<Boolean?>(null) }
         var showImpostorDeletionConfirmation by remember { mutableStateOf(false) }
+        var showReportSheet by remember { mutableStateOf(false) }
 
         LaunchedEffect(screenModel, locale) {
             screenModel.notices.collect { notice ->
@@ -327,8 +331,21 @@ class AvatarProfileScreen(
                     impostorDeletionState = impostorDeletionState,
                     onDeleteImpostor = { showImpostorDeletionConfirmation = true },
                     onRetryImpostorVerification = screenModel::retryImpostorVerification,
+                    // 举报入口只给别人的模型
+                    showReport = displayedAvatar.authorId != currentSession?.account?.userId,
+                    onReport = { showReportSheet = true },
                 )
             }
+        }
+        if (showReportSheet) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.Avatar,
+                    contentId = displayedAvatar.avatarId,
+                    displayName = displayedAvatar.avatarName,
+                ),
+                onDismiss = { showReportSheet = false },
+            )
         }
         FavoriteGroupBottomSheet(
             isVisible = showFavoriteSheet,
@@ -589,6 +606,8 @@ private fun ColumnScope.AvatarProfileActionSheet(
     impostorDeletionState: AvatarImpostorDeletionUiState,
     onDeleteImpostor: () -> Unit,
     onRetryImpostorVerification: () -> Unit,
+    showReport: Boolean,
+    onReport: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val dismissAndRun: (() -> Unit) -> Unit = { action ->
@@ -699,6 +718,14 @@ private fun ColumnScope.AvatarProfileActionSheet(
             loading = deletionState.isDeleting,
             isDestructive = true,
             onClick = { dismissAndRun(onDelete) },
+        )
+    }
+
+    if (showReport) {
+        AvatarProfileSheetButton(
+            text = strings.report,
+            isDestructive = true,
+            onClick = { dismissAndRun(onReport) },
         )
     }
 }

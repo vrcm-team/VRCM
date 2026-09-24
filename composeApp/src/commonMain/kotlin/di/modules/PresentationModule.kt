@@ -136,7 +136,6 @@ val presentationModule: Module = module {
             worldsApi = get(),
             avatarsApi = get(),
             favoriteApi = get(),
-            feedbackApi = get(),
             inviteApi = get(),
             gallerySelectionSessionStore = get(),
             imageInviteRemote = get(),

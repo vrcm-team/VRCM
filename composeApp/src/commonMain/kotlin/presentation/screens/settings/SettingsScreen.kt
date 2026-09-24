@@ -421,7 +421,7 @@ private fun AboutSection(platform: AppPlatform) {
     // 不能直接version.not()因为默认为false会导致一点开就显示
     var isLatestVersion by remember { mutableStateOf(false) }
     var isLoadingVersion by remember { mutableStateOf(false) }
-    val checkVersion = {
+    val checkVersion: () -> Unit = {
         scope.launch {
             if (isLoadingVersion) return@launch
             isLoadingVersion = true
@@ -475,7 +475,8 @@ private fun AboutSection(platform: AppPlatform) {
                     AppActivityIndicator(modifier = Modifier.size(20.dp))
                 }
             },
-            onClick = { checkVersion() },
+            // 应用商店分发的安装包由商店负责更新：版本行只展示版本号，不查询 GitHub
+            onClick = checkVersion.takeIf { platform.supportsGitHubUpdateCheck },
         )
         SettingsRowDivider()
         AppRow(
@@ -491,6 +492,19 @@ private fun AboutSection(platform: AppPlatform) {
             },
             chevron = true,
             onClick = { platform.openUrl(AppConst.APP_GITHUB_URL) },
+        )
+        SettingsRowDivider()
+        AppRow(
+            title = strings.stettingPrivacyPolicy,
+            chevron = true,
+            onClick = { platform.openUrl(AppConst.APP_PRIVACY_POLICY_URL) },
+        )
+        SettingsRowDivider()
+        AppRow(
+            title = strings.stettingContact,
+            value = AppConst.APP_CONTACT_EMAIL,
+            chevron = true,
+            onClick = { platform.openUrl("mailto:${AppConst.APP_CONTACT_EMAIL}") },
         )
     }
     if (!isLatestVersion) {

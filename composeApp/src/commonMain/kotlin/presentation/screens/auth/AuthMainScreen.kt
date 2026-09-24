@@ -88,6 +88,7 @@ object AuthScreen : AppRoute {
                                 VerifyCardInput(
                                     uiState = authUIState,
                                     onVerifyCodeChange = authScreenModel::onVerifyCodeChange,
+                                    onSwitchTwoFactorMethod = authScreenModel::switchTwoFactorMethod,
                                     onClick = authScreenModel::verify
                                 )
                             }

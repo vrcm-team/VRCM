@@ -289,7 +289,7 @@ fun LazyItemScope.renderWorldItem(
                // 缓存里的世界可能还没有包信息，刷新后同一个列表项要跟着更新
                remember(world.unityPackages) { world.unityPackages.platformPackages.keys.sortedBy { it.name } }.forEach {
                     val icon = when(it){
-                        Android -> AppIcons.Android
+                        Android -> AppIcons.VrHeadset
                         Ios -> AppIcons.Apple
                         Windows -> AppIcons.Windows
                     }
@@ -428,7 +428,7 @@ fun LazyItemScope.renderAvatarItem(
                     }.distinct().sortedBy { it.name }
                 }.forEach {
                     val icon = when (it) {
-                        Android -> AppIcons.Android
+                        Android -> AppIcons.VrHeadset
                         Ios -> AppIcons.Apple
                         Windows -> AppIcons.Windows
                     }

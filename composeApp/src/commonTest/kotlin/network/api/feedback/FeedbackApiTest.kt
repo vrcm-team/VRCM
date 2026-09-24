@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.api.feedback
 
+import io.github.vrcmteam.vrcm.network.api.feedback.data.ModerationReportRequest
 import io.github.vrcmteam.vrcm.network.supports.VRCApiException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -20,54 +21,89 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class FeedbackApiTest {
     @Test
-    fun reportUserSendsTheSupportedBehaviorReport() = runBlocking {
+    fun submitReportPostsTheSelectedModerationReport() = runBlocking {
         var capturedRequest: HttpRequestData? = null
         val client = feedbackClient { request ->
             capturedRequest = request
-            HttpStatusCode.OK
+            HttpStatusCode.OK to "{}"
         }
 
-        FeedbackApi(client).reportUser("usr_target")
+        FeedbackApi(client).submitReport(
+            ModerationReportRequest(
+                type = "user",
+                category = "behavior",
+                reason = "harassing",
+                contentId = "usr_target",
+            )
+        )
 
         val request = requireNotNull(capturedRequest)
         val body = Json.parseToJsonElement(request.bodyText()).jsonObject
         assertEquals(HttpMethod.Post, request.method)
-        assertEquals("/feedback/usr_target/user", request.url.encodedPath)
+        assertEquals("/moderationReports", request.url.encodedPath)
         assertEquals(ContentType.Application.Json, request.body.contentType)
-        assertEquals("user", body.getValue("contentType").jsonPrimitive.content)
-        assertEquals("behavior-hacking", body.getValue("reason").jsonPrimitive.content)
-        assertEquals("report", body.getValue("type").jsonPrimitive.content)
+        assertEquals("user", body.getValue("type").jsonPrimitive.content)
+        assertEquals("behavior", body.getValue("category").jsonPrimitive.content)
+        assertEquals("harassing", body.getValue("reason").jsonPrimitive.content)
+        assertEquals("usr_target", body.getValue("contentId").jsonPrimitive.content)
+        // 没填补充说明时不发 description，避免把空串当成用户输入
+        assertFalse("description" in body)
         client.close()
     }
 
     @Test
-    fun reportUserPropagatesRejectedSubmission() = runBlocking {
-        val client = feedbackClient { HttpStatusCode.Forbidden }
+    fun submitReportPropagatesRejectedSubmission() = runBlocking {
+        val client = feedbackClient { HttpStatusCode.Forbidden to "rejected" }
 
         val error = assertFailsWith<VRCApiException> {
-            FeedbackApi(client).reportUser("usr_target")
+            FeedbackApi(client).submitReport(
+                ModerationReportRequest(type = "user", category = "behavior", reason = "other", contentId = "usr_target")
+            )
         }
 
         assertEquals(HttpStatusCode.Forbidden.value, error.code)
         client.close()
     }
 
-    private fun feedbackClient(status: (HttpRequestData) -> HttpStatusCode) = HttpClient(MockEngine) {
+    @Test
+    fun reportConfigReadsOnlyTheReportSectionsOfTheConfig() = runBlocking {
+        val client = feedbackClient { request ->
+            assertEquals("/config", request.url.encodedPath)
+            HttpStatusCode.OK to """
+                {
+                  "clientApiKey": "ignored",
+                  "reportOptions": {"group": {"group": ["sexual", "other"], "groupstore": ["billing"]}},
+                  "reportCategories": {"group": {"text": "Group", "tooltip": "", "order": 18}},
+                  "reportReasons": {"sexual": {"text": "Sexual Content", "tooltip": ""}}
+                }
+            """.trimIndent()
+        }
+
+        val config = FeedbackApi(client).reportConfig()
+
+        assertEquals(listOf("sexual", "other"), config.reportOptions.getValue("group").getValue("group"))
+        assertEquals(18, config.reportCategories.getValue("group").order)
+        assertEquals("Sexual Content", config.reportReasons.getValue("sexual").text)
+        client.close()
+    }
+
+    private fun feedbackClient(respondWith: (HttpRequestData) -> Pair<HttpStatusCode, String>) = HttpClient(MockEngine) {
         engine {
             addHandler { request ->
-                val responseStatus = status(request)
+                val (status, content) = respondWith(request)
                 respond(
-                    content = if (responseStatus == HttpStatusCode.OK) "{}" else "rejected",
-                    status = responseStatus,
+                    content = content,
+                    status = status,
                     headers = headersOf(HttpHeaders.ContentType, "application/json"),
                 )
             }
         }
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
+            json(Json { ignoreUnknownKeys = true; explicitNulls = false })
         }
     }
 

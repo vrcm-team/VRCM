@@ -1,0 +1,2 @@
+/* Photo library add-only permission, requested when the user saves an image. */
+"NSPhotoLibraryAddUsageDescription" = "保存を選んだ画像（VRChat のギャラリー写真、プリント、ネームプレートなど）を写真ライブラリに追加します。";

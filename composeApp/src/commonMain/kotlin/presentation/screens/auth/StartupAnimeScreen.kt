@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
+import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.navigation.AppRoute
 import org.koin.compose.viewmodel.koinViewModel
 import io.github.vrcmteam.vrcm.presentation.navigation.LocalNavigator
@@ -68,6 +69,8 @@ object StartupAnimeScreen : AppRoute {
 
 @Composable
 fun VersionDialog() {
+    // 应用商店分发的安装包由商店负责更新，不查询 GitHub Release
+    if (!getAppPlatform().supportsGitHubUpdateCheck) return
     val versionService: VersionService = koinInject()
     val logger: Logger = koinInject()
     var version by remember { mutableStateOf(VersionVo()) }

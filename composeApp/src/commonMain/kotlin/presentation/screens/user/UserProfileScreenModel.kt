@@ -16,7 +16,6 @@ import io.github.vrcmteam.vrcm.network.api.attributes.UserState
 import io.github.vrcmteam.vrcm.network.api.avatars.AvatarsApi
 import io.github.vrcmteam.vrcm.network.api.avatars.data.AvatarData
 import io.github.vrcmteam.vrcm.network.api.favorite.FavoriteApi
-import io.github.vrcmteam.vrcm.network.api.feedback.FeedbackApi
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.friends.date.FriendData
 import io.github.vrcmteam.vrcm.network.api.groups.GroupsApi
@@ -329,44 +328,6 @@ internal class PlayerBlockStateMachine {
     }
 }
 
-internal enum class UserReportState {
-    Idle,
-    Submitting,
-    Submitted,
-    Failed,
-}
-
-internal class UserReportStateMachine {
-    private val _state = MutableStateFlow(UserReportState.Idle)
-    val state: StateFlow<UserReportState> = _state.asStateFlow()
-
-    fun tryStart(): Boolean {
-        while (true) {
-            val current = _state.value
-            if (current == UserReportState.Submitting || current == UserReportState.Submitted) {
-                return false
-            }
-            if (_state.compareAndSet(current, UserReportState.Submitting)) return true
-        }
-    }
-
-    fun complete() = finish(UserReportState.Submitted)
-
-    fun fail() = finish(UserReportState.Failed)
-
-    fun reset() {
-        while (true) {
-            val current = _state.value
-            if (current == UserReportState.Idle || current == UserReportState.Submitting) return
-            if (_state.compareAndSet(current, UserReportState.Idle)) return
-        }
-    }
-
-    private fun finish(result: UserReportState) {
-        _state.compareAndSet(UserReportState.Submitting, result)
-    }
-}
-
 /** State shown for the current account's avatar-copying privacy control. */
 data class AvatarCopyingPrivacyState(
     val accountUserId: String? = null,
@@ -657,7 +618,6 @@ class UserProfileScreenModel internal constructor(
     private val worldsApi: WorldsApi,
     private val avatarsApi: AvatarsApi,
     private val favoriteApi: FavoriteApi,
-    private val feedbackApi: FeedbackApi,
     private val inviteApi: InviteApi,
     gallerySelectionSessionStore: GallerySelectionSessionStore,
     imageInviteRemote: ImageInviteRemote,
@@ -799,8 +759,6 @@ class UserProfileScreenModel internal constructor(
     private val playerBlockStateMachine = PlayerBlockStateMachine()
     internal val playerBlockState: StateFlow<PlayerBlockState> =
         playerBlockStateMachine.state
-    private val userReportStateMachine = UserReportStateMachine()
-    internal val userReportState: StateFlow<UserReportState> = userReportStateMachine.state
     private val avatarCopyingPrivacyStateMachine = AvatarCopyingPrivacyStateMachine()
     internal val avatarCopyingPrivacyState: StateFlow<AvatarCopyingPrivacyState> =
         avatarCopyingPrivacyStateMachine.state
@@ -1659,41 +1617,6 @@ class UserProfileScreenModel internal constructor(
             }
         }
     }
-
-    fun reportUser(
-        userId: String,
-        successMessage: String,
-        failureMessage: String,
-    ) {
-        val sessionToken = SharedFlowCentre.currentSession.value?.token ?: return
-        if (userId == cacheOwnerUserId ||
-            userId == sessionToken.userId ||
-            !userReportStateMachine.tryStart()
-        ) {
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val response = authService.runSessionBoundCatching(sessionToken) {
-                feedbackApi.reportUser(userId)
-            }
-            if (response == null || !SharedFlowCentre.isCurrentSession(response.sessionToken)) {
-                userReportStateMachine.fail()
-                return@launch
-            }
-
-            response.result.onSuccess {
-                userReportStateMachine.complete()
-                SharedFlowCentre.toastText.emit(ToastText.Success(successMessage))
-            }.onFailure { error ->
-                logger.error(error.message.toString())
-                userReportStateMachine.fail()
-                SharedFlowCentre.toastText.emit(ToastText.Error(failureMessage))
-            }
-        }
-    }
-
-    fun resetUserReportState() = userReportStateMachine.reset()
 
     suspend fun boop(
         userId: String,

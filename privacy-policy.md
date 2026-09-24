@@ -1,6 +1,6 @@
 # Privacy Policy for VRCM
 
-**Last Updated:** August 13, 2026
+**Last Updated:** September 24, 2026
 
 ## 1. Overview
 
@@ -20,21 +20,23 @@ Depending on the features you use, VRCM may store the following locally:
 
 Authentication credentials use the platform's secure storage where available. Other application data is stored in VRCM's local app storage. Exported screenshots, gallery images, and meetup cards are written to a location you select or to the system photo gallery.
 
+On iOS, VRCM only asks for permission to add photos to your library when you save an image; it cannot read your existing photos. Images you choose to upload are picked through the system photo picker, which shares only the images you select.
+
 VRCM does not upload locally generated friend-activity statistics or friend-network data to a server operated by the VRCM developers.
 
 ## 3. Third-party network communication
 
 VRCM sends requests directly to services needed for the action you request:
 
-- **VRChat services:** authentication, profiles, friends, presence, worlds, instances, groups, notifications, avatars, inventory, and gallery operations. Information sent to VRChat is handled under VRChat's own privacy policy and terms.
-- **GitHub:** checking the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information.
+- **VRChat services:** authentication, profiles, friends, presence, worlds, instances, groups, notifications, avatars, inventory, and gallery operations, plus any report you choose to submit (the reported content, the category and reason you pick, and optional details) for review by VRChat's moderation team. Requests identify the app by its name, version, and the contact email below, as VRChat requires. Information sent to VRChat is handled under VRChat's own privacy policy and terms.
+- **GitHub:** builds distributed through GitHub Releases check the VRCM repository's latest public release. GitHub may receive standard network information such as your IP address and user-agent information. Builds installed from the App Store do not contact GitHub; the App Store delivers their updates.
 - **Media hosts referenced by VRChat:** downloading profile images, world images, avatar images, and profile decorations for display or local caching.
 
 When you explicitly upload a gallery image or avatar cover, the selected image is processed on your device and then sent to VRChat. VRCM does not proxy these requests through a VRCM-operated server.
 
 ## 4. Clipboard and external links
 
-When VRCM returns to the foreground, it may inspect clipboard text locally for an exact supported VRChat URL or content ID. Unrelated clipboard text is ignored. VRCM asks for confirmation before resolving a clipboard target through the VRChat API.
+Clipboard reading is off by default. If you turn it on in Settings, VRCM inspects clipboard text locally when it returns to the foreground, looking for an exact supported VRChat URL or content ID. Unrelated clipboard text is ignored. VRCM asks for confirmation before resolving a clipboard target through the VRChat API.
 
 On supported platforms, a `vrchat.com` link opened from another app can also be handed directly to VRCM. VRCM validates supported official URL formats before requesting the target content.
 

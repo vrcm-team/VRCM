@@ -65,6 +65,8 @@ import io.github.vrcmteam.vrcm.presentation.screens.avatar.AvatarProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.currentSessionDeletedAvatarIds
 import io.github.vrcmteam.vrcm.presentation.screens.avatar.data.AvatarProfileVo
 import io.github.vrcmteam.vrcm.service.BoopResult
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
 import io.github.vrcmteam.vrcm.service.InviteMessageAction
 import io.github.vrcmteam.vrcm.service.FriendActivityEvent
 import io.github.vrcmteam.vrcm.service.FriendActivityEventType
@@ -290,10 +292,7 @@ data class UserProfileScreen(
                             )
                         },
                         confirmPlayerBlockChange = { pendingPlayerBlockChange = it },
-                        openReportDialog = {
-                            userProfileScreenModel.resetUserReportState()
-                            openReportDialog = true
-                        },
+                        openReportDialog = { openReportDialog = true },
                         openImageInvitePicker = openImageInvitePicker,
                         openInviteMessageSelection = { action ->
                             userProfileScreenModel.openInviteMessageSelection(
@@ -458,31 +457,16 @@ data class UserProfileScreen(
                 }
             },
         )
-        val userReportState by userProfileScreenModel.userReportState.collectAsState()
-        LaunchedEffect(userReportState) {
-            if (userReportState == UserReportState.Submitted) {
-                openReportDialog = false
-                userProfileScreenModel.resetUserReportState()
-            }
+        if (openReportDialog) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.User,
+                    contentId = currentUser.id,
+                    displayName = currentUser.displayName,
+                ),
+                onDismiss = { openReportDialog = false },
+            )
         }
-        val reportSuccessMessage = strings.profileReportSuccess
-        val reportFailureMessage = strings.profileReportFailed
-        UserReportDialog(
-            visible = openReportDialog,
-            targetName = currentUser.displayName,
-            state = userReportState,
-            onDismiss = {
-                openReportDialog = false
-                userProfileScreenModel.resetUserReportState()
-            },
-            onSubmit = {
-                userProfileScreenModel.reportUser(
-                    userId = currentUser.id,
-                    successMessage = reportSuccessMessage,
-                    failureMessage = reportFailureMessage,
-                )
-            },
-        )
         ImageInviteDialog(
             state = imageInviteState,
             targetName = currentUser.displayName,
@@ -682,7 +666,7 @@ private fun ColumnScope.SheetItems(
     })
     if (!currentUser.isSelf) {
         SheetButtonItem(
-            text = localeStrings.profileReportUser,
+            text = localeStrings.report,
             onClick = {
                 scope.launch { hideSheet() }.invokeOnCompletion {
                     onHideCompletion()

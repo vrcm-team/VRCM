@@ -36,7 +36,9 @@ internal const val USER_NOTES_API_PREFIX = "userNotes"
 
 internal const val FAVORITES_API_PREFIX = "favorites"
 
-internal const val FEEDBACK_API_PREFIX = "feedback"
+internal const val CONFIG_API_PREFIX = "config"
+
+internal const val MODERATION_REPORTS_API_PREFIX = "moderationReports"
 
 internal const val FAVORITE_LIMITS_API_SUFFIX = "favoritelimits"
 

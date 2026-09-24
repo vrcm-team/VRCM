@@ -278,7 +278,7 @@ private fun DeviceStatsRow(
         }
         if (androidUsers != null && androidUsers > 0) {
             IconLabelRow(
-                icon = AppIcons.Android,
+                icon = AppIcons.VrHeadset,
                 text = "$androidUsers",
                 iconSize = iconSize,
                 spacing = spacing

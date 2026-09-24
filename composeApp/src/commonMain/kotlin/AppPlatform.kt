@@ -9,6 +9,9 @@ interface AppPlatform : KoinComponent {
     val version: String
     val type: AppPlatformType
 
+    /** 是否在应用内检查 GitHub Release 新版本；由应用商店分发、由商店负责更新的安装包应返回 false。 */
+    val supportsGitHubUpdateCheck: Boolean get() = true
+
     val supportsFriendActivityNotifications: Boolean get() = false
     val supportsBackgroundFriendMonitoring: Boolean get() = false
     fun hasBackgroundFriendMonitoringPermission(): Boolean = true

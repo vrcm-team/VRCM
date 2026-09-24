@@ -41,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -70,6 +71,8 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppSize
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSpacing
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppSurface
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTab
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetAction
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppSheetActionGroup
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTabRow
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
@@ -77,6 +80,7 @@ import io.github.vrcmteam.vrcm.presentation.designsystem.AppToggle
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.designsystem.glassBackdropSource
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberAppSheetState
 import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.navigation.AppDetailRoute
 import org.koin.compose.viewmodel.koinViewModel
@@ -88,7 +92,9 @@ import io.github.vrcmteam.vrcm.network.api.groups.data.Role
 import io.github.vrcmteam.vrcm.network.api.instances.data.InstanceData
 import io.github.vrcmteam.vrcm.network.api.users.data.UserData
 import io.github.vrcmteam.vrcm.core.extensions.toLocalDateTime
+import io.github.vrcmteam.vrcm.presentation.compoments.ABottomSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.AImage
+import io.github.vrcmteam.vrcm.presentation.compoments.ContentReportSheet
 import io.github.vrcmteam.vrcm.presentation.compoments.GroupIcon
 import io.github.vrcmteam.vrcm.presentation.compoments.LocalSharedTransitionDialogScope
 import io.github.vrcmteam.vrcm.presentation.compoments.LoadingButton
@@ -116,6 +122,9 @@ import io.github.vrcmteam.vrcm.presentation.screens.world.WorldProfileScreen
 import io.github.vrcmteam.vrcm.presentation.screens.world.data.WorldProfileVo
 import io.github.vrcmteam.vrcm.presentation.settings.locale.strings
 import io.github.vrcmteam.vrcm.presentation.supports.AppIcons
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
+import kotlinx.coroutines.launch
 import presentation.compoments.TopMenuBar
 import kotlinx.serialization.Serializable
 
@@ -166,6 +175,43 @@ class GroupProfileScreen(
                     screenModel.loadMorePosts()
                 }
             }
+        }
+
+        // 更多操作目前只有举报，只对别人的群组显示
+        val canReport = group.ownerId != currentSession?.account?.userId
+        var actionSheetIsVisible by remember { mutableStateOf(false) }
+        val actionSheetState = rememberAppSheetState()
+        var showReportSheet by rememberSaveable(groupProfileVo.groupId) { mutableStateOf(false) }
+        val actionScope = rememberCoroutineScope()
+        ABottomSheet(
+            isVisible = actionSheetIsVisible && canReport,
+            sheetState = actionSheetState,
+            onDismissRequest = { actionSheetIsVisible = false },
+        ) {
+            AppSheetActionGroup {
+                AppSheetAction(
+                    role = AppButtonRole.Destructive,
+                    onClick = {
+                        actionScope.launch {
+                            actionSheetState.hide()
+                            if (!actionSheetState.isVisible) actionSheetIsVisible = false
+                            showReportSheet = true
+                        }
+                    },
+                ) {
+                    AppText(strings.report)
+                }
+            }
+        }
+        if (showReportSheet && canReport) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.Group,
+                    contentId = group.groupId,
+                    displayName = group.name,
+                ),
+                onDismiss = { showReportSheet = false },
+            )
         }
 
         CompositionLocalProvider(LocalSharedSuffixKey provides sharedSuffixKey) {
@@ -257,7 +303,10 @@ class GroupProfileScreen(
                             offsetDp = 0.dp,
                             ratio = ratio,
                             onReturn = { currentNavigator.pop() },
-                            onMenu = null,
+                            onMenu = if (canReport) {
+                                { actionSheetIsVisible = true }
+                            } else null,
+                            menuContentDescription = strings.groupProfileMoreActions,
                             actions = {
                                 OfficialUrlShareButton(
                                     url = "https://vrchat.com/home/group/${group.groupId}",

@@ -29,6 +29,8 @@ fun registerArchiveTask(
         "-archivePath", archivePath.get().asFile.absolutePath,
         "CODE_SIGNING_ALLOWED=NO",
         "CODE_SIGNING_REQUIRED=NO",
+        // 这里产出的是 GitHub Release / 自签用的 IPA，保留应用内 GitHub 更新检查
+        "VRCM_DISTRIBUTION_CHANNEL=GitHub",
     )
 }
 

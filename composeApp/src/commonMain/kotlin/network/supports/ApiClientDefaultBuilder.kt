@@ -1,5 +1,6 @@
 package io.github.vrcmteam.vrcm.network.supports
 
+import io.github.vrcmteam.vrcm.core.shared.AppConst
 import io.github.vrcmteam.vrcm.network.api.attributes.VRC_API_URL
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -65,6 +66,8 @@ internal fun HttpClientConfig<*>.configureApiClient(
         // ping间隔（保持连接活跃，必须小于 socketTimeoutMillis）
         pingInterval = 30.seconds
     }
-    // user agent用户代理信息 (就是添加一个header)
-    install(UserAgent)
+    // VRChat 要求以"应用名/版本 联系方式"标识调用方；HTTP、WebSocket 与图片加载共用此 client
+    install(UserAgent) {
+        agent = AppConst.APP_USER_AGENT
+    }
 }

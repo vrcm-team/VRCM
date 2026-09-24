@@ -58,6 +58,8 @@ import io.github.vrcmteam.vrcm.core.shared.SharedFlowCentre
 import io.github.vrcmteam.vrcm.network.api.attributes.FavoriteType
 import io.github.vrcmteam.vrcm.network.api.files.data.PlatformType.*
 import io.github.vrcmteam.vrcm.presentation.compoments.*
+import io.github.vrcmteam.vrcm.service.data.ContentReportType
+import io.github.vrcmteam.vrcm.service.data.ReportTarget
 import io.github.vrcmteam.vrcm.presentation.extensions.*
 import io.github.vrcmteam.vrcm.presentation.favorites.FavoriteEntryState
 import io.github.vrcmteam.vrcm.presentation.screens.user.UserProfileScreen
@@ -438,6 +440,21 @@ class WorldProfileScreen(
             )
         }
 
+        // 举报入口只给别人的世界
+        val currentSession by SharedFlowCentre.currentSession.collectAsState()
+        val canReport = worldProfileVo.authorID != currentSession?.account?.userId
+        var showReportSheet by rememberSaveable(worldProfileVo.worldId) { mutableStateOf(false) }
+        if (showReportSheet && canReport) {
+            ContentReportSheet(
+                target = ReportTarget(
+                    type = ContentReportType.World,
+                    contentId = worldProfileVo.worldId,
+                    displayName = worldProfileVo.worldName,
+                ),
+                onDismiss = { showReportSheet = false },
+            )
+        }
+
         val favoriteEntryState by screenModel.favoriteEntryState.collectAsState()
         val instanceCreationGroups by screenModel.instanceCreationGroups.collectAsState()
         val instanceCreationState by screenModel.instanceCreationState.collectAsState()
@@ -645,6 +662,8 @@ class WorldProfileScreen(
                     onEditImage = onEditImage,
                     canEditMetadata = canEditMetadata,
                     onEditMetadata = onEditMetadata,
+                    showReport = canReport,
+                    onReport = { showReportSheet = true },
                 )
             }
         }
@@ -1020,7 +1039,7 @@ private fun ColumnScope.InfoArea(
         val icon = when (platformSize.platform) {
             Windows -> AppIcons.Computer
             Ios -> AppIcons.Apple
-            Android -> AppIcons.Android
+            Android -> AppIcons.VrHeadset
         }
         Triple(icon, platformSize.formattedSize, platformSize.displayName)
     }
@@ -1589,6 +1608,8 @@ private fun WorldProfileTopBar(
     onEditImage: () -> Unit,
     canEditMetadata: Boolean,
     onEditMetadata: () -> Unit,
+    showReport: Boolean,
+    onReport: () -> Unit,
 ) {
     var bottomSheetIsVisible by remember { mutableStateOf(false) }
     val sheetState = rememberAppSheetState()
@@ -1668,6 +1689,8 @@ private fun WorldProfileTopBar(
                 onEditImage = onEditImage,
                 canEditMetadata = canEditMetadata,
                 onEditMetadata = onEditMetadata,
+                showReport = showReport,
+                onReport = onReport,
             )
         }
     }
@@ -1693,6 +1716,8 @@ private fun ColumnScope.WorldProfileActionSheet(
     onEditImage: () -> Unit,
     canEditMetadata: Boolean,
     onEditMetadata: () -> Unit,
+    showReport: Boolean,
+    onReport: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val dismissAndRun: (() -> Unit) -> Unit = { action ->
@@ -1770,6 +1795,13 @@ private fun ColumnScope.WorldProfileActionSheet(
             loading = isDeleting,
             isDestructive = true,
             onClick = { dismissAndRun(onDelete) },
+        )
+    }
+    if (showReport) {
+        WorldProfileSheetButton(
+            text = strings.report,
+            isDestructive = true,
+            onClick = { dismissAndRun(onReport) },
         )
     }
 }
