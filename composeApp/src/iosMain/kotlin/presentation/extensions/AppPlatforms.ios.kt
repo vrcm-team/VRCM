@@ -5,6 +5,7 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIActivityViewController
+import platform.UIKit.UIPasteboard
 import platform.UIKit.UIViewController
 import platform.UIKit.popoverPresentationController
 
@@ -34,6 +35,9 @@ actual fun AppPlatform.shareUrl(url: String): Boolean {
     presenter.presentViewController(activityController, animated = true, completion = null)
     return true
 }
+
+/** changeCount 是系统在剪贴板每次被改写时递增的计数，读它不读内容，不会弹"允许粘贴"。 */
+actual fun AppPlatform.clipboardChangeToken(): Long? = UIPasteboard.generalPasteboard.changeCount
 
 private tailrec fun UIViewController.topPresentedViewController(): UIViewController =
     presentedViewController?.topPresentedViewController() ?: this

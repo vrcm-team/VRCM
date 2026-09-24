@@ -75,9 +75,8 @@ object DaoKeys{
         const val LAST_VRCHAT_STATUS_INDICATOR_KEY = "${PREFIX}.lastVrchatStatusIndicator"
         const val PRESENCE_FILTER_KEY = "${PREFIX}.friendPresenceFilter"
         const val BACKGROUND_FRIEND_MONITORING_ENABLED_KEY = "${PREFIX}.backgroundFriendMonitoringEnabled"
-        const val CLIPBOARD_READING_ENABLED_KEY = "${PREFIX}.clipboardReadingOptIn"
-        /** 默认开启时代的旧键：保存任意设置都会把默认的 true 写进去，存的多半不是用户的选择，只用来清理。 */
-        const val LEGACY_CLIPBOARD_READING_ENABLED_KEY = "${PREFIX}.clipboardReadingEnabled"
+        const val CLIPBOARD_READING_ENABLED_KEY = "${PREFIX}.clipboardReadingEnabled"
+        const val LAST_CLIPBOARD_CHANGE_TOKEN_KEY = "${PREFIX}.lastClipboardChangeToken"
 
     }
 

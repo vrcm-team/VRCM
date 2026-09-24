@@ -37,7 +37,7 @@ When you explicitly upload a gallery image or avatar cover, the selected image i
 
 ## 4. Clipboard and external links
 
-Clipboard reading is off by default. If you turn it on in Settings, VRCM inspects clipboard text locally when it returns to the foreground, looking for an exact supported VRChat URL or content ID. Unrelated clipboard text is ignored. VRCM asks for confirmation before resolving a clipboard target through the VRChat API.
+When VRCM returns to the foreground, it may inspect clipboard text locally for an exact supported VRChat URL or content ID. Unrelated clipboard text is ignored. VRCM asks for confirmation before resolving a clipboard target through the VRChat API.
 
 On supported platforms, a `vrchat.com` link opened from another app can also be handed directly to VRCM. VRCM validates supported official URL formats before requesting the target content.
 

@@ -18,3 +18,6 @@ actual val AppPlatform.supportsSystemShare: Boolean
     get() = false
 
 actual fun AppPlatform.shareUrl(url: String): Boolean = false
+
+/** 桌面读剪贴板没有系统提示，不需要标记，直接读取；同一个链接由弹窗逻辑去重。 */
+actual fun AppPlatform.clipboardChangeToken(): Long? = null

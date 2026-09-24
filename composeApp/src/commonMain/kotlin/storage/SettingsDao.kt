@@ -11,11 +11,6 @@ class SettingsDao(
     private val settingsSettings: Settings
 ) {
 
-    init {
-        // 剪贴板读取改为默认关闭并换了新键；旧键里是旧版随其他设置写入的默认值，不能让升级用户继续被读取剪贴板
-        settingsSettings.remove(DaoKeys.Settings.LEGACY_CLIPBOARD_READING_ENABLED_KEY)
-    }
-
     var settings: SettingsData
         get() {
             return SettingsData(
@@ -116,8 +111,16 @@ class SettingsDao(
         get() = settingsSettings.getBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, false)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.BACKGROUND_FRIEND_MONITORING_ENABLED_KEY, value)
 
-    // 默认关闭：iOS 每次读取其他 App 复制的内容都会弹"允许粘贴"，Android 12+ 也会提示已读取剪贴板，改为用户主动开启
     var clipboardReadingEnabled: Boolean
-        get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, false)
+        get() = settingsSettings.getBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, true)
         set(value) = settingsSettings.putBoolean(DaoKeys.Settings.CLIPBOARD_READING_ENABLED_KEY, value)
+
+    /** 上次真正读取剪贴板时的变化标记；重启 App 后剪贴板没变也不用再读一次。 */
+    var lastClipboardChangeToken: Long?
+        get() = settingsSettings.getLongOrNull(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY)
+        set(value) {
+            value?.let {
+                settingsSettings.putLong(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY, it)
+            } ?: settingsSettings.remove(DaoKeys.Settings.LAST_CLIPBOARD_CHANGE_TOKEN_KEY)
+        }
 }
