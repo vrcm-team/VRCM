@@ -62,12 +62,15 @@ fun AppAlertContent(
 ) {
     // 弹窗内部是"抬升"层级：深色下面板和里面的控件各上移一档
     val c = AppTheme.colors.elevated()
-    CompositionLocalProvider(LocalAppColors provides c, LocalGlassBackdrop provides null) {
+    // 面板里弹出的菜单模糊的是面板本身
+    val panelBackdrop = rememberGlassBackdrop()
+    CompositionLocalProvider(LocalAppColors provides c, LocalGlassBackdrop provides null, LocalPopupBackdrop provides panelBackdrop) {
     Column(
         modifier
             .widthIn(min = 270.dp, max = 340.dp)
             .shadow(24.dp, AppShapes.l, clip = false)
             .clip(AppShapes.l)
+            .glassBackdropSource(panelBackdrop)
             .background(c.groupedBackground),
     ) {
         Column(
@@ -159,14 +162,20 @@ fun AppDialogSurface(
     content: @Composable () -> Unit,
 ) {
     val c = AppTheme.colors.elevated()
-    CompositionLocalProvider(LocalAppColors provides c, LocalGlassBackdrop provides null) {
+    // 面板里弹出的菜单模糊的是面板本身
+    val panelBackdrop = rememberGlassBackdrop()
+    CompositionLocalProvider(LocalAppColors provides c, LocalGlassBackdrop provides null, LocalPopupBackdrop provides panelBackdrop) {
         AppSurface(
             modifier = modifier,
             shape = shape,
             color = c.groupedBackground,
             contentColor = c.label,
             shadowElevation = 24.dp,
-            content = content,
-        )
+        ) {
+            // 取样源挂在面板的裁剪之内（投影画在它外面），并带上底色，菜单模糊到的才是整块面板
+            Box(Modifier.glassBackdropSource(panelBackdrop).background(c.groupedBackground), propagateMinConstraints = true) {
+                content()
+            }
+        }
     }
 }

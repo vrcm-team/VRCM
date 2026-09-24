@@ -75,6 +75,7 @@ fun <T> GroupOptionsUI(
                         onOptionsChanged(updateOptions(currentOptions, null))
                         expandGroupMenu = false
                     },
+                    selected = selectedGroup == null,
                 )
 
                 favoriteGroups.forEach { (group, data) ->
@@ -85,6 +86,7 @@ fun <T> GroupOptionsUI(
                             onOptionsChanged(updateOptions(currentOptions, group))
                             expandGroupMenu = false
                         },
+                        selected = group == selectedGroup,
                     )
                 }
             }

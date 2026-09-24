@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalAppColors
 import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalPopupBackdrop
+import io.github.vrcmteam.vrcm.presentation.designsystem.glassBackdropSource
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.extensions.enableIf
 import io.github.vrcmteam.vrcm.presentation.extensions.getInsetPadding
 import io.github.vrcmteam.vrcm.presentation.extensions.simpleClickable
@@ -162,9 +165,12 @@ fun SharedDialogContainer(
 ) {
     // 弹层内部是"抬升"层级：深色下面板上的卡片才不会和面板糊成一片
     val colors = AppTheme.colors.elevated()
+    // 面板里弹出的菜单模糊的是面板本身
+    val panelBackdrop = rememberGlassBackdrop()
     CompositionLocalProvider(
         LocalAppColors provides colors,
         LocalContentColor provides colors.label,
+        LocalPopupBackdrop provides panelBackdrop,
     ) {
         Column(
             modifier = Modifier
@@ -184,6 +190,7 @@ fun SharedDialogContainer(
                         }
                     )
                 }
+                .glassBackdropSource(panelBackdrop)
                 .background(background, DialogShapeForSharedElement)
                 .clip(DialogShapeForSharedElement),
             content = content

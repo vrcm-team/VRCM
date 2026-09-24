@@ -466,20 +466,7 @@ private fun <T> HomeTabOptionsMenu(
                     onDismissRequest()
                     onSelected(option)
                 },
-                leadingIcon = {
-                    Box(
-                        modifier = Modifier.size(20.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (option == selected) {
-                            AppIcon(
-                                imageVector = AppIcons.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                },
+                selected = option == selected,
             )
         }
     }

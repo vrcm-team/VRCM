@@ -43,6 +43,13 @@ fun rememberGlassBackdrop(): GlassBackdrop = remember { GlassBackdrop(HazeState(
 /** 为 null 表示此处拿不到内容层（不在玻璃骨架里，或自己就在内容层中）：玻璃走高填充回退。 */
 val LocalGlassBackdrop = staticCompositionLocalOf<GlassBackdrop?> { null }
 
+/**
+ * 从这里弹出的菜单取样的那一层：页面上是页面内容层（[AppScaffold] 提供），sheet / 对话框里是它们自己的面板。
+ * 和 [LocalGlassBackdrop] 分开：面板里的玻璃件长在面板这个取样源里面，不能取样它；菜单画在另开的弹层里，可以。
+ * 为 null 时菜单走不透明回退。
+ */
+val LocalPopupBackdrop = staticCompositionLocalOf<GlassBackdrop?> { null }
+
 /** 挂在内容层根上：把这个节点及其子树标记为玻璃的取样源。 */
 fun Modifier.glassBackdropSource(backdrop: GlassBackdrop): Modifier = this.hazeSource(backdrop.hazeState)
 

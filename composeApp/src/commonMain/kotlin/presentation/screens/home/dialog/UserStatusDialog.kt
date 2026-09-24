@@ -130,15 +130,7 @@ class UserStatusDialog(
                                 setStatusDescriptionText(historyStatus)
                                 historyExpanded = false
                             },
-                            trailingIcon = {
-                                if (historyStatus == statusDescriptionText) {
-                                    AppIcon(
-                                        imageVector = AppIcons.Check,
-                                        contentDescription = "checked",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
+                            selected = historyStatus == statusDescriptionText,
                         )
                     }
                 }

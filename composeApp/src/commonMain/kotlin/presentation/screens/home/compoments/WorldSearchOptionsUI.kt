@@ -87,7 +87,8 @@ fun WorldSearchOptionsUI(
                         onClick = {
                             onOptionsChanged(options.copy(sortOption = sortOption))
                             expandSortMenu = false
-                        }
+                        },
+                        selected = sortOption == options.sortOption,
                     )
                 }
             }

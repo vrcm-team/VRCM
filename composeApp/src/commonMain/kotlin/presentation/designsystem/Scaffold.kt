@@ -41,6 +41,7 @@ fun AppScaffold(
     val insets = contentWindowInsets.asPaddingValues(LocalDensity.current)
     CompositionLocalProvider(
         LocalGlassBackdrop provides backdrop,
+        LocalPopupBackdrop provides backdrop,
         LocalContentColor provides contentColor,
     ) {
         SubcomposeLayout(modifier.fillMaxSize().background(containerColor)) { constraints ->

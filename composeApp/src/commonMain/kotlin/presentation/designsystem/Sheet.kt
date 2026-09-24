@@ -188,6 +188,8 @@ fun AppSheet(
         val scope = rememberCoroutineScope()
         val density = LocalDensity.current
         val shape = RoundedCornerShape(topStart = AppRadius.xl, topEnd = AppRadius.xl)
+        // 面板里弹出的菜单模糊的是面板本身，不是被压暗的页面
+        val panelBackdrop = rememberGlassBackdrop()
         val requestDismiss: () -> Unit = {
             if (sheetState.confirmValueChange(AppSheetValue.Hidden)) {
                 scope.launch {
@@ -280,6 +282,7 @@ fun AppSheet(
                     .onSizeChanged { sheetHeight = it.height }
                     .shadow(24.dp, shape, clip = false)
                     .clip(shape)
+                    .glassBackdropSource(panelBackdrop)
                     .background(containerColor)
                     .semantics { paneTitle = "Sheet" }
                     .pointerInput(Unit) {}
@@ -301,6 +304,7 @@ fun AppSheet(
                     LocalAppColors provides AppTheme.colors.elevated(),
                     LocalContentColor provides AppTheme.colors.label,
                     LocalGlassBackdrop provides null,
+                    LocalPopupBackdrop provides panelBackdrop,
                 ) {
                     if (dragHandle) {
                         Box(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 10.dp), contentAlignment = Alignment.Center) {

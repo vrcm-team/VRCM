@@ -316,27 +316,13 @@ private fun <T> InventoryDropdown(
             modifier = Modifier.widthIn(min = 200.dp),
         ) {
             options.forEach { option ->
-                val isSelected = option == selected
                 AppMenuItem(
                     text = { AppText(optionLabel(option)) },
                     onClick = {
                         expanded = false
                         onSelected(option)
                     },
-                    leadingIcon = {
-                        Box(
-                            modifier = Modifier.size(20.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (isSelected) {
-                                AppIcon(
-                                    imageVector = AppIcons.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    },
+                    selected = option == selected,
                 )
             }
         }

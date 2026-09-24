@@ -667,14 +667,20 @@ private fun AvatarStyleDropdown(
     onChoice: (AvatarStyleChoice) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedText = when (choice) {
+    // 当前生效的风格：未改动时按原值（id 或名称）匹配；null 是"无"，或原值不在选项里
+    val selectedStyle = when (choice) {
         AvatarStyleChoice.Unchanged -> options.firstOrNull {
             it.id == currentStyle || it.styleName == currentStyle
-        }?.styleName ?: currentStyle.orEmpty().ifBlank { noneLabel }
-        AvatarStyleChoice.Clear -> noneLabel
+        }
+        AvatarStyleChoice.Clear -> null
         is AvatarStyleChoice.Selected -> options.firstOrNull { it.id == choice.id }
-            ?.styleName
-            .orEmpty()
+    }
+    val noneSelected = choice == AvatarStyleChoice.Clear ||
+        (choice == AvatarStyleChoice.Unchanged && currentStyle.isNullOrBlank())
+    val selectedText = when (choice) {
+        AvatarStyleChoice.Unchanged -> selectedStyle?.styleName ?: currentStyle.orEmpty().ifBlank { noneLabel }
+        AvatarStyleChoice.Clear -> noneLabel
+        is AvatarStyleChoice.Selected -> selectedStyle?.styleName.orEmpty()
     }
 
     AppPopUpButton(
@@ -691,6 +697,7 @@ private fun AvatarStyleDropdown(
                 onChoice(AvatarStyleChoice.Clear)
                 expanded = false
             },
+            selected = noneSelected,
         )
         options.forEach { style ->
             AppMenuItem(
@@ -699,6 +706,7 @@ private fun AvatarStyleDropdown(
                     onChoice(AvatarStyleChoice.Selected(style.id))
                     expanded = false
                 },
+                selected = style.id == selectedStyle?.id,
             )
         }
     }

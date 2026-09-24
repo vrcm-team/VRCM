@@ -389,6 +389,7 @@ internal class CreateInstanceDialog(
                         onGroupSelected(group.id)
                         expanded = false
                     },
+                    selected = group.id == selectedGroupId,
                 )
             }
         }
@@ -417,6 +418,7 @@ internal class CreateInstanceDialog(
                         onSelected(performance)
                         expanded = false
                     },
+                    selected = performance == selected,
                 )
             }
         }

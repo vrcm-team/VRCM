@@ -28,10 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -74,6 +75,8 @@ fun AppMenu(
     val scale by transition.animateFloat({ tween(motion.fastMs) }, label = "menuScale") { if (it) 1f else 0.86f }
     val alpha by transition.animateFloat({ tween(motion.fastMs) }, label = "menuAlpha") { if (it) 1f else 0f }
     val c = AppTheme.colors.elevated()
+    // 菜单画在另开的弹层里，模糊的是打开它的那一层（页面内容，或 sheet / 对话框的面板）；得在弹层外面读
+    val backdrop = LocalPopupBackdrop.current
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismissRequest,
@@ -94,9 +97,7 @@ fun AppMenu(
                     transformOrigin = positionProvider.transformOrigin
                 }
                 .padding(MenuShadowInset) // 给投影留出不被弹层窗口裁掉的空间，定位时再扣回去
-                .shadow(16.dp, AppShapes.m, clip = false)
-                .clip(AppShapes.m)
-                .background(c.secondarySystemBackground)
+                .glassFlat(AppShapes.m, backdrop = backdrop)
                 .then(modifier)
                 .widthIn(min = 180.dp, max = 300.dp)
                 .width(IntrinsicSize.Max)
@@ -107,12 +108,16 @@ fun AppMenu(
     }
 }
 
-/** 菜单行：44 dp 高、正文字号；[role] 为破坏性时红字。行与行之间自己加 [AppDivider]（成组时）。 */
+/**
+ * 菜单行：44 dp 高、正文字号；[role] 为破坏性时红字。行与行之间自己加 [AppDivider]（成组时）。
+ * [selected] 给多选一的菜单用：不为 null 时行首留出对勾位（整张菜单的文字才对齐），为 true 的那一行打勾；动作菜单保持 null。
+ */
 @Composable
 fun AppMenuItem(
     text: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
@@ -123,6 +128,7 @@ fun AppMenuItem(
     Row(
         modifier
             .fillMaxWidth()
+            .then(if (selected != null) Modifier.semantics { this.selected = selected } else Modifier)
             .clickable(interactionSource = null, indication = LocalIndication.current, enabled = enabled, onClick = onClick)
             .enabledAlpha(enabled)
             .defaultMinSize(minHeight = 44.dp)
@@ -131,15 +137,23 @@ fun AppMenuItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ProvideContentColor(foreground, AppTheme.type.body) {
-            if (leadingIcon != null) Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) { leadingIcon() }
+            if (selected != null) {
+                Box(Modifier.size(MenuItemIconSlot), contentAlignment = Alignment.Center) {
+                    if (selected) AppIcon(AppCheckmark, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+            }
+            if (leadingIcon != null) Box(Modifier.size(MenuItemIconSlot), contentAlignment = Alignment.Center) { leadingIcon() }
             Box(Modifier.weight(1f)) { text() }
             // 尾随位多半是图标，也可能是计数这类短文字：至少占一个图标位，内容更宽时跟着撑开而不是被裁掉
             if (trailingIcon != null) {
-                Box(Modifier.defaultMinSize(minWidth = 22.dp, minHeight = 22.dp), contentAlignment = Alignment.Center) { trailingIcon() }
+                Box(Modifier.defaultMinSize(minWidth = MenuItemIconSlot, minHeight = MenuItemIconSlot), contentAlignment = Alignment.Center) { trailingIcon() }
             }
         }
     }
 }
+
+/** 菜单行首尾的图标位（对勾、前导 / 尾随图标）。 */
+private val MenuItemIconSlot = 22.dp
 
 /**
  * 弹出按钮（HIG Pop-up buttons）：一行里显示当前值 + 上下箭头，点开是一张菜单；用于表单里的多选一。
