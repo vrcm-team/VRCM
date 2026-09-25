@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VRCM — Your VRChat social life, on your phone</title>
+<meta name="description" content="VRCM is a free, open-source VRChat companion for Android, iOS and desktop: friend network, time together, VRChat+ Gallery on your phone, real-time alerts and meetup name cards.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://vrcm-team.github.io/VRCM/">
+<link rel="alternate" hreflang="en" href="https://vrcm-team.github.io/VRCM/?lang=en">
+<link rel="alternate" hreflang="zh-Hans" href="https://vrcm-team.github.io/VRCM/?lang=zh">
+<link rel="alternate" hreflang="ja" href="https://vrcm-team.github.io/VRCM/?lang=ja">
+<link rel="alternate" hreflang="x-default" href="https://vrcm-team.github.io/VRCM/">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-64.png" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VRCM">
+<meta property="og:title" content="VRCM — Your VRChat social life, on your phone">
+<meta property="og:description" content="A free, open-source VRChat companion for Android, iOS and desktop.">
+<meta property="og:url" content="https://vrcm-team.github.io/VRCM/">
+<meta property="og:image" content="https://vrcm-team.github.io/VRCM/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VRCM app icon next to its Home screen on a desktop window with the wide layout, an Android phone and an iPhone">
+<meta name="twitter:card" content="summary_large_image">
+<script>
+  /* 首帧前套用访客在本页选过的主题模式 / 主题色，避免先闪一下默认外观 */
+  (function () {
+    var d = document.documentElement;
+    d.className = d.className.replace('no-js', 'js');
+    try {
+      var t = localStorage.getItem('vrcm-site-theme'), a = localStorage.getItem('vrcm-site-accent');
+      if (t === 'dark' || t === 'light') d.setAttribute('data-theme', t);
+      if (a && a !== 'blue') d.setAttribute('data-accent', a);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  /* ---------- 设计令牌：与 composeApp/.../presentation/designsystem（Palette.kt、Tokens.kt）同值 ---------- */
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      "PingFang SC", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans SC", "Noto Sans JP", "Microsoft YaHei", "Yu Gothic UI", Meiryo, sans-serif;
+    --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      "PingFang SC", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans SC", "Noto Sans JP", "Microsoft YaHei", "Yu Gothic UI", Meiryo, sans-serif;
+
+    --label: #1C1C1E; --label2: #5F5F66; --label3: #8A8A8E;
+    --sec: #FFFFFF;             /* 普通分节底（systemBackground） */
+    --sec-alt: #F2F2F7;         /* 分组分节底（groupedBackground） */
+    --card: #FFFFFF;            /* 分组分节里的卡片 */
+    --card2: #F2F2F7;           /* 普通分节里的卡片 */
+    --separator: #D8D8DC;
+    --fill: rgba(120, 120, 128, .14); --fill2: rgba(120, 120, 128, .08);
+    --glass: rgba(255, 255, 255, .72); --glass-stroke: rgba(0, 0, 0, .08); --glass-hi: rgba(255, 255, 255, .95);
+    --thumb: #FFFFFF;
+    --band: #6C6D72; --band-edge: rgba(255, 255, 255, .6);
+    --phone-shadow: 0 34px 64px -30px rgba(16, 32, 72, .5), 0 14px 28px -18px rgba(16, 32, 72, .28);
+    --window-stroke: rgba(0, 0, 0, .1); --window-shadow: 0 40px 80px -40px rgba(16, 32, 72, .42), 0 16px 32px -22px rgba(16, 32, 72, .24);
+    --aurora: .5;
+
+    /* 主题色：Palette.kt 的六组强调色，默认蓝；-l 浅色、-d 深色 */
+    --tint-l: #1E63C9; --on-tint-l: #FFFFFF; --soft-l: #E4EEFB; --on-soft-l: #174F9E;
+    --tint-d: #7AB4FF; --on-tint-d: #0B2B5E; --soft-d: #10284A; --on-soft-d: #9CC6FF;
+    --tint: var(--tint-l); --on-tint: var(--on-tint-l); --soft: var(--soft-l); --on-soft: var(--on-soft-l);
+
+    /* 彩色圆角方块图标（AppRowIconColor） */
+    --ic-blue: #3478F6; --ic-indigo: #5856D6; --ic-purple: #AF52DE; --ic-pink: #FF2D55; --ic-red: #FF3B30;
+    --ic-orange: #FF9500; --ic-green: #2E9E4F; --ic-teal: #30B0C7; --ic-gray: #8E8E93;
+
+    /* 品牌：图标底色渐变与两颗圆点 */
+    --brand-1: #A3D5FF; --brand-2: #74B6FC; --peach: #FFC49E; --pink: #FFBCCF;
+
+    --r-xs: 6px; --r-s: 10px; --r-m: 14px; --r-l: 20px; --r-xl: 28px;
+    --wrap: 1120px;
+    color-scheme: light;
+  }
+  :root[data-accent="purple"] { --tint-l: #6F3DC7; --on-tint-l: #FFFFFF; --soft-l: #EEE7FA; --on-soft-l: #552E98; --tint-d: #B79CF2; --on-tint-d: #2C1462; --soft-d: #261A45; --on-soft-d: #C9B5F7; }
+  :root[data-accent="pink"]   { --tint-l: #C2185B; --on-tint-l: #FFFFFF; --soft-l: #FCE4EC; --on-soft-l: #8E0F3F; --tint-d: #F48FB1; --on-tint-d: #4A0A25; --soft-d: #3E1424; --on-soft-d: #F8A5C2; }
+  :root[data-accent="orange"] { --tint-l: #B3520A; --on-tint-l: #FFFFFF; --soft-l: #FDEBDC; --on-soft-l: #8A3E05; --tint-d: #FFA35C; --on-tint-d: #4A2200; --soft-d: #3E2410; --on-soft-d: #FFB985; }
+  :root[data-accent="green"]  { --tint-l: #2E7D32; --on-tint-l: #FFFFFF; --soft-l: #E6F3E7; --on-soft-l: #1F5D24; --tint-d: #7CD98A; --on-tint-d: #0F3A16; --soft-d: #123A1A; --on-soft-d: #9BE3A6; }
+  :root[data-accent="teal"]   { --tint-l: #0D7680; --on-tint-l: #FFFFFF; --soft-l: #E3F3F4; --on-soft-l: #0A5F67; --tint-d: #4FC3CC; --on-tint-d: #00363B; --soft-d: #0B3F44; --on-soft-d: #7FD6DD; }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --label: #F2F2F7; --label2: #A1A1A6; --label3: #6E6E73;
+      --sec: #000000; --sec-alt: #0E0E10; --card: #1C1C1E; --card2: #1C1C1E;
+      --separator: #3A3A3C; --fill: rgba(120, 120, 128, .32); --fill2: rgba(120, 120, 128, .18);
+      --glass: rgba(30, 30, 32, .72); --glass-stroke: rgba(255, 255, 255, .08); --glass-hi: rgba(255, 255, 255, .22);
+      --thumb: #636366; --band: #45464B; --band-edge: rgba(255, 255, 255, .24);
+      --phone-shadow: 0 34px 70px -34px rgba(0, 0, 0, .95);
+      --window-stroke: rgba(255, 255, 255, .14); --window-shadow: 0 40px 90px -40px rgba(0, 0, 0, .95);
+      --aurora: .26;
+      --tint: var(--tint-d); --on-tint: var(--on-tint-d); --soft: var(--soft-d); --on-soft: var(--on-soft-d);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --label: #F2F2F7; --label2: #A1A1A6; --label3: #6E6E73;
+    --sec: #000000; --sec-alt: #0E0E10; --card: #1C1C1E; --card2: #1C1C1E;
+    --separator: #3A3A3C; --fill: rgba(120, 120, 128, .32); --fill2: rgba(120, 120, 128, .18);
+    --glass: rgba(30, 30, 32, .72); --glass-stroke: rgba(255, 255, 255, .08); --glass-hi: rgba(255, 255, 255, .22);
+    --thumb: #636366; --band: #45464B; --band-edge: rgba(255, 255, 255, .24);
+    --phone-shadow: 0 34px 70px -34px rgba(0, 0, 0, .95);
+    --window-stroke: rgba(255, 255, 255, .14); --window-shadow: 0 40px 90px -40px rgba(0, 0, 0, .95);
+    --aurora: .26;
+    --tint: var(--tint-d); --on-tint: var(--on-tint-d); --soft: var(--soft-d); --on-soft: var(--on-soft-d);
+    color-scheme: dark;
+  }
+
+  html[lang="ja"] {
+    --font: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Segoe UI", Roboto, "Noto Sans JP", "Yu Gothic UI", Meiryo, "PingFang SC", sans-serif;
+    --font-display: var(--font);
+  }
+  html[lang="zh-CN"] {
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, "Noto Sans SC", "Microsoft YaHei", "Hiragino Sans GB", "Hiragino Sans", sans-serif;
+    --font-display: var(--font);
+  }
+
+  /* ---------- 基础 ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    margin: 0; background: var(--sec); color: var(--label);
+    font-family: var(--font); font-size: 17px; line-height: 1.47; letter-spacing: -.01em;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-x: clip;
+  }
+  html[lang="ja"] body, html[lang="zh-CN"] body { letter-spacing: 0; line-height: 1.7; }
+  h1, h2, h3, p, ul { margin: 0; }
+  ul { padding: 0; list-style: none; }
+  img { max-width: 100%; }
+  a { color: var(--tint); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: .18em; }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--tint) 60%, transparent); outline-offset: 2px; border-radius: 8px; }
+  code { font: .92em ui-monospace, "SF Mono", Menlo, Consolas, monospace; background: var(--fill2); padding: .08em .35em; border-radius: 5px; }
+  .wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding-inline: max(20px, env(safe-area-inset-left)); }
+  .i { width: 1.25em; height: 1.25em; flex: none; }
+  .skip { position: absolute; left: 12px; top: 0; z-index: 100; padding: 10px 14px; border-radius: 10px; background: var(--tint); color: var(--on-tint); font-weight: 600; transform: translateY(-120%); }
+  .skip:focus { transform: translateY(12px); text-decoration: none; }
+
+  /* ---------- 按钮（AppButton：主色胶囊 / 灰底主色字）---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: .45em;
+    min-height: 44px; padding: 0 20px; border-radius: 999px; border: 0; cursor: pointer;
+    font-size: 17px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap;
+    transition: filter .15s ease, transform .15s ease, background-color .2s ease;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn:active { filter: brightness(.88); transform: scale(.98); }
+  .btn-primary { background: var(--tint); color: var(--on-tint); }
+  .btn-secondary { background: var(--fill); color: var(--tint); }
+  .btn-lg { min-height: 50px; padding: 0 26px; font-size: 18px; }
+  .btn-sm { min-height: 32px; padding: 0 14px; font-size: 14px; }
+  .btn .size { font-weight: 400; opacity: .78; font-size: .86em; }
+  .link-more { display: inline-flex; align-items: center; gap: .2em; font-weight: 500; }
+  .link-more .i { width: .9em; height: .9em; }
+
+  /* ---------- 分段控件（AppSegmentedControl）---------- */
+  .seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: 2px; border-radius: 10px; background: var(--fill); }
+  .seg button {
+    min-height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: var(--label); white-space: nowrap;
+  }
+  .seg button[aria-pressed="true"] { background: var(--thumb); font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04); }
+  .seg-sm button { min-height: 26px; padding: 0 10px; font-size: 13px; }
+
+  /* ---------- 顶栏：通栏高斯模糊玻璃（Modifier.glassBar）---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: .5px solid transparent; transition: border-color .2s ease;
+  }
+  .nav.scrolled { border-bottom-color: var(--glass-stroke); }
+  .nav-inner { display: flex; align-items: center; gap: 20px; height: 56px; padding-top: env(safe-area-inset-top); }
+  .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--label); font-weight: 700; font-size: 19px; letter-spacing: -.02em; }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 28px; height: 28px; border-radius: 7px; }
+  .nav-links { display: flex; gap: 22px; margin-left: 12px; }
+  .nav-links a { color: var(--label2); font-size: 14px; }
+  .nav-links a:hover { color: var(--label); text-decoration: none; }
+  .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .lang-select { display: none; position: relative; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 999px; background: var(--fill); color: var(--label); }
+  .lang-select .i { width: 17px; height: 17px; }
+  .lang-select select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: 500 14px var(--font); padding: 0 2px; cursor: pointer; }
+  .lang-select select:focus-visible { outline: none; }
+  .lang-select:focus-within { outline: 3px solid color-mix(in srgb, var(--tint) 60%, transparent); outline-offset: 2px; }
+  @media (max-width: 820px) {
+    .nav-links { display: none; }
+    .nav-actions .lang-seg { display: none; }
+    .lang-select { display: inline-flex; }
+  }
+
+  /* ---------- 首屏 ---------- */
+  .hero { position: relative; overflow: hidden; padding: clamp(40px, 5.5vw, 72px) 0 clamp(28px, 4.5vw, 64px); background: var(--sec); isolation: isolate; }
+  .aurora {
+    position: absolute; inset: -10% -20% 0; z-index: -1; opacity: var(--aurora); pointer-events: none;
+    background:
+      radial-gradient(40% 36% at 50% 62%, var(--brand-2), transparent 70%),
+      radial-gradient(28% 30% at 20% 78%, var(--peach), transparent 70%),
+      radial-gradient(28% 30% at 82% 70%, var(--pink), transparent 70%),
+      radial-gradient(40% 30% at 50% 10%, var(--brand-1), transparent 70%);
+    filter: blur(20px);
+  }
+  .hero-copy { text-align: center; display: flex; flex-direction: column; align-items: center; }
+  .hero-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 10px 30px -10px rgba(40, 110, 220, .45); margin-bottom: 20px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px;
+    background: var(--soft); color: var(--on-soft); font-size: 14px; font-weight: 600; margin-bottom: 18px;
+  }
+  h1 {
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(40px, 6.4vw, 80px); line-height: 1.04;
+    letter-spacing: -.035em; max-width: 13em; text-wrap: balance;
+  }
+  html[lang="ja"] h1, html[lang="zh-CN"] h1 { letter-spacing: 0; line-height: 1.16; max-width: 14em; font-size: clamp(36px, 5.6vw, 68px); }
+  .lead { margin-top: 22px; max-width: 42em; font-size: clamp(18px, 1.6vw, 21px); line-height: 1.5; color: var(--label2); text-wrap: pretty; }
+  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 30px; }
+  .platform-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 20px; margin-top: 22px; font-size: 15px; color: var(--label2); }
+  .platform-line li { display: inline-flex; align-items: center; gap: 6px; }
+  .platform-line .i { width: 18px; height: 18px; color: var(--label3); }
+  .release-meta { margin-top: 10px; font-size: 14px; color: var(--label3); }
+
+  /* 三端首页：桌面窗口靠左上，露出竖排标签栏、列表和详情栏；两台手机叠在右下角。
+     整组按舞台宽度等比缩放（位置用百分比，尺寸用 cqw），与 README 主图 image/MultiPlatformPreview.png 同一构图 */
+  .hero-stage {
+    position: relative; container-type: inline-size; aspect-ratio: 1600 / 1000;
+    max-width: 1120px; margin: clamp(36px, 5vw, 60px) auto 0;
+  }
+  .desktop-window {
+    position: absolute; left: 2.25%; top: 3%; width: 76.9%; margin: 0; overflow: hidden;
+    border-radius: 1.05cqw; background: var(--sec-alt);
+    box-shadow: 0 0 0 1px var(--window-stroke), var(--window-shadow);
+  }
+  .desktop-window img { display: block; width: 100%; height: auto; }
+  .hero-stage .phone { position: absolute; bottom: 2.8%; }
+  .hero-android { --w: 16.4cqw; left: 64.5%; z-index: 1; }
+  .hero-iphone { --w: 18.9cqw; right: 2.1%; z-index: 2; }
+  /* 窄屏：窗口铺满舞台上部，两台手机放大压在它下方，不然手机只剩指甲盖大小 */
+  @media (max-width: 700px) {
+    .hero-stage { aspect-ratio: 100 / 112; }
+    .desktop-window { left: 0; top: 0; width: 100%; border-radius: 1.6cqw; }
+    .hero-stage .phone { bottom: 0; }
+    .hero-android { --w: 31cqw; left: auto; right: 32cqw; }
+    .hero-iphone { --w: 34cqw; right: 0; }
+  }
+
+  /* ---------- 手机外框：黑边 + 金属中框 + 侧键（尺寸按手机宽度的比例，cqw）---------- */
+  .phone { container-type: inline-size; width: var(--w, 280px); margin: 0; }
+  .device {
+    position: relative; margin: 1.4cqw; padding: 3.1cqw; border-radius: 15.6cqw; background: #050506;
+    box-shadow: 0 0 0 1.25cqw var(--band), 0 0 0 calc(1.25cqw + 1px) var(--band-edge), var(--phone-shadow);
+  }
+  .device.android { border-radius: 12.6cqw; }
+  .device::before, .device::after { content: ""; position: absolute; width: 1cqw; background: var(--band); }
+  .device::before { left: -2.3cqw; top: 23%; height: 15%; border-radius: 1cqw 0 0 1cqw; background: linear-gradient(var(--band) 0 44%, transparent 44% 56%, var(--band) 56%); }
+  .device::after { right: -2.3cqw; top: 28%; height: 10%; border-radius: 0 1cqw 1cqw 0; }
+  .device.android::before { left: auto; right: -2.3cqw; top: 20%; height: 11%; border-radius: 0 1cqw 1cqw 0; background: var(--band); }
+  .device.android::after { top: 37%; height: 6%; }
+  .screen { position: relative; overflow: hidden; border-radius: 12.4cqw; background: #000; }
+  .device.android .screen { border-radius: 9.6cqw; }
+  .device.android .screen::after {
+    content: ""; position: absolute; left: 50%; top: 2.55cqw; width: 3.6cqw; height: 3.6cqw; margin-left: -1.8cqw; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #2a2d3a 0 22%, #060608 32%);
+  }
+  .screen img { display: block; width: 100%; height: auto; }
+
+  /* ---------- 分节 ---------- */
+  section { position: relative; }
+  .feature { padding: clamp(72px, 10vw, 128px) 0; background: var(--sec); }
+  .feature.alt { background: var(--sec-alt); }
+  .feature-grid { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr); gap: clamp(40px, 6vw, 88px); align-items: center; }
+  .feature-grid > * { min-width: 0; }
+  .feature-grid.flip .feature-media { order: -1; }
+  .feature-media { display: flex; justify-content: center; }
+  .feature-media .phone { --w: clamp(240px, 26vw, 300px); }
+  @media (max-width: 900px) {
+    .feature-grid { grid-template-columns: minmax(0, 1fr); }
+    .feature-grid.flip .feature-media { order: 0; }
+  }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--label2); margin-bottom: 14px; }
+  h2 {
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 4.2vw, 50px); line-height: 1.08;
+    letter-spacing: -.028em; text-wrap: balance;
+  }
+  html[lang="ja"] h2, html[lang="zh-CN"] h2 { letter-spacing: 0; line-height: 1.22; font-size: clamp(28px, 3.6vw, 44px); }
+  /* 日文标题按词组断行（Chrome 支持，其他浏览器忽略），避免「一緒 / に」这样从词中间断开 */
+  html[lang="ja"] :is(h1, h2, h3, .lead, .section-lead) { word-break: auto-phrase; }
+  .section-lead { margin-top: 16px; font-size: clamp(18px, 1.5vw, 20px); line-height: 1.5; color: var(--label2); text-wrap: pretty; }
+  .footnote { margin-top: 16px; font-size: 13px; line-height: 1.55; color: var(--label2); }
+
+  /* 彩色圆角方块图标（AppRowIcon） */
+  .row-icon { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--c, var(--ic-blue)); color: #fff; flex: none; }
+  .row-icon .i { width: 19px; height: 19px; }
+  .row-icon.lg { width: 44px; height: 44px; border-radius: 11px; }
+  .row-icon.lg .i { width: 26px; height: 26px; }
+
+  /* inset grouped 列表（AppGroup）：一整张卡片 + 从文字起的发丝线 */
+  .group { margin-top: 28px; background: var(--card2); border-radius: var(--r-m); overflow: hidden; }
+  .alt .group { background: var(--card); }
+  .rows li { display: flex; gap: 14px; padding: 14px 16px; position: relative; }
+  .rows li + li::before { content: ""; position: absolute; top: 0; left: 60px; right: 16px; border-top: .5px solid var(--separator); }
+  .rows h3 { font-size: 17px; font-weight: 600; line-height: 1.3; letter-spacing: -.015em; }
+  .rows p { margin-top: 3px; font-size: 15px; line-height: 1.45; color: var(--label2); text-wrap: pretty; }
+  .rows .row-icon { margin-top: 1px; }
+
+  /* 身份铭牌：两台手机错开 */
+  .duo { position: relative; justify-content: center; gap: 0; }
+  .duo .phone { --w: clamp(150px, 44vw, 262px); }
+  .duo .phone + .phone { margin-left: calc(var(--w) * -0.22); margin-top: 18%; }
+  .duo .phone:first-child { z-index: 1; }
+
+  /* ---------- 外观：和 App 设置页一样的三行，直接改本页 ---------- */
+  .settings { margin-top: 28px; display: grid; gap: 18px; }
+  .settings .label { display: block; font-size: 13px; color: var(--label2); margin: 0 0 8px 4px; }
+  .settings .seg { display: grid; width: 100%; }
+  .settings .seg button { min-height: 34px; font-size: 15px; }
+  .swatches { display: flex; justify-content: space-between; gap: 8px; padding: 12px 16px; background: var(--card2); border-radius: var(--r-m); }
+  .swatch {
+    --sw: var(--sw-l);
+    width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; background: transparent;
+    display: grid; place-items: center; box-shadow: inset 0 0 0 2px transparent;
+  }
+  .swatch span { width: 28px; height: 28px; border-radius: 50%; background: var(--sw); display: grid; place-items: center; color: #fff; }
+  .swatch[aria-checked="true"] { box-shadow: inset 0 0 0 2px var(--sw); }
+  .swatch .i { width: 16px; height: 16px; opacity: 0; }
+  .swatch[aria-checked="true"] .i { opacity: 1; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .swatch { --sw: var(--sw-d); } :root:not([data-theme="light"]) .swatch span { color: #111; } }
+  :root[data-theme="dark"] .swatch { --sw: var(--sw-d); }
+  :root[data-theme="dark"] .swatch span { color: #111; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--fill2); font-size: 14px; color: var(--label2); }
+  .chip .i { width: 16px; height: 16px; color: var(--tint); }
+  .pair { gap: clamp(14px, 2.4vw, 28px); }
+  .pair .phone { --w: clamp(140px, 40vw, 236px); }
+
+  /* ---------- 更多能力 ---------- */
+  .section-head { max-width: 760px; }
+  .section-head.center { margin: 0 auto; text-align: center; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 44px; }
+  .card { background: var(--card2); border-radius: var(--r-l); padding: 22px; }
+  .alt .card { background: var(--card); }
+  .card h3 { margin-top: 16px; font-size: 19px; font-weight: 600; letter-spacing: -.015em; }
+  .card p { margin-top: 6px; font-size: 15px; line-height: 1.5; color: var(--label2); }
+
+  /* ---------- 下载 ---------- */
+  .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 44px; }
+  .platform { display: flex; flex-direction: column; background: var(--card2); border-radius: var(--r-l); padding: 24px; }
+  .alt .platform, .alt .callout { background: var(--card); }
+  .platform-head { display: flex; align-items: center; gap: 12px; }
+  .platform h3 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .badge { margin-left: auto; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--fill); color: var(--label2); white-space: nowrap; }
+  .badge.full { background: var(--soft); color: var(--on-soft); }
+  .platform p { margin-top: 14px; font-size: 15px; line-height: 1.5; color: var(--label2); flex: 1; }
+  .platform-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .platform-actions .btn { font-size: 15px; min-height: 40px; padding: 0 16px; }
+  .callout { margin-top: 24px; display: flex; gap: 14px; background: var(--card2); border-radius: var(--r-l); padding: 20px 22px; font-size: 15px; line-height: 1.55; color: var(--label2); }
+  .callout p + p { margin-top: 6px; }
+  .all-releases { margin-top: 26px; text-align: center; }
+
+  /* ---------- 隐私 ---------- */
+  .privacy-card { max-width: 860px; margin: 0 auto; background: var(--card2); border-radius: var(--r-xl); padding: clamp(28px, 4vw, 48px); }
+  .privacy-card h2 { margin-top: 18px; }
+  .checks { margin-top: 24px; display: grid; gap: 14px; }
+  .checks li { display: flex; gap: 12px; font-size: 16px; line-height: 1.5; color: var(--label2); }
+  .checks .i { width: 20px; height: 20px; color: var(--tint); margin-top: 2px; }
+  .privacy-card .link-more { margin-top: 22px; }
+
+  /* ---------- 开源 / 页脚 ---------- */
+  .community { text-align: center; }
+  .community .cta { margin-top: 28px; }
+  footer { padding: 36px 0 calc(36px + env(safe-area-inset-bottom)); background: var(--sec-alt); color: var(--label3); font-size: 13px; line-height: 1.6; }
+  .foot { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between; border-top: .5px solid var(--separator); padding-top: 20px; }
+  .foot nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+  .foot a { color: var(--label2); }
+  .foot .brand { font-size: 15px; }
+  .foot .brand img { width: 22px; height: 22px; border-radius: 5px; }
+  .foot-note { margin-top: 14px; }
+
+  /* ---------- 进场动画 ---------- */
+  .js .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2, .7, .2, 1), transform .8s cubic-bezier(.2, .7, .2, 1); }
+  .js .reveal.in { opacity: 1; transform: none; }
+  .js .hero-stage > * { animation: rise 1s cubic-bezier(.2, .7, .2, 1) both; }
+  .js .hero-android { animation-delay: .14s; }
+  .js .hero-iphone { animation-delay: .24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(60px); } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .js .reveal { opacity: 1; transform: none; transition: none; }
+    .js .hero-stage > * { animation: none; }
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+<!-- ICONS:BEGIN 由 AppIcons.kt 的路径逐一翻译而来（24 视口、圆头圆角描边），改图标时两边一起改 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9.2 4.8L16.4 12L9.2 19.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-checkmark" viewBox="0 0 24 24"><path d="M5 12.8L10 17.6L19 6.8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-search" viewBox="0 0 24 24"><path d="M4.5 10.8A6.3 6.3 0 1 1 17.1 10.8A6.3 6.3 0 1 1 4.5 10.8ZM15.5 15.5L20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3L12 14.5M8 7L12 3L16 7M8.5 10L7.5 10A2.5 2.5 0 0 0 5 12.5L5 18.5A2.5 2.5 0 0 0 7.5 21L16.5 21A2.5 2.5 0 0 0 19 18.5L19 12.5A2.5 2.5 0 0 0 16.5 10L15.5 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-save" viewBox="0 0 24 24"><path d="M12 3.5L12 15M7.8 10.8L12 15L16.2 10.8M4.5 14.5L4.5 18A2.5 2.5 0 0 0 7 20.5L17 20.5A2.5 2.5 0 0 0 19.5 18L19.5 14.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-open-in-new" viewBox="0 0 24 24"><path d="M11 5L7 5A2.5 2.5 0 0 0 4.5 7.5L4.5 17A2.5 2.5 0 0 0 7 19.5L16.5 19.5A2.5 2.5 0 0 0 19 17L19 13M11.5 12.5L20 4M14.5 4L20 4L20 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-copy" viewBox="0 0 24 24"><path d="M6.5 8L12.5 8A2.5 2.5 0 0 1 15 10.5L15 18.5A2.5 2.5 0 0 1 12.5 21L6.5 21A2.5 2.5 0 0 1 4 18.5L4 10.5A2.5 2.5 0 0 1 6.5 8ZM9 8L9 5.5A2.5 2.5 0 0 1 11.5 3L17.5 3A2.5 2.5 0 0 1 20 5.5L20 13.5A2.5 2.5 0 0 1 17.5 16L15 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-link" viewBox="0 0 24 24"><g transform="rotate(-45 12 12)"><path d="M10.2 8.4L6.6 8.4A3.6 3.6 0 1 0 6.6 15.6L10.2 15.6M13.8 8.4L17.4 8.4A3.6 3.6 0 1 1 17.4 15.6L13.8 15.6M8.6 12L15.4 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></symbol><symbol id="i-house" viewBox="0 0 24 24"><path d="M3.2 11.2L12 3.6L20.8 11.2M5.4 9.6L5.4 18A2.5 2.5 0 0 0 7.9 20.5L16.1 20.5A2.5 2.5 0 0 0 18.6 18L18.6 9.6M9.8 20.5L9.8 15.6A1.4 1.4 0 0 1 11.2 14.2L12.8 14.2A1.4 1.4 0 0 1 14.2 15.6L14.2 20.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-house-fill" viewBox="0 0 24 24"><path d="M12 2.6L21.4 10.6C21.9 11 21.6 11.8 21 11.8L19.4 11.8L19.4 18.4C19.4 19.9 18.3 21 16.8 21L7.2 21C5.7 21 4.6 19.9 4.6 18.4L4.6 11.8L3 11.8C2.4 11.8 2.1 11 2.6 10.6ZM9.9 21L9.9 15.6C9.9 14.8 10.5 14.2 11.3 14.2L12.7 14.2C13.5 14.2 14.1 14.8 14.1 15.6L14.1 21Z" fill="currentColor" fill-rule="evenodd"/></symbol><symbol id="i-safari" viewBox="0 0 24 24"><path d="M2.8 12A9.2 9.2 0 1 1 21.2 12A9.2 9.2 0 1 1 2.8 12ZM15.9 8.1L13.5 13.5L8.1 15.9L10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-heart-fill" viewBox="0 0 24 24"><path d="M12 20.6C12 20.6 3 15 3 8.9C3 5.9 5.3 3.8 7.8 3.8C9.6 3.8 11.2 4.8 12 6.3C12.8 4.8 14.4 3.8 16.2 3.8C18.7 3.8 21 5.9 21 8.9C21 15 12 20.6 12 20.6Z" fill="currentColor"/></symbol><symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.9C12 19.9 3.7 15 3.7 8.9C3.7 5.9 5.72 4.5 7.8 4.5C9.6 4.5 11.2 5.5 12 7C12.8 5.5 14.4 4.5 16.2 4.5C18.28 4.5 20.3 5.9 20.3 8.9C20.3 15 12 19.9 12 19.9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-envelope" viewBox="0 0 24 24"><path d="M5.5 5.5L18.5 5.5A2.5 2.5 0 0 1 21 8L21 16A2.5 2.5 0 0 1 18.5 18.5L5.5 18.5A2.5 2.5 0 0 1 3 16L3 8A2.5 2.5 0 0 1 5.5 5.5ZM3.9 7.7L12 13.3L20.1 7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d="M12 2.8L12 4.2M6.2 10.2C6.2 6.8 8.7 4.2 12 4.2C15.3 4.2 17.8 6.8 17.8 10.2L17.8 13.2C17.8 14.8 18.6 16.2 19.6 17.2L4.4 17.2C5.4 16.2 6.2 14.8 6.2 13.2ZM9.8 19.8C10.2 21 11 21.5 12 21.5C13 21.5 13.8 21 14.2 19.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-bell-fill" viewBox="0 0 24 24"><path d="M12 2.4C12.8 2.4 13.4 3 13.4 3.8C16.2 4.5 18.2 7.1 18.2 10.2L18.2 13C18.2 14.6 19 15.9 20.2 17C20.7 17.5 20.4 18.4 19.6 18.4L4.4 18.4C3.6 18.4 3.3 17.5 3.8 17C5 15.9 5.8 14.6 5.8 13L5.8 10.2C5.8 7.1 7.8 4.5 10.6 3.8C10.6 3 11.2 2.4 12 2.4ZM9.3 19.9L14.7 19.9C14.4 21.2 13.3 22 12 22C10.7 22 9.6 21.2 9.3 19.9Z" fill="currentColor"/></symbol><symbol id="i-person" viewBox="0 0 24 24"><path d="M8.3 8A3.7 3.7 0 1 1 15.7 8A3.7 3.7 0 1 1 8.3 8ZM4.8 20C4.8 15.8 7.8 13.9 12 13.9C16.2 13.9 19.2 15.8 19.2 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-person-2" viewBox="0 0 24 24"><path d="M5.9 8.6A3.1 3.1 0 1 1 12.1 8.6A3.1 3.1 0 1 1 5.9 8.6ZM2.8 19.5C2.8 15.7 5.4 14 9 14C12.6 14 15.2 15.7 15.2 19.5M14.4 9A2.5 2.5 0 1 1 19.4 9A2.5 2.5 0 1 1 14.4 9ZM17.4 14.2C19.9 14.5 21.4 16.1 21.4 19.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-person-3" viewBox="0 0 24 24"><path d="M9 8.2A3 3 0 1 1 15 8.2A3 3 0 1 1 9 8.2ZM6.4 19.5C6.4 15.8 8.7 14 12 14C15.3 14 17.6 15.8 17.6 19.5M2.9 9.9A2 2 0 1 1 6.9 9.9A2 2 0 1 1 2.9 9.9ZM1.6 18.4C1.6 16 2.8 14.7 4.8 14.4M17.1 9.9A2 2 0 1 1 21.1 9.9A2 2 0 1 1 17.1 9.9ZM22.4 18.4C22.4 16 21.2 14.7 19.2 14.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-person-crop-circle" viewBox="0 0 24 24"><path d="M2.8 12A9.2 9.2 0 1 1 21.2 12A9.2 9.2 0 1 1 2.8 12ZM9 9.8A3 3 0 1 1 15 9.8A3 3 0 1 1 9 9.8ZM6.3 18.7C7.3 16.1 9.4 15 12 15C14.6 15 16.7 16.1 17.7 18.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-person-search" viewBox="0 0 24 24"><path d="M6.2 7.8A3.3 3.3 0 1 1 12.8 7.8A3.3 3.3 0 1 1 6.2 7.8ZM3.3 19.5C3.3 15.6 5.8 13.6 9.5 13.6C10.6 13.6 11.6 13.8 12.4 14.1M13.7 16.2A2.9 2.9 0 1 1 19.5 16.2A2.9 2.9 0 1 1 13.7 16.2ZM18.8 18.4L21.2 20.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-lock" viewBox="0 0 24 24"><path d="M7.5 10.5L16.5 10.5A2.5 2.5 0 0 1 19 13L19 18.5A2.5 2.5 0 0 1 16.5 21L7.5 21A2.5 2.5 0 0 1 5 18.5L5 13A2.5 2.5 0 0 1 7.5 10.5ZM8 10.5L8 7.5A4 4 0 0 1 16 7.5L16 10.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3C14.2 4.6 16.6 5.4 19 5.6L19 11.2C19 15.8 16.2 19.2 12 21C7.8 19.2 5 15.8 5 11.2L5 5.6C7.4 5.4 9.8 4.6 12 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-gearshape" viewBox="0 0 24 24"><path d="M19.067 10.172L21.495 10.581A9.6 9.6 0 0 1 21.495 13.419L19.067 13.828A7.3 7.3 0 0 1 18.29 15.705L19.717 17.71A9.6 9.6 0 0 1 17.71 19.717L15.705 18.29A7.3 7.3 0 0 1 13.828 19.067L13.419 21.495A9.6 9.6 0 0 1 10.581 21.495L10.172 19.067A7.3 7.3 0 0 1 8.295 18.29L6.29 19.717A9.6 9.6 0 0 1 4.283 17.71L5.71 15.705A7.3 7.3 0 0 1 4.933 13.828L2.505 13.419A9.6 9.6 0 0 1 2.505 10.581L4.933 10.172A7.3 7.3 0 0 1 5.71 8.295L4.283 6.29A9.6 9.6 0 0 1 6.29 4.283L8.295 5.71A7.3 7.3 0 0 1 10.172 4.933L10.581 2.505A9.6 9.6 0 0 1 13.419 2.505L13.828 4.933A7.3 7.3 0 0 1 15.705 5.71L17.71 4.283A9.6 9.6 0 0 1 19.717 6.29L18.29 8.295A7.3 7.3 0 0 1 19.067 10.172ZM8.9 12A3.1 3.1 0 1 1 15.1 12A3.1 3.1 0 1 1 8.9 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-photo" viewBox="0 0 24 24"><path d="M5.5 7.5L15.5 7.5A2.5 2.5 0 0 1 18 10L18 17A2.5 2.5 0 0 1 15.5 19.5L5.5 19.5A2.5 2.5 0 0 1 3 17L3 10A2.5 2.5 0 0 1 5.5 7.5ZM3.6 16.6L7.6 12.8L10.8 15.8L12.8 14L17.4 18.2M7 7.5L7 6.5A2.5 2.5 0 0 1 9.5 4L18.5 4A2.5 2.5 0 0 1 21 6.5L21 13A2.5 2.5 0 0 1 18.5 15.5L18 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-photo-plus" viewBox="0 0 24 24"><path d="M13.5 6L5.5 6A2.5 2.5 0 0 0 3 8.5L3 16.5A2.5 2.5 0 0 0 5.5 19L16 19A2.5 2.5 0 0 0 18.5 16.5L18.5 11.5M3.6 16L7.8 12L11.2 15.2L13.4 13.2L17.8 17.4M19.5 2.5L19.5 8.5M16.5 5.5L22.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-archivebox" viewBox="0 0 24 24"><path d="M4.6 4.5L19.4 4.5A1.6 1.6 0 0 1 21 6.1L21 7.9A1.6 1.6 0 0 1 19.4 9.5L4.6 9.5A1.6 1.6 0 0 1 3 7.9L3 6.1A1.6 1.6 0 0 1 4.6 4.5ZM4.5 9.5L4.5 17A2.5 2.5 0 0 0 7 19.5L17 19.5A2.5 2.5 0 0 0 19.5 17L19.5 9.5M10 13.2L14 13.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-calendar" viewBox="0 0 24 24"><path d="M6.5 5L17.5 5A3 3 0 0 1 20.5 8L20.5 17.5A3 3 0 0 1 17.5 20.5L6.5 20.5A3 3 0 0 1 3.5 17.5L3.5 8A3 3 0 0 1 6.5 5ZM3.5 10L20.5 10M8 3L8 6.5M16 3L16 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.95 13.8A1.05 1.05 0 1 1 9.05 13.8A1.05 1.05 0 1 1 6.95 13.8ZM10.95 13.8A1.05 1.05 0 1 1 13.05 13.8A1.05 1.05 0 1 1 10.95 13.8ZM14.95 13.8A1.05 1.05 0 1 1 17.05 13.8A1.05 1.05 0 1 1 14.95 13.8ZM6.95 17.2A1.05 1.05 0 1 1 9.05 17.2A1.05 1.05 0 1 1 6.95 17.2ZM10.95 17.2A1.05 1.05 0 1 1 13.05 17.2A1.05 1.05 0 1 1 10.95 17.2Z" fill="currentColor"/></symbol><symbol id="i-globe" viewBox="0 0 24 24"><path d="M2.8 12A9.2 9.2 0 1 1 21.2 12A9.2 9.2 0 1 1 2.8 12ZM12 2.8A4.2 9.2 0 0 1 12 21.2A4.2 9.2 0 0 1 12 2.8ZM2.8 12L21.2 12M4.2 7.2L19.8 7.2M4.2 16.8L19.8 16.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-desktop" viewBox="0 0 24 24"><path d="M5.2 4L18.8 4A2.2 2.2 0 0 1 21 6.2L21 13.8A2.2 2.2 0 0 1 18.8 16L5.2 16A2.2 2.2 0 0 1 3 13.8L3 6.2A2.2 2.2 0 0 1 5.2 4ZM12 16L12 19.8M8 20L16 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-vr-headset" viewBox="0 0 24 24"><path d="M6 7.5L18 7.5A3 3 0 0 1 21 10.5L21 13.5A3 3 0 0 1 18 16.5L15.2 16.5C14.4 14.9 13.4 14 12 14C10.6 14 9.6 14.9 8.8 16.5L6 16.5A3 3 0 0 1 3 13.5L3 10.5A3 3 0 0 1 6 7.5ZM1.2 12L3 12M21 12L22.8 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-phone" viewBox="0 0 24 24"><path d="M9.3 2.5L14.7 2.5A2.8 2.8 0 0 1 17.5 5.3L17.5 18.7A2.8 2.8 0 0 1 14.7 21.5L9.3 21.5A2.8 2.8 0 0 1 6.5 18.7L6.5 5.3A2.8 2.8 0 0 1 9.3 2.5ZM10.6 5.4L13.4 5.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-hand-wave" viewBox="0 0 24 24"><g transform="rotate(-18 12 14)"><path d="M17.6 14.5L17.6 9.6A1.3 1.3 0 0 0 15 9.6L15 7.4A1.3 1.3 0 0 0 12.4 7.4L12.4 6.4A1.3 1.3 0 0 0 9.8 6.4L9.8 7.9A1.3 1.3 0 0 0 7.2 7.9L7.2 13C6.3 12.1 5.1 11.2 4 11.9C3.1 12.5 3.5 13.7 4.3 14.5C5.9 16.2 6.5 17.4 7.3 18.9C8.1 20.4 9.7 21.4 12 21.4C15.4 21.4 17.6 18.9 17.6 14.5ZM15 9.6L15 12.6M12.4 7.4L12.4 12.4M9.8 7.9L9.8 12.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g><path d="M1.811 10.078A10.6 10.6 0 0 1 5.186 4.88M22.189 15.922A10.6 10.6 0 0 1 18.814 21.12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12C5 7.2 8.3 5.2 12 5.2C15.7 5.2 19 7.2 21.5 12C19 16.8 15.7 18.8 12 18.8C8.3 18.8 5 16.8 2.5 12ZM8.9 12A3.1 3.1 0 1 1 15.1 12A3.1 3.1 0 1 1 8.9 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.328 11.37A7.4 7.4 0 1 1 15.474 5.866M11.089 7.819L15.474 5.866L14.641 1.139" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
+<!-- ICONS:END -->
+
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><img src="img/icon.svg" width="28" height="28" alt=""><span>VRCM</span></a>
+    <nav class="nav-links" data-i18n-aria="nav.label" aria-label="Sections">
+      <a href="#social" data-i18n="nav.features">Features</a>
+      <a href="#appearance" data-i18n="nav.appearance">Appearance</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
+      <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
+      <a href="https://github.com/vrcm-team/VRCM" data-readme-link>GitHub</a>
+    </nav>
+    <div class="nav-actions">
+      <div class="seg seg-sm lang-seg" role="group" data-i18n-aria="lang.label" aria-label="Language" data-lang-group>
+        <button type="button" data-lang="en" lang="en">EN</button>
+        <button type="button" data-lang="zh" lang="zh-CN">中文</button>
+        <button type="button" data-lang="ja" lang="ja">日本語</button>
+      </div>
+      <label class="lang-select">
+        <svg class="i" aria-hidden="true"><use href="#i-globe"/></svg>
+        <select data-lang-select data-i18n-aria="lang.label" aria-label="Language">
+          <option value="en" lang="en">English</option>
+          <option value="zh" lang="zh-CN">简体中文</option>
+          <option value="ja" lang="ja">日本語</option>
+        </select>
+      </label>
+      <a class="btn btn-primary btn-sm" href="#download" data-i18n="nav.get">Download</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ======================= 首屏 ======================= -->
+  <section class="hero" id="top">
+    <div class="aurora" aria-hidden="true"></div>
+    <div class="wrap hero-copy">
+      <img class="hero-icon" src="img/icon.svg" width="88" height="88" alt="">
+      <p class="pill" data-i18n="hero.eyebrow">Free and open source</p>
+      <h1 data-i18n="hero.title">Bring your VRChat social life to your phone</h1>
+      <p class="lead" data-i18n="hero.lead">VRCM is a cross-platform VRChat companion focused on social connection and convenience. It goes beyond showing who is online: explore your social circles, remember time spent together, and move smoothly from shared links to worlds, interactions, and real-world meetups.</p>
+      <div class="cta">
+        <a class="btn btn-primary btn-lg" id="hero-download" href="#download">
+          <svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span data-dl-label>Download</span>
+        </a>
+        <a class="btn btn-secondary btn-lg" href="https://github.com/vrcm-team/VRCM" data-readme-link>
+          <span data-i18n="hero.github">View on GitHub</span><svg class="i" aria-hidden="true"><use href="#i-open-in-new"/></svg>
+        </a>
+      </div>
+      <ul class="platform-line">
+        <li><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg>Android</li>
+        <li><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg>iOS</li>
+        <li><svg class="i" aria-hidden="true"><use href="#i-desktop"/></svg>Windows · macOS · Linux</li>
+      </ul>
+      <p class="release-meta" data-release-meta hidden></p>
+    </div>
+    <!-- 三端首页：桌面端宽屏（竖排标签栏 + 列表 + 详情分栏）在后，Android 与 iPhone 叠在右下角 -->
+    <div class="wrap">
+      <div class="hero-stage">
+        <figure class="desktop-window">
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="img/screens/desktop-dark.webp" data-dark-source>
+            <img src="img/screens/desktop-light.webp" width="1400" height="967" fetchpriority="high" data-i18n-alt="alt.desktop" alt="Desktop app in a wide window: a vertical tab bar on the left, the Home list of friends' worlds, and a world page open in the detail pane beside it">
+          </picture>
+        </figure>
+        <figure class="phone hero-android">
+          <div class="device android"><div class="screen"><picture>
+            <source media="(prefers-color-scheme: dark)" srcset="img/screens/android-home-dark.webp" data-dark-source>
+            <img src="img/screens/android-home-light.webp" width="720" height="1688" fetchpriority="high" data-i18n-alt="alt.androidHome" alt="Home on an Android phone: friends' worlds grouped by instance, with world artwork, instance type and player counts; friends' names are pixelated">
+          </picture></div></div>
+        </figure>
+        <figure class="phone hero-iphone">
+          <div class="device"><div class="screen"><picture>
+            <source media="(prefers-color-scheme: dark)" srcset="img/screens/home-dark.webp" data-dark-source>
+            <img src="img/screens/home-light.webp" width="720" height="1565" fetchpriority="high" data-i18n-alt="alt.home" alt="Home on an iPhone: friends' worlds grouped by instance, then other friends online in private worlds or on the web; friends' names are pixelated">
+          </picture></div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 社交关系 ======================= -->
+  <section class="feature alt" id="social" aria-labelledby="social-title">
+    <div class="wrap feature-grid">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-indigo)"><svg class="i" aria-hidden="true"><use href="#i-person-search"/></svg></span><span data-i18n="social.eyebrow">Social graph</span></p>
+        <h2 id="social-title" data-i18n="social.title">Social graph and shared history</h2>
+        <p class="section-lead" data-i18n="social.lead">See how your circles connect, look back on what friends have been up to, and keep the time you spend together.</p>
+        <ul class="group rows">
+          <li><span class="row-icon" style="--c: var(--ic-indigo)"><svg class="i" aria-hidden="true"><use href="#i-person-search"/></svg></span><div><h3 data-i18n="social.r1.t">Friend network</h3><p data-i18n="social.r1.d">Build community and ego-centered views from mutual-friend relationships, inspect connections, zoom, refresh, and reuse locally cached graph data.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-orange)"><svg class="i" aria-hidden="true"><use href="#i-calendar"/></svg></span><div><h3 data-i18n="social.r2.t">Friend activity history</h3><p data-i18n="social.r2.d">Revisit online/offline events, world changes, status updates, and bio changes from a profile.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-green)"><svg class="i" aria-hidden="true"><use href="#i-person-2"/></svg></span><div><h3 data-i18n="social.r3.t">Time together</h3><p data-i18n="social.r3.d">See when you last met, how often you met, and how long you played together.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-teal)"><svg class="i" aria-hidden="true"><use href="#i-person-3"/></svg></span><div><h3 data-i18n="social.r4.t">Mutual context</h3><p data-i18n="social.r4.d">Discover mutual friends and mutual groups without leaving the profile flow.</p></div></li>
+        </ul>
+        <p class="footnote" data-i18n="social.note">Activity and time-together data cover only what VRCM observed while running. Android can continue observing in the background when background monitoring is enabled. This is not a complete VRChat account history.</p>
+      </div>
+      <div class="feature-media reveal">
+        <figure class="phone">
+          <div class="device android"><div class="screen">
+            <img src="img/screens/android-network.webp" width="720" height="1688" loading="lazy" decoding="async" data-i18n-alt="alt.network" alt="Friend network on an Android phone in the Around me view: you in the middle, connected friends around you, every friend pixelated for privacy">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 便捷跳转 ======================= -->
+  <section class="feature" id="shortcuts" aria-labelledby="shortcuts-title">
+    <div class="wrap feature-grid flip">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-link"/></svg></span><span data-i18n="shortcuts.eyebrow">Shortcuts</span></p>
+        <h2 id="shortcuts-title" data-i18n="shortcuts.title">Mobile shortcuts and in-game interaction</h2>
+        <p class="section-lead" data-i18n="shortcuts.lead">Get from a shared link to the right page in a tap, and from there straight into the game.</p>
+        <ul class="group rows">
+          <li><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg></span><div><h3 data-i18n="shortcuts.r1.t">Clipboard recognition</h3><p data-i18n="shortcuts.r1.d">Copy a VRChat user, world, group, or avatar URL/ID, return to VRCM, confirm, and jump directly to it.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-teal)"><svg class="i" aria-hidden="true"><use href="#i-link"/></svg></span><div><h3 data-i18n="shortcuts.r2.t">Open web links in VRCM</h3><p data-i18n="shortcuts.r2.d">Android can open supported <code>vrchat.com</code> links in VRCM. On Android 12 and later, first check <code>vrchat.com</code> and <code>www.vrchat.com</code> under VRCM’s app info → <b>Open by default</b> → <b>Add link</b>; otherwise these links keep opening in the browser.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-green)"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg></span><div><h3 data-i18n="shortcuts.r3.t">Native sharing</h3><p data-i18n="shortcuts.r3.d">Share public profile links through the Android/iOS share sheet; Desktop falls back to copying the URL.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-pink)"><svg class="i" aria-hidden="true"><use href="#i-hand-wave"/></svg></span><div><h3 data-i18n="shortcuts.r4.t">Act immediately</h3><p data-i18n="shortcuts.r4.d">Inspect a friend’s instance, invite yourself, send several kinds of Boop, and handle friend requests or invitations.</p></div></li>
+        </ul>
+      </div>
+      <div class="feature-media reveal">
+        <figure class="phone">
+          <div class="device"><div class="screen">
+            <img src="img/screens/clipboard.webp" width="720" height="1565" loading="lazy" decoding="async" data-i18n-alt="alt.clipboard" alt="Back in VRCM after copying a VRChat link, a dialog asks: Open VRChat content — a VRChat user link or ID was found in your clipboard. Open it in VRCM? with Cancel and Open">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 相册 ======================= -->
+  <section class="feature alt" id="gallery" aria-labelledby="gallery-title">
+    <div class="wrap feature-grid">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-orange)"><svg class="i" aria-hidden="true"><use href="#i-photo"/></svg></span><span data-i18n="gallery.eyebrow">Gallery</span></p>
+        <h2 id="gallery-title" data-i18n="gallery.title">Two-way phone gallery and VRChat+ Gallery workflow</h2>
+        <p class="section-lead" data-i18n="gallery.lead">Photos travel both ways: from your camera roll into VRChat, and from VRChat back to your phone.</p>
+        <ul class="group rows">
+          <li><span class="row-icon" style="--c: var(--ic-orange)"><svg class="i" aria-hidden="true"><use href="#i-photo-plus"/></svg></span><div><h3 data-i18n="gallery.r1.t">From phone to VRChat</h3><p data-i18n="gallery.r1.d">Select an image from your phone and upload it to VRChat+ Gallery; crop and preview Prints before uploading.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg></span><div><h3 data-i18n="gallery.r2.t">From VRChat to phone</h3><p data-i18n="gallery.r2.d">Save photos taken in-game and synced to Gallery into the system photo library, ready to share through your gallery or messaging apps.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-green)"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg></span><div><h3 data-i18n="gallery.r3.t">Direct image sharing</h3><p data-i18n="gallery.r3.d">Open a Gallery or Print image and send the original image through the native Android/iOS share sheet; sharing does not write another copy to the photo library.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-purple)"><svg class="i" aria-hidden="true"><use href="#i-photo"/></svg></span><div><h3 data-i18n="gallery.r4.t">Mobile photo management</h3><p data-i18n="gallery.r4.d">Browse, zoom, download, and batch-delete Gallery content. Non-VRC+ users can still view Prints.</p></div></li>
+        </ul>
+      </div>
+      <div class="feature-media reveal">
+        <figure class="phone">
+          <div class="device android"><div class="screen">
+            <img src="img/screens/android-gallery.webp" width="720" height="1688" loading="lazy" decoding="async" data-i18n-alt="alt.gallery" alt="VRChat+ Gallery on an Android phone: Gallery, Print, Icon and Emoji tabs with usage counts, a grid of photos and the upload button">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= Android 提醒 ======================= -->
+  <section class="feature" id="alerts" aria-labelledby="alerts-title">
+    <div class="wrap feature-grid flip">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-red)"><svg class="i" aria-hidden="true"><use href="#i-bell"/></svg></span><span data-i18n="alerts.eyebrow">Android alerts</span></p>
+        <h2 id="alerts-title" data-i18n="alerts.title">Android real-time alerts</h2>
+        <p class="section-lead" data-i18n="alerts.lead">Hear about the friends and events you care about, even when VRCM is in the background.</p>
+        <ul class="group rows">
+          <li><span class="row-icon" style="--c: var(--ic-indigo)"><svg class="i" aria-hidden="true"><use href="#i-person-2"/></svg></span><div><h3 data-i18n="alerts.r1.t">Friends you choose</h3><p data-i18n="alerts.r1.d">Filter online/offline alerts by favorite group with allow/deny modes and per-friend overrides.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-red)"><svg class="i" aria-hidden="true"><use href="#i-bell"/></svg></span><div><h3 data-i18n="alerts.r2.t">Events that matter</h3><p data-i18n="alerts.r2.d">Receive Boop, friend-request, group event, and VRChat service-status alerts.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-green)"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg></span><div><h3 data-i18n="alerts.r3.t">Background monitoring</h3><p data-i18n="alerts.r3.d">Keep optional background monitoring active and jump to notification or battery-management settings when needed.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-envelope"/></svg></span><div><h3 data-i18n="alerts.r4.t">Notification center</h3><p data-i18n="alerts.r4.d">Review and act on events from the dedicated in-app notification center.</p></div></li>
+        </ul>
+      </div>
+      <div class="feature-media reveal">
+        <figure class="phone">
+          <div class="device android"><div class="screen">
+            <img src="img/screens/android-notifications.webp" width="720" height="1688" loading="lazy" decoding="async" data-i18n-alt="alt.alerts" alt="Android notification settings: Boop, friend-request and group alerts, VRChat service alerts, and background monitoring with shortcuts to notification and battery settings">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 身份铭牌 ======================= -->
+  <section class="feature alt" id="meetup" aria-labelledby="meetup-title">
+    <div class="wrap feature-grid">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-pink)"><svg class="i" aria-hidden="true"><use href="#i-person-crop-circle"/></svg></span><span data-i18n="meetup.eyebrow">Meetups</span></p>
+        <h2 id="meetup-title" data-i18n="meetup.title">Meetup name card</h2>
+        <p class="section-lead" data-i18n="meetup.lead">Hold up your phone at an in-person meetup and let new friends find you in VRChat.</p>
+        <ul class="group rows">
+          <li><span class="row-icon" style="--c: var(--ic-pink)"><svg class="i" aria-hidden="true"><use href="#i-person-crop-circle"/></svg></span><div><h3 data-i18n="meetup.r1.t">One long-press away</h3><p data-i18n="meetup.r1.d">Long-press your avatar on Home to open a full-screen card designed to be held up at an in-person meetup.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-purple)"><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg></span><div><h3 data-i18n="meetup.r2.t">Three templates</h3><p data-i18n="meetup.r2.d">Choose Info Bar, Spotlight, or Side Tag templates with independent portrait and landscape layouts.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-orange)"><svg class="i" aria-hidden="true"><use href="#i-photo"/></svg></span><div><h3 data-i18n="meetup.r3.t">Your photo, your details</h3><p data-i18n="meetup.r3.d">Use your profile background, a local photo, or VRChat Gallery, and include status, languages, group identity, and profile effects.</p></div></li>
+          <li><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg></span><div><h3 data-i18n="meetup.r4.t">QR codes to connect</h3><p data-i18n="meetup.r4.d">Add up to four QR codes for your VRChat profile and profile social links, then save the card to the system gallery.</p></div></li>
+        </ul>
+      </div>
+      <div class="feature-media duo reveal">
+        <figure class="phone">
+          <div class="device"><div class="screen">
+            <img src="img/screens/nameplate-infobar.webp" width="720" height="1565" loading="lazy" decoding="async" data-i18n-alt="alt.infobar" alt="Name card with the Info Bar template: a large photo above a bar with avatar, name, status, language flags and a VRChat profile QR code">
+          </div></div>
+        </figure>
+        <figure class="phone">
+          <div class="device"><div class="screen">
+            <img src="img/screens/nameplate-spotlight.webp" width="720" height="1565" loading="lazy" decoding="async" data-i18n-alt="alt.spotlight" alt="The same name card with the Spotlight template: the photo fills the screen and the name badge and QR code float over it">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 外观 ======================= -->
+  <section class="feature" id="appearance" aria-labelledby="appearance-title">
+    <div class="wrap feature-grid flip">
+      <div class="reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-gray)"><svg class="i" aria-hidden="true"><use href="#i-gearshape"/></svg></span><span data-i18n="appearance.eyebrow">Appearance</span></p>
+        <h2 id="appearance-title" data-i18n="appearance.title">Make it yours</h2>
+        <p class="section-lead" data-i18n="appearance.lead">Follow the system or pick light or dark, choose one of six accent colors, and switch the interface language on the spot. The same controls below restyle this page.</p>
+        <div class="settings">
+          <div>
+            <span class="label" id="set-lang" data-i18n="appearance.lang">Language</span>
+            <div class="seg" role="group" aria-labelledby="set-lang" data-lang-group>
+              <button type="button" data-lang="en" lang="en">English</button>
+              <button type="button" data-lang="ja" lang="ja">日本語</button>
+              <button type="button" data-lang="zh" lang="zh-CN">简体中文</button>
+            </div>
+          </div>
+          <div>
+            <span class="label" id="set-mode" data-i18n="appearance.mode">Theme mode</span>
+            <div class="seg" role="group" aria-labelledby="set-mode" data-theme-group>
+              <button type="button" data-theme-mode="system" data-i18n="appearance.system">System</button>
+              <button type="button" data-theme-mode="dark" data-i18n="appearance.dark">Dark</button>
+              <button type="button" data-theme-mode="light" data-i18n="appearance.light">Light</button>
+            </div>
+          </div>
+          <div>
+            <span class="label" id="set-color" data-i18n="appearance.color">Theme color</span>
+            <div class="swatches" role="radiogroup" aria-labelledby="set-color">
+              <button type="button" class="swatch" role="radio" data-accent="blue" style="--sw-l: #1E63C9; --sw-d: #7AB4FF" data-i18n-aria="appearance.blue" aria-label="Blue"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+              <button type="button" class="swatch" role="radio" data-accent="purple" style="--sw-l: #6F3DC7; --sw-d: #B79CF2" data-i18n-aria="appearance.purple" aria-label="Purple"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+              <button type="button" class="swatch" role="radio" data-accent="pink" style="--sw-l: #C2185B; --sw-d: #F48FB1" data-i18n-aria="appearance.pink" aria-label="Pink"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+              <button type="button" class="swatch" role="radio" data-accent="orange" style="--sw-l: #B3520A; --sw-d: #FFA35C" data-i18n-aria="appearance.orange" aria-label="Orange"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+              <button type="button" class="swatch" role="radio" data-accent="green" style="--sw-l: #2E7D32; --sw-d: #7CD98A" data-i18n-aria="appearance.green" aria-label="Green"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+              <button type="button" class="swatch" role="radio" data-accent="teal" style="--sw-l: #0D7680; --sw-d: #4FC3CC" data-i18n-aria="appearance.teal" aria-label="Teal"><span><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg></span></button>
+            </div>
+          </div>
+        </div>
+        <ul class="chips">
+          <li class="chip"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg><span data-i18n="appearance.c1">English · 日本語 · 简体中文 · 繁體中文</span></li>
+          <li class="chip"><svg class="i" aria-hidden="true"><use href="#i-desktop"/></svg><span data-i18n="appearance.c2">Adaptive wide-screen layouts</span></li>
+          <li class="chip"><svg class="i" aria-hidden="true"><use href="#i-eye"/></svg><span data-i18n="appearance.c3">Shared-element transitions</span></li>
+        </ul>
+      </div>
+      <div class="feature-media pair reveal">
+        <figure class="phone">
+          <div class="device"><div class="screen">
+            <img src="img/screens/settings-light.webp" width="720" height="1565" loading="lazy" decoding="async" data-i18n-alt="alt.settingsLight" alt="Settings in light mode: language, theme mode and theme color, clipboard reading, cache, version and links">
+          </div></div>
+        </figure>
+        <figure class="phone">
+          <div class="device"><div class="screen">
+            <img src="img/screens/settings-dark.webp" width="720" height="1565" loading="lazy" decoding="async" data-i18n-alt="alt.settingsDark" alt="The same Settings page in dark mode">
+          </div></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 更多能力 ======================= -->
+  <section class="feature alt" id="more" aria-labelledby="more-title">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <h2 id="more-title" data-i18n="more.title">More capabilities</h2>
+      </div>
+      <div class="cards">
+        <article class="card reveal"><span class="row-icon lg" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-person"/></svg></span><h3 data-i18n="more.c1.t">Profile and content</h3><p data-i18n="more.c1.d">Edit status, bio, languages, pronouns, and social links; browse created worlds, avatars, and favorite worlds.</p></article>
+        <article class="card reveal"><span class="row-icon lg" style="--c: var(--ic-teal)"><svg class="i" aria-hidden="true"><use href="#i-safari"/></svg></span><h3 data-i18n="more.c2.t">Worlds and groups</h3><p data-i18n="more.c2.d">Search worlds and groups; inspect instances, recently visited worlds, group posts, members, galleries, and group instances.</p></article>
+        <article class="card reveal"><span class="row-icon lg" style="--c: var(--ic-purple)"><svg class="i" aria-hidden="true"><use href="#i-archivebox"/></svg></span><h3 data-i18n="more.c3.t">Avatar management</h3><p data-i18n="more.c3.d">View avatar details, switch or copy available avatars, and edit the name, description, and cover of avatars you uploaded.</p></article>
+        <article class="card reveal"><span class="row-icon lg" style="--c: var(--ic-gray)"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg></span><h3 data-i18n="more.c4.t">Accounts and UI</h3><p data-i18n="more.c4.d">Multiple accounts, email/2FA authentication, four UI languages, themes, shared transitions, and adaptive widescreen layouts.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 下载 ======================= -->
+  <section class="feature" id="download" aria-labelledby="download-title">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <p class="eyebrow"><span class="row-icon" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg></span><span data-i18n="download.eyebrow">Download</span></p>
+        <h2 id="download-title" data-i18n="download.title">Get VRCM</h2>
+        <p class="section-lead" data-i18n="download.lead">Free and open source. Every build is published on GitHub Releases.</p>
+        <p class="release-meta" data-release-meta hidden></p>
+      </div>
+      <div class="platforms">
+        <article class="platform reveal">
+          <div class="platform-head"><span class="row-icon lg" style="--c: var(--ic-green)"><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg></span><h3>Android</h3><span class="badge full" data-i18n="download.full">Full support</span></div>
+          <p data-i18n="download.android">Includes native alerts, background friend monitoring, and VRChat web-link handling.</p>
+          <div class="platform-actions">
+            <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM/releases/latest" data-asset="android"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span data-i18n="download.apk">Download APK</span><span class="size" data-size="android"></span></a>
+          </div>
+        </article>
+        <article class="platform reveal">
+          <div class="platform-head"><span class="row-icon lg" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg></span><h3>iOS</h3><span class="badge" data-i18n="download.supported">Supported</span></div>
+          <p data-i18n="download.ios">Requires self-signing; Android background system alerts are not available.</p>
+          <div class="platform-actions">
+            <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM/releases/latest" data-asset="ios"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span data-i18n="download.ipa">Download IPA</span><span class="size" data-size="ios"></span></a>
+            <a class="btn btn-secondary" href="https://github.com/vrcm-team/VRCM/blob/main/self-signing.md" data-i18n="download.selfsign">Self-signing guide</a>
+          </div>
+        </article>
+        <article class="platform reveal">
+          <div class="platform-head"><span class="row-icon lg" style="--c: var(--ic-indigo)"><svg class="i" aria-hidden="true"><use href="#i-desktop"/></svg></span><h3>Desktop</h3><span class="badge" data-i18n="download.supported">Supported</span></div>
+          <p data-i18n="download.desktop">Native Windows, macOS, and Linux packages; sharing falls back to copying links.</p>
+          <div class="platform-actions">
+            <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM/releases/latest" data-asset="windows"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span>Windows</span><span class="size" data-size="windows"></span></a>
+            <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM/releases/latest" data-asset="mac"><svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span>macOS</span><span class="size" data-size="mac"></span></a>
+            <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM/releases/latest" data-asset="linux" data-optional hidden><svg class="i" aria-hidden="true"><use href="#i-save"/></svg><span>Linux</span><span class="size" data-size="linux"></span></a>
+          </div>
+        </article>
+      </div>
+      <aside class="callout reveal">
+        <span class="row-icon" style="--c: var(--ic-gray)"><svg class="i" aria-hidden="true"><use href="#i-desktop"/></svg></span>
+        <div>
+          <p data-i18n="download.vrcx1">VRCM follows a different product direction from VRCX: VRCX puts greater emphasis on desktop logging and information management, while VRCM prioritizes mobile social connection, convenient interaction, and availability on the go.</p>
+          <p data-i18n="download.vrcx2">Desktop builds will continue to receive basic support and essential maintenance, but deeper desktop development is not a near-term priority, nor is matching VRCX’s desktop feature depth.</p>
+        </div>
+      </aside>
+      <p class="all-releases"><a class="link-more" href="https://github.com/vrcm-team/VRCM/releases"><span data-i18n="download.all">All releases and release notes</span><svg class="i" aria-hidden="true"><use href="#i-chevron-right"/></svg></a></p>
+    </div>
+  </section>
+
+  <!-- ======================= 隐私 ======================= -->
+  <section class="feature alt" id="privacy" aria-labelledby="privacy-title">
+    <div class="wrap">
+      <div class="privacy-card reveal">
+        <span class="row-icon lg" style="--c: var(--ic-blue)"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg></span>
+        <h2 id="privacy-title" data-i18n="privacy.title">Privacy and disclaimer</h2>
+        <ul class="checks">
+          <li><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg><span data-i18n="privacy.p1">Friend activity, caches, and meetup-card configuration remain on the local device.</span></li>
+          <li><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg><span data-i18n="privacy.p2">VRCM is not affiliated with VRChat Inc. and does not represent its views or opinions.</span></li>
+          <li><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg><span data-i18n="privacy.p3">VRCM does not modify the game client. Use it responsibly and follow the <a href="https://hello.vrchat.com/legal">VRChat Terms of Service</a> and applicable laws.</span></li>
+          <li><svg class="i" aria-hidden="true"><use href="#i-checkmark"/></svg><span data-i18n="privacy.p4">The authors are not responsible for damage caused by using this application.</span></li>
+        </ul>
+        <a class="link-more" href="https://github.com/vrcm-team/VRCM/blob/main/privacy-policy.md"><span data-i18n="privacy.link">Read the privacy policy</span><svg class="i" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= 开源 ======================= -->
+  <section class="feature community" aria-labelledby="community-title">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <h2 id="community-title" data-i18n="community.title">Open source, built in the open</h2>
+        <p class="section-lead" data-i18n="community.lead">VRCM is open source under the MIT License. Code contributions, bug reports, and feature proposals are welcome.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/vrcm-team/VRCM" data-readme-link><span data-i18n="community.star">View on GitHub</span></a>
+          <a class="btn btn-secondary" href="https://github.com/vrcm-team/VRCM/issues" data-i18n="community.issue">Report an issue</a>
+          <a class="btn btn-secondary" href="https://github.com/vrcm-team/VRCM/discussions" data-i18n="community.idea">Suggest a feature</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <a class="brand" href="#top"><img src="img/icon.svg" width="22" height="22" alt=""><span>VRCM</span></a>
+      <nav data-i18n-aria="footer.label" aria-label="Footer">
+        <a href="https://github.com/vrcm-team/VRCM" data-readme-link>GitHub</a>
+        <a href="https://github.com/vrcm-team/VRCM/releases" data-i18n="footer.releases">Releases</a>
+        <a href="https://github.com/vrcm-team/VRCM/blob/main/privacy-policy.md" data-i18n="footer.privacy">Privacy policy</a>
+        <a href="https://github.com/vrcm-team/VRCM/blob/main/LICENSE" data-i18n="footer.license">MIT License</a>
+      </nav>
+    </div>
+    <p class="foot-note" data-i18n="footer.note">VRCM is not affiliated with VRChat Inc. Screenshots show real app screens; other players’ names and avatars are pixelated.</p>
+  </div>
+</footer>
+
+<script src="i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+  var root = document.documentElement;
+  var REPO = 'vrcm-team/VRCM';
+  var RELEASES = 'https://github.com/' + REPO + '/releases/latest';
+  function store(key, value) { try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (e) {} }
+  function read(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+  /* ---------------- 多语言：HTML 里是英文底稿，中文 / 日文来自 i18n.js ---------------- */
+  var DICT = window.VRCM_I18N || {};
+  var HTML_LANG = { en: 'en', zh: 'zh-CN', ja: 'ja' };
+  var README = { en: 'https://github.com/vrcm-team/VRCM', zh: 'https://github.com/vrcm-team/VRCM/blob/main/README_ZH.md', ja: 'https://github.com/vrcm-team/VRCM/blob/main/README_JP.md' };
+  var en = {
+    title: document.title,
+    'dl.android': 'Download for Android', 'dl.ios': 'Download for iOS', 'dl.mac': 'Download for macOS',
+    'dl.windows': 'Download for Windows', 'dl.linux': 'Download for Linux', 'dl.other': 'Download',
+    'dl.meta': 'Version {v} · {date}'
+  };
+  document.querySelectorAll('[data-i18n]').forEach(function (el) { en[el.getAttribute('data-i18n')] = el.innerHTML; });
+  document.querySelectorAll('[data-i18n-alt]').forEach(function (el) { en['alt:' + el.getAttribute('data-i18n-alt')] = el.getAttribute('alt'); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(function (el) { en['aria:' + el.getAttribute('data-i18n-aria')] = el.getAttribute('aria-label'); });
+  DICT.en = en;
+  var cur = 'en';
+  function tr(k) { var d = DICT[cur] || {}; return (k in d) ? d[k] : en[k]; }
+
+  function applyLang(lang, persist) {
+    if (!DICT[lang]) lang = 'en';
+    cur = lang;
+    root.lang = HTML_LANG[lang];
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var v = tr(el.getAttribute('data-i18n'));
+      if (el.innerHTML !== v) el.innerHTML = v;
+    });
+    document.querySelectorAll('[data-i18n-alt]').forEach(function (el) { el.setAttribute('alt', tr('alt:' + el.getAttribute('data-i18n-alt'))); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(function (el) { el.setAttribute('aria-label', tr('aria:' + el.getAttribute('data-i18n-aria'))); });
+    document.title = tr('title');
+    document.querySelectorAll('[data-lang-group] button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang)); });
+    document.querySelectorAll('[data-lang-select]').forEach(function (s) { s.value = lang; });
+    document.querySelectorAll('[data-readme-link]').forEach(function (a) { a.href = README[lang]; });
+    if (persist) store('vrcm-site-lang', lang);
+    renderDownloads();
+  }
+  function detectLang() {
+    try { var q = new URLSearchParams(location.search).get('lang'); if (q && DICT[q]) return q; } catch (e) {}
+    var st = read('vrcm-site-lang'); if (st && DICT[st]) return st;
+    var navs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || 'en'];
+    for (var i = 0; i < navs.length; i++) { var code = String(navs[i]).toLowerCase().slice(0, 2); if (DICT[code]) return code; }
+    return 'en';
+  }
+
+  /* ---------------- 主题模式 / 主题色：和 App 设置页同一套选项 ---------------- */
+  var darkSources = document.querySelectorAll('source[data-dark-source]');
+  var metaThemes = document.querySelectorAll('meta[name="theme-color"]');
+  function applyTheme(mode, persist) {
+    if (mode !== 'dark' && mode !== 'light') mode = 'system';
+    if (mode === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', mode);
+    // <picture> 只认媒体查询：手动选了深 / 浅时把深色图的条件改成恒真 / 恒假
+    darkSources.forEach(function (s) { s.media = mode === 'dark' ? 'all' : mode === 'light' ? 'not all' : '(prefers-color-scheme: dark)'; });
+    metaThemes.forEach(function (m, i) {
+      var sys = i === 0 ? '(prefers-color-scheme: light)' : '(prefers-color-scheme: dark)';
+      m.media = mode === 'system' ? sys : (i === 0) === (mode === 'light') ? 'all' : 'not all';
+    });
+    document.querySelectorAll('[data-theme-group] button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-mode') === mode)); });
+    if (persist) store('vrcm-site-theme', mode === 'system' ? null : mode);
+  }
+  function applyAccent(id, persist) {
+    if (!document.querySelector('.swatch[data-accent="' + id + '"]')) id = 'blue';
+    if (id === 'blue') root.removeAttribute('data-accent'); else root.setAttribute('data-accent', id);
+    document.querySelectorAll('.swatch').forEach(function (b) {
+      var on = b.getAttribute('data-accent') === id;
+      b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on ? 0 : -1;
+    });
+    if (persist) store('vrcm-site-accent', id === 'blue' ? null : id);
+  }
+
+  /* ---------------- 下载：按访客平台给主按钮，安装包取自最新 GitHub Release ---------------- */
+  var ua = navigator.userAgent || '';
+  var plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  var platform = /Android/i.test(ua) ? 'android'
+    : (/iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(plat) && navigator.maxTouchPoints > 1)) ? 'ios'
+    : /Mac/i.test(plat) ? 'mac'
+    : /Win/i.test(plat) ? 'windows'
+    : /Linux/i.test(plat) ? 'linux' : 'other';
+  var release = null;
+  // 发版脚本产出 VRCM-v版本号.apk / .ipa / .dmg / .deb / .msi 与 -setup.exe；同一平台有多个包时按数组顺序优先
+  var PATTERNS = {
+    android: [/\.apk$/i], ios: [/\.ipa$/i], mac: [/\.dmg$/i],
+    windows: [/-setup\.exe$/i, /\.exe$/i, /\.msi$/i], linux: [/\.deb$/i, /\.rpm$/i, /\.AppImage$/i]
+  };
+  function asset(kind) {
+    if (!release || !release.assets) return null;
+    for (var p = 0; p < PATTERNS[kind].length; p++) {
+      for (var i = 0; i < release.assets.length; i++) if (PATTERNS[kind][p].test(release.assets[i].name)) return release.assets[i];
+    }
+    return null;
+  }
+  function renderDownloads() {
+    var hero = document.getElementById('hero-download');
+    var label = hero.querySelector('[data-dl-label]');
+    label.textContent = tr('dl.' + platform);
+    // iOS 要自签，先去下载区看说明；其余平台有对应安装包就直接下载
+    var direct = (platform === 'ios' || platform === 'other') ? null : asset(platform);
+    hero.href = direct ? direct.browser_download_url : (platform === 'ios' || platform === 'other' || release) ? '#download' : RELEASES;
+    if (!release) return;
+    document.querySelectorAll('[data-asset]').forEach(function (a) {
+      var found = asset(a.getAttribute('data-asset'));
+      a.href = found ? found.browser_download_url : RELEASES;
+      if (a.hasAttribute('data-optional')) a.hidden = !found;
+    });
+    document.querySelectorAll('[data-size]').forEach(function (s) {
+      var found = asset(s.getAttribute('data-size'));
+      s.textContent = found ? (found.size / 1048576).toFixed(1) + ' MB' : '';
+    });
+    var date = '';
+    try { date = new Intl.DateTimeFormat(HTML_LANG[cur], { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(release.published_at)); } catch (e) {}
+    var text = tr('dl.meta').replace('{v}', String(release.tag_name || '').replace(/^v/i, '')).replace('{date}', date);
+    document.querySelectorAll('[data-release-meta]').forEach(function (p) { p.textContent = text; p.hidden = false; });
+  }
+  function loadRelease() {
+    var cached = null;
+    try { cached = JSON.parse(sessionStorage.getItem('vrcm-site-release') || 'null'); } catch (e) {}
+    if (cached && Date.now() - cached.at < 3600e3) { release = cached.data; renderDownloads(); return; }
+    if (!window.fetch) return;
+    fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        release = { tag_name: data.tag_name, published_at: data.published_at, assets: (data.assets || []).map(function (a) { return { name: a.name, size: a.size, browser_download_url: a.browser_download_url }; }) };
+        try { sessionStorage.setItem('vrcm-site-release', JSON.stringify({ at: Date.now(), data: release })); } catch (e) {}
+        renderDownloads();
+      })
+      .catch(function () { /* 网络或限流失败时保留指向 Releases 页的静态链接 */ });
+  }
+
+  /* ---------------- 交互绑定 ---------------- */
+  document.querySelectorAll('[data-lang-group] button').forEach(function (b) { b.addEventListener('click', function () { applyLang(b.getAttribute('data-lang'), true); }); });
+  document.querySelectorAll('[data-lang-select]').forEach(function (s) { s.addEventListener('change', function () { applyLang(s.value, true); }); });
+  document.querySelectorAll('[data-theme-group] button').forEach(function (b) { b.addEventListener('click', function () { applyTheme(b.getAttribute('data-theme-mode'), true); }); });
+  var swatches = Array.prototype.slice.call(document.querySelectorAll('.swatch'));
+  swatches.forEach(function (b, i) {
+    b.addEventListener('click', function () { applyAccent(b.getAttribute('data-accent'), true); });
+    b.addEventListener('keydown', function (e) {
+      var step = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      var next = swatches[(i + step + swatches.length) % swatches.length];
+      applyAccent(next.getAttribute('data-accent'), true);
+      next.focus();
+    });
+  });
+
+  applyTheme(read('vrcm-site-theme') || 'system', false);
+  applyAccent(read('vrcm-site-accent') || 'blue', false);
+  applyLang(detectLang(), false);
+  loadRelease();
+
+  /* 顶栏：滚动后露出底部发丝线 */
+  var nav = document.getElementById('nav');
+  function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 4); }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* 滚动进场 */
+  var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  var reduce = false;
+  try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (reduce || !('IntersectionObserver' in window)) {
+    reveals.forEach(function (el) { el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    reveals.forEach(function (el) { io.observe(el); });
+  }
+})();
+</script>
+</body>
+</html>
