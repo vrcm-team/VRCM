@@ -248,7 +248,7 @@ private fun ProfileCard(
             val visibilityScope = this
             val dialogSharedUserId = userId?.let(::drawerStatusSharedUserId).orEmpty()
             Column {
-                AppDivider(Modifier.padding(start = AppSpacing.row))
+                AppDivider(Modifier.padding(horizontal = AppSpacing.row))
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -328,9 +328,10 @@ private fun DrawerRow(
     )
 }
 
+/** 行与行之间的发丝线：从标题起、到行尾内边距止，右端和 chevron 对齐。 */
 @Composable
 private fun DrawerRowDivider() {
-    AppDivider(Modifier.padding(start = AppRowIconDividerInset))
+    AppDivider(Modifier.padding(start = AppRowIconDividerInset, end = AppSpacing.row))
 }
 
 /** 破坏性操作独占一组、红字居中（与设置页的退出登录一致）。 */

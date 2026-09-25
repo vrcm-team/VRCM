@@ -3,9 +3,7 @@ package io.github.vrcmteam.vrcm.presentation.screens.meetup.display
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,8 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
@@ -48,10 +46,16 @@ import io.github.vrcmteam.vrcm.getAppPlatform
 import io.github.vrcmteam.vrcm.presentation.compoments.ToastText
 import io.github.vrcmteam.vrcm.presentation.compoments.sharedBoundsBy
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppActivityIndicator
+import io.github.vrcmteam.vrcm.presentation.designsystem.AppControlContext
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIcon
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppIconButton
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppText
 import io.github.vrcmteam.vrcm.presentation.designsystem.AppTheme
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalAppControlContext
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalContentColor
+import io.github.vrcmteam.vrcm.presentation.designsystem.LocalGlassBackdrop
+import io.github.vrcmteam.vrcm.presentation.designsystem.glassBackdropSource
+import io.github.vrcmteam.vrcm.presentation.designsystem.rememberGlassBackdrop
 import io.github.vrcmteam.vrcm.presentation.screens.gallery.editor.PlatformImageCodec
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardCanvas
 import io.github.vrcmteam.vrcm.presentation.screens.meetup.MeetupCardResizeMode
@@ -97,6 +101,8 @@ fun MeetupCardDisplayContent(
     val imageCodec = koinInject<PlatformImageCodec>()
     // 只录制卡片图层，控制层不会被存进图片。
     val cardLayer = rememberGraphicsLayer()
+    // 卡片是内容层：四角的玻璃圆钮取样它做模糊
+    val glassBackdrop = rememberGlassBackdrop()
 
     BoxWithConstraints(
         modifier = Modifier
@@ -152,6 +158,7 @@ fun MeetupCardDisplayContent(
                     resizeMode = MeetupCardResizeMode,
                 )
                 .let { if (rotateCard) it.rotateClockwise() else it }
+                .glassBackdropSource(glassBackdrop)
                 // 录制在旋转之内：存出来的是正着的横版图，不是躺倒的截图。
                 .drawWithContent {
                     cardLayer.record { this@drawWithContent.drawContent() }
@@ -159,7 +166,11 @@ fun MeetupCardDisplayContent(
                 },
         )
         // 控制层不参与共享变换，否则会跟着整卡一起缩放。
-        run {
+        // 四角按钮与其他页面的悬浮按钮一样是玻璃圆钮。
+        CompositionLocalProvider(
+            LocalGlassBackdrop provides glassBackdrop,
+            LocalAppControlContext provides AppControlContext.NavBar,
+        ) {
             val visible by controls.visible.collectAsState()
             AnimatedVisibility(
                 visible = visible,
@@ -180,7 +191,7 @@ fun MeetupCardDisplayContent(
                         ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ControlIconButton(
+                    AppIconButton(
                         onClick = {
                             if (!actionInFlight) {
                                 actionInFlight = true
@@ -190,7 +201,6 @@ fun MeetupCardDisplayContent(
                     ) {
                         AppIcon(
                             painter = rememberVectorPainter(AppIcons.ArrowBackIosNew),
-                            tint = Color.White,
                             contentDescription = "back",
                         )
                     }
@@ -204,7 +214,7 @@ fun MeetupCardDisplayContent(
                         color = Color.White,
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    ControlIconButton(
+                    AppIconButton(
                         onClick = {
                             if (!actionInFlight) {
                                 actionInFlight = true
@@ -214,7 +224,6 @@ fun MeetupCardDisplayContent(
                     ) {
                         AppIcon(
                             painter = rememberVectorPainter(AppIcons.Edit),
-                            tint = Color.White,
                             contentDescription = strings.meetupCardEdit,
                         )
                     }
@@ -242,27 +251,24 @@ fun MeetupCardDisplayContent(
                 ) {
                     // 视口本来就是横的时候不需要这个开关。
                     if (!viewportLandscape) {
-                        ControlIconButton(
+                        AppIconButton(
                             onClick = {
                                 controls.onActivity()
                                 forcedLandscape = !forcedLandscape
                             },
+                            // 横过来看时符号用强调色，表示开关处于打开状态
+                            contentColor = if (forcedLandscape) AppTheme.colors.tint else Color.Unspecified,
                         ) {
                             AppIcon(
                                 painter = rememberVectorPainter(AppIcons.ScreenRotation),
-                                tint = if (forcedLandscape) {
-                                    AppTheme.colors.tint
-                                } else {
-                                    Color.White
-                                },
                                 contentDescription = strings.meetupCardRotatePreview,
                             )
                         }
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    ControlIconButton(
+                    AppIconButton(
                         onClick = {
-                            if (saving) return@ControlIconButton
+                            if (saving) return@AppIconButton
                             controls.onActivity()
                             saving = true
                             scope.launch {
@@ -296,12 +302,11 @@ fun MeetupCardDisplayContent(
                         if (saving) {
                             AppActivityIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = LocalContentColor.current,
                             )
                         } else {
                             AppIcon(
                                 painter = rememberVectorPainter(AppIcons.SaveAlt),
-                                tint = Color.White,
                                 contentDescription = strings.meetupCardSaveImage,
                             )
                         }
@@ -354,15 +359,3 @@ private fun Modifier.meetupControlPadding(insets: MeetupViewportInsets): Modifie
 @OptIn(ExperimentalTime::class)
 private fun meetupCardImageFileName(ownerUserId: String): String =
     "VRCM_${ownerUserId}_${Clock.System.now().toEpochMilliseconds()}.png"
-
-@Composable
-private fun ControlIconButton(
-    onClick: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    Box(
-        modifier = Modifier.background(Color.Black.copy(alpha = 0.35f), CircleShape),
-    ) {
-        AppIconButton(onClick = onClick, content = content)
-    }
-}
